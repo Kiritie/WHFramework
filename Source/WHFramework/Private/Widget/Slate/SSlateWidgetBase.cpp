@@ -3,13 +3,16 @@
 
 #include "Widget/Slate/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
+#include "WidgetModuleBPLibrary.h"
 
+class AWidgetModule;
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SSlateWidgetBase::SSlateWidgetBase()
 {
-	WidgetType = EWHWidgetType::None;
-	InputMode = EWHInputMode::None;
+	WidgetType = EWidgetType::None;
+	InputMode = EInputMode::None;
+	OwnerActor = nullptr;
 }
 
 void SSlateWidgetBase::Construct(const FArguments& InArgs)
@@ -22,27 +25,35 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-void SSlateWidgetBase::OnInitialize()
+void SSlateWidgetBase::OnInitialize(AActor* InOwner)
 {
-}
-
-void SSlateWidgetBase::OnAttach()
-{
-}
-
-void SSlateWidgetBase::OnRefresh(float DeltaSeconds)
-{
+	OwnerActor = InOwner;
 }
 
 void SSlateWidgetBase::OnOpen()
 {
+	OnRefresh();
+	SetVisibility(EVisibility::SelfHitTestInvisible);
 }
 
 void SSlateWidgetBase::OnClose()
 {
+	SetVisibility(EVisibility::Hidden);
 }
 
-void SSlateWidgetBase::OnDetach()
+void SSlateWidgetBase::OnToggle()
+{
+	if(GetVisibility() == EVisibility::Hidden)
+	{
+		OpenSelf();
+	}
+	else
+	{
+		CloseSelf();
+	}
+}
+
+void SSlateWidgetBase::OnRefresh()
 {
 }
 
@@ -52,10 +63,12 @@ void SSlateWidgetBase::OnDestroy()
 
 void SSlateWidgetBase::OpenSelf()
 {
+	UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld);
 }
 
 void SSlateWidgetBase::CloseSelf()
 {
+	UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

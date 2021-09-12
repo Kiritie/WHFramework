@@ -8,7 +8,7 @@
 * 输入模式
 */
 UENUM(BlueprintType)
-enum class EWHInputMode : uint8
+enum class EInputMode : uint8
 {
 	/// 无
 	None,
@@ -24,7 +24,7 @@ enum class EWHInputMode : uint8
 * Widget类型
 */
 UENUM(BlueprintType)
-enum class EWHWidgetType : uint8
+enum class EWidgetType : uint8
 {
 	/// 无
 	None,

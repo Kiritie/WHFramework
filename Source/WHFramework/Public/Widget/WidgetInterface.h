@@ -24,18 +24,16 @@ class WHFRAMEWORK_API IWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnInitialize() = 0;
-
-	virtual void OnAttach() = 0;
+	virtual void OnInitialize(AActor* InOwner = nullptr) = 0;
 
 	virtual void OnOpen() = 0;
 	
 	virtual void OnClose() = 0;
 	
-	virtual void OnRefresh(float DeltaSeconds) = 0;
+	virtual void OnToggle() = 0;
 
-	virtual void OnDetach() = 0;
-	
+	virtual void OnRefresh() = 0;
+
 	virtual void OnDestroy() = 0;
 
 protected:
@@ -44,7 +42,9 @@ protected:
 	virtual void CloseSelf() = 0;
 
 public:
-	virtual EWHWidgetType GetWidgetType() const = 0;
+	virtual EWidgetType GetWidgetType() const = 0;
 
-	virtual EWHInputMode GetInputMode() const = 0;
+	virtual EInputMode GetInputMode() const = 0;
+
+	virtual AActor* GetOwnerActor() const = 0;
 };

@@ -23,18 +23,16 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
-	virtual void OnInitialize() override;
-
-	virtual void OnAttach() override;
-	
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
 	virtual void OnOpen() override;
 	
 	virtual void OnClose() override;
 
-	virtual void OnDetach() override;
+	virtual void OnToggle() override;
 	
+	virtual void OnRefresh() override;
+
 	virtual void OnDestroy() override;
 
 protected:
@@ -43,12 +41,16 @@ protected:
 	virtual void CloseSelf() override;
 
 protected:
-	EWHWidgetType WidgetType;
+	EWidgetType WidgetType;
 		
-	EWHInputMode InputMode;
+	EInputMode InputMode;
+
+	AActor* OwnerActor;
 
 public:
-	virtual EWHWidgetType GetWidgetType() const override { return WidgetType; }
+	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 
-	virtual EWHInputMode GetInputMode() const override { return InputMode; }
+	virtual EInputMode GetInputMode() const override { return InputMode; }
+
+	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 };

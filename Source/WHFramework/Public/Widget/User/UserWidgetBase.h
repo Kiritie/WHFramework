@@ -21,22 +21,19 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize() override;
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnAttach() override;
+	void OnInitialize(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnOpen() override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnClose() override;
-	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh(float DeltaSeconds) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnDetach() override;
+	void OnToggle() override;
+	
+	UFUNCTION(BlueprintNativeEvent)
+	void OnRefresh() override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy() override;
@@ -50,15 +47,21 @@ protected:
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-	EWHWidgetType WidgetType;
+	EWidgetType WidgetType;
 		
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-	EWHInputMode InputMode;
+	EInputMode InputMode;
+		
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	AActor* OwnerActor;
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual EWHWidgetType GetWidgetType() const override { return WidgetType; }
+	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EWHInputMode GetInputMode() const override { return InputMode; }
+	virtual EInputMode GetInputMode() const override { return InputMode; }
+
+	UFUNCTION(BlueprintPure)
+	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 };

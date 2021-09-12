@@ -45,14 +45,14 @@ public:
 			const FName WidgetName = typeid(UserWidget).name();
 			switch (UserWidget->GetWidgetType())
 			{
-				case EWHWidgetType::Permanent:
+				case EWidgetType::Permanent:
 				{
 					if(!PermanentUserWidgets.Contains(WidgetName))
 					{
 						PermanentUserWidgets.Add(WidgetName, UserWidget);
 					}
 				}
-				case EWHWidgetType::Temporary:
+				case EWidgetType::Temporary:
 				{
 					if(!AllUserWidgets.Contains(WidgetName))
 					{
@@ -72,7 +72,7 @@ public:
 	{
 		return CreateUserWidget<UUserWidgetBase>(InWidgetClass);
 	}
-	
+
 	template<class T>
 	T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
@@ -91,13 +91,30 @@ public:
 	{
 		return GetUserWidget<UUserWidgetBase>(InWidgetClass);
 	}
-	
+		
+	template<class T>
+	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
+		{
+			UserWidget->OnInitialize(InOwner);
+			return true;
+		}
+		return false;
+	}
+
+	UFUNCTION(BlueprintCallable)
+	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass)
+	{
+		return InitializeUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
+	}
+
 	template<class T>
 	bool OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
-			if(UserWidget->GetWidgetType() == EWHWidgetType::Temporary)
+			if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				if(TemporaryUserWidget)
 				{
@@ -116,13 +133,13 @@ public:
 	{
 		return OpenUserWidget<UUserWidgetBase>(InWidgetClass);
 	}
-	
+
 	template<class T>
 	bool CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
-			if(UserWidget->GetWidgetType() == EWHWidgetType::Temporary)
+			if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				TemporaryUserWidget = nullptr;
 			}
@@ -136,6 +153,23 @@ public:
 	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
 	{
 		return CloseUserWidget<UUserWidgetBase>(InWidgetClass);
+	}
+		
+	template<class T>
+	bool ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
+		{
+			UserWidget->OnToggle();
+			return true;
+		}
+		return false;
+	}
+
+	UFUNCTION(BlueprintCallable)
+	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
+	{
+		return ToggleUserWidget<UUserWidgetBase>(InWidgetClass);
 	}
 
 	template<class T>
@@ -152,7 +186,7 @@ public:
 				AllUserWidgets.Remove(WidgetName);
 				switch (UserWidget->GetWidgetType())
 				{
-					case EWHWidgetType::Permanent:
+					case EWidgetType::Permanent:
 					{
 						if(PermanentUserWidgets.Contains(WidgetName))
 						{
@@ -160,7 +194,7 @@ public:
 						}
 						break;
 					}
-					case EWHWidgetType::Temporary:
+					case EWidgetType::Temporary:
 					{
 						if(TemporaryUserWidget == UserWidget)
 						{
@@ -201,14 +235,14 @@ public:
 			const FName WidgetName = typeid(SlateWidget).name();
 			switch (SlateWidget->GetWidgetType())
 			{
-				case EWHWidgetType::Permanent:
+				case EWidgetType::Permanent:
 				{
 					if(!PermanentSlateWidgets.Contains(WidgetName))
 					{
 						PermanentSlateWidgets.Add(WidgetName, SlateWidget);
 					}
 				}
-				case EWHWidgetType::Temporary:
+				case EWidgetType::Temporary:
 				{
 					if(!AllSlateWidgets.Contains(WidgetName))
 					{
@@ -222,7 +256,7 @@ public:
 		}
 		return nullptr;
 	}
-	
+
 	template<class T>
 	TSharedPtr<T> GetSlateWidget()
 	{
@@ -233,13 +267,24 @@ public:
 		}
 		return nullptr;
 	}
+	
+	template<class T>
+	bool InitializeSlateWidget(AActor* InOwner)
+	{
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		{
+			SlateWidget->OnInitialize(InOwner);
+			return true;
+		}
+		return false;
+	}
 
 	template<class T>
 	bool OpenSlateWidget()
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			if(SlateWidget->GetWidgetType() == EWHWidgetType::Temporary)
+			if(SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				if(TemporarySlateWidget)
 				{
@@ -258,11 +303,22 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			if(SlateWidget->GetWidgetType() == EWHWidgetType::Temporary)
+			if(SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				TemporarySlateWidget = nullptr;
 			}
 			SlateWidget->OnClose();
+			return true;
+		}
+		return false;
+	}
+	
+	template<class T>
+	bool ToggleSlateWidget()
+	{
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		{
+			SlateWidget->OnToggle();
 			return true;
 		}
 		return false;
@@ -280,7 +336,7 @@ public:
 				AllSlateWidgets.Remove(WidgetName);
 				switch (SlateWidget->GetWidgetType())
 				{
-					case EWHWidgetType::Permanent:
+					case EWidgetType::Permanent:
 					{
 						if(PermanentSlateWidgets.Contains(WidgetName))
 						{
@@ -288,7 +344,7 @@ public:
 						}
 						break;
 					}
-					case EWHWidgetType::Temporary:
+					case EWidgetType::Temporary:
 					{
 						if(TemporarySlateWidget == SlateWidget)
 						{
@@ -303,4 +359,20 @@ public:
 		}
 		return false;
 	}
+	
+	//////////////////////////////////////////////////////////////////////////
+	// InputMode
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EInputMode InputMode;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void UpdateInputMode();
+
+	UFUNCTION(BlueprintCallable)
+	void SetInputMode(EInputMode InInputMode);
+
+	UFUNCTION(BlueprintPure)
+	EInputMode GetInputMode() const { return InputMode; }
 };
