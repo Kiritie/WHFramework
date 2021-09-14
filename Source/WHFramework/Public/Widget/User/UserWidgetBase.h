@@ -24,13 +24,13 @@ public:
 	void OnInitialize(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnOpen() override;
+	void OnOpen(bool bInstant = true) override;
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnClose() override;
+	void OnClose(bool bInstant = true) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnToggle() override;
+	void OnToggle(bool bInstant = true) override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRefresh() override;
@@ -40,10 +40,10 @@ public:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OpenSelf() override;
+	void OpenSelf(bool bInstant = true) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void CloseSelf() override;
+	void CloseSelf(bool bInstant = true) override;
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)

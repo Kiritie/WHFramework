@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include "ModuleBase.h"
 #include "SSlateWidgetBase.h"
 #include "GameFramework/Actor.h"
 #include "UserWidget.h"
@@ -11,15 +12,29 @@
 #include "WidgetModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API AWidgetModule : public AActor
+class WHFRAMEWORK_API AWidgetModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
 public:	
 	AWidgetModule();
 
-protected:
-	virtual void BeginPlay() override;
+	//////////////////////////////////////////////////////////////////////////
+	/// Module
+public:
+#if WITH_EDITOR
+	virtual void OnGenerate_Implementation() override;
+
+	virtual void OnDestroy_Implementation() override;
+#endif
+	
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnPause_Implementation() override;
+
+	virtual void OnUnPause_Implementation() override;
 
 	////////////////////////////////////////////////////
 	// UserWidget
@@ -67,11 +82,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return CreateUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"))
+	class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	template<class T>
 	T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -81,17 +93,14 @@ public:
 		const FName WidgetName = typeid(InWidgetClass->GetDefaultObject()).name();
 		if(AllUserWidgets.Contains(WidgetName))
 		{
-			return AllUserWidgets[WidgetName];
+			return Cast<T>(AllUserWidgets[WidgetName]);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return GetUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
-		
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
+	class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+
 	template<class T>
 	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
@@ -103,14 +112,11 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return InitializeUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
-	}
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidget"))
+	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	bool OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool OpenUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -118,24 +124,22 @@ public:
 			{
 				if(TemporaryUserWidget)
 				{
-					TemporaryUserWidget->OnClose();
+					TemporaryUserWidget->OnClose(bInstant);
 				}
 				TemporaryUserWidget = UserWidget;
 			}
-			UserWidget->OnOpen();
+			UserWidget->OnOpen(bInstant);
+			UpdateInputMode();
 			return true;
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return OpenUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget"))
+	bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
 
 	template<class T>
-	bool CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool CloseUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -143,37 +147,32 @@ public:
 			{
 				TemporaryUserWidget = nullptr;
 			}
-			UserWidget->OnClose();
+			UserWidget->OnClose(bInstant);
+			UpdateInputMode();
 			return true;
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return CloseUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
-		
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CloseUserWidget"))
+	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
+
 	template<class T>
-	bool ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool ToggleUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
-			UserWidget->OnToggle();
+			UserWidget->OnToggle(bInstant);
 			return true;
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return ToggleUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "ToggleUserWidget"))
+	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
 
 	template<class T>
-	bool RemoveUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(!InWidgetClass) return false;
 
@@ -204,17 +203,22 @@ public:
 					}
 					default: break;
 				}
+				UserWidget->OnDestroy();
+				UpdateInputMode();
 			}
 			return true;
 		}
 		return false;
 	}
 
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyUserWidget"))
+	bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+
 	UFUNCTION(BlueprintCallable)
-	bool K2_RemoveUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return RemoveUserWidget<UUserWidgetBase>(InWidgetClass);
-	}
+	void OpenAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+
+	UFUNCTION(BlueprintCallable)
+	void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
 
 	////////////////////////////////////////////////////
 	// SlateWidget
@@ -280,7 +284,7 @@ public:
 	}
 
 	template<class T>
-	bool OpenSlateWidget()
+	bool OpenSlateWidget(bool bInstant = true)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
@@ -288,18 +292,19 @@ public:
 			{
 				if(TemporarySlateWidget)
 				{
-					TemporarySlateWidget->OnClose();
+					TemporarySlateWidget->OnClose(bInstant);
 				}
 				TemporarySlateWidget = SlateWidget;
 			}
-			SlateWidget->OnOpen();
+			SlateWidget->OnOpen(bInstant);
+			UpdateInputMode();
 			return true;
 		}
 		return false;
 	}
 	
 	template<class T>
-	bool CloseSlateWidget()
+	bool CloseSlateWidget(bool bInstant = true)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
@@ -307,25 +312,26 @@ public:
 			{
 				TemporarySlateWidget = nullptr;
 			}
-			SlateWidget->OnClose();
+			SlateWidget->OnClose(bInstant);
+			UpdateInputMode();
 			return true;
 		}
 		return false;
 	}
 	
 	template<class T>
-	bool ToggleSlateWidget()
+	bool ToggleSlateWidget(bool bInstant = true)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			SlateWidget->OnToggle();
+			SlateWidget->OnToggle(bInstant);
 			return true;
 		}
 		return false;
 	}
 
 	template<class T>
-	bool RemoveSlateWidget()
+	bool DestroySlateWidget()
 	{
 		const FName WidgetName = typeid(T).name();
 		if(AllSlateWidgets.Contains(WidgetName))
@@ -354,12 +360,18 @@ public:
 					}
 					default: break;
 				}
+				SlateWidget->OnDestroy();
+				UpdateInputMode();
 			}
 			return true;
 		}
 		return false;
 	}
-	
+
+	void OpenAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+
+	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 protected:

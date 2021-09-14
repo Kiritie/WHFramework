@@ -26,20 +26,20 @@ class WHFRAMEWORK_API IWidgetInterface
 public:
 	virtual void OnInitialize(AActor* InOwner = nullptr) = 0;
 
-	virtual void OnOpen() = 0;
+	virtual void OnOpen(bool bInstant = true) = 0;
 	
-	virtual void OnClose() = 0;
+	virtual void OnClose(bool bInstant = true) = 0;
 	
-	virtual void OnToggle() = 0;
+	virtual void OnToggle(bool bInstant = true) = 0;
 
 	virtual void OnRefresh() = 0;
 
 	virtual void OnDestroy() = 0;
 
 protected:
-	virtual void OpenSelf() = 0;
+	virtual void OpenSelf(bool bInstant = true) = 0;
 
-	virtual void CloseSelf() = 0;
+	virtual void CloseSelf(bool bInstant = true) = 0;
 
 public:
 	virtual EWidgetType GetWidgetType() const = 0;

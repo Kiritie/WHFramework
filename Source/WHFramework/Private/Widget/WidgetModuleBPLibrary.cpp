@@ -3,16 +3,21 @@
 
 #include "Widget/WidgetModuleBPLibrary.h"
 
+#include "MainModule.h"
+#include "MainModuleBPLibrary.h"
 #include "WidgetModule.h"
 #include "Kismet/GameplayStatics.h"
 
-AWidgetModule* UWidgetModuleBPLibrary::WidgetModule = nullptr;
+AWidgetModule* UWidgetModuleBPLibrary::WidgetModuleInst = nullptr;
 
 AWidgetModule* UWidgetModuleBPLibrary::GetWidgetModule(UObject* InWorldContext)
 {
-	if ((!WidgetModule || !WidgetModule->IsValidLowLevel()) && (InWorldContext && InWorldContext->IsValidLowLevel()))
+	if (!WidgetModuleInst || !WidgetModuleInst->IsValidLowLevel())
 	{
-		WidgetModule = Cast<AWidgetModule>(UGameplayStatics::GetActorOfClass(InWorldContext, AWidgetModule::StaticClass()));
+		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
+		{
+			WidgetModuleInst = MainModule->GetModuleByClass<AWidgetModule>();
+		}
 	}
-	return WidgetModule;
+	return WidgetModuleInst;
 }

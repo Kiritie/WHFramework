@@ -17,9 +17,9 @@ class WHFRAMEWORK_API UWidgetModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static AWidgetModule* WidgetModule;
+	static AWidgetModule* WidgetModuleInst;
 
-	UFUNCTION(BlueprintPure, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "WidgetModuleBPLibrary")
 	static AWidgetModule* GetWidgetModule(UObject* InWorldContext);
 
 	////////////////////////////////////////////////////
@@ -34,8 +34,8 @@ public:
 		}
 		return nullptr;
 	}
-
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
+	
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
 	static class UUserWidgetBase* K2_CreateUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
 	{
 		return CreateUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
@@ -51,7 +51,7 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext", DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
 	static class UUserWidgetBase* K2_GetUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
 	{
 		return GetUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
@@ -67,74 +67,112 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "InitializeUserWidget"), Category = "WidgetModuleBPLibrary")
 	static bool K2_InitializeUserWidget(UObject* InWorldContext, AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass)
 	{
-		return InitializeUserWidget<UUserWidgetBase>(InWorldContext, InOwner, InWidgetClass);
-	}
-
-	template<class T>
-	static bool OpenUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
-	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->OpenUserWidget<T>(InWidgetClass);
+			return WidgetModule->K2_InitializeUserWidget(InOwner, InWidgetClass);
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
-	static bool K2_OpenUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
-	{
-		return OpenUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
-	}
-
 	template<class T>
-	static bool CloseUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool OpenUserWidget(UObject* InWorldContext, bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->CloseUserWidget<T>(InWidgetClass);
+			return WidgetModule->OpenUserWidget<T>(bInstant, InWidgetClass);
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
-	static bool K2_CloseUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "OpenUserWidget"), Category = "WidgetModuleBPLibrary")
+	static bool K2_OpenUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true)
 	{
-		return CloseUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			return WidgetModule->K2_OpenUserWidget(InWidgetClass, bInstant);
+		}
+		return false;
+	}
+
+	template<class T>
+	static bool CloseUserWidget(UObject* InWorldContext, bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			return WidgetModule->CloseUserWidget<T>(bInstant, InWidgetClass);
+		}
+		return false;
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "CloseUserWidget"), Category = "WidgetModuleBPLibrary")
+	static bool K2_CloseUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true)
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			return WidgetModule->K2_CloseUserWidget(InWidgetClass, bInstant);
+		}
+		return false;
 	}
 		
 	template<class T>
-	static bool ToggleUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool ToggleUserWidget(UObject* InWorldContext, bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->ToggleUserWidget<T>(InWidgetClass);
+			return WidgetModule->ToggleUserWidget<T>(bInstant, InWidgetClass);
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
-	static bool K2_ToggleUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "ToggleUserWidget"), Category = "WidgetModuleBPLibrary")
+	static bool K2_ToggleUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true)
 	{
-		return ToggleUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			return WidgetModule->K2_ToggleUserWidget(InWidgetClass, bInstant);
+		}
+		return false;
 	}
 
 	template<class T>
-	static bool RemoveUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool DestroyUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->RemoveUserWidget<T>(InWidgetClass);
+			return WidgetModule->DestroyUserWidget<T>(InWidgetClass);
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = InWorldContext), Category = "WidgetModuleBPLibrary")
-	static bool K2_RemoveUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DisplayName = "DestroyUserWidget"), Category = "WidgetModuleBPLibrary")
+	static bool K2_DestroyUserWidget(UObject* InWorldContext, TSubclassOf<class UUserWidgetBase> InWidgetClass)
 	{
-		return RemoveUserWidget<UUserWidgetBase>(InWorldContext, InWidgetClass);
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			return WidgetModule->K2_DestroyUserWidget(InWidgetClass);
+		}
+		return false;
+	}
+		
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "WidgetModuleBPLibrary")
+	static void OpenAllUserWidget(UObject* InWorldContext, EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true)
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			WidgetModule->OpenAllUserWidget(InWidgetType, bInstant);
+		}
+	}
+	
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "WidgetModuleBPLibrary")
+	static void CloseAllUserWidget(UObject* InWorldContext, EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true)
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			WidgetModule->CloseAllUserWidget(InWidgetType, bInstant);
+		}
 	}
 
 	////////////////////////////////////////////////////
@@ -171,31 +209,31 @@ public:
 	}
 
 	template<class T>
-	static bool OpenSlateWidget(UObject* InWorldContext)
+	static bool OpenSlateWidget(UObject* InWorldContext, bool bInstant = true)
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->OpenSlateWidget<T>();
+			return WidgetModule->OpenSlateWidget<T>(bInstant);
 		}
 		return false;
 	}
 	
 	template<class T>
-	static bool CloseSlateWidget(UObject* InWorldContext)
+	static bool CloseSlateWidget(UObject* InWorldContext, bool bInstant = true)
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->CloseSlateWidget<T>();
+			return WidgetModule->CloseSlateWidget<T>(bInstant);
 		}
 		return false;
 	}
 	
 	template<class T>
-	static bool ToggleSlateWidget(UObject* InWorldContext)
+	static bool ToggleSlateWidget(UObject* InWorldContext, bool bInstant = true)
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->ToggleSlateWidget<T>();
+			return WidgetModule->ToggleSlateWidget<T>(bInstant);
 		}
 		return false;
 	}
@@ -205,8 +243,24 @@ public:
 	{
 		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
 		{
-			return WidgetModule->RemoveSlateWidget<T>();
+			return WidgetModule->DestroySlateWidget<T>();
 		}
 		return false;
+	}
+		
+	static void OpenAllSlateWidget(UObject* InWorldContext, EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true)
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			WidgetModule->OpenAllSlateWidget(InWidgetType, bInstant);
+		}
+	}
+	
+	static void CloseAllSlateWidget(UObject* InWorldContext, EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true)
+	{
+		if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+		{
+			WidgetModule->CloseAllSlateWidget(InWidgetType, bInstant);
+		}
 	}
 };

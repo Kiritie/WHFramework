@@ -25,20 +25,20 @@ public:
 public:
 	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
-	virtual void OnOpen() override;
+	virtual void OnOpen(bool bInstant = true) override;
 	
-	virtual void OnClose() override;
+	virtual void OnClose(bool bInstant = true) override;
 
-	virtual void OnToggle() override;
+	virtual void OnToggle(bool bInstant = true) override;
 	
 	virtual void OnRefresh() override;
 
 	virtual void OnDestroy() override;
 
 protected:
-	virtual void OpenSelf() override;
+	virtual void OpenSelf(bool bInstant = true) override;
 
-	virtual void CloseSelf() override;
+	virtual void CloseSelf(bool bInstant = true) override;
 
 protected:
 	EWidgetType WidgetType;

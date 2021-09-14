@@ -21,31 +21,37 @@ void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 	}
 }
 
-void UUserWidgetBase::OnRefresh_Implementation()
+void UUserWidgetBase::OnOpen_Implementation(bool bInstant)
 {
-}
-
-void UUserWidgetBase::OnOpen_Implementation()
-{
+	if(bInstant)
+	{
+		SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 	OnRefresh();
-	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
-void UUserWidgetBase::OnClose_Implementation()
+void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
-	SetVisibility(ESlateVisibility::Hidden);
+	if(bInstant)
+	{
+		SetVisibility(ESlateVisibility::Hidden);
+	}
 }
 
-void UUserWidgetBase::OnToggle_Implementation()
+void UUserWidgetBase::OnToggle_Implementation(bool bInstant)
 {
 	if(GetVisibility() == ESlateVisibility::Hidden)
 	{
-		OpenSelf();
+		OpenSelf(bInstant);
 	}
 	else
 	{
-		CloseSelf();
+		CloseSelf(bInstant);
 	}
+}
+
+void UUserWidgetBase::OnRefresh_Implementation()
+{
 }
 
 void UUserWidgetBase::OnDestroy_Implementation()
@@ -56,12 +62,12 @@ void UUserWidgetBase::OnDestroy_Implementation()
 	}
 }
 
-void UUserWidgetBase::OpenSelf_Implementation()
+void UUserWidgetBase::OpenSelf_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(this, StaticClass());
+	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(this, bInstant, StaticClass());
 }
 
-void UUserWidgetBase::CloseSelf_Implementation()
+void UUserWidgetBase::CloseSelf_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(this, StaticClass());
+	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(this, bInstant, StaticClass());
 }
