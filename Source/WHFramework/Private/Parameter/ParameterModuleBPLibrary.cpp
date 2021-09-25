@@ -7,6 +7,8 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Parameter/ParameterModule.h"
 
+AParameterModule* UParameterModuleBPLibrary::ParameterModuleInst = nullptr;
+
 AParameterModule* UParameterModuleBPLibrary::GetParameterModule(UObject* InWorldContext)
 {
 	if (!ParameterModuleInst || !ParameterModuleInst->IsValidLowLevel())

@@ -3,8 +3,11 @@
 
 #include "WebRequest/WebRequestModuleBPLibrary.h"
 
+#include "WebRequestModule.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
+
+AWebRequestModule* UWebRequestModuleBPLibrary::WebRequestModuleInst = nullptr;
 
 AWebRequestModule* UWebRequestModuleBPLibrary::GetWebRequestModule(UObject* InWorldContext)
 {

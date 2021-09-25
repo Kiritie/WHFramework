@@ -9,6 +9,8 @@
 #include "Network/NetworkModule.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 
+ANetworkModule* UNetworkModuleBPLibrary::NetworkModuleInst = nullptr;
+
 ANetworkModule* UNetworkModuleBPLibrary::GetNetworkModule(UObject* InWorldContext)
 {
 	if (!NetworkModuleInst || !NetworkModuleInst->IsValidLowLevel())

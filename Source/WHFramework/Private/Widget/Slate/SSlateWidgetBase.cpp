@@ -32,31 +32,13 @@ void SSlateWidgetBase::OnInitialize(AActor* InOwner)
 
 void SSlateWidgetBase::OnOpen(bool bInstant)
 {
-	if(bInstant)
-	{
-		SetVisibility(EVisibility::SelfHitTestInvisible);
-	}
-	OnRefresh();
+	SetVisibility(EVisibility::SelfHitTestInvisible);
+	Refresh();
 }
 
 void SSlateWidgetBase::OnClose(bool bInstant)
 {
-	if(bInstant)
-	{
-		SetVisibility(EVisibility::Hidden);
-	}
-}
-
-void SSlateWidgetBase::OnToggle(bool bInstant)
-{
-	if(GetVisibility() == EVisibility::Hidden)
-	{
-		OpenSelf(bInstant);
-	}
-	else
-	{
-		CloseSelf(bInstant);
-	}
+	SetVisibility(EVisibility::Hidden);
 }
 
 void SSlateWidgetBase::OnRefresh()
@@ -67,14 +49,49 @@ void SSlateWidgetBase::OnDestroy()
 {
 }
 
-void SSlateWidgetBase::OpenSelf(bool bInstant)
+void SSlateWidgetBase::Open(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
+	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
+	
+	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(GWorld))
+	{
+		WidgetModule->UpdateInputMode();
+	}
 }
 
-void SSlateWidgetBase::CloseSelf(bool bInstant)
+void SSlateWidgetBase::Close(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
+	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
+	
+	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(GWorld))
+	{
+		WidgetModule->UpdateInputMode();
+	}
+}
+
+void SSlateWidgetBase::Toggle(bool bInstant)
+{
+	if(!IsOpened())
+	{
+		Open(bInstant);
+	}
+	else
+	{
+		Close(bInstant);
+	}
+}
+
+void SSlateWidgetBase::Refresh()
+{
+	if(IsOpened())
+	{
+		OnRefresh();
+	}
+}
+
+bool SSlateWidgetBase::IsOpened() const
+{
+	return GetVisibility() != EVisibility::Hidden && GetVisibility() != EVisibility::Collapsed;
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

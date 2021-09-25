@@ -50,14 +50,42 @@ protected:
 
 public:
 	template<class T>
+	bool HasUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass()) const
+	{
+		if(!InWidgetClass) return false;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		return AllUserWidgets.Contains(WidgetName);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidget"))
+	bool K2_HasUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass) const;
+
+	template<class T>
+	T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass()) const
+	{
+		if(!InWidgetClass) return nullptr;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		if(AllUserWidgets.Contains(WidgetName))
+		{
+			return Cast<T>(AllUserWidgets[WidgetName]);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
+	class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass) const;
+
+	template<class T>
 	T* CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(!InWidgetClass) return nullptr;
 		
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), InWidgetClass))
 		{
 			UserWidget->OnInitialize();
-			const FName WidgetName = typeid(UserWidget).name();
 			switch (UserWidget->GetWidgetType())
 			{
 				case EWidgetType::Permanent:
@@ -77,7 +105,7 @@ public:
 				}
 				default: break;
 			}
-			return UserWidget;
+			return Cast<T>(UserWidget);
 		}
 		return nullptr;
 	}
@@ -86,25 +114,9 @@ public:
 	class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
-	{
-		if(!InWidgetClass) return nullptr;
-
-		const FName WidgetName = typeid(InWidgetClass->GetDefaultObject()).name();
-		if(AllUserWidgets.Contains(WidgetName))
-		{
-			return Cast<T>(AllUserWidgets[WidgetName]);
-		}
-		return nullptr;
-	}
-
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
-	class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
-
-	template<class T>
 	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
-		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
+		if(UUserWidgetBase* UserWidget = HasUserWidget<T>(InWidgetClass) ? GetUserWidget<UUserWidgetBase>(InWidgetClass) : CreateUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
 			UserWidget->OnInitialize(InOwner);
 			return true;
@@ -116,9 +128,9 @@ public:
 	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	bool OpenUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool OpenUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
-		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
+		if(UUserWidgetBase* UserWidget = HasUserWidget<T>(InWidgetClass) ? GetUserWidget<UUserWidgetBase>(InWidgetClass) : CreateUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
 			if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
@@ -136,10 +148,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget"))
-	bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
+	bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
-	bool CloseUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool CloseUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -155,28 +167,28 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CloseUserWidget"))
-	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
+	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
-	bool ToggleUserWidget(bool bInstant = true, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool ToggleUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
-			UserWidget->OnToggle(bInstant);
+			UserWidget->Toggle(bInstant);
 			return true;
 		}
 		return false;
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "ToggleUserWidget"))
-	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = true);
+	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
 	bool DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(!InWidgetClass) return false;
 
-		const FName WidgetName = typeid(InWidgetClass->GetDefaultObject()).name();
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		if(AllUserWidgets.Contains(WidgetName))
 		{
 			if(UUserWidgetBase* UserWidget = AllUserWidgets[WidgetName])
@@ -215,10 +227,10 @@ public:
 	bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintCallable)
-	void OpenAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+	void OpenAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+	void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
 
 	////////////////////////////////////////////////////
 	// SlateWidget
@@ -230,6 +242,24 @@ protected:
 	TSharedPtr<class SSlateWidgetBase> TemporarySlateWidget;
 
 public:
+	template<class T>
+	bool HasSlateWidget() const
+	{
+		const FName WidgetName = typeid(T).name();
+		return AllSlateWidgets.Contains(WidgetName);
+	}
+
+	template<class T>
+	TSharedPtr<T> GetSlateWidget() const
+	{
+		const FName WidgetName = typeid(T).name();
+		if(AllSlateWidgets.Contains(WidgetName))
+		{
+			return AllSlateWidgets[WidgetName];
+		}
+		return nullptr;
+	}
+
 	template<class T>
 	TSharedPtr<T> CreateSlateWidget()
 	{
@@ -256,18 +286,7 @@ public:
 				}
 				default: break;
 			}
-			return SlateWidget;
-		}
-		return nullptr;
-	}
-
-	template<class T>
-	TSharedPtr<T> GetSlateWidget()
-	{
-		const FName WidgetName = typeid(T).name();
-		if(AllSlateWidgets.Contains(WidgetName))
-		{
-			return AllSlateWidgets[WidgetName];
+			return Cast<T>(SlateWidget);
 		}
 		return nullptr;
 	}
@@ -275,7 +294,7 @@ public:
 	template<class T>
 	bool InitializeSlateWidget(AActor* InOwner)
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>()))
 		{
 			SlateWidget->OnInitialize(InOwner);
 			return true;
@@ -284,9 +303,9 @@ public:
 	}
 
 	template<class T>
-	bool OpenSlateWidget(bool bInstant = true)
+	bool OpenSlateWidget(bool bInstant = false)
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>()))
 		{
 			if(SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
@@ -304,7 +323,7 @@ public:
 	}
 	
 	template<class T>
-	bool CloseSlateWidget(bool bInstant = true)
+	bool CloseSlateWidget(bool bInstant = false)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
@@ -320,11 +339,11 @@ public:
 	}
 	
 	template<class T>
-	bool ToggleSlateWidget(bool bInstant = true)
+	bool ToggleSlateWidget(bool bInstant = false)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			SlateWidget->OnToggle(bInstant);
+			SlateWidget->Toggle(bInstant);
 			return true;
 		}
 		return false;
@@ -368,9 +387,9 @@ public:
 		return false;
 	}
 
-	void OpenAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+	void OpenAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
 
-	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = true);
+	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode

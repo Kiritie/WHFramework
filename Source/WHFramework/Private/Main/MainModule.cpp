@@ -3,6 +3,8 @@
 
 #include "Main/MainModule.h"
 
+#include "DebugModule.h"
+#include "WidgetModule.h"
 #include "Asset/AssetModule.h"
 #include "Base/ModuleBase.h"
 #include "Event/EventModule.h"
@@ -25,6 +27,16 @@ AMainModule::AMainModule()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
+	ModuleClasses.Add(AAssetModule::StaticClass());
+	ModuleClasses.Add(ADebugModule::StaticClass());
+	ModuleClasses.Add(AEventModule::StaticClass());
+	ModuleClasses.Add(ALatentActionModule::StaticClass());
+	ModuleClasses.Add(ANetworkModule::StaticClass());
+	ModuleClasses.Add(AObjectPoolModule::StaticClass());
+	ModuleClasses.Add(AParameterModule::StaticClass());
+	ModuleClasses.Add(ASpawnPoolModule::StaticClass());
+	ModuleClasses.Add(AWebRequestModule::StaticClass());
+	ModuleClasses.Add(AWidgetModule::StaticClass());
 	
 	ModuleRefs = TArray<TScriptInterface<IModule>>();
 }
@@ -35,6 +47,13 @@ void AMainModule::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeModules();
+}
+
+void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	TerminationModules();
 }
 
 // Called every frame
@@ -67,7 +86,7 @@ void AMainModule::GenerateModules_Implementation()
 		{
 			if(Iter.GetObject() && Iter.GetObject()->IsA(ModuleClasses[i]))
 			{
-				Iter->Execute_OnGenerate(Iter.GetObject(), CourseMode);
+				Iter->Execute_OnGenerate(Iter.GetObject());
 				IsNeedSpawn = false;
 				break;
 			}
@@ -82,7 +101,7 @@ void AMainModule::GenerateModules_Implementation()
 		{
 			Module->SetActorLabel(ModuleClasses[i]->GetDefaultObject<AModuleBase>()->Execute_GetModuleName(ModuleClasses[i]->GetDefaultObject<AModuleBase>()).ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
-			Module->Execute_OnGenerate(Module, CourseMode);
+			Module->Execute_OnGenerate(Module);
 			ModuleRefs.Add(Module);
 		}
 	}
@@ -171,6 +190,17 @@ void AMainModule::UnPauseModules_Implementation()
 	}
 }
 
+void AMainModule::TerminationModules_Implementation()
+{
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
+	{
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		{
+			ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i].GetObject());
+		}
+	}
+}
+
 AModuleBase* AMainModule::K2_GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
@@ -193,53 +223,6 @@ TScriptInterface<IModule> AMainModule::K2_GetModuleByName(const FName InModuleNa
 		}
 	}
 	return nullptr;
-}
-
-void AMainModule::AddCourseLog(ECourseLogModuleType InModuleType, const FString& InModuleName, const FString& InModuleDesc, const FString& InJsonString)
-{
-	FString LogContent;
-
-	LogContent += TEXT("时间: ");
-	LogContent += FDateTime::Now().ToString();
-	LogContent += TEXT("\t|\t");
-	
-	LogContent += TEXT("模块类型: ");
-	switch (InModuleType)
-	{
-		case ECourseLogModuleType::Procedure :
-		{
-			LogContent += TEXT("流程");
-			break;
-		}
-
-		case ECourseLogModuleType::Examination :
-		{
-			LogContent += TEXT("测试");
-			break;
-		}
-
-		case ECourseLogModuleType::Listener :
-		{
-			LogContent += TEXT("监听");
-			break;
-		}
-	}
-	LogContent += TEXT("\t|\t");
-
-	LogContent += TEXT("模块名称: ") + InModuleName;
-	LogContent += InModuleName.Len() <= 10 ? TEXT("\t\t") : TEXT("\t");
-
-	LogContent += TEXT("|\t");
-	
-	LogContent += TEXT("模块描述: ") + InModuleDesc;
-	LogContent += TEXT("\n");
-
-	FFileHelper::SaveStringToFile(LogContent , *CourseLogFilePath, FFileHelper::EEncodingOptions::ForceUTF8, &IFileManager::Get(), EFileWrite::FILEWRITE_Append);
-}
-
-void AMainModule::ClearCourseLog()
-{
-	FFileHelper::SaveStringToFile(TEXT("") , *CourseLogFilePath, FFileHelper::EEncodingOptions::ForceUTF8, &IFileManager::Get(), EFileWrite::FILEWRITE_NoFail);
 }
 
 void AMainModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

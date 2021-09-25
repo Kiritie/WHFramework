@@ -6,6 +6,20 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
+ALatentActionModule* ULatentActionModuleBPLibrary::LatentActionModuleInst = nullptr;
+
+ALatentActionModule* ULatentActionModuleBPLibrary::GetLatentActionModule(const UObject* InWorldContext)
+{
+	if (!LatentActionModuleInst || !LatentActionModuleInst->IsValidLowLevel())
+    {
+    	if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
+    	{
+    		LatentActionModuleInst = MainModule->GetModuleByClass<ALatentActionModule>();
+    	}
+    }
+    return LatentActionModuleInst;
+}
+
 void ULatentActionModuleBPLibrary::MoveActorTo(UObject* WorldContextObject, AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, TEnumAsByte<EMoveActorAction::Type> MoveAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr)

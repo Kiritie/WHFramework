@@ -7,6 +7,8 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "SpawnPool/SpawnPoolModule.h"
 
+ASpawnPoolModule* USpawnPoolModuleBPLibrary::SpawnPoolModuleInst = nullptr;
+
 ASpawnPoolModule* USpawnPoolModuleBPLibrary::GetSpawnPoolModule(UObject* InWorldContext)
 {
 	if (!SpawnPoolModuleInst || !SpawnPoolModuleInst->IsValidLowLevel())

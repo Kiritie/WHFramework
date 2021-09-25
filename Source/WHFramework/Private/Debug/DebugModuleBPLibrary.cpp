@@ -7,6 +7,8 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Debug/DebugModule.h"
 
+ADebugModule* UDebugModuleBPLibrary::DebugModuleInst = nullptr;
+
 ADebugModule* UDebugModuleBPLibrary::GetDebugModule(UObject* InWorldContext)
 {
 	if (!DebugModuleInst || !DebugModuleInst->IsValidLowLevel())

@@ -46,17 +46,15 @@ void ASpawnPoolModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
+void ASpawnPoolModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+	ClearAllActor();
+}
+
 AActor* ASpawnPoolModule::K2_SpawnActor(TSubclassOf<AActor> InType)
 {
-	if(!InType) return nullptr;
-
-	if (!SpawnPools.Contains(InType))
-	{
-		USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
-		SpawnPool->Initialize(Limit, InType);
-		SpawnPools.Add(InType, SpawnPool);
-	}
-	return SpawnPools[InType]->Spawn();
+	return SpawnActor<AActor>(InType);
 }
 
 void ASpawnPoolModule::DespawnActor(AActor* InActor)

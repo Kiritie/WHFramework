@@ -16,9 +16,13 @@ UCLASS()
 class WHFRAMEWORK_API ULatentActionModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
-public:
 	
+public:
+	static ALatentActionModule* LatentActionModuleInst;
+
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "LatentFunction")
+	static ALatentActionModule* GetLatentActionModule(const UObject* InWorldContext);
+
 	/**
 	* MoveActorTo
 	* 将插值对象移动到期望位置,优先使用锚点位置
@@ -57,5 +61,4 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject", Duration="0.2", ExpandEnumAsExecs= "DelayPlusAction", Keywords="sleep", UnsafeDuringActorConstruction = "true"), Category="LatentFunction")
 	static void	DelayPlus(UObject* WorldContextObject, float Duration, TEnumAsByte<EDelayPlusAction::Type> DelayPlusAction, FLatentActionInfo LatentInfo);
-
 };

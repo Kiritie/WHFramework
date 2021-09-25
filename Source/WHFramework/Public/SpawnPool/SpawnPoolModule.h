@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "SpawnPool.h"
 #include "Base/ModuleBase.h"
 
 #include "SpawnPoolModule.generated.h"
@@ -33,6 +35,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// SpawnPool
 protected:
@@ -40,15 +44,22 @@ protected:
 	UPROPERTY(EditAnywhere)
 	int32 Limit;
 
-private:
-	UPROPERTY()
-	TMap<UClass*, class USpawnPool*> SpawnPools;
+	UPROPERTY(VisibleAnywhere)
+	TMap<UClass*, USpawnPool*> SpawnPools;
 
 public:
 	template<class T>
-	T* SpawnActor(TSubclassOf<AActor> InType = nullptr)
+	T* SpawnActor(TSubclassOf<AActor> InType = T::StaticClass())
 	{
-		return Cast<T>(K2_SpawnActor(InType != nullptr ? InType.Get() : T::StaticClass()));
+		if(!InType) return nullptr;
+
+		if (!SpawnPools.Contains(InType))
+		{
+			USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
+			SpawnPool->Initialize(Limit, InType);
+			SpawnPools.Add(InType, SpawnPool);
+		}
+		return Cast<T>(SpawnPools[InType]->Spawn());
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Actor"))

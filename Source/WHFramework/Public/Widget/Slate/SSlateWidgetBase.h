@@ -25,20 +25,22 @@ public:
 public:
 	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
-	virtual void OnOpen(bool bInstant = true) override;
+	virtual void OnOpen(bool bInstant = false) override;
 	
-	virtual void OnClose(bool bInstant = true) override;
-
-	virtual void OnToggle(bool bInstant = true) override;
+	virtual void OnClose(bool bInstant = false) override;
 	
 	virtual void OnRefresh() override;
 
 	virtual void OnDestroy() override;
 
-protected:
-	virtual void OpenSelf(bool bInstant = true) override;
+public:
+	virtual void Open(bool bInstant = false) override;
 
-	virtual void CloseSelf(bool bInstant = true) override;
+	virtual void Close(bool bInstant = false) override;
+
+	virtual void Toggle(bool bInstant) override;
+
+	virtual void Refresh() override;
 
 protected:
 	EWidgetType WidgetType;
@@ -48,6 +50,8 @@ protected:
 	AActor* OwnerActor;
 
 public:
+	virtual bool IsOpened() const override;
+	
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 
 	virtual EInputMode GetInputMode() const override { return InputMode; }

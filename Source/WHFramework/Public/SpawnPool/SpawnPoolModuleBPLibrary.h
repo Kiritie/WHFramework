@@ -3,10 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "SpawnPoolModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "SpawnPoolModuleBPLibrary.generated.h"
 
-class ASpawnPoolModule;
 /**
  * 
  */
@@ -22,7 +23,7 @@ public:
 	static ASpawnPoolModule* GetSpawnPoolModule(UObject* InWorldContext);
 
 	template<class T>
-	static T* SpawnActor(UObject* InWorldContext, TSubclassOf<AActor> InType = nullptr)
+	static T* SpawnActor(UObject* InWorldContext, TSubclassOf<AActor> InType = T::StaticClass())
 	{
 		if(ASpawnPoolModule* SpawnPoolModule = GetSpawnPoolModule(InWorldContext))
 		{

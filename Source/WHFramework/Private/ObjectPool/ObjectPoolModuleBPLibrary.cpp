@@ -6,6 +6,8 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
+AObjectPoolModule* UObjectPoolModuleBPLibrary::ObjectPoolModuleInst = nullptr;
+
 AObjectPoolModule* UObjectPoolModuleBPLibrary::GetObjectPoolModule(UObject* InWorldContext)
 {
 	if (!ObjectPoolModuleInst || !ObjectPoolModuleInst->IsValidLowLevel())

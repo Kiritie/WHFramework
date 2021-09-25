@@ -34,6 +34,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 public:
 	virtual void Pause_Implementation() override;
 

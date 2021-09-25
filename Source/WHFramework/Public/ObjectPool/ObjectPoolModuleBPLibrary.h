@@ -23,7 +23,7 @@ public:
 	static AObjectPoolModule* GetObjectPoolModule(UObject* InWorldContext);
 
 	template<class T>
-	static T* SpawnObject(UObject* InWorldContext, TSubclassOf<UObject> InType = nullptr)
+	static T* SpawnObject(UObject* InWorldContext, TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AObjectPoolModule* ObjectPoolModule = GetObjectPoolModule(InWorldContext))
 		{

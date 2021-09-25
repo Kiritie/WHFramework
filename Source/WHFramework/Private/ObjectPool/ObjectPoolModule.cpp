@@ -46,17 +46,15 @@ void AObjectPoolModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
+void AObjectPoolModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+	ClearAllObject();
+}
+
 UObject* AObjectPoolModule::K2_SpawnObject(TSubclassOf<UObject> InType)
 {
-	if(!InType) return nullptr;
-
-	if (!ObjectPools.Contains(InType))
-	{
-		UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
-		ObjectPool->Initialize(Limit, InType);
-		ObjectPools.Add(InType, ObjectPool);
-	}
-	return ObjectPools[InType]->Spawn();
+	return SpawnObject<UObject>(InType);
 }
 
 void AObjectPoolModule::DespawnObject(UObject* InObject)

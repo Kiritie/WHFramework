@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
+AMainModule* UMainModuleBPLibrary::MainModuleInst = nullptr;
+
 AMainModule* UMainModuleBPLibrary::GetMainModule(const UObject* InWorldContext)
 {
 	if (!MainModuleInst || !MainModuleInst->IsValidLowLevel())

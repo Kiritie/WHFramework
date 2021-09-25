@@ -24,13 +24,10 @@ public:
 	void OnInitialize(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnOpen(bool bInstant = true) override;
+	void OnOpen(bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnClose(bool bInstant = true) override;
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnToggle(bool bInstant = true) override;
+	void OnClose(bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRefresh() override;
@@ -38,14 +35,23 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy() override;
 
-protected:
-	UFUNCTION(BlueprintNativeEvent)
-	void OpenSelf(bool bInstant = true) override;
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Open(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void CloseSelf(bool bInstant = true) override;
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Close(bool bInstant = false) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Toggle(bool bInstant = false) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Refresh() override;
 
 protected:
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	FName WidgetName;
+
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EWidgetType WidgetType;
 		
@@ -56,6 +62,12 @@ protected:
 	AActor* OwnerActor;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual bool IsOpened() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FName GetWidgetName() const { return WidgetName; }
+
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 

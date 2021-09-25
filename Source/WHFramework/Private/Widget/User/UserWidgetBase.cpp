@@ -7,6 +7,7 @@
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	WidgetName = NAME_None;
 	WidgetType = EWidgetType::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
@@ -15,38 +16,37 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 {
 	OwnerActor = InOwner;
-	if(!IsInViewport())
-	{
-		AddToViewport();
-	}
 }
 
 void UUserWidgetBase::OnOpen_Implementation(bool bInstant)
 {
-	if(bInstant)
+	if(!IsInViewport())
 	{
-		SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		AddToViewport();
 	}
-	OnRefresh();
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	Refresh();
+	
+	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(this))
+	{
+		WidgetModule->UpdateInputMode();
+	}
 }
 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
-	if(bInstant)
+	if(WidgetType == EWidgetType::Temporary)
 	{
-		SetVisibility(ESlateVisibility::Hidden);
+		if(IsInViewport())
+		{
+			RemoveFromViewport();
+		}
 	}
-}
-
-void UUserWidgetBase::OnToggle_Implementation(bool bInstant)
-{
-	if(GetVisibility() == ESlateVisibility::Hidden)
+	SetVisibility(ESlateVisibility::Hidden);
+	
+	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(this))
 	{
-		OpenSelf(bInstant);
-	}
-	else
-	{
-		CloseSelf(bInstant);
+		WidgetModule->UpdateInputMode();
 	}
 }
 
@@ -62,12 +62,37 @@ void UUserWidgetBase::OnDestroy_Implementation()
 	}
 }
 
-void UUserWidgetBase::OpenSelf_Implementation(bool bInstant)
+void UUserWidgetBase::Open_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(this, bInstant, StaticClass());
+	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(this, bInstant, GetClass());
 }
 
-void UUserWidgetBase::CloseSelf_Implementation(bool bInstant)
+void UUserWidgetBase::Close_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(this, bInstant, StaticClass());
+	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(this, bInstant, GetClass());
+}
+
+void UUserWidgetBase::Toggle_Implementation(bool bInstant)
+{
+	if(!IsOpened())
+	{
+		Open(bInstant);
+	}
+	else
+	{
+		Close(bInstant);
+	}
+}
+
+void UUserWidgetBase::Refresh_Implementation()
+{
+	if(IsOpened())
+	{
+		OnRefresh();
+	}
+}
+
+bool UUserWidgetBase::IsOpened() const
+{
+	return IsInViewport() && GetVisibility() != ESlateVisibility::Hidden && GetVisibility() != ESlateVisibility::Collapsed;
 }

@@ -30,6 +30,10 @@ UObject* UObjectPool::Spawn()
 	{
 		Object = NewObject<UObject>(GetOuter(), Type);
 	}
+	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(Object))
+	{
+		Interface->Execute_OnSpawn(Object);
+	}
 	return Object;
 }
 
@@ -42,10 +46,10 @@ void UObjectPool::Despawn(UObject* InObject)
 	else
 	{
 		List.Add(InObject);
-		if(IObjectPoolInterface* Reference = Cast<IObjectPoolInterface>(InObject))
-		{
-			Reference->Execute_Reset(InObject);
-		}
+	}
+	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(InObject))
+	{
+		Interface->Execute_OnDespawn(InObject);
 	}
 }
 

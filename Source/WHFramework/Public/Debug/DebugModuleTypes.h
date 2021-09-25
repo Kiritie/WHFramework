@@ -35,7 +35,7 @@ DEFINE_LOG_CATEGORY_STATIC(WHEvent, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WHHTTP, Log, All);
 
 #define WH_LOG(CategoryName, Verbosity, Format, ...) { UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); }
-#define WHStatusLog(CategoryName, device_status_code, device_status_level, Format, ...) \
+#define WH_StatusLog(CategoryName, device_status_code, device_status_level, Format, ...) \
 	{ \
 		if (device_status_level == EStatusLevel::ERF_Warning) { UE_LOG(CategoryName, Warning, Format, ##__VA_ARGS__); }\
 		else if (device_status_level == EStatusLevel::ERF_Error) { UE_LOG(CategoryName, Error, Format, ##__VA_ARGS__); }\
@@ -44,7 +44,7 @@ DEFINE_LOG_CATEGORY_STATIC(WHHTTP, Log, All);
 		FWHLog::StatusLog(device_status_code, device_status_level, __Z__LogContent);\
 	}
 
-class IVREALKIT_API FWHLog 
+class WHFRAMEWORK_API FWHLog 
 {
 public:
 

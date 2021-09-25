@@ -4,11 +4,10 @@
 
 #include "CoreMinimal.h"
 
+#include "ObjectPool.h"
 #include "Base/ModuleBase.h"
 
 #include "ObjectPoolModule.generated.h"
-
-class UObjectPool;
 
 UCLASS()
 class WHFRAMEWORK_API AObjectPoolModule : public AModuleBase
@@ -36,6 +35,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 protected:
@@ -43,15 +44,22 @@ protected:
 	UPROPERTY(EditAnywhere)
 	int32 Limit;
 
-private:
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	TMap<UClass*, UObjectPool*> ObjectPools;
 
 public:
 	template<class T>
-	T* SpawnObject(TSubclassOf<UObject> InType = nullptr)
+	T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		return Cast<T>(K2_SpawnObject(InType != nullptr ? InType.Get() : T::StaticClass()));
+		if(!InType) return nullptr;
+
+		if (!ObjectPools.Contains(InType))
+		{
+			UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
+			ObjectPool->Initialize(Limit, InType);
+			ObjectPools.Add(InType, ObjectPool);
+		}
+		return Cast<T>(ObjectPools[InType]->Spawn());
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Object"))

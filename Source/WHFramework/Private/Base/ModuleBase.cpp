@@ -50,6 +50,11 @@ void AModuleBase::OnUnPause_Implementation()
 	ModuleState = EModuleState::Executing;
 }
 
+void AModuleBase::OnTermination_Implementation()
+{
+	
+}
+
 void AModuleBase::Pause_Implementation()
 {
 	if(ModuleState != EModuleState::Pausing)

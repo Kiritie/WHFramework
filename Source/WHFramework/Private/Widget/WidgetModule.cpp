@@ -43,14 +43,19 @@ void AWidgetModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
+bool AWidgetModule::K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+{
+	return HasUserWidget<UUserWidgetBase>(InWidgetClass);
+}
+
+UUserWidgetBase* AWidgetModule::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+{
+	return GetUserWidget<UUserWidgetBase>(InWidgetClass);
+}
+
 UUserWidgetBase* AWidgetModule::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	return CreateUserWidget<UUserWidgetBase>(InWidgetClass);
-}
-
-UUserWidgetBase* AWidgetModule::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
-{
-	return GetUserWidget<UUserWidgetBase>(InWidgetClass);
 }
 
 bool AWidgetModule::K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass)
@@ -93,7 +98,6 @@ void AWidgetModule::OpenAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 				TemporaryUserWidget = Iter.Value;
 			}
 			Iter.Value->OnOpen(bInstant);
-			UpdateInputMode();
 		}
 	}
 }
@@ -102,6 +106,7 @@ void AWidgetModule::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 {
 	for (auto Iter : AllUserWidgets)
 	{
+		if(!Iter.Value) continue;
 		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
 		{
 			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
@@ -109,7 +114,6 @@ void AWidgetModule::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 				TemporaryUserWidget = nullptr;
 			}
 			Iter.Value->OnClose(bInstant);
-			UpdateInputMode();
 		}
 	}
 }
@@ -118,6 +122,7 @@ void AWidgetModule::OpenAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)
 	{
+		if(!Iter.Value) continue;
 		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
 		{
 			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
@@ -129,7 +134,6 @@ void AWidgetModule::OpenAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 				TemporarySlateWidget = Iter.Value;
 			}
 			Iter.Value->OnOpen(bInstant);
-			UpdateInputMode();
 		}
 	}
 }
@@ -138,6 +142,7 @@ void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)
 	{
+		if(!Iter.Value) continue;
 		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
 		{
 			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
@@ -145,23 +150,23 @@ void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 				TemporarySlateWidget = nullptr;
 			}
 			Iter.Value->OnClose(bInstant);
-			UpdateInputMode();
 		}
 	}
 }
 
 void AWidgetModule::UpdateInputMode()
 {
-	EInputMode inputMode = EInputMode::GameOnly;
-	for (auto iter : AllUserWidgets)
+	EInputMode TempInputMode = EInputMode::GameOnly;
+	for (auto Iter : AllUserWidgets)
 	{
-		UUserWidgetBase* UserWidget = iter.Value;
-		if (UserWidget && UserWidget->IsVisible() && (int32)UserWidget->GetInputMode() < (int32)inputMode)
+		if(!Iter.Value) continue;
+		UUserWidgetBase* UserWidget = Iter.Value;
+		if (UserWidget && UserWidget->IsOpened() && (int32)UserWidget->GetInputMode() < (int32)TempInputMode)
 		{
-			inputMode = UserWidget->GetInputMode();
+			TempInputMode = UserWidget->GetInputMode();
 		}
 	}
-	SetInputMode(inputMode);
+	SetInputMode(TempInputMode);
 }
 
 void AWidgetModule::SetInputMode(EInputMode InInputMode)

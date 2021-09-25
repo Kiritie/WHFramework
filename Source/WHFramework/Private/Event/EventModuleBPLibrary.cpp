@@ -9,7 +9,7 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-class AIVRealPlayerController_OneToMany;
+AEventModule* UEventModuleBPLibrary::EventModuleInst = nullptr;
 
 AEventModule* UEventModuleBPLibrary::GetEventModule(const UObject* InWorldContext)
 {
