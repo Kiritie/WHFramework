@@ -19,14 +19,16 @@ public:
 
 private:
 	/// 限制大小
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	int32 Limit;
 	/// Actor类型
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	TSubclassOf<AActor> Type;
+	/// Actor数量
+	UPROPERTY(VisibleAnywhere)
+	int32 Count;
 	/// Actor列表
-	UPROPERTY()
-	TArray<AActor*> List;
+	TQueue<AActor*> Queue;
 
 public:
 	/**
@@ -41,7 +43,6 @@ public:
 	AActor* Spawn();
 	/**
 	* 回收Actor
-	* @param InActor 回收Actor
 	*/
 	void Despawn(AActor* InActor);
 	/**
@@ -53,6 +54,4 @@ public:
 	int32 GetLimit() const;
 
 	int32 GetCount() const;
-
-	TArray<AActor*> GetQueue() const;
 };

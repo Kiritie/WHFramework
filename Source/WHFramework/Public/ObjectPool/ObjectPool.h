@@ -20,14 +20,16 @@ public:
 
 private:
 	/// 限制大小
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	int32 Limit;
-	/// 引用类型
-	UPROPERTY()
+	/// 对象类型
+	UPROPERTY(VisibleAnywhere)
 	TSubclassOf<UObject> Type;
-	/// 引用列表
-	UPROPERTY()
-	TArray<UObject*> List;
+	/// 对象数量
+	UPROPERTY(VisibleAnywhere)
+	int32 Count;
+	/// 对象列表
+	TQueue<UObject*> Queue;
 
 public:
 	/**
@@ -37,16 +39,16 @@ public:
 	*/
 	void Initialize(int32 InLimit, TSubclassOf<UObject> InType);
 	/**
-	* 生成引用
+	* 生成对象
 	*/
 	UObject* Spawn();
 	/**
-	* 回收引用
-	* @param InObject 回收引用
+	* 回收对象
+	* @param InObject 对象
 	*/
 	void Despawn(UObject* InObject);
 	/**
-	* 清理引用
+	* 清理对象
 	*/
 	void Clear();
 
@@ -54,6 +56,4 @@ public:
 	int32 GetLimit() const;
 
 	int32 GetCount() const;
-
-	TArray<UObject*> GetQueue() const;
 };

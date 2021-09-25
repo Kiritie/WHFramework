@@ -9,7 +9,6 @@ UObjectPool::UObjectPool()
 {
 	Limit = 100;
 	Type = nullptr;
-	List = TArray<UObject*>();
 }
 
 void UObjectPool::Initialize(int32 InLimit, TSubclassOf<UObject> InType)
@@ -21,14 +20,15 @@ void UObjectPool::Initialize(int32 InLimit, TSubclassOf<UObject> InType)
 UObject* UObjectPool::Spawn()
 {
 	UObject* Object;
-	if(GetCount() > 0)
+	if(Count > 0)
 	{
-		Object = List[0];
-		List.RemoveAt(0);
+		Queue.Dequeue(Object);
+		Count--;
 	}
 	else
 	{
-		Object = NewObject<UObject>(GetOuter(), Type);
+		Object = NewObject<UObject>(GetTransientPackage(), Type);
+		Object->AddToRoot();
 	}
 	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(Object))
 	{
@@ -39,13 +39,15 @@ UObject* UObjectPool::Spawn()
 
 void UObjectPool::Despawn(UObject* InObject)
 {
-	if(GetCount() >= Limit)
+	if(Count >= Limit)
 	{
+		InObject->RemoveFromRoot();
 		InObject->ConditionalBeginDestroy();
 	}
 	else
 	{
-		List.Add(InObject);
+		Queue.Enqueue(InObject);
+		Count++;
 	}
 	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(InObject))
 	{
@@ -55,14 +57,16 @@ void UObjectPool::Despawn(UObject* InObject)
 
 void UObjectPool::Clear()
 {
-	for (auto Iter : List)
+	UObject* Object;
+	while(Queue.Dequeue(Object))
 	{
-		if(Iter)
+		if(Object)
 		{
-			Iter->ConditionalBeginDestroy();
+			Object->RemoveFromRoot();
+			Object->ConditionalBeginDestroy();
 		}
 	}
-	List.Empty();
+	Queue.Empty();
 }
 
 int32 UObjectPool::GetLimit() const
@@ -72,10 +76,5 @@ int32 UObjectPool::GetLimit() const
 
 int32 UObjectPool::GetCount() const
 {
-	return List.Num();
-}
-
-TArray<UObject*> UObjectPool::GetQueue() const
-{
-	return List;
+	return Count;
 }

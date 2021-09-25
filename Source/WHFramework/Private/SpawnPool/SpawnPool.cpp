@@ -9,7 +9,6 @@ USpawnPool::USpawnPool()
 {
 	Limit = 100;
 	Type = nullptr;
-	List = TArray<AActor*>();
 }
 
 void USpawnPool::Initialize(int32 InLimit, TSubclassOf<AActor> InType)
@@ -21,10 +20,10 @@ void USpawnPool::Initialize(int32 InLimit, TSubclassOf<AActor> InType)
 AActor* USpawnPool::Spawn()
 {
 	AActor* Actor;
-	if(GetCount() > 0)
+	if(Count > 0)
 	{
-		Actor = List[0];
-		List.RemoveAt(0);
+		Queue.Dequeue(Actor);
+		Count--;
 	}
 	else
 	{
@@ -41,13 +40,14 @@ AActor* USpawnPool::Spawn()
 
 void USpawnPool::Despawn(AActor* InActor)
 {
-	if(GetCount() >= Limit)
+	if(Count >= Limit)
 	{
 		InActor->Destroy();
 	}
 	else
 	{
-		List.Add(InActor);
+		Queue.Enqueue(InActor);
+		Count++;
 	}
 	if(ISpawnPoolInterface* Interface = Cast<ISpawnPoolInterface>(InActor))
 	{
@@ -57,14 +57,15 @@ void USpawnPool::Despawn(AActor* InActor)
 
 void USpawnPool::Clear()
 {
-	for (auto Iter : List)
+	AActor* Actor;
+	while(Queue.Dequeue(Actor))
 	{
-		if(Iter)
+		if(Actor)
 		{
-			Iter->Destroy();
+			Actor->Destroy();
 		}
 	}
-	List.Empty();
+	Queue.Empty();
 }
 
 int32 USpawnPool::GetLimit() const
@@ -74,10 +75,5 @@ int32 USpawnPool::GetLimit() const
 
 int32 USpawnPool::GetCount() const
 {
-	return List.Num();
-}
-
-TArray<AActor*> USpawnPool::GetQueue() const
-{
-	return List;
+	return Count;
 }
