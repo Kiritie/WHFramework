@@ -14,10 +14,4 @@ UCLASS()
 class WHFRAMEWORK_API UAssetModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
-public:
-	static class AAssetModule* AssetModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "AssetModuleBPLibrary")
-	static class AAssetModule* GetAssetModule(UObject* InWorldContext);
 };

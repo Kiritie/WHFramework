@@ -9,56 +9,33 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-AEventModule* UEventModuleBPLibrary::EventModuleInst = nullptr;
-
-AEventModule* UEventModuleBPLibrary::GetEventModule(const UObject* InWorldContext)
+void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
 {
-	if (!EventModuleInst || !EventModuleInst->IsValidLowLevel())
-	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			EventModuleInst = MainModule->GetModuleByClass<AEventModule>();
-		}
-	}
-	return EventModuleInst;
-}
-
-UEventModuleNetworkComponent* UEventModuleBPLibrary::GetEventModuleNetworkComponent(UObject* InWorldContext)
-{
-	if (APlayerController* PlayerController = UGameplayStatics::GetPlayerController(InWorldContext, 0))
-	{
-		return Cast<UEventModuleNetworkComponent>(PlayerController->FindComponentByClass(UEventModuleNetworkComponent::StaticClass()));
-	}
-	return nullptr;
-}
-
-void UEventModuleBPLibrary::SubscribeEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
-{
-	if(AEventModule* EventModule = GetEventModule(InWorldContext))
+	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
 		EventModule->SubscribeEvent(InEventHandleClass, InOwner, InFuncName);
 	}
 }
 
-void UEventModuleBPLibrary::UnsubscribeEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
+void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
 {
-	if(AEventModule* EventModule = GetEventModule(InWorldContext))
+	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
 		EventModule->UnsubscribeEvent(InEventHandleClass, InOwner, InFuncName);
 	}
 }
 
-void UEventModuleBPLibrary::UnsubscribeAllEvent(const UObject* InWorldContext)
+void UEventModuleBPLibrary::UnsubscribeAllEvent()
 {
-	if(AEventModule* EventModule = GetEventModule(InWorldContext))
+	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
 		EventModule->UnsubscribeAllEvent();
 	}
 }
 
-void UEventModuleBPLibrary::BroadcastEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters)
+void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters)
 {
-	if(AEventModule* EventModule = GetEventModule(InWorldContext))
+	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
 		EventModule->BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParameters);
 	}

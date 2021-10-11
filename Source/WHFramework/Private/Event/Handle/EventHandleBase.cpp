@@ -22,6 +22,10 @@ void UEventHandleBase::Fill_Implementation(const TArray<FParameter>& InParameter
 	
 }
 
+void UEventHandleBase::OnSpawn_Implementation()
+{
+}
+
 void UEventHandleBase::OnDespawn_Implementation()
 {
 	

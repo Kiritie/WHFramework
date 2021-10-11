@@ -6,34 +6,22 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
-AMainModule* UMainModuleBPLibrary::MainModuleInst = nullptr;
-
-AMainModule* UMainModuleBPLibrary::GetMainModule(const UObject* InWorldContext)
+AMainModule* UMainModuleBPLibrary::GetMainModule()
 {
-	if (!MainModuleInst || !MainModuleInst->IsValidLowLevel())
-	{
-		if(InWorldContext && InWorldContext->IsValidLowLevel())
-		{
-			MainModuleInst = Cast<AMainModule>(UGameplayStatics::GetActorOfClass(InWorldContext, AMainModule::StaticClass()));
-		}
-	}
-	return MainModuleInst;
+	return AMainModule::Get();
 }
 
-AModuleBase* UMainModuleBPLibrary::K2_GetModuleByClass(const UObject* InWorldContext, TSubclassOf<AModuleBase> InModuleClass)
+AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
-	if(AMainModule* MainModule = GetMainModule(InWorldContext))
-	{
-		return MainModule->K2_GetModuleByClass(InModuleClass);
-	}
-	return nullptr;
+	return AMainModule::GetModuleByClass<AModuleBase>(InModuleClass);
 }
 
-TScriptInterface<IModule> UMainModuleBPLibrary::K2_GetModuleByName(const UObject* InWorldContext, const FName InModuleName)
+TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InModuleName)
 {
-	if(AMainModule* MainModule = GetMainModule(InWorldContext))
-	{
-		return MainModule->K2_GetModuleByName(InModuleName);
-	}
-	return nullptr;
+	return AMainModule::GetModuleByName<UObject>(InModuleName);
+}
+
+UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass( TSubclassOf<UModuleNetworkComponent> InModuleClass)
+{
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(InModuleClass);
 }

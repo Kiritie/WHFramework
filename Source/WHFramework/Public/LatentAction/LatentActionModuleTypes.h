@@ -120,7 +120,7 @@ class WHFRAMEWORK_API FMoveActorToAction : public FPendingLatentAction
 	            }
             	
 				// #if WITH_EDITOR
-				// UE_LOG(LogTemp,Log,TEXT("插值变换结束."));
+				// WH_LOG(LogTemp,Log,TEXT("插值变换结束."));
 				// #endif
             }
     		
@@ -377,20 +377,19 @@ virtual FString GetDescription() const override
 };
 
 
-//////////  DelayPlusLatentAction ///////////////
+//////////  CancelableDelayLatentAction ///////////////
 
 UENUM(BlueprintType)
-namespace EDelayPlusAction
+namespace ECancelableDelayAction
 {
 	enum Type
 	{	
 		None,
-
-		Stop
+		Cancel
 	};
 }
 
-class WHFRAMEWORK_API FDelayPlusAction : public FPendingLatentAction
+class WHFRAMEWORK_API FCancelableDelayAction : public FPendingLatentAction
 {
 	public:
 	float TimeRemaining;
@@ -399,7 +398,7 @@ class WHFRAMEWORK_API FDelayPlusAction : public FPendingLatentAction
 	int32 OutputLink;
 	FWeakObjectPtr CallbackTarget;
 
-	FDelayPlusAction(float Duration, const FLatentActionInfo& LatentInfo)
+	FCancelableDelayAction(float Duration, const FLatentActionInfo& LatentInfo)
 		: TimeRemaining(Duration)
 		, bExecute(true)
 		, ExecutionFunction(LatentInfo.ExecutionFunction)
@@ -418,10 +417,10 @@ class WHFRAMEWORK_API FDelayPlusAction : public FPendingLatentAction
 	// Returns a human readable description of the latent operation's current state
 	virtual FString GetDescription() const override
 	{
-		static const FNumberFormattingOptions DelayPlusTimeFormatOptions = FNumberFormattingOptions()
+		static const FNumberFormattingOptions CancelableDelayTimeFormatOptions = FNumberFormattingOptions()
 			.SetMinimumFractionalDigits(3)
 			.SetMaximumFractionalDigits(3);
-		return FText::Format(NSLOCTEXT("DelayPlusAction", "DelayPlusActionTimeFmt", "Delay ({0} seconds left)"), FText::AsNumber(TimeRemaining, &DelayPlusTimeFormatOptions)).ToString();
+		return FText::Format(NSLOCTEXT("CancelableDelayAction", "CancelableDelayActionTimeFmt", "Delay ({0} seconds left)"), FText::AsNumber(TimeRemaining, &CancelableDelayTimeFormatOptions)).ToString();
 	}
 #endif
 };

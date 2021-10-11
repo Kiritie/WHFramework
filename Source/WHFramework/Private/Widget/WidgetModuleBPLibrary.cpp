@@ -8,126 +8,112 @@
 #include "WidgetModule.h"
 #include "Kismet/GameplayStatics.h"
 
-AWidgetModule* UWidgetModuleBPLibrary::WidgetModuleInst = nullptr;
-
-AWidgetModule* UWidgetModuleBPLibrary::GetWidgetModule(UObject* InWorldContext)
+UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if (!WidgetModuleInst || !WidgetModuleInst->IsValidLowLevel())
-	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			WidgetModuleInst = MainModule->GetModuleByClass<AWidgetModule>();
-		}
-	}
-	return WidgetModuleInst;
-}
-
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass)
-{
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_CreateUserWidget(InWidgetClass);
 	}
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass)
+UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_GetUserWidget(InWidgetClass);
 	}
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_InitializeUserWidget(UObject* InWorldContext, AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool UWidgetModuleBPLibrary::K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_InitializeUserWidget(InOwner, InWidgetClass);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_OpenUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_OpenUserWidget(InWidgetClass, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_CloseUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_CloseUserWidget(InWidgetClass, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_ToggleUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_ToggleUserWidget(InWidgetClass, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_DestroyUserWidget(UObject* InWorldContext, TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool UWidgetModuleBPLibrary::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->K2_DestroyUserWidget(InWidgetClass);
 	}
 	return false;
 }
 
-void UWidgetModuleBPLibrary::OpenAllUserWidget(UObject* InWorldContext, EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::OpenAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->OpenAllUserWidget(InWidgetType, bInstant);
 	}
 }
 
-void UWidgetModuleBPLibrary::CloseAllUserWidget(UObject* InWorldContext, EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->CloseAllUserWidget(InWidgetType, bInstant);
 	}
 }
 
-void UWidgetModuleBPLibrary::OpenAllSlateWidget(UObject* InWorldContext, EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::OpenAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->OpenAllSlateWidget(InWidgetType, bInstant);
 	}
 }
 
-void UWidgetModuleBPLibrary::CloseAllSlateWidget(UObject* InWorldContext, EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 {
-	if (AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->CloseAllSlateWidget(InWidgetType, bInstant);
 	}
 }
 
-void UWidgetModuleBPLibrary::SetInputMode(UObject* InWorldContext, EInputMode InInputMode)
+void UWidgetModuleBPLibrary::SetInputMode(EInputMode InInputMode)
 {
-	if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->SetInputMode(InInputMode);
 	}
 }
 
-EInputMode UWidgetModuleBPLibrary::GetInputMode(UObject* InWorldContext)
+EInputMode UWidgetModuleBPLibrary::GetInputMode()
 {
-	if(AWidgetModule* WidgetModule = GetWidgetModule(InWorldContext))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		return WidgetModule->GetInputMode();
 	}

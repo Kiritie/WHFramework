@@ -67,17 +67,15 @@ protected:
 	TSubclassOf<class AEventManagerBase> EventManagerClass;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "EventManager")
-	class AEventManagerBase* EventDispatcher;
+	class AEventManagerBase* EventManager;
 
 public:
-	// UFUNCTION(CallInEditor, Category = "EventDispatcher")
-	void SpawnEventDispatcher();
+	void SpawnEventManager();
 
-	// UFUNCTION(CallInEditor, Category = "EventDispatcher")
-	void DestroyEventDispatcher();
+	void DestroyEventManager();
 
 	UFUNCTION(BlueprintPure)
-	class AEventManagerBase* GetEventDispatcher() const { return EventDispatcher; }
+	class AEventManagerBase* GetEventManager() const { return EventManager; }
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

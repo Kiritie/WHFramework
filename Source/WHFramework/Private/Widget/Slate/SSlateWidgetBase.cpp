@@ -25,6 +25,11 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
+void SSlateWidgetBase::OnCreate()
+{
+	
+}
+
 void SSlateWidgetBase::OnInitialize(AActor* InOwner)
 {
 	OwnerActor = InOwner;
@@ -53,8 +58,8 @@ void SSlateWidgetBase::Open(bool bInstant)
 {
 	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
 	
-	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(GWorld))
-	{
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	{ 
 		WidgetModule->UpdateInputMode();
 	}
 }
@@ -63,7 +68,7 @@ void SSlateWidgetBase::Close(bool bInstant)
 {
 	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
 	
-	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(GWorld))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->UpdateInputMode();
 	}

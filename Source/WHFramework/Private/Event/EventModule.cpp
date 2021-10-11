@@ -3,6 +3,7 @@
 
 #include "Event/EventModule.h"
 
+#include "MainModule.h"
 #include "NetworkModuleBPLibrary.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/ActorChannel.h"
@@ -37,7 +38,7 @@ void AEventModule::OnInitialize_Implementation()
 
 	if(HasAuthority())
 	{
-		SpawnEventDispatcher();
+		SpawnEventManager();
 	}
 }
 
@@ -133,7 +134,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 	{
 		case EEventNetType::Client:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = UEventModuleBPLibrary::GetEventModuleNetworkComponent(this))
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InEventHandleClass, InParameters);
 				return;
@@ -141,7 +142,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		}
 		case EEventNetType::Server:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = UEventModuleBPLibrary::GetEventModuleNetworkComponent(this))
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InEventHandleClass, InParameters);
 				return;
@@ -149,7 +150,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		}
 		case EEventNetType::Multicast:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = UEventModuleBPLibrary::GetEventModuleNetworkComponent(this))
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InEventHandleClass, InParameters);
 				return;
@@ -170,7 +171,7 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass
 {
 	if(!EventHandleInfos.Contains(InEventHandleClass)) return;
 	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(this, InEventHandleClass))
+	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(InEventHandleClass))
 	{
 		EventHandle->Fill(InParameters);
 		
@@ -184,44 +185,44 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{
-				if (EventHandle->Filter(Iter1.Key, Iter2) && UNetworkModuleBPLibrary::ExecuteObjectFunc(this, Iter1.Key, Iter2, &Params))
+				if (EventHandle->Filter(Iter1.Key, Iter2) && UNetworkModuleBPLibrary::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
 					WH_LOG(WHEvent, Log, TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName());
 				}
 			}
 		}
 
-		UObjectPoolModuleBPLibrary::DespawnObject(InSender, EventHandle);
+		UObjectPoolModuleBPLibrary::DespawnObject(EventHandle);
 	}
 }
 
-void AEventModule::SpawnEventDispatcher()
+void AEventModule::SpawnEventManager()
 {
-	if(EventManagerClass && (!EventDispatcher || !EventDispatcher->IsA(EventManagerClass)))
+	if(EventManagerClass && (!EventManager || !EventManager->IsA(EventManagerClass)))
 	{
-		DestroyEventDispatcher();
+		DestroyEventManager();
 		
 		FActorSpawnParameters ActorSpawnParameters = FActorSpawnParameters();
         ActorSpawnParameters.Owner = this;
         ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		EventDispatcher = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
-        if(EventDispatcher)
+		EventManager = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
+        if(EventManager)
         {
 			#if(WITH_EDITOR)
-        	EventDispatcher->SetActorLabel(TEXT("EventDispatcher"));
+        	EventManager->SetActorLabel(TEXT("EventManager"));
 			#endif
-        	EventDispatcher->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
+        	EventManager->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
         }
 	}
 }
 
-void AEventModule::DestroyEventDispatcher()
+void AEventModule::DestroyEventManager()
 {
-	if(EventDispatcher)
+	if(EventManager)
 	{
-		EventDispatcher->Destroy();
-		EventDispatcher = nullptr;
+		EventManager->Destroy();
+		EventManager = nullptr;
 	}
 }
 
@@ -229,5 +230,5 @@ void AEventModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	DOREPLIFETIME(AEventModule, EventDispatcher);
+	DOREPLIFETIME(AEventModule, EventManager);
 }

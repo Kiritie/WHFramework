@@ -3,7 +3,12 @@
 
 #include "Main/MainModule.h"
 
+#include "AudioModule.h"
+#include "CharacterModule.h"
 #include "DebugModule.h"
+#include "MediaModule.h"
+#include "ProcedureModule.h"
+#include "SceneModule.h"
 #include "WidgetModule.h"
 #include "Asset/AssetModule.h"
 #include "Base/ModuleBase.h"
@@ -15,6 +20,8 @@
 #include "ObjectPool/ObjectPoolModule.h"
 #include "WebRequest/WebRequestModule.h"
 #include "Net/UnrealNetwork.h"
+
+AMainModule* AMainModule::Current = nullptr;
 
 // ParamSets default values
 AMainModule::AMainModule()
@@ -28,17 +35,26 @@ AMainModule::AMainModule()
 
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAssetModule::StaticClass());
+	ModuleClasses.Add(AAudioModule::StaticClass());
+	ModuleClasses.Add(ACharacterModule::StaticClass());
 	ModuleClasses.Add(ADebugModule::StaticClass());
 	ModuleClasses.Add(AEventModule::StaticClass());
 	ModuleClasses.Add(ALatentActionModule::StaticClass());
+	ModuleClasses.Add(AMediaModule::StaticClass());
 	ModuleClasses.Add(ANetworkModule::StaticClass());
 	ModuleClasses.Add(AObjectPoolModule::StaticClass());
 	ModuleClasses.Add(AParameterModule::StaticClass());
+	ModuleClasses.Add(AProcedureModule::StaticClass());
+	ModuleClasses.Add(ASceneModule::StaticClass());
 	ModuleClasses.Add(ASpawnPoolModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());
 	
 	ModuleRefs = TArray<TScriptInterface<IModule>>();
+
+	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
+
+	Current = this;
 }
 
 // Called when the game starts or when spawned
@@ -153,8 +169,10 @@ void AMainModule::InitializeModules_Implementation()
 		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
 			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i].GetObject());
+			ModuleMap.Add(ModuleRefs[i]->Execute_GetModuleName(ModuleRefs[i].GetObject()), ModuleRefs[i]);
 		}
 	}
+	OnModuleInitialized.Broadcast();
 }
 
 void AMainModule::RefreshModules_Implementation(float DeltaSeconds)
@@ -199,30 +217,7 @@ void AMainModule::TerminationModules_Implementation()
 			ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i].GetObject());
 		}
 	}
-}
-
-AModuleBase* AMainModule::K2_GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i].GetObject()->IsA(InModuleClass))
-		{
-			return Cast<AModuleBase>(ModuleRefs[i].GetObject());
-		}
-	}
-	return nullptr;
-}
-
-TScriptInterface<IModule> AMainModule::K2_GetModuleByName(const FName InModuleName)
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->GetModuleName() == InModuleName)
-		{
-			return ModuleRefs[i];
-		}
-	}
-	return nullptr;
+	ModuleMap.Empty();
 }
 
 void AMainModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

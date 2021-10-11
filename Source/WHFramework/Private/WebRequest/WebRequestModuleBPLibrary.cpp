@@ -6,17 +6,3 @@
 #include "WebRequestModule.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
-
-AWebRequestModule* UWebRequestModuleBPLibrary::WebRequestModuleInst = nullptr;
-
-AWebRequestModule* UWebRequestModuleBPLibrary::GetWebRequestModule(UObject* InWorldContext)
-{
-	if (!WebRequestModuleInst || !WebRequestModuleInst->IsValidLowLevel())
-	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			WebRequestModuleInst = MainModule->GetModuleByClass<AWebRequestModule>();
-		}
-	}
-	return WebRequestModuleInst;
-}

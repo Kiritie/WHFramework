@@ -13,6 +13,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	OwnerActor = nullptr;
 }
 
+void UUserWidgetBase::OnCreate_Implementation()
+{
+	
+}
+
 void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 {
 	OwnerActor = InOwner;
@@ -27,7 +32,7 @@ void UUserWidgetBase::OnOpen_Implementation(bool bInstant)
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	Refresh();
 	
-	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(this))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->UpdateInputMode();
 	}
@@ -44,7 +49,7 @@ void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 	}
 	SetVisibility(ESlateVisibility::Hidden);
 	
-	if(AWidgetModule* WidgetModule = UWidgetModuleBPLibrary::GetWidgetModule(this))
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->UpdateInputMode();
 	}
@@ -64,12 +69,12 @@ void UUserWidgetBase::OnDestroy_Implementation()
 
 void UUserWidgetBase::Open_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(this, bInstant, GetClass());
+	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(bInstant, GetClass());
 }
 
 void UUserWidgetBase::Close_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(this, bInstant, GetClass());
+	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(bInstant, GetClass());
 }
 
 void UUserWidgetBase::Toggle_Implementation(bool bInstant)

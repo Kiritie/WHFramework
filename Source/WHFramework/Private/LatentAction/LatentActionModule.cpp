@@ -3,8 +3,7 @@
 
 #include "LatentAction/LatentActionModule.h"
 
-
-
+#include "DebugModuleTypes.h"
 
 ALatentActionModule::ALatentActionModule()
 {
@@ -107,7 +106,7 @@ void ALatentActionModule::MoveActorTo(AActor* Actor, ATargetPoint* InTargetPoint
 				}
 				else
 				{
-					UE_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WH_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
 				}
 			}
 			else if (MoveAction == EMoveActorAction::Stop)
@@ -166,7 +165,7 @@ void ALatentActionModule::RotatorActorTo(AActor* Actor, FRotator InRotator, floa
 				}
 				else
 				{
-					UE_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WH_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
 				}
 			}
 			
@@ -222,7 +221,7 @@ void ALatentActionModule::ScaleActorTo(AActor* Actor, FVector InScale, float App
 				}
 				else
 				{
-					UE_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WH_LOG(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
 				}
 			}
 			
@@ -243,28 +242,23 @@ void ALatentActionModule::ScaleActorTo(AActor* Actor, FVector InScale, float App
 	}	
 }
 
-// void ALatentActionModule::Multi_MoveActorTo_Implementation(AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
-//  {
-//  	MoveActorTo(Actor, InTargetPoint,  InTargetTransform, bUseRotator,  bUseScale,  ApplicationTime, bEaseIn,  bEaseOut,  BlendExp,    bForceShortestRotationPath, MoveAction, LatentInfo);
-// }
-
-void ALatentActionModule::DelayPlus(UObject* WorldContextObject, float Duration, EDelayPlusAction::Type DelayPlusAction, FLatentActionInfo LatentInfo)
+void ALatentActionModule::CancelableDelay(UObject* WorldContextObject, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
-		if (LatentActionManager.FindExistingAction<FDelayPlusAction>(LatentInfo.CallbackTarget, LatentInfo.UUID) == NULL)
+		if (LatentActionManager.FindExistingAction<FCancelableDelayAction>(LatentInfo.CallbackTarget, LatentInfo.UUID) == NULL)
 		{
-			if(DelayPlusAction == EDelayPlusAction::None)
+			if(CancelableDelayAction == ECancelableDelayAction::None)
 			{
-				LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FDelayPlusAction(Duration, LatentInfo));
+				LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FCancelableDelayAction(Duration, LatentInfo));
 			}
 		}
 		else
 		{
-			if(DelayPlusAction == EDelayPlusAction::Stop)
+			if(CancelableDelayAction == ECancelableDelayAction::Cancel)
 			{
-				LatentActionManager.FindExistingAction<FDelayPlusAction>(LatentInfo.CallbackTarget, LatentInfo.UUID)->bExecute = false;
+				LatentActionManager.FindExistingAction<FCancelableDelayAction>(LatentInfo.CallbackTarget, LatentInfo.UUID)->bExecute = false;
 			}
 		}
 	}

@@ -19,23 +19,15 @@ class WHFRAMEWORK_API UEventModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static AEventModule* EventModuleInst;
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
+	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
 
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static AEventModule* GetEventModule(const UObject* InWorldContext);
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
+	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
 
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static class UEventModuleNetworkComponent* GetEventModuleNetworkComponent(UObject* InWorldContext);
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
+	static void UnsubscribeAllEvent();
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static void SubscribeEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static void UnsubscribeEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static void UnsubscribeAllEvent(const UObject* InWorldContext);
-
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "EventModuleBPLibrary")
-	static void BroadcastEvent(const UObject* InWorldContext, TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
+	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
 };

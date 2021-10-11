@@ -16,8 +16,10 @@ class WHFRAMEWORK_API UDebugModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static ADebugModule* DebugModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "DebugModuleBPLibrary")
-	static ADebugModule* GetDebugModule(UObject* InWorldContext);
+public:
+	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
+	static void EnsureCrash(const FString& Message, bool bNoCrash = false);
+	
+	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
+	static void EnsureEditorCrash(const FString& Message, bool bNoCrash = false);
 };

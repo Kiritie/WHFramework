@@ -24,6 +24,8 @@ class WHFRAMEWORK_API IWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual void OnCreate() = 0;
+
 	virtual void OnInitialize(AActor* InOwner = nullptr) = 0;
 
 	virtual void OnOpen(bool bInstant = false) = 0;

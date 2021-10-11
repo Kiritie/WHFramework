@@ -23,6 +23,8 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
+	virtual void OnCreate() override;
+	
 	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
 	virtual void OnOpen(bool bInstant = false) override;

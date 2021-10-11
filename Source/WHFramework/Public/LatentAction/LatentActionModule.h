@@ -23,7 +23,10 @@ class WHFRAMEWORK_API ALatentActionModule : public AModuleBase
 
 public:
 	ALatentActionModule();
-
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Module
+public:
 #if WITH_EDITOR
 	virtual void OnGenerate_Implementation() override;
 
@@ -38,18 +41,17 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-
-	////////// LatentAction ///////////
+	//////////////////////////////////////////////////////////////////////////
+	/// Translation
 public:
-	
 	void MoveActorTo(AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform,bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
 
 	void RotatorActorTo(AActor* Actor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
 
 	void ScaleActorTo(AActor* Actor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
-	
-	// UFUNCTION(NetMulticast,Reliable)
-	// void Multi_MoveActorTo(AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform,bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
 
-	void DelayPlus(UObject* WorldContextObject, float Duration, EDelayPlusAction::Type DelayPlusAction, FLatentActionInfo LatentInfo);
+	//////////////////////////////////////////////////////////////////////////
+	/// Flow
+public:
+	void CancelableDelay(UObject* WorldContextObject, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo);
 };

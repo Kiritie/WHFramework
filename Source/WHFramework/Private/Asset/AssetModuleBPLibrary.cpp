@@ -6,14 +6,3 @@
 #include "Asset/AssetModule.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
-
-AAssetModule* UAssetModuleBPLibrary::AssetModuleInst = nullptr;
-
-AAssetModule* UAssetModuleBPLibrary::GetAssetModule(UObject* InWorldContext)
-{
-	if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-	{
-		return MainModule->GetModuleByClass<AAssetModule>();
-	}
-	return nullptr;
-}

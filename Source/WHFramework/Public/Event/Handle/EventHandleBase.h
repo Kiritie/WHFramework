@@ -26,8 +26,10 @@ public:
 	EEventType EventType;
 
 public:
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnSpawn_Implementation() override;
 	
+	virtual void OnDespawn_Implementation() override;
+
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
 	bool Filter(UObject* InOwner, const FName InFuncName);
 

@@ -14,10 +14,4 @@ UCLASS()
 class WHFRAMEWORK_API UWebRequestModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
-public:
-	static AWebRequestModule* WebRequestModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "WebRequestModuleBPLibrary")
-	static AWebRequestModule* GetWebRequestModule(UObject* InWorldContext);
 };

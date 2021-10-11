@@ -3,27 +3,14 @@
 
 #include "Parameter/ParameterModuleBPLibrary.h"
 
+#include "DebugModuleTypes.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Parameter/ParameterModule.h"
 
-AParameterModule* UParameterModuleBPLibrary::ParameterModuleInst = nullptr;
-
-AParameterModule* UParameterModuleBPLibrary::GetParameterModule(UObject* InWorldContext)
+bool UParameterModuleBPLibrary::HasParameter(FName InName, bool bEnsured)
 {
-	if (!ParameterModuleInst || !ParameterModuleInst->IsValidLowLevel())
-	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			ParameterModuleInst = MainModule->GetModuleByClass<AParameterModule>();
-		}
-	}
-	return ParameterModuleInst;
-}
-
-bool UParameterModuleBPLibrary::HasParameter(UObject* InWorldContext, FName InName, bool bEnsured)
-{
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->HasParameter(InName, bEnsured);
 	}
@@ -31,17 +18,17 @@ bool UParameterModuleBPLibrary::HasParameter(UObject* InWorldContext, FName InNa
 	return false;
 }
 
-void UParameterModuleBPLibrary::SetParameter(UObject* InWorldContext, FName InName, FParameter InParameter)
+void UParameterModuleBPLibrary::SetParameter(FName InName, FParameter InParameter)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetParameter(InName, InParameter);
 	}
 }
 
-FParameter UParameterModuleBPLibrary::GetParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+FParameter UParameterModuleBPLibrary::GetParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetParameter(InName, bEnsured);
 	}
@@ -49,9 +36,9 @@ FParameter UParameterModuleBPLibrary::GetParameter(UObject* InWorldContext, FNam
 	return FParameter();
 }
 
-TArray<FParameter> UParameterModuleBPLibrary::GetParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<FParameter> UParameterModuleBPLibrary::GetParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetParameters(InName, bEnsured);
 	}
@@ -60,17 +47,17 @@ TArray<FParameter> UParameterModuleBPLibrary::GetParameters(UObject* InWorldCont
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetIntegerParameter(UObject* InWorldContext, FName InName, int32 InValue)
+void UParameterModuleBPLibrary::SetIntegerParameter(FName InName, int32 InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetIntegerParameter(InName, InValue);
 	}
 }
 
-int32 UParameterModuleBPLibrary::GetIntegerParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+int32 UParameterModuleBPLibrary::GetIntegerParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetIntegerParameter(InName, bEnsured);
 	}
@@ -78,9 +65,9 @@ int32 UParameterModuleBPLibrary::GetIntegerParameter(UObject* InWorldContext, FN
 	return 0;
 }
 
-TArray<int32> UParameterModuleBPLibrary::GetIntegerParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<int32> UParameterModuleBPLibrary::GetIntegerParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetIntegerParameters(InName, bEnsured);
 	}
@@ -89,17 +76,17 @@ TArray<int32> UParameterModuleBPLibrary::GetIntegerParameters(UObject* InWorldCo
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetFloatParameter(UObject* InWorldContext, FName InName, float InValue)
+void UParameterModuleBPLibrary::SetFloatParameter(FName InName, float InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetFloatParameter(InName, InValue);
 	}
 }
 
-float UParameterModuleBPLibrary::GetFloatParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+float UParameterModuleBPLibrary::GetFloatParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetFloatParameter(InName, bEnsured);
 	}
@@ -107,9 +94,9 @@ float UParameterModuleBPLibrary::GetFloatParameter(UObject* InWorldContext, FNam
 	return 0.f;
 }
 
-TArray<float> UParameterModuleBPLibrary::GetFloatParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<float> UParameterModuleBPLibrary::GetFloatParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetFloatParameters(InName, bEnsured);
 	}
@@ -118,17 +105,17 @@ TArray<float> UParameterModuleBPLibrary::GetFloatParameters(UObject* InWorldCont
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetStringParameter(UObject* InWorldContext, FName InName, const FString& InValue)
+void UParameterModuleBPLibrary::SetStringParameter(FName InName, const FString& InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetStringParameter(InName, InValue);
 	}
 }
 
-FString UParameterModuleBPLibrary::GetStringParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+FString UParameterModuleBPLibrary::GetStringParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetStringParameter(InName, bEnsured);
 	}
@@ -136,9 +123,9 @@ FString UParameterModuleBPLibrary::GetStringParameter(UObject* InWorldContext, F
 	return TEXT("");
 }
 
-TArray<FString> UParameterModuleBPLibrary::GetStringParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<FString> UParameterModuleBPLibrary::GetStringParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetStringParameters(InName, bEnsured);
 	}
@@ -147,17 +134,17 @@ TArray<FString> UParameterModuleBPLibrary::GetStringParameters(UObject* InWorldC
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetBooleanParameter(UObject* InWorldContext, FName InName, bool InValue)
+void UParameterModuleBPLibrary::SetBooleanParameter(FName InName, bool InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetBooleanParameter(InName, InValue);
 	}
 }
 
-bool UParameterModuleBPLibrary::GetBooleanParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+bool UParameterModuleBPLibrary::GetBooleanParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetBooleanParameter(InName, bEnsured);
 	}
@@ -165,9 +152,9 @@ bool UParameterModuleBPLibrary::GetBooleanParameter(UObject* InWorldContext, FNa
 	return false;
 }
 
-TArray<bool> UParameterModuleBPLibrary::GetBooleanParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<bool> UParameterModuleBPLibrary::GetBooleanParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetBooleanParameters(InName, bEnsured);
 	}
@@ -176,17 +163,17 @@ TArray<bool> UParameterModuleBPLibrary::GetBooleanParameters(UObject* InWorldCon
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetVectorParameter(UObject* InWorldContext, FName InName, FVector InValue)
+void UParameterModuleBPLibrary::SetVectorParameter(FName InName, FVector InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetVectorParameter(InName, InValue);
 	}
 }
 
-FVector UParameterModuleBPLibrary::GetVectorParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+FVector UParameterModuleBPLibrary::GetVectorParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetVectorParameter(InName, bEnsured);
 	}
@@ -194,9 +181,9 @@ FVector UParameterModuleBPLibrary::GetVectorParameter(UObject* InWorldContext, F
 	return FVector();
 }
 
-TArray<FVector> UParameterModuleBPLibrary::GetVectorParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<FVector> UParameterModuleBPLibrary::GetVectorParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetVectorParameters(InName, bEnsured);
 	}
@@ -205,17 +192,17 @@ TArray<FVector> UParameterModuleBPLibrary::GetVectorParameters(UObject* InWorldC
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetRotatorParameter(UObject* InWorldContext, FName InName, FRotator InValue)
+void UParameterModuleBPLibrary::SetRotatorParameter(FName InName, FRotator InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetRotatorParameter(InName, InValue);
 	}
 }
 
-FRotator UParameterModuleBPLibrary::GetRotatorParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+FRotator UParameterModuleBPLibrary::GetRotatorParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetRotatorParameter(InName, bEnsured);
 	}
@@ -223,9 +210,9 @@ FRotator UParameterModuleBPLibrary::GetRotatorParameter(UObject* InWorldContext,
 	return FRotator();
 }
 
-TArray<FRotator> UParameterModuleBPLibrary::GetRotatorParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<FRotator> UParameterModuleBPLibrary::GetRotatorParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetRotatorParameters(InName, bEnsured);
 	}
@@ -234,17 +221,17 @@ TArray<FRotator> UParameterModuleBPLibrary::GetRotatorParameters(UObject* InWorl
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetClassParameter(UObject* InWorldContext, FName InName, UClass* InValue)
+void UParameterModuleBPLibrary::SetClassParameter(FName InName, UClass* InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetClassParameter(InName, InValue);
 	}
 }
 
-UClass* UParameterModuleBPLibrary::GetClassParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+UClass* UParameterModuleBPLibrary::GetClassParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetClassParameter(InName, bEnsured);
 	}
@@ -252,9 +239,9 @@ UClass* UParameterModuleBPLibrary::GetClassParameter(UObject* InWorldContext, FN
 	return nullptr;
 }
 
-TArray<UClass*> UParameterModuleBPLibrary::GetClassParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<UClass*> UParameterModuleBPLibrary::GetClassParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetClassParameters(InName, bEnsured);
 	}
@@ -263,17 +250,17 @@ TArray<UClass*> UParameterModuleBPLibrary::GetClassParameters(UObject* InWorldCo
 }
 
 //////////////////////////////////////////////////////////////////////////
-void UParameterModuleBPLibrary::SetObjectParameter(UObject* InWorldContext, FName InName, UObject* InValue)
+void UParameterModuleBPLibrary::SetObjectParameter(FName InName, UObject* InValue)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		ParameterModule->SetObjectParameter(InName, InValue);
 	}
 }
 
-UObject* UParameterModuleBPLibrary::GetObjectParameter(UObject* InWorldContext, FName InName, bool bEnsured)
+UObject* UParameterModuleBPLibrary::GetObjectParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetObjectParameter(InName, bEnsured);
 	}
@@ -281,9 +268,9 @@ UObject* UParameterModuleBPLibrary::GetObjectParameter(UObject* InWorldContext, 
 	return nullptr;
 }
 
-TArray<UObject*> UParameterModuleBPLibrary::GetObjectParameters(UObject* InWorldContext, FName InName, bool bEnsured)
+TArray<UObject*> UParameterModuleBPLibrary::GetObjectParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = GetParameterModule(InWorldContext))
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
 	{
 		return ParameterModule->GetObjectParameters(InName, bEnsured);
 	}

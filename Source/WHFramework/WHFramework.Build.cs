@@ -39,6 +39,7 @@ public class WHFramework : ModuleRules
 				"UMG",
 				"Slate",
 				"SlateCore",
+				"MediaAssets"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

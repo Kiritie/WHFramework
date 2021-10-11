@@ -6,40 +6,26 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-AObjectPoolModule* UObjectPoolModuleBPLibrary::ObjectPoolModuleInst = nullptr;
-
-AObjectPoolModule* UObjectPoolModuleBPLibrary::GetObjectPoolModule(UObject* InWorldContext)
+UObject* UObjectPoolModuleBPLibrary::K2_SpawnObject(TSubclassOf<UObject> InType)
 {
-	if (!ObjectPoolModuleInst || !ObjectPoolModuleInst->IsValidLowLevel())
-	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			ObjectPoolModuleInst = MainModule->GetModuleByClass<AObjectPoolModule>();
-		}
-	}
-	return ObjectPoolModuleInst;
-}
-
-UObject* UObjectPoolModuleBPLibrary::K2_SpawnObject(UObject* InWorldContext, TSubclassOf<UObject> InType)
-{
-	if(AObjectPoolModule* ObjectPoolModule = GetObjectPoolModule(InWorldContext))
+	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 	{
 		return ObjectPoolModule->K2_SpawnObject(InType);
 	}
 	return nullptr;
 }
 
-void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InWorldContext, UObject* InObject)
+void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
 {
-	if(AObjectPoolModule* ObjectPoolModule = GetObjectPoolModule(InWorldContext))
+	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 	{
 		ObjectPoolModule->DespawnObject(InObject);
 	}
 }
 
-void UObjectPoolModuleBPLibrary::ClearAllObject(UObject* InWorldContext)
+void UObjectPoolModuleBPLibrary::ClearAllObject()
 {
-	if(AObjectPoolModule* ObjectPoolModule = GetObjectPoolModule(InWorldContext))
+	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 	{
 		ObjectPoolModule->ClearAllObject();
 	}

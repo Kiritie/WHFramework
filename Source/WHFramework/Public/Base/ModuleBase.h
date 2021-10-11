@@ -8,7 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "ModuleBase.generated.h"
 
-UCLASS()
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API AModuleBase : public AActor, public IModule
 {
 	GENERATED_BODY()

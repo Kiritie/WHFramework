@@ -11,6 +11,8 @@
 #include "UserWidgetBase.h"
 #include "WidgetModule.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChangeInputMode, EInputMode, InInputMode);
+
 UCLASS()
 class WHFRAMEWORK_API AWidgetModule : public AModuleBase
 {
@@ -85,7 +87,7 @@ public:
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), InWidgetClass))
 		{
-			UserWidget->OnInitialize();
+			UserWidget->OnCreate();
 			switch (UserWidget->GetWidgetType())
 			{
 				case EWidgetType::Permanent:
@@ -265,7 +267,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = &SNew(T))
 		{
-			SlateWidget->OnInitialize();
+			SlateWidget->OnCreate();
 			const FName WidgetName = typeid(SlateWidget).name();
 			switch (SlateWidget->GetWidgetType())
 			{
@@ -396,6 +398,10 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EInputMode InputMode;
+
+public:
+	UPROPERTY(BlueprintCallable)
+	FOnChangeInputMode OnChangeInputMode;
 
 public:
 	UFUNCTION(BlueprintCallable)

@@ -16,13 +16,8 @@ UCLASS()
 class WHFRAMEWORK_API ULatentActionModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-	
+
 public:
-	static ALatentActionModule* LatentActionModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "LatentFunction")
-	static ALatentActionModule* GetLatentActionModule(const UObject* InWorldContext);
-
 	/**
 	* MoveActorTo
 	* 将插值对象移动到期望位置,优先使用锚点位置
@@ -41,24 +36,24 @@ public:
 	* @param LatentInfo
 	* @return void
 	*/
-	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject", BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath", UnsafeDuringActorConstruction = "true"), Category="LatentFunction")
+	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject", BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath", UnsafeDuringActorConstruction = "true"), Category="LatentActionModuleBPLibrary")
 	static void MoveActorTo(UObject* WorldContextObject, AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, TEnumAsByte<EMoveActorAction::Type> MoveAction, FLatentActionInfo LatentInfo);
 
-	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject",BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath",UnsafeDuringActorConstruction = "true"), Category="LatentFunction")
+	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject",BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath",UnsafeDuringActorConstruction = "true"), Category="LatentActionModuleBPLibrary")
 	static void RotatorActorTo(UObject* WorldContextObject, AActor* Actor, FRotator InRotator, float ApplicationTime, TEnumAsByte<EMoveActorAction::Type> MoveAction, FLatentActionInfo LatentInfo);
 
-	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject",BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath",UnsafeDuringActorConstruction = "true"), Category="LatentFunction")
+	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject",BlendExp= "1.0", ApplicationTime= "1.0", ExpandEnumAsExecs= "MoveAction", AdvancedDisplay = "bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath",UnsafeDuringActorConstruction = "true"), Category="LatentActionModuleBPLibrary")
 	static void ScaleActorTo(UObject* WorldContextObject, AActor* Actor, FVector InScale3D, float ApplicationTime, TEnumAsByte<EMoveActorAction::Type> MoveAction, FLatentActionInfo LatentInfo);
 	
 	/**
-	* DelayPlus
+	* CancelableDelay
 	* 可以手动停止的延时，用法同Delay
 	* @param WorldContextObject
 	* @param Duration						延时时长
-	* @param DelayPlusAction
+	* @param CancelableDelayAction
 	* @param LatentInfo
 	* @return void
 	*/
-	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject", Duration="0.2", ExpandEnumAsExecs= "DelayPlusAction", Keywords="sleep", UnsafeDuringActorConstruction = "true"), Category="LatentFunction")
-	static void	DelayPlus(UObject* WorldContextObject, float Duration, TEnumAsByte<EDelayPlusAction::Type> DelayPlusAction, FLatentActionInfo LatentInfo);
+	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", WorldContext= "WorldContextObject", Duration="0.2", ExpandEnumAsExecs= "CancelableDelayAction", Keywords="sleep", UnsafeDuringActorConstruction = "true"), Category="LatentActionModuleBPLibrary")
+	static void	CancelableDelay(UObject* WorldContextObject, float Duration, TEnumAsByte<ECancelableDelayAction::Type> CancelableDelayAction, FLatentActionInfo LatentInfo);
 };

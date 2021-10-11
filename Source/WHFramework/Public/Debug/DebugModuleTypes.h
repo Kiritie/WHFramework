@@ -1,61 +1,63 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "DebugModuleTypes.generated.h"
-
-UENUM(BlueprintType)
-enum class EStatusLevel : uint8
-{
-	//普通
-	ERF_Log		UMETA(DisplayName = "ERF_Log"),
-	//警告
-	ERF_Warning		UMETA(DisplayName = "ERF_Warning"),
-	//错误
-	ERF_Error			UMETA(DisplayName = "ERF_Error"),
-};
-int32 EStatusLevelToInt(EStatusLevel StatusLevel);
-
-/**
- * DEFINE_LOG_CATEGORY_STATIC(CategoryName, DefaultVerbosity, CompileTimeVerbosity);
- * CategoryName:分类名称
- * DefaultVerbosity:默认显示等级
- * CompileTimeVerbosity:最大显示等级
- */
 
 // 流程
-DEFINE_LOG_CATEGORY_STATIC(WHProcedureFlow, Log, All);
-
-// 控制器
-DEFINE_LOG_CATEGORY_STATIC(WHPlayerController, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(WHProcedure, Log, All);
 
 // 事件
 DEFINE_LOG_CATEGORY_STATIC(WHEvent, Log, All);
 
-// HTTP请求
-DEFINE_LOG_CATEGORY_STATIC(WHHTTP, Log, All);
+// 网络
+DEFINE_LOG_CATEGORY_STATIC(WHNetwork, Log, All);
 
-#define WH_LOG(CategoryName, Verbosity, Format, ...) { UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); }
-#define WH_StatusLog(CategoryName, device_status_code, device_status_level, Format, ...) \
+// Web请求
+DEFINE_LOG_CATEGORY_STATIC(WHWebRequest, Log, All);
+
+// 打印
+#define WH_LOG(CategoryName, Verbosity, Format, ...) \
+{ \
+	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
+}
+
+// 断言实现
+#define WH_ENSURE_IMPL(Capture, InExpression, InFormat, ...) \
+(LIKELY(!!(InExpression)) || (([Capture] () ->bool \
+{ \
+	static bool bExecuted = false; \
+	if ((!bExecuted)) \
 	{ \
-		if (device_status_level == EStatusLevel::ERF_Warning) { UE_LOG(CategoryName, Warning, Format, ##__VA_ARGS__); }\
-		else if (device_status_level == EStatusLevel::ERF_Error) { UE_LOG(CategoryName, Error, Format, ##__VA_ARGS__); }\
-		else { UE_LOG(CategoryName, Log, Format, ##__VA_ARGS__); }\
-		FString __Z__LogContent = FString::Printf(Format, ##__VA_ARGS__); \
-		FWHLog::StatusLog(device_status_code, device_status_level, __Z__LogContent);\
-	}
+		bExecuted = true; \
+		FString Expr = #InExpression;\
+		FString File = __FILE__;\
+		int32 Line = __LINE__;\
+		UE_LOG(LogTemp, Error, TEXT("IVREAL UE4 CRASH"));\
+		UE_LOG(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
+		UE_LOG(LogTemp, Error, InFormat, ##__VA_ARGS__); \
+	} \
+	return false; \
+})()))
 
-class WHFRAMEWORK_API FWHLog 
-{
-public:
-
-	static void StatusLog(int32 device_status_code, EStatusLevel device_status_level, const FString& device_status_info);
-};
-
-// 用这两个断言, 代替多数, 仅需要在编辑器中进行判断的断言
+// 用这两个断言, 代替多数仅需要在编辑器中进行判断的断言
 #if WITH_EDITOR
 	#define ensureEditor(InExpression) ensureAlways(InExpression)
 	#define ensureEditorMsgf( InExpression, InFormat, ... ) ensureAlwaysMsgf( InExpression, InFormat, ##__VA_ARGS__)
 #else
-	#define ensureEditor(InExpression) IVREAL_ENSURE_IMPL( , InExpression, TEXT(""))
-	#define ensureEditorMsgf( InExpression, InFormat, ... ) IVREAL_ENSURE_IMPL(&, InExpression, InFormat, ##__VA_ARGS__)
+	#define ensureEditor(InExpression) WH_ENSURE_IMPL( , InExpression, TEXT(""))
+	#define ensureEditorMsgf( InExpression, InFormat, ... ) WH_ENSURE_IMPL(&, InExpression, InFormat, ##__VA_ARGS__)
 #endif
+
+/*
+ * 输出调试信息到游戏窗口
+ * @param Message 消息内容
+ * @param DisplayColor 显示颜色
+ * @param Duration 程持续时间
+ * @param bNewerOnTop 更新在顶部
+ */
+FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor, float Duration = 1.5f, bool bNewerOnTop = true)
+{
+	if(GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, Duration, DisplayColor, Message, bNewerOnTop);
+	}
+}

@@ -9,9 +9,10 @@
 
 #include "MainModuleBPLibrary.generated.h"
 
+class UModuleNetworkComponent;
 class IModule;
-class AModuleBase;
 class AMainModule;
+class AModuleBase;
 /**
  * 
  */
@@ -21,14 +22,15 @@ class WHFRAMEWORK_API UMainModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static AMainModule* MainModuleInst;
+	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
+	static AMainModule* GetMainModule();
 
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "MainModuleBPLibrary")
-	static AMainModule* GetMainModule(const UObject* InWorldContext);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
+	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
 
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext", DisplayName = "Get Module By Class", DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
-	static AModuleBase* K2_GetModuleByClass(const UObject* InWorldContext, TSubclassOf<AModuleBase> InModuleClass);
-	
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext", DisplayName = "Get Module By Name"), Category = "MainModuleBPLibrary")
-	static TScriptInterface<IModule> K2_GetModuleByName(const UObject* InWorldContext, const FName InModuleName);
+	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
+	static TScriptInterface<IModule> GetModuleByName(const FName InModuleName);
+
+	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
+	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass);
 };

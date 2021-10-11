@@ -3,6 +3,7 @@
 
 #include "Network/NetworkModule.h"
 
+#include "MainModule.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Network/NetworkModuleNetworkComponent.h"
@@ -66,10 +67,10 @@ void ANetworkModule::ServerExecuteActorFunc(AActor* InActor, FName InFuncName)
 	{
 		if (ExecuteObjectFunc(InActor, InFuncName, nullptr))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFunc(InActor, InFuncName);
 	}
@@ -81,10 +82,10 @@ void ANetworkModule::ServerExecuteActorFuncOneParam(AActor* InActor, FName InFun
 	{
 		if (ExecuteObjectFunc(InActor, InFuncName, &InParam))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFuncOneParam(InActor, InFuncName, InParam);
 	}
@@ -102,10 +103,10 @@ void ANetworkModule::ServerExecuteActorFuncTwoParam(AActor* InActor, FName InFun
 		
 		if (ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFuncTwoParam(InActor, InFuncName, InParam1, InParam2);
 	}
@@ -124,10 +125,10 @@ void ANetworkModule::ServerExecuteActorFuncThreeParam(AActor* InActor, FName InF
 		
 		if (ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFuncThreeParam(InActor, InFuncName, InParam1, InParam2, InParam3);
 	}
@@ -147,10 +148,10 @@ void ANetworkModule::ServerExecuteActorFuncFourParam(AActor* InActor, FName InFu
 
 		if (ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFuncFourParam(InActor, InFuncName, InParam1, InParam2, InParam3, InParam4);
 	}
@@ -171,10 +172,10 @@ void ANetworkModule::ServerExecuteActorFuncFiveParam(AActor* InActor, FName InFu
 		
 		if (ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WH_LOG(WHPlayerController, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WH_LOG(WHNetwork, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
 		}
 	}
-	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = UNetworkModuleBPLibrary::GetNetworkModuleNetworkComponent(this))
+	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
 	{
 		NetworkModuleNetworkComponent->ServerExecuteActorFuncFiveParam(InActor, InFuncName, InParam1, InParam2, InParam3, InParam4, InParam5);
 	}

@@ -21,6 +21,9 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
+	void OnCreate() override;
+
+	UFUNCTION(BlueprintNativeEvent)
 	void OnInitialize(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)

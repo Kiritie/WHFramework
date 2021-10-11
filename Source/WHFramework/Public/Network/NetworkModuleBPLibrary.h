@@ -17,38 +17,29 @@ class WHFRAMEWORK_API UNetworkModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
-public:
-	static ANetworkModule* NetworkModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static ANetworkModule* GetNetworkModule(UObject* InWorldContext);
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static class UNetworkModuleNetworkComponent* GetNetworkModuleNetworkComponent(UObject* InWorldContext);
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute Object Func
 public:
-	static bool ExecuteObjectFunc(UObject* InWorldContext, UObject* InObject, const FName& InFuncName, void* Params);
+	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute Actor Func
 public:
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFunc(UObject* InWorldContext, AActor* InActor, FName InFuncName);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFunc(AActor* InActor, FName InFuncName);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFuncOneParam(UObject* InWorldContext, AActor* InActor, FName InFuncName, FParameter InParam);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFuncOneParam(AActor* InActor, FName InFuncName, FParameter InParam);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFuncTwoParam(UObject* InWorldContext, AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFuncTwoParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFuncThreeParam(UObject* InWorldContext, AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFuncThreeParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFuncFourParam(UObject* InWorldContext, AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFuncFourParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "NetworkModuleBPLibrary")
-	static void ServerExecuteActorFuncFiveParam(UObject* InWorldContext, AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4, FParameter InParam5);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
+	static void ServerExecuteActorFuncFiveParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4, FParameter InParam5);
 };

@@ -203,6 +203,7 @@ void AWidgetModule::SetInputMode(EInputMode InInputMode)
 					break;
 				}
 			}
+			OnChangeInputMode.Broadcast(InputMode);
 		}
 	}
 }

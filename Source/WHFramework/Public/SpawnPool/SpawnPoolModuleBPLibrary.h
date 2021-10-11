@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include "MainModule.h"
 #include "SpawnPoolModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "SpawnPoolModuleBPLibrary.generated.h"
@@ -17,27 +18,22 @@ class WHFRAMEWORK_API USpawnPoolModuleBPLibrary : public UBlueprintFunctionLibra
 	GENERATED_BODY()
 
 public:
-	static ASpawnPoolModule* SpawnPoolModuleInst;
-
-	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "SpawnPoolModuleBPLibrary")
-	static ASpawnPoolModule* GetSpawnPoolModule(UObject* InWorldContext);
-
 	template<class T>
-	static T* SpawnActor(UObject* InWorldContext, TSubclassOf<AActor> InType = T::StaticClass())
+	static T* SpawnActor(TSubclassOf<AActor> InType = T::StaticClass())
 	{
-		if(ASpawnPoolModule* SpawnPoolModule = GetSpawnPoolModule(InWorldContext))
+		if(ASpawnPoolModule* SpawnPoolModule = AMainModule::GetModuleByClass<ASpawnPoolModule>())
 		{
 			return SpawnPoolModule->SpawnActor<T>(InType);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", DisplayName = "Spawn Actor"), Category = "SpawnPoolModuleBPLibrary")
-	static AActor* K2_SpawnActor(UObject* InWorldContext, TSubclassOf<AActor> InType);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Actor"), Category = "SpawnPoolModuleBPLibrary")
+	static AActor* K2_SpawnActor(TSubclassOf<AActor> InType);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "SpawnPoolModuleBPLibrary")
-	static void DespawnActor(UObject* InWorldContext, AActor* InActor);
+	UFUNCTION(BlueprintCallable, Category = "SpawnPoolModuleBPLibrary")
+	static void DespawnActor(AActor* InActor);
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext"), Category = "SpawnPoolModuleBPLibrary")
-	static void ClearAllActor(UObject* InWorldContext);
+	UFUNCTION(BlueprintCallable, Category = "SpawnPoolModuleBPLibrary")
+	static void ClearAllActor();
 };

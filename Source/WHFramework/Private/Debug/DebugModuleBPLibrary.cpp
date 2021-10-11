@@ -3,20 +3,24 @@
 
 #include "Debug/DebugModuleBPLibrary.h"
 
+#include "DebugModuleTypes.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Debug/DebugModule.h"
 
-ADebugModule* UDebugModuleBPLibrary::DebugModuleInst = nullptr;
-
-ADebugModule* UDebugModuleBPLibrary::GetDebugModule(UObject* InWorldContext)
+void UDebugModuleBPLibrary::EnsureCrash(const FString& Message, bool bNoCrash)
 {
-	if (!DebugModuleInst || !DebugModuleInst->IsValidLowLevel())
+	ensureMsgf(bNoCrash, TEXT("%s"), *Message);
+}
+
+void UDebugModuleBPLibrary::EnsureEditorCrash(const FString& Message, bool bNoCrash)
+{
+#if WITH_EDITOR
+	ensureEditorMsgf(bNoCrash, TEXT("%s"), *Message);
+#else
+	if(!bNoCrash)
 	{
-		if(AMainModule* MainModule = UMainModuleBPLibrary::GetMainModule(InWorldContext))
-		{
-			DebugModuleInst = MainModule->GetModuleByClass<ADebugModule>();
-		}
+		WH_LOG(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
 	}
-	return DebugModuleInst;
+#endif
 }

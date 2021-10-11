@@ -6,11 +6,15 @@
 #include "GameFramework/Actor.h"
 #include "Base/Module.h"
 #include "MainModuleTypes.h"
+#include "ModuleBase.h"
+#include "ModuleNetworkComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "MainModule.generated.h"
 
-class AIVRealGameState;
 class AModuleBase;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnModuleInitialized);
 
 UCLASS()
 class WHFRAMEWORK_API AMainModule : public AActor
@@ -30,6 +34,14 @@ protected:
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Instance
+protected:
+	static AMainModule* Current;
+
+public:
+	static AMainModule* Get() { return Current; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -64,48 +76,61 @@ public:
 	/// 模块列表
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "MainModule")
 	TArray<TScriptInterface<IModule>> ModuleRefs;
+	/// 当模块初始化完成
+	UPROPERTY(BlueprintAssignable);
+	FOnModuleInitialized OnModuleInitialized;
+
+protected:
+	UPROPERTY()
+	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
 public:
 	/**
 	 * 通过类型获取模块
 	 */
 	template<class T>
-	T* GetModuleByClass()
+	static T* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass = T::StaticClass())
 	{
-		for(int32 i = 0; i < ModuleRefs.Num(); i++)
+		if(Current && Current->IsValidLowLevel())
 		{
-			if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i].GetObject()->IsA(T::StaticClass()))
+			AModuleBase* ModuleBase = InModuleClass.GetDefaultObject();
+			if(Current->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
 			{
-				return Cast<T>(ModuleRefs[i].GetObject());
+				return Cast<T>(Current->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
 			}
 		}
 		return nullptr;
 	}
-	/**
-	* 通过类型获取模块
-	*/
-	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Get Module By Class", DeterminesOutputType = "InModuleClass"))
-	AModuleBase* K2_GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
 	/**
 	* 通过名称获取模块
 	*/
 	template<class T>
-	T* GetModuleByName(const FName InModuleName)
+	static T* GetModuleByName(const FName InModuleName)
 	{
-		for(int32 i = 0; i < ModuleRefs.Num(); i++)
+		if(Current && Current->IsValidLowLevel())
 		{
-			if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->GetModuleName() == InModuleName)
+			if(Current->ModuleMap.Contains(InModuleName))
 			{
-				return Cast<T>(ModuleRefs[i].GetObject());
+				return Cast<T>(Current->ModuleMap[InModuleName].GetObject());
 			}
 		}
 		return nullptr;
 	}
 	/**
-	* 通过名称获取模块
+	* 通过类型获取模块网络组件
 	*/
-	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Get Module By Name"))
-	TScriptInterface<IModule> K2_GetModuleByName(const FName InModuleName);
+	template<class T>
+	static T* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass = T::StaticClass())
+	{
+		if(Current && Current->IsValidLowLevel())
+		{
+			if(APlayerController* PlayerController = UGameplayStatics::GetPlayerController(Current, 0))
+			{
+				return Cast<T>(PlayerController->GetComponentByClass(InModuleClass));
+			}
+		}
+		return nullptr;
+	}
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
