@@ -3,6 +3,5 @@
 
 #include "WebRequest/WebRequestModuleBPLibrary.h"
 
-#include "WebRequestModule.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"

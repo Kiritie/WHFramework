@@ -3,7 +3,7 @@
 
 #include "Procedure/ProcedureModule.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Engine/TargetPoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/Base/ProcedureBase.h"

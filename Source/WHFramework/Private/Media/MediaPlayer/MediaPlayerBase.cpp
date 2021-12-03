@@ -3,7 +3,7 @@
 
 #include "Media/MediaPlayer/MediaPlayerBase.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Media/MediaModuleBPLibrary.h"
 #include "Media/MediaModuleNetworkComponent.h"
 #include "Scene/SceneModuleBPLibrary.h"

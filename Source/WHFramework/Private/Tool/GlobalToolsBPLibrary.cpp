@@ -3,7 +3,7 @@
 
 #include "Tool/GlobalToolsBPLibrary.h"
 
-#include "DebugModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
 
 FString UGlobalToolsBPLibrary::EnumValueToString(const FString& InEnumName, int32 InEnumValue)
 {

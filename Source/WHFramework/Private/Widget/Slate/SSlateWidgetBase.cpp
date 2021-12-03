@@ -3,7 +3,8 @@
 
 #include "Widget/Slate/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
-#include "WidgetModuleBPLibrary.h"
+#include "Main/MainModule.h"
+#include "Widget/WidgetModule.h"
 
 class AWidgetModule;
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION

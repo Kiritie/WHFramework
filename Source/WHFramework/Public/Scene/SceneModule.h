@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 
-#include "PhysicsVolumeTypes.h"
 #include "Base/ModuleBase.h"
+#include "Object/PhysicsVolume/PhysicsVolumeTypes.h"
 
 #include "SceneModule.generated.h"
 

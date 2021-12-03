@@ -3,7 +3,7 @@
 
 #include "LatentAction/LatentActionModule.h"
 
-#include "DebugModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
 
 ALatentActionModule::ALatentActionModule()
 {

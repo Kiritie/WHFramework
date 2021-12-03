@@ -1,11 +1,10 @@
 
 #include "Scene/SceneModule.h"
 
-#include "PhysicsVolumeBase.h"
-#include "SpawnPoolModuleBPLibrary.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/TargetPoint.h"
 #include "Scene/Object/SceneObject.h"
+#include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
 
 ASceneModule::ASceneModule()
 {

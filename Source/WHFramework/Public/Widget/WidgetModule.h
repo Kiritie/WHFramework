@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 
-#include "ModuleBase.h"
-#include "SSlateWidgetBase.h"
+#include "Base/ModuleBase.h"
 #include "GameFramework/Actor.h"
-#include "UserWidget.h"
-#include "UserWidgetBase.h"
+#include "Widget/WidgetModuleTypes.h"
+#include "Widget/Slate/SSlateWidgetBase.h"
+#include "Widget/User/UserWidgetBase.h"
 #include "WidgetModule.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChangeInputMode, EInputMode, InInputMode);
@@ -42,17 +42,17 @@ public:
 	// UserWidget
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TMap<FName, class UUserWidgetBase*> AllUserWidgets;
+	TMap<FName, UUserWidgetBase*> AllUserWidgets;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TMap<FName, class UUserWidgetBase*> PermanentUserWidgets;
+	TMap<FName, UUserWidgetBase*> PermanentUserWidgets;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	class UUserWidgetBase* TemporaryUserWidget;
+	UUserWidgetBase* TemporaryUserWidget;
 
 public:
 	template<class T>
-	bool HasUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass()) const
+	bool HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass()) const
 	{
 		if(!InWidgetClass) return false;
 
@@ -61,10 +61,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidget"))
-	bool K2_HasUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass) const;
+	bool K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const;
 
 	template<class T>
-	T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass()) const
+	T* GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass()) const
 	{
 		if(!InWidgetClass) return nullptr;
 
@@ -77,10 +77,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
-	class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass) const;
+	UUserWidgetBase* K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const;
 
 	template<class T>
-	T* CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	T* CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(!InWidgetClass) return nullptr;
 		
@@ -113,10 +113,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"))
-	class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidget<T>(InWidgetClass) ? GetUserWidget<UUserWidgetBase>(InWidgetClass) : CreateUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -127,10 +127,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidget"))
-	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	bool OpenUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool OpenUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidget<T>(InWidgetClass) ? GetUserWidget<UUserWidgetBase>(InWidgetClass) : CreateUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -150,10 +150,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget"))
-	bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	bool K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
-	bool CloseUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -169,10 +169,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CloseUserWidget"))
-	bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	bool K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
-	bool ToggleUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool ToggleUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
@@ -183,10 +183,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "ToggleUserWidget"))
-	bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	bool K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
 	template<class T>
-	bool DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(!InWidgetClass) return false;
 
@@ -226,7 +226,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyUserWidget"))
-	bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	bool K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintCallable)
 	void OpenAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);

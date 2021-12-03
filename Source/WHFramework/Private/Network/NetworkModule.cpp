@@ -3,7 +3,7 @@
 
 #include "Network/NetworkModule.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Network/NetworkModuleNetworkComponent.h"

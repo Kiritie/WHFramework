@@ -3,23 +3,23 @@
 
 #include "Main/MainModule.h"
 
-#include "AudioModule.h"
-#include "CharacterModule.h"
-#include "DebugModule.h"
-#include "MediaModule.h"
-#include "ProcedureModule.h"
-#include "SceneModule.h"
-#include "WidgetModule.h"
+#include "Audio/AudioModule.h"
 #include "Asset/AssetModule.h"
 #include "Base/ModuleBase.h"
+#include "Character/CharacterModule.h"
+#include "Debug/DebugModule.h"
 #include "Event/EventModule.h"
 #include "LatentAction/LatentActionModule.h"
+#include "Media/MediaModule.h"
 #include "Network/NetworkModule.h"
 #include "SpawnPool/SpawnPoolModule.h"
 #include "Parameter/ParameterModule.h"
 #include "ObjectPool/ObjectPoolModule.h"
 #include "WebRequest/WebRequestModule.h"
 #include "Net/UnrealNetwork.h"
+#include "Procedure/ProcedureModule.h"
+#include "Scene/SceneModule.h"
+#include "Widget/WidgetModule.h"
 
 AMainModule* AMainModule::Current = nullptr;
 

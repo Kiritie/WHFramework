@@ -2,7 +2,7 @@
 
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"
 

@@ -3,8 +3,7 @@
 
 #include "Event/EventModule.h"
 
-#include "MainModule.h"
-#include "NetworkModuleBPLibrary.h"
+#include "Main/MainModule.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/ActorChannel.h"
 #include "Event/EventModuleBPLibrary.h"
@@ -13,6 +12,7 @@
 #include "Event/Handle/EventHandleBase.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Network/NetworkModuleBPLibrary.h"
 
 // ParamSets default values
 AEventModule::AEventModule()

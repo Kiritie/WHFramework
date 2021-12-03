@@ -6,8 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "Base/Module.h"
 #include "MainModuleTypes.h"
-#include "ModuleBase.h"
-#include "ModuleNetworkComponent.h"
+#include "Base/ModuleBase.h"
+#include "Base/ModuleNetworkComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 #include "MainModule.generated.h"

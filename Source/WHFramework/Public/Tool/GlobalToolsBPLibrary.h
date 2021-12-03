@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 
-#include "ObjectAndNameAsStringProxyArchive.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 #include "GlobalToolsBPLibrary.generated.h"
 

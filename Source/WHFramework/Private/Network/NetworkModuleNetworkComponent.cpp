@@ -2,7 +2,7 @@
 
 #include "Network/NetworkModuleNetworkComponent.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Network/NetworkModule.h"
 #include "Network/NetworkModuleBPLibrary.h"
 

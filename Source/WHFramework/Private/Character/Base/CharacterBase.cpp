@@ -3,7 +3,7 @@
 
 #include "Character/Base/CharacterBase.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Components/AudioComponent.h"
 #include "Debug/DebugModuleTypes.h"

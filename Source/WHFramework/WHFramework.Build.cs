@@ -6,6 +6,10 @@ public class WHFramework : ModuleRules
 {
 	public WHFramework(ReadOnlyTargetRules Target) : base(Target)
 	{
+		bLegacyPublicIncludePaths = false;
+
+		ShadowVariableWarningLevel = WarningLevel.Error;
+
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
 		PublicIncludePaths.AddRange(

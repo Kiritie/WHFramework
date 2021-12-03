@@ -3,7 +3,7 @@
 
 #include "Parameter/ParameterModuleBPLibrary.h"
 
-#include "DebugModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Parameter/ParameterModule.h"

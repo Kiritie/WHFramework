@@ -3,7 +3,9 @@
 
 #include "Widget/User/UserWidgetBase.h"
 
-#include "WidgetModuleBPLibrary.h"
+#include "Main/MainModule.h"
+#include "Widget/WidgetModule.h"
+#include "Widget/WidgetModuleBPLibrary.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {

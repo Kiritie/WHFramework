@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 
 #include "PhysicsVolumeTypes.h"
-#include "SpawnPoolInterface.h"
 #include "GameFramework/PhysicsVolume.h"
 #include "Scene/Object/SceneObject.h"
+#include "SpawnPool/SpawnPoolInterface.h"
 
 #include "PhysicsVolumeBase.generated.h"
 

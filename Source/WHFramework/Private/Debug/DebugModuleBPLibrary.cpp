@@ -3,10 +3,10 @@
 
 #include "Debug/DebugModuleBPLibrary.h"
 
-#include "DebugModuleTypes.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Debug/DebugModule.h"
+#include "Debug/DebugModuleTypes.h"
 
 void UDebugModuleBPLibrary::EnsureCrash(const FString& Message, bool bNoCrash)
 {

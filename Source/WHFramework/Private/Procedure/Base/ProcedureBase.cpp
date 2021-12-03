@@ -3,9 +3,9 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
-#include "EventHandle_EnterProcedure.h"
-#include "EventHandle_LeaveProcedure.h"
 #include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
+#include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"

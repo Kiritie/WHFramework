@@ -3,9 +3,7 @@
 
 #include "Widget/WidgetModuleBPLibrary.h"
 
-#include "MainModule.h"
-#include "MainModuleBPLibrary.h"
-#include "WidgetModule.h"
+#include "Main/MainModule.h"
 #include "Kismet/GameplayStatics.h"
 
 UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)

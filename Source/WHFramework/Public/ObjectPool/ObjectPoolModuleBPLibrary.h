@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "ObjectPoolModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "ObjectPoolModuleBPLibrary.generated.h"

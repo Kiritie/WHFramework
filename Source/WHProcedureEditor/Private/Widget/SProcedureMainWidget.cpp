@@ -3,7 +3,7 @@
 
 #include "Widget/SProcedureMainWidget.h"
 
-#include "MainModule.h"
+#include "Main/MainModule.h"
 #include "SlateOptMacros.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModuleBPLibrary.h"

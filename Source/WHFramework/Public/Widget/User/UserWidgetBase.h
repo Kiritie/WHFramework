@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 
-#include "WidgetInterface.h"
 #include "Blueprint/UserWidget.h"
+#include "Widget/WidgetInterface.h"
+
 #include "UserWidgetBase.generated.h"
 
 /**

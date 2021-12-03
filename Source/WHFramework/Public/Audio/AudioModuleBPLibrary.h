@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "AudioModuleTypes.h"
+#include "Audio/AudioModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AudioModuleBPLibrary.generated.h"
 

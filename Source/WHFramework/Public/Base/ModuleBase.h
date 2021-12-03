@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Module.h"
+#include "Base/Module.h"
 #include "GameFramework/Actor.h"
 #include "ModuleBase.generated.h"
 
