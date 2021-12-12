@@ -32,12 +32,20 @@ class WHFRAMEWORK_API UGlobalToolsBPLibrary : public UBlueprintFunctionLibrary
 	// Enum
 public:
 	/*
-	 * 将枚举值转换为字符串
+	 * 获取枚举值变量名称
 	 * @param InEnumName 枚举名称
 	 * @param InEnumValue 枚举值
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalTools")
-	static FString EnumValueToString(const FString& InEnumName, int32 InEnumValue);
+	static FString GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue);
+
+	/*
+	* 获取枚举值显示名称
+	* @param InEnumName 枚举名称
+	* @param InEnumValue 枚举值
+	*/
+	UFUNCTION(BlueprintPure, Category = "GlobalTools")
+	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize

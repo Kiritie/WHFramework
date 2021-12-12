@@ -5,13 +5,22 @@
 
 #include "Debug/DebugModuleTypes.h"
 
-FString UGlobalToolsBPLibrary::EnumValueToString(const FString& InEnumName, int32 InEnumValue)
+FString UGlobalToolsBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
 	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
 	{
 		return EnumPtr->GetAuthoredNameStringByValue(InEnumValue);
 	}
 	return TEXT("");
+}
+
+FText UGlobalToolsBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
+{
+	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
+	{
+		return EnumPtr->GetDisplayNameTextByValue(InEnumValue);
+	}
+	return FText::GetEmpty();
 }
 
 void UGlobalToolsBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
