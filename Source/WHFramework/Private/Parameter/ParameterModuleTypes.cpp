@@ -3,6 +3,7 @@
 
 #include "Parameter/ParameterModuleTypes.h"
 
+#include "Debug/DebugModuleTypes.h"
 
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {
