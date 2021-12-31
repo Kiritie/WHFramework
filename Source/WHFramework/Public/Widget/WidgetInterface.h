@@ -53,4 +53,8 @@ public:
 	virtual EInputMode GetInputMode() const = 0;
 
 	virtual AActor* GetOwnerActor() const = 0;
+
+	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const = 0;
+
+	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) = 0;
 };

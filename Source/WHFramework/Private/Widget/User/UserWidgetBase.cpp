@@ -42,11 +42,15 @@ void UUserWidgetBase::OnOpen_Implementation(bool bInstant)
 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
-	if(WidgetType == EWidgetType::Temporary)
+	if(WidgetType == EWidgetType::Temporary || WidgetType == EWidgetType::SemiTemporary)
 	{
 		if(IsInViewport())
 		{
 			RemoveFromViewport();
+		}
+		if(GetLastWidget())
+		{
+			GetLastWidget()->Open();
 		}
 	}
 	SetVisibility(ESlateVisibility::Hidden);

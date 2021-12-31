@@ -61,9 +61,12 @@ protected:
 		
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EInputMode InputMode;
-		
+
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	AActor* OwnerActor;
+	
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	TScriptInterface<IWidgetInterface> LastWidget;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -80,4 +83,10 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
+
+	UFUNCTION(BlueprintPure)
+	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const override { return LastWidget; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
 };

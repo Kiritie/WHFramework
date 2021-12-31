@@ -21,6 +21,26 @@ class WHFRAMEWORK_API UWidgetModuleBPLibrary : public UBlueprintFunctionLibrary
 	// UserWidget
 public:
 	template<class T>
+	static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(FName InName = NAME_None)
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->GetUserWidgetClass<T>(InName);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "CreateUserWidget"), Category = "WidgetModuleBPLibrary")
+	static TSubclassOf<UUserWidgetBase> K2_GetUserWidgetClass(FName InName)
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->K2_GetUserWidgetClass(InName);
+		}
+		return nullptr;
+	}
+
+	template<class T>
 	static T* CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())

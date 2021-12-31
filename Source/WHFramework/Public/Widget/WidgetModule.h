@@ -41,16 +41,39 @@ public:
 	////////////////////////////////////////////////////
 	// UserWidget
 protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TArray<TSubclassOf<UUserWidgetBase>> UserWidgetClasses;
+
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	TMap<FName, UUserWidgetBase*> AllUserWidgets;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TMap<FName, UUserWidgetBase*> PermanentUserWidgets;
-
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	UUserWidgetBase* TemporaryUserWidget;
 
+	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
+
 public:
+	template<class T>
+	TSubclassOf<UUserWidgetBase> GetUserWidgetClass(FName InName = NAME_None) const
+	{
+		if(InName.IsNone()) InName = Cast<UUserWidgetBase>(T::StaticClass()->GetDefaultObject())->GetWidgetName();
+		if(UserWidgetClassMap.Contains(InName))
+		{
+			return UserWidgetClassMap[InName];
+		}
+		return nullptr;
+	}
+	
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UUserWidgetBase> K2_GetUserWidgetClass(FName InName) const
+	{
+		if(UserWidgetClassMap.Contains(InName))
+		{
+			return UserWidgetClassMap[InName];
+		}
+		return nullptr;
+	}
+	
 	template<class T>
 	bool HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass()) const
 	{
@@ -85,27 +108,15 @@ public:
 		if(!InWidgetClass) return nullptr;
 		
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		
+		if(!UserWidgetClassMap.Contains(WidgetName)) return nullptr;
+		
 		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), InWidgetClass))
 		{
 			UserWidget->OnCreate();
-			switch (UserWidget->GetWidgetType())
+			if(!AllUserWidgets.Contains(WidgetName))
 			{
-				case EWidgetType::Permanent:
-				{
-					if(!PermanentUserWidgets.Contains(WidgetName))
-					{
-						PermanentUserWidgets.Add(WidgetName, UserWidget);
-					}
-				}
-				case EWidgetType::Temporary:
-				{
-					if(!AllUserWidgets.Contains(WidgetName))
-					{
-						AllUserWidgets.Add(WidgetName, UserWidget);
-					}
-					break;
-				}
-				default: break;
+				AllUserWidgets.Add(WidgetName, UserWidget);
 			}
 			return Cast<T>(UserWidget);
 		}
@@ -197,25 +208,9 @@ public:
 			{
 				UserWidget->RemoveFromParent();
 				AllUserWidgets.Remove(WidgetName);
-				switch (UserWidget->GetWidgetType())
+				if(TemporaryUserWidget == UserWidget)
 				{
-					case EWidgetType::Permanent:
-					{
-						if(PermanentUserWidgets.Contains(WidgetName))
-						{
-							PermanentUserWidgets.Remove(WidgetName);
-						}
-						break;
-					}
-					case EWidgetType::Temporary:
-					{
-						if(TemporaryUserWidget == UserWidget)
-						{
-							TemporaryUserWidget = nullptr;
-						}
-						break;
-					}
-					default: break;
+					TemporaryUserWidget = nullptr;
 				}
 				UserWidget->OnDestroy();
 				UpdateInputMode();
@@ -238,8 +233,6 @@ public:
 	// SlateWidget
 protected:
 	TMap<FName, TSharedPtr<class SSlateWidgetBase>> AllSlateWidgets;
-
-	TMap<FName, TSharedPtr<class SSlateWidgetBase>> PermanentSlateWidgets;
 
 	TSharedPtr<class SSlateWidgetBase> TemporarySlateWidget;
 
@@ -269,24 +262,9 @@ public:
 		{
 			SlateWidget->OnCreate();
 			const FName WidgetName = typeid(SlateWidget).name();
-			switch (SlateWidget->GetWidgetType())
+			if(!AllSlateWidgets.Contains(WidgetName))
 			{
-				case EWidgetType::Permanent:
-				{
-					if(!PermanentSlateWidgets.Contains(WidgetName))
-					{
-						PermanentSlateWidgets.Add(WidgetName, SlateWidget);
-					}
-				}
-				case EWidgetType::Temporary:
-				{
-					if(!AllSlateWidgets.Contains(WidgetName))
-					{
-						AllSlateWidgets.Add(WidgetName, SlateWidget);
-					}
-					break;
-				}
-				default: break;
+				AllSlateWidgets.Add(WidgetName, SlateWidget);
 			}
 			return Cast<T>(SlateWidget);
 		}
@@ -361,25 +339,9 @@ public:
 			{
 				// SlateWidget->RemoveFromParent();
 				AllSlateWidgets.Remove(WidgetName);
-				switch (SlateWidget->GetWidgetType())
+				if(TemporarySlateWidget == SlateWidget)
 				{
-					case EWidgetType::Permanent:
-					{
-						if(PermanentSlateWidgets.Contains(WidgetName))
-						{
-							PermanentSlateWidgets.Remove(WidgetName);
-						}
-						break;
-					}
-					case EWidgetType::Temporary:
-					{
-						if(TemporarySlateWidget == SlateWidget)
-						{
-							TemporarySlateWidget = nullptr;
-						}
-						break;
-					}
-					default: break;
+					TemporarySlateWidget = nullptr;
 				}
 				SlateWidget->OnDestroy();
 				UpdateInputMode();

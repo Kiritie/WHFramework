@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "WidgetInterface.h"
+#include "Widget/WidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"
 
 /**
@@ -50,6 +50,8 @@ protected:
 	EInputMode InputMode;
 
 	AActor* OwnerActor;
+	
+	TScriptInterface<IWidgetInterface> LastWidget;
 
 public:
 	virtual bool IsOpened() const override;
@@ -59,4 +61,8 @@ public:
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
+
+	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const override { return LastWidget; }
+
+	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
 };

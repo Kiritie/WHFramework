@@ -26,6 +26,18 @@ void AWidgetModule::OnDestroy_Implementation()
 void AWidgetModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : UserWidgetClasses)
+	{
+		if(Iter)
+		{
+			const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+			if(!UserWidgetClassMap.Contains(WidgetName))
+			{
+				UserWidgetClassMap.Add(WidgetName, Iter);
+			}
+		}
+	}
 }
 
 void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -145,12 +157,10 @@ void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 		if(!Iter.Value) continue;
 		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
 		{
-			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
-			{
-				TemporarySlateWidget = nullptr;
-			}
+			Iter.Value->SetLastWidget(nullptr);
 			Iter.Value->OnClose(bInstant);
 		}
+		TemporarySlateWidget = nullptr;
 	}
 }
 

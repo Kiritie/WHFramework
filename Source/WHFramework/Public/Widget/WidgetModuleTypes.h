@@ -28,8 +28,12 @@ enum class EWidgetType : uint8
 {
 	/// 无
 	None,
+	/// 常驻
+	Permanent,
+	/// 半常驻
+	SemiPermanent,
 	/// 临时
 	Temporary,
-	/// 常驻
-	Permanent
+	/// 半临时
+	SemiTemporary
 };
