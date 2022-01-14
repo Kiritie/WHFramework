@@ -69,22 +69,34 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
 	void TerminationModules();
 
-public:
+protected:
 	/// 模块类
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "MainModule")
 	TArray<TSubclassOf<AModuleBase>> ModuleClasses;
 	/// 模块列表
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "MainModule")
 	TArray<TScriptInterface<IModule>> ModuleRefs;
-	/// 当模块初始化完成
-	UPROPERTY(BlueprintAssignable);
-	FOnModuleInitialized OnModuleInitialized;
 
-protected:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
 public:
+	/// 当模块初始化完成
+	UPROPERTY(BlueprintAssignable);
+	FOnModuleInitialized OnModuleInitialized;
+
+public:
+	/**
+	* 获取所有模块
+	*/
+	static TArray<TScriptInterface<IModule>> GetAllModules()
+	{
+		if(Current && Current->IsValidLowLevel())
+		{
+			return Current->ModuleRefs;
+		}
+		return TArray<TScriptInterface<IModule>>();
+	}
 	/**
 	 * 通过类型获取模块
 	 */

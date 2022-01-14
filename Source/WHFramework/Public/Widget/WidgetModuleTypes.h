@@ -5,22 +5,6 @@
 #include "CoreMinimal.h"
 
 /**
-* 输入模式
-*/
-UENUM(BlueprintType)
-enum class EInputMode : uint8
-{
-	/// 无
-	None,
-	/// UI模式
-	UIOnly,
-	/// 游戏和UI模式
-	GameAndUI,
-	/// 游戏模式
-	GameOnly,
-};
-
-/**
 * Widget类型
 */
 UENUM(BlueprintType)
@@ -36,4 +20,22 @@ enum class EWidgetType : uint8
 	Temporary,
 	/// 半临时
 	SemiTemporary
+};
+
+/**
+* Widget状态
+*/
+UENUM(BlueprintType)
+enum class EWidgetState : uint8
+{
+	/// 无
+	None,
+	/// 打开中
+	Opening,
+	/// 已打开
+	Opened,
+	/// 关闭中
+	Closing,
+	/// 已关闭
+	Closed
 };

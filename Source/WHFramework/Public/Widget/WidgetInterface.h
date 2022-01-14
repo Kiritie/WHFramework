@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 
 #include "WidgetModuleTypes.h"
+#include "Input/InputModuleTypes.h"
+#include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
 #include "WidgetInterface.generated.h"
 
@@ -28,9 +30,11 @@ public:
 
 	virtual void OnInitialize(AActor* InOwner = nullptr) = 0;
 
-	virtual void OnOpen(bool bInstant = false) = 0;
+	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
 	
 	virtual void OnClose(bool bInstant = false) = 0;
+
+	virtual void OnReset() = 0;
 
 	virtual void OnRefresh() = 0;
 
@@ -43,12 +47,21 @@ public:
 
 	virtual void Toggle(bool bInstant = false) = 0;
 
+	virtual void Reset() = 0;
+
 	virtual void Refresh() = 0;
 
-public:
-	virtual bool IsOpened() const = 0;
+	virtual void Destroy() = 0;
 
+protected:
+	virtual void FinishOpen(bool bInstant) = 0;
+
+	virtual void FinishClose(bool bInstant) = 0;
+
+public:
 	virtual EWidgetType GetWidgetType() const = 0;
+
+	virtual EWidgetState GetWidgetState() const = 0;
 
 	virtual EInputMode GetInputMode() const = 0;
 

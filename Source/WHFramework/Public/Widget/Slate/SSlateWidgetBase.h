@@ -27,9 +27,11 @@ public:
 	
 	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
-	virtual void OnOpen(bool bInstant = false) override;
+	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
 	virtual void OnClose(bool bInstant = false) override;
+
+	virtual void OnReset() override;
 	
 	virtual void OnRefresh() override;
 
@@ -42,11 +44,22 @@ public:
 
 	virtual void Toggle(bool bInstant) override;
 
+	virtual void Reset() override;
+
 	virtual void Refresh() override;
+
+	virtual void Destroy() override;
+
+protected:
+	virtual void FinishOpen(bool bInstant) override;
+
+	virtual void FinishClose(bool bInstant) override;
 
 protected:
 	EWidgetType WidgetType;
-		
+				
+	EWidgetState WidgetState;
+
 	EInputMode InputMode;
 
 	AActor* OwnerActor;
@@ -54,9 +67,9 @@ protected:
 	TScriptInterface<IWidgetInterface> LastWidget;
 
 public:
-	virtual bool IsOpened() const override;
-	
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
+	
+	virtual EWidgetState GetWidgetState() const override { return WidgetState; }
 
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 

@@ -41,17 +41,17 @@ public:
 	}
 
 	template<class T>
-	static T* CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
-			return WidgetModule->CreateUserWidget<T>(InWidgetClass);
+			return WidgetModule->CreateUserWidget<T>(InOwner, InWidgetClass);
 		}
 		return nullptr;
 	}
 	
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	static class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, AActor* InOwner = nullptr);
 
 	template<class T>
 	static T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -77,20 +77,20 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	static bool K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner);
 
 	template<class T>
-	static bool OpenUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
-			return WidgetModule->OpenUserWidget<T>(bInstant, InWidgetClass);
+			return WidgetModule->OpenUserWidget<T>(InParams, bInstant, InWidgetClass);
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_OpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	static bool K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
 
 	template<class T>
 	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -132,9 +132,6 @@ public:
 	static bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static void OpenAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
-
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
 
 	////////////////////////////////////////////////////
@@ -171,11 +168,11 @@ public:
 	}
 
 	template<class T>
-	static bool OpenSlateWidget(bool bInstant = false)
+	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
-			return WidgetModule->OpenSlateWidget<T>(bInstant);
+			return WidgetModule->OpenSlateWidget<T>(InParams, bInstant);
 		}
 		return false;
 	}
@@ -201,7 +198,7 @@ public:
 	}
 
 	template<class T>
-	static bool RemoveSlateWidget()
+	static bool DestroySlateWidget()
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -210,16 +207,5 @@ public:
 		return false;
 	}
 
-	static void OpenAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
-
 	static void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
-
-	//////////////////////////////////////////////////////////////////////////
-	// InputMode
-public:
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static void SetInputMode(EInputMode InInputMode);
-
-	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
-	static EInputMode GetInputMode();
 };

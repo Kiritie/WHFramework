@@ -11,6 +11,11 @@ AMainModule* UMainModuleBPLibrary::GetMainModule()
 	return AMainModule::Get();
 }
 
+TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModules()
+{
+	return AMainModule::GetAllModules();
+}
+
 AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
 	return AMainModule::GetModuleByClass<AModuleBase>(InModuleClass);

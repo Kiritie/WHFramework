@@ -28,10 +28,13 @@ public:
 	void OnInitialize(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnOpen(bool bInstant = false) override;
+	void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnClose(bool bInstant = false) override;
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnReset() override;
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRefresh() override;
@@ -50,7 +53,20 @@ public:
 	void Toggle(bool bInstant = false) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Reset() override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Refresh() override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Destroy() override;
+	
+protected:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void FinishOpen(bool bInstant) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void FinishClose(bool bInstant) override;
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
@@ -59,6 +75,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EWidgetType WidgetType;
 		
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	EWidgetState WidgetState;
+
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EInputMode InputMode;
 
@@ -70,13 +89,13 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool IsOpened() const override;
-
-	UFUNCTION(BlueprintPure)
 	virtual FName GetWidgetName() const { return WidgetName; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
+
+	UFUNCTION(BlueprintPure)
+	virtual EWidgetState GetWidgetState() const override { return WidgetState; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetInputMode() const override { return InputMode; }

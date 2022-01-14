@@ -25,6 +25,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
 	static AMainModule* GetMainModule();
 
+	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
+	static TArray<TScriptInterface<IModule>> GetAllModules();
+	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
 	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
 

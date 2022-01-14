@@ -6,11 +6,11 @@
 #include "Main/MainModule.h"
 #include "Kismet/GameplayStatics.h"
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
+UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CreateUserWidget(InWidgetClass);
+		return WidgetModule->K2_CreateUserWidget(InWidgetClass, InOwner);
 	}
 	return nullptr;
 }
@@ -24,20 +24,20 @@ UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidget(TSubclassOf<UUserWidge
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool UWidgetModuleBPLibrary::K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_InitializeUserWidget(InOwner, InWidgetClass);
+		return WidgetModule->K2_InitializeUserWidget(InWidgetClass, InOwner);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_OpenUserWidget(InWidgetClass, bInstant);
+		return WidgetModule->K2_OpenUserWidget(InWidgetClass, InParams, bInstant);
 	}
 	return false;
 }
@@ -69,27 +69,11 @@ bool UWidgetModuleBPLibrary::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> I
 	return false;
 }
 
-void UWidgetModuleBPLibrary::OpenAllUserWidget(EWidgetType InWidgetType, bool bInstant)
-{
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		WidgetModule->OpenAllUserWidget(InWidgetType, bInstant);
-	}
-}
-
 void UWidgetModuleBPLibrary::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
 		WidgetModule->CloseAllUserWidget(InWidgetType, bInstant);
-	}
-}
-
-void UWidgetModuleBPLibrary::OpenAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
-{
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		WidgetModule->OpenAllSlateWidget(InWidgetType, bInstant);
 	}
 }
 
@@ -99,21 +83,4 @@ void UWidgetModuleBPLibrary::CloseAllSlateWidget(EWidgetType InWidgetType, bool 
 	{
 		WidgetModule->CloseAllSlateWidget(InWidgetType, bInstant);
 	}
-}
-
-void UWidgetModuleBPLibrary::SetInputMode(EInputMode InInputMode)
-{
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		WidgetModule->SetInputMode(InInputMode);
-	}
-}
-
-EInputMode UWidgetModuleBPLibrary::GetInputMode()
-{
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		return WidgetModule->GetInputMode();
-	}
-	return EInputMode::None;
 }

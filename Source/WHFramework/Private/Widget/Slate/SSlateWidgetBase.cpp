@@ -5,6 +5,7 @@
 #include "SlateOptMacros.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModule.h"
+#include "Widget/WidgetModuleBPLibrary.h"
 
 class AWidgetModule;
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -12,6 +13,7 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 SSlateWidgetBase::SSlateWidgetBase()
 {
 	WidgetType = EWidgetType::None;
+	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 }
@@ -36,15 +38,43 @@ void SSlateWidgetBase::OnInitialize(AActor* InOwner)
 	OwnerActor = InOwner;
 }
 
-void SSlateWidgetBase::OnOpen(bool bInstant)
+void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	SetVisibility(EVisibility::SelfHitTestInvisible);
-	Refresh();
+	WidgetState = EWidgetState::Opening;
+	
+	switch (WidgetType)
+	{
+		case EWidgetType::Permanent:
+		case EWidgetType::SemiPermanent:
+		{
+			SetVisibility(EVisibility::SelfHitTestInvisible);
+		}
+		case EWidgetType::Temporary:
+		case EWidgetType::SemiTemporary:
+		{
+			//AddToViewport();
+		}
+		default: break;
+	}
+	
+	if(bInstant)
+	{
+		FinishOpen(bInstant);
+	}
 }
 
 void SSlateWidgetBase::OnClose(bool bInstant)
 {
-	SetVisibility(EVisibility::Hidden);
+	WidgetState = EWidgetState::Closing;
+
+	if(bInstant)
+	{
+		FinishClose(bInstant);
+	}
+}
+
+void SSlateWidgetBase::OnReset()
+{
 }
 
 void SSlateWidgetBase::OnRefresh()
@@ -57,27 +87,19 @@ void SSlateWidgetBase::OnDestroy()
 
 void SSlateWidgetBase::Open(bool bInstant)
 {
-	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
-	
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{ 
-		WidgetModule->UpdateInputMode();
-	}
+	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(nullptr, bInstant);
 }
 
 void SSlateWidgetBase::Close(bool bInstant)
 {
-	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(GWorld, bInstant);
-	
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		WidgetModule->UpdateInputMode();
-	}
+	//UWidgetModuleBPLibrary::CloseSlateWidget<SSlateWidgetBase>(bInstant);
 }
 
 void SSlateWidgetBase::Toggle(bool bInstant)
 {
-	if(!IsOpened())
+	if(WidgetState == EWidgetState::Opening || WidgetState == EWidgetState::Closing) return;
+	
+	if(WidgetState != EWidgetState::Opened)
 	{
 		Open(bInstant);
 	}
@@ -87,17 +109,61 @@ void SSlateWidgetBase::Toggle(bool bInstant)
 	}
 }
 
+void SSlateWidgetBase::Reset()
+{
+	OnReset();
+}
+
 void SSlateWidgetBase::Refresh()
 {
-	if(IsOpened())
+	if(WidgetState == EWidgetState::Opened)
 	{
 		OnRefresh();
 	}
 }
 
-bool SSlateWidgetBase::IsOpened() const
+void SSlateWidgetBase::Destroy()
 {
-	return GetVisibility() != EVisibility::Hidden && GetVisibility() != EVisibility::Collapsed;
+	//UWidgetModuleBPLibrary::DestroySlateWidget<SSlateWidgetBase>();
+}
+
+void SSlateWidgetBase::FinishOpen(bool bInstant)
+{
+	WidgetState = EWidgetState::Opened;
+
+	Refresh();
+}
+
+void SSlateWidgetBase::FinishClose(bool bInstant)
+{
+	WidgetState = EWidgetState::Closed;
+
+	switch (WidgetType)
+	{
+		case EWidgetType::Permanent:
+		case EWidgetType::SemiPermanent:
+		{
+			SetVisibility(EVisibility::Hidden);
+			break;
+		}
+		case EWidgetType::Temporary:
+		{
+			if(!bInstant && GetLastWidget())
+			{
+				GetLastWidget()->Open();
+			}
+		}
+		case EWidgetType::SemiTemporary:
+		{
+			//RemoveFromViewport();
+		}
+		default: break;
+	}
+
+	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	{
+		InputModule->UpdateInputMode();
+	}
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

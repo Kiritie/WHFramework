@@ -11,6 +11,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 {
 	WidgetName = NAME_None;
 	WidgetType = EWidgetType::None;
+	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 }
@@ -25,40 +26,43 @@ void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 	OwnerActor = InOwner;
 }
 
-void UUserWidgetBase::OnOpen_Implementation(bool bInstant)
+void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(!IsInViewport())
-	{
-		AddToViewport();
-	}
-	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	Refresh();
+	WidgetState = EWidgetState::Opening;
 	
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	switch (WidgetType)
 	{
-		WidgetModule->UpdateInputMode();
+		case EWidgetType::Permanent:
+		case EWidgetType::SemiPermanent:
+		{
+			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		}
+		case EWidgetType::Temporary:
+		case EWidgetType::SemiTemporary:
+		{
+			AddToViewport();
+		}
+		default: break;
+	}
+
+	if(bInstant)
+	{
+		FinishOpen(bInstant);
 	}
 }
 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
-	if(WidgetType == EWidgetType::Temporary || WidgetType == EWidgetType::SemiTemporary)
+	WidgetState = EWidgetState::Closing;
+
+	if(bInstant)
 	{
-		if(IsInViewport())
-		{
-			RemoveFromViewport();
-		}
-		if(GetLastWidget())
-		{
-			GetLastWidget()->Open();
-		}
+		FinishClose(bInstant);
 	}
-	SetVisibility(ESlateVisibility::Hidden);
-	
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-	{
-		WidgetModule->UpdateInputMode();
-	}
+}
+
+void UUserWidgetBase::OnReset_Implementation()
+{
 }
 
 void UUserWidgetBase::OnRefresh_Implementation()
@@ -75,7 +79,7 @@ void UUserWidgetBase::OnDestroy_Implementation()
 
 void UUserWidgetBase::Open_Implementation(bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(bInstant, GetClass());
+	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(nullptr, bInstant, GetClass());
 }
 
 void UUserWidgetBase::Close_Implementation(bool bInstant)
@@ -85,7 +89,9 @@ void UUserWidgetBase::Close_Implementation(bool bInstant)
 
 void UUserWidgetBase::Toggle_Implementation(bool bInstant)
 {
-	if(!IsOpened())
+	if(WidgetState == EWidgetState::Opening || WidgetState == EWidgetState::Closing) return;
+	
+	if(WidgetState != EWidgetState::Opened)
 	{
 		Open(bInstant);
 	}
@@ -95,15 +101,64 @@ void UUserWidgetBase::Toggle_Implementation(bool bInstant)
 	}
 }
 
+void UUserWidgetBase::Reset_Implementation()
+{
+	OnReset();
+}
+
 void UUserWidgetBase::Refresh_Implementation()
 {
-	if(IsOpened())
+	if(WidgetState == EWidgetState::Opened)
 	{
 		OnRefresh();
 	}
 }
 
-bool UUserWidgetBase::IsOpened() const
+void UUserWidgetBase::Destroy_Implementation()
 {
-	return IsInViewport() && GetVisibility() != ESlateVisibility::Hidden && GetVisibility() != ESlateVisibility::Collapsed;
+	UWidgetModuleBPLibrary::DestroyUserWidget<UUserWidgetBase>(GetClass());
+}
+
+void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
+{
+	WidgetState = EWidgetState::Opened;
+
+	Refresh();
+	
+	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	{
+		InputModule->UpdateInputMode();
+	}
+}
+
+void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
+{
+	WidgetState = EWidgetState::Closed;
+
+	switch (WidgetType)
+	{
+		case EWidgetType::Permanent:
+		case EWidgetType::SemiPermanent:
+		{
+			SetVisibility(ESlateVisibility::Hidden);
+			break;
+		}
+		case EWidgetType::Temporary:
+		{
+			if(!bInstant && GetLastWidget())
+			{
+				GetLastWidget()->Open();
+			}
+		}
+		case EWidgetType::SemiTemporary:
+		{
+			RemoveFromViewport();
+		}
+		default: break;
+	}
+
+	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	{
+		InputModule->UpdateInputMode();
+	}
 }

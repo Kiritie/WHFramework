@@ -9,6 +9,7 @@
 #include "Character/CharacterModule.h"
 #include "Debug/DebugModule.h"
 #include "Event/EventModule.h"
+#include "Input/InputModule.h"
 #include "LatentAction/LatentActionModule.h"
 #include "Media/MediaModule.h"
 #include "Network/NetworkModule.h"
@@ -18,6 +19,7 @@
 #include "WebRequest/WebRequestModule.h"
 #include "Net/UnrealNetwork.h"
 #include "Procedure/ProcedureModule.h"
+#include "SaveGame/SaveGameModule.h"
 #include "Scene/SceneModule.h"
 #include "Widget/WidgetModule.h"
 
@@ -39,12 +41,14 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(ACharacterModule::StaticClass());
 	ModuleClasses.Add(ADebugModule::StaticClass());
 	ModuleClasses.Add(AEventModule::StaticClass());
+	ModuleClasses.Add(AInputModule::StaticClass());
 	ModuleClasses.Add(ALatentActionModule::StaticClass());
 	ModuleClasses.Add(AMediaModule::StaticClass());
 	ModuleClasses.Add(ANetworkModule::StaticClass());
 	ModuleClasses.Add(AObjectPoolModule::StaticClass());
 	ModuleClasses.Add(AParameterModule::StaticClass());
 	ModuleClasses.Add(AProcedureModule::StaticClass());
+	ModuleClasses.Add(ASaveGameModule::StaticClass());
 	ModuleClasses.Add(ASceneModule::StaticClass());
 	ModuleClasses.Add(ASpawnPoolModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());

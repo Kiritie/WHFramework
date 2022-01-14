@@ -65,19 +65,19 @@ UUserWidgetBase* AWidgetModule::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> In
 	return GetUserWidget<UUserWidgetBase>(InWidgetClass);
 }
 
-UUserWidgetBase* AWidgetModule::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
+UUserWidgetBase* AWidgetModule::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
-	return CreateUserWidget<UUserWidgetBase>(InWidgetClass);
+	return CreateUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
 }
 
-bool AWidgetModule::K2_InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool AWidgetModule::K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	return InitializeUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
 }
 
-bool AWidgetModule::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool AWidgetModule::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams,  bool bInstant)
 {
-	return OpenUserWidget<UUserWidgetBase>(bInstant, InWidgetClass);
+	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, InWidgetClass);
 }
 
 bool AWidgetModule::K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
@@ -93,25 +93,6 @@ bool AWidgetModule::K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetCla
 bool AWidgetModule::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	return DestroyUserWidget<UUserWidgetBase>(InWidgetClass);
-}
-
-void AWidgetModule::OpenAllUserWidget(EWidgetType InWidgetType, bool bInstant)
-{
-	for (auto Iter : AllUserWidgets)
-	{
-		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
-		{
-			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
-			{
-				if (TemporaryUserWidget)
-				{
-					TemporaryUserWidget->OnClose(bInstant);
-				}
-				TemporaryUserWidget = Iter.Value;
-			}
-			Iter.Value->OnOpen(bInstant);
-		}
-	}
 }
 
 void AWidgetModule::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
@@ -130,26 +111,6 @@ void AWidgetModule::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
 	}
 }
 
-void AWidgetModule::OpenAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
-{
-	for (auto Iter : AllSlateWidgets)
-	{
-		if(!Iter.Value) continue;
-		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
-		{
-			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
-			{
-				if (TemporarySlateWidget)
-				{
-					TemporarySlateWidget->OnClose(bInstant);
-				}
-				TemporarySlateWidget = Iter.Value;
-			}
-			Iter.Value->OnOpen(bInstant);
-		}
-	}
-}
-
 void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)
@@ -164,56 +125,17 @@ void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 	}
 }
 
-void AWidgetModule::UpdateInputMode()
+EInputMode AWidgetModule::GetNativeInputMode() const
 {
-	EInputMode TempInputMode = EInputMode::GameOnly;
-	for (auto Iter : AllUserWidgets)
-	{
-		if(!Iter.Value) continue;
-		UUserWidgetBase* UserWidget = Iter.Value;
-		if (UserWidget && UserWidget->IsOpened() && (int32)UserWidget->GetInputMode() < (int32)TempInputMode)
-		{
-			TempInputMode = UserWidget->GetInputMode();
-		}
-	}
-	SetInputMode(TempInputMode);
-}
-
-void AWidgetModule::SetInputMode(EInputMode InInputMode)
-{
-	if(APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0))
-	{
-		if(InputMode != InInputMode)
-		{
-			InputMode = InInputMode;
-			switch (InInputMode)
-			{
-				case EInputMode::None:
-				{
-					PlayerController->SetInputMode(FInputModeUIOnly());
-					PlayerController->bShowMouseCursor = false;
-					break;
-				}
-				case EInputMode::GameAndUI:
-				{
-					PlayerController->SetInputMode(FInputModeGameAndUI());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				}
-				case EInputMode::GameOnly:
-				{
-					PlayerController->SetInputMode(FInputModeGameOnly());
-					PlayerController->bShowMouseCursor = false;
-					break;
-				}
-				case EInputMode::UIOnly:
-				{
-					PlayerController->SetInputMode(FInputModeUIOnly());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				}
-			}
-			OnChangeInputMode.Broadcast(InputMode);
-		}
-	}
+	EInputMode ReturnValue = EInputMode::GameOnly;
+    for (auto Iter : AllUserWidgets)
+    {
+    	if(!Iter.Value) continue;
+    	UUserWidgetBase* UserWidget = Iter.Value;
+    	if (UserWidget && UserWidget->GetWidgetState() == EWidgetState::Opened && (int32)UserWidget->GetInputMode() < (int32)ReturnValue)
+    	{
+    		ReturnValue = UserWidget->GetInputMode();
+    	}
+    }
+   return ReturnValue;
 }
