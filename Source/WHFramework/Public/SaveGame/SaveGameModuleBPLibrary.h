@@ -78,7 +78,7 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "LoadSaveGame"), Category = "SaveGameModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"), Category = "SaveGameModuleBPLibrary")
 	static bool K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex, bool bRefresh = false);
 
 	template<class T>

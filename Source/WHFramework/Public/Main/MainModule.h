@@ -14,8 +14,6 @@
 
 class AModuleBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnModuleInitialized);
-
 UCLASS()
 class WHFRAMEWORK_API AMainModule : public AActor
 {
@@ -79,11 +77,6 @@ protected:
 
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
-
-public:
-	/// 当模块初始化完成
-	UPROPERTY(BlueprintAssignable);
-	FOnModuleInitialized OnModuleInitialized;
 
 public:
 	/**

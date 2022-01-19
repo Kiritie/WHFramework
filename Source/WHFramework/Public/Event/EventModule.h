@@ -50,7 +50,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeAllEvent();
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParameters"))
 	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
 
 	UFUNCTION(NetMulticast, Reliable)

@@ -90,8 +90,8 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetSaveGame", DeterminesOutputType = "InSaveGameClass"))
 	USaveGameBase* K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const;
 
-	template<class T>
-	T* CreateSaveGame(USaveGameDataBase* InSaveGameData, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	template<class T, typename... ParamTypes>
+	T* CreateSaveGame(ParamTypes... Params, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		if(!InSaveGameClass) return nullptr;
 		
@@ -101,7 +101,7 @@ public:
 			if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InSaveGameClass)))
 			{
 				AllSaveGames.Add(SaveName, SaveGame);
-				SaveGame->OnCreate(InSaveGameData);
+				SaveGame->OnCreate(Params);
 				SaveGame->OnLoad();
 				return Cast<T>(SaveGame);
 			}
@@ -133,7 +133,7 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "LoadSaveGame"))
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
 	bool K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex, bool  bRefresh = false);
 
 	template<class T>
@@ -154,6 +154,10 @@ public:
 					return Cast<T>(SaveGame);
 				}
 			}
+		}
+		else
+		{
+			AllSaveGames[SaveName]->OnLoad();
 		}
 		return nullptr;
 	}

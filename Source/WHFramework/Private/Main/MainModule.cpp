@@ -9,6 +9,8 @@
 #include "Character/CharacterModule.h"
 #include "Debug/DebugModule.h"
 #include "Event/EventModule.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Main/EventHandle_ModuleInitialized.h"
 #include "Input/InputModule.h"
 #include "LatentAction/LatentActionModule.h"
 #include "Media/MediaModule.h"
@@ -176,7 +178,7 @@ void AMainModule::InitializeModules_Implementation()
 			ModuleMap.Add(ModuleRefs[i]->Execute_GetModuleName(ModuleRefs[i].GetObject()), ModuleRefs[i]);
 		}
 	}
-	OnModuleInitialized.Broadcast();
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ModuleInitialized::StaticClass(), EEventNetType::Single, this, TArray<FParameter>());
 }
 
 void AMainModule::RefreshModules_Implementation(float DeltaSeconds)

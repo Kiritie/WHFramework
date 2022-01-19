@@ -6,7 +6,6 @@
 #include "GameFramework/SaveGame.h"
 #include "SaveGameBase.generated.h"
 
-class USaveGameDataBase;
 /**
 * 数据存取基类
 */
@@ -19,26 +18,19 @@ public:
 	USaveGameBase();
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(USaveGameDataBase* InSaveGameData);
+	virtual void OnCreate(...);
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnSave();
+	virtual void OnSave();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnLoad();
+	virtual void OnLoad();
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnUnload();
+	virtual void OnUnload();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnReset();
+	virtual void OnReset();
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh();
+	virtual void OnRefresh();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy();
+	virtual void OnDestroy();
 
 protected:
 	UPROPERTY(BlueprintReadOnly)

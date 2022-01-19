@@ -19,12 +19,7 @@ USaveGameDataBase* USaveGameBase::K2_GetSaveGameData(TSubclassOf<USaveGameDataBa
 	return SaveGameData;
 }
 
-void USaveGameBase::OnSave_Implementation()
-{
-	bSaved = true;
-}
-
-void USaveGameBase::OnCreate_Implementation(USaveGameDataBase* InSaveGameData)
+void USaveGameBase::OnCreate(USaveGameDataBase* InSaveGameData)
 {
 	SaveGameData = InSaveGameData;
 	if(SaveGameData)
@@ -33,25 +28,30 @@ void USaveGameBase::OnCreate_Implementation(USaveGameDataBase* InSaveGameData)
 	}
 }
 
-void USaveGameBase::OnLoad_Implementation()
+void USaveGameBase::OnSave()
+{
+	bSaved = true;
+}
+
+void USaveGameBase::OnLoad()
 {
 	bLoaded = true;
 }
 
-void USaveGameBase::OnUnload_Implementation()
+void USaveGameBase::OnUnload()
 {
 	bLoaded = false;
 }
 
-void USaveGameBase::OnReset_Implementation()
+void USaveGameBase::OnReset()
 {
 }
 
-void USaveGameBase::OnRefresh_Implementation()
+void USaveGameBase::OnRefresh()
 {
 }
 
-void USaveGameBase::OnDestroy_Implementation()
+void USaveGameBase::OnDestroy()
 {
 	
 }
