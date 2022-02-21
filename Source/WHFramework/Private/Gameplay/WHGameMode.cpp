@@ -2,6 +2,8 @@
 
 #include "Gameplay/WHGameMode.h"
 
+#include "Main/MainModule.h"
+
 AWHGameMode::AWHGameMode()
 {
 	
@@ -10,4 +12,9 @@ AWHGameMode::AWHGameMode()
 void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if(AMainModule* MainModule = AMainModule::Get())
+	{
+		MainModule->InitializeModules();
+	}
 }

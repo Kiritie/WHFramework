@@ -55,9 +55,9 @@ USaveGameBase* ASaveGameModule::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSave
 	return GetSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, USaveGameDataBase* InSaveGameData)
+USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
-	return CreateSaveGame<USaveGameBase>(InSaveGameData, InSaveGameClass);
+	return CreateSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
 bool ASaveGameModule::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex, bool bRefresh)

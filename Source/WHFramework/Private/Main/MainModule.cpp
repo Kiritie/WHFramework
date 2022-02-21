@@ -68,7 +68,6 @@ void AMainModule::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitializeModules();
 }
 
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -178,7 +177,7 @@ void AMainModule::InitializeModules_Implementation()
 			ModuleMap.Add(ModuleRefs[i]->Execute_GetModuleName(ModuleRefs[i].GetObject()), ModuleRefs[i]);
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ModuleInitialized::StaticClass(), EEventNetType::Single, this, TArray<FParameter>());
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ModuleInitialized::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>());
 }
 
 void AMainModule::RefreshModules_Implementation(float DeltaSeconds)

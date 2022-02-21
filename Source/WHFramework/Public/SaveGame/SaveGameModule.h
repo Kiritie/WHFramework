@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "SaveGameBase.h"
+#include "SaveGameModuleBPLibrary.h"
 #include "SaveGameModuleTypes.h"
 #include "Base/ModuleBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -67,7 +68,7 @@ public:
 		}
 		else
 		{
-			return UGameplayStatics::DoesSaveGameExist(FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex);
+			return UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
 		}
 	}
 
@@ -90,8 +91,8 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetSaveGame", DeterminesOutputType = "InSaveGameClass"))
 	USaveGameBase* K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const;
 
-	template<class T, typename... ParamTypes>
-	T* CreateSaveGame(ParamTypes... Params, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	template<class T>
+	T* CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		if(!InSaveGameClass) return nullptr;
 		
@@ -101,8 +102,7 @@ public:
 			if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InSaveGameClass)))
 			{
 				AllSaveGames.Add(SaveName, SaveGame);
-				SaveGame->OnCreate(Params);
-				SaveGame->OnLoad();
+				SaveGame->OnCreate();
 				return Cast<T>(SaveGame);
 			}
 		}
@@ -110,7 +110,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateSaveGame", DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, USaveGameDataBase* InSaveGameData);
+	USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass);
 
 	template<class T>
 	bool SaveSaveGame(int32 InIndex, bool bRefresh = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
@@ -126,7 +126,8 @@ public:
 				{
 					RefreshSaveGame<T>(InSaveGameClass);
 				}
-				return UGameplayStatics::SaveGameToSlot(SaveGame, FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex);
+				SaveGame->OnSave(InIndex);
+				return UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
 			}
 			return true;
 		}
@@ -142,22 +143,29 @@ public:
 		if(!InSaveGameClass) return nullptr;
 
 		const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-		if(!AllSaveGames.Contains(SaveName))
+		if (UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex))
 		{
-			if (UGameplayStatics::DoesSaveGameExist(FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex))
+			USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex));
+			if(SaveGame)
 			{
-				USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex));
-				if(SaveGame)
+				if(!AllSaveGames.Contains(SaveName))
 				{
 					AllSaveGames.Add(SaveName, SaveGame);
 					SaveGame->OnLoad();
 					return Cast<T>(SaveGame);
 				}
+				else
+				{
+					AllSaveGames[SaveName] = SaveGame;
+					AllSaveGames[SaveName]->OnLoad();
+					return Cast<T>(AllSaveGames[SaveName]);
+				}
 			}
 		}
-		else
+		else if(AllSaveGames[SaveName])
 		{
 			AllSaveGames[SaveName]->OnLoad();
+			return Cast<T>(AllSaveGames[SaveName]);
 		}
 		return nullptr;
 	}
@@ -240,9 +248,9 @@ public:
 				SaveGame->ConditionalBeginDestroy();
 			}
 		}
-		if (UGameplayStatics::DoesSaveGameExist(FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex))
+		if (UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex))
 		{
-			UGameplayStatics::DeleteGameInSlot(FString::Printf(TEXT("SaveGame_%s%d"), *SaveName.ToString(), InIndex), UserIndex);
+			UGameplayStatics::DeleteGameInSlot(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
 			return true;
 		}
 		return false;

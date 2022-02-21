@@ -18,42 +18,62 @@ public:
 	USaveGameBase();
 
 public:
-	virtual void OnCreate(...);
+	UFUNCTION(BlueprintNativeEvent)
+	void OnCreate();
 	
-	virtual void OnSave();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSave(int32 InIndex);
 
-	virtual void OnLoad();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnLoad();
 	
-	virtual void OnUnload();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnUnload();
 
-	virtual void OnReset();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnReset();
 	
-	virtual void OnRefresh();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnRefresh();
 
-	virtual void OnDestroy();
+	UFUNCTION(BlueprintNativeEvent)
+	void OnDestroy();
 
-protected:
-	UPROPERTY(BlueprintReadOnly)
-	USaveGameDataBase* SaveGameData;
 public:
-	template<class T>
-	T* GetSaveGameData() const
-	{
-		return Cast<T>(SaveGameData);
-	}
+	UFUNCTION(BlueprintCallable)
+	void Save(int32 InIndex, bool bRefresh = false);
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetSaveGameData", DeterminesOutputType = "InSaveGameDataClass"))
-	USaveGameDataBase* K2_GetSaveGameData(TSubclassOf<USaveGameDataBase> InSaveGameDataClass) const;
+	UFUNCTION(BlueprintCallable)
+	void Load();
+
+	UFUNCTION(BlueprintCallable)
+	void Unload();
+
+	UFUNCTION(BlueprintCallable)
+	void Reset();
+
+	UFUNCTION(BlueprintCallable)
+	void Refresh();
+
+	UFUNCTION(BlueprintCallable)
+	void Destroy();
 
 protected:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly)
 	FName SaveName;
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetSaveName() const { return SaveName; }
 
 protected:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
+	int32 SaveIndex;
+public:
+	UFUNCTION(BlueprintPure)
+	int32 GetSaveIndex() const { return SaveIndex; }
+
+protected:
+	UPROPERTY()
 	bool bSaved;
 public:
 	UFUNCTION(BlueprintPure)

@@ -20,6 +20,11 @@ void USaveGameModuleBPLibrary::SetUserIndex(int32 InUserIndex)
 	}
 }
 
+FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InIndex)
+{
+	return FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex);
+}
+
 bool USaveGameModuleBPLibrary::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
@@ -38,11 +43,11 @@ USaveGameBase* USaveGameModuleBPLibrary::K2_GetSaveGame(TSubclassOf<USaveGameBas
 	return nullptr;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, USaveGameDataBase* InSaveGameData)
+USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass, InSaveGameData);
+		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass);
 	}
 	return nullptr;
 }
