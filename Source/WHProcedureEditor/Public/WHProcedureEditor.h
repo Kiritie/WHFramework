@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "ModuleInterface.h"
+#include "Modules/ModuleManager.h"
 
 class SProcedureMainWidget;
 class FToolBarBuilder;
