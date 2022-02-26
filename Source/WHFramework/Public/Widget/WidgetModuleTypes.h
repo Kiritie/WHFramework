@@ -14,12 +14,38 @@ enum class EWidgetType : uint8
 	None,
 	/// 常驻
 	Permanent,
-	/// 半常驻
-	SemiPermanent,
 	/// 临时
 	Temporary,
-	/// 半临时
-	SemiTemporary
+	/// 子界面
+	Child
+};
+
+/**
+* Widget打开类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetOpenType : uint8
+{
+	/// 显示
+	Visible,
+	/// 显示并禁用点击
+	HitTestInvisible,
+	/// 显示并禁用自身点击
+	SelfHitTestInvisible
+};
+
+/**
+* Widget关闭类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCloseType : uint8
+{
+	/// 隐藏
+	Hidden,
+	/// 塌陷
+	Collapsed,
+	/// 移除
+	Remove
 };
 
 /**

@@ -12,10 +12,12 @@ enum class EInputMode : uint8
 {
 	/// 无
 	None,
+	/// 游戏模式
+	GameOnly,
 	/// UI模式
 	UIOnly,
 	/// 游戏和UI模式
 	GameAndUI,
-	/// 游戏模式
-	GameOnly,
+	/// 游戏和UI模式_不隐藏光标
+	GameAndUI_NotHideCursor
 };

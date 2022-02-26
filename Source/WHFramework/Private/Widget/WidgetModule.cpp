@@ -4,11 +4,14 @@
 #include "Widget/WidgetModule.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "Widget/WidgetModuleBPLibrary.h"
 
 // Sets default values
 AWidgetModule::AWidgetModule()
 {
 	ModuleName = FName("WidgetModule");
+
+	bPreloadWidgets = false;
 }
 
 #if WITH_EDITOR
@@ -35,6 +38,10 @@ void AWidgetModule::OnInitialize_Implementation()
 			if(!UserWidgetClassMap.Contains(WidgetName))
 			{
 				UserWidgetClassMap.Add(WidgetName, Iter);
+			}
+			if(bPreloadWidgets)
+			{
+				UWidgetModuleBPLibrary::CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
 			}
 		}
 	}
@@ -63,6 +70,15 @@ bool AWidgetModule::K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 UUserWidgetBase* AWidgetModule::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	return GetUserWidget<UUserWidgetBase>(InWidgetClass);
+}
+
+UUserWidgetBase* AWidgetModule::K2_GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+{
+	if(AllUserWidgets.Contains(InName))
+	{
+		return AllUserWidgets[InName];
+	}
+	return nullptr;
 }
 
 UUserWidgetBase* AWidgetModule::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
@@ -127,12 +143,12 @@ void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
 
 EInputMode AWidgetModule::GetNativeInputMode() const
 {
-	EInputMode ReturnValue = EInputMode::GameOnly;
+	EInputMode ReturnValue = EInputMode::None;
     for (auto Iter : AllUserWidgets)
     {
     	if(!Iter.Value) continue;
     	UUserWidgetBase* UserWidget = Iter.Value;
-    	if (UserWidget && UserWidget->GetWidgetState() == EWidgetState::Opened && (int32)UserWidget->GetInputMode() < (int32)ReturnValue)
+    	if (UserWidget && UserWidget->GetWidgetState() == EWidgetState::Opened && !UserWidget->GetParentWidget() && (int32)UserWidget->GetInputMode() > (int32)ReturnValue)
     	{
     		ReturnValue = UserWidget->GetInputMode();
     	}

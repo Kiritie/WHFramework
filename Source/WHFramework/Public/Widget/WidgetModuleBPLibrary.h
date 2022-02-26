@@ -21,6 +21,26 @@ class WHFRAMEWORK_API UWidgetModuleBPLibrary : public UBlueprintFunctionLibrary
 	// UserWidget
 public:
 	template<class T>
+	static T* GetTemporaryUserWidget()
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->GetTemporaryUserWidget<T>();
+		}
+		return nullptr;
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetTemporaryUserWidget"))
+	static UUserWidgetBase* K2_GetTemporaryUserWidget()
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->K2_GetTemporaryUserWidget();
+		}
+		return nullptr;
+	}
+	
+	template<class T>
 	static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(FName InName = NAME_None)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -62,6 +82,19 @@ public:
 		}
 		return nullptr;
 	}
+
+	template<class T>
+	static T* GetUserWidgetByName(FName InName)
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->GetUserWidgetByName<T>(InName);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidgetByName", DeterminesOutputType = "InWidgetClass"))
+	static UUserWidgetBase* K2_GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
 	static class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);

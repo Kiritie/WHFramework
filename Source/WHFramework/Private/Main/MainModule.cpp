@@ -59,8 +59,6 @@ AMainModule::AMainModule()
 	ModuleRefs = TArray<TScriptInterface<IModule>>();
 
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
-
-	Current = this;
 }
 
 // Called when the game starts or when spawned
@@ -83,6 +81,20 @@ void AMainModule::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	RefreshModules(DeltaTime);
+}
+
+AMainModule* AMainModule::Get()
+{
+	if(!Current || !Current->IsValidLowLevel())
+	{
+		TArray<AActor*> Actors;
+		UGameplayStatics::GetAllActorsOfClass(GWorld, AMainModule::StaticClass(), Actors);
+		if(Actors.IsValidIndex(0))
+		{
+			Current = Cast<AMainModule>(Actors[0]);
+		}
+	}
+	return Current;
 }
 
 #if WITH_EDITOR

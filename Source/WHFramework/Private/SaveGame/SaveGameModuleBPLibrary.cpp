@@ -22,7 +22,11 @@ void USaveGameModuleBPLibrary::SetUserIndex(int32 InUserIndex)
 
 FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InIndex)
 {
-	return FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex);
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->GetSaveSlotName(InSaveName, InIndex);
+	}
+	return TEXT("");
 }
 
 bool USaveGameModuleBPLibrary::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)

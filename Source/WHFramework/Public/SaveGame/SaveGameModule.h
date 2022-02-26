@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 
 #include "SaveGameBase.h"
-#include "SaveGameModuleBPLibrary.h"
 #include "SaveGameModuleTypes.h"
 #include "Base/ModuleBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -68,7 +67,7 @@ public:
 		}
 		else
 		{
-			return UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
+			return UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex);
 		}
 	}
 
@@ -127,7 +126,7 @@ public:
 					RefreshSaveGame<T>(InSaveGameClass);
 				}
 				SaveGame->OnSave(InIndex);
-				return UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
+				return UGameplayStatics::SaveGameToSlot(SaveGame, GetSaveSlotName(SaveName, InIndex), UserIndex);
 			}
 			return true;
 		}
@@ -143,9 +142,9 @@ public:
 		if(!InSaveGameClass) return nullptr;
 
 		const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-		if (UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex))
+		if (UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex))
 		{
-			USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex));
+			USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSaveSlotName(SaveName, InIndex), UserIndex));
 			if(SaveGame)
 			{
 				if(!AllSaveGames.Contains(SaveName))
@@ -248,9 +247,9 @@ public:
 				SaveGame->ConditionalBeginDestroy();
 			}
 		}
-		if (UGameplayStatics::DoesSaveGameExist(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex))
+		if (UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex))
 		{
-			UGameplayStatics::DeleteGameInSlot(USaveGameModuleBPLibrary::GetSaveSlotName(SaveName, InIndex), UserIndex);
+			UGameplayStatics::DeleteGameInSlot(GetSaveSlotName(SaveName, InIndex), UserIndex);
 			return true;
 		}
 		return false;
@@ -258,6 +257,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroySaveGame"))
 	bool K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex);
+
+	UFUNCTION(BlueprintPure)
+	FString GetSaveSlotName(FName InSaveName, int32 InIndex) const;
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

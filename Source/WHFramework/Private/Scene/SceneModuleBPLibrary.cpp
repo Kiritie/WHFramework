@@ -7,6 +7,40 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Scene/SceneModule.h"
 
+void USceneModuleBPLibrary::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		SceneModule->AsyncLoadLevel(InLevelPath, OnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
+	}
+}
+
+void USceneModuleBPLibrary::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		SceneModule->AsyncUnloadLevel(InLevelPath, InOnAsyncUnloadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
+	}
+}
+
+float USceneModuleBPLibrary::GetAsyncLoadLevelProgress(FName InLevelPath)
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		return SceneModule->GetAsyncLoadLevelProgress(InLevelPath);
+	}
+	return 0.f;
+}
+
+float USceneModuleBPLibrary::GetAsyncUnloadLevelProgress(FName InLevelPath)
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		return SceneModule->GetAsyncUnloadLevelProgress(InLevelPath);
+	}
+	return 0.f;
+}
+
 bool USceneModuleBPLibrary::HasSceneObject(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())

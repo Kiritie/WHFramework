@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SceneModuleTypes.h"
 
 #include "Base/ModuleBase.h"
 #include "Object/PhysicsVolume/PhysicsVolumeTypes.h"
@@ -36,6 +37,32 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Level
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "TargetPoint")
+	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
+	
+public:
+	UFUNCTION(BlueprintCallable, Category = "SceneObject")
+	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneObject")
+	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintPure, Category = "SceneObject")
+	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
+
+	UFUNCTION(BlueprintPure, Category = "SceneObject")
+	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
+
+protected:
+	UFUNCTION()
+	void OnAsyncLoadLevelFinished(const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevelFinished(const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Object

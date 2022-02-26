@@ -38,8 +38,10 @@ public:
 	virtual void OnDestroy() override;
 
 public:
-	virtual void Open(bool bInstant = false) override;
-
+	virtual void Open(TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	
 	virtual void Close(bool bInstant = false) override;
 
 	virtual void Toggle(bool bInstant) override;
@@ -56,8 +58,16 @@ protected:
 	virtual void FinishClose(bool bInstant) override;
 
 protected:
+	FName WidgetName;
+
+	FName ParentName;
+
 	EWidgetType WidgetType;
-				
+						
+	EWidgetOpenType WidgetOpenType;
+
+	EWidgetCloseType WidgetCloseType;
+
 	EWidgetState WidgetState;
 
 	EInputMode InputMode;
@@ -65,11 +75,23 @@ protected:
 	AActor* OwnerActor;
 	
 	TScriptInterface<IWidgetInterface> LastWidget;
+	
+	TScriptInterface<IWidgetInterface> ParentWidget;
+	
+	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
 
 public:
+	virtual FName GetWidgetName() const override { return WidgetName; }
+
+	virtual FName GetParentName() const override { return ParentName; }
+	
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 	
 	virtual EWidgetState GetWidgetState() const override { return WidgetState; }
+
+	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
+
+	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
 
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
@@ -78,4 +100,12 @@ public:
 	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const override { return LastWidget; }
 
 	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
+
+	virtual TScriptInterface<IWidgetInterface> GetParentWidget() const override { return ParentWidget; }
+
+	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
+
+	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+
+	virtual void SetChildWidgets(const TArray<TScriptInterface<IWidgetInterface>>& InChildWidgets) override { ChildWidgets = InChildWidgets; }
 };

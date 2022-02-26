@@ -39,7 +39,7 @@ protected:
 	static AMainModule* Current;
 
 public:
-	static AMainModule* Get() { return Current; }
+	static AMainModule* Get();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module

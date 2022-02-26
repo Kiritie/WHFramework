@@ -12,7 +12,7 @@
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Widget/Slate/SSlateWidgetBase.h"
-#include "Widget/User/UserWidgetBase.h"
+#include "Widget/UMG/UserWidgetBase.h"
 #include "WidgetModule.generated.h"
 
 UCLASS()
@@ -41,6 +41,12 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	////////////////////////////////////////////////////
+	// General
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	bool bPreloadWidgets;
+
+	////////////////////////////////////////////////////
 	// UserWidget
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
@@ -52,9 +58,22 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	UUserWidgetBase* TemporaryUserWidget;
 
+protected:
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 public:
+	template<class T>
+	T* GetTemporaryUserWidget() const
+	{
+		return Cast<T>(TemporaryUserWidget);
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetTemporaryUserWidget"))
+	UUserWidgetBase* K2_GetTemporaryUserWidget() const
+	{
+		return TemporaryUserWidget;
+	}
+
 	template<class T>
 	TSubclassOf<UUserWidgetBase> GetUserWidgetClass(FName InName = NAME_None) const
 	{
@@ -66,7 +85,7 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidget"))
 	TSubclassOf<UUserWidgetBase> K2_GetUserWidgetClass(FName InName) const
 	{
 		if(UserWidgetClassMap.Contains(InName))
@@ -103,6 +122,19 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
 	UUserWidgetBase* K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const;
+
+	template<class T>
+	T* GetUserWidgetByName(FName InName) const
+	{
+		if(AllUserWidgets.Contains(InName))
+		{
+			return Cast<T>(AllUserWidgets[InName]);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidgetByName", DeterminesOutputType = "InWidgetClass"))
+	UUserWidgetBase* K2_GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InWidgetClass) const;
 
 	template<class T>
 	T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -165,7 +197,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget", AutoCreateRefTerm = "InParams"))
 	bool K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
-
+ 
 	template<class T>
 	bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{

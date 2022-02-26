@@ -90,6 +90,11 @@ bool ASaveGameModule::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameCl
 	return DestroySaveGame<USaveGameBase>(InIndex, InSaveGameClass);
 }
 
+FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InIndex) const
+{
+	return FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex);
+}
+
 void ASaveGameModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

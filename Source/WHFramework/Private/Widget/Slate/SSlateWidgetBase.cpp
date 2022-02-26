@@ -12,10 +12,17 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SSlateWidgetBase::SSlateWidgetBase()
 {
+	WidgetName = NAME_None;
+	ParentName = NAME_None;
 	WidgetType = EWidgetType::None;
+	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
+	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
+	LastWidget = nullptr;
+	ParentWidget = nullptr;
+	ChildWidgets = TArray<TScriptInterface<IWidgetInterface>>();
 }
 
 void SSlateWidgetBase::Construct(const FArguments& InArgs)
@@ -45,12 +52,10 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	switch (WidgetType)
 	{
 		case EWidgetType::Permanent:
-		case EWidgetType::SemiPermanent:
 		{
 			SetVisibility(EVisibility::SelfHitTestInvisible);
 		}
 		case EWidgetType::Temporary:
-		case EWidgetType::SemiTemporary:
 		{
 			//AddToViewport();
 		}
@@ -85,9 +90,13 @@ void SSlateWidgetBase::OnDestroy()
 {
 }
 
-void SSlateWidgetBase::Open(bool bInstant)
+void SSlateWidgetBase::Open(TArray<FParameter>* InParams, bool bInstant)
 {
-	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(nullptr, bInstant);
+}
+
+void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
+{
+	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant);
 }
 
 void SSlateWidgetBase::Close(bool bInstant)
@@ -101,7 +110,7 @@ void SSlateWidgetBase::Toggle(bool bInstant)
 	
 	if(WidgetState != EWidgetState::Opened)
 	{
-		Open(bInstant);
+		Open(nullptr, bInstant);
 	}
 	else
 	{
@@ -141,7 +150,6 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 	switch (WidgetType)
 	{
 		case EWidgetType::Permanent:
-		case EWidgetType::SemiPermanent:
 		{
 			SetVisibility(EVisibility::Hidden);
 			break;
@@ -152,9 +160,6 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 			{
 				GetLastWidget()->Open();
 			}
-		}
-		case EWidgetType::SemiTemporary:
-		{
 			//RemoveFromViewport();
 		}
 		default: break;

@@ -15,6 +15,15 @@ UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWi
 	return nullptr;
 }
 
+UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InWidgetClass)
+{
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	{
+		return WidgetModule->K2_GetUserWidgetByName(InName, InWidgetClass);
+	}
+	return nullptr;
+}
+
 UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())

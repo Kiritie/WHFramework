@@ -49,17 +49,14 @@ void AInputModule::OnUnPause_Implementation()
 
 void AInputModule::UpdateInputMode()
 {
-	EInputMode TmpInputMode = EInputMode::GameOnly;
+	EInputMode TmpInputMode = EInputMode::None;
 	for (auto Iter : AMainModule::GetAllModules())
 	{
 		if(IInputManager* InputManager = Cast<IInputManager>(Iter.GetObject()))
 		{
-			if(InputManager->GetNativeInputMode() != EInputMode::None)
+			if ((int32)InputManager->GetNativeInputMode() > (int32)TmpInputMode)
 			{
-				if ((int32)InputManager->GetNativeInputMode() < (int32)TmpInputMode)
-				{
-					TmpInputMode = InputManager->GetNativeInputMode();
-				}
+				TmpInputMode = InputManager->GetNativeInputMode();
 			}
 		}
 	}
@@ -81,12 +78,6 @@ void AInputModule::SetInputMode(EInputMode InInputMode)
 					PlayerController->bShowMouseCursor = false;
 					break;
 				}
-				case EInputMode::GameAndUI:
-				{
-					PlayerController->SetInputMode(FInputModeGameAndUI());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				}
 				case EInputMode::GameOnly:
 				{
 					PlayerController->SetInputMode(FInputModeGameOnly());
@@ -96,6 +87,20 @@ void AInputModule::SetInputMode(EInputMode InInputMode)
 				case EInputMode::UIOnly:
 				{
 					PlayerController->SetInputMode(FInputModeUIOnly());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				}
+				case EInputMode::GameAndUI:
+				{
+					PlayerController->SetInputMode(FInputModeGameAndUI());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				}
+				case EInputMode::GameAndUI_NotHideCursor:
+				{
+					FInputModeGameAndUI InputModeGameAndUI;
+					InputModeGameAndUI.SetHideCursorDuringCapture(true);
+					PlayerController->SetInputMode(InputModeGameAndUI);
 					PlayerController->bShowMouseCursor = true;
 					break;
 				}

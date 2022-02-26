@@ -41,7 +41,9 @@ public:
 	virtual void OnDestroy() = 0;
 
 public:
-	virtual void Open(bool bInstant = false) = 0;
+	virtual void Open(TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
+	
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
 
 	virtual void Close(bool bInstant = false) = 0;
 
@@ -59,7 +61,15 @@ protected:
 	virtual void FinishClose(bool bInstant) = 0;
 
 public:
+	virtual FName GetWidgetName() const = 0;
+
+	virtual FName GetParentName() const = 0;
+
 	virtual EWidgetType GetWidgetType() const = 0;
+
+	virtual EWidgetOpenType GetWidgetOpenType() const = 0;
+
+	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
 	virtual EWidgetState GetWidgetState() const = 0;
 
@@ -67,7 +77,17 @@ public:
 
 	virtual AActor* GetOwnerActor() const = 0;
 
+	virtual class UPanelWidget* GetRootPanelWidget() const = 0;
+
 	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const = 0;
 
 	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) = 0;
+
+	virtual TScriptInterface<IWidgetInterface> GetParentWidget() const = 0;
+
+	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) = 0;
+
+	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() = 0;
+
+	virtual void SetChildWidgets(const TArray<TScriptInterface<IWidgetInterface>>& InChildWidgets) = 0;
 };

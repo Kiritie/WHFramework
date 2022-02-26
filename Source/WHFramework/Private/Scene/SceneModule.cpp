@@ -1,14 +1,21 @@
 
 #include "Scene/SceneModule.h"
 
+#include "PackageTools.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/TargetPoint.h"
+#include "Kismet/GameplayStatics.h"
 #include "Scene/Object/SceneObject.h"
 #include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
+#include "Scene/Widget/WidgetLoadingPanel.h"
+#include "Widget/WidgetModuleBPLibrary.h"
 
 ASceneModule::ASceneModule()
 {
 	ModuleName = FName("SceneModule");
+
+	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
 	SceneObjects = TMap<FName, TScriptInterface<ISceneObject>>();
 
@@ -69,6 +76,119 @@ void ASceneModule::OnPause_Implementation()
 void ASceneModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	if(!LoadedLevels.Contains(InLevelPath))
+	{
+		if(bCreateLoadingWidget)
+		{
+			const TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
+			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingPanel>(&Parameters);
+		}
+		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
+			UE_LOG(LogTemp, Warning, TEXT("Start load level: %s"), *LoadPackagePath);
+			if(Result == EAsyncLoadingResult::Failed)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Load level failed!"));
+			}
+			else if(Result == EAsyncLoadingResult::Succeeded)
+			{
+				FLatentActionInfo LatentActionInfo;
+				UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedPackage, true, false, LatentActionInfo);
+				if(InFinishDelayTime > 0.f)
+				{
+					FTimerHandle TimerHandle;
+					FTimerDelegate TimerDelegate;
+					TimerDelegate.BindUObject(this, &ASceneModule::OnAsyncLoadLevelFinished, InOnAsyncLoadLevelFinished);
+					GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
+				}
+				else
+				{
+					OnAsyncLoadLevelFinished(InOnAsyncLoadLevelFinished);
+				}
+				if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>())
+				{
+					UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>()->SetLoadProgress(1.f);
+				}
+				LoadedLevels.Add(InLevelPath, LoadedPackage);
+			}
+		}), 0, PKG_ContainsMap);
+	}
+	else
+	{
+		FLatentActionInfo LatentActionInfo;
+		UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
+		OnAsyncLoadLevelFinished(InOnAsyncLoadLevelFinished);
+	}
+}
+
+void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	if(LoadedLevels.Contains(InLevelPath))
+	{
+		FLatentActionInfo LatentActionInfo;
+		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
+		if(bCreateLoadingWidget)
+		{
+			const TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
+			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingPanel>(&Parameters);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Start unload level: %s"), *LoadPackagePath);
+		if(InFinishDelayTime > 0.f)
+		{
+			FTimerHandle TimerHandle;
+			FTimerDelegate TimerDelegate;
+			TimerDelegate.BindUObject(this, &ASceneModule::OnAsyncUnloadLevelFinished, InOnAsyncUnloadLevelFinished);
+			GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
+		}
+		else
+		{
+			OnAsyncUnloadLevelFinished(InOnAsyncUnloadLevelFinished);
+		}
+		if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>())
+		{
+			UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>()->SetLoadProgress(1.f);
+		}
+		LoadedLevels.Remove(InLevelPath);
+	}
+}
+
+float ASceneModule::GetAsyncLoadLevelProgress(FName InLevelPath) const
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	return GetAsyncLoadPercentage(*LoadPackagePath) / 100.f;
+}
+
+float ASceneModule::GetAsyncUnloadLevelProgress(FName InLevelPath) const
+{
+	return 1.f;
+}
+
+void ASceneModule::OnAsyncLoadLevelFinished(const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Load level Succeeded!"));
+
+	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingPanel>();
+
+	if(InOnAsyncLoadLevelFinished.IsBound())
+	{
+		InOnAsyncLoadLevelFinished.Execute();
+	}
+}
+
+void ASceneModule::OnAsyncUnloadLevelFinished(const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Unload level Succeeded!"));
+
+	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingPanel>();
+	
+	if(InOnAsyncUnloadLevelFinished.IsBound())
+	{
+		InOnAsyncUnloadLevelFinished.Execute();
+	}
 }
 
 bool ASceneModule::HasSceneObject(FName InName, bool bEnsured) const

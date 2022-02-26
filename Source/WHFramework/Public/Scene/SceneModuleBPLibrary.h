@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SceneModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 
 #include "SceneModuleBPLibrary.generated.h"
@@ -16,6 +17,20 @@ class WHFRAMEWORK_API USceneModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	//////////////////////////////////////////////////////////////////////////
+	/// Level
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
+	static float GetAsyncLoadLevelProgress(FName InLevelPath);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
+	static float GetAsyncUnloadLevelProgress(FName InLevelPath);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Object
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
