@@ -6,7 +6,7 @@
 
 #include "CharacterModuleTypes.h"
 #include "Base/CharacterInterface.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "CharacterModule.generated.h"
 
@@ -29,6 +29,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

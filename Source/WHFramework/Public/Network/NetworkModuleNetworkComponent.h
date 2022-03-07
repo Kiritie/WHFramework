@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponent.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "NetworkModuleNetworkComponent.generated.h"

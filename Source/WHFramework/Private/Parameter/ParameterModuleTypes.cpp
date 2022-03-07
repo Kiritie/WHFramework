@@ -279,3 +279,30 @@ TArray<UObject*> FParameters::GetObjectParameters(FName InName, bool bEnsured) c
 	}
 	return TmpArr;
 }
+
+void FParameters::SetPointerParameter(FName InName, void* InValue)
+{
+	SetParameter(InName, FParameter::MakePointer(InValue));
+}
+
+void* FParameters::GetPointerParameter(FName InName, bool bEnsured) const
+{
+	if(HasParameter(InName, bEnsured))
+	{
+		return GetParameter(InName, bEnsured).GetPointerValue();
+	}
+	return nullptr;
+}
+
+TArray<void*> FParameters::GetPointerParameters(FName InName, bool bEnsured) const
+{
+	TArray<void*> TmpArr = TArray<void*>();
+	if(HasParameter(InName, bEnsured))
+	{
+		for (auto Iter : GetParameters(InName, bEnsured))
+		{
+			TmpArr.Add(Iter.GetPointerValue());
+		}
+	}
+	return TmpArr;
+}

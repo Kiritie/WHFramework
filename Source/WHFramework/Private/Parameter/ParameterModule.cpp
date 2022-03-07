@@ -28,6 +28,11 @@ void AParameterModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void AParameterModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void AParameterModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
@@ -181,6 +186,21 @@ UObject* AParameterModule::GetObjectParameter(FName InName, bool bEnsured) const
 TArray<UObject*> AParameterModule::GetObjectParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetObjectParameters(InName, bEnsured);
+}
+
+void AParameterModule::SetPointerParameter(FName InName, void* InValue)
+{
+	Parameters.SetPointerParameter(InName, InValue);
+}
+
+void* AParameterModule::GetPointerParameter(FName InName, bool bEnsured) const
+{
+	return Parameters.GetPointerParameter(InName, bEnsured);
+}
+
+TArray<void*> AParameterModule::GetPointerParameters(FName InName, bool bEnsured) const
+{
+	return Parameters.GetPointerParameters(InName, bEnsured);
 }
 
 void AParameterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

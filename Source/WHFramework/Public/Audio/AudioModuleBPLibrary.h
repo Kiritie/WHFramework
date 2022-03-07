@@ -18,6 +18,12 @@ class WHFRAMEWORK_API UAudioModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PlaySound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
 	static void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
@@ -25,4 +31,25 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
 	static void StopSingleSound();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PlayGlobalBGSound();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PauseGlobalBGSound();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void StopGlobalBGSound();
+	
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void InitSingleBGSound(USoundBase* InBGSound, float InBGVolume = 1.0f, bool bIsLoopSound = true, bool bIsUISound = false, bool bIsAutoPlay = true);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PlaySingleBGSound();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void PauseSingleBGSound();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void StopSingleBGSound();
 };

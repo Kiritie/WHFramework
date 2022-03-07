@@ -6,7 +6,7 @@
 
 #include "ParameterManager.h"
 #include "ParameterModuleTypes.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 #include "ParameterModule.generated.h"
 
 class ATargetPoint;
@@ -34,6 +34,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
@@ -143,6 +145,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	virtual TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Pointer
+	virtual void SetPointerParameter(FName InName, void* InValue) override;
+
+	virtual void* GetPointerParameter(FName InName, bool bEnsured = true) const override;
+
+	virtual TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true) const override;
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

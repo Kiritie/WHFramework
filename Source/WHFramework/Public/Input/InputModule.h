@@ -5,11 +5,9 @@
 #include "CoreMinimal.h"
 
 #include "InputManager.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "InputModule.generated.h"
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChangeInputMode, EInputMode, InInputMode);
 
 UCLASS()
 class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
@@ -30,6 +28,8 @@ public:
 	
 	virtual void OnInitialize_Implementation() override;
 
+	virtual void OnPreparatory_Implementation() override;
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnPause_Implementation() override;
@@ -39,13 +39,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EInputMode NativeInputMode;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EInputMode InputMode;
-
-public:
-	UPROPERTY(BlueprintCallable)
-	FOnChangeInputMode OnChangeInputMode;
-
+	
 public:
 	UFUNCTION(BlueprintCallable)
 	void UpdateInputMode();
@@ -56,5 +55,5 @@ public:
 	UFUNCTION(BlueprintPure)
 	EInputMode GetInputMode() const { return InputMode; }
 
-	virtual EInputMode GetNativeInputMode() const override;
+	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 };

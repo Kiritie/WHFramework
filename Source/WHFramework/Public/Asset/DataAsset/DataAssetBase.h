@@ -23,4 +23,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString Pack();
+
+protected:
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	FName DataAssetName;
+	
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FName GetDataAssetName() const { return DataAssetName; }
 };

@@ -6,6 +6,21 @@
 
 #include "ParameterModuleTypes.generated.h"
 
+UENUM(BlueprintType)
+enum class EParameterType : uint8
+{
+	None,
+	Integer,
+	Float,
+	String,
+	Boolean,
+	Vector,
+	Rotator,
+	Class,
+	Object,
+	Pointer
+};
+
 USTRUCT(BlueprintType)
 struct FParameter
 {
@@ -14,6 +29,7 @@ struct FParameter
 public:
 	FParameter()
 	{
+		ParameterType = EParameterType::None;
 		IntegerValue = 0;
 		FloatValue = 0.f;
 		StringValue = TEXT("");
@@ -22,34 +38,44 @@ public:
 		RotatorValue = FRotator::ZeroRotator;
 		ClassValue = nullptr;
 		ObjectValue = nullptr;
+		PointerValue = nullptr;
 	}
 
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	EParameterType ParameterType;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Integer"))
 	int32 IntegerValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Float"))
 	float FloatValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::String"))
 	FString StringValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Boolean"))
 	bool BooleanValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Vector"))
 	FVector VectorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Rotator"))
 	FRotator RotatorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Class"))
 	UClass* ClassValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Object"))
 	UObject* ObjectValue;
 
+	void* PointerValue;
+
 public:
+	EParameterType GetParameterType() const { return ParameterType; }
+
+	void SetParameterType(EParameterType InParameterType) { this->ParameterType = InParameterType; }
+
 	int32 GetIntegerValue() const { return IntegerValue; }
 
 	void SetIntegerValue(int32 InIntegerValue) { this->IntegerValue = InIntegerValue; }
@@ -85,10 +111,18 @@ public:
 
 	void SetObjectValue(UObject* InObjectValue) { this->ObjectValue = InObjectValue; }
 
+	void* GetPointerValue() const { return PointerValue; }
+
+	template<class T>
+	T* GetPointerValue() const { return static_cast<T*>(PointerValue); }
+
+	void SetPointerValue(void* InPointerValue) { this->PointerValue = InPointerValue; }
+
 public:
 	static FParameter MakeInteger(int32 InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Integer;
 		Parameter.SetIntegerValue(InValue);
 		return Parameter;
 	}
@@ -96,6 +130,7 @@ public:
 	static FParameter MakeFloat(float InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Float;
 		Parameter.SetFloatValue(InValue);
 		return Parameter;
 	}
@@ -103,6 +138,7 @@ public:
 	static FParameter MakeString(const FString& InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::String;
 		Parameter.SetStringValue(InValue);
 		return Parameter;
 	}
@@ -110,6 +146,7 @@ public:
 	static FParameter MakeBoolean(bool InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Boolean;
 		Parameter.SetBooleanValue(InValue);
 		return Parameter;
 	}
@@ -117,6 +154,7 @@ public:
 	static FParameter MakeVector(const FVector& InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Vector;
 		Parameter.SetVectorValue(InValue);
 		return Parameter;
 	}
@@ -124,6 +162,7 @@ public:
 	static FParameter MakeRotator(const FRotator& InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Rotator;
 		Parameter.SetRotatorValue(InValue);
 		return Parameter;
 	}
@@ -131,6 +170,7 @@ public:
 	static FParameter MakeClass(UClass* InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Class;
 		Parameter.SetClassValue(InValue);
 		return Parameter;
 	}
@@ -138,7 +178,16 @@ public:
 	static FParameter MakeObject(UObject* InValue)
 	{
 		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Object;
 		Parameter.SetObjectValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakePointer(void* InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Pointer;
+		Parameter.SetPointerValue(InValue);
 		return Parameter;
 	}
 };
@@ -243,4 +292,11 @@ public:
 	UObject* GetObjectParameter(FName InName, bool bEnsured = true) const;
 
 	TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const;
+	
+	//////////////////////////////////////////////////////////////////////////
+	void SetPointerParameter(FName InName, void* InValue);
+
+	void* GetPointerParameter(FName InName, bool bEnsured = true) const;
+
+	TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true) const;
 };

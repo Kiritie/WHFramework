@@ -10,6 +10,8 @@
 AMediaModule::AMediaModule()
 {
 	ModuleName = FName("MediaModule");
+
+	MediaPlayers = TArray<AMediaPlayerBase*>();
 }
 
 #if WITH_EDITOR
@@ -27,6 +29,11 @@ void AMediaModule::OnDestroy_Implementation()
 void AMediaModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+}
+
+void AMediaModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
 }
 
 void AMediaModule::OnRefresh_Implementation(float DeltaSeconds)

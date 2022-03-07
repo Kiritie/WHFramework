@@ -6,13 +6,11 @@
 
 #include "SceneModuleTypes.generated.h"
 
-DECLARE_DYNAMIC_DELEGATE(FOnAsyncLoadLevelFinished);
-DECLARE_DYNAMIC_DELEGATE(FOnAsyncUnloadLevelFinished);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
 
-UENUM(BlueprintType)
-enum class EProcedureType1 : uint8
+USTRUCT()
+struct FSceneModuleStruct
 {
-	Root,
-	Default,
-	Standalone
+	GENERATED_BODY()
 };

@@ -14,9 +14,11 @@ SSlateWidgetBase::SSlateWidgetBase()
 {
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
+	WidgetZOrder = 0;
 	WidgetType = EWidgetType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetCloseType = EWidgetCloseType::Hidden;
+	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
@@ -57,7 +59,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		}
 		case EWidgetType::Temporary:
 		{
-			//AddToViewport();
+			//AddToViewport(WidgetZOrder);
 		}
 		default: break;
 	}
@@ -90,7 +92,7 @@ void SSlateWidgetBase::OnDestroy()
 {
 }
 
-void SSlateWidgetBase::Open(TArray<FParameter>* InParams, bool bInstant)
+void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 }
 

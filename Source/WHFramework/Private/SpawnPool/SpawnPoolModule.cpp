@@ -31,6 +31,11 @@ void ASpawnPoolModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ASpawnPoolModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ASpawnPoolModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

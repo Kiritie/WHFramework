@@ -14,9 +14,12 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 {
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
+	WidgetZOrder = 0;
 	WidgetType = EWidgetType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetCloseType = EWidgetCloseType::Hidden;
+	WidgetRefreshType = EWidgetRefreshType::None;
+	WidgetRefreshTime = 0.f;
 	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
@@ -50,7 +53,7 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 		{
 			if(!IsInViewport())
 			{
-				AddToViewport();
+				AddToViewport(WidgetZOrder);
 			}
 			break;
 		}
@@ -122,15 +125,21 @@ void UUserWidgetBase::OnDestroy_Implementation()
 	{
 		ParentWidget->GetChildWidgets().Remove(this);
 	}
+	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	{
+		InputModule->UpdateInputMode();
+	}
 }
 
-void UUserWidgetBase::Open(TArray<FParameter>* InParams, bool bInstant)
+void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
 }
 
 void UUserWidgetBase::Open_Implementation(const TArray<FParameter>& InParams, bool bInstant)
 {
+	if(WidgetState == EWidgetState::Opened) return;
+
 	UWidgetModuleBPLibrary::K2_OpenUserWidget(GetClass(), InParams, bInstant);
 }
 
@@ -160,10 +169,9 @@ void UUserWidgetBase::Reset_Implementation()
 
 void UUserWidgetBase::Refresh_Implementation()
 {
-	if(WidgetState == EWidgetState::Opened)
-	{
-		OnRefresh();
-	}
+	if(WidgetState != EWidgetState::Opened || WidgetRefreshType == EWidgetRefreshType::None) return;
+
+	OnRefresh();
 }
 
 void UUserWidgetBase::Destroy_Implementation()
@@ -176,6 +184,11 @@ void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
 	WidgetState = EWidgetState::Opened;
 
 	Refresh();
+
+	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	{
+		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+	}
 	
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{
@@ -232,6 +245,11 @@ void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
 		{
 			//GetLastWidget()->Open();
 		}
+	}
+
+	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())

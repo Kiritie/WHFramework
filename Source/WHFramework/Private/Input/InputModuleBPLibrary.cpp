@@ -23,3 +23,20 @@ void UInputModuleBPLibrary::SetInputMode(EInputMode InInputMode)
 		InputModule->SetInputMode(InInputMode);
 	}
 }
+
+void UInputModuleBPLibrary::UpdateInputMode()
+{
+	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	{
+		InputModule->UpdateInputMode();
+	}
+}
+
+bool UInputModuleBPLibrary::IsInputKeyDown(const UObject* InWorldContext, FKey InKey)
+{
+	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(InWorldContext))
+	{
+		return PlayerController->IsInputKeyDown(InKey);
+	}
+	return false;
+}

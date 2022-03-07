@@ -4,20 +4,25 @@
 
 #include "CoreMinimal.h"
 #include "Event/Handle/EventHandleBase.h"
+#include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 
-#include "EventHandle_ModuleInitialized.generated.h"
+#include "EventHandle_AsyncUnloadLevelFinished.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_ModuleInitialized : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_AsyncUnloadLevelFinished : public UEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_ModuleInitialized();
+	UEventHandle_AsyncUnloadLevelFinished();
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FName LevelPath;
 	
 public:
 	virtual void OnDespawn_Implementation() override;

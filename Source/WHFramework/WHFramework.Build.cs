@@ -30,6 +30,8 @@ public class WHFramework : ModuleRules
 			new string[]
 			{
 				"Core",
+				"CoreUObject",
+				"UMG",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -43,6 +45,7 @@ public class WHFramework : ModuleRules
 				"UMG",
 				"Slate",
 				"SlateCore",
+				"InputCore",
 				"MediaAssets"
 				// ... add private dependencies that you statically link with here ...	
 			}

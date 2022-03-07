@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponent.h"
 
 #include "AudioModuleNetworkComponent.generated.h"
 
@@ -18,4 +18,10 @@ class WHFRAMEWORK_API UAudioModuleNetworkComponent : public UModuleNetworkCompon
 
 public:
 	UAudioModuleNetworkComponent();
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerPlaySound2DMulticast(USoundBase* InSound, float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerPlaySoundAtLocationMulticast(USoundBase* InSound, FVector InLocation, float InVolume);
 };

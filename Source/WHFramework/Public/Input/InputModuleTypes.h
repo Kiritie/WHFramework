@@ -21,3 +21,20 @@ enum class EInputMode : uint8
 	/// 游戏和UI模式_不隐藏光标
 	GameAndUI_NotHideCursor
 };
+
+struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
+{
+	FInputModeNone()
+	{}
+
+protected:
+	virtual void ApplyInputMode(FReply& SlateOperations, class UGameViewportClient& GameViewportClient) const override;
+};
+
+struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGameAndUI
+{
+	FInputModeGameAndUI_NotHideCursor()
+	{
+		bHideCursorDuringCapture = false;
+	}
+};

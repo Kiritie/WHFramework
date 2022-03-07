@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -33,6 +33,11 @@ void AModuleBase::OnDestroy_Implementation()
 void AModuleBase::OnInitialize_Implementation()
 {
 	ModuleState = EModuleState::Executing;
+}
+
+void AModuleBase::OnPreparatory_Implementation()
+{
+	
 }
 
 void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)

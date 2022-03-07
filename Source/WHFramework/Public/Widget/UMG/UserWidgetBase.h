@@ -43,7 +43,7 @@ public:
 	void OnDestroy() override;
 
 public:
-	void Open(TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
 	void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
@@ -76,6 +76,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
 	FName ParentName;
+	
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	int32 WidgetZOrder;
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EWidgetType WidgetType;
@@ -86,11 +89,17 @@ protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EWidgetCloseType WidgetCloseType;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	EWidgetState WidgetState;
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	EWidgetRefreshType WidgetRefreshType;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
+	float WidgetRefreshTime;
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	EInputMode InputMode;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	EWidgetState WidgetState;
 
 	UPROPERTY(BlueprintReadOnly)
 	AActor* OwnerActor;
@@ -104,12 +113,18 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
 
+private:
+	FTimerHandle WidgetRefreshTimerHandle;
+
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	UFUNCTION(BlueprintPure)
 	virtual FName GetParentName() const override { return ParentName; }
+
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
@@ -121,7 +136,17 @@ public:
 	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EWidgetState GetWidgetState() const override { return WidgetState; }
+	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
+
+	UFUNCTION(BlueprintPure)
+	virtual EWidgetState GetWidgetState() const override
+	{
+		if(ParentWidget && ParentWidget->GetWidgetState() == EWidgetState::Closed)
+		{
+			return EWidgetState::Closed;
+		}
+		return WidgetState;
+	}
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetInputMode() const override { return InputMode; }

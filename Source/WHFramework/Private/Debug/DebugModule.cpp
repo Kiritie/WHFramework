@@ -27,6 +27,11 @@ void ADebugModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ADebugModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ADebugModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

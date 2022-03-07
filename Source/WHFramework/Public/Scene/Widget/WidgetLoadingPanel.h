@@ -22,6 +22,8 @@ public:
 
 	virtual void OnClose_Implementation(bool bInstant) override;
 
+	virtual void OnRefresh_Implementation() override;
+
 protected:
 	UPROPERTY(BlueprintReadOnly)
 	FName LoadingLevelPath;
@@ -43,10 +45,4 @@ public:
 
 private:
 	float CurrentProgress;
-
-protected:
-	virtual void NativeConstruct() override;
-
-public:
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 };

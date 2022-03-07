@@ -24,4 +24,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
 	static void SetInputMode(EInputMode InInputMode);
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
+	static void UpdateInputMode();
+
+	//////////////////////////////////////////////////////////////////////////
+	// InputEvent
+public:
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "InWorldContext"), Category = "InputModuleBPLibrary")
+	static bool IsInputKeyDown(const UObject* InWorldContext, FKey InKey);
 };

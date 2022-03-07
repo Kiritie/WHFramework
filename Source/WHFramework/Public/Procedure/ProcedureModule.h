@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "ProcedureModuleTypes.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "ProcedureModule.generated.h"
 
@@ -35,6 +35,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

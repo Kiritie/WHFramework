@@ -9,12 +9,17 @@ AWHGameMode::AWHGameMode()
 	
 }
 
-void AWHGameMode::BeginPlay()
+void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
-	Super::BeginPlay();
+	Super::InitGame(MapName, Options, ErrorMessage);
 
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
 		MainModule->InitializeModules();
 	}
+}
+
+void AWHGameMode::BeginPlay()
+{
+	Super::BeginPlay();
 }

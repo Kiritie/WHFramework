@@ -88,4 +88,11 @@ public:
 	virtual UObject* GetObjectParameter(FName InName, bool bEnsured = true) const = 0;
 
 	virtual TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const = 0;
+
+	//////////////////////////////////////////////////////////////////////////
+	virtual void SetPointerParameter(FName InName, void* InValue) = 0;
+
+	virtual void* GetPointerParameter(FName InName, bool bEnsured = true) const = 0;
+
+	virtual TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true) const = 0;
 };

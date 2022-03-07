@@ -16,6 +16,9 @@ class WHFRAMEWORK_API AWHGameMode : public AGameModeBase
 public:
 	AWHGameMode();
 
+public:
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+
 protected:
 	virtual void BeginPlay() override;
 };

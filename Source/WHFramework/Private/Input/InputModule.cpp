@@ -3,9 +3,13 @@
 
 #include "Input/InputModule.h"
 
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Input/EventHandle_ChangeInputMode.h"
+#include "Gameplay/WHPlayerController.h"
 #include "Input/InputManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
@@ -30,6 +34,13 @@ void AInputModule::OnDestroy_Implementation()
 void AInputModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+}
+
+void AInputModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+
+	UpdateInputMode();
 }
 
 void AInputModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -65,7 +76,7 @@ void AInputModule::UpdateInputMode()
 
 void AInputModule::SetInputMode(EInputMode InInputMode)
 {
-	if(APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0))
+	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 	{
 		if(InputMode != InInputMode)
 		{
@@ -74,7 +85,7 @@ void AInputModule::SetInputMode(EInputMode InInputMode)
 			{
 				case EInputMode::None:
 				{
-					PlayerController->SetInputMode(FInputModeUIOnly());
+					PlayerController->SetInputMode(FInputModeNone());
 					PlayerController->bShowMouseCursor = false;
 					break;
 				}
@@ -98,20 +109,13 @@ void AInputModule::SetInputMode(EInputMode InInputMode)
 				}
 				case EInputMode::GameAndUI_NotHideCursor:
 				{
-					FInputModeGameAndUI InputModeGameAndUI;
-					InputModeGameAndUI.SetHideCursorDuringCapture(true);
-					PlayerController->SetInputMode(InputModeGameAndUI);
+					PlayerController->SetInputMode(FInputModeGameAndUI_NotHideCursor());
 					PlayerController->bShowMouseCursor = true;
 					break;
 				}
 				default: break;
 			}
-			OnChangeInputMode.Broadcast(InputMode);
+			UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakePointer(&InputMode) });
 		}
 	}
-}
-
-EInputMode AInputModule::GetNativeInputMode() const
-{
-	return EInputMode::None;
 }

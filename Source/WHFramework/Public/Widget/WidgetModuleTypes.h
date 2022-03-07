@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "WidgetModuleTypes.generated.h"
+
 /**
 * Widget类型
 */
@@ -49,6 +51,22 @@ enum class EWidgetCloseType : uint8
 };
 
 /**
+* Widget刷新类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetRefreshType : uint8
+{
+	/// 无
+	None,
+	/// 帧更新
+	Tick,
+	/// 计时器
+	Timer,
+	/// 程序
+	Procedure
+};
+
+/**
 * Widget状态
 */
 UENUM(BlueprintType)
@@ -64,4 +82,20 @@ enum class EWidgetState : uint8
 	Closing,
 	/// 已关闭
 	Closed
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWorldWidgets
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FWorldWidgets()
+	{
+		WorldWidgets = TArray<class UWorldWidgetBase*>();
+	}
+	
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<class UWorldWidgetBase*> WorldWidgets;
 };

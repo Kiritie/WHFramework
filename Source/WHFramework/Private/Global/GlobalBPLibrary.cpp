@@ -1,11 +1,54 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Tool/GlobalToolsBPLibrary.h"
+#include "Global/GlobalBPLibrary.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "Global/GlobalTypes.h"
+#include "Kismet/GameplayStatics.h"
 
-FString UGlobalToolsBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
+UGameInstance* UGlobalBPLibrary::K2_GetGameInstance(const UObject* InWorldContext, TSubclassOf<UGameInstance> InClass)
+{
+	return UGameplayStatics::GetGameInstance(InWorldContext);
+}
+
+AGameModeBase* UGlobalBPLibrary::K2_GetGameMode(const UObject* InWorldContext, TSubclassOf<AGameModeBase> InClass)
+{
+	return UGameplayStatics::GetGameMode(InWorldContext);
+}
+
+AGameStateBase* UGlobalBPLibrary::K2_GetGameState(const UObject* InWorldContext, TSubclassOf<AGameStateBase> InClass)
+{
+	return UGameplayStatics::GetGameState(InWorldContext);
+}
+
+APlayerController* UGlobalBPLibrary::K2_GetPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass, int32 InPlayerIndex)
+{
+	return UGameplayStatics::GetPlayerController(InWorldContext, InPlayerIndex);
+}
+
+APlayerController* UGlobalBPLibrary::K2_GetPlayerControllerByID(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass, int32 InPlayerID)
+{
+	return UGameplayStatics::GetPlayerControllerFromID(InWorldContext, InPlayerID);
+}
+
+APlayerController* UGlobalBPLibrary::K2_GetLocalPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass)
+{
+	if(UWorld* World = GEngine->GetWorldFromContextObject(InWorldContext, EGetWorldErrorMode::LogAndReturnNull))
+	{
+		for(auto Iter = World->GetPlayerControllerIterator(); Iter; ++Iter)
+		{
+			APlayerController* PlayerController = Iter->Get();
+			if(PlayerController->IsLocalController())
+			{
+				return PlayerController;
+			}
+		}
+	}
+	return nullptr;
+}
+
+FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
 	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
 	{
@@ -14,7 +57,7 @@ FString UGlobalToolsBPLibrary::GetEnumValueAuthoredName(const FString& InEnumNam
 	return TEXT("");
 }
 
-FText UGlobalToolsBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
+FText UGlobalBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
 {
 	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
 	{
@@ -23,7 +66,7 @@ FText UGlobalToolsBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, 
 	return FText::GetEmpty();
 }
 
-void UGlobalToolsBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
+void UGlobalBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
 	if(InObject)
 	{
@@ -33,7 +76,7 @@ void UGlobalToolsBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>&
 	}
 }
 
-void UGlobalToolsBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
+void UGlobalBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
 {
 	if(InObject && InObjectData.Num() > 0)
 	{
@@ -43,7 +86,7 @@ void UGlobalToolsBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray
 	}
 }
 
-void UGlobalToolsBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FString, FString>& InParam, bool bParamHavePropertyType)
+void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FString, FString>& InParam, bool bParamHavePropertyType)
 {
 	for(auto pair: InParam)
 	{
@@ -69,7 +112,7 @@ void UGlobalToolsBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<
 	}
 }
 
-void UGlobalToolsBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString>& OutParams, bool bDisplayPropertyType)
+void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString>& OutParams, bool bDisplayPropertyType)
 {
 	if(InClass)
 	{
@@ -90,7 +133,7 @@ void UGlobalToolsBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FS
 				!bIsDelegate )
 			{
 				FString PropertyName = Property->GetFName().ToString();
-				if(PropertyName!="Param"&&PropertyName!="Instigator")
+				if(PropertyName != "Param" && PropertyName != "Instigator")
 				{
 					if(bDisplayPropertyType)
 					{
@@ -119,7 +162,7 @@ void UGlobalToolsBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FS
 	}
 }
 
-bool UGlobalToolsBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult)
+bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult)
 {
 	const FRegexPattern MatherPatter(InPattern);
 	FRegexMatcher Matcher(MatherPatter, InSourceStr);

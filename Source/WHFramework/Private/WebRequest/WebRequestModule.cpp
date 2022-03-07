@@ -26,6 +26,11 @@ void AWebRequestModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void AWebRequestModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void AWebRequestModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

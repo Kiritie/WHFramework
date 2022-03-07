@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "CharacterModuleTypes.h"
-#include "Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponent.h"
 
 #include "CharacterModuleNetworkComponent.generated.h"
 

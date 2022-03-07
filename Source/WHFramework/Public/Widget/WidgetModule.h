@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 #include "GameFramework/Actor.h"
 #include "Input/InputManager.h"
 #include "Input/InputModule.h"
@@ -13,6 +13,7 @@
 #include "Widget/WidgetModuleTypes.h"
 #include "Widget/Slate/SSlateWidgetBase.h"
 #include "Widget/UMG/UserWidgetBase.h"
+#include "World/WorldWidgetBase.h"
 #include "WidgetModule.generated.h"
 
 UCLASS()
@@ -34,17 +35,13 @@ public:
 	
 	virtual void OnInitialize_Implementation() override;
 
+	virtual void OnPreparatory_Implementation() override;
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
-
-	////////////////////////////////////////////////////
-	// General
-protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	bool bPreloadWidgets;
 
 	////////////////////////////////////////////////////
 	// UserWidget
@@ -63,38 +60,11 @@ protected:
 
 public:
 	template<class T>
-	T* GetTemporaryUserWidget() const
-	{
-		return Cast<T>(TemporaryUserWidget);
-	}
+	T* GetTemporaryUserWidget() const { return Cast<T>(TemporaryUserWidget); }
 	
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetTemporaryUserWidget"))
-	UUserWidgetBase* K2_GetTemporaryUserWidget() const
-	{
-		return TemporaryUserWidget;
-	}
+	UUserWidgetBase* K2_GetTemporaryUserWidget() const { return TemporaryUserWidget; }
 
-	template<class T>
-	TSubclassOf<UUserWidgetBase> GetUserWidgetClass(FName InName = NAME_None) const
-	{
-		if(InName.IsNone()) InName = Cast<UUserWidgetBase>(T::StaticClass()->GetDefaultObject())->GetWidgetName();
-		if(UserWidgetClassMap.Contains(InName))
-		{
-			return UserWidgetClassMap[InName];
-		}
-		return nullptr;
-	}
-	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidget"))
-	TSubclassOf<UUserWidgetBase> K2_GetUserWidgetClass(FName InName) const
-	{
-		if(UserWidgetClassMap.Contains(InName))
-		{
-			return UserWidgetClassMap[InName];
-		}
-		return nullptr;
-	}
-	
 	template<class T>
 	bool HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass()) const
 	{
@@ -113,28 +83,24 @@ public:
 		if(!InWidgetClass) return nullptr;
 
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
-		if(AllUserWidgets.Contains(WidgetName))
-		{
-			return Cast<T>(AllUserWidgets[WidgetName]);
-		}
-		return nullptr;
+		return GetUserWidgetByName<T>(WidgetName);
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"))
 	UUserWidgetBase* K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const;
 
 	template<class T>
-	T* GetUserWidgetByName(FName InName) const
+	T* GetUserWidgetByName(FName InWidgetName) const
 	{
-		if(AllUserWidgets.Contains(InName))
+		if(AllUserWidgets.Contains(InWidgetName))
 		{
-			return Cast<T>(AllUserWidgets[InName]);
+			return Cast<T>(AllUserWidgets[InWidgetName]);
 		}
 		return nullptr;
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidgetByName", DeterminesOutputType = "InWidgetClass"))
-	UUserWidgetBase* K2_GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InWidgetClass) const;
+	UUserWidgetBase* K2_GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass) const;
 
 	template<class T>
 	T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -143,23 +109,34 @@ public:
 		
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		
-		if(!UserWidgetClassMap.Contains(WidgetName)) return nullptr;
+		return CreateUserWidgetByName<T>(WidgetName, InOwner);
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"))
+	UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner = nullptr);
+
+	template<class T>
+	T* CreateUserWidgetByName(FName InWidgetName, AActor* InOwner = nullptr)
+	{
+		if(InWidgetName.IsNone()) return nullptr;
 		
-		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), UserWidgetClassMap[WidgetName]))
+		if(!UserWidgetClassMap.Contains(InWidgetName)) return nullptr;
+		
+		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), UserWidgetClassMap[InWidgetName]))
 		{
 			UserWidget->OnCreate();
 			UserWidget->OnInitialize(InOwner);
-			if(!AllUserWidgets.Contains(WidgetName))
+			if(!AllUserWidgets.Contains(InWidgetName))
 			{
-				AllUserWidgets.Add(WidgetName, UserWidget);
+				AllUserWidgets.Add(InWidgetName, UserWidget);
 			}
 			return Cast<T>(UserWidget);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"))
-	UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidgetByName"))
+	UUserWidgetBase* K2_CreateUserWidgetByName(FName InWidgetName, AActor* InOwner = nullptr);
 
 	template<class T>
 	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -180,17 +157,20 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidget<T>(InWidgetClass) ? GetUserWidget<UUserWidgetBase>(InWidgetClass) : CreateUserWidget<UUserWidgetBase>(nullptr, InWidgetClass))
 		{
-			if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+			if(UserWidget->GetWidgetState() != EWidgetState::Opening && UserWidget->GetWidgetState() != EWidgetState::Opened)
 			{
-				if(TemporaryUserWidget)
+				if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
 				{
-					TemporaryUserWidget->OnClose(true);
+					if(TemporaryUserWidget)
+					{
+						TemporaryUserWidget->OnClose(true);
+					}
+					UserWidget->SetLastWidget(TemporaryUserWidget);
+					TemporaryUserWidget = UserWidget;
 				}
-				UserWidget->SetLastWidget(TemporaryUserWidget);
-				TemporaryUserWidget = UserWidget;
+				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
+				return true;
 			}
-			UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
-			return true;
 		}
 		return false;
 	}
@@ -203,11 +183,14 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidget<UUserWidgetBase>(InWidgetClass))
 		{
-			if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+			if(UserWidget->GetWidgetState() != EWidgetState::Closing && UserWidget->GetWidgetState() != EWidgetState::Closed)
 			{
-				TemporaryUserWidget = nullptr;
+				if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+				{
+					TemporaryUserWidget = nullptr;
+				}
+				UserWidget->OnClose(bInstant);
 			}
-			UserWidget->OnClose(bInstant);
 			return true;
 		}
 		return false;
@@ -240,7 +223,6 @@ public:
 		{
 			if(UUserWidgetBase* UserWidget = AllUserWidgets[WidgetName])
 			{
-				UserWidget->RemoveFromParent();
 				AllUserWidgets.Remove(WidgetName);
 				if(TemporaryUserWidget == UserWidget)
 				{
@@ -248,10 +230,6 @@ public:
 				}
 				UserWidget->OnDestroy();
 				UserWidget->ConditionalBeginDestroy();
-				if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
-				{
-					InputModule->UpdateInputMode();
-				}
 			}
 			return true;
 		}
@@ -275,18 +253,19 @@ public:
 	template<class T>
 	bool HasSlateWidget() const
 	{
-		const FName WidgetName = typeid(T).name();
-		return AllSlateWidgets.Contains(WidgetName);
+		// const FName WidgetName = typeid(T).name();
+		// return AllSlateWidgets.Contains(WidgetName);
+		return false;
 	}
 
 	template<class T>
 	TSharedPtr<T> GetSlateWidget() const
 	{
-		const FName WidgetName = typeid(T).name();
-		if(AllSlateWidgets.Contains(WidgetName))
-		{
-			return AllSlateWidgets[WidgetName];
-		}
+		// const FName WidgetName = typeid(T).name();
+		// if(AllSlateWidgets.Contains(WidgetName))
+		// {
+		// 	return AllSlateWidgets[WidgetName];
+		// }
 		return nullptr;
 	}
 
@@ -297,16 +276,16 @@ public:
 		{
 			SlateWidget->OnCreate();
 			SlateWidget->OnInitialize(InOwner);
-			const FName WidgetName = typeid(SlateWidget).name();
-			if(!AllSlateWidgets.Contains(WidgetName))
-			{
-				AllSlateWidgets.Add(WidgetName, SlateWidget);
-			}
+			// const FName WidgetName = typeid(SlateWidget).name();
+			// if(!AllSlateWidgets.Contains(WidgetName))
+			// {
+			// 	AllSlateWidgets.Add(WidgetName, SlateWidget);
+			// }
 			return Cast<T>(SlateWidget);
 		}
 		return nullptr;
 	}
-	
+
 	template<class T>
 	bool InitializeSlateWidget(AActor* InOwner)
 	{
@@ -333,10 +312,6 @@ public:
 				TemporarySlateWidget = SlateWidget;
 			}
 			SlateWidget->OnOpen(*InParams, bInstant);
-			if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
-			{
-				InputModule->UpdateInputMode();
-			}
 			return true;
 		}
 		return false;
@@ -352,10 +327,6 @@ public:
 				TemporarySlateWidget = nullptr;
 			}
 			SlateWidget->OnClose(bInstant);
-			if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
-			{
-				InputModule->UpdateInputMode();
-			}
 			return true;
 		}
 		return false;
@@ -375,29 +346,196 @@ public:
 	template<class T>
 	bool DestroySlateWidget()
 	{
-		const FName WidgetName = typeid(T).name();
-		if(AllSlateWidgets.Contains(WidgetName))
+		// const FName WidgetName = typeid(T).name();
+		// if(AllSlateWidgets.Contains(WidgetName))
+		// {
+		// 	if(TSharedPtr<SSlateWidgetBase> SlateWidget = AllSlateWidgets[WidgetName])
+		// 	{
+		// 		AllSlateWidgets.Remove(WidgetName);
+		// 		if(TemporarySlateWidget == SlateWidget)
+		// 		{
+		// 			TemporarySlateWidget = nullptr;
+		// 		}
+		// 		SlateWidget->OnDestroy();
+		// 		SlateWidget = nullptr;
+		// 	}
+		// 	return true;
+		// }
+		return false;
+	}
+
+	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	
+	////////////////////////////////////////////////////
+	// Widget
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TArray<TSubclassOf<UWorldWidgetBase>> WorldWidgetClasses;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	TMap<FName, FWorldWidgets> AllWorldWidgets;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TSubclassOf<UUserWidget> WorldWidgetParentClass;
+	
+	UPROPERTY()
+	UUserWidget* WorldWidgetParent;
+
+protected:
+	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
+
+public:
+	UFUNCTION(BlueprintPure)
+	UUserWidget* GetWorldWidgetParent() const { return WorldWidgetParent; }
+
+	template<class T>
+	bool HasWorldWidget(int32 InWidgetIndex, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass()) const
+	{
+		if(!InWidgetClass) return false;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		return AllWorldWidgets.Contains(WidgetName) && AllWorldWidgets[WidgetName].WorldWidgets.IsValidIndex(InWidgetIndex);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasWorldWidget"))
+	bool K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const;
+
+	template<class T>
+	T* GetWorldWidget(int32 InWidgetIndex, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass()) const
+	{
+		if(!InWidgetClass) return nullptr;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		return GetWorldWidgetByName<T>(WidgetName, InWidgetIndex);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWidget", DeterminesOutputType = "InWidgetClass"))
+	UWorldWidgetBase* K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const;
+
+	template<class T>
+	T* GetWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex) const
+	{
+		if(AllWorldWidgets.Contains(InWidgetName) && AllWorldWidgets[InWidgetName].WorldWidgets.IsValidIndex(InWidgetIndex))
 		{
-			if(TSharedPtr<SSlateWidgetBase> SlateWidget = AllSlateWidgets[WidgetName])
+			return Cast<T>(AllWorldWidgets[InWidgetName].WorldWidgets[InWidgetIndex]);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgetByName", DeterminesOutputType = "InWidgetClass"))
+	UWorldWidgetBase* K2_GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const;
+
+	template<class T>
+	TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass()) const
+	{
+		if(!InWidgetClass) return TArray<T*>();
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		return GetWorldWidgetsByName<T>(WidgetName);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgets"))
+	TArray<UWorldWidgetBase*> K2_GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass) const;
+
+	template<class T>
+	TArray<T*> GetWorldWidgetsByName(FName InWidgetName) const
+	{
+		if(InWidgetName.IsNone()) return TArray<T*>();
+
+		TArray<T*> Widgets;
+		if(AllWorldWidgets.Contains(InWidgetName))
+		{
+			for(auto Iter : AllWorldWidgets[InWidgetName].WorldWidgets)
 			{
-				AllSlateWidgets.Remove(WidgetName);
-				if(TemporarySlateWidget == SlateWidget)
+				Widgets.Add(Cast<T>(Iter));
+			}
+		}
+		return Widgets;
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgetsByName"))
+	TArray<UWorldWidgetBase*> K2_GetWorldWidgetsByName(FName InWidgetName) const;
+
+	template<class T>
+	T* CreateWorldWidget(AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(!InWidgetClass) return nullptr;
+		
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		
+		if(!WorldWidgetClassMap.Contains(WidgetName)) return nullptr;
+		
+		if(UWorldWidgetBase* WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), WorldWidgetClassMap[WidgetName]))
+		{
+			WorldWidget->OnCreate(InOwner, InLocation, InSceneComp, *InParams);
+			if(!AllWorldWidgets.Contains(WidgetName))
+			{
+				AllWorldWidgets.Add(WidgetName);
+			}
+			WorldWidget->SetWidgetIndex(AllWorldWidgets[WidgetName].WorldWidgets.Add(WorldWidget));
+			return Cast<T>(WorldWidget);
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
+	UWorldWidgetBase* K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+
+	template<class T>
+	bool DestroyWorldWidget(int32 InWidgetIndex, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(!InWidgetClass) return false;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		if(AllWorldWidgets.Contains(WidgetName) && AllWorldWidgets[WidgetName].WorldWidgets.IsValidIndex(InWidgetIndex))
+		{
+			if(UWorldWidgetBase* WorldWidget = AllWorldWidgets[WidgetName].WorldWidgets[InWidgetIndex])
+			{
+				AllWorldWidgets[WidgetName].WorldWidgets.RemoveAt(InWidgetIndex);
+				if(AllWorldWidgets[WidgetName].WorldWidgets.Num() > 0)
 				{
-					TemporarySlateWidget = nullptr;
+					for(int32 i = 0; i < AllWorldWidgets[WidgetName].WorldWidgets.Num(); i++)
+					{
+						AllWorldWidgets[WidgetName].WorldWidgets[i]->SetWidgetIndex(i);
+					}
 				}
-				SlateWidget->OnDestroy();
-				SlateWidget = nullptr;
-				if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+				else
 				{
-					InputModule->UpdateInputMode();
+					AllWorldWidgets.Remove(WidgetName);
 				}
+				WorldWidget->OnDestroy();
+				WorldWidget->ConditionalBeginDestroy();
 			}
 			return true;
 		}
 		return false;
 	}
 
-	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWidget"))
+	bool K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
+
+	template<class T>
+	void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(!InWidgetClass) return;
+
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+		if(AllWorldWidgets.Contains(WidgetName))
+		{
+			for(auto Iter : AllWorldWidgets[WidgetName].WorldWidgets)
+			{
+				if(Iter)
+				{
+					Iter->OnDestroy();
+					Iter->ConditionalBeginDestroy();
+				}
+			}
+			AllWorldWidgets.Remove(WidgetName);
+		}
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgets"))
+	void K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode

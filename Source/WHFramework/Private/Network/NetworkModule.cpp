@@ -31,6 +31,11 @@ void ANetworkModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ANetworkModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ANetworkModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

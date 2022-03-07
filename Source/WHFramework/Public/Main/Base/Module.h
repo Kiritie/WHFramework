@@ -30,7 +30,7 @@ class WHFRAMEWORK_API IModule
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-#if WITH_EDITOR
+// #if WITH_EDITOR
 	/**
 	* 当构建
 	*/
@@ -41,12 +41,17 @@ public:
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy();
-#endif
+// #endif
 	/**
 	* 当初始化
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	void OnInitialize();
+	/**
+	* 当准备
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPreparatory();
 	/**
 	* 当刷新
 	*/

@@ -27,6 +27,11 @@ void ALatentActionModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ALatentActionModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ALatentActionModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

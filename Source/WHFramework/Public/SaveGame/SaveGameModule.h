@@ -6,7 +6,7 @@
 
 #include "SaveGameBase.h"
 #include "SaveGameModuleTypes.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 #include "Kismet/GameplayStatics.h"
 
 #include "SaveGameModule.generated.h"
@@ -32,6 +32,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

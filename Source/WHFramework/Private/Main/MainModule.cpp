@@ -5,12 +5,12 @@
 
 #include "Audio/AudioModule.h"
 #include "Asset/AssetModule.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 #include "Character/CharacterModule.h"
+#include "Camera/CameraModule.h"
 #include "Debug/DebugModule.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
-#include "Event/Handle/Main/EventHandle_ModuleInitialized.h"
 #include "Input/InputModule.h"
 #include "LatentAction/LatentActionModule.h"
 #include "Media/MediaModule.h"
@@ -41,6 +41,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AAssetModule::StaticClass());
 	ModuleClasses.Add(AAudioModule::StaticClass());
 	ModuleClasses.Add(ACharacterModule::StaticClass());
+	ModuleClasses.Add(ACameraModule::StaticClass());
 	ModuleClasses.Add(ADebugModule::StaticClass());
 	ModuleClasses.Add(AEventModule::StaticClass());
 	ModuleClasses.Add(AInputModule::StaticClass());
@@ -59,6 +60,8 @@ AMainModule::AMainModule()
 	ModuleRefs = TArray<TScriptInterface<IModule>>();
 
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
+
+	Current = this;
 }
 
 // Called when the game starts or when spawned
@@ -66,6 +69,7 @@ void AMainModule::BeginPlay()
 {
 	Super::BeginPlay();
 
+	PreparatoryModules();
 }
 
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -81,20 +85,6 @@ void AMainModule::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	RefreshModules(DeltaTime);
-}
-
-AMainModule* AMainModule::Get()
-{
-	if(!Current || !Current->IsValidLowLevel())
-	{
-		TArray<AActor*> Actors;
-		UGameplayStatics::GetAllActorsOfClass(GWorld, AMainModule::StaticClass(), Actors);
-		if(Actors.IsValidIndex(0))
-		{
-			Current = Cast<AMainModule>(Actors[0]);
-		}
-	}
-	return Current;
 }
 
 #if WITH_EDITOR
@@ -119,6 +109,10 @@ void AMainModule::GenerateModules_Implementation()
 		{
 			if(Iter.GetObject() && Iter.GetObject()->IsA(ModuleClasses[i]))
 			{
+				if(!ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
+				{
+					ModuleMap.Add(Iter->Execute_GetModuleName(Iter.GetObject()), Iter.GetObject());
+				}
 				Iter->Execute_OnGenerate(Iter.GetObject());
 				IsNeedSpawn = false;
 				break;
@@ -132,10 +126,14 @@ void AMainModule::GenerateModules_Implementation()
 
 		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(ModuleClasses[i], ActorSpawnParameters))
 		{
+			ModuleRefs.Add(Module);
+			if(!ModuleMap.Contains(Module->Execute_GetModuleName(Module)))
+			{
+				ModuleMap.Add(Module->Execute_GetModuleName(Module), Module);
+			}
 			Module->SetActorLabel(ModuleClasses[i]->GetDefaultObject<AModuleBase>()->Execute_GetModuleName(ModuleClasses[i]->GetDefaultObject<AModuleBase>()).ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			Module->Execute_OnGenerate(Module);
-			ModuleRefs.Add(Module);
 		}
 	}
 
@@ -156,6 +154,10 @@ void AMainModule::GenerateModules_Implementation()
 	for(auto Iter : RemoveList)
 	{
 		ModuleRefs.Remove(Iter);
+		if(!ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
+		{
+			ModuleMap.Remove(Iter->Execute_GetModuleName(Iter.GetObject()));
+		}
 	}
 
 	Modify();
@@ -186,10 +188,19 @@ void AMainModule::InitializeModules_Implementation()
 		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
 			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i].GetObject());
-			ModuleMap.Add(ModuleRefs[i]->Execute_GetModuleName(ModuleRefs[i].GetObject()), ModuleRefs[i]);
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ModuleInitialized::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>());
+}
+
+void AMainModule::PreparatoryModules_Implementation()
+{
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
+	{
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		{
+			ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject());
+		}
+	}
 }
 
 void AMainModule::RefreshModules_Implementation(float DeltaSeconds)

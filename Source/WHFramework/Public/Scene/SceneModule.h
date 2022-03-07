@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "SceneModuleTypes.h"
 
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 #include "Object/PhysicsVolume/PhysicsVolumeTypes.h"
 
 #include "SceneModule.generated.h"
@@ -31,6 +31,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
@@ -59,10 +61,10 @@ public:
 
 protected:
 	UFUNCTION()
-	void OnAsyncLoadLevelFinished(const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
+	void OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
+	void OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Object
@@ -130,4 +132,23 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
 	void SetPhysicsVolume(FName InName, class APhysicsVolumeBase* InPhysicsVolume);
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Outline
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	class UMaterialInterface* OutlineMat;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	FLinearColor OutlineColor;
+
+	UPROPERTY(Transient)
+	class UMaterialInstanceDynamic* OutlineMatInst;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FLinearColor GetOutlineColor() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetOutlineColor(const FLinearColor& InColor);
 };

@@ -31,6 +31,11 @@ void AObjectPoolModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void AObjectPoolModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void AObjectPoolModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

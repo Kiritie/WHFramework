@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "SpawnPool.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "SpawnPoolModule.generated.h"
 
@@ -28,6 +28,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

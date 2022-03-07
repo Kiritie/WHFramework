@@ -41,7 +41,7 @@ public:
 	virtual void OnDestroy() = 0;
 
 public:
-	virtual void Open(TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
 
@@ -65,11 +65,15 @@ public:
 
 	virtual FName GetParentName() const = 0;
 
+	virtual int32 GetWidgetZOrder() const = 0;
+
 	virtual EWidgetType GetWidgetType() const = 0;
 
 	virtual EWidgetOpenType GetWidgetOpenType() const = 0;
 
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
+
+	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
 
 	virtual EWidgetState GetWidgetState() const = 0;
 

@@ -4,11 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Base/Module.h"
+#include "Main/Base/Module.h"
 #include "MainModuleTypes.h"
-#include "Base/ModuleBase.h"
-#include "Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleBase.h"
+#include "Main/Base/ModuleNetworkComponent.h"
+#include "Gameplay/WHPlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Global/GlobalBPLibrary.h"
 
 #include "MainModule.generated.h"
 
@@ -39,7 +41,7 @@ protected:
 	static AMainModule* Current;
 
 public:
-	static AMainModule* Get();
+	static AMainModule* Get() { return Current; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -55,6 +57,9 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
 	void InitializeModules();
     
+	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
+	void PreparatoryModules();
+
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
     void RefreshModules(float DeltaSeconds);
     
@@ -99,7 +104,7 @@ public:
 		if(Current && Current->IsValidLowLevel())
 		{
 			AModuleBase* ModuleBase = InModuleClass.GetDefaultObject();
-			if(Current->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
+ 			if(Current->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
 			{
 				return Cast<T>(Current->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
 			}
@@ -129,7 +134,7 @@ public:
 	{
 		if(Current && Current->IsValidLowLevel())
 		{
-			if(APlayerController* PlayerController = UGameplayStatics::GetPlayerController(Current, 0))
+			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Current))
 			{
 				return Cast<T>(PlayerController->GetComponentByClass(InModuleClass));
 			}

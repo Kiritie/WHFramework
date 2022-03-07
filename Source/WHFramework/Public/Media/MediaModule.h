@@ -5,10 +5,11 @@
 #include "CoreMinimal.h"
 
 #include "MediaModuleTypes.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "MediaModule.generated.h"
 
+class AMediaPlayerBase;
 UCLASS()
 class WHFRAMEWORK_API AMediaModule : public AModuleBase
 {
@@ -29,6 +30,8 @@ public:
 
 	virtual void OnInitialize_Implementation() override;
 
+	virtual void OnPreparatory_Implementation() override;
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnPause_Implementation() override;
@@ -39,20 +42,20 @@ public:
 	/// MediaPlayer
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "MediaPlayer")
-	TArray<class AMediaPlayerBase*> MediaPlayers;
+	TArray<AMediaPlayerBase*> MediaPlayers;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void AddMediaPlayerToList(class AMediaPlayerBase* InMediaPlayer);
+	void AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveMediaPlayerFromList(class AMediaPlayerBase* InMediaPlayer);
+	void RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable)
 	void RemoveMediaPlayerFromListByName(const FName InMediaPlayerName);
 
 	UFUNCTION(BlueprintPure)
-	class AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName) const;
+	AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName) const;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Movie

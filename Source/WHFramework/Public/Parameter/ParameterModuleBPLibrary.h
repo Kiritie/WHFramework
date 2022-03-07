@@ -29,10 +29,10 @@ public:
 	static void SetParameter(FName InName, FParameter InParameter);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
-	static FParameter GetParameter(FName InName, bool bEnsured);
+	static FParameter GetParameter(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
-	static TArray<FParameter> GetParameters(FName InName, bool bEnsured);
+	static TArray<FParameter> GetParameters(FName InName, bool bEnsured = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Integer

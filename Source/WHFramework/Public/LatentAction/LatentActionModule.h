@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Engine/TargetPoint.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "Engine/LatentActionManager.h"
 #include "LatentAction/LatentActionModuleTypes.h"
@@ -34,6 +34,8 @@ public:
 #endif
 
 	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

@@ -30,6 +30,11 @@ void ASaveGameModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ASaveGameModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ASaveGameModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

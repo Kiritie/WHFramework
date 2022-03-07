@@ -11,6 +11,7 @@ UWidgetLoadingPanel::UWidgetLoadingPanel(const FObjectInitializer& objectInitial
 {
 	WidgetName = FName("LoadingPanel");
 	WidgetType = EWidgetType::Temporary;
+	WidgetRefreshType = EWidgetRefreshType::Tick;
 	InputMode = EInputMode::None;
 	
 	LoadingLevelPath = NAME_None;
@@ -37,14 +38,9 @@ void UWidgetLoadingPanel::OnClose_Implementation(bool bInstant)
 	FinishClose(bInstant);
 }
 
-void UWidgetLoadingPanel::NativeConstruct()
+void UWidgetLoadingPanel::OnRefresh_Implementation()
 {
-	Super::NativeConstruct();
-}
-
-void UWidgetLoadingPanel::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
-{
-	Super::NativeTick(MyGeometry, InDeltaTime);
+	Super::OnRefresh_Implementation();
 
 	const float Progress = USceneModuleBPLibrary::GetAsyncLoadLevelProgress(LoadingLevelPath);
 	if(Progress > LoadProgress)
@@ -53,14 +49,14 @@ void UWidgetLoadingPanel::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 	}
 	if(LoadProgress >= 0)
 	{
-		CurrentProgress = FMath::FInterpConstantTo(CurrentProgress, LoadProgress, InDeltaTime, 1.f);
+		CurrentProgress = FMath::FInterpConstantTo(CurrentProgress, LoadProgress, GetWorld()->GetDeltaSeconds(), 1.f);
 		if(PBarProgress)
 		{
 			PBarProgress->SetPercent(CurrentProgress);
 		}
 		if(TxtProgress)
 		{
-			TxtProgress->SetText(FText::FromString(FString::Printf(TEXT("%d/100"), FMath::FloorToInt(CurrentProgress * 100.f))));
+			TxtProgress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
 		}
 		UE_LOG(LogTemp, Log, TEXT("Load level progress: %f"), CurrentProgress);
 	}

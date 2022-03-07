@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Audio/AudioModuleTypes.h"
-#include "Base/ModuleBase.h"
+#include "Main/Base/ModuleBase.h"
 
 #include "AudioModule.generated.h"
 
@@ -30,11 +30,26 @@ public:
 
 	virtual void OnInitialize_Implementation() override;
 
+	virtual void OnPreparatory_Implementation() override;
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Sound
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void PlaySound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiPlaySound2D(USoundBase* InSound, float InVolume = 1.0f);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiPlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Single Sound
@@ -95,36 +110,36 @@ protected:
 	virtual void OnRep_GlobalBGSoundParams();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Game BGSound
+	/// Single BGSound
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
-	UAudioComponent* GameBGSoundComponent;
+	UAudioComponent* SingleBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_GameBGSoundParams, Category = "BGSound")
-	FBGSoundParams GameBGSoundParams;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundParams, Category = "BGSound")
+	FBGSoundParams SingleBGSoundParams;
 
 private:
-	FTimerHandle GameBGSoundLoopTimerHandle;
+	FTimerHandle SingleBGSoundLoopTimerHandle;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void InitGameBGSound(USoundBase* InBGSound, float InBGVolume = 1.0f, bool bIsLoopSound = true, bool bIsUISound = false, bool bIsAutoPlay = true);
+	virtual void InitSingleBGSound(USoundBase* InBGSound, float InBGVolume = 1.0f, bool bIsLoopSound = true, bool bIsUISound = false, bool bIsAutoPlay = true);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void PlayGameBGSound();
+	virtual void PlaySingleBGSound();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void PauseGameBGSound();
+	virtual void PauseSingleBGSound();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void StopGameBGSound();
+	virtual void StopSingleBGSound();
 
 protected:
 	UFUNCTION()
-	virtual void OnLoopGameBGSound();
+	virtual void OnLoopSingleBGSound();
 
 	UFUNCTION()
-	virtual void OnRep_GameBGSoundParams();
+	virtual void OnRep_SingleBGSoundParams();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

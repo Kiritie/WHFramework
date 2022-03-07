@@ -42,6 +42,11 @@ void AEventModule::OnInitialize_Implementation()
 	}
 }
 
+void AEventModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void AEventModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

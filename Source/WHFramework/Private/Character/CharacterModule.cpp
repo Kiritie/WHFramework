@@ -30,6 +30,11 @@ void ACharacterModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
+void ACharacterModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void ACharacterModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);

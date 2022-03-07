@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Base/Module.h"
+#include "Main/Base/Module.h"
 #include "GameFramework/Actor.h"
 #include "ModuleBase.generated.h"
 
@@ -28,6 +28,8 @@ public:
 
 	virtual void OnInitialize_Implementation() override;
 
+	virtual void OnPreparatory_Implementation() override;
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnPause_Implementation() override;
@@ -43,10 +45,10 @@ public:
 
 protected:
 	/// 模块名称
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated)
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Replicated)
 	FName ModuleName;
 	/// 模块状态
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
 
 public:

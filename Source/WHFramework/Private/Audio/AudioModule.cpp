@@ -7,6 +7,7 @@
 #include "Components/AudioComponent.h"
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Audio/AudioModuleNetworkComponent.h"
+#include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
 
@@ -14,17 +15,17 @@
 AAudioModule::AAudioModule()
 {
 	ModuleName = FName("AudioModule");
+	
+	SingleSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("SingleSoundComponent"));
+	SingleSoundComponent->SetupAttachment(RootComponent);
 
 	bAutoPlayGlobalBGSound = true;
-	
+
 	GlobalBGSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("GlobalBGSoundComponent"));
 	GlobalBGSoundComponent->SetupAttachment(RootComponent);
 
-	GameBGSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("GameBGSoundComponent"));
-	GameBGSoundComponent->SetupAttachment(RootComponent);
-
-	SingleSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("SingleSoundComponent"));
-	SingleSoundComponent->SetupAttachment(RootComponent);
+	SingleBGSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("SingleBGSoundComponent"));
+	SingleBGSoundComponent->SetupAttachment(RootComponent);
 }
 
 #if WITH_EDITOR
@@ -49,6 +50,11 @@ void AAudioModule::OnInitialize_Implementation()
 	}
 }
 
+void AAudioModule::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
 void AAudioModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
@@ -62,6 +68,50 @@ void AAudioModule::OnPause_Implementation()
 void AAudioModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
+{
+	if(bMulticast)
+	{
+		if(HasAuthority())
+		{
+			MultiPlaySound2D(InSound, InVolume);
+		}
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		{
+			AudioModuleNetworkComponent->ServerPlaySound2DMulticast(InSound, InVolume);
+		}
+		return;
+	}
+	UGameplayStatics::PlaySound2D(this, InSound, InVolume);
+}
+
+void AAudioModule::MultiPlaySound2D_Implementation(USoundBase* InSound, float InVolume)
+{
+	PlaySound2D(InSound, InVolume, false);
+}
+
+void AAudioModule::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
+{
+	if(bMulticast)
+	{
+		if(HasAuthority())
+		{
+			MultiPlaySoundAtLocation(InSound, InLocation, InVolume);
+		}
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		{
+			AudioModuleNetworkComponent->ServerPlaySoundAtLocationMulticast(InSound, InLocation, InVolume);
+		}
+		return;
+	}
+	UGameplayStatics::PlaySoundAtLocation(this, InSound, InLocation,InVolume);
+}
+
+void AAudioModule::MultiPlaySoundAtLocation_Implementation(USoundBase* InSound, FVector InLocation, float InVolume)
+{
+	PlaySoundAtLocation(InSound, InLocation, InVolume, false);
 }
 
 void AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
@@ -159,7 +209,7 @@ void AAudioModule::PlayGlobalBGSound()
 
 void AAudioModule::PauseGlobalBGSound()
 {
-	GetWorld()->GetTimerManager().PauseTimer(GameBGSoundLoopTimerHandle);
+	GetWorld()->GetTimerManager().PauseTimer(SingleBGSoundLoopTimerHandle);
 	GlobalBGSoundParams.BGSoundState = EBGSoundState::Pausing;
 	OnRep_GlobalBGSoundParams();
 	GetWorld()->GetTimerManager().PauseTimer(GlobalBGSoundLoopTimerHandle);
@@ -217,94 +267,94 @@ void AAudioModule::OnRep_GlobalBGSoundParams()
 	}
 }
 
-void AAudioModule::InitGameBGSound(USoundBase* InBGSound, float InBGVolume, bool bIsLoopSound, bool bIsUISound, bool bIsAutoPlay)
+void AAudioModule::InitSingleBGSound(USoundBase* InBGSound, float InBGVolume, bool bIsLoopSound, bool bIsUISound, bool bIsAutoPlay)
 {
-	GameBGSoundParams = FBGSoundParams(InBGSound, EBGSoundState::None, InBGVolume, bIsLoopSound, bIsUISound);
-	OnRep_GameBGSoundParams();
+	SingleBGSoundParams = FBGSoundParams(InBGSound, EBGSoundState::None, InBGVolume, bIsLoopSound, bIsUISound);
+	OnRep_SingleBGSoundParams();
 	if(bIsAutoPlay)
 	{
-		PlayGameBGSound();
+		PlaySingleBGSound();
 	}
 }
 
-void AAudioModule::PlayGameBGSound()
+void AAudioModule::PlaySingleBGSound()
 {
-	if(!GameBGSoundParams.BGSound) return;
+	if(!SingleBGSoundParams.BGSound) return;
 
 	PauseGlobalBGSound();
 	
-	if(GameBGSoundParams.bIsLoopSound && !GameBGSoundParams.BGSound->IsLooping())
+	if(SingleBGSoundParams.bIsLoopSound && !SingleBGSoundParams.BGSound->IsLooping())
 	{
-		if(GameBGSoundParams.BGSoundState == EBGSoundState::Pausing)
+		if(SingleBGSoundParams.BGSoundState == EBGSoundState::Pausing)
 		{
-			GetWorld()->GetTimerManager().UnPauseTimer(GameBGSoundLoopTimerHandle);
+			GetWorld()->GetTimerManager().UnPauseTimer(SingleBGSoundLoopTimerHandle);
 		}
 		else
 		{
-			GetWorld()->GetTimerManager().SetTimer(GameBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopGameBGSound, FMath::Max(GameBGSoundParams.BGSound->GetDuration() - 1.f, 0.f));
+			GetWorld()->GetTimerManager().SetTimer(SingleBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopSingleBGSound, FMath::Max(SingleBGSoundParams.BGSound->GetDuration() - 1.f, 0.f));
 		}
 	}
-	GameBGSoundParams.BGSoundState = EBGSoundState::Playing;
-	OnRep_GameBGSoundParams();
+	SingleBGSoundParams.BGSoundState = EBGSoundState::Playing;
+	OnRep_SingleBGSoundParams();
 }
 
-void AAudioModule::PauseGameBGSound()
+void AAudioModule::PauseSingleBGSound()
 {
-	GameBGSoundParams.BGSoundState = EBGSoundState::Pausing;
-	OnRep_GameBGSoundParams();
-	GetWorld()->GetTimerManager().PauseTimer(GameBGSoundLoopTimerHandle);
+	SingleBGSoundParams.BGSoundState = EBGSoundState::Pausing;
+	OnRep_SingleBGSoundParams();
+	GetWorld()->GetTimerManager().PauseTimer(SingleBGSoundLoopTimerHandle);
 }
 
-void AAudioModule::StopGameBGSound()
+void AAudioModule::StopSingleBGSound()
 {
 	if(bAutoPlayGlobalBGSound)
 	{
 		PlayGlobalBGSound();
 	}
-	GameBGSoundParams.BGSoundState = EBGSoundState::Stopped;
-	OnRep_GameBGSoundParams();
-	GetWorld()->GetTimerManager().ClearTimer(GameBGSoundLoopTimerHandle);
+	SingleBGSoundParams.BGSoundState = EBGSoundState::Stopped;
+	OnRep_SingleBGSoundParams();
+	GetWorld()->GetTimerManager().ClearTimer(SingleBGSoundLoopTimerHandle);
 }
 
-void AAudioModule::OnLoopGameBGSound()
+void AAudioModule::OnLoopSingleBGSound()
 {
-	GameBGSoundParams.BGSoundState = EBGSoundState::None;
-	GetWorld()->GetTimerManager().SetTimer(GameBGSoundLoopTimerHandle, this, &AAudioModule::PlayGameBGSound, 1.f);
+	SingleBGSoundParams.BGSoundState = EBGSoundState::None;
+	GetWorld()->GetTimerManager().SetTimer(SingleBGSoundLoopTimerHandle, this, &AAudioModule::PlaySingleBGSound, 1.f);
 }
 
-void AAudioModule::OnRep_GameBGSoundParams()
+void AAudioModule::OnRep_SingleBGSoundParams()
 {
-	if(!GameBGSoundParams.BGSound) return;
+	if(!SingleBGSoundParams.BGSound) return;
 	
-	if(GameBGSoundComponent->Sound != GameBGSoundParams.BGSound)
+	if(SingleBGSoundComponent->Sound != SingleBGSoundParams.BGSound)
 	{
-		GameBGSoundComponent->Sound = GameBGSoundParams.BGSound;
+		SingleBGSoundComponent->Sound = SingleBGSoundParams.BGSound;
 	}
-	GameBGSoundComponent->VolumeMultiplier = GameBGSoundParams.BGVolume;
-	GameBGSoundComponent->bIsUISound = GameBGSoundParams.bIsUISound;
+	SingleBGSoundComponent->VolumeMultiplier = SingleBGSoundParams.BGVolume;
+	SingleBGSoundComponent->bIsUISound = SingleBGSoundParams.bIsUISound;
 
-	switch(GameBGSoundParams.BGSoundState)
+	switch(SingleBGSoundParams.BGSoundState)
 	{
 		case EBGSoundState::Playing:
 		{
-			if(GameBGSoundComponent->bIsPaused)
+			if(SingleBGSoundComponent->bIsPaused)
 			{
-				GameBGSoundComponent->SetPaused(false);
+				SingleBGSoundComponent->SetPaused(false);
 			}
 			else
 			{
-				GameBGSoundComponent->Play();
+				SingleBGSoundComponent->Play();
 			}
 			break;
 		}
 		case EBGSoundState::Pausing:
 		{
-			GameBGSoundComponent->SetPaused(true);
+			SingleBGSoundComponent->SetPaused(true);
 			break;
 		}
 		case EBGSoundState::Stopped:
 		{
-			GameBGSoundComponent->Stop();
+			SingleBGSoundComponent->Stop();
 			break;
 		}
 		default: { }
@@ -316,5 +366,5 @@ void AAudioModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AAudioModule, GlobalBGSoundParams);
-	DOREPLIFETIME(AAudioModule, GameBGSoundParams);
+	DOREPLIFETIME(AAudioModule, SingleBGSoundParams);
 }

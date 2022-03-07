@@ -38,7 +38,7 @@ public:
 	virtual void OnDestroy() override;
 
 public:
-	virtual void Open(TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
@@ -61,16 +61,20 @@ protected:
 	FName WidgetName;
 
 	FName ParentName;
+	
+	int32 WidgetZOrder;
 
 	EWidgetType WidgetType;
 						
 	EWidgetOpenType WidgetOpenType;
 
 	EWidgetCloseType WidgetCloseType;
-
-	EWidgetState WidgetState;
+	
+	EWidgetRefreshType WidgetRefreshType;
 
 	EInputMode InputMode;
+
+	EWidgetState WidgetState;
 
 	AActor* OwnerActor;
 	
@@ -84,14 +88,25 @@ public:
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	virtual FName GetParentName() const override { return ParentName; }
+
+	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 	
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
 	
-	virtual EWidgetState GetWidgetState() const override { return WidgetState; }
+	virtual EWidgetState GetWidgetState() const override
+	{
+		if(ParentWidget && ParentWidget->GetWidgetState() == EWidgetState::Closed)
+		{
+			return EWidgetState::Closed;
+		}
+		return WidgetState;
+	}
 
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
 
 	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
+	
+	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
