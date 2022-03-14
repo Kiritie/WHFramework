@@ -43,7 +43,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 protected:
-	UPROPERTY(VisibleAnywhere, Category = "TargetPoint")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "TargetPoint")
 	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
 	
 public:
@@ -136,10 +136,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UPROPERTY(EditAnywhere)
 	class UMaterialInterface* OutlineMat;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UPROPERTY(EditAnywhere)
 	FLinearColor OutlineColor;
 
 	UPROPERTY(Transient)

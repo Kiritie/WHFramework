@@ -71,16 +71,16 @@ void AInputModule::UpdateInputMode()
 			}
 		}
 	}
-	SetInputMode(TmpInputMode);
+	SetGlobalInputMode(TmpInputMode);
 }
 
-void AInputModule::SetInputMode(EInputMode InInputMode)
+void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
 {
 	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 	{
-		if(InputMode != InInputMode)
+		if(GlobalInputMode != InInputMode)
 		{
-			InputMode = InInputMode;
+			GlobalInputMode = InInputMode;
 			switch (InInputMode)
 			{
 				case EInputMode::None:
@@ -115,7 +115,7 @@ void AInputModule::SetInputMode(EInputMode InInputMode)
 				}
 				default: break;
 			}
-			UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakePointer(&InputMode) });
+			UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakePointer(&GlobalInputMode) });
 		}
 	}
 }

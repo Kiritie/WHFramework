@@ -40,10 +40,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// DataAsset
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "DataAsset")
+	UPROPERTY(EditAnywhere, Category = "DataAsset")
 	TArray<UDataAssetBase*> DataAssets;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "DataAsset")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "DataAsset")
 	TMap<FName, UDataAssetBase*> DataAssetMap;
 	
 public:

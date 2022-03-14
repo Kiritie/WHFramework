@@ -31,7 +31,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	USceneComponent* ScenePoint;
 
 public:
@@ -63,10 +63,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	UAudioComponent* SingleSound;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundParams, Category = "SoundActionInfos")
+	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundParams, Category = "SoundActionInfos")
 	FSingleSoundParams SingleSoundParams;
 
 private:

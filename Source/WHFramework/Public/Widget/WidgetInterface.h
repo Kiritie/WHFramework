@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WidgetInterfaceBase.h"
 
 #include "WidgetModuleTypes.h"
 #include "Input/InputModuleTypes.h"
@@ -12,7 +13,7 @@
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWidgetInterface : public UInterface
+class UWidgetInterface : public UWidgetInterfaceBase
 {
 	GENERATED_BODY()
 };
@@ -20,7 +21,7 @@ class UWidgetInterface : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IWidgetInterface
+class WHFRAMEWORK_API IWidgetInterface : public IWidgetInterfaceBase
 {
 	GENERATED_BODY()
 
@@ -36,10 +37,6 @@ public:
 
 	virtual void OnReset() = 0;
 
-	virtual void OnRefresh() = 0;
-
-	virtual void OnDestroy() = 0;
-
 public:
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
 	
@@ -51,37 +48,23 @@ public:
 
 	virtual void Reset() = 0;
 
-	virtual void Refresh() = 0;
-
-	virtual void Destroy() = 0;
-
 protected:
 	virtual void FinishOpen(bool bInstant) = 0;
 
 	virtual void FinishClose(bool bInstant) = 0;
 
 public:
-	virtual FName GetWidgetName() const = 0;
-
 	virtual FName GetParentName() const = 0;
 
-	virtual int32 GetWidgetZOrder() const = 0;
-
 	virtual EWidgetType GetWidgetType() const = 0;
+
+	virtual EWidgetCreateType GetWidgetCreateType() const = 0;
 
 	virtual EWidgetOpenType GetWidgetOpenType() const = 0;
 
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
-	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
-
 	virtual EWidgetState GetWidgetState() const = 0;
-
-	virtual EInputMode GetInputMode() const = 0;
-
-	virtual AActor* GetOwnerActor() const = 0;
-
-	virtual class UPanelWidget* GetRootPanelWidget() const = 0;
 
 	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const = 0;
 

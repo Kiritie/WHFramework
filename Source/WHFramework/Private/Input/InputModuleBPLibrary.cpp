@@ -7,24 +7,24 @@
 #include "Main/MainModule.h"
 #include "Kismet/GameplayStatics.h"
 
-EInputMode UInputModuleBPLibrary::GetInputMode()
+EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 {
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{
-		return InputModule->GetInputMode();
+		return InputModule->GetGlobalInputMode();
 	}
 	return EInputMode::None;
 }
 
-void UInputModuleBPLibrary::SetInputMode(EInputMode InInputMode)
+void UInputModuleBPLibrary::SetGlobalInputMode(EInputMode InInputMode)
 {
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{
-		InputModule->SetInputMode(InInputMode);
+		InputModule->SetGlobalInputMode(InInputMode);
 	}
 }
 
-void UInputModuleBPLibrary::UpdateInputMode()
+void UInputModuleBPLibrary::UpdateGlobalInputMode()
 {
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{

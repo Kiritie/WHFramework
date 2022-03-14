@@ -16,6 +16,9 @@ class WHFRAMEWORK_API AWHGameState : public AGameStateBase
 public:
 	AWHGameState();
 
+public:	
+	virtual void Initialize();
+	
 protected:
 	virtual void BeginPlay() override;
 };

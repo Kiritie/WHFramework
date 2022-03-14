@@ -21,4 +21,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+public:
+	virtual void InitGameState() override;
+	
+	virtual APlayerController* SpawnPlayerController(ENetRole InRemoteRole, const FString& Options) override;
 };

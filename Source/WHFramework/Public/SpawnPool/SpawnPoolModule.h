@@ -46,7 +46,7 @@ protected:
 	UPROPERTY(EditAnywhere)
 	int32 Limit;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Transient)
 	TMap<UClass*, USpawnPool*> SpawnPools;
 
 public:

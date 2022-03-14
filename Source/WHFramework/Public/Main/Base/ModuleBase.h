@@ -45,10 +45,10 @@ public:
 
 protected:
 	/// 模块名称
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Replicated)
+	UPROPERTY(EditDefaultsOnly, Replicated)
 	FName ModuleName;
 	/// 模块状态
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
 
 public:

@@ -16,6 +16,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ParentName = NAME_None;
 	WidgetZOrder = 0;
 	WidgetType = EWidgetType::None;
+	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetRefreshType = EWidgetRefreshType::None;

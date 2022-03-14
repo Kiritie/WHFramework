@@ -16,6 +16,92 @@ UCLASS()
 class WHFRAMEWORK_API UGlobalBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+
+	//////////////////////////////////////////////////////////////////////////
+	// States
+public:
+	/*
+	 * 当前是否为播放状态
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsPlaying() { return GWorld->HasBegunPlay(); }
+	/*
+	 * 当前是否为运行状态
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsRunning() { return GIsRunning; }
+	/*
+	 * 当前是否为编辑器状态运行
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsEditor() { return GIsEditor; }
+
+	//////////////////////////////////////////////////////////////////////////
+	// Enum
+public:
+	/*
+	 * 获取枚举值变量名称
+	 * @param InEnumName 枚举名称
+	 * @param InEnumValue 枚举值
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static FString GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue);
+
+	/*
+	* 获取枚举值显示名称
+	* @param InEnumName 枚举名称
+	* @param InEnumValue 枚举值
+	*/
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Serialize
+public:
+	/*
+	* 将目标对象数据保存到内存
+	* @param InObject 目标对象
+	* @param OutObjectData 保存到的字节数组
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
+
+	/*
+	* 从内存加载目标对象数据
+	* @param InObject 目标对象
+	* @param InObjectData 目标对象字节数组
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
+
+	/*
+	* 解析目标对象带有 ExposeOnSpawn 标签的参数
+	* @param InObject 目标对象
+	* @param InParams 符合导出格式的参数键值对
+	* @param bParamHavePropertyType Param的key是否含有属性类的前缀表示：<int> <Array>...
+	*/
+	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
+	static void SerializeExposedParam(UObject* InObject, const TMap<FString,FString>& InParams, bool bParamHavePropertyType = true);
+	/*
+	* 导出目标类带有 ExposeOnSpawn 标签的参数
+	* @param InClass 目标类
+	* @param OutParams 导出参数的存放键值对
+	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
+	*/
+	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
+	static void ExportExposedParam(UClass* InClass, TMap<FString,FString>& OutParams, bool bDisplayPropertyType = true);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Regex
+public:
+	/*
+	* 正则表达式匹配字串，匹配到返回true，没匹配到返回false
+	* @param InSourceStr 源字符串
+	* @param InPattern 正则表达式匹配规则
+	* @param OutResult 匹配到的字符串
+	*/
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
@@ -67,71 +153,4 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerController", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APlayerController* K2_GetLocalPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Enum
-public:
-	/*
-	 * 获取枚举值变量名称
-	 * @param InEnumName 枚举名称
-	 * @param InEnumValue 枚举值
-	 */
-	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static FString GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue);
-
-	/*
-	* 获取枚举值显示名称
-	* @param InEnumName 枚举名称
-	* @param InEnumValue 枚举值
-	*/
-	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Serialize
-public:
-	/*
-	* 将目标对象数据保存到内存
-	* @param InObject 目标对象
-	* @param OutObjectData 保存到的字节数组
-	*/
-	UFUNCTION(BlueprintCallable, Category = "GlobalTools")
-	static void SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
-
-	/*
-	* 从内存加载目标对象数据
-	* @param InObject 目标对象
-	* @param InObjectData 目标对象字节数组
-	*/
-	UFUNCTION(BlueprintCallable, Category = "GlobalTools")
-	static void LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
-
-	/*
-	* 解析目标对象带有 ExposeOnSpawn 标签的参数
-	* @param InObject 目标对象
-	* @param InParams 符合导出格式的参数键值对
-	* @param bParamHavePropertyType Param的key是否含有属性类的前缀表示：<int> <Array>...
-	*/
-	UFUNCTION(BlueprintCallable,Category = "GlobalTools")
-	static void SerializeExposedParam(UObject* InObject, const TMap<FString,FString>& InParams, bool bParamHavePropertyType = true);
-	/*
-	* 导出目标类带有 ExposeOnSpawn 标签的参数
-	* @param InClass 目标类
-	* @param OutParams 导出参数的存放键值对
-	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
-	*/
-	UFUNCTION(BlueprintCallable,Category = "GlobalTools")
-	static void ExportExposedParam(UClass* InClass, TMap<FString,FString>& OutParams, bool bDisplayPropertyType = true);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Regex
-public:
-	/*
-	* 正则表达式匹配字串，匹配到返回true，没匹配到返回false
-	* @param InSourceStr 源字符串
-	* @param InPattern 正则表达式匹配规则
-	* @param OutResult 匹配到的字符串
-	*/
-	UFUNCTION(BlueprintPure, Category = "GlobalTools")
-	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 };

@@ -3,16 +3,33 @@
 
 #include "Widget/WidgetModule.h"
 
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Kismet/GameplayStatics.h"
 #include "Widget/WidgetModuleBPLibrary.h"
+#include "Widget/World/WorldWidgetContainer.h"
 
 // Sets default values
 AWidgetModule::AWidgetModule()
 {
 	ModuleName = FName("WidgetModule");
 
+	UserWidgetClasses = TArray<TSubclassOf<UUserWidgetBase>>();
+	AllUserWidgets = TMap<FName, UUserWidgetBase*>();
+	TemporaryUserWidget = nullptr;
+	UserWidgetClassMap = TMap<FName, TSubclassOf<UUserWidgetBase>>();
+
+	AllSlateWidgets = TMap<FName, TSharedPtr<class SSlateWidgetBase>>();
+	TemporarySlateWidget = nullptr;
+
+	WorldWidgetClasses = TArray<TSubclassOf<UWorldWidgetBase>>();
+
+	WorldWidgetContainerClass = LoadClass<UWorldWidgetContainer>(nullptr, TEXT("WidgetBlueprint'/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer.WBP_WorldWidgetContainer_C'"));
+	WorldWidgetContainerZOrder = -1;
+	AllWorldWidgets = TMap<FName, FWorldWidgets>();
+	WorldWidgetContainer = nullptr;
+	WorldWidgetClassMap = TMap<FName, TSubclassOf<UWorldWidgetBase>>();
 }
 
 #if WITH_EDITOR
@@ -40,6 +57,20 @@ void AWidgetModule::OnInitialize_Implementation()
 			{
 				UserWidgetClassMap.Add(WidgetName, Iter);
 			}
+			switch(Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetCreateType())
+			{
+				case EWidgetCreateType::AutoCreate:
+				{
+					CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
+					break;
+				}
+				case EWidgetCreateType::AutoCreateAndOpen:
+				{
+					OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
+					break;
+				}
+				default: break;
+			}
 		}
 	}
 
@@ -55,11 +86,10 @@ void AWidgetModule::OnInitialize_Implementation()
 		}
 	}
 
-	WorldWidgetParent = CreateWidget(GetWorld(), WorldWidgetParentClass);
-	if(WorldWidgetParent)
+	WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
+	if(WorldWidgetContainer)
 	{
-		WorldWidgetParent->AddToViewport(-1);
-		// if(CanvasPanelWorldWidgetParent->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
+		WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
 	}
 }
 
@@ -71,6 +101,19 @@ void AWidgetModule::OnPreparatory_Implementation()
 void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	TArray<UUserWidget*> InterfaceWidgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UWidgetInterfaceBase::StaticClass(), true);
+	for (auto Iter : InterfaceWidgets)
+	{
+		if(IWidgetInterfaceBase* InterfaceWidget = Cast<IWidgetInterfaceBase>(Iter))
+		{
+			if(InterfaceWidget->Execute_IsTickAble(Iter))
+			{
+				InterfaceWidget->Execute_TickWidget(Iter);
+			}
+		}
+	}
 
 	for (auto Iter : AllUserWidgets)
 	{

@@ -7,6 +7,11 @@ AWHGameState::AWHGameState()
 	
 }
 
+void AWHGameState::Initialize()
+{
+	
+}
+
 void AWHGameState::BeginPlay()
 {
 	Super::BeginPlay();

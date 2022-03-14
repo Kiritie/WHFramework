@@ -7,6 +7,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
+#include "Widget/WidgetInterfaceBase.h"
 #include "Widget/WidgetModuleTypes.h"
 
 #include "WorldWidgetBase.generated.h"
@@ -15,12 +16,17 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget
+class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IWidgetInterfaceBase
 {
 	GENERATED_BODY()
 
 public:
 	UWorldWidgetBase(const FObjectInitializer& ObjectInitializer);
+
+public:
+	void TickWidget_Implementation() override;
+
+	bool IsTickAble_Implementation() const override { return true; }
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -49,43 +55,43 @@ public:
 	void UnBindWidgetPoint(UWidget* InWidget);
 
 protected:
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
 	
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-	int32 WidgetZOrder;
-	
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-	FAnchors WidgetAnchors;
-
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoSize;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly)
+	int32 WidgetZOrder;
+
+	UPROPERTY(EditDefaultsOnly)
+	FAnchors WidgetAnchors;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	FVector2D WidgetAlignment;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	EWidgetRefreshType WidgetRefreshType;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 	
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	EInputMode InputMode;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(Transient)
 	AActor* OwnerActor;
 	
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(Transient)
 	int32 WidgetIndex;
 	
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(Transient)
 	class UWorldWidgetComponent* WidgetComponent;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TMap<UWidget*, class USceneComponent*> BindWidgetMap;
 
 private:
@@ -94,6 +100,18 @@ private:
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetWidgetName() const { return WidgetName; }
+	
+	UFUNCTION(BlueprintPure)
+	int32 GetWidgetZOrder() const { return WidgetZOrder; }
+
+	UFUNCTION(BlueprintPure)
+	FAnchors GetWidgetAnchors() const { return WidgetAnchors; }
+
+	UFUNCTION(BlueprintPure)
+	FMargin GetWidgetOffsets() const { return WidgetOffsets; }
+
+	UFUNCTION(BlueprintPure)
+	FVector2D GetWidgetAlignment() const { return WidgetAlignment; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetRefreshType GetWidgetRefreshType() const { return WidgetRefreshType; }
@@ -111,5 +129,5 @@ public:
 	virtual void SetWidgetIndex(int32 InWidgetIndex) { WidgetIndex = InWidgetIndex; }
 
 	UFUNCTION(BlueprintPure)
-	virtual class UPanelWidget* GetRootPanelWidget() const;
+	virtual class UPanelWidget* GetRootPanelWidget() const override;
 };

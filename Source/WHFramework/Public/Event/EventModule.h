@@ -65,10 +65,10 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Event Manager
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EventManager")
+	UPROPERTY(EditAnywhere, Category = "EventManager")
 	TSubclassOf<class AEventManagerBase> EventManagerClass;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "EventManager")
+	UPROPERTY(VisibleAnywhere, Replicated, Category = "EventManager")
 	class AEventManagerBase* EventManager;
 
 public:

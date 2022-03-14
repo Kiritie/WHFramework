@@ -30,6 +30,7 @@ public:
 	
 	virtual void OnDespawn_Implementation() override;
 
+public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
 	bool Filter(UObject* InOwner, const FName InFuncName);
 

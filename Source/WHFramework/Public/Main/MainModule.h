@@ -16,7 +16,7 @@
 
 class AModuleBase;
 
-UCLASS()
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API AMainModule : public AActor
 {
 	GENERATED_BODY()
@@ -74,12 +74,13 @@ public:
 
 protected:
 	/// 模块类
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "MainModule")
+	UPROPERTY(EditAnywhere, Category = "MainModule")
 	TArray<TSubclassOf<AModuleBase>> ModuleClasses;
 	/// 模块列表
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "MainModule")
+	UPROPERTY(EditAnywhere, Replicated, Category = "MainModule")
 	TArray<TScriptInterface<IModule>> ModuleRefs;
 
+private:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
@@ -130,13 +131,13 @@ public:
 	* 通过类型获取模块网络组件
 	*/
 	template<class T>
-	static T* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass = T::StaticClass())
+	static T* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
 	{
 		if(Current && Current->IsValidLowLevel())
 		{
 			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Current))
 			{
-				return Cast<T>(PlayerController->GetComponentByClass(InModuleClass));
+				return PlayerController->GetModuleNetCompByClass<T>(InModuleNetworkComponentClass);
 			}
 		}
 		return nullptr;

@@ -103,6 +103,15 @@ void UWidgetModuleBPLibrary::CloseAllSlateWidget(EWidgetType InWidgetType, bool 
 	}
 }
 
+UWorldWidgetContainer* UWidgetModuleBPLibrary::GetWorldWidgetContainer()
+{
+	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	{
+		return WidgetModule->GetWorldWidgetContainer();
+	}
+	return nullptr;
+}
+
 bool UWidgetModuleBPLibrary::K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())

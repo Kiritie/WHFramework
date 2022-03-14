@@ -23,6 +23,20 @@ enum class EWidgetType : uint8
 };
 
 /**
+* Widget创建类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCreateType : uint8
+{
+	/// 无
+	None,
+	/// 自动创建
+	AutoCreate,
+	/// 自动创建并打开
+	AutoCreateAndOpen
+};
+
+/**
 * Widget打开类型
 */
 UENUM(BlueprintType)

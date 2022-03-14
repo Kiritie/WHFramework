@@ -20,13 +20,13 @@ class WHFRAMEWORK_API UInputModuleBPLibrary : public UBlueprintFunctionLibrary
 	// InputMode
 public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleBPLibrary")
-	static EInputMode GetInputMode();
+	static EInputMode GetGlobalInputMode();
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void SetInputMode(EInputMode InInputMode);
+	static void SetGlobalInputMode(EInputMode InInputMode);
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void UpdateInputMode();
+	static void UpdateGlobalInputMode();
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputEvent

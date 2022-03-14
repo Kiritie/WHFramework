@@ -39,21 +39,21 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere)
 	EInputMode NativeInputMode;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EInputMode InputMode;
+	UPROPERTY(VisibleAnywhere)
+	EInputMode GlobalInputMode;
 	
 public:
 	UFUNCTION(BlueprintCallable)
 	void UpdateInputMode();
 
 	UFUNCTION(BlueprintCallable)
-	void SetInputMode(EInputMode InInputMode);
+	void SetGlobalInputMode(EInputMode InInputMode);
 
 	UFUNCTION(BlueprintPure)
-	EInputMode GetInputMode() const { return InputMode; }
+	EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 };

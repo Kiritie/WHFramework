@@ -15,11 +15,12 @@ ACameraModule::ACameraModule()
 {
 	ModuleName = FName("CameraModule");
 
+	DefaultCameraClass = nullptr;
 	CameraClasses = TArray<TSubclassOf<ACameraPawnBase>>();
 	CameraClasses.Add(ARoamCameraPawn::StaticClass());
-	CurrentCamera = nullptr;
-
 	Cameras = TArray<ACameraPawnBase*>();
+	CameraMap = TMap<FName, ACameraPawnBase*>();
+	CurrentCamera = nullptr;
 }
 
 #if WITH_EDITOR
@@ -71,11 +72,24 @@ void ACameraModule::OnDestroy_Implementation()
 void ACameraModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : Cameras)
+	{
+		if(Iter && !CameraMap.Contains(Iter->GetCameraName()))
+		{
+			CameraMap.Add(Iter->GetCameraName(), Iter);
+		}
+	}
 }
 
 void ACameraModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	if(DefaultCameraClass)
+	{
+		SwitchCamera<ACameraPawnBase>(DefaultCameraClass);
+	}
 }
 
 void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -93,54 +107,48 @@ void ACameraModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera)
+ACameraPawnBase* ACameraModule::K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass)
 {
-	if(CurrentCamera != InCamera)
-	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
-		{
-			PlayerController->Possess(InCamera);
-		}
-		CurrentCamera = InCamera;
-	}
+	if(!InClass) return nullptr;
+	
+	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
+	return K2_GetCameraByName(CameraName);
 }
 
-void ACameraModule::AddCameraToList(ACameraPawnBase* InCamera)
+ACameraPawnBase* ACameraModule::K2_GetCameraByName(const FName InCameraName) const
 {
-	if(!Cameras.Contains(InCamera))
+	if(CameraMap.Contains(InCameraName))
 	{
-		Cameras.Add(InCamera);
-	}
-}
-
-void ACameraModule::RemoveCameraFromList(ACameraPawnBase* InCamera)
-{
-	if(Cameras.Contains(InCamera))
-	{
-		Cameras.Remove(InCamera);
-	}
-}
-
-void ACameraModule::RemoveCameraFromListByName(const FName InCameraName)
-{
-	RemoveCameraFromList(GetCameraByName(InCameraName));
-}
-
-ACameraPawnBase* ACameraModule::GetCameraByName(const FName InCameraName) const
-{
-	for (auto Iter : Cameras)
-	{
-		if(Iter->GetCameraName() == InCameraName)
-		{
-			return Iter;
-		}
+		return CameraMap[InCameraName];
 	}
 	return nullptr;
+}
+
+void ACameraModule::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass)
+{
+	if(!InClass) return;
+	
+	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
+	SwitchCameraByName(CameraName);
+}
+
+void ACameraModule::SwitchCameraByName(const FName InCameraName)
+{
+	if(!CurrentCamera || CurrentCamera->GetCameraName() != InCameraName)
+	{
+		if(ACameraPawnBase* Camera = GetCameraByName<ACameraPawnBase>(InCameraName))
+		{
+			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+			{
+				PlayerController->Possess(Camera);
+			}
+			CurrentCamera = Camera;
+		}
+	}
 }
 
 void ACameraModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ACameraModule, Cameras);
 }

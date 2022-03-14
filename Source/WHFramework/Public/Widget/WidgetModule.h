@@ -46,16 +46,17 @@ public:
 	////////////////////////////////////////////////////
 	// UserWidget
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "UserWidget")
 	TArray<TSubclassOf<UUserWidgetBase>> UserWidgetClasses;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TMap<FName, UUserWidgetBase*> AllUserWidgets;
-
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+private:
+	UPROPERTY(Transient)
 	UUserWidgetBase* TemporaryUserWidget;
 
-protected:
+	UPROPERTY()
+	TMap<FName, UUserWidgetBase*> AllUserWidgets;
+
+	UPROPERTY(Transient)
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 public:
@@ -122,15 +123,19 @@ public:
 		
 		if(!UserWidgetClassMap.Contains(InWidgetName)) return nullptr;
 		
-		if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), UserWidgetClassMap[InWidgetName]))
+		if(!AllUserWidgets.Contains(InWidgetName))
 		{
-			UserWidget->OnCreate();
-			UserWidget->OnInitialize(InOwner);
-			if(!AllUserWidgets.Contains(InWidgetName))
+			if(UUserWidgetBase* UserWidget = CreateWidget<UUserWidgetBase>(GetWorld(), UserWidgetClassMap[InWidgetName]))
 			{
+				UserWidget->OnCreate();
+				UserWidget->OnInitialize(InOwner);
 				AllUserWidgets.Add(InWidgetName, UserWidget);
+				return Cast<T>(UserWidget);
 			}
-			return Cast<T>(UserWidget);
+		}
+		else
+		{
+			return Cast<T>(AllUserWidgets[InWidgetName]);
 		}
 		return nullptr;
 	}
@@ -369,24 +374,28 @@ public:
 	////////////////////////////////////////////////////
 	// Widget
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "WorldWidget")
 	TArray<TSubclassOf<UWorldWidgetBase>> WorldWidgetClasses;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	UPROPERTY(EditAnywhere, Category = "WorldWidget")
+	TSubclassOf<class UWorldWidgetContainer> WorldWidgetContainerClass;
+	
+	UPROPERTY(EditAnywhere, Category = "WorldWidget")
+	int32 WorldWidgetContainerZOrder;
+	
+private:
+	UPROPERTY(Transient)
 	TMap<FName, FWorldWidgets> AllWorldWidgets;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	TSubclassOf<UUserWidget> WorldWidgetParentClass;
-	
-	UPROPERTY()
-	UUserWidget* WorldWidgetParent;
+	UPROPERTY(Transient)
+	class UWorldWidgetContainer* WorldWidgetContainer;
 
-protected:
+	UPROPERTY(Transient)
 	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
 
 public:
 	UFUNCTION(BlueprintPure)
-	UUserWidget* GetWorldWidgetParent() const { return WorldWidgetParent; }
+	UWorldWidgetContainer* GetWorldWidgetContainer() const { return WorldWidgetContainer; }
 
 	template<class T>
 	bool HasWorldWidget(int32 InWidgetIndex, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass()) const
@@ -464,7 +473,7 @@ public:
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		
 		if(!WorldWidgetClassMap.Contains(WidgetName)) return nullptr;
-		
+
 		if(UWorldWidgetBase* WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), WorldWidgetClassMap[WidgetName]))
 		{
 			WorldWidget->OnCreate(InOwner, InLocation, InSceneComp, *InParams);
@@ -492,6 +501,7 @@ public:
 			if(UWorldWidgetBase* WorldWidget = AllWorldWidgets[WidgetName].WorldWidgets[InWidgetIndex])
 			{
 				AllWorldWidgets[WidgetName].WorldWidgets.RemoveAt(InWidgetIndex);
+
 				if(AllWorldWidgets[WidgetName].WorldWidgets.Num() > 0)
 				{
 					for(int32 i = 0; i < AllWorldWidgets[WidgetName].WorldWidgets.Num(); i++)

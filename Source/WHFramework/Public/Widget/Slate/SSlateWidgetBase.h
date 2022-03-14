@@ -65,7 +65,9 @@ protected:
 	int32 WidgetZOrder;
 
 	EWidgetType WidgetType;
-						
+								
+	EWidgetCreateType WidgetCreateType;
+				
 	EWidgetOpenType WidgetOpenType;
 
 	EWidgetCloseType WidgetCloseType;
@@ -101,6 +103,8 @@ public:
 		}
 		return WidgetState;
 	}
+
+	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
 
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
 

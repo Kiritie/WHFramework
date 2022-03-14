@@ -14,18 +14,19 @@
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetComponent.h"
+#include "Widget/World/WorldWidgetContainer.h"
 
 UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	WidgetName = NAME_None;
+	bWidgetAutoSize = false;
 	WidgetZOrder = -1;
 	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-	bWidgetAutoSize = false;
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
-	InputMode = EInputMode::None;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	WidgetRefreshTime = 0;
+	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 	WidgetIndex = 0;
 
@@ -33,52 +34,15 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, class USceneComponent*>();
 }
 
+void UWorldWidgetBase::TickWidget_Implementation()
+{
+	
+}
+
 void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	OwnerActor = InOwner;
 	
-	if(!IsInViewport())
-	{
-		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
-		{
-			if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(WidgetModule->GetWorldWidgetParent()->GetRootWidget()))
-			{
-				if(UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(this))
-				{
-					CanvasPanelSlot->SetZOrder(WidgetZOrder);
-					CanvasPanelSlot->SetAnchors(WidgetAnchors);
-					CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
-					CanvasPanelSlot->SetOffsets(WidgetOffsets);
-					CanvasPanelSlot->SetAlignment(WidgetAlignment);
-
-					if(!InLocation.IsNearlyZero())
-					{
-						FVector2D ScreenPos;
-						if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), OwnerActor->GetActorLocation(), ScreenPos, false))
-						{
-							CanvasPanelSlot->SetPosition(ScreenPos);
-						}
-					}
-					else if(InSceneComp)
-					{
-						if(InSceneComp->IsA(UWorldWidgetComponent::StaticClass()))
-						{
-							WidgetComponent = Cast<UWorldWidgetComponent>(InSceneComp);
-							if(WidgetComponent && WidgetComponent->IsBindWidgetToSelf())
-							{
-								BindWidgetPoint(this, WidgetComponent);
-							}
-						}
-						else
-						{
-							BindWidgetPoint(this, InSceneComp);
-						}
-					}
-				}
-			}
-		}
-	}
-
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
@@ -87,6 +51,48 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{
 		InputModule->UpdateInputMode();
+	}
+
+	if(InSceneComp && InSceneComp->IsA(UWorldWidgetComponent::StaticClass()))
+	{
+		WidgetComponent = Cast<UWorldWidgetComponent>(InSceneComp);
+		if(WidgetComponent->GetWidgetSpace() == EWidgetSpace::World) return;
+	}
+
+	if(!IsInViewport())
+	{
+		if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
+		{
+			if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
+			{
+				CanvasPanelSlot->SetZOrder(WidgetZOrder);
+				CanvasPanelSlot->SetAnchors(WidgetAnchors);
+				CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
+				CanvasPanelSlot->SetOffsets(WidgetOffsets);
+				CanvasPanelSlot->SetAlignment(WidgetAlignment);
+				SetRenderTransformPivot(WidgetAlignment);
+
+				if(!InLocation.IsNearlyZero())
+				{
+					FVector2D ScreenPos;
+					if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), OwnerActor->GetActorLocation(), ScreenPos, false))
+					{
+						CanvasPanelSlot->SetPosition(ScreenPos);
+					}
+				}
+				else if(InSceneComp)
+				{
+					if(!WidgetComponent)
+					{
+						BindWidgetPoint(this, InSceneComp);
+					}
+					else if(WidgetComponent->IsBindWidgetToSelf())
+					{
+						BindWidgetPoint(this, WidgetComponent);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -109,7 +115,10 @@ void UWorldWidgetBase::OnDestroy_Implementation()
 {
 	if(IsInViewport())
 	{
-		RemoveFromViewport();
+		if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
+		{
+			Container->RemoveWorldWidget(this);
+		}
 	}
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)

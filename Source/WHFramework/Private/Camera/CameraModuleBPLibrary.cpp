@@ -8,35 +8,36 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-void UCameraModuleBPLibrary::AddCameraToList(ACameraPawnBase* InCamera)
+ACameraPawnBase* UCameraModuleBPLibrary::K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		return CameraModule->AddCameraToList(InCamera);
-	}
-}
-
-void UCameraModuleBPLibrary::RemoveCameraFromList(ACameraPawnBase* InCamera)
-{
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
-	{
-		return CameraModule->RemoveCameraFromList(InCamera);
-	}
-}
-
-void UCameraModuleBPLibrary::RemoveCameraFromListByName(const FName InCameraName)
-{
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
-	{
-		return CameraModule->RemoveCameraFromListByName(InCameraName);
-	}
-}
-
-ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InCameraName)
-{
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
-	{
-		return CameraModule->GetCameraByName(InCameraName);
+		return CameraModule->K2_GetCamera(InClass);
 	}
 	return nullptr;
+}
+
+ACameraPawnBase* UCameraModuleBPLibrary::K2_GetCameraByName(const FName InCameraName)
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->K2_GetCameraByName(InCameraName);
+	}
+	return nullptr;
+}
+
+void UCameraModuleBPLibrary::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass)
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		CameraModule->K2_SwitchCamera(InClass);
+	}
+}
+
+void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName)
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		CameraModule->SwitchCameraByName(InCameraName);
+	}
 }

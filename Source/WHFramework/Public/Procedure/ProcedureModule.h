@@ -101,10 +101,10 @@ public:
 	/// RootProcedure
 public:
 	/// 当前根流程索引
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated)
+	UPROPERTY(EditAnywhere, Replicated)
 	int32 RootProcedureIndex;
 	/// 根流程
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, Replicated)
 	TArray<ARootProcedureBase*> RootProcedures;
 public:
 	/**
@@ -122,13 +122,13 @@ public:
 	/// Procedure
 protected:
 	/// 当前流程 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, Replicated, Transient)
 	AProcedureBase* CurrentProcedure;
 	/// 当前本地流程 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, Replicated, Transient)
 	AProcedureBase* CurrentLocalProcedure;
 	/// 当前父流程
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, Replicated, Transient)
 	AProcedureBase* CurrentParentProcedure;
 public:
 	/**

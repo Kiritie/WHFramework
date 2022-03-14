@@ -80,7 +80,7 @@ public:
 	bool IsSaved() const { return bSaved; }
 
 protected:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
 	bool bLoaded;
 public:
 	UFUNCTION(BlueprintPure)

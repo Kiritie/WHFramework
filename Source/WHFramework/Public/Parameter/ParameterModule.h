@@ -21,7 +21,7 @@ public:
 	AParameterModule();
 
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated)
+	UPROPERTY(EditAnywhere, Replicated)
 	FParameters Parameters;
 	
 	//////////////////////////////////////////////////////////////////////////

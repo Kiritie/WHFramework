@@ -41,7 +41,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Character
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "Character")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
 	TArray<TScriptInterface<ICharacterInterface>> Characters;
 
 public:

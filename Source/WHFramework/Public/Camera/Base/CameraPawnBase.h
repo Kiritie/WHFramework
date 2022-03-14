@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Camera/CameraModuleTypes.h"
 #include "GameFramework/Pawn.h"
 #include "CameraPawnBase.generated.h"
 
@@ -17,68 +18,42 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class UCameraComponent* Camera;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class USpringArmComponent* CameraBoom;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class UCameraComponent* FollowCamera;
-	
+	class UPawnMovementComponent* MovementComponent;
+
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, Category = "Default")
 	FName CameraName;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float CameraTurnRate;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float CameraLookUpRate;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MinCameraDistance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxCameraDistance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float InitCameraDistance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CameraZoomSpeed;
-
-private:
-	float TargetCameraDistance;
+	UPROPERTY(EditAnywhere, Category = "Default")
+	ECameraCollisionMode CameraCollisionMode;
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-public:	
-	// Called every frame
+public:
 	virtual void Tick(float DeltaTime) override;
-
-protected:
-	void TurnCam(float InRate);
-
-	void LookUpCam(float InRate);
-	
-	void ZoomCam(float InRate);
 
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetCameraName() const { return CameraName; }
-	
+
 	UFUNCTION(BlueprintPure)
-	float GetCameraDistance() const { return TargetCameraDistance; }
+	UCameraComponent* GetCamera() const { return Camera; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetCameraDistance(float InCameraDistance = -1.f, bool bInstant = false);
-
-public:	
 	UFUNCTION(BlueprintPure)
 	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 
 	UFUNCTION(BlueprintPure)
-	UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+	ECameraCollisionMode GetCameraCollisionMode() const { return CameraCollisionMode; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode);
 };

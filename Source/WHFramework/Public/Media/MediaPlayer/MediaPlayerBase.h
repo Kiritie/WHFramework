@@ -38,7 +38,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	UPROPERTY(EditAnywhere, Category = "Default")
 	FName PlayerName;
 	
 public:

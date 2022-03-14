@@ -39,7 +39,7 @@ ASceneModule::ASceneModule()
 	WaterPhysicsVolume.PhysicsVolumeClass = APhysicsVolumeBase::StaticClass();
 	DefaultPhysicsVolumes.Add(WaterPhysicsVolume);
 
-	OutlineMat = LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Materials/M_PostHigtLight.M_PostHigtLight'"));
+	OutlineMat = LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Scene/Materials/M_PostHigtLight.M_PostHigtLight'"));
 	OutlineColor = FLinearColor(0.03f, 0.7f, 1.f);
 	OutlineMatInst = nullptr;
 }

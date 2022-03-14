@@ -16,6 +16,10 @@ public:
 	ARoamCameraPawn();
 
 protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class USphereComponent* Sphere;
+
+protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
@@ -32,4 +36,7 @@ protected:
 	virtual void MoveRight(float InValue);
 
 	virtual void MoveUp(float InValue);
+
+public:
+	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode) override;
 };

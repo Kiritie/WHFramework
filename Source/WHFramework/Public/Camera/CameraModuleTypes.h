@@ -3,3 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+UENUM(BlueprintType)
+enum class ECameraCollisionMode : uint8
+{
+	None,
+	All,
+	PhysicsOnly,
+	SightOnly
+};

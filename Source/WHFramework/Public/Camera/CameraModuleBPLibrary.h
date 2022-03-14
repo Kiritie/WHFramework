@@ -8,7 +8,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "CameraModuleBPLibrary.generated.h"
 
-class ACameraModule;
+class ACameraPawnBase;
 /**
  * 
  */
@@ -18,15 +18,33 @@ class WHFRAMEWORK_API UCameraModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void AddCameraToList(class ACameraPawnBase* InCamera);
+	template<class T>
+	static T* GetCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	{
+		return Cast<T>(K2_GetCamera(InClass));
+	}
+
+	UFUNCTION(BlueprintCallable, DisplayName = "GetCamera", meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
+
+	template<class T>
+	static T* GetCameraByName(const FName InCameraName)
+	{
+		return Cast<T>(K2_GetCameraByName(InCameraName));
+	}
+
+	UFUNCTION(BlueprintPure, DisplayName = "GetCamera", Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* K2_GetCameraByName(const FName InCameraName);
+
+	template<class T>
+	static void SwitchCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	{
+		K2_SwitchCamera(InClass);
+	}
+
+	UFUNCTION(BlueprintCallable, DisplayName = "SwitchCamera", Category = "CameraModuleBPLibrary")
+	static void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void RemoveCameraFromList(class ACameraPawnBase* InCamera);
-
-	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void RemoveCameraFromListByName(const FName InCameraName);
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static class ACameraPawnBase* GetCameraByName(const FName InCameraName);
+	static void SwitchCameraByName(const FName InCameraName);
 };

@@ -9,6 +9,7 @@
 
 #include "CameraModule.generated.h"
 
+class ACameraPawnBase;
 UCLASS()
 class WHFRAMEWORK_API ACameraModule : public AModuleBase
 {
@@ -40,30 +41,52 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "Camera")
-	TArray<TSubclassOf<class ACameraPawnBase>> CameraClasses;
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	TSubclassOf<ACameraPawnBase> DefaultCameraClass;
+
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	TArray<TSubclassOf<ACameraPawnBase>> CameraClasses;
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "Camera")
-	TArray<class ACameraPawnBase*> Cameras;
-	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "Camera")
-	class ACameraPawnBase* CurrentCamera;
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	TArray<ACameraPawnBase*> Cameras;
+		
+	UPROPERTY(VisibleAnywhere, Category = "Camera")
+	ACameraPawnBase* CurrentCamera;
+
+private:			
+	UPROPERTY(Transient)
+	TMap<FName, ACameraPawnBase*> CameraMap;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void SwitchCamera(class ACameraPawnBase* InCamera);
-	
-	UFUNCTION(BlueprintCallable)
-	void AddCameraToList(class ACameraPawnBase* InCamera);
+	template<class T>
+	T* GetCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	{
+		return Cast<T>(K2_GetCamera(InClass));
+	}
+
+	UFUNCTION(BlueprintCallable, DisplayName = "GetCamera", meta = (DeterminesOutputType = "InClass"))
+	ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
+
+	template<class T>
+	T* GetCameraByName(const FName InCameraName)
+	{
+		return Cast<T>(K2_GetCameraByName(InCameraName));
+	}
+
+	UFUNCTION(BlueprintPure, DisplayName = "GetCamera")
+	ACameraPawnBase* K2_GetCameraByName(const FName InCameraName) const;
+
+	template<class T>
+	void SwitchCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	{
+		K2_SwitchCamera(InClass);
+	}
+
+	UFUNCTION(BlueprintCallable, DisplayName = "SwitchCamera")
+	void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveCameraFromList(class ACameraPawnBase* InCamera);
-
-	UFUNCTION(BlueprintCallable)
-	void RemoveCameraFromListByName(const FName InCameraName);
-
-	UFUNCTION(BlueprintPure)
-	class ACameraPawnBase* GetCameraByName(const FName InCameraName) const;
+	void SwitchCameraByName(const FName InCameraName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

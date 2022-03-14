@@ -238,6 +238,9 @@ public:
 	////////////////////////////////////////////////////
 	// Widget
 public:
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static UWorldWidgetContainer* GetWorldWidgetContainer();
+
 	template<class T>
 	static bool HasWorldWidget(int32 InWidgetIndex, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
 	{

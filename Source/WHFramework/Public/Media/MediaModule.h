@@ -41,7 +41,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// MediaPlayer
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "MediaPlayer")
+	UPROPERTY(EditAnywhere, Replicated, Category = "MediaPlayer")
 	TArray<AMediaPlayerBase*> MediaPlayers;
 
 public:
