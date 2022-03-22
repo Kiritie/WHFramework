@@ -88,10 +88,9 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
-protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control
-	protected:
+protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
 	bool bCameraControlAble;
 
@@ -103,6 +102,15 @@ protected:
 
 	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl")
 	bool bCameraZoomAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	float bNormalizeMove;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	float bNormalizeRotate;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	float bNormalizeZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
 	float CameraMoveRate;
@@ -243,6 +251,83 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetCameraStates(bool bInCameraControlAble, bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble);
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraMoveRate() const { return CameraMoveRate; }
+
+	void SetCameraMoveRate(float InCameraMoveRate) { this->CameraMoveRate = InCameraMoveRate; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraMoveSmooth() const { return CameraMoveSmooth; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraMoveSmooth(float InCameraMoveSmooth) { this->CameraMoveSmooth = InCameraMoveSmooth; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraTurnRate() const { return CameraTurnRate; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraTurnRate(float InCameraTurnRate) { this->CameraTurnRate = InCameraTurnRate; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraLookUpRate() const { return CameraLookUpRate; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraLookUpRate(float InCameraLookUpRate) { this->CameraLookUpRate = InCameraLookUpRate; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraRotateSmooth() const { return CameraRotateSmooth; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraRotateSmooth(float InCameraRotateSmooth) { this->CameraRotateSmooth = InCameraRotateSmooth; }
+
+	UFUNCTION(BlueprintPure)
+	float GetMinCameraPinch() const { return MinCameraPinch; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMinCameraPinch(float InMinCameraPinch) { this->MinCameraPinch = InMinCameraPinch; }
+
+	UFUNCTION(BlueprintPure)
+	float GetMaxCameraPinch() const { return MaxCameraPinch; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMaxCameraPinch(float InMaxCameraPinch) { this->MaxCameraPinch = InMaxCameraPinch; }
+
+	UFUNCTION(BlueprintPure)
+	float GetInitCameraPinch() const { return InitCameraPinch; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetInitCameraPinch(float InInitCameraPinch) { this->InitCameraPinch = InInitCameraPinch; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraZoomRate() const { return CameraZoomRate; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraZoomRate(float InCameraZoomRate) { this->CameraZoomRate = InCameraZoomRate; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraZoomSmooth() const { return CameraZoomSmooth; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraZoomSmooth(float InCameraZoomSmooth) { this->CameraZoomSmooth = InCameraZoomSmooth; }
+
+	UFUNCTION(BlueprintPure)
+	float GetMinCameraDistance() const { return MinCameraDistance; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMinCameraDistance(float InMinCameraDistance) { this->MinCameraDistance = InMinCameraDistance; }
+
+	UFUNCTION(BlueprintPure)
+	float GetMaxCameraDistance() const { return MaxCameraDistance; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMaxCameraDistance(float InMaxCameraDistance) { this->MaxCameraDistance = InMaxCameraDistance; }
+
+	UFUNCTION(BlueprintPure)
+	float GetInitCameraDistance() const { return InitCameraDistance; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraDistance(bool bReally = true);

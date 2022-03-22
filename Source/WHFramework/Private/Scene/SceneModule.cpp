@@ -1,7 +1,6 @@
 
 #include "Scene/SceneModule.h"
 
-#include "PackageTools.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/PostProcessVolume.h"
@@ -78,54 +77,57 @@ void ASceneModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
 
-	APostProcessVolume* UnboundPostProcessVolume = nullptr;
-	
-	for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
-	{
-		if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
-		{
-			if (PostProcessVolume->bUnbound)
-			{
-				UnboundPostProcessVolume = PostProcessVolume;
-				break;
-			}
-		}
-	}
-
-	if (!UnboundPostProcessVolume)
-	{
-		APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
-		
-		if (PostProcessVolume)
-		{
-			PostProcessVolume->bUnbound = true;
-			UnboundPostProcessVolume = PostProcessVolume;
-		}
-	}
-
-	if (UnboundPostProcessVolume)
-	{
-		bool bNeedAddMat = true;
-		// 查找是否描边材质已经添加
-		for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
-		{
-			if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
-			{
-				if (OutlineMatInst)
-				{
-					UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
-				}
-				bNeedAddMat = false;
-				break;
-			}
-		}
-		if (bNeedAddMat)
-		{
-			UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
-		}
-	}
-
-	SetOutlineColor(OutlineColor);
+	// APostProcessVolume* UnboundPostProcessVolume = nullptr;
+	//
+	// for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
+	// {
+	// 	if (PostProcessVolumeInterface)
+	// 	{
+	// 		if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
+	// 		{
+	// 			if (PostProcessVolume->bUnbound)
+	// 			{
+	// 				UnboundPostProcessVolume = PostProcessVolume;
+	// 				break;
+	// 			}
+	// 		}
+	// 	}
+	// }
+	//
+	// if (!UnboundPostProcessVolume)
+	// {
+	// 	APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
+	// 	
+	// 	if (PostProcessVolume)
+	// 	{
+	// 		PostProcessVolume->bUnbound = true;
+	// 		UnboundPostProcessVolume = PostProcessVolume;
+	// 	}
+	// }
+	//
+	// if (UnboundPostProcessVolume)
+	// {
+	// 	bool bNeedAddMat = true;
+	// 	// 查找是否描边材质已经添加
+	// 	for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
+	// 	{
+	// 		if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
+	// 		{
+	// 			if (OutlineMatInst)
+	// 			{
+	// 				UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
+	// 			}
+	// 			bNeedAddMat = false;
+	// 			break;
+	// 		}
+	// 	}
+	// 	if (bNeedAddMat)
+	// 	{
+	// 		UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
+	// 	}
+	// }
+	//
+	// SetOutlineColor(OutlineColor);
 }
 
 void ASceneModule::OnRefresh_Implementation(float DeltaSeconds)

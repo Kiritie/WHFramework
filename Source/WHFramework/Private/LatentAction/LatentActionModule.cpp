@@ -47,22 +47,22 @@ void ALatentActionModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ALatentActionModule::MoveActorTo(AActor* Actor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void ALatentActionModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
-	if (UWorld* World  = GEngine->GetWorldFromContextObject(Actor, EGetWorldErrorMode::LogAndReturnNull))
+	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
 		FMoveActorToAction* Action = LatentActionManager.FindExistingAction<FMoveActorToAction>(LatentInfo.CallbackTarget, LatentInfo.UUID);
 	
-		const FVector ActorLocation = (Actor != nullptr) ? Actor->GetActorLocation() : FVector::ZeroVector;
-		const FRotator ActorRotation = (Actor != nullptr) ? Actor->GetActorRotation() : FRotator::ZeroRotator;
-		const FVector ActorScale = (Actor != nullptr) ? Actor->GetActorScale() : FVector::ZeroVector;
+		const FVector ActorLocation = (InActor != nullptr) ? InActor->GetActorLocation() : FVector::ZeroVector;
+		const FRotator ActorRotation = (InActor != nullptr) ? InActor->GetActorRotation() : FRotator::ZeroRotator;
+		const FVector ActorScale = (InActor != nullptr) ? InActor->GetActorScale() : FVector::ZeroVector;
 	
 		if (Action == nullptr)
 		{
 			if (MoveAction == EMoveActorAction::Start)
 			{
-				Action = new FMoveActorToAction(ApplicationTime, LatentInfo, Actor, bUseRotator, bUseScale, bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath);
+				Action = new FMoveActorToAction(ApplicationTime, LatentInfo, InActor, bUseRotator, bUseScale, bEaseIn, bEaseOut, BlendExp, bForceShortestRotationPath);
 	
 				if (InTargetPoint)
 				{
@@ -135,20 +135,20 @@ void ALatentActionModule::MoveActorTo(AActor* Actor, ATargetPoint* InTargetPoint
 	}
 }
 
-void ALatentActionModule::RotatorActorTo(AActor* Actor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void ALatentActionModule::RotatorActorTo(AActor* InActor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
-	if (UWorld* World  = GEngine->GetWorldFromContextObject(Actor, EGetWorldErrorMode::LogAndReturnNull))
+	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
 		FRotatorActorToAction* Action = LatentActionManager.FindExistingAction<FRotatorActorToAction>(LatentInfo.CallbackTarget, LatentInfo.UUID);
 		
-		const FRotator ActorRotation = (Actor != nullptr) ? Actor->GetActorRotation() : FRotator::ZeroRotator;
+		const FRotator ActorRotation = (InActor != nullptr) ? InActor->GetActorRotation() : FRotator::ZeroRotator;
 	
 		if (Action == nullptr)
 		{
 			if (MoveAction == EMoveActorAction::Start)
 			{
-				Action = new FRotatorActorToAction(ApplicationTime, LatentInfo, Actor);
+				Action = new FRotatorActorToAction(ApplicationTime, LatentInfo, InActor);
 
 				Action->TargetRotation = InRotator;	 			
 				Action->InitialRotation = ActorRotation;
@@ -191,20 +191,20 @@ void ALatentActionModule::RotatorActorTo(AActor* Actor, FRotator InRotator, floa
 	}
 }
 
-void ALatentActionModule::ScaleActorTo(AActor* Actor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void ALatentActionModule::ScaleActorTo(AActor* InActor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
-	if (UWorld* World  = GEngine->GetWorldFromContextObject(Actor, EGetWorldErrorMode::LogAndReturnNull))
+	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
 		FScaleActorToAction* Action = LatentActionManager.FindExistingAction<FScaleActorToAction>(LatentInfo.CallbackTarget, LatentInfo.UUID);
 		
-		const FVector ActorScale = (Actor != nullptr) ? Actor->GetActorScale() : FVector::OneVector;
+		const FVector ActorScale = (InActor != nullptr) ? InActor->GetActorScale() : FVector::OneVector;
 	
 		if (Action == nullptr)
 		{
 			if (MoveAction == EMoveActorAction::Start)
 			{
-				Action = new FScaleActorToAction(ApplicationTime,LatentInfo,Actor);
+				Action = new FScaleActorToAction(ApplicationTime,LatentInfo,InActor);
 
 				Action->TargetScale = InScale;	 			
 				Action->InitialScale = ActorScale;
@@ -247,9 +247,9 @@ void ALatentActionModule::ScaleActorTo(AActor* Actor, FVector InScale, float App
 	}	
 }
 
-void ALatentActionModule::CancelableDelay(UObject* WorldContextObject, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo)
+void ALatentActionModule::CancelableDelay(UObject* InWorldContext, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo)
 {
-	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
+	if (UWorld* World = GEngine->GetWorldFromContextObject(InWorldContext, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
 		if (LatentActionManager.FindExistingAction<FCancelableDelayAction>(LatentInfo.CallbackTarget, LatentInfo.UUID) == NULL)

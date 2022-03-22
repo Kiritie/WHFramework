@@ -9,6 +9,7 @@
 #include "Character/CharacterModule.h"
 #include "Camera/CameraModule.h"
 #include "Debug/DebugModule.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Input/InputModule.h"
@@ -154,7 +155,7 @@ void AMainModule::GenerateModules_Implementation()
 	for(auto Iter : RemoveList)
 	{
 		ModuleRefs.Remove(Iter);
-		if(!ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
+		if(ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
 		{
 			ModuleMap.Remove(Iter->Execute_GetModuleName(Iter.GetObject()));
 		}
