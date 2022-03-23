@@ -144,29 +144,19 @@ public:
 		if(!InSaveGameClass) return nullptr;
 
 		const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-		if (UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex))
-		{
-			USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSaveSlotName(SaveName, InIndex), UserIndex));
-			if(SaveGame)
-			{
-				if(!AllSaveGames.Contains(SaveName))
-				{
-					AllSaveGames.Add(SaveName, SaveGame);
-					SaveGame->OnLoad();
-					return Cast<T>(SaveGame);
-				}
-				else
-				{
-					AllSaveGames[SaveName] = SaveGame;
-					AllSaveGames[SaveName]->OnLoad();
-					return Cast<T>(AllSaveGames[SaveName]);
-				}
-			}
-		}
-		else if(AllSaveGames[SaveName])
+		if (AllSaveGames.Contains(SaveName))
 		{
 			AllSaveGames[SaveName]->OnLoad();
 			return Cast<T>(AllSaveGames[SaveName]);
+		}
+		else if(UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex))
+		{
+			if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSaveSlotName(SaveName, InIndex), UserIndex)))
+			{
+				AllSaveGames.Add(SaveName, SaveGame);
+				SaveGame->OnLoad();
+				return Cast<T>(SaveGame);
+			}
 		}
 		return nullptr;
 	}

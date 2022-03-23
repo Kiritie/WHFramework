@@ -13,7 +13,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Scene/Object/SceneObject.h"
 #include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
-#include "Scene/Widget/WidgetLoadingPanel.h"
+#include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
 ASceneModule::ASceneModule()
@@ -150,7 +150,7 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 		if(bCreateLoadingWidget)
 		{
 			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
-			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingPanel>(&Parameters);
+			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
 			UE_LOG(LogTemp, Warning, TEXT("Start load level: %s"), *LoadPackagePath);
@@ -173,9 +173,9 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 				{
 					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
 				}
-				if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>())
+				if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingLevelPanel>())
 				{
-					UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>()->SetLoadProgress(1.f);
+					UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
 				}
 				LoadedLevels.Add(InLevelPath, LoadedPackage);
 			}
@@ -199,7 +199,7 @@ void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevel
 		if(bCreateLoadingWidget)
 		{
 			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
-			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingPanel>(&Parameters);
+			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		UE_LOG(LogTemp, Warning, TEXT("Start unload level: %s"), *LoadPackagePath);
 		if(InFinishDelayTime > 0.f)
@@ -213,9 +213,9 @@ void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevel
 		{
 			OnAsyncUnloadLevelFinished(InLevelPath, InOnAsyncUnloadLevelFinished);
 		}
-		if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>())
+		if(bCreateLoadingWidget && UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingLevelPanel>())
 		{
-			UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingPanel>()->SetLoadProgress(1.f);
+			UWidgetModuleBPLibrary::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
 		}
 		LoadedLevels.Remove(InLevelPath);
 	}
@@ -236,7 +236,7 @@ void ASceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 {
 	UE_LOG(LogTemp, Warning, TEXT("Load level Succeeded!"));
 
-	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingPanel>();
+	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingLevelPanel>();
 
 	if(InOnAsyncLoadLevelFinished.IsBound())
 	{
@@ -249,7 +249,7 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 {
 	UE_LOG(LogTemp, Warning, TEXT("Unload level Succeeded!"));
 
-	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingPanel>();
+	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingLevelPanel>();
 	
 	if(InOnAsyncUnloadLevelFinished.IsBound())
 	{

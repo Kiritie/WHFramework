@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Widget/UMG/UserWidgetBase.h"
-#include "WidgetLoadingPanel.generated.h"
+#include "WidgetLoadingLevelPanel.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetLoadingPanel : public UUserWidgetBase
+class WHFRAMEWORK_API UWidgetLoadingLevelPanel : public UUserWidgetBase
 {
 	GENERATED_BODY()
 	
 public:
-	UWidgetLoadingPanel(const FObjectInitializer& objectInitializer);
+	UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer);
 
 public:
 	virtual void OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant) override;
