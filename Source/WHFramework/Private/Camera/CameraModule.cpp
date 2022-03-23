@@ -37,7 +37,7 @@ void ACameraModule::OnGenerate_Implementation()
 		{
 			if(Camera && Camera->IsA(Class))
 			{
-				Camera->AttachToActor(AMainModule::GetModuleByClass<ACameraModule>(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+				Camera->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 				bNeedSpawn = false;
 				break;
 			}
@@ -48,7 +48,7 @@ void ACameraModule::OnGenerate_Implementation()
 			ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			if(ACameraPawnBase* CameraPawn = GetWorld()->SpawnActor<ACameraPawnBase>(Class, ActorSpawnParameters))
 			{
-				CameraPawn->AttachToActor(AMainModule::GetModuleByClass<ACameraModule>(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+				CameraPawn->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 				Cameras.Add(CameraPawn);
 			}
 		}

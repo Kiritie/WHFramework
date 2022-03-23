@@ -48,6 +48,10 @@ AWHPlayerController::AWHPlayerController()
 	bCameraRotateAble = true;
 	bCameraZoomAble = true;
 
+	bNormalizeMove = false;
+	bNormalizeRotate = false;
+	bNormalizeZoom = false;
+
 	CameraMoveRate = 20.f;
 	CameraMoveSmooth = 5.f;
 
@@ -127,17 +131,17 @@ void AWHPlayerController::Tick(float DeltaTime)
 
 	if(GetPawn() && !GetPawn()->GetActorLocation().Equals(TargetCameraLocation))
 	{
-		GetPawn()->SetActorLocation(FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+		GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
 	}
 
 	if(!GetControlRotation().Equals(TargetCameraRotation))
 	{
-		SetControlRotation(FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
+		SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
 	}
 
 	if(GetCameraBoom() && GetCameraBoom()->TargetArmLength != TargetCameraDistance)
 	{
-		GetCameraBoom()->TargetArmLength = FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth);
+		GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth);
 	}
 }
 void AWHPlayerController::Turn(float InRate)

@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Main/Base/Module.h"
 #include "MainModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "Main/Base/ModuleNetworkComponent.h"
 #include "Gameplay/WHPlayerController.h"

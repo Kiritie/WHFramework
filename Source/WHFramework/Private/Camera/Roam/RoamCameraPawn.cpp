@@ -11,7 +11,6 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHPlayerController.h"
 
-// Sets default values
 ARoamCameraPawn::ARoamCameraPawn()
 {
 	CameraName = FName("RoamCamera");
@@ -25,14 +24,12 @@ ARoamCameraPawn::ARoamCameraPawn()
 	MovementComponent->UpdatedComponent = Sphere;
 }
 
-// Called when the game starts or when spawned
 void ARoamCameraPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
 }
 
-// Called to bind functionality to input
 void ARoamCameraPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);

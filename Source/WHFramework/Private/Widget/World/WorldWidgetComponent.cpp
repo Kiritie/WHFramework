@@ -76,6 +76,7 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	}
 }
 
+#if WITH_EDITOR
 bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 {
 	if ( InProperty )
@@ -143,6 +144,7 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
+#endif
 
 void UWorldWidgetComponent::CreateWidget()
 {
