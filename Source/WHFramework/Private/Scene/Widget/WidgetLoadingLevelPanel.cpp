@@ -1,15 +1,15 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Widget/WidgetLoadingPanel.h"
+#include "Scene/Widget/WidgetLoadingLevelPanel.h"
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Scene/SceneModuleBPLibrary.h"
 
-UWidgetLoadingPanel::UWidgetLoadingPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
+UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
 {
-	WidgetName = FName("LoadingPanel");
+	WidgetName = FName("LoadingLevelPanel");
 	WidgetType = EWidgetType::Temporary;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	InputMode = EInputMode::None;
@@ -19,7 +19,7 @@ UWidgetLoadingPanel::UWidgetLoadingPanel(const FObjectInitializer& objectInitial
 	CurrentProgress = 0.f;
 }
 
-void UWidgetLoadingPanel::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetLoadingLevelPanel::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
 {
 	Super::OnOpen_Implementation(InParams, bInstant);
 	if(InParams.IsValidIndex(0))
@@ -31,14 +31,14 @@ void UWidgetLoadingPanel::OnOpen_Implementation(const TArray<FParameter>& InPara
 	FinishOpen(bInstant);
 }
 
-void UWidgetLoadingPanel::OnClose_Implementation(bool bInstant)
+void UWidgetLoadingLevelPanel::OnClose_Implementation(bool bInstant)
 {
 	Super::OnClose_Implementation(bInstant);
 	
 	FinishClose(bInstant);
 }
 
-void UWidgetLoadingPanel::OnRefresh_Implementation()
+void UWidgetLoadingLevelPanel::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 
