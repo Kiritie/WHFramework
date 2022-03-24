@@ -104,13 +104,7 @@ protected:
 	bool bCameraZoomAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
-	float bNormalizeMove;
-
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
-	float bNormalizeRotate;
-
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
-	float bNormalizeZoom;
+	bool bUseNormalizedZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
 	float CameraMoveRate;
@@ -226,6 +220,22 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
+	bool IsControllingMove(bool bTouch = false) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsControllingRotate(bool bTouch = false) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsControllingZoom(bool bTouch = false) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraDistance(bool bReally = true);
+	
+	UFUNCTION(BlueprintPure)
+	class USpringArmComponent* GetCameraBoom();
+
+public:
+	UFUNCTION(BlueprintPure)
 	bool IsCameraControlAble() const { return bCameraControlAble; }
 
 	UFUNCTION(BlueprintCallable)
@@ -250,7 +260,7 @@ public:
 	void SetCameraZoomAble(bool bInCameraZoomAble) { this->bCameraZoomAble = bInCameraZoomAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraStates(bool bInCameraControlAble, bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble);
+	void SetCameraControlStates(bool bInCameraControlAble, bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble);
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }
@@ -328,10 +338,4 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
-
-	UFUNCTION(BlueprintPure)
-	float GetCameraDistance(bool bReally = true);
-	
-	UFUNCTION(BlueprintPure)
-	class USpringArmComponent* GetCameraBoom();
 };
