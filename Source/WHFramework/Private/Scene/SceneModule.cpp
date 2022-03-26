@@ -10,6 +10,8 @@
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
+#include "Scene/Components/WorldTimerComponent.h"
+#include "Scene/Components/WorldWeatherComponent.h"
 #include "Scene/Object/SceneObject.h"
 #include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
@@ -18,6 +20,17 @@
 ASceneModule::ASceneModule()
 {
 	ModuleName = FName("SceneModule");
+
+	static ConstructorHelpers::FClassFinder<UWorldTimerComponent> WorldTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldTimer.BPC_WorldTimer_C'"));
+	if(WorldTimerClass.Succeeded())
+	{
+		WorldTimer = Cast<UWorldTimerComponent>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
+	}
+	static ConstructorHelpers::FClassFinder<UWorldWeatherComponent> WeatherTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldWeather.BPC_WorldWeather_C'"));
+	if(WeatherTimerClass.Succeeded())
+	{                                                                                          
+		WorldWeather = Cast<UWorldWeatherComponent>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));
+	}
 
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
@@ -133,6 +146,15 @@ void ASceneModule::OnPreparatory_Implementation()
 void ASceneModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(WorldTimer)
+	{
+		WorldTimer->UpdateTimer();
+	}
+	if (WorldWeather)
+	{
+		WorldWeather->UpdateWeather();
+	}
 }
 
 void ASceneModule::OnPause_Implementation()

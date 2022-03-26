@@ -2,6 +2,9 @@
 
 #include "CoreMinimal.h"
 
+// 事件
+DEFINE_LOG_CATEGORY_STATIC(WHAsset, Log, All);
+
 // 流程
 DEFINE_LOG_CATEGORY_STATIC(WHProcedure, Log, All);
 

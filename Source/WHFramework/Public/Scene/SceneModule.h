@@ -10,6 +10,8 @@
 
 #include "SceneModule.generated.h"
 
+class UWorldWeatherComponent;
+class UWorldTimerComponent;
 /**
  * 
  */
@@ -40,6 +42,21 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 	
+	//////////////////////////////////////////////////////////////////////////
+	// Components
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UWorldTimerComponent* WorldTimer;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UWorldWeatherComponent* WorldWeather;
+public:
+	UFUNCTION(BlueprintPure)
+	UWorldTimerComponent* GetWorldTimer() const { return WorldTimer; }
+
+	UFUNCTION(BlueprintPure)
+	UWorldWeatherComponent* GetWorldWeather() const { return WorldWeather; }
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 protected:

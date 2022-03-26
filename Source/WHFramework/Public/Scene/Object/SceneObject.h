@@ -21,25 +21,18 @@ class WHFRAMEWORK_API ISceneObject
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Initialize(FTransform InBirthPos);
+	virtual void Initialize(FTransform InBirthPos) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	class USceneComponent* GetScenePoint() const;
+	virtual USceneComponent* GetScenePoint() const = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	FTransform GetBirthPos() const;
+	virtual FTransform GetBirthPos() const = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnChangeBirthPos(FTransform InBirthPos);
-	virtual void OnRep_BirthPos() { }
+	virtual void OnChangeBirthPos(FTransform InBirthPos) = 0;
+	virtual void OnRep_BirthPos() = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	bool GetDisplay() const;
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetDisplay(bool bInDisplay);
+	virtual bool GetDisplay() const = 0;
+	virtual void SetDisplay(bool bInDisplay) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnChangeDisplay(bool bInDisplay);
-	virtual void OnRep_Display() { }
+	virtual void OnChangeDisplay(bool bInDisplay) = 0;
+	virtual void OnRep_Display() = 0;
 };

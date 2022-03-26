@@ -24,46 +24,30 @@ class WHFRAMEWORK_API ICharacterInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StartSpeak();
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopSpeak();
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) = 0;
 	
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopSound();
+	virtual void StopSound() = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false);
+	virtual void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false) = 0;
 	
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlayMontageByName(const FName InMontageName, bool bMulticast = false);
+	virtual void PlayMontageByName(const FName InMontageName, bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopMontage(class UAnimMontage* InMontage, bool bMulticast = false);
+	virtual void StopMontage(class UAnimMontage* InMontage, bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopMontageByName(const FName InMontageName, bool bMulticast = false);
+	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void TeleportTo(FTransform InTransform, bool bMulticast = false);
+	virtual void TeleportTo(FTransform InTransform, bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void AIMoveTo(FTransform InTransform, bool bMulticast = false);
+	virtual void AIMoveTo(FTransform InTransform, bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopAIMove(bool bMulticast = false);
+	virtual void StopAIMove(bool bMulticast = false) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false);
+	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) = 0;
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	FName GetCharacterName() const;
+	virtual FString GetNameC() const = 0;
+	
+	virtual void SetNameC(const FString& InName) = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	class UCharacterAnim* GetCharacterAnim() const;
+	virtual class UCharacterAnim* GetAnim() const = 0;
 };
