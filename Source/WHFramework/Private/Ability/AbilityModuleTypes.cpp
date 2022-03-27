@@ -1,5 +1,7 @@
 #include "Ability/AbilityModuleTypes.h"
 
+#include "Asset/Primary/Item/ItemAssetBase.h"
+
 FItem FItem::Empty = FItem();
 
 void UTargetType::GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const
@@ -23,4 +25,9 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	{
 		OutActors.Add(const_cast<AActor*>(EventData.Target));
 	}
+}
+
+UItemAssetBase& FAbilityData::GetItemData() const
+{
+	return UPrimaryAssetManager::LoadItemAsset(AbilityID);
 }

@@ -33,12 +33,12 @@ void AAbilitySkillBase::Tick(float DeltaTime)
 
 }
 
-void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FName& InSkillIndex)
+void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID)
 {
 	if (InOwnerCharacter)
 	{
 		OwnerCharacter = InOwnerCharacter;
-		SkillAbilityIndex = InSkillIndex;
+		SkillAbilityID = InSkillID;
 		SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
 		SetActorRotation(OwnerCharacter->GetActorRotation());
 	}

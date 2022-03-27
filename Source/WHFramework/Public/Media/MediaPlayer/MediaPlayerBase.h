@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Media/MediaModuleTypes.h"
-#include "Scene/Object/SceneObject.h"
+#include "Scene/Object/SceneObjectInterface.h"
 
 #include "MediaPlayerBase.generated.h"
 
@@ -13,7 +13,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API AMediaPlayerBase : public AActor, public ISceneObject
+class WHFRAMEWORK_API AMediaPlayerBase : public AActor, public ISceneObjectInterface
 {
 	GENERATED_BODY()
 	

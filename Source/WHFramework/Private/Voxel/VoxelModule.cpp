@@ -11,6 +11,7 @@
 #include "SpawnPool/SpawnPoolModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelAssetBase.h"
 
 AVoxelModule* AVoxelModule::Current = nullptr;
@@ -69,6 +70,11 @@ void AVoxelModule::OnDestroy_Implementation()
 void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	UVoxel::EmptyVoxel = UVoxel::SpawnVoxel(EVoxelType::Empty);
+	UVoxel::UnknownVoxel = UVoxel::SpawnVoxel(EVoxelType::Unknown);
+	
+	USpawnPoolModuleBPLibrary::DespawnActor(USpawnPoolModuleBPLibrary::SpawnActor<AVoxelChunk>());
 }
 
 void AVoxelModule::OnPreparatory_Implementation()

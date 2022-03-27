@@ -5,10 +5,12 @@
 #include "AbilitySystemInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "AbilityCharacterBase.generated.h"
 
+class UCharacterAssetBase;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
 class AVoxelChunk;
@@ -24,7 +26,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
  * 角色
  */
 UCLASS()
-class DREAMWORLD_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface
+class DREAMWORLD_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -39,7 +41,7 @@ protected:
 protected:
 	// stats
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FPrimaryAssetId ID;
+	FPrimaryAssetId AssetID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FString RaceID;
@@ -187,14 +189,31 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
+	template<class T = UCharacterAttributeSetBase>
+	T* GetAttributeSet() const
+	{
+		return Cast<T>(AttributeSet);
+	}
 	UFUNCTION(BlueprintPure)
 	UCharacterAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
+
+	template<class T = UCharacterAssetBase>
+	T& GetCharacterData() const
+	{
+		return static_cast<T>(GetCharacterData());
+	}
+	
+	UFUNCTION(BlueprintPure)
+	UCharacterAssetBase& GetCharacterData() const;
 
 public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead() const override { return bDead; }
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+
 	UFUNCTION(BlueprintPure)
 	virtual FString GetNameV() const override { return Name; }
 

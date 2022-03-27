@@ -1,14 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PickUp/PickUp.h"
-#include "Gameplay/DWGameMode.h"
+#include "Scene/Object/PickUp/PickUp.h"
+
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
-#include "World/Chunk.h"
-#include "Inventory/Inventory.h"
-#include "Character/AbilityCharacterBase.h"
-#include "Inventory/CharacterInventory.h"
+#include "Scene/Object/PickUp/PickerInterface.h"
+#include "Voxel/VoxelModuleTypes.h"
+#include "Voxel/Chunks/VoxelChunk.h"
 
 // Sets default values
 APickUp::APickUp()
@@ -28,7 +27,7 @@ APickUp::APickUp()
 	MeshComponent = nullptr;
 
 	Item = FItem::Empty;
-	OwnerChunk = nullptr;
+	Container = nullptr;
 }
 
 // Called when the game starts or when spawned
@@ -45,38 +44,46 @@ void APickUp::Initialize(FItem InItem, bool bPreview /*= false*/)
 	BoxComponent->SetCollisionEnabled(!bPreview ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
+void APickUp::RemoveFromContainer()
+{
+	if(Container)
+	{
+		Container->RemoveSceneObject(this);
+		Container= nullptr;
+	}
+}
+
 void APickUp::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (OtherActor)
 	{
-		auto character = Cast<AAbilityCharacterBase>(OtherActor);
-		if (character)
+		auto Picker = Cast<IPickerInterface>(OtherActor);
+		if (Picker)
 		{
-			OnPickUp(character);
+			OnPickUp(Picker);
 		}
 	}
 }
 
-void APickUp::OnPickUp(AAbilityCharacterBase* InPicker)
+void APickUp::OnPickUp(IPickerInterface* InPicker)
 {
-	if(!OwnerChunk || !OwnerChunk->IsValidLowLevel()) return;
-
-	OwnerChunk->DestroyPickUp(this);
-	if(InPicker && InPicker->GetInventory())
+	if(InPicker)
 	{
-		InPicker->GetInventory()->AdditionItemByRange(Item, -1);
+		InPicker->PickUp(this);
 	}
+	RemoveFromContainer();
 }
 
-void APickUp::LoadData(FPickUpSaveData InPickUpData)
+void APickUp::LoadData(FSaveData* InSaveData)
 {
-	if (!InPickUpData.bSaved) return;
+	FPickUpSaveData SaveData = *static_cast<FPickUpSaveData*>(InSaveData);
+	if (!SaveData.bSaved) return;
 
-	SetActorLocation(InPickUpData.Location);
-	Item = InPickUpData.Item;
+	SetActorLocation(SaveData.Location);
+	Item = SaveData.Item;
 }
 
-FPickUpSaveData APickUp::ToData(bool bSaved) const
+FSaveData* APickUp::ToData(bool bSaved)
 {
 	auto data = FPickUpSaveData();
 
@@ -85,7 +92,7 @@ FPickUpSaveData APickUp::ToData(bool bSaved) const
 	data.Item = Item;
 	data.Location = GetActorLocation();
 
-	return data;
+	return &data;
 }
 
 // Called every frame

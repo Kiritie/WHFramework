@@ -37,10 +37,10 @@ public:
 	static bool HasSceneObject(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static TScriptInterface<class ISceneObject> GetSceneObject(FName InName, bool bEnsured = true);
+	static TScriptInterface<class ISceneObjectInterface> GetSceneObject(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SetSceneObject(FName InName, TScriptInterface<class ISceneObject> InObject);
+	static void SetSceneObject(FName InName, TScriptInterface<class ISceneObjectInterface> InObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Target Point

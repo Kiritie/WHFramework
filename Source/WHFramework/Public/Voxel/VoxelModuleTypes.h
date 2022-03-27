@@ -334,8 +334,6 @@ public:
 
 	UVoxel* GetVoxel() const;
 
-	UVoxelAssetBase& GetVoxelData() const;
-
 	FString GetStringData() const;
 
 	bool HasParam(FName InName) const;

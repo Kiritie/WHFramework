@@ -69,7 +69,7 @@ void UVoxelWater::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitR
 		{
 			case ECharacterPartType::Chest:
 			{
-				if(InHitResult.VoxelItem.GetVoxelData().VoxelType != EVoxelType::Water)
+				if(InHitResult.VoxelItem.GetData<UVoxelAssetBase>().VoxelType != EVoxelType::Water)
 				{
 					Character->UnSwim();
 				}
@@ -77,7 +77,7 @@ void UVoxelWater::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitR
 			}
 			case ECharacterPartType::Neck:
 			{
-				if(InHitResult.VoxelItem.GetVoxelData().VoxelType != EVoxelType::Water)
+				if(InHitResult.VoxelItem.GetData<UVoxelAssetBase>().VoxelType != EVoxelType::Water)
 				{
 					Character->Float(Owner->IndexToLocation(Index).Z + AVoxelModule::GetWorldData().BlockSize);
 				}

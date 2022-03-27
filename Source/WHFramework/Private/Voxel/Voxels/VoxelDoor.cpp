@@ -38,9 +38,9 @@ void UVoxelDoor::OpenTheDoor()
 	Rotation += FRotator(0, -90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetVoxelData().OperationSounds.Num() > 0)
+	if(GetData<UVoxelAssetBase>().OperationSounds.Num() > 0)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetVoxelData().OperationSounds[0], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData<UVoxelAssetBase>().OperationSounds[0], Owner->IndexToLocation(Index));
 	}
 }
 
@@ -50,9 +50,9 @@ void UVoxelDoor::CloseTheDoor()
 	Rotation += FRotator(0, 90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetVoxelData().OperationSounds.Num() > 1)
+	if(GetData<UVoxelAssetBase>().OperationSounds.Num() > 1)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetVoxelData().OperationSounds[1], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData<UVoxelAssetBase>().OperationSounds[1], Owner->IndexToLocation(Index));
 	}
 }
 

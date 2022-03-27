@@ -50,7 +50,7 @@ bool USceneModuleBPLibrary::HasSceneObject(FName InName, bool bEnsured)
 	return false;
 }
 
-TScriptInterface<ISceneObject> USceneModuleBPLibrary::GetSceneObject(FName InName, bool bEnsured)
+TScriptInterface<ISceneObjectInterface> USceneModuleBPLibrary::GetSceneObject(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
@@ -59,7 +59,7 @@ TScriptInterface<ISceneObject> USceneModuleBPLibrary::GetSceneObject(FName InNam
 	return nullptr;
 }
 
-void USceneModuleBPLibrary::SetSceneObject(FName InName, TScriptInterface<ISceneObject> InObject)
+void USceneModuleBPLibrary::SetSceneObject(FName InName, TScriptInterface<ISceneObjectInterface> InObject)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{

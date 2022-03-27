@@ -103,7 +103,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	UVoxelAssetBase& GetVoxelData() const;
+	UVoxelAssetBase& GetData() const;
 
 	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId GetID() const { return ID; }

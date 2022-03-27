@@ -12,7 +12,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "Scene/Components/WorldWeatherComponent.h"
-#include "Scene/Object/SceneObject.h"
+#include "Scene/Object/SceneObjectInterface.h"
 #include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Widget/WidgetModuleBPLibrary.h"
@@ -34,7 +34,7 @@ ASceneModule::ASceneModule()
 
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
-	SceneObjects = TMap<FName, TScriptInterface<ISceneObject>>();
+	SceneObjects = TMap<FName, TScriptInterface<ISceneObjectInterface>>();
 
 	TargetPoints = TMap<FName, ATargetPoint*>();
 	
@@ -288,7 +288,7 @@ bool ASceneModule::HasSceneObject(FName InName, bool bEnsured) const
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-TScriptInterface<ISceneObject> ASceneModule::GetSceneObject(FName InName, bool bEnsured) const
+TScriptInterface<ISceneObjectInterface> ASceneModule::GetSceneObject(FName InName, bool bEnsured) const
 {
 	if(HasSceneObject(InName, bEnsured))
 	{
@@ -297,7 +297,7 @@ TScriptInterface<ISceneObject> ASceneModule::GetSceneObject(FName InName, bool b
 	return nullptr;
 }
 
-void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObject> InObject)
+void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObjectInterface> InObject)
 {
 	if(SceneObjects.Contains(InName))
 	{

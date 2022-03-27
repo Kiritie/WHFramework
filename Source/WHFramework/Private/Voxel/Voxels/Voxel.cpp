@@ -7,6 +7,7 @@
 #include "Voxel/Voxels/VoxelAssetBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
@@ -32,7 +33,7 @@ UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 {
-	const UVoxelAssetBase voxelData = UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(InVoxelID);
+	const UVoxelAssetBase& voxelData = UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(InVoxelID);
 	const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : StaticClass();
 	auto voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
 	if(voxel) voxel->ID = InVoxelID;
@@ -156,20 +157,20 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 	{
 		case EMouseButton::Left:
 		{
-			if(ADWPlayerCharacter* PlayerCharacter = UDWHelper::GetPlayerCharacter(this))
+			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
 			{
-				PlayerCharacter->DestroyVoxel(InHitResult);
+				VoxelAgentPlayer->DestroyVoxel(InHitResult);
 			}
 			break;
 		}
 		case EMouseButton::Right:
 		{
-			ADWPlayerCharacter* PlayerCharacter = UDWHelper::GetPlayerCharacter(this);
+			IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this);
 			auto tmpSlot = UWidgetModuleBPLibrary::GetUserWidget<UWidgetInventoryBar>()->GetSelectedSlot();
-			if(PlayerCharacter && tmpSlot && !tmpSlot->IsEmpty())
+			if(VoxelAgentPlayer && tmpSlot && !tmpSlot->IsEmpty())
 			{
 				FItem tmpItem = FItem(tmpSlot->GetItem(), 1);
-				if(PlayerCharacter->GenerateVoxel(InHitResult, tmpItem))
+				if(VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem))
 				{
 					tmpSlot->SubItem(tmpItem);
 				}
@@ -196,7 +197,7 @@ void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
 	
 }
 
-UVoxelAssetBase UVoxel::GetVoxelData() const
+UVoxelAssetBase& UVoxel::GetData() const
 {
-	return UDWHelper::LoadVoxelData(ID);
+	return UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(ID);
 }

@@ -16,13 +16,13 @@ UWorldTextComponent::UWorldTextComponent()
 	SetDrawSize(FVector2D(200, 50));
 	SetPivot(FVector2D(0.5f, 1));
 
-	static ConstructorHelpers::FClassFinder<UWidgetWorldText> NormalWorldTextClassFinder(TEXT("WidgetBlueprint'/Game/Blueprints/Widget/Other/WB_WorldText_Normal.WB_WorldText_Normal_C'"));
+	static ConstructorHelpers::FClassFinder<UWidgetWorldText> NormalWorldTextClassFinder(TEXT("WidgetBlueprint'/Game/Blueprints/Widget/World/WB_WorldText_Normal.WB_WorldText_Normal_C'"));
 	if(NormalWorldTextClassFinder.Succeeded())
 	{
 		WorldTextMap.Add(EWorldTextStyle::Normal, NormalWorldTextClassFinder.Class);
 	}
 
-	static ConstructorHelpers::FClassFinder<UWidgetWorldText> StressWorldTextClassFinder(TEXT("WidgetBlueprint'/Game/Blueprints/Widget/Other/WB_WorldText_Stress.WB_WorldText_Stress_C'"));
+	static ConstructorHelpers::FClassFinder<UWidgetWorldText> StressWorldTextClassFinder(TEXT("WidgetBlueprint'/Game/Blueprints/Widget/World/WB_WorldText_Stress.WB_WorldText_Stress_C'"));
 	if(StressWorldTextClassFinder.Succeeded())
 	{
 		WorldTextMap.Add(EWorldTextStyle::Stress, StressWorldTextClassFinder.Class);

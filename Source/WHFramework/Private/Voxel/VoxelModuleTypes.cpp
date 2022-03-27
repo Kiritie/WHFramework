@@ -38,11 +38,6 @@ UVoxel* FVoxelItem::GetVoxel() const
 	return UVoxel::LoadVoxel(Owner, *this);
 }
 
-UVoxelAssetBase& FVoxelItem::GetVoxelData() const
-{
-	return UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(ID);
-}
-
 FString FVoxelItem::GetStringData() const
 {
 	FString tmpData;

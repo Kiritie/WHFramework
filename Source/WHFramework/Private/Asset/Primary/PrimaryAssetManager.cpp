@@ -33,8 +33,8 @@ void UPrimaryAssetManager::StartInitialLoading()
 	UAbilitySystemGlobals::Get().InitGlobalData();
 }
 
-UItemAssetBase& UPrimaryAssetManager::LoadAbilityItem(const FPrimaryAssetId& PrimaryAssetId, bool bLogWarning)
-{	
+UItemAssetBase& UPrimaryAssetManager::LoadItemAsset(const FPrimaryAssetId& PrimaryAssetId, bool bLogWarning)
+{
 	FSoftObjectPath ItemPath = GetPrimaryAssetPath(PrimaryAssetId);
 
 	UItemAssetBase* LoadedItem = Cast<UItemAssetBase>(ItemPath.TryLoad());

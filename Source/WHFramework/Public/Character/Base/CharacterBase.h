@@ -7,7 +7,7 @@
 #include "CharacterInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
-#include "Scene/Object/SceneObject.h"
+#include "Scene/Object/SceneObjectInterface.h"
 
 #include "CharacterBase.generated.h"
 
@@ -15,7 +15,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneObject
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneObjectInterface
 {
 	GENERATED_BODY()
 	

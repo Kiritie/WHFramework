@@ -25,7 +25,7 @@ protected:
 	float DurationTime;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
-	FName SkillAbilityIndex;
+	FPrimaryAssetId SkillAbilityID;
 
 private:
 	FTimerHandle DestroyTimer;
@@ -38,11 +38,11 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FName& InSkillIndex);
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID);
 
 	virtual void Destroyed() override;
 
 public:
 	UFUNCTION(BlueprintPure)
-	FName GetSkillIndex() const { return SkillAbilityIndex; }
+	FPrimaryAssetId GetSkillID() const { return SkillAbilityID; }
 };

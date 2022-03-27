@@ -30,7 +30,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	bDead = true;
 	
 	// stats
-	ID = NAME_None;
+	AssetID = FPrimaryAssetId();
 	Name = TEXT("");
 	RaceID = TEXT("");
 	Level = 0;
@@ -220,6 +220,11 @@ float AAbilityVitalityBase::GetPhysicsDamage() const
 float AAbilityVitalityBase::GetMagicDamage() const
 {
 	return AttributeSet->GetMagicDamage();
+}
+
+UVitalityAssetBase& AAbilityVitalityBase::GetVitalityData() const
+{
+	return UPrimaryAssetManager::LoadItemAsset<UVitalityAssetBase>(AssetID);
 }
 
 UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const

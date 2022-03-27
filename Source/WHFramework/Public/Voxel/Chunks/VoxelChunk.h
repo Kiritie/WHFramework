@@ -4,6 +4,8 @@
 
 #include "SpawnPool/SpawnPoolInterface.h"
 #include "GameFramework/Actor.h"
+#include "SaveGame/Base/SaveDataInterface.h"
+#include "Scene/Container/SceneContainerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
@@ -17,7 +19,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AActor, public ISpawnPoolInterface
+class WHFRAMEWORK_API AVoxelChunk : public AActor, public ISpawnPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -107,9 +109,9 @@ public:
 public:
 	virtual void Initialize(FIndex InIndex, int32 InBatch);
 
-	virtual void LoadData(FChunkSaveData* InChunkData);
+	virtual void LoadData(FSaveData* InSaveData) override;
 
-	virtual FChunkSaveData* ToData(bool bSaved = true);
+	virtual FSaveData* ToData(bool bSaved = true) override;
 
 	virtual void Generate(bool bPreview = false);
 
@@ -187,6 +189,15 @@ public:
 	AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
 
 	void DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary);
+
+	//////////////////////////////////////////////////////////////////////////
+	// SceneContainer
+public:
+	virtual void AddSceneObject(ISceneObjectInterface* InSceneObject) override;
+
+	virtual void RemoveSceneObject(ISceneObjectInterface* InSceneObject) override;
+
+	virtual void DestroySceneObject(ISceneObjectInterface* InSceneObject) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp

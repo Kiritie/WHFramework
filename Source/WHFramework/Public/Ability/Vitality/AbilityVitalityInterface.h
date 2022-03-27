@@ -18,10 +18,6 @@ class DREAMWORLD_API IAbilityVitalityInterface
 	GENERATED_BODY()
 
 public:
-	virtual void LoadData(FSaveData* InSaveData) = 0;
-
-	virtual FSaveData* ToData(bool bSaved = true) = 0;
-
 	virtual void Spawn() = 0;
 	
 	virtual void Revive() = 0;
@@ -40,6 +36,9 @@ public:
 
 public:
 	virtual bool IsDead() const = 0;
+	
+public:
+	virtual FPrimaryAssetId GetAssetID() const = 0;
 	
 	virtual FString GetNameV() const = 0;
 

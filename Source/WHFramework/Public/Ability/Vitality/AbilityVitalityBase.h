@@ -5,9 +5,12 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
+#include "SaveGame/Base/SaveDataInterface.h"
+#include "Scene/Object/SceneObjectInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
+class UVitalityAssetBase;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
@@ -18,7 +21,7 @@ class UAttributeSetBase;
  * ������������
  */
 UCLASS()
-class DREAMWORLD_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public IAbilitySystemInterface
+class DREAMWORLD_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneObjectInterface, public IAbilitySystemInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -33,7 +36,7 @@ protected:
 protected:
 	// stats
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FName ID;
+	FPrimaryAssetId AssetID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FString Name;
@@ -148,6 +151,10 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead() const override;
 
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+
 	UFUNCTION(BlueprintPure)
 	virtual FString GetNameV() const override { return Name; }
 
@@ -205,8 +212,25 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual float GetMagicDamage() const override;
 
+	template<class T = UVitalityAssetBase>
+	T& GetVitalityData() const
+	{
+		return static_cast<T>(GetVitalityData());
+	}
+	
+	UFUNCTION(BlueprintPure)
+	UVitalityAssetBase& GetVitalityData() const;
+
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	template<class T = UVitalityAttributeSetBase>
+	T* GetAttributeSet() const
+	{
+		return Cast<T>(AttributeSet);
+	}
+	UFUNCTION(BlueprintPure)
+	UVitalityAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
 
 public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;

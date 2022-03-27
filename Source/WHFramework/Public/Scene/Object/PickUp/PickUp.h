@@ -2,11 +2,14 @@
 
 #pragma once
 
-#include "DreamWorld/DreamWorld.h"
+#include "Ability/AbilityModuleTypes.h"
 #include "GameFramework/Actor.h"
+#include "SaveGame/Base/SaveDataInterface.h"
+#include "Scene/Object/SceneObjectInterface.h"
+
 #include "PickUp.generated.h"
 
-class AAbilityCharacterBase;
+class IPickerInterface;
 class AVoxelChunk;
 class UBoxComponent;
 class UMeshComponent;
@@ -16,7 +19,7 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class DREAMWORLD_API APickUp : public AActor, public ISceneObject
+class DREAMWORLD_API APickUp : public AActor, public ISceneObjectInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -24,12 +27,11 @@ public:
 	// Sets default values for this actor's properties
 	APickUp();
 
-public:
+protected:
 	UPROPERTY(BlueprintReadWrite)
 	FItem Item;
 
-	UPROPERTY(BlueprintReadWrite)
-	AVoxelChunk* OwnerChunk;
+	ISceneContainerInterface* Container;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -48,18 +50,27 @@ protected:
 	UFUNCTION()
 	virtual void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	virtual void OnPickUp(AAbilityCharacterBase* InPicker);
+	virtual void OnPickUp(IPickerInterface* InPicker);
 
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	void LoadData(FPickUpSaveData InPickUpData);
+	virtual void LoadData(FSaveData* InSaveData) override;
 
-	FPickUpSaveData ToData(bool bSaved = true) const;
+	virtual FSaveData* ToData(bool bSaved = true) override;
 
 	virtual void Initialize(FItem InItem, bool bPreview = false);
 
+	virtual void RemoveFromContainer() override;
+
+public:
+	FItem& GetItem() { return Item; }
+	
+	virtual ISceneContainerInterface* GetContainer() const override { return Container; }
+
+	virtual void SetContainer(ISceneContainerInterface* InContainer) override { Container = InContainer; }
+	
 	UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 
 	UMeshComponent* GetMeshComponent() const { return MeshComponent; }

@@ -20,5 +20,7 @@ public:
 	static UPrimaryAssetBase* Empty;
 
 public:
+	virtual bool IsValid() const;
+	
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 };

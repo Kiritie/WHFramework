@@ -309,7 +309,7 @@ struct WHFRAMEWORK_API FAbilityData : public FTableRowBase
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName AbilityName;
+	FPrimaryAssetId AbilityID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 AbilityLevel;
@@ -318,10 +318,18 @@ public:
 
 	FORCEINLINE FAbilityData()
 	{
-		AbilityName = NAME_None;
 		AbilityLevel = 1;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
+
+public:
+	template<class T = UItemAssetBase>
+	T& GetItemData() const
+	{
+		return static_cast<T>(GetItemData());
+	}
+
+	UItemAssetBase& GetItemData() const;
 };
 
 /**

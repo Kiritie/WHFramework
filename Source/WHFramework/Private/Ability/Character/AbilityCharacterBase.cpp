@@ -370,6 +370,11 @@ UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() cons
 	return AbilitySystem;
 }
 
+UCharacterAssetBase& AAbilityCharacterBase::GetCharacterData() const
+{
+	return UPrimaryAssetManager::LoadItemAsset<UCharacterAssetBase>(AssetID);
+}
+
 void AAbilityCharacterBase::SetNameV(const FString& InName)
 {
 	Name = InName;

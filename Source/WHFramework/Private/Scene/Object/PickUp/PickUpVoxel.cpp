@@ -28,7 +28,7 @@ void APickUpVoxel::BeginPlay()
 void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	BoxComponent->SetBoxExtent(GetVoxelData().Range * AVoxelModule::GetWorldData().BlockSize * (1 / GetVoxelData().Range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(GetData<UVoxelAssetBase>().Range * AVoxelModule::GetWorldData().BlockSize * (1 / GetData<UVoxelAssetBase>().Range.Z) * 0.2f);
 	if(UVoxelMeshComponent* VoxelMeshComponent = Cast<UVoxelMeshComponent>(MeshComponent))
 	{
 		VoxelMeshComponent->Initialize(!bPreview ? EVoxelMeshType::PickUp : EVoxelMeshType::PreviewItem);
@@ -37,7 +37,7 @@ void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
 	}
 }
 
-UVoxelAssetBase APickUpVoxel::GetVoxelData() const
+UVoxelAssetBase APickUpVoxel::GetData<UVoxelAssetBase>() const
 {
 	return UDWHelper::LoadVoxelData(Item.ID);
 }
