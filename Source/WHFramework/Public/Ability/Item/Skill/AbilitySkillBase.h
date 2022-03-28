@@ -9,7 +9,7 @@
  * 技能
  */
 UCLASS()
-class DREAMWORLD_API AAbilitySkillBase : public AAbilityItemBase
+class WHFRAMEWORK_API AAbilitySkillBase : public AAbilityItemBase
 {
 	GENERATED_BODY()
 	
@@ -37,7 +37,9 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	
+
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
+
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID);
 
 	virtual void Destroyed() override;

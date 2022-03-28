@@ -2,13 +2,12 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Asset/AssetModuleBPLibrary.h"
 
 UEquipAssetBase::UEquipAssetBase()
 {
-	Type = UAbilityModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Equip);
+	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Equip);
 	MaxCount = 1;
-	EquipType = EEquipType::Weapon;
-	PartType = EEquipPartType::Head;
 	EquipMesh = nullptr;
 	EquipClass = nullptr;
 	EffectClass = nullptr;

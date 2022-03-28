@@ -5,11 +5,13 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
+#include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Object/SceneObjectInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
+class UVitalityInteractionComponent;
 class UVitalityAssetBase;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
@@ -21,7 +23,7 @@ class UAttributeSetBase;
  * ������������
  */
 UCLASS()
-class DREAMWORLD_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneObjectInterface, public IAbilitySystemInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneObjectInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -66,6 +68,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
 	UVitalityAttributeSetBase* AttributeSet;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityInteractionComponent* Interaction;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -94,7 +99,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Revive() override;
+
+	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 	
+	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+
+	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle) override;
 
@@ -212,25 +225,27 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual float GetMagicDamage() const override;
 
-	template<class T = UVitalityAssetBase>
-	T& GetVitalityData() const
+	template<class T>
+	T* GetVitalityData() const
 	{
-		return static_cast<T>(GetVitalityData());
+		return Cast<T>(GetVitalityData());
 	}
 	
-	UFUNCTION(BlueprintPure)
-	UVitalityAssetBase& GetVitalityData() const;
+	UVitalityAssetBase* GetVitalityData() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	template<class T = UVitalityAttributeSetBase>
+	template<class T>
 	T* GetAttributeSet() const
 	{
 		return Cast<T>(AttributeSet);
 	}
 	UFUNCTION(BlueprintPure)
 	UVitalityAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
+
+	UFUNCTION(BlueprintPure)
+	virtual UInteractionComponent* GetInteractionComponent() const override;
 
 public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;

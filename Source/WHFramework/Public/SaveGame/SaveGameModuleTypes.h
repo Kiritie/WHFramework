@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "SaveGameModuleTypes.generated.h"
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSaveData
 {

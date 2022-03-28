@@ -14,7 +14,7 @@ class UProjectileMovementComponent;
  * Զ�̼���
  */
 UCLASS()
-class DREAMWORLD_API AAbilitySkillRemote : public AAbilitySkillBase
+class WHFRAMEWORK_API AAbilitySkillRemote : public AAbilitySkillBase
 {
 	GENERATED_BODY()
 	
@@ -39,7 +39,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FName& InSkillIndex) override;
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID) override;
 
 	UFUNCTION()
 	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);

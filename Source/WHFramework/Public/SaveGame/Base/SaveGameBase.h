@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "SaveGameModuleTypes.h"
 #include "GameFramework/SaveGame.h"
 #include "SaveGameBase.generated.h"
 

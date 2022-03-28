@@ -7,7 +7,7 @@
  * 装备Ability基类
  */
 UCLASS()
-class DREAMWORLD_API UEquipAbilityBase : public UItemAbilityBase
+class WHFRAMEWORK_API UEquipAbilityBase : public UItemAbilityBase
 {
 	GENERATED_BODY()
 

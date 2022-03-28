@@ -309,7 +309,7 @@ void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObjectInt
 	}
 	if(InObject.GetObject() && InObject.GetObject()->IsValidLowLevel())
 	{
-		SetScenePoint(InName, InObject->Execute_GetScenePoint(InObject.GetObject()));
+		SetScenePoint(InName, InObject->GetScenePoint());
 	}
 }
 

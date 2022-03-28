@@ -7,7 +7,7 @@
  * 道具Ability基类
  */
 UCLASS()
-class DREAMWORLD_API UPropAbilityBase : public UItemAbilityBase
+class WHFRAMEWORK_API UPropAbilityBase : public UItemAbilityBase
 {
 	GENERATED_BODY()
 

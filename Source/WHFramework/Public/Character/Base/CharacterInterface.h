@@ -38,7 +38,7 @@ public:
 
 	virtual void TeleportTo(FTransform InTransform, bool bMulticast = false) = 0;
 
-	virtual void AIMoveTo(FTransform InTransform, bool bMulticast = false) = 0;
+	virtual void AIMoveTo(FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false) = 0;
 
 	virtual void StopAIMove(bool bMulticast = false) = 0;
 

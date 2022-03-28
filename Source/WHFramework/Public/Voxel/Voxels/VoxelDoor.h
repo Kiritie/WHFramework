@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "DreamWorld/DreamWorld.h"
-#include "Voxel/Voxel.h"
+#include "Voxel.h"
 #include "VoxelDoor.generated.h"
 
 class AVoxelChunk;
@@ -41,13 +40,13 @@ public:
 public:
 	virtual void OnSpawn_Implementation() override;
 	
-	virtual void OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult) override;
+	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 
-	virtual void OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult) override;
+	virtual void OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 
-	virtual void OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult) override;
+	virtual void OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 
-	virtual void OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult) override;
+	virtual void OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 
 	virtual bool OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult) override;
 

@@ -7,6 +7,7 @@
 #include "AsyncTasks/ChunkMapGenerateTask.h"
 #include "GameFramework/Actor.h"
 #include "Main/Base/ModuleBase.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 #include "VoxelModule.generated.h"
 
 class AVoxelChunk;
@@ -22,7 +23,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWorldGenerated, FVector, InPlaye
  * 体素模块
  */
 UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API AVoxelModule : public AModuleBase
+class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -62,11 +63,11 @@ protected:
 	static FWorldSaveData* WorldData;
 public:
 	template<class T>
-	static T& GetWorldData()
+	static T* GetWorldData()
 	{
-		return static_cast<T>(GetWorldData());
+		return static_cast<T*>(GetWorldData());
 	}
-	static FWorldSaveData& GetWorldData();
+	static FWorldSaveData* GetWorldData();
 
 public:
 	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
@@ -116,9 +117,9 @@ public:
 	FOnWorldGenerated OnWorldGenerated;
 
 public:
-	virtual void LoadData(FWorldSaveData* InWorldData);
+	virtual void LoadData(FSaveData* InWorldData) override;
 
-	virtual FWorldSaveData* ToData(bool bSaved = true) const;
+	virtual FSaveData* ToData(bool bSaved = true) override;
 
 	virtual void UnloadData(bool bPreview = false);
 
@@ -134,7 +135,7 @@ public:
 
 	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
-	virtual UVoxelAssetBase& GetNoiseVoxelData(FIndex InIndex);
+	virtual UVoxelAssetBase* GetNoiseVoxelData(FIndex InIndex);
 
 	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
 

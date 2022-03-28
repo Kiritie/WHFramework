@@ -29,7 +29,7 @@ public:
 public:
 	/// 角色名称
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character")
-	FName CharacterName;
+	FString CharacterName;
 	/// 蒙太奇
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character")
 	class UAnimMontage* Montage;

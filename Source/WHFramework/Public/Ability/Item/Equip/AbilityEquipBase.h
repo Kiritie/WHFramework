@@ -12,7 +12,7 @@ class UStaticMeshComponent;
  * װ��
  */
 UCLASS()
-class DREAMWORLD_API AAbilityEquipBase : public AAbilityItemBase
+class WHFRAMEWORK_API AAbilityEquipBase : public AAbilityItemBase
 {
 	GENERATED_BODY()
 	

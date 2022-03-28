@@ -8,12 +8,12 @@
 #include "VoxelAgentInterface.generated.h"
 
 UINTERFACE()
-class DREAMWORLD_API UVoxelAgentInterface : public UInterface
+class WHFRAMEWORK_API UVoxelAgentInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class DREAMWORLD_API IVoxelAgentInterface
+class WHFRAMEWORK_API IVoxelAgentInterface
 {
 	GENERATED_BODY()
 
@@ -26,4 +26,8 @@ public:
 	virtual AVoxelChunk* GetOwnerChunk() const = 0;
 
 	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) = 0;
+
+	virtual FItem& GetGeneratingVoxelItem() = 0;
+
+	virtual FVoxelItem& GetSelectedVoxelItem() = 0;
 };

@@ -2,19 +2,20 @@
 
 #pragma once
 
-#include "DreamWorld/DreamWorld.h"
+#include "Ability/Interaction/InteractionAgentInterface.h"
 #include "GameFramework/Actor.h"
-#include "Interaction/Interaction.h"
+#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelAuxiliary.generated.h"
 
+class AVoxelChunk;
 class UVoxel;
 
 /**
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AActor, public IInteraction
+class WHFRAMEWORK_API AVoxelAuxiliary : public AActor, public IInteractionAgentInterface
 {
 	GENERATED_BODY()
 	
@@ -29,9 +30,13 @@ protected:
 public:	
 	virtual void Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex);
 
-	virtual bool CanInteract(IInteraction* InTrigger, EInteractAction InInteractAction) override;
+	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(IInteraction* InTrigger, EInteractAction InInteractAction) override;
+	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+
+	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

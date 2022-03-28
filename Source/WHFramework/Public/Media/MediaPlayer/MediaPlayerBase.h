@@ -33,7 +33,7 @@ protected:
 	USceneComponent* ScenePoint;
 
 public:
-	virtual USceneComponent* GetScenePoint_Implementation() const override;
+	virtual USceneComponent* GetScenePoint() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name

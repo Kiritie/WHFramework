@@ -7,7 +7,7 @@
  * 角色Ability基类
  */
 UCLASS()
-class DREAMWORLD_API UCharacterAbilityBase : public UAbilityBase
+class WHFRAMEWORK_API UCharacterAbilityBase : public UAbilityBase
 {
 	GENERATED_BODY()
 

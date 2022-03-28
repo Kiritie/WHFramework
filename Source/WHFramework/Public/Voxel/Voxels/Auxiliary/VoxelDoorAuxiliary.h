@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "DreamWorld/DreamWorld.h"
-#include "VoxelAuxiliary/VoxelVirtualAuxiliary.h"
+#include "VoxelVirtualAuxiliary.h"
 #include "VoxelDoorAuxiliary.generated.h"
 
 class UVoxel;
@@ -31,9 +30,9 @@ protected:
 public:	
 	virtual void Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex) override;
 
-	virtual bool CanInteract(IInteraction* InInteractionTarget, EInteractAction InInteractAction) override;
+	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
-	virtual void OnInteract(IInteraction* InTrigger, EInteractAction InInteractAction) override;
+	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OpenDoor();
 

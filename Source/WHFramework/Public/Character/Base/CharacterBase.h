@@ -99,9 +99,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// AI Move
 public:
-	virtual void AIMoveTo(FTransform InTransform, bool bMulticast = false) override;
+	virtual void AIMoveTo(FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiAIMoveTo(FTransform InTransform);
+	virtual void MultiAIMoveTo(FVector InLocation, float InStopDistance = 10.f);
 
 	virtual void StopAIMove(bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)

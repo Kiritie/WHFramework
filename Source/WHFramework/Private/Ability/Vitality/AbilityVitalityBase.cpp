@@ -5,8 +5,10 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Components/VitalityInteractionComponent.h"
 #include "Ability/Vitality/VitalityAbilityBase.h"
 #include "Ability/Vitality/VitalityAttributeSetBase.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Scene/Components/WorldTextComponent.h"
@@ -25,6 +27,10 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 
 	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
+	
+	Interaction = CreateDefaultSubobject<UVitalityInteractionComponent>(FName("Interaction"));
+	Interaction->SetupAttachment(RootComponent);
+	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
 	// states
 	bDead = true;
@@ -138,6 +144,23 @@ void AAbilityVitalityBase::Revive()
 	}
 }
 
+void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+bool AAbilityVitalityBase::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+{
+	return false;
+}
+
+void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+{
+}
+
 bool AAbilityVitalityBase::IsDead() const
 {
 	return bDead;
@@ -222,9 +245,9 @@ float AAbilityVitalityBase::GetMagicDamage() const
 	return AttributeSet->GetMagicDamage();
 }
 
-UVitalityAssetBase& AAbilityVitalityBase::GetVitalityData() const
+UVitalityAssetBase* AAbilityVitalityBase::GetVitalityData() const
 {
-	return UPrimaryAssetManager::LoadItemAsset<UVitalityAssetBase>(AssetID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVitalityAssetBase>(AssetID);
 }
 
 UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
@@ -412,6 +435,11 @@ void AAbilityVitalityBase::ModifyEXP(float InDeltaValue)
 		}
 	}
 	HandleEXPChanged(EXP);
+}
+
+UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
+{
+	return Interaction;
 }
 
 void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)

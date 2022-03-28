@@ -66,16 +66,16 @@ void ACharacterModule::RemoveCharacterFromList(TScriptInterface<ICharacterInterf
 	}
 }
 
-void ACharacterModule::RemoveCharacterFromListByName(const FName InCharacterName)
+void ACharacterModule::RemoveCharacterFromListByName(const FString& InCharacterName)
 {
 	RemoveCharacterFromList(GetCharacterByName(InCharacterName));
 }
 
-TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(const FName InCharacterName) const
+TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(const FString& InCharacterName) const
 {
 	for (auto Iter : Characters)
 	{
-		if(Iter->Execute_GetCharacterName(Iter.GetObject()) == InCharacterName)
+		if(Iter->GetNameC() == InCharacterName)
 		{
 			return Iter;
 		}
@@ -83,83 +83,83 @@ TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(const
 	return nullptr;
 }
 
-void ACharacterModule::PlayCharacterSound(const FName InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
+void ACharacterModule::PlayCharacterSound(const FString& InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_PlaySound(Character.GetObject(), InSound, InVolume, bMulticast);
+		Character->PlaySound(InSound, InVolume, bMulticast);
 	}
 }
 
-void ACharacterModule::StopCharacterSound(const FName InCharacterName)
+void ACharacterModule::StopCharacterSound(const FString& InCharacterName)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_StopSound(Character.GetObject());
+		Character->StopSound();
 	}
 }
 
-void ACharacterModule::PlayCharacterMontage(const FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void ACharacterModule::PlayCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_PlayMontage(Character.GetObject(), InMontage, bMulticast);
+		Character->PlayMontage(InMontage, bMulticast);
 	}
 }
 
-void ACharacterModule::PlayCharacterMontageByName(const FName InCharacterName, const FName InMontageName, bool bMulticast)
+void ACharacterModule::PlayCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_PlayMontageByName(Character.GetObject(), InMontageName, bMulticast);
+		Character->PlayMontageByName(InMontageName, bMulticast);
 	}
 }
 
-void ACharacterModule::StopCharacterMontage(const FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void ACharacterModule::StopCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_StopMontage(Character.GetObject(), InMontage, bMulticast);
+		Character->StopMontage(InMontage, bMulticast);
 	}
 }
 
-void ACharacterModule::StopCharacterMontageByName(const FName InCharacterName, const FName InMontageName, bool bMulticast)
+void ACharacterModule::StopCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_StopMontageByName(Character.GetObject(), InMontageName, bMulticast);
+		Character->StopMontageByName(InMontageName, bMulticast);
 	}
 }
 
-void ACharacterModule::TeleportCharacterTo(const FName InCharacterName, FTransform InTransform, bool bMulticast)
+void ACharacterModule::TeleportCharacterTo(const FString& InCharacterName, FTransform InTransform, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_TeleportTo(Character.GetObject(), InTransform, bMulticast);
+		Character->TeleportTo(InTransform, bMulticast);
 	}
 }
 
-void ACharacterModule::AIMoveCharacterTo(const FName InCharacterName, FTransform InTransform, bool bMulticast)
+void ACharacterModule::AIMoveCharacterTo(const FString& InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_AIMoveTo(Character.GetObject(), InTransform, bMulticast);
+		Character->AIMoveTo(InLocation, InStopDistance, bMulticast);
 	}
 }
 
-void ACharacterModule::StopCharacterAIMove(const FName InCharacterName, bool bMulticast)
+void ACharacterModule::StopCharacterAIMove(const FString& InCharacterName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_StopAIMove(Character.GetObject(), bMulticast);
+		Character->StopAIMove(bMulticast);
 	}
 }
 
-void ACharacterModule::RotationCharacterTowards(const FName InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
+void ACharacterModule::RotationCharacterTowards(const FString& InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->Execute_RotationTowards(Character.GetObject(), InRotation, InDuration, bMulticast);
+		Character->RotationTowards(InRotation, InDuration, bMulticast);
 	}
 }
 

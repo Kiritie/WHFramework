@@ -1,12 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "VoxelAuxiliary/VoxelAuxiliary.h"
+#include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
-#include "Interaction/Components/InteractionComponent.h"
-#include "Interaction/Components/VoxelInteractionComponent.h"
-#include "Voxel/Voxel.h"
-#include "World/Chunk.h"
+#include "Ability/Components/VoxelInteractionComponent.h"
+#include "Voxel/Chunks/VoxelChunk.h"
 
 // Sets default values
 AVoxelAuxiliary::AVoxelAuxiliary()
@@ -35,12 +33,20 @@ void AVoxelAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex)
 	VoxelIndex = InVoxelIndex;
 }
 
-bool AVoxelAuxiliary::CanInteract(IInteraction* InTrigger, EInteractAction InInteractAction)
+void AVoxelAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AVoxelAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+bool AVoxelAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
 	return true;
 }
 
-void AVoxelAuxiliary::OnInteract(IInteraction* InTrigger, EInteractAction InInteractAction)
+void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
 	
 }

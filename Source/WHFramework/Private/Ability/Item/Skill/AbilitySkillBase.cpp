@@ -33,6 +33,11 @@ void AAbilitySkillBase::Tick(float DeltaTime)
 
 }
 
+void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
+{
+	Super::Initialize(InOwnerCharacter);
+}
+
 void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID)
 {
 	if (InOwnerCharacter)

@@ -1,7 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PickUp/PickUpProp.h"
+#include "Scene/Object/PickUp/PickUpProp.h"
+
+#include "Ability/Item/Prop/PropAssetBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
@@ -23,26 +25,14 @@ void APickUpProp::BeginPlay()
 
 }
 
-// Called every frame
-void APickUpProp::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
 void APickUpProp::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(GetPropData().PropMesh);
+	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UPropAssetBase>()->PropMesh);
 }
 
-void APickUpProp::OnPickUp(AAbilityCharacterBase* InPicker)
+void APickUpProp::OnPickUp(IPickerInterface* InPicker)
 {
 	Super::OnPickUp(InPicker);
 
-}
-
-FPropData APickUpProp::GetPropData()
-{
-	return UDWHelper::LoadPropData(Item.ID);
 }

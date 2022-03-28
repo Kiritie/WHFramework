@@ -1,9 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Voxel/VoxelTorch.h"
-#include "World/Chunk.h"
-#include "World/VoxelModule.h"
+#include "Voxel/Voxels/VoxelTorch.h"
 
 UVoxelTorch::UVoxelTorch()
 {
@@ -20,22 +18,22 @@ FString UVoxelTorch::ToData()
 	return Super::ToData();
 }
 
-void UVoxelTorch::OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetHit(InTarget, InHitResult);
 }
 
-void UVoxelTorch::OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetEnter(InTarget, InHitResult);
 }
 
-void UVoxelTorch::OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetStay(InTarget, InHitResult);
 }
 
-void UVoxelTorch::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetExit(InTarget, InHitResult);
 }

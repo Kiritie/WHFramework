@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
 
@@ -12,7 +13,7 @@ class AAbilityCharacterBase;
  * װ��
  */
 UCLASS()
-class DREAMWORLD_API AAbilityItemBase : public AActor
+class WHFRAMEWORK_API AAbilityItemBase : public AActor
 {
 	GENERATED_BODY()
 	
@@ -38,18 +39,18 @@ public:
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter);
 
 public:
-	template<class T = UItemAssetBase>
-	T& GetItemData() const
+	template<class T >
+	T* GetItemData() const
 	{
 		return Item.GetData<T>();
 	}
 
-	UItemAssetBase& GetItemData() const
+	UItemAssetBase* GetItemData() const
 	{
 		return Item.GetData();
 	}
 
-	template<class T = AAbilityCharacterBase>
+	template<class T>
 	T* GetOwnerCharacter() const
 	{
 		return Cast<T>(OwnerCharacter);

@@ -8,135 +8,6 @@
 class UItemAssetBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
-/**
- * ???????
- */
-UENUM(BlueprintType)
-enum class EItemType : uint8
-{
-	// ??
-	None,
-	// ????
-	Voxel,
-	// ????
-	Prop,
-	// ???
-	Equip,
-	// ????
-	Skill,
-	// ????
-	Vitality,
-	// ????
-	Character
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FItem
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FPrimaryAssetId ID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Count;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Level;
-
-	static FItem Empty;
-
-public:
-	FORCEINLINE FItem()
-	{
-		Count = 0;
-		Level = 0;
-	}
-		
-	FORCEINLINE FItem(const FPrimaryAssetId& InID, int32 InCount, int32 InLevel = 0)
-	{
-		ID = InID;
-		Count = InCount;
-		Level = InLevel;
-	}
-	
-	FORCEINLINE FItem(const FItem& InItem, int InCount = -1)
-	{
-		ID = InItem.ID;
-		Count = InCount == -1 ? InItem.Count : InCount;
-		Level = InItem.Level;
-	}
-
-	virtual ~FItem() = default;
-
-	template<class T = UItemAssetBase>
-	T& GetData() const
-	{
-		return UPrimaryAssetManager::Get().LoadItemAsset<T>(ID);
-	}
-
-	UItemAssetBase& GetData() const
-	{
-		return UPrimaryAssetManager::Get().LoadItemAsset(ID);
-	}
-
-	FORCEINLINE virtual bool IsValid() const
-	{
-		return ID.IsValid();
-	}
-
-	FORCEINLINE bool EqualType(FItem InItem) const
-	{
-		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
-	}
-
-	FORCEINLINE friend bool operator==(const FItem& A, const FItem& B)
-	{
-		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level);
-	}
-
-	FORCEINLINE friend bool operator!=(const FItem& A, const FItem& B)
-	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level);
-	}
-
-	FORCEINLINE friend FItem operator+(FItem& A, FItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count += B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FItem operator-(FItem& A, FItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count -= B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FItem& operator+=(FItem& A, FItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count += B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FItem& operator-=(FItem& A, FItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count -= B.Count;
-		}
-		return A;
-	}
-};
 
 /**
  * ����Ŀ�����
@@ -323,13 +194,13 @@ public:
 	}
 
 public:
-	template<class T = UItemAssetBase>
-	T& GetItemData() const
+	template<class T>
+	T* GetItemData() const
 	{
-		return static_cast<T>(GetItemData());
+		return Cast<T>(GetItemData());
 	}
 
-	UItemAssetBase& GetItemData() const;
+	UItemAssetBase* GetItemData() const;
 };
 
 /**
@@ -372,4 +243,32 @@ enum class ESkillMode : uint8
 	Passive,
 	// 主动
 	Initiative
+};
+
+/**
+ * 交互选项
+ */
+UENUM(BlueprintType)
+enum class EInteractAction : uint8
+{
+	// 无
+	None UMETA(DisplayName="无"),
+	// 复活
+	Revive UMETA(DisplayName="复活"),
+	// 喂食
+	Feed UMETA(DisplayName="喂食"),
+	// 骑乘
+	Ride UMETA(DisplayName="骑乘"),
+	// 取消骑乘
+	UnRide UMETA(DisplayName="取消骑乘"),
+	// 战斗
+	Fight UMETA(DisplayName="战斗"),
+	// 对话
+	Dialogue UMETA(DisplayName="对话"),
+	// 交易
+	Transaction UMETA(DisplayName="交易"),
+	// 打开
+	Open UMETA(DisplayName="打开"),
+	// 关闭
+	Close UMETA(DisplayName="关闭")
 };

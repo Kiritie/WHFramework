@@ -2,13 +2,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "VoxelAuxiliary/VoxelDoorAuxiliary.h"
+#include "Voxel/Voxels/Auxiliary/VoxelDoorAuxiliary.h"
 
-#include "Voxel/Voxel.h"
-#include "Character/Player/DWPlayerCharacter.h"
-#include "Components/BoxComponent.h"
-#include "Interaction/Components/VoxelInteractionComponent.h"
-#include "Voxel/VoxelDoor.h"
+#include "Ability/Components/VoxelInteractionComponent.h"
+#include "Voxel/Voxels/VoxelDoor.h"
 
 // Sets default values
 AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
@@ -39,9 +36,9 @@ void AVoxelDoorAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIn
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 }
 
-bool AVoxelDoorAuxiliary::CanInteract(IInteraction* InInteractionTarget, EInteractAction InInteractAction)
+bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
-	if(!Super::CanInteract(InInteractionTarget, InInteractAction)) return false;
+	if(!Super::CanInteract(InInteractionAgent, InInteractAction)) return false;
 	
 	switch (InInteractAction)
 	{
@@ -66,9 +63,9 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteraction* InInteractionTarget, EIntera
 	return false;
 }
 
-void AVoxelDoorAuxiliary::OnInteract(IInteraction* InTrigger, EInteractAction InInteractAction)
+void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
-	Super::OnInteract(InTrigger, InInteractAction);
+	Super::OnInteract(InInteractionAgent, InInteractAction);
 
 	switch (InInteractAction)
 	{

@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "AssetModule.h"
+#include "AssetModuleTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Main/MainModule.h"
 #include "AssetModuleBPLibrary.generated.h"
 
-class UDataAssetBase;
+class UPrimaryAssetBase;
 /**
  * 
  */
@@ -18,6 +19,8 @@ class WHFRAMEWORK_API UAssetModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
+	//////////////////////////////////////////////////////////////////////////
+	/// DataAsset
 public:
 	template<class T>
 	static bool HasDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass = T::StaticClass())
@@ -86,4 +89,18 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	static void RemoveAllDataAsset();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// PrimaryAsset
+public:
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static FPrimaryAssetType GetPrimaryAssetTypeByItemType(EItemType InItemType);
+
+	template<class T>
+	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
+	{
+		return Cast<T>(LoadPrimaryAsset(InPrimaryAssetId, bLogWarning));
+	}
+	
+	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true);
 };

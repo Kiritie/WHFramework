@@ -3,6 +3,8 @@
 
 #include "Voxel/Voxels/Voxel.h"
 
+#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleTypes.h"
 #include "Asset/Primary/PrimaryAssetManager.h"
 #include "Voxel/Voxels/VoxelAssetBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -27,14 +29,14 @@ UVoxel::UVoxel()
 
 UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 {
-	// return SpawnVoxel(*FString::Printf(TEXT("Voxel_%d"), (int32)InVoxelType));
+	return SpawnVoxel(FPrimaryAssetId::FromString(FString::Printf(TEXT("Voxel_%d"), (int32)InVoxelType)));
 	return nullptr;
 }
 
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 {
-	const UVoxelAssetBase& voxelData = UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(InVoxelID);
-	const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : StaticClass();
+	const UVoxelAssetBase* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(InVoxelID);
+	const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : StaticClass();
 	auto voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
 	if(voxel) voxel->ID = InVoxelID;
 	return voxel;
@@ -53,7 +55,7 @@ UVoxel* UVoxel::LoadVoxel(AVoxelChunk* InOwner, const FString& InVoxelData)
 {
 	FString str1, str2;
 	InVoxelData.Split(TEXT(";"), &str1, &str2);
-	auto voxel = SpawnVoxel(*str1);
+	auto voxel = SpawnVoxel(FPrimaryAssetId::FromString(str1));
 	voxel->LoadData(str2);
 	voxel->SetOwner(InOwner);
 	return voxel;
@@ -116,6 +118,7 @@ FVoxelItem UVoxel::ToItem()
 
 void UVoxel::OnSpawn_Implementation()
 {
+	
 }
 
 void UVoxel::OnDespawn_Implementation()
@@ -129,22 +132,22 @@ void UVoxel::OnDespawn_Implementation()
 	Auxiliary = nullptr;
 }
 
-void UVoxel::OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxel::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	
 }
 
-void UVoxel::OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxel::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	
 }
 
-void UVoxel::OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxel::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	
 }
 
-void UVoxel::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxel::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	
 }
@@ -159,21 +162,16 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 		{
 			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
 			{
-				VoxelAgentPlayer->DestroyVoxel(InHitResult);
+				return VoxelAgentPlayer->DestroyVoxel(InHitResult);
 			}
 			break;
 		}
 		case EMouseButton::Right:
 		{
-			IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this);
-			auto tmpSlot = UWidgetModuleBPLibrary::GetUserWidget<UWidgetInventoryBar>()->GetSelectedSlot();
-			if(VoxelAgentPlayer && tmpSlot && !tmpSlot->IsEmpty())
+			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
 			{
-				FItem tmpItem = FItem(tmpSlot->GetItem(), 1);
-				if(VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem))
-				{
-					tmpSlot->SubItem(tmpItem);
-				}
+				FItem tmpItem = FItem(VoxelAgentPlayer->GetGeneratingVoxelItem(), 1);
+				return VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem);
 			}
 			break;
 		}
@@ -197,7 +195,7 @@ void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
 	
 }
 
-UVoxelAssetBase& UVoxel::GetData() const
+UVoxelAssetBase* UVoxel::GetData() const
 {
-	return UPrimaryAssetManager::LoadItemAsset<UVoxelAssetBase>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(ID);
 }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Ability/AbilityModuleTypes.h"
 #include "Data/DataAssetBase.h"
 
 #include "Main/Base/ModuleBase.h"

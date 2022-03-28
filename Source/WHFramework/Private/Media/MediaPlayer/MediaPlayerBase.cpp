@@ -33,7 +33,7 @@ void AMediaPlayerBase::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 }
 
-USceneComponent* AMediaPlayerBase::GetScenePoint_Implementation() const
+USceneComponent* AMediaPlayerBase::GetScenePoint() const
 {
 	return ScenePoint;
 }

@@ -5,10 +5,10 @@
 #include "Engine/AssetManager.h"
 #include "PrimaryAssetManager.generated.h"
 
-class UItemAssetBase;
+class UPrimaryAssetBase;
 
 UCLASS()
-class ACTIONRPG_API UPrimaryAssetManager : public UAssetManager
+class WHFRAMEWORK_API UPrimaryAssetManager : public UAssetManager
 {
 	GENERATED_BODY()
 
@@ -21,12 +21,12 @@ public:
 	static UPrimaryAssetManager& Get();
 
 public:
-	template<class T = UItemAssetBase>
-	T& LoadItemAsset(const FPrimaryAssetId& PrimaryAssetId, bool bLogWarning = true)
+	template<class T>
+	T* LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{
-		return static_cast<T>(LoadItemAsset(PrimaryAssetId, bLogWarning));
+		return Cast<T>(LoadAsset(InPrimaryAssetId, bLogWarning));
 	}
 	
-	UItemAssetBase& LoadItemAsset(const FPrimaryAssetId& PrimaryAssetId, bool bLogWarning = true);
+	UPrimaryAssetBase* LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true);
 };
 

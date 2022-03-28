@@ -1,13 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Voxel/VoxelWater.h"
+#include "Voxel/Voxels/VoxelWater.h"
 
-#include "World/Chunk.h"
-#include "World/VoxelModule.h"
-#include "Character/AbilityCharacter.h"
-#include "Character/AbilityCharacterPart.h"
-#include "Character/Player/DWPlayerCharacter.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
@@ -26,66 +21,24 @@ FString UVoxelWater::ToData()
 	return Super::ToData();
 }
 
-void UVoxelWater::OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetHit(InTarget, InHitResult);
 }
 
-void UVoxelWater::OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetEnter(InTarget, InHitResult);
-	
-	if(ACharacterBase* Character = InTarget->GetOwnerCharacter())
-	{
-		switch (InTarget->GetCharacterPartType())
-		{
-			case ECharacterPartType::Chest:
-			{
-				Character->Swim();
-				break;
-			}
-			case ECharacterPartType::Neck:
-			{
-				Character->UnFloat();
-				break;
-			}
-			default: break;
-		}
-	}
 }
 
-void UVoxelWater::OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetStay(InTarget, InHitResult);
 }
 
-void UVoxelWater::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetExit(InTarget, InHitResult);
-
-	if(ACharacterBase* Character = InTarget->GetOwnerCharacter())
-	{
-		switch (InTarget->GetCharacterPartType())
-		{
-			case ECharacterPartType::Chest:
-			{
-				if(InHitResult.VoxelItem.GetData<UVoxelAssetBase>().VoxelType != EVoxelType::Water)
-				{
-					Character->UnSwim();
-				}
-				break;
-			}
-			case ECharacterPartType::Neck:
-			{
-				if(InHitResult.VoxelItem.GetData<UVoxelAssetBase>().VoxelType != EVoxelType::Water)
-				{
-					Character->Float(Owner->IndexToLocation(Index).Z + AVoxelModule::GetWorldData().BlockSize);
-				}
-				break;
-			}
-			default: break;
-		}
-	}
 }
 
 bool UVoxelWater::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)

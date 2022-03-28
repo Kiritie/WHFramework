@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Asset/AssetModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
@@ -389,7 +390,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct DREAMWORLD_API FPickUpSaveData : public FSaveData
+struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
@@ -408,7 +409,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct DREAMWORLD_API FChunkSaveData : public FSaveData
+struct WHFRAMEWORK_API FChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
 

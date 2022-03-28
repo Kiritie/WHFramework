@@ -8,12 +8,12 @@
 
 class UAbilityBase;
 UINTERFACE()
-class DREAMWORLD_API UAbilityVitalityInterface : public UInterface
+class WHFRAMEWORK_API UAbilityVitalityInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class DREAMWORLD_API IAbilityVitalityInterface
+class WHFRAMEWORK_API IAbilityVitalityInterface
 {
 	GENERATED_BODY()
 

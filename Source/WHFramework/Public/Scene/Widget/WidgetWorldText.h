@@ -11,7 +11,7 @@
  * �����ı�
  */
 UCLASS()
-class DREAMWORLD_API UWidgetWorldText : public UWorldWidgetBase
+class WHFRAMEWORK_API UWidgetWorldText : public UWorldWidgetBase
 {
 	GENERATED_BODY()
 

@@ -2,12 +2,13 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Asset/AssetModuleBPLibrary.h"
 
 UItemAssetBase* UItemAssetBase::Empty = nullptr;
 
 UItemAssetBase::UItemAssetBase()
 {
-	Type = UAbilityModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::None);
+	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::None);
 	Icon = nullptr;
 	Price = 0;
 	MaxCount = -1;
@@ -15,7 +16,7 @@ UItemAssetBase::UItemAssetBase()
 	AbilityClass = nullptr;
 }
 
-FPrimaryAssetId UItemAssetBase::GetPrimaryAssetId() const
+bool UItemAssetBase::EqualType(EItemType InItemType) const
 {
-	return FPrimaryAssetId(Type, GetFName());
+	return Type == UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(InItemType);
 }

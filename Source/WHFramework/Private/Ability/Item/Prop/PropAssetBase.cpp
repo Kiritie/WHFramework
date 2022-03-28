@@ -2,10 +2,11 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Asset/AssetModuleBPLibrary.h"
 
 UPropAssetBase::UPropAssetBase()
 {
-	Type = UAbilityModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Prop);
+	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Prop);
 	MaxCount = 10;
 	PropMesh = nullptr;
 }

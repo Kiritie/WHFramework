@@ -19,7 +19,7 @@ ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
 
-	Name = NAME_None;
+	Name = TEXT("");
 	Anim = nullptr;
 
 	ScenePoint = CreateDefaultSubobject<USceneComponent>(FName("ScenePoint"));
@@ -33,7 +33,7 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	USceneModuleBPLibrary::SetSceneObject(Name, this);
+	USceneModuleBPLibrary::SetSceneObject(*Name, this);
 
 	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
 }
@@ -178,25 +178,25 @@ void ACharacterBase::MultiTeleportTo_Implementation(FTransform InTransform)
 	TeleportTo(InTransform, false);
 }
 
-void ACharacterBase::AIMoveTo(FTransform InTransform, bool bMulticast)
+void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiAIMoveTo(InTransform);
+			MultiAIMoveTo(InLocation, InStopDistance);
 		}
 		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
-			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InTransform);
+			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
 		}
 		return;
 	}
 }
 
-void ACharacterBase::MultiAIMoveTo_Implementation(FTransform InTransform)
+void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InStopDistance)
 {
-	AIMoveTo(InTransform, false);
+	AIMoveTo(InLocation, InStopDistance, false);
 }
 
 void ACharacterBase::StopAIMove(bool bMulticast)

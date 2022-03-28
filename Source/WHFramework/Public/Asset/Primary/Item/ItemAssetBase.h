@@ -37,6 +37,6 @@ public:
 public:
 	static UItemAssetBase* Empty;
 
-public:
-	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+public:	
+	virtual bool EqualType(EItemType InItemType) const;
 };

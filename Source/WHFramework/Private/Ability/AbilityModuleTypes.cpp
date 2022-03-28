@@ -1,8 +1,7 @@
 #include "Ability/AbilityModuleTypes.h"
 
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/Primary/Item/ItemAssetBase.h"
-
-FItem FItem::Empty = FItem();
 
 void UTargetType::GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const
 {
@@ -27,7 +26,7 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-UItemAssetBase& FAbilityData::GetItemData() const
+UItemAssetBase* FAbilityData::GetItemData() const
 {
-	return UPrimaryAssetManager::LoadItemAsset(AbilityID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemAssetBase>(AbilityID);
 }

@@ -9,6 +9,8 @@
 #include "Ability/Base/AbilityBase.h"
 #include "Ability/Character/CharacterAttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Components/CharacterInteractionComponent.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
 #include "Perception/AISense_Sight.h"
@@ -26,6 +28,11 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 
 	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
+	
+	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
+	Interaction->SetupAttachment(RootComponent);
+	Interaction->SetRelativeLocation(FVector(0, 0, 0));
+	Interaction->AddInteractionAction(EInteractAction::Revive);
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
@@ -183,6 +190,23 @@ void AAbilityCharacterBase::Jump()
 void AAbilityCharacterBase::UnJump()
 {
 	Super::StopJumping();
+}
+
+void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+bool AAbilityCharacterBase::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+{
+	return false;
+}
+
+void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+{
 }
 
 FGameplayAbilitySpecHandle AAbilityCharacterBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
@@ -370,9 +394,14 @@ UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() cons
 	return AbilitySystem;
 }
 
-UCharacterAssetBase& AAbilityCharacterBase::GetCharacterData() const
+UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 {
-	return UPrimaryAssetManager::LoadItemAsset<UCharacterAssetBase>(AssetID);
+	return Interaction;
+}
+
+UCharacterAssetBase* AAbilityCharacterBase::GetCharacterData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UCharacterAssetBase>(AssetID);
 }
 
 void AAbilityCharacterBase::SetNameV(const FString& InName)

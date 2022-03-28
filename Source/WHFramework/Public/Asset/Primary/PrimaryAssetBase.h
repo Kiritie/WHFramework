@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ability/Base/AbilityBase.h"
+#include "Asset/AssetModuleTypes.h"
 
 #include "PrimaryAssetBase.generated.h"
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
+#include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -10,6 +11,7 @@
 
 #include "AbilityCharacterBase.generated.h"
 
+class UCharacterInteractionComponent;
 class UCharacterAssetBase;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
@@ -26,7 +28,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
  * 角色
  */
 UCLASS()
-class DREAMWORLD_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -75,6 +77,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
 	UCharacterAttributeSetBase* AttributeSet;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UCharacterInteractionComponent* Interaction;
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnCharacterDead OnCharacterDead;
@@ -120,6 +125,14 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnJump();
+
+	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+
+	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -189,22 +202,24 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	template<class T = UCharacterAttributeSetBase>
+	template<class T>
 	T* GetAttributeSet() const
 	{
 		return Cast<T>(AttributeSet);
 	}
 	UFUNCTION(BlueprintPure)
 	UCharacterAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
-
-	template<class T = UCharacterAssetBase>
-	T& GetCharacterData() const
-	{
-		return static_cast<T>(GetCharacterData());
-	}
 	
 	UFUNCTION(BlueprintPure)
-	UCharacterAssetBase& GetCharacterData() const;
+	virtual UInteractionComponent* GetInteractionComponent() const override;
+
+	template<class T>
+	T* GetCharacterData() const
+	{
+		return Cast<T>(GetCharacterData());
+	}
+	
+	UCharacterAssetBase* GetCharacterData() const;
 
 public:
 	UFUNCTION(BlueprintPure)

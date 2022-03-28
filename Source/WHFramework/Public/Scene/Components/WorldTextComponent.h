@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
 #include "Components/WidgetComponent.h"
+#include "Scene/SceneModuleTypes.h"
 #include "Widget/World/WorldWidgetComponent.h"
 #include "WorldTextComponent.generated.h"
 
@@ -11,7 +11,7 @@
  * �����ı����
  */
 UCLASS(Blueprintable, meta = (BlueprintSpawnableComponent))
-class DREAMWORLD_API UWorldTextComponent : public UWorldWidgetComponent
+class WHFRAMEWORK_API UWorldTextComponent : public UWorldWidgetComponent
 {
 	GENERATED_BODY()
 

@@ -15,8 +15,4 @@ UCLASS()
 class WHFRAMEWORK_API UAbilityModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
-public:
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FPrimaryAssetType GetPrimaryAssetTypeByItemType(EItemType InItemType);
 };

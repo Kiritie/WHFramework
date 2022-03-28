@@ -8,7 +8,7 @@
  * 角色属性集
  */
 UCLASS()
-class DREAMWORLD_API UCharacterAttributeSetBase : public UAttributeSetBase
+class WHFRAMEWORK_API UCharacterAttributeSetBase : public UAttributeSetBase
 {
 	GENERATED_BODY()
 

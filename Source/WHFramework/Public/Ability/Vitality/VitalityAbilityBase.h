@@ -8,7 +8,7 @@
  * Vitality Ability基类
  */
 UCLASS()
-class DREAMWORLD_API UVitalityAbilityBase : public UAbilityBase
+class WHFRAMEWORK_API UVitalityAbilityBase : public UAbilityBase
 {
 	GENERATED_BODY()
 

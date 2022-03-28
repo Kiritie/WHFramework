@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "VoxelAuxiliary/VoxelTorchAuxiliary.h"
-#include "Voxel/Voxel.h"
+#include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 #include "Components/PointLightComponent.h"
-#include "World/VoxelModule.h"
+#include "Voxel/VoxelModule.h"
+#include "Voxel/Voxels/VoxelAssetBase.h"
 
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
@@ -28,5 +28,5 @@ void AVoxelTorchAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelI
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelAssetBase>().GetFinalRange().Z * 0.5f * AVoxelModule::GetWorldData().BlockSize);
+	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelAssetBase>()->GetFinalRange().Z * 0.5f * AVoxelModule::GetWorldData()->BlockSize);
 }

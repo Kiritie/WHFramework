@@ -8,12 +8,12 @@
 
 class UAbilityBase;
 UINTERFACE()
-class DREAMWORLD_API USaveDataInterface : public UInterface
+class WHFRAMEWORK_API USaveDataInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class DREAMWORLD_API ISaveDataInterface
+class WHFRAMEWORK_API ISaveDataInterface
 {
 	GENERATED_BODY()
 

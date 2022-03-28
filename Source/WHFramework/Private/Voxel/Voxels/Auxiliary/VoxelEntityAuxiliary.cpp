@@ -1,10 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "VoxelAuxiliary/VoxelEntityAuxiliary.h"
-#include "Voxel/Voxel.h"
-#include "Character/Player/DWPlayerCharacter.h"
+#include "Voxel/Voxels/Auxiliary/VoxelEntityAuxiliary.h"
 #include "Components/BoxComponent.h"
+#include "Voxel/Voxels/VoxelAssetBase.h"
 
 // Sets default values
 AVoxelEntityAuxiliary::AVoxelEntityAuxiliary()
@@ -32,5 +31,5 @@ void AVoxelEntityAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxel
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelAssetBase>().GetFinalRange() * 0.5f);
+	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelAssetBase>()->GetFinalRange() * 0.5f);
 }

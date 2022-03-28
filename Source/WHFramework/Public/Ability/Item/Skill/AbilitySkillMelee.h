@@ -13,7 +13,7 @@ class UProjectileMovementComponent;
  * ��ս����
  */
 UCLASS()
-class DREAMWORLD_API AAbilitySkillMelee : public AAbilitySkillBase
+class WHFRAMEWORK_API AAbilitySkillMelee : public AAbilitySkillBase
 {
 	GENERATED_BODY()
 	

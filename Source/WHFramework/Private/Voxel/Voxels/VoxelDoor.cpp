@@ -1,10 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Voxel/VoxelDoor.h"
-#include "World/Chunk.h"
-#include "World/VoxelModule.h"
+#include "Voxel/Voxels/VoxelDoor.h"
+
 #include "Kismet/GameplayStatics.h"
+#include "Voxel/VoxelModule.h"
+#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Voxels/VoxelAssetBase.h"
 
 UVoxelDoor::UVoxelDoor()
 {
@@ -38,9 +40,9 @@ void UVoxelDoor::OpenTheDoor()
 	Rotation += FRotator(0, -90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetData<UVoxelAssetBase>().OperationSounds.Num() > 0)
+	if(GetData()->OperationSounds.Num() > 0)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData<UVoxelAssetBase>().OperationSounds[0], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData()->OperationSounds[0], Owner->IndexToLocation(Index));
 	}
 }
 
@@ -50,9 +52,9 @@ void UVoxelDoor::CloseTheDoor()
 	Rotation += FRotator(0, 90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetData<UVoxelAssetBase>().OperationSounds.Num() > 1)
+	if(GetData()->OperationSounds.Num() > 1)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData<UVoxelAssetBase>().OperationSounds[1], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData()->OperationSounds[1], Owner->IndexToLocation(Index));
 	}
 }
 
@@ -71,22 +73,22 @@ void UVoxelDoor::OnSpawn_Implementation()
 	Params.Add(FName("bOpened"), FParameter::MakeBoolean(false));
 }
 
-void UVoxelDoor::OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetHit(InTarget, InHitResult);
 }
 
-void UVoxelDoor::OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetEnter(InTarget, InHitResult);
 }
 
-void UVoxelDoor::OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetStay(InTarget, InHitResult);
 }
 
-void UVoxelDoor::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetExit(InTarget, InHitResult);
 }

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Object/SceneObjectInterface.h"
@@ -19,7 +19,7 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class DREAMWORLD_API APickUp : public AActor, public ISceneObjectInterface, public ISaveDataInterface
+class WHFRAMEWORK_API APickUp : public AActor, public ISceneObjectInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	

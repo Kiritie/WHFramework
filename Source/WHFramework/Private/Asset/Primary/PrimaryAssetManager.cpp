@@ -33,15 +33,15 @@ void UPrimaryAssetManager::StartInitialLoading()
 	UAbilitySystemGlobals::Get().InitGlobalData();
 }
 
-UItemAssetBase& UPrimaryAssetManager::LoadItemAsset(const FPrimaryAssetId& PrimaryAssetId, bool bLogWarning)
+UPrimaryAssetBase* UPrimaryAssetManager::LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
 {
-	FSoftObjectPath ItemPath = GetPrimaryAssetPath(PrimaryAssetId);
+	FSoftObjectPath ItemPath = GetPrimaryAssetPath(InPrimaryAssetId);
 
-	UItemAssetBase* LoadedItem = Cast<UItemAssetBase>(ItemPath.TryLoad());
+	UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(ItemPath.TryLoad());
 
 	if (bLogWarning && LoadedItem == nullptr)
 	{
-		WH_LOG(WHAsset, Warning, TEXT("Failed to load item for identifier %s!"), *PrimaryAssetId.ToString());
+		WH_LOG(WHAsset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
 	}
-	return LoadedItem ? *LoadedItem : *UItemAssetBase::Empty;
+	return LoadedItem ? LoadedItem : UPrimaryAssetBase::Empty;
 }

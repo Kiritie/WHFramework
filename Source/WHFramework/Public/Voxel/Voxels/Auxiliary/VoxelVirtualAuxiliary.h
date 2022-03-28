@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "DreamWorld/DreamWorld.h"
-#include "VoxelAuxiliary/VoxelAuxiliary.h"
+#include "VoxelAuxiliary.h"
 #include "VoxelVirtualAuxiliary.generated.h"
 
 class UVoxel;

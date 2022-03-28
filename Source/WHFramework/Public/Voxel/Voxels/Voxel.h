@@ -7,9 +7,9 @@
 
 #include "Voxel.generated.h"
 
-class ACharacterBase;
+class IVoxelAgentInterface;
 class AVoxelChunk;
-class UAbilityCharacterPart;
+class IVoxelAgentInterface;
 class UVoxelAssetBase;
 
 /**
@@ -61,13 +61,13 @@ public:
 
 	virtual void OnDespawn_Implementation() override;
 
-	virtual void OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
 
-	virtual void OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
 
-	virtual void OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
 
-	virtual void OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
 
 	virtual bool OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult);
 
@@ -102,8 +102,7 @@ protected:
 	AVoxelAuxiliary* Auxiliary;
 
 public:
-	UFUNCTION(BlueprintPure)
-	UVoxelAssetBase& GetData() const;
+	UVoxelAssetBase* GetData() const;
 
 	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId GetID() const { return ID; }

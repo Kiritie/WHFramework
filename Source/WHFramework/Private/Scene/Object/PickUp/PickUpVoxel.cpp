@@ -1,11 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PickUp/PickUpVoxel.h"
-#include "Voxel/Voxel.h"
+#include "Scene/Object/PickUp/PickUpVoxel.h"
+
 #include "Components/BoxComponent.h"
+#include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "World/VoxelModule.h"
+#include "Voxel/Voxels/VoxelAssetBase.h"
 
 // Sets default values
 APickUpVoxel::APickUpVoxel()
@@ -28,7 +29,7 @@ void APickUpVoxel::BeginPlay()
 void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	BoxComponent->SetBoxExtent(GetData<UVoxelAssetBase>().Range * AVoxelModule::GetWorldData().BlockSize * (1 / GetData<UVoxelAssetBase>().Range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(Item.GetData<UVoxelAssetBase>()->Range * AVoxelModule::GetWorldData()->BlockSize * (1 / Item.GetData<UVoxelAssetBase>()->Range.Z) * 0.2f);
 	if(UVoxelMeshComponent* VoxelMeshComponent = Cast<UVoxelMeshComponent>(MeshComponent))
 	{
 		VoxelMeshComponent->Initialize(!bPreview ? EVoxelMeshType::PickUp : EVoxelMeshType::PreviewItem);
@@ -37,19 +38,7 @@ void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
 	}
 }
 
-UVoxelAssetBase APickUpVoxel::GetData<UVoxelAssetBase>() const
-{
-	return UDWHelper::LoadVoxelData(Item.ID);
-}
-
-void APickUpVoxel::OnPickUp(AAbilityCharacterBase* InPicker)
+void APickUpVoxel::OnPickUp(IPickerInterface* InPicker)
 {
 	Super::OnPickUp(InPicker);
-}
-
-// Called every frame
-void APickUpVoxel::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
 }

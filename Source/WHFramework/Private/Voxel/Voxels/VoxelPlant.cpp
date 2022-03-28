@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Voxel/VoxelPlant.h"
-#include "World/Chunk.h"
+#include "Voxel/Voxels/VoxelPlant.h"
 
 UVoxelPlant::UVoxelPlant()
 {
@@ -19,25 +18,26 @@ FString UVoxelPlant::ToData()
 	return Super::ToData();
 }
 
-void UVoxelPlant::OnTargetHit(ACharacterBase* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetHit(InTarget, InHitResult);
 }
 
-void UVoxelPlant::OnTargetEnter(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetEnter(InTarget, InHitResult);
 }
 
-void UVoxelPlant::OnTargetStay(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetStay(InTarget, InHitResult);
 }
 
-void UVoxelPlant::OnTargetExit(UAbilityCharacterPart* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
 {
 	Super::OnTargetExit(InTarget, InHitResult);
 }
+
 bool UVoxelPlant::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
 {
 	switch (InMouseButton)
