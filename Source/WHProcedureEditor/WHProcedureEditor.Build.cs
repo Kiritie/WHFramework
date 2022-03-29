@@ -8,6 +8,14 @@ public class WHProcedureEditor : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
+		bLegacyPublicIncludePaths = false;
+
+		ShadowVariableWarningLevel = WarningLevel.Error;
+		
+		DefaultBuildSettings = BuildSettingsVersion.V2;
+
+		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
 		PublicIncludePaths.AddRange(
 			new string[] {
 				// ... add public include paths required here ...

@@ -30,3 +30,33 @@ UItemAssetBase* FAbilityData::GetItemData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemAssetBase>(AbilityID);
 }
+
+bool FGameplayEffectContainerSpec::HasValidTargets() const
+{
+	return TargetGameplayEffectSpecs.Num() > 0;
+}
+
+bool FGameplayEffectContainerSpec::HasValidEffects() const
+{
+	return TargetData.Num() > 0;
+}
+
+void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors)
+{
+	for (const FHitResult& HitResult : HitResults)
+	{
+		// 创建单个射线目标数据对象
+		FGameplayAbilityTargetData_SingleTargetHit* NewData = new FGameplayAbilityTargetData_SingleTargetHit(HitResult);
+		// 将目标数据加入列表
+		TargetData.Add(NewData);
+	}
+
+	if (TargetActors.Num() > 0)
+	{
+		// 创建目标Actor数组对象
+		FGameplayAbilityTargetData_ActorArray* NewData = new FGameplayAbilityTargetData_ActorArray();
+		NewData->TargetActorArray.Append(TargetActors);
+		// 将目标数据加入列表
+		TargetData.Add(NewData);
+	}
+}

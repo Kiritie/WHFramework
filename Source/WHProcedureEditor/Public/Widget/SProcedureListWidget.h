@@ -60,7 +60,7 @@ public:
 
 	FClassViewerInitializationOptions ClassViewerOptions;
 
-	TSharedPtr<FProcedureClassFilter> ProcedureClassFilter;
+	TSharedRef<FProcedureClassFilter> ProcedureClassFilter;
 
 	TSharedPtr<STreeView<TSharedPtr<FProcedureListItem>>> TreeView;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/AbilityModuleTypes.h"
 #include "Asset/Primary/Item/ItemAssetBase.h"
 
 #include "SkillAssetBase.generated.h"

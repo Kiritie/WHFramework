@@ -5,6 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
+#include "VitalityAssetBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Object/SceneObjectInterface.h"
@@ -12,7 +13,6 @@
 #include "AbilityVitalityBase.generated.h"
 
 class UVitalityInteractionComponent;
-class UVitalityAssetBase;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
@@ -62,10 +62,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVitalityAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

@@ -85,7 +85,7 @@ void APickUp::LoadData(FSaveData* InSaveData)
 
 FSaveData* APickUp::ToData(bool bSaved)
 {
-	auto data = FPickUpSaveData();
+	static auto data = FPickUpSaveData();
 
 	data.bSaved = bSaved;
 

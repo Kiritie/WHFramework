@@ -2,10 +2,9 @@
 
 #pragma once
 
+#include "PrimaryAssetBase.h"
 #include "Engine/AssetManager.h"
 #include "PrimaryAssetManager.generated.h"
-
-class UPrimaryAssetBase;
 
 UCLASS()
 class WHFRAMEWORK_API UPrimaryAssetManager : public UAssetManager

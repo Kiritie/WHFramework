@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
+#include "CharacterAssetBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
@@ -12,7 +13,6 @@
 #include "AbilityCharacterBase.generated.h"
 
 class UCharacterInteractionComponent;
-class UCharacterAssetBase;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
 class AVoxelChunk;
@@ -71,10 +71,10 @@ protected:
 	AController* OwnerController;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCharacterAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

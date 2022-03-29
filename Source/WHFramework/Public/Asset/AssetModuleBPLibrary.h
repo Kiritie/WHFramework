@@ -5,12 +5,12 @@
 #include "CoreMinimal.h"
 #include "AssetModule.h"
 #include "AssetModuleTypes.h"
-
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Main/MainModule.h"
+#include "Asset/Primary/PrimaryAssetBase.h"
+
 #include "AssetModuleBPLibrary.generated.h"
 
-class UPrimaryAssetBase;
 /**
  * 
  */

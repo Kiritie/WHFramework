@@ -377,6 +377,11 @@ bool ASceneModule::HasPhysicsVolume(FName InName, bool bEnsured) const
 	return bEnsured ? ensureEditor(false) : false;
 }
 
+APhysicsVolume* ASceneModule::GetPhysicsVolume() const
+{
+	return Super::GetPhysicsVolume();
+}
+
 APhysicsVolumeBase* ASceneModule::GetPhysicsVolume(FName InName, bool bEnsured) const
 {
 	if(HasPhysicsVolume(InName, bEnsured))

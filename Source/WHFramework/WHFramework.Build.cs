@@ -9,6 +9,8 @@ public class WHFramework : ModuleRules
 		bLegacyPublicIncludePaths = false;
 
 		ShadowVariableWarningLevel = WarningLevel.Error;
+		
+		DefaultBuildSettings = BuildSettingsVersion.V2;
 
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
@@ -47,6 +49,10 @@ public class WHFramework : ModuleRules
 				"SlateCore",
 				"InputCore",
 				"MediaAssets",
+				"AIModule",
+				"GameplayAbilities",
+				"GameplayTags",
+				"GameplayTasks",
 				"GameplayAbilities",
 				"ProceduralMeshComponent"
 				// ... add private dependencies that you statically link with here ...	
