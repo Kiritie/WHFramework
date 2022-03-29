@@ -143,8 +143,6 @@ protected:
 public:
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
 	bool HasPhysicsVolume(FName InName, bool bEnsured = true) const;
-
-	virtual APhysicsVolume* GetPhysicsVolume() const override;
 	
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
 	class APhysicsVolumeBase* GetPhysicsVolume(FName InName, bool bEnsured = true) const;

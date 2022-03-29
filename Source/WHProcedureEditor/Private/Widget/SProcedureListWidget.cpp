@@ -58,7 +58,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 
 	ProcedureClassFilter = MakeShareable(new FProcedureClassFilter);
 	ProcedureClassFilter->IncludeParentClass = ARootProcedureBase::StaticClass();
-	ClassViewerOptions.ClassFilters.Add(ProcedureClassFilter);
+	ClassViewerOptions.ClassFilter = ProcedureClassFilter;
 
 	SAssignNew(ClassPickButton, SComboButton)
 	.OnGetMenuContent(this, &SProcedureListWidget::GenerateClassPicker)
