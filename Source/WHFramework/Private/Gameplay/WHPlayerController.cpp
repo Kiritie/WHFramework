@@ -5,10 +5,12 @@
 #include "Net/UnrealNetwork.h"
 #include "Audio/AudioModuleNetworkComponent.h"
 #include "Camera/CameraModuleNetworkComponent.h"
+#include "Camera/Base/CameraPawnBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Event/EventModuleNetworkComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Gameplay/WHPlayerInterface.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Media/MediaModuleNetworkComponent.h"
 #include "Network/NetworkModuleNetworkComponent.h"
@@ -76,6 +78,8 @@ AWHPlayerController::AWHPlayerController()
 	TargetCameraLocation = FVector::ZeroVector;
 	TargetCameraRotation = FRotator::ZeroRotator;
 	TargetCameraDistance = 0.f;
+
+	bUse2DInputMode = false;
 }
 
 void AWHPlayerController::Initialize()
@@ -98,6 +102,10 @@ void AWHPlayerController::SetupInputComponent()
 	InputComponent->BindAxis(FName("PanV"), this, &AWHPlayerController::PanV);
 	InputComponent->BindAxis(FName("Pinch"), this, &AWHPlayerController::Pinch);
 	InputComponent->BindAxis(FName("ZoomCam"), this, &AWHPlayerController::ZoomCam);
+
+	InputComponent->BindAxis(FName("MoveForward"), this, &AWHPlayerController::MoveForward);
+	InputComponent->BindAxis(FName("MoveRight"), this, &AWHPlayerController::MoveRight);
+	InputComponent->BindAxis(FName("MoveUp"), this, &AWHPlayerController::MoveUp);
 
 	InputComponent->BindAction(FName("Interact"), EInputEvent::IE_Pressed, this, &AWHPlayerController::StartInteract);
 	InputComponent->BindAction(FName("Interact"), EInputEvent::IE_Released, this, &AWHPlayerController::EndInteract);
@@ -127,7 +135,7 @@ void AWHPlayerController::Tick(float DeltaTime)
 
 	TrackTarget();
 
-	if(GetPawn() && !GetPawn()->GetActorLocation().Equals(TargetCameraLocation))
+	if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()) && !GetPawn()->GetActorLocation().Equals(TargetCameraLocation))
 	{
 		GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
 	}
@@ -144,7 +152,7 @@ void AWHPlayerController::Tick(float DeltaTime)
 }
 void AWHPlayerController::Turn(float InRate)
 {
-	if(InRate == 0.f || !bCameraRotateAble) return;
+	if(InRate == 0.f) return;
 
 	if(IsControllingRotate())
 	{
@@ -154,7 +162,7 @@ void AWHPlayerController::Turn(float InRate)
 
 void AWHPlayerController::LookUp(float InRate)
 {
-	if(InRate == 0.f || !bCameraRotateAble) return;
+	if(InRate == 0.f) return;
 
 	if(IsControllingRotate())
 	{
@@ -164,7 +172,7 @@ void AWHPlayerController::LookUp(float InRate)
 
 void AWHPlayerController::PanH(float InRate)
 {
-	if(InRate == 0.f || !bCameraMoveAble) return;
+	if(InRate == 0.f) return;
 
 	if(IsControllingMove())
 	{
@@ -177,7 +185,7 @@ void AWHPlayerController::PanH(float InRate)
 
 void AWHPlayerController::PanV(float InRate)
 {
-	if(InRate == 0.f || !bCameraMoveAble) return;
+	if(InRate == 0.f) return;
 
 	if(IsControllingMove())
 	{
@@ -189,7 +197,7 @@ void AWHPlayerController::PanV(float InRate)
 
 void AWHPlayerController::Pinch(float InRate)
 {
-	if(InRate == 0.f || !bCameraZoomAble) return;
+	if(InRate == 0.f) return;
 	
 	if(TouchPressedCount == 2)
 	{
@@ -215,7 +223,7 @@ void AWHPlayerController::Pinch(float InRate)
 
 void AWHPlayerController::ZoomCam(float InRate)
 {
-	if(InRate == 0.f || !bCameraZoomAble) return;
+	if(InRate == 0.f) return;
 
 	AddCameraDistanceInput(InRate);
 }
@@ -280,7 +288,7 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 	{
 		case ETrackTargetMode::LocationOnly:
 		{
-			if(!IsControllingMove())
+			if(!TrackAllowControl || !IsControllingMove())
 			{
 				SetCameraLocation(TrackTargetActor->GetActorLocation() + TrackTargetActor->GetActorRotation().RotateVector(TrackLocationOffset), bInstant);
 			}
@@ -288,11 +296,11 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 		}
 		case ETrackTargetMode::LocationAndRotation:
 		{
-			if(!IsControllingMove())
+			if(!TrackAllowControl || !IsControllingMove())
 			{
 				SetCameraLocation(TrackTargetActor->GetActorLocation() + TrackTargetActor->GetActorRotation().RotateVector(TrackLocationOffset), bInstant);
 			}
-			if(!IsControllingRotate())
+			if(!TrackAllowControl || !IsControllingRotate())
 			{
 				SetCameraRotation(TrackTargetActor->GetActorRotation().Yaw + TrackYawOffset, TrackTargetActor->GetActorRotation().Pitch + TrackPitchOffset, bInstant);
 			}
@@ -300,15 +308,15 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 		}
 		case ETrackTargetMode::LocationAndRotationAndDistance:
 		{
-			if(!IsControllingMove())
+			if(!TrackAllowControl || !IsControllingMove())
 			{
 				SetCameraLocation(TrackTargetActor->GetActorLocation() + TrackTargetActor->GetActorRotation().RotateVector(TrackLocationOffset), bInstant);
 			}
-			if(!IsControllingRotate())
+			if(!TrackAllowControl || !IsControllingRotate())
 			{
 				SetCameraRotation(TrackTargetActor->GetActorRotation().Yaw + TrackYawOffset, TrackTargetActor->GetActorRotation().Pitch + TrackPitchOffset, bInstant);
 			}
-			if(!IsControllingZoom())
+			if(!TrackAllowControl || !IsControllingZoom())
 			{
 				SetCameraDistance(TrackDistance, bInstant);
 			}
@@ -316,15 +324,15 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 		}
 		case ETrackTargetMode::LocationAndRotationAndDistanceOnce:
 		{
-			if(!IsControllingMove())
+			if(!TrackAllowControl || !IsControllingMove())
 			{
 				SetCameraLocation(TrackTargetActor->GetActorLocation() + TrackTargetActor->GetActorRotation().RotateVector(TrackLocationOffset), bInstant);
 			}
-			if(!IsControllingRotate())
+			if(!TrackAllowControl || !IsControllingRotate())
 			{
 				SetCameraRotation(TrackTargetActor->GetActorRotation().Yaw + TrackYawOffset, TrackTargetActor->GetActorRotation().Pitch + TrackPitchOffset, bInstant);
 			}
-			if(!IsControllingZoom())
+			if(!TrackAllowControl || !IsControllingZoom())
 			{
 				SetCameraDistance(TrackDistance, bInstant);
 			}
@@ -334,7 +342,7 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 	}
 }
 
-void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bInstant)
+void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
 	if(!InTargetActor) return;
 
@@ -346,6 +354,7 @@ void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMo
 		TrackYawOffset = InYawOffset;
 		TrackPitchOffset = InPitchOffset;
 		TrackDistance = InDistance;
+		TrackAllowControl = bAllowControl;
 		TrackTarget(bInstant);
 	}
 }
@@ -358,7 +367,7 @@ void AWHPlayerController::EndTrackTarget()
 void AWHPlayerController::SetCameraLocation(FVector InLocation, bool bInstant)
 {
 	TargetCameraLocation = InLocation;
-	if(GetPawn() && bInstant)
+	if(bInstant && GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
 	{
 		GetPawn()->SetActorLocation(TargetCameraLocation);
 	}
@@ -410,19 +419,19 @@ void AWHPlayerController::AddCameraMovementInput(FVector InDirection, float InVa
 	SetCameraLocation(TargetCameraLocation + InDirection * CameraMoveRate * InValue * GetWorld()->GetDeltaSeconds(), false);
 }
 
-bool AWHPlayerController::IsControllingMove(bool bTouch) const
+bool AWHPlayerController::IsControllingMove() const
 {
-	return bTouch ? TouchPressedCount == 2 : IsInputKeyDown(FKey(TEXT("MiddleMouseButton")));
+	return IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || TouchPressedCount == 2;
 }
 
-bool AWHPlayerController::IsControllingRotate(bool bTouch) const
+bool AWHPlayerController::IsControllingRotate() const
 {
-	return bTouch ? TouchPressedCount == 1 : IsInputKeyDown(FKey(TEXT("RightMouseButton")));
+	return IsInputKeyDown(FKey(TEXT("RightMouseButton"))) || TouchPressedCount == 1;
 }
 
-bool AWHPlayerController::IsControllingZoom(bool bTouch) const
+bool AWHPlayerController::IsControllingZoom() const
 {
-	return bTouch ? GetInputAxisValue(FName("Pinch")) > 0.f : GetInputAxisValue(FName("ZoomCam")) > 0.f;
+	return GetInputAxisValue(FName("ZoomCam")) != 0.f || GetInputAxisValue(FName("Pinch")) != 0.f;
 }
 
 float AWHPlayerController::GetCameraDistance(bool bReally)
@@ -449,4 +458,34 @@ void AWHPlayerController::SetCameraControlStates(bool bInCameraControlAble, bool
 	bCameraMoveAble = bInCameraMoveAble;
 	bCameraRotateAble = bInCameraRotateAble;
 	bCameraZoomAble = bInCameraZoomAble;
+}
+
+void AWHPlayerController::MoveForward(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	{
+		PlayerInterface->MoveForward(InValue, bUse2DInputMode);
+	}
+}
+
+void AWHPlayerController::MoveRight(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	{
+		PlayerInterface->MoveRight(InValue, bUse2DInputMode);
+	}
+}
+
+void AWHPlayerController::MoveUp(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	{
+		PlayerInterface->MoveUp(InValue, bUse2DInputMode);
+	}
 }

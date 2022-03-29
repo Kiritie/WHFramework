@@ -18,17 +18,20 @@ public:
 	UDataAssetBase();
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void Fill(const FString& InJsonData);
+	UFUNCTION(BlueprintNativeEvent)
+	void InitData();
 
-	UFUNCTION(BlueprintPure)
-	virtual FString Pack();
+	UFUNCTION(BlueprintNativeEvent)
+	void FillData(const FString& InJsonData);
+
+	UFUNCTION(BlueprintNativeEvent)
+	FString PackData();
 
 protected:
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly)
 	FName DataAssetName;
 	
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetDataAssetName() const { return DataAssetName; }
+	FName GetDataAssetName() const { return DataAssetName; }
 };

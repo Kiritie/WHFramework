@@ -7,47 +7,38 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-bool UAssetModuleBPLibrary::K2_HasDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
+bool UAssetModuleBPLibrary::HasDataAsset(FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_HasDataAsset(InDataAssetClass);
+		return AssetModule->HasDataAsset(InDataAssetName);
 	}
 	return false;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
+UDataAssetBase* UAssetModuleBPLibrary::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_GetDataAsset(InDataAssetClass);
+		return AssetModule->K2_GetDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return nullptr;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::K2_GetDataAssetByName(FName InName, TSubclassOf<UDataAssetBase> InDataAssetClass)
+UDataAssetBase* UAssetModuleBPLibrary::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_GetDataAssetByName(InName, InDataAssetClass);
+		return AssetModule->K2_CreateDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return nullptr;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
+bool UAssetModuleBPLibrary::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_CreateDataAsset(InDataAssetClass);
-	}
-	return nullptr;
-}
-
-bool UAssetModuleBPLibrary::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
-{
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
-	{
-		return AssetModule->K2_RemoveDataAsset(InDataAssetClass);
+		return AssetModule->K2_RemoveDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return false;
 }

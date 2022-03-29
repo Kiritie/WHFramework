@@ -52,6 +52,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeAllEvent();
 
+	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters = nullptr);
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParameters"))
 	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
 

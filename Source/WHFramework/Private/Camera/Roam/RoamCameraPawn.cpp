@@ -33,10 +33,6 @@ void ARoamCameraPawn::BeginPlay()
 void ARoamCameraPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	PlayerInputComponent->BindAxis(FName("MoveForward"), this, &ARoamCameraPawn::MoveForward);
-	PlayerInputComponent->BindAxis(FName("MoveRight"), this, &ARoamCameraPawn::MoveRight);
-	PlayerInputComponent->BindAxis(FName("MoveUp"), this, &ARoamCameraPawn::MoveUp);
 }
 
 // Called every frame
@@ -46,39 +42,37 @@ void ARoamCameraPawn::Tick(float DeltaTime)
 
 }
 
-void ARoamCameraPawn::MoveForward(float InValue)
+void ARoamCameraPawn::MoveForward(float InValue, bool b2DMode)
 {
-	if(InValue == 0.f) return;
-	
-	if(AWHPlayerController* PlayerController = GetController<AWHPlayerController>())
+	FVector Direction;
+	if(b2DMode)
 	{
-		PlayerController->AddCameraMovementInput(GetControlRotation().Vector(), InValue);
+		Direction = FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Z);
 	}
-}
-
-void ARoamCameraPawn::MoveRight(float InValue)
-{
-	if(InValue == 0.f) return;
-	
-	const FRotator Rotation = GetControlRotation();
-	const FRotator YawRotation(0, Rotation.Yaw, 0);
-	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	else
+	{
+		Direction = GetControlRotation().Vector();
+	}
 	if(AWHPlayerController* PlayerController = GetController<AWHPlayerController>())
 	{
 		PlayerController->AddCameraMovementInput(Direction, InValue);
 	}
 }
 
-void ARoamCameraPawn::MoveUp(float InValue)
+void ARoamCameraPawn::MoveRight(float InValue, bool b2DMode)
 {
-	if(InValue == 0.f) return;
-	
-	const FRotator Rotation = GetControlRotation();
-	const FRotator YawRotation(0, Rotation.Yaw, 0);
-	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	const FVector Direction = FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Y);
 	if(AWHPlayerController* PlayerController = GetController<AWHPlayerController>())
 	{
-		PlayerController->AddCameraMovementInput(FVector(Direction.X * 0.f, Direction.Y * 0.f, 1.f), InValue);
+		PlayerController->AddCameraMovementInput(Direction, InValue);
+	}
+}
+
+void ARoamCameraPawn::MoveUp(float InValue, bool b2DMode)
+{
+	if(AWHPlayerController* PlayerController = GetController<AWHPlayerController>())
+	{
+		PlayerController->AddCameraMovementInput(FVector::UpVector, InValue);
 	}
 }
 

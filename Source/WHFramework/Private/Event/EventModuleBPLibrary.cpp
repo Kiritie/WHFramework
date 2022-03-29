@@ -33,6 +33,14 @@ void UEventModuleBPLibrary::UnsubscribeAllEvent()
 	}
 }
 
+void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters)
+{
+	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
+	{
+		EventModule->BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParameters);
+	}
+}
+
 void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters)
 {
 	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())

@@ -126,6 +126,11 @@ void AEventModule::UnsubscribeAllEvent()
 	EventHandleInfos.Empty();
 }
 
+void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters)
+{
+	BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParameters ? *InParameters : TArray<FParameter>());
+}
+
 void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters)
 {
 	if(!InSender || !InEventHandleClass) return;
@@ -214,9 +219,9 @@ void AEventModule::SpawnEventManager()
 		EventManager = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
         if(EventManager)
         {
-			#if(WITH_EDITOR)
+#if(WITH_EDITOR)
         	EventManager->SetActorLabel(TEXT("EventManager"));
-			#endif
+#endif
         	EventManager->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
         }
 	}
