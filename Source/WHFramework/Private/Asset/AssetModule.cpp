@@ -32,6 +32,7 @@ void AAssetModule::OnInitialize_Implementation()
 	{
 		if(Iter)
 		{
+			Iter->InitData();
 			DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
 		}
 	}
@@ -57,33 +58,36 @@ void AAssetModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-bool AAssetModule::K2_HasDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass) const
+bool AAssetModule::HasDataAsset(FName InDataAssetName) const
 {
-	return HasDataAsset<UDataAssetBase>(InDataAssetClass);
+	return DataAssetMap.Contains(InDataAssetName);
 }
 
-UDataAssetBase* AAssetModule::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass) const
+UDataAssetBase* AAssetModule::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName) const
 {
-	return GetDataAsset<UDataAssetBase>(InDataAssetClass);
+	if(!InDataAssetClass) return nullptr;
+	
+	if(InDataAssetName.IsNone()) InDataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
+
+	return GetDataAsset<UDataAssetBase>(InDataAssetName);
 }
 
-UDataAssetBase* AAssetModule::K2_GetDataAssetByName(FName InName, TSubclassOf<UDataAssetBase> InDataAssetClass) const
+UDataAssetBase* AAssetModule::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	if(DataAssetMap.Contains(InName))
-	{
-		return DataAssetMap[InName];
-	}
-	return nullptr;
+	if(!InDataAssetClass) return nullptr;
+
+	if(InDataAssetName.IsNone()) InDataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
+
+	return CreateDataAsset<UDataAssetBase>(InDataAssetName);
 }
 
-UDataAssetBase* AAssetModule::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
+bool AAssetModule::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	return CreateDataAsset<UDataAssetBase>(InDataAssetClass);
-}
+	if(!InDataAssetClass) return nullptr;
 
-bool AAssetModule::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass)
-{
-	return RemoveDataAsset<UDataAssetBase>(InDataAssetClass);
+	if(InDataAssetName.IsNone()) InDataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
+
+	return RemoveDataAsset<UDataAssetBase>(InDataAssetName);
 }
 
 void AAssetModule::RemoveAllDataAsset()

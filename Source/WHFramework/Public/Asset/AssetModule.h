@@ -47,59 +47,34 @@ protected:
 	TMap<FName, UDataAssetBase*> DataAssetMap;
 	
 public:
-	template<class T>
-	bool HasDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass = T::StaticClass()) const
-	{
-		if(!InDataAssetClass) return false;
-
-		const FName DataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
-		return DataAssetMap.Contains(DataAssetName);
-	}
-
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasDataAsset"))
-	bool K2_HasDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass) const;
+	UFUNCTION(BlueprintPure)
+	bool HasDataAsset(FName InDataAssetName) const;
 
 	template<class T>
-	T* GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass = T::StaticClass()) const
+	T* GetDataAsset(FName InDataAssetName = NAME_None) const
 	{
-		if(!InDataAssetClass) return nullptr;
+		if(InDataAssetName.IsNone()) InDataAssetName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
 
-		const FName DataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
-		if(DataAssetMap.Contains(DataAssetName))
+		if(DataAssetMap.Contains(InDataAssetName))
 		{
-			return Cast<T>(DataAssetMap[DataAssetName]);
+			return Cast<T>(DataAssetMap[InDataAssetName]);
 		}
 		return nullptr;
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetDataAsset", DeterminesOutputType = "InDataAssetClass"))
-	UDataAssetBase* K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass) const;
+	UDataAssetBase* K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None) const;
 
 	template<class T>
-	T* GetDataAssetByName(FName InName) const
+	T* CreateDataAsset(FName InDataAssetName = NAME_None)
 	{
-		if(DataAssetMap.Contains(InName))
-		{
-			return Cast<T>(DataAssetMap[InName]);
-		}
-		return nullptr;
-	}
+		if(InDataAssetName.IsNone()) InDataAssetName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetDataAssetByName", DeterminesOutputType = "InDataAssetClass"))
-	UDataAssetBase* K2_GetDataAssetByName(FName InName, TSubclassOf<UDataAssetBase> InDataAssetClass) const;
-
-	template<class T>
-	T* CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass = T::StaticClass())
-	{
-		if(!InDataAssetClass) return nullptr;
-		
-		const FName DataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
-		
-		if(UDataAssetBase* DataAsset = NewObject<UDataAssetBase>(this, InDataAssetClass))
+		if(UDataAssetBase* DataAsset = NewObject<UDataAssetBase>(this, T::StaticClass()))
 		{
-			if(!DataAssetMap.Contains(DataAssetName))
+			if(!DataAssetMap.Contains(InDataAssetName))
 			{
-				DataAssetMap.Add(DataAssetName, DataAsset);
+				DataAssetMap.Add(InDataAssetName, DataAsset);
 			}
 			return Cast<T>(DataAsset);
 		}
@@ -107,20 +82,19 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateDataAsset", DeterminesOutputType = "InDataAssetClass"))
-	UDataAssetBase* K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass);
+	UDataAssetBase* K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
 
 	template<class T>
-	bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass = T::StaticClass())
+	bool RemoveDataAsset(FName InDataAssetName = NAME_None)
 	{
-		if(!InDataAssetClass) return false;
+		if(InDataAssetName.IsNone()) InDataAssetName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
 
-		const FName DataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
-		if(DataAssetMap.Contains(DataAssetName))
+		if(DataAssetMap.Contains(InDataAssetName))
 		{
-			if(UDataAssetBase* DataAsset = DataAssetMap[DataAssetName])
+			if(UDataAssetBase* DataAsset = DataAssetMap[InDataAssetName])
 			{
 				DataAsset->ConditionalBeginDestroy();
-				DataAssetMap.Remove(DataAssetName);
+				DataAssetMap.Remove(InDataAssetName);
 			}
 			return true;
 		}
@@ -128,7 +102,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "RemoveDataAsset"))
-	bool K2_RemoveDataAsset(TSubclassOf<UDataAssetBase>  InDataAssetClass);
+	bool K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
 
 	UFUNCTION(BlueprintCallable)
 	void RemoveAllDataAsset();

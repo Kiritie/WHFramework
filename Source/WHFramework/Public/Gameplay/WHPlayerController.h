@@ -94,55 +94,55 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
 	bool bCameraControlAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Move")
 	bool bCameraMoveAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Rotate")
 	bool bCameraRotateAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Zoom")
 	bool bCameraZoomAble;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bUseNormalizedZoom;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveSmooth;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraTurnRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraLookUpRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraRotateSmooth;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float MinCameraPinch;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float MaxCameraPinch;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float InitCameraPinch;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float CameraZoomRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float CameraZoomSmooth;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MinCameraDistance;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MaxCameraDistance;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float InitCameraDistance;
 
 private:
@@ -152,6 +152,7 @@ private:
 	float TrackYawOffset;
 	float TrackPitchOffset;
 	float TrackDistance;
+	bool TrackAllowControl;
 	ETrackTargetMode TrackTargetMode;
 
 	FVector TargetCameraLocation;
@@ -192,7 +193,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, FVector InLocationOffset = FVector::ZeroVector, float InYawOffset = 0.f, float InPitchOffset = 0.f, float InDistance = 0.f, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, FVector InLocationOffset = FVector::ZeroVector, float InYawOffset = 0.f, float InPitchOffset = 0.f, float InDistance = 0.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget();
@@ -220,13 +221,13 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool IsControllingMove(bool bTouch = false) const;
+	bool IsControllingMove() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsControllingRotate(bool bTouch = false) const;
+	bool IsControllingRotate() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsControllingZoom(bool bTouch = false) const;
+	bool IsControllingZoom() const;
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraDistance(bool bReally = true);
@@ -265,6 +266,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }
 
+	UFUNCTION(BlueprintCallable)
 	void SetCameraMoveRate(float InCameraMoveRate) { this->CameraMoveRate = InCameraMoveRate; }
 
 	UFUNCTION(BlueprintPure)
@@ -338,4 +340,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
+
+protected:	
+	UPROPERTY(EditAnywhere, Category = "PlayerControl")
+	bool bUse2DInputMode;
+
+protected:
+	virtual void MoveForward(float InValue);
+
+	virtual void MoveRight(float InValue);
+
+	virtual void MoveUp(float InValue);
 };

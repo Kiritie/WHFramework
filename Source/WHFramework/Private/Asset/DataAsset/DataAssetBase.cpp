@@ -8,12 +8,17 @@ UDataAssetBase::UDataAssetBase()
 	
 }
 
-void UDataAssetBase::Fill(const FString& InJsonData)
+void UDataAssetBase::InitData_Implementation()
 {
 	
 }
 
-FString UDataAssetBase::Pack()
+void UDataAssetBase::FillData_Implementation(const FString& InJsonData)
+{
+	
+}
+
+FString UDataAssetBase::PackData_Implementation()
 {
 	return TEXT("");
 }

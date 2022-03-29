@@ -153,4 +153,52 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerController", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APlayerController* K2_GetLocalPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass);
+
+	template<class T>
+	static T* GetPlayerPawn(const UObject* InWorldContext, int32 InPlayerIndex = 0)
+	{
+		return Cast<T>(UGameplayStatics::GetPlayerPawn(InWorldContext, InPlayerIndex));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawn", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* K2_GetPlayerPawn(const UObject* InWorldContext, TSubclassOf<APawn> InClass, int32 InPlayerIndex = 0);
+
+	template<class T>
+	static T* GetPlayerPawnByID(const UObject* InWorldContext, int32 InPlayerID = 0)
+	{
+		return Cast<T>(K2_GetPlayerPawnByID(InWorldContext, T::StaticClass(), InPlayerID));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawnByID", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* K2_GetPlayerPawnByID(const UObject* InWorldContext, TSubclassOf<APawn> InClass, int32 InPlayerID = 0);
+
+	template<class T>
+	static T* GetLocalPlayerPawn(const UObject* InWorldContext)
+	{
+		return Cast<T>(K2_GetLocalPlayerPawn(InWorldContext, T::StaticClass()));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerPawn", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* K2_GetLocalPlayerPawn(const UObject* InWorldContext, TSubclassOf<APawn> InClass);
+
+	template<class T>
+	static T* GetPlayerCharacter(const UObject* InWorldContext, int32 InPlayerIndex = 0)
+	{
+		return Cast<T>(UGameplayStatics::GetPlayerCharacter(InWorldContext, InPlayerIndex));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacter", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static ACharacter* K2_GetPlayerCharacter(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass, int32 InPlayerIndex = 0);
+
+	template<class T>
+	static T* GetPlayerCharacterByID(const UObject* InWorldContext, int32 InPlayerID = 0)
+	{
+		return Cast<T>(K2_GetPlayerCharacterByID(InWorldContext, T::StaticClass(), InPlayerID));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacterByID", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static ACharacter* K2_GetPlayerCharacterByID(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass, int32 InPlayerID = 0);
+
+	template<class T>
+	static T* GetLocalPlayerCharacter(const UObject* InWorldContext)
+	{
+		return Cast<T>(K2_GetLocalPlayerCharacter(InWorldContext, T::StaticClass()));
+	}
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerCharacter", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static ACharacter* K2_GetLocalPlayerCharacter(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass);
 };
