@@ -4,6 +4,7 @@
 #include "Global/GlobalBPLibrary.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "GameFramework/InputSettings.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -131,6 +132,17 @@ bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InP
 	}
 
 	return OutResult.Num() == 0 ? false : true;
+}
+
+FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputActionName)
+{
+	TArray<FInputActionKeyMapping> KeyMappings;
+	UInputSettings::GetInputSettings()->GetActionMappingByName(*InInputActionName, KeyMappings);
+	for(auto Iter : KeyMappings)
+	{
+		return FText::FromString(Iter.Key.GetFName().ToString());
+	}
+	return FText::GetEmpty();
 }
 
 UGameInstance* UGlobalBPLibrary::K2_GetGameInstance(const UObject* InWorldContext, TSubclassOf<UGameInstance> InClass)

@@ -10,7 +10,9 @@
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
-#include "Scene/Object/SceneObject.h"
+#include "Scene/Components/WorldTimerComponent.h"
+#include "Scene/Components/WorldWeatherComponent.h"
+#include "Scene/Object/SceneObjectInterface.h"
 #include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Widget/WidgetModuleBPLibrary.h"
@@ -19,9 +21,20 @@ ASceneModule::ASceneModule()
 {
 	ModuleName = FName("SceneModule");
 
+	static ConstructorHelpers::FClassFinder<UWorldTimerComponent> WorldTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldTimer.BPC_WorldTimer_C'"));
+	if(WorldTimerClass.Succeeded())
+	{
+		WorldTimer = Cast<UWorldTimerComponent>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
+	}
+	static ConstructorHelpers::FClassFinder<UWorldWeatherComponent> WeatherTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldWeather.BPC_WorldWeather_C'"));
+	if(WeatherTimerClass.Succeeded())
+	{                                                                                          
+		WorldWeather = Cast<UWorldWeatherComponent>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));
+	}
+
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
-	SceneObjects = TMap<FName, TScriptInterface<ISceneObject>>();
+	SceneObjects = TMap<FName, TScriptInterface<ISceneObjectInterface>>();
 
 	TargetPoints = TMap<FName, ATargetPoint*>();
 	
@@ -133,6 +146,15 @@ void ASceneModule::OnPreparatory_Implementation()
 void ASceneModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(WorldTimer)
+	{
+		WorldTimer->UpdateTimer();
+	}
+	if (WorldWeather)
+	{
+		WorldWeather->UpdateWeather();
+	}
 }
 
 void ASceneModule::OnPause_Implementation()
@@ -266,7 +288,7 @@ bool ASceneModule::HasSceneObject(FName InName, bool bEnsured) const
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-TScriptInterface<ISceneObject> ASceneModule::GetSceneObject(FName InName, bool bEnsured) const
+TScriptInterface<ISceneObjectInterface> ASceneModule::GetSceneObject(FName InName, bool bEnsured) const
 {
 	if(HasSceneObject(InName, bEnsured))
 	{
@@ -275,7 +297,7 @@ TScriptInterface<ISceneObject> ASceneModule::GetSceneObject(FName InName, bool b
 	return nullptr;
 }
 
-void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObject> InObject)
+void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObjectInterface> InObject)
 {
 	if(SceneObjects.Contains(InName))
 	{
@@ -287,7 +309,7 @@ void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObject> I
 	}
 	if(InObject.GetObject() && InObject.GetObject()->IsValidLowLevel())
 	{
-		SetScenePoint(InName, InObject->Execute_GetScenePoint(InObject.GetObject()));
+		SetScenePoint(InName, InObject->GetScenePoint());
 	}
 }
 

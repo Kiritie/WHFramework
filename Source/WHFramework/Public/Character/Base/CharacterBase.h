@@ -7,7 +7,7 @@
 #include "CharacterInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
-#include "Scene/Object/SceneObject.h"
+#include "Scene/Object/SceneObjectInterface.h"
 
 #include "CharacterBase.generated.h"
 
@@ -15,7 +15,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneObject
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneObjectInterface
 {
 	GENERATED_BODY()
 	
@@ -35,30 +35,25 @@ protected:
 	USceneComponent* ScenePoint;
 
 public:
-	virtual USceneComponent* GetScenePoint_Implementation() const override;
+	virtual USceneComponent* GetScenePoint() const override { return ScenePoint; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
-	FName CharacterName;
+	FString Name;
 public:
-	virtual FName GetCharacterName_Implementation() const override;
+	virtual FString GetNameC() const override { return Name; }
+
+	virtual void SetNameC(const FString& InName) override { Name = InName; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
-	UCharacterAnim* CharacterAnim;
+	UCharacterAnim* Anim;
 public:
-	virtual UCharacterAnim* GetCharacterAnim_Implementation() const override;
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Speak
-public:
-	virtual void StartSpeak_Implementation() override;
-
-	virtual void StopSpeak_Implementation() override;
+	virtual UCharacterAnim* GetAnim() const override { return Anim; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
@@ -73,9 +68,9 @@ private:
 	FTimerHandle SingleSoundStopTimerHandle;
 
 public:
-	virtual void PlaySound_Implementation(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
+	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	
-	virtual void StopSound_Implementation() override;
+	virtual void StopSound() override;
 	
 protected:
 	UFUNCTION()
@@ -84,38 +79,38 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
 public:
-	virtual void PlayMontage_Implementation(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiPlayMontage(class UAnimMontage* InMontage);
-	virtual void PlayMontageByName_Implementation(const FName InMontageName, bool bMulticast = false) override;
+	virtual void PlayMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
-	virtual void StopMontage_Implementation(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void StopMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiStopMontage(class UAnimMontage* InMontage);
-	virtual void StopMontageByName_Implementation(const FName InMontageName, bool bMulticast = false) override;
+	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Teleport
 public:
-	virtual void TeleportTo_Implementation(FTransform InTransform, bool bMulticast = false) override;
+	virtual void TeleportTo(FTransform InTransform, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiTeleportTo(FTransform InTransform);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI Move
 public:
-	virtual void AIMoveTo_Implementation(FTransform InTransform, bool bMulticast = false) override;
+	virtual void AIMoveTo(FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiAIMoveTo(FTransform InTransform);
+	virtual void MultiAIMoveTo(FVector InLocation, float InStopDistance = 10.f);
 
-	virtual void StopAIMove_Implementation(bool bMulticast = false) override;
+	virtual void StopAIMove(bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiStopAIMove();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Rotation
 public:
-	virtual void RotationTowards_Implementation(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) override;
+	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiRotationTowards(FRotator InRotation, float InDuration = 1.f);
 

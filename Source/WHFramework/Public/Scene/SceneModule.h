@@ -10,6 +10,8 @@
 
 #include "SceneModule.generated.h"
 
+class UWorldWeatherComponent;
+class UWorldTimerComponent;
 /**
  * 
  */
@@ -41,6 +43,21 @@ public:
 	virtual void OnUnPause_Implementation() override;
 	
 	//////////////////////////////////////////////////////////////////////////
+	// Components
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UWorldTimerComponent* WorldTimer;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UWorldWeatherComponent* WorldWeather;
+public:
+	UFUNCTION(BlueprintPure)
+	UWorldTimerComponent* GetWorldTimer() const { return WorldTimer; }
+
+	UFUNCTION(BlueprintPure)
+	UWorldWeatherComponent* GetWorldWeather() const { return WorldWeather; }
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Level
 protected:
 	UPROPERTY(VisibleAnywhere, Transient, Category = "TargetPoint")
@@ -70,17 +87,17 @@ protected:
     /// Scene Object
 protected:
 	UPROPERTY(EditAnywhere, Category = "SceneObject")
-	TMap<FName, TScriptInterface<class ISceneObject>> SceneObjects;
+	TMap<FName, TScriptInterface<class ISceneObjectInterface>> SceneObjects;
 
 public:
 	UFUNCTION(BlueprintPure, Category = "SceneObject")
 	bool HasSceneObject(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure, Category = "SceneObject")
-	TScriptInterface<class ISceneObject> GetSceneObject(FName InName, bool bEnsured = true) const;
+	TScriptInterface<class ISceneObjectInterface> GetSceneObject(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
-	void SetSceneObject(FName InName, TScriptInterface<class ISceneObject> InObject);
+	void SetSceneObject(FName InName, TScriptInterface<class ISceneObjectInterface> InObject);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Target Point

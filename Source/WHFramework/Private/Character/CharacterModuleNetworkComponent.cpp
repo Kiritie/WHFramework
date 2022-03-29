@@ -16,7 +16,7 @@ void UCharacterModuleNetworkComponent::ServerPlayMontageMulticast_Implementation
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_PlayMontage(InCharacter, InMontage, true);
+		Character->PlayMontage(InMontage, true);
 	}
 }
 
@@ -25,7 +25,7 @@ void UCharacterModuleNetworkComponent::ServerStopMontageMulticast_Implementation
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_StopMontage(InCharacter, InMontage, true);
+		Character->StopMontage(InMontage, true);
 	}
 }
 
@@ -34,16 +34,16 @@ void UCharacterModuleNetworkComponent::ServerTeleportToMulticast_Implementation(
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_TeleportTo(InCharacter, InTransform, true);
+		Character->TeleportTo(InTransform, true);
 	}
 }
 
-bool UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Validate(AActor* InCharacter, FTransform InTransform) { return true; }
-void UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Implementation(AActor* InCharacter, FTransform InTransform)
+bool UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Validate(AActor* InCharacter, FVector InLocation, float InStopDistance) { return true; }
+void UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Implementation(AActor* InCharacter, FVector InLocation, float InStopDistance)
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_AIMoveTo(InCharacter, InTransform, true);
+		Character->AIMoveTo(InLocation, InStopDistance, true);
 	}
 }
 
@@ -52,7 +52,7 @@ void UCharacterModuleNetworkComponent::ServerStopAIMoveMulticast_Implementation(
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_StopAIMove(InCharacter, true);
+		Character->StopAIMove(true);
 	}
 }
 
@@ -61,6 +61,6 @@ void UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Implementa
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->Execute_RotationTowards(InCharacter, InRotation, InDuration, true);
+		Character->RotationTowards(InRotation, InDuration, true);
 	}
 }

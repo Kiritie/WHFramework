@@ -3,3 +3,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "SaveGameModuleTypes.generated.h"
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	bool bSaved;
+
+	UPROPERTY()
+	TArray<uint8> Datas;
+
+	FORCEINLINE FSaveData()
+	{
+		bSaved = false;
+		Datas = TArray<uint8>();
+	}
+};

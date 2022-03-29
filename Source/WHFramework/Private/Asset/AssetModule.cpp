@@ -3,8 +3,6 @@
 
 #include "Asset/AssetModule.h"
 
-#include "Asset/DataAsset/DataAssetBase.h"
-
 // Sets default values
 AAssetModule::AAssetModule()
 {

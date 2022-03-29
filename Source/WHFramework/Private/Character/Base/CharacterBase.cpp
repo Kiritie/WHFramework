@@ -19,8 +19,8 @@ ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
 
-	CharacterName = NAME_None;
-	CharacterAnim = nullptr;
+	Name = TEXT("");
+	Anim = nullptr;
 
 	ScenePoint = CreateDefaultSubobject<USceneComponent>(FName("ScenePoint"));
 	ScenePoint->SetupAttachment(RootComponent);
@@ -33,39 +33,14 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	USceneModuleBPLibrary::SetSceneObject(CharacterName, this);
+	USceneModuleBPLibrary::SetSceneObject(*Name, this);
 
-	CharacterAnim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
+	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
 }
 
 void ACharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-}
-
-USceneComponent* ACharacterBase::GetScenePoint_Implementation() const
-{
-	return ScenePoint;
-}
-
-FName ACharacterBase::GetCharacterName_Implementation() const
-{
-	return CharacterName;
-}
-
-UCharacterAnim* ACharacterBase::GetCharacterAnim_Implementation() const
-{
-	return CharacterAnim;
-}
-
-void ACharacterBase::StartSpeak_Implementation()
-{
-	
-}
-
-void ACharacterBase::StopSpeak_Implementation()
-{
-	
 }
 
 void ACharacterBase::OnRep_SingleSoundParams()
@@ -94,7 +69,7 @@ void ACharacterBase::OnRep_SingleSoundParams()
 	}
 }
 
-void ACharacterBase::PlaySound_Implementation(USoundBase* InSound, float InVolume, bool bMulticast)
+void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	if(!InSound) return;
 
@@ -112,20 +87,16 @@ void ACharacterBase::PlaySound_Implementation(USoundBase* InSound, float InVolum
 		SingleSound->Play();
 		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &ACharacterBase::StopSound, InSound->GetDuration());
 	}
-
-	Execute_StartSpeak(this);
 }
 
-void ACharacterBase::StopSound_Implementation()
+void ACharacterBase::StopSound()
 {
 	SingleSoundParams.Sound = nullptr;
 	OnRep_SingleSoundParams();
 	GetWorld()->GetTimerManager().ClearTimer(SingleSoundStopTimerHandle);
-
-	Execute_StopSpeak(this);
 }
 
-void ACharacterBase::PlayMontage_Implementation(UAnimMontage* InMontage, bool bMulticast)
+void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
 {
 	if(bMulticast)
 	{
@@ -139,23 +110,23 @@ void ACharacterBase::PlayMontage_Implementation(UAnimMontage* InMontage, bool bM
 		}
 		return;
 	}
-	if(UAnimInstance* AnimInstance = Execute_GetCharacterAnim(this))
+	if(Anim)
 	{
-		AnimInstance->Montage_Play(InMontage);
+		Anim->Montage_Play(InMontage);
 	}
 }
 
 void ACharacterBase::MultiPlayMontage_Implementation(UAnimMontage* InMontage)
 {
-	Execute_PlayMontage(this, InMontage, false);
+	PlayMontage(InMontage, false);
 }
 
-void ACharacterBase::PlayMontageByName_Implementation(const FName InMontageName, bool bMulticast)
+void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticast)
 {
 	
 }
 
-void ACharacterBase::StopMontage_Implementation(UAnimMontage* InMontage, bool bMulticast)
+void ACharacterBase::StopMontage(UAnimMontage* InMontage, bool bMulticast)
 {
 	if(bMulticast)
 	{
@@ -169,23 +140,23 @@ void ACharacterBase::StopMontage_Implementation(UAnimMontage* InMontage, bool bM
 		}
 		return;
 	}
-	if(UAnimInstance* AnimInstance = Execute_GetCharacterAnim(this))
+	if(Anim)
 	{
-		AnimInstance->Montage_Stop(.2f, InMontage);
+		Anim->Montage_Stop(.2f, InMontage);
 	}
 }
 
 void ACharacterBase::MultiStopMontage_Implementation(UAnimMontage* InMontage)
 {
-	Execute_StopMontage(this, InMontage, false);
+	StopMontage(InMontage, false);
 }
 
-void ACharacterBase::StopMontageByName_Implementation(const FName InMontageName, bool bMulticast)
+void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticast)
 {
 	
 }
 
-void ACharacterBase::TeleportTo_Implementation(FTransform InTransform, bool bMulticast)
+void ACharacterBase::TeleportTo(FTransform InTransform, bool bMulticast)
 {
 	if(bMulticast)
 	{
@@ -204,31 +175,31 @@ void ACharacterBase::TeleportTo_Implementation(FTransform InTransform, bool bMul
 
 void ACharacterBase::MultiTeleportTo_Implementation(FTransform InTransform)
 {
-	Execute_TeleportTo(this, InTransform, false);
+	TeleportTo(InTransform, false);
 }
 
-void ACharacterBase::AIMoveTo_Implementation(FTransform InTransform, bool bMulticast)
+void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiAIMoveTo(InTransform);
+			MultiAIMoveTo(InLocation, InStopDistance);
 		}
 		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
-			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InTransform);
+			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
 		}
 		return;
 	}
 }
 
-void ACharacterBase::MultiAIMoveTo_Implementation(FTransform InTransform)
+void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InStopDistance)
 {
-	Execute_AIMoveTo(this, InTransform, false);
+	AIMoveTo(InLocation, InStopDistance, false);
 }
 
-void ACharacterBase::StopAIMove_Implementation(bool bMulticast)
+void ACharacterBase::StopAIMove(bool bMulticast)
 {
 	if(bMulticast)
 	{
@@ -246,10 +217,10 @@ void ACharacterBase::StopAIMove_Implementation(bool bMulticast)
 
 void ACharacterBase::MultiStopAIMove_Implementation()
 {
-	Execute_StopAIMove(this, false);
+	StopAIMove(false);
 }
 
-void ACharacterBase::RotationTowards_Implementation(FRotator InRotation, float InDuration, bool bMulticast)
+void ACharacterBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
 {
 	if(bMulticast)
 	{
@@ -267,7 +238,7 @@ void ACharacterBase::RotationTowards_Implementation(FRotator InRotation, float I
 
 void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, float InDuration)
 {
-	Execute_RotationTowards(this, InRotation, InDuration, false);
+	RotationTowards(InRotation, InDuration, false);
 }
 
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

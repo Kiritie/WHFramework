@@ -31,7 +31,7 @@ public:
 	void ServerTeleportToMulticast(AActor* InCharacter, FTransform InTransform);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerAIMoveToMulticast(AActor* InCharacter, FTransform InTransform);
+	void ServerAIMoveToMulticast(AActor* InCharacter, FVector InLocation, float InStopDistance);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerStopAIMoveMulticast(AActor* InCharacter);

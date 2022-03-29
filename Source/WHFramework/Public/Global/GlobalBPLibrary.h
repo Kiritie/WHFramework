@@ -104,6 +104,12 @@ public:
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 	
 	//////////////////////////////////////////////////////////////////////////
+	// Input
+public:
+	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
 public:
 	template<class T>

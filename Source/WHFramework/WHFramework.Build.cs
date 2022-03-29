@@ -31,7 +31,7 @@ public class WHFramework : ModuleRules
 			{
 				"Core",
 				"CoreUObject",
-				"UMG",
+				"UMG"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -46,7 +46,9 @@ public class WHFramework : ModuleRules
 				"Slate",
 				"SlateCore",
 				"InputCore",
-				"MediaAssets"
+				"MediaAssets",
+				"GameplayAbilities",
+				"ProceduralMeshComponent"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

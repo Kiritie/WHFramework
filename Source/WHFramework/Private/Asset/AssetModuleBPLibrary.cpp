@@ -50,3 +50,13 @@ void UAssetModuleBPLibrary::RemoveAllDataAsset()
 		AssetModule->RemoveAllDataAsset();
 	}
 }
+
+FPrimaryAssetType UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType InItemType)
+{
+	return *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EItemType"), (int32)InItemType);
+}
+
+UPrimaryAssetBase* UAssetModuleBPLibrary::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
+{
+	return UPrimaryAssetManager::Get().LoadAsset(InPrimaryAssetId, bLogWarning);
+}
