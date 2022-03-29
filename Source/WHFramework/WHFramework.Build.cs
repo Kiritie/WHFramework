@@ -33,7 +33,8 @@ public class WHFramework : ModuleRules
 			{
 				"Core",
 				"CoreUObject",
-				"UMG"
+				"UMG",
+				"GameplayAbilities"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -50,7 +51,6 @@ public class WHFramework : ModuleRules
 				"InputCore",
 				"MediaAssets",
 				"AIModule",
-				"GameplayAbilities",
 				"GameplayTags",
 				"GameplayTasks",
 				"GameplayAbilities",
