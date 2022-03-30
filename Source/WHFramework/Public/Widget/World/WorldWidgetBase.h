@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Components/WidgetComponent.h"
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetInterfaceBase.h"
@@ -12,6 +13,7 @@
 
 #include "WorldWidgetBase.generated.h"
 
+class UCanvasPanelSlot;
 /**
  * 
  */
@@ -26,7 +28,7 @@ public:
 public:
 	void TickWidget_Implementation() override;
 
-	bool IsTickAble_Implementation() const override { return true; }
+	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -57,10 +59,13 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
-	
+
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
+
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoSize;
-
+	
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
@@ -100,6 +105,9 @@ private:
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetWidgetName() const { return WidgetName; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsWidgetAutoSize() const { return bWidgetAutoSize; }
 	
 	UFUNCTION(BlueprintPure)
 	int32 GetWidgetZOrder() const { return WidgetZOrder; }
@@ -128,6 +136,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetWidgetIndex(int32 InWidgetIndex) { WidgetIndex = InWidgetIndex; }
 
+	UFUNCTION(BlueprintPure)
+	UWorldWidgetComponent* GetWidgetComponent() const { return WidgetComponent; }
+
+	UFUNCTION(BlueprintPure)
+	EWidgetSpace GetWidgetSpace() const;
+	
 	UFUNCTION(BlueprintPure)
 	virtual class UPanelWidget* GetRootPanelWidget() const override;
 };

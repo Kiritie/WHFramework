@@ -163,6 +163,10 @@ private:
 	FVector2D TouchLocationPrevious;
 	float TouchPinchValuePrevious;
 
+	FTimerHandle TouchReleaseTimerHandle1;
+	FTimerHandle TouchReleaseTimerHandle2;
+	FTimerHandle TouchReleaseTimerHandle3;
+
 	UPROPERTY()
 	class USpringArmComponent* CameraBoom;
 	
@@ -174,14 +178,14 @@ protected:
 	virtual void PanH(float InRate);
 
 	virtual void PanV(float InRate);
-	
-	virtual void Pinch(float InRate);
 
 	virtual void ZoomCam(float InRate);
 
 	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
 	virtual void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
+
+	virtual void TouchReleasedImpl();
 
 	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
@@ -341,9 +345,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
 
+	//////////////////////////////////////////////////////////////////////////
+	/// PlayerController
 protected:	
-	UPROPERTY(EditAnywhere, Category = "PlayerControl")
+	UPROPERTY(EditAnywhere, Category = "PlayerController")
 	bool bUse2DInputMode;
+
+	UPROPERTY(EditAnywhere, Category = "PlayerController")
+	float TouchInputRate;
 
 protected:
 	virtual void MoveForward(float InValue);

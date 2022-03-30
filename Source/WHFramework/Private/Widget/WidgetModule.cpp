@@ -103,7 +103,7 @@ void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
 	TArray<UUserWidget*> InterfaceWidgets;
-	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UWidgetInterfaceBase::StaticClass(), true);
+	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UWidgetInterfaceBase::StaticClass(), false);
 	for (auto Iter : InterfaceWidgets)
 	{
 		if(IWidgetInterfaceBase* InterfaceWidget = Cast<IWidgetInterfaceBase>(Iter))

@@ -4,6 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Blueprint/UserWidget.h"
+#include "Scene/SceneModuleTypes.h"
 #include "Widget/World/WorldWidgetBase.h"
 #include "WidgetWorldText.generated.h"
 

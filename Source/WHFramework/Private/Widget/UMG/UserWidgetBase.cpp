@@ -14,6 +14,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 {
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
+	bWidgetTickAble = false;
 	WidgetZOrder = 0;
 	WidgetType = EWidgetType::None;
 	WidgetCreateType = EWidgetCreateType::None;
@@ -27,6 +28,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	LastWidget = nullptr;
 	ParentWidget = nullptr;
 	ChildWidgets = TArray<TScriptInterface<IWidgetInterface>>();
+}
+
+void UUserWidgetBase::TickWidget_Implementation()
+{
+	
 }
 
 void UUserWidgetBase::OnCreate_Implementation()

@@ -21,12 +21,12 @@ ASceneModule::ASceneModule()
 {
 	ModuleName = FName("SceneModule");
 
-	static ConstructorHelpers::FClassFinder<UWorldTimerComponent> WorldTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldTimer.BPC_WorldTimer_C'"));
+	static ConstructorHelpers::FClassFinder<UWorldTimerComponent> WorldTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BPC_WorldTimer.BPC_WorldTimer_C'"));
 	if(WorldTimerClass.Succeeded())
 	{
 		WorldTimer = Cast<UWorldTimerComponent>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
 	}
-	static ConstructorHelpers::FClassFinder<UWorldWeatherComponent> WeatherTimerClass(TEXT("Blueprint'/Game/Blueprints/World/BPC_WorldWeather.BPC_WorldWeather_C'"));
+	static ConstructorHelpers::FClassFinder<UWorldWeatherComponent> WeatherTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BPC_WorldWeather.BPC_WorldWeather_C'"));
 	if(WeatherTimerClass.Succeeded())
 	{                                                                                          
 		WorldWeather = Cast<UWorldWeatherComponent>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));

@@ -80,6 +80,11 @@ AWHPlayerController::AWHPlayerController()
 	TargetCameraDistance = 0.f;
 
 	bUse2DInputMode = false;
+	TouchInputRate = 1.f;
+
+	TouchPressedCount = 0;
+	TouchLocationPrevious = FVector2D(-1.f, -1.f);
+	TouchPinchValuePrevious = -1.f;
 }
 
 void AWHPlayerController::Initialize()
@@ -100,7 +105,6 @@ void AWHPlayerController::SetupInputComponent()
 	InputComponent->BindAxis(FName("LookUp"), this, &AWHPlayerController::LookUp);
 	InputComponent->BindAxis(FName("PanH"), this, &AWHPlayerController::PanH);
 	InputComponent->BindAxis(FName("PanV"), this, &AWHPlayerController::PanV);
-	InputComponent->BindAxis(FName("Pinch"), this, &AWHPlayerController::Pinch);
 	InputComponent->BindAxis(FName("ZoomCam"), this, &AWHPlayerController::ZoomCam);
 
 	InputComponent->BindAxis(FName("MoveForward"), this, &AWHPlayerController::MoveForward);
@@ -112,7 +116,7 @@ void AWHPlayerController::SetupInputComponent()
 
 	InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &AWHPlayerController::TouchPressed);
 	InputComponent->BindTouch(EInputEvent::IE_Released, this, &AWHPlayerController::TouchReleased);
-	InputComponent->BindTouch(EInputEvent::IE_Axis, this, &AWHPlayerController::TouchMoved);
+	InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &AWHPlayerController::TouchMoved);
 }
 
 void AWHPlayerController::OnPossess(APawn* InPawn)
@@ -154,7 +158,7 @@ void AWHPlayerController::Turn(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsControllingRotate())
+	if(IsInputKeyDown(FKey(TEXT("RightMouseButton"))))
 	{
 		AddCameraRotationInput(InRate, 0.f);
 	}
@@ -164,7 +168,7 @@ void AWHPlayerController::LookUp(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsControllingRotate())
+	if(IsInputKeyDown(FKey(TEXT("RightMouseButton"))))
 	{
 		AddCameraRotationInput(0.f, -InRate);
 	}
@@ -174,10 +178,9 @@ void AWHPlayerController::PanH(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsControllingMove())
+	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
 	{
 		const FRotator Rotation = GetControlRotation();
-		//const FRotator YawRotation(0, Rotation.Yaw, 0);
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * -1.f;
 		AddCameraMovementInput(Direction, InRate);
 	}
@@ -187,37 +190,11 @@ void AWHPlayerController::PanV(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsControllingMove())
+	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
 	{
 		const FRotator Rotation = GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -1.f;;
 		AddCameraMovementInput(Direction, InRate);
-	}
-}
-
-void AWHPlayerController::Pinch(float InRate)
-{
-	if(InRate == 0.f) return;
-	
-	if(TouchPressedCount == 2)
-	{
-		float PinchDeltaValue;
-		if(InRate > TouchPinchValuePrevious)
-		{
-			PinchDeltaValue = -(InRate / TouchPinchValuePrevious - 1.f);
-		}
-		else
-		{
-			PinchDeltaValue = TouchPinchValuePrevious / InRate - 1.f;
-		}
-		if(FMath::Abs(PinchDeltaValue) >= 1.f)
-		{
-			TouchPinchValuePrevious = InRate;
-		}
-		else
-		{
-			AddCameraDistanceInput(PinchDeltaValue);
-		}
 	}
 }
 
@@ -231,43 +208,89 @@ void AWHPlayerController::ZoomCam(float InRate)
 void AWHPlayerController::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	TouchPressedCount++;
+
+	TouchLocationPrevious = FVector2D(-1.f, -1.f);
+	TouchPinchValuePrevious = -1.f;
 }
 
 void AWHPlayerController::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
-	TouchPressedCount--;
+	switch (InTouchIndex)
+	{
+		case ETouchIndex::Type::Touch1:
+		{
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle1, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			break;
+		}
+		case ETouchIndex::Type::Touch2:
+		{
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle2, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			break;
+		}
+		case ETouchIndex::Type::Touch3:
+		{
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle3, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			break;
+		}
+		default: break;
+	}
+}
 
-	float TouchLocationX;
-	float TouchLocationY;
-	bool bIsCurrentPressed;
-	GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
+void AWHPlayerController::TouchReleasedImpl()
+{
+	TouchPressedCount--;
+	if(TouchPressedCount < 0)
+	{
+		TouchPressedCount = 0;
+	}
 	
-	TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
-	TouchPinchValuePrevious = GetInputAxisValue(FName("Pinch"));
+	TouchLocationPrevious = FVector2D(-1.f, -1.f);
+	TouchPinchValuePrevious = -1.f;
 }
 
 void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
+	if(TouchPressedCount <= 0) return;
+	
 	float TouchLocationX;
 	float TouchLocationY;
 	bool bIsCurrentPressed;
 	GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
-	
+
 	if(TouchPressedCount == 1)
 	{
-		if(bIsCurrentPressed)
+		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			AddCameraRotationInput(TouchLocationX / TouchLocationPrevious.X - 1.f, -(TouchLocationY / TouchLocationPrevious.Y - 1.f));
-			TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
+			AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
 		}
 	}
-	else if(TouchPressedCount >= 2)
+	else if(TouchPressedCount == 2)
 	{
-		const FRotator Rotation = GetControlRotation();
-		const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX / TouchLocationPrevious.X - 1.f);
-		const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY / TouchLocationPrevious.Y - 1.f);
-		AddCameraMovementInput(DirectionH + DirectionV, 1.f);
+		float TouchLocationX2;
+		float TouchLocationY2;
+		bool bIsCurrentPressed2;
+		GetInputTouchState(ETouchIndex::Touch2, TouchLocationX2, TouchLocationY2, bIsCurrentPressed2);
+
+		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX, TouchLocationY), FVector2D(TouchLocationX2, TouchLocationY2));
+		
+		if(TouchPinchValuePrevious != -1.f)
+		{
+			AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
+		}
+
+		TouchPinchValuePrevious = TouchCurrentPinchValue;
 	}
+	else if(TouchPressedCount >= 3)
+	{
+		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
+		{
+			const FRotator Rotation = GetControlRotation();
+			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
+			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
+			AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate);
+		}
+	}
+	TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 }
 
 void AWHPlayerController::StartInteract(FKey InKey)
@@ -431,7 +454,7 @@ bool AWHPlayerController::IsControllingRotate() const
 
 bool AWHPlayerController::IsControllingZoom() const
 {
-	return GetInputAxisValue(FName("ZoomCam")) != 0.f || GetInputAxisValue(FName("Pinch")) != 0.f;
+	return GetInputAxisValue(FName("ZoomCam")) != 0.f || GetInputAxisValue(FName("PinchGesture")) != 0.f;
 }
 
 float AWHPlayerController::GetCameraDistance(bool bReally)

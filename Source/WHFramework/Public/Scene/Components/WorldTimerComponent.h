@@ -54,12 +54,17 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent)
-	void UpdateTimer();
-	
 	UFUNCTION(BlueprintCallable)
 	void SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer = true);
 
+	UFUNCTION(BlueprintCallable)
+	void UpdateTimer();
+
+protected:
+	UFUNCTION(BlueprintImplementableEvent)
+	void UpdateLight(float InLightDirection);
+	
+public:
 	UFUNCTION(BlueprintPure)
 	float GetSecondsOfDay() const { return SecondsOfDay; }
 

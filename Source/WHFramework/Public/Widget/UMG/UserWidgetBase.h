@@ -21,6 +21,11 @@ public:
 	UUserWidgetBase(const FObjectInitializer& ObjectInitializer);
 
 public:
+	void TickWidget_Implementation() override;
+
+	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+
+public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnCreate() override;
 
@@ -77,6 +82,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
 	FName ParentName;
 	
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
+
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 

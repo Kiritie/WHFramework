@@ -54,6 +54,9 @@ public:
 #if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
+	UFUNCTION(CallInEditor, Category = "UserInterface")
+	virtual void RefreshParams();
 #endif
 
 public:
