@@ -29,25 +29,32 @@ UVoxel::UVoxel()
 
 UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 {
-	return SpawnVoxel(FPrimaryAssetId::FromString(FString::Printf(TEXT("Voxel_%d"), (int32)InVoxelType)));
+	return SpawnVoxel(FPrimaryAssetId::FromString(FString::Printf(TEXT("Voxel:DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType))));
 	return nullptr;
 }
 
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 {
-	const UVoxelAssetBase* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(InVoxelID);
-	const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : StaticClass();
-	auto voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
-	if(voxel) voxel->ID = InVoxelID;
+	UVoxel* voxel = nullptr;
+	UVoxelAssetBase* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(InVoxelID);
+	if(voxelData)
+	{
+		const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : StaticClass();
+		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
+		if(voxel) voxel->ID = InVoxelID;
+	}
 	return voxel;
 }
 
 UVoxel* UVoxel::LoadVoxel(AVoxelChunk* InOwner, const FVoxelItem& InVoxelItem)
 {
-	auto voxel = SpawnVoxel(InVoxelItem.ID);
-	voxel->LoadItem(InVoxelItem);
-	voxel->SetOwner(InOwner);
-	voxel->SetAuxiliary(InVoxelItem.Auxiliary);
+	UVoxel* voxel = SpawnVoxel(InVoxelItem.ID);
+	if(voxel)
+	{
+		voxel->LoadItem(InVoxelItem);
+		voxel->SetOwner(InOwner);
+		voxel->SetAuxiliary(InVoxelItem.Auxiliary);
+	}
 	return voxel;
 }
 
@@ -55,9 +62,12 @@ UVoxel* UVoxel::LoadVoxel(AVoxelChunk* InOwner, const FString& InVoxelData)
 {
 	FString str1, str2;
 	InVoxelData.Split(TEXT(";"), &str1, &str2);
-	auto voxel = SpawnVoxel(FPrimaryAssetId::FromString(str1));
-	voxel->LoadData(str2);
-	voxel->SetOwner(InOwner);
+	UVoxel* voxel = SpawnVoxel(FPrimaryAssetId::FromString(str1));
+	if(voxel)
+	{
+		voxel->LoadData(str2);
+		voxel->SetOwner(InOwner);
+	}
 	return voxel;
 }
 

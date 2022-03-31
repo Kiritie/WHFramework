@@ -22,7 +22,8 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	bWidgetTickAble = true;
 	bWidgetAutoSize = false;
 	WidgetZOrder = -1;
-	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
+	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	WidgetDrawSize = FVector2D();
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Tick;
@@ -79,9 +80,12 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 			if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
 			{
 				CanvasPanelSlot->SetZOrder(WidgetZOrder);
-				CanvasPanelSlot->SetAnchors(WidgetAnchors);
 				CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
-				CanvasPanelSlot->SetOffsets(WidgetOffsets);
+				if(!bWidgetAutoSize)
+				{
+					CanvasPanelSlot->SetAnchors(WidgetAnchors);
+					CanvasPanelSlot->SetOffsets(WidgetOffsets);
+				}
 				CanvasPanelSlot->SetAlignment(WidgetAlignment);
 				SetRenderTransformPivot(WidgetAlignment);
 

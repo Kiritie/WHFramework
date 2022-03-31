@@ -183,9 +183,11 @@ protected:
 
 	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
+	virtual void TouchPressedImpl();
+
 	virtual void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
-	virtual void TouchReleasedImpl();
+	virtual void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
 
 	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
 

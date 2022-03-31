@@ -3,6 +3,7 @@
 
 #include "Main/MainModule.h"
 
+#include "Ability/AbilityModule.h"
 #include "Audio/AudioModule.h"
 #include "Asset/AssetModule.h"
 #include "Main/Base/ModuleBase.h"
@@ -24,6 +25,7 @@
 #include "Procedure/ProcedureModule.h"
 #include "SaveGame/SaveGameModule.h"
 #include "Scene/SceneModule.h"
+#include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
 AMainModule* AMainModule::Current = nullptr;
@@ -39,6 +41,7 @@ AMainModule::AMainModule()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
+	ModuleClasses.Add(AAbilityModule::StaticClass());
 	ModuleClasses.Add(AAssetModule::StaticClass());
 	ModuleClasses.Add(AAudioModule::StaticClass());
 	ModuleClasses.Add(ACharacterModule::StaticClass());
@@ -55,6 +58,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(ASaveGameModule::StaticClass());
 	ModuleClasses.Add(ASceneModule::StaticClass());
 	ModuleClasses.Add(ASpawnPoolModule::StaticClass());
+	ModuleClasses.Add(AVoxelModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());
 	

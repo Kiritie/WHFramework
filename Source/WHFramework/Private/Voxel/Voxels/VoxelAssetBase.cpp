@@ -1,11 +1,13 @@
 #include "Voxel/Voxels/VoxelAssetBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelPlant.h"
 
 UVoxelAssetBase::UVoxelAssetBase()
 {
+	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Voxel);
 	MaxCount = 64;
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = nullptr;

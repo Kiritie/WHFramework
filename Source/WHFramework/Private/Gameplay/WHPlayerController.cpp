@@ -207,36 +207,79 @@ void AWHPlayerController::ZoomCam(float InRate)
 
 void AWHPlayerController::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
-	TouchPressedCount++;
-
-	TouchLocationPrevious = FVector2D(-1.f, -1.f);
-	TouchPinchValuePrevious = -1.f;
-}
-
-void AWHPlayerController::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
-{
 	switch (InTouchIndex)
 	{
-		case ETouchIndex::Type::Touch1:
+		case ETouchIndex::Touch1:
 		{
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle1, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			if(TouchReleaseTimerHandle1.IsValid())
+			{
+				TouchReleasedImpl(InTouchIndex);
+			}
+			TouchPressedImpl();
 			break;
 		}
-		case ETouchIndex::Type::Touch2:
+		case ETouchIndex::Touch2:
 		{
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle2, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			if(TouchReleaseTimerHandle2.IsValid())
+			{
+				TouchReleasedImpl(InTouchIndex);
+			}
+			TouchPressedImpl();
 			break;
 		}
-		case ETouchIndex::Type::Touch3:
+		case ETouchIndex::Touch3:
 		{
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle3, this, &AWHPlayerController::TouchReleasedImpl, 0.15f, false);
+			if(TouchReleaseTimerHandle3.IsValid())
+			{
+				TouchReleasedImpl(InTouchIndex);
+			}
+			TouchPressedImpl();
 			break;
 		}
 		default: break;
 	}
 }
 
-void AWHPlayerController::TouchReleasedImpl()
+void AWHPlayerController::TouchPressedImpl()
+{
+	TouchPressedCount++;
+
+	TouchLocationPrevious = FVector2D(-1.f, -1.f);
+	TouchPinchValuePrevious = -1.f;
+
+	GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
+}
+
+void AWHPlayerController::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
+{
+	switch (InTouchIndex)
+	{
+		case ETouchIndex::Touch1:
+		{
+			FTimerDelegate TimerDelegate;
+			TimerDelegate.BindUObject(this, &AWHPlayerController::TouchReleasedImpl, InTouchIndex);
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle1, TimerDelegate, 0.15f, false);
+			break;
+		}
+		case ETouchIndex::Touch2:
+		{
+			FTimerDelegate TimerDelegate;
+			TimerDelegate.BindUObject(this, &AWHPlayerController::TouchReleasedImpl, InTouchIndex);
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle2, TimerDelegate, 0.15f, false);
+			break;
+		}
+		case ETouchIndex::Touch3:
+		{
+			FTimerDelegate TimerDelegate;
+			TimerDelegate.BindUObject(this, &AWHPlayerController::TouchReleasedImpl, InTouchIndex);
+			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle3, TimerDelegate, 0.15f, false);
+			break;
+		}
+		default: break;
+	}
+}
+
+void AWHPlayerController::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 {
 	TouchPressedCount--;
 	if(TouchPressedCount < 0)
@@ -246,42 +289,73 @@ void AWHPlayerController::TouchReleasedImpl()
 	
 	TouchLocationPrevious = FVector2D(-1.f, -1.f);
 	TouchPinchValuePrevious = -1.f;
+
+	switch (InTouchIndex)
+	{
+		case ETouchIndex::Touch1:
+		{
+			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle1);
+			break;
+		}
+		case ETouchIndex::Touch2:
+		{
+			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle2);
+			break;
+		}
+		case ETouchIndex::Touch3:
+		{
+			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle3);
+			break;
+		}
+		default: break;
+	}
+
+	GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
 }
 
 void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	if(TouchPressedCount <= 0) return;
 	
-	float TouchLocationX;
-	float TouchLocationY;
-	bool bIsCurrentPressed;
-	GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
-
 	if(TouchPressedCount == 1)
 	{
+		float TouchLocationX = 0.f;
+		float TouchLocationY = 0.f;
+		bool bIsCurrentPressed = false;
+		GetInputTouchState(InTouchIndex, TouchLocationX, TouchLocationY, bIsCurrentPressed);
+		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
 			AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
 		}
+		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
 	else if(TouchPressedCount == 2)
 	{
+		float TouchLocationX1 = 0.f;
+		float TouchLocationY1 = 0.f;
+		bool bIsCurrentPressed1 = false;
+		GetInputTouchState(ETouchIndex::Touch1, TouchLocationX1, TouchLocationY1, bIsCurrentPressed1);
+		
 		float TouchLocationX2;
 		float TouchLocationY2;
 		bool bIsCurrentPressed2;
 		GetInputTouchState(ETouchIndex::Touch2, TouchLocationX2, TouchLocationY2, bIsCurrentPressed2);
-
-		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX, TouchLocationY), FVector2D(TouchLocationX2, TouchLocationY2));
 		
+		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
 		if(TouchPinchValuePrevious != -1.f)
 		{
 			AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
 		}
-
 		TouchPinchValuePrevious = TouchCurrentPinchValue;
 	}
-	else if(TouchPressedCount >= 3)
+	else if(TouchPressedCount == 3)
 	{
+		float TouchLocationX = 0.f;
+		float TouchLocationY = 0.f;
+		bool bIsCurrentPressed = false;
+		GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
+		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
 			const FRotator Rotation = GetControlRotation();
@@ -289,8 +363,8 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
 			AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate);
 		}
+		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
-	TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 }
 
 void AWHPlayerController::StartInteract(FKey InKey)

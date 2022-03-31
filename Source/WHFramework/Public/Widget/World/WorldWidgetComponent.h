@@ -19,16 +19,20 @@ public:
 	UWorldWidgetComponent();
 
 protected:
+#if WITH_EDITOR
+	UPROPERTY(EditAnywhere, Category = "UserInterface")
+	bool bRefreshEditorOnly;
+#endif
+
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	TSubclassOf<UWorldWidgetBase> WorldWidgetClass;
-
+	
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	bool bAutoCreate;
 
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	bool bOrientCamera;
 
-protected:
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	bool bBindToSelf;
 
@@ -54,8 +58,6 @@ public:
 #if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
-	UFUNCTION(CallInEditor, Category = "UserInterface")
 	virtual void RefreshParams();
 #endif
 

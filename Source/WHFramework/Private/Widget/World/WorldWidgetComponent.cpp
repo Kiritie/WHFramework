@@ -88,7 +88,9 @@ bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 	{
 		FString PropertyName = InProperty->GetName();
 
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WidgetClass))
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WidgetClass) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, DrawSize) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Pivot))
 		{
 			return false;
 		}
@@ -98,13 +100,15 @@ bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 			return Space == EWidgetSpace::Screen;
 		}
 
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, DrawSize) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bDrawAtDesiredSize) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Pivot) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, CylinderArcAngle) ||
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bDrawAtDesiredSize) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, TickMode))
 		{
 			return Space == EWidgetSpace::World;
+		}
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, CylinderArcAngle))
+		{
+			return Space == EWidgetSpace::World && GeometryMode == EWidgetGeometryMode::Cylinder;
 		}
 	}
 
@@ -117,11 +121,21 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
+		static FName RefreshEditorOnly("bRefreshEditorOnly");
 		static FName SpaceName("Space");
 		static FName AutoCreateName("bAutoCreate");
 		static FName WorldWidgetClassName("WorldWidgetClass");
 
 		auto PropertyName = Property->GetFName();
+
+		if(PropertyName == RefreshEditorOnly)
+		{
+			if(bRefreshEditorOnly)
+			{
+				RefreshParams();
+				bRefreshEditorOnly = false;
+			}
+		}
 
 		if(PropertyName == WorldWidgetClassName)
 		{
@@ -150,7 +164,7 @@ void UWorldWidgetComponent::RefreshParams()
 	{
 		if(UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
 		{
-			DrawSize = FIntPoint(DefaultObject->GetWidgetOffsets().Right - DefaultObject->GetWidgetOffsets().Left, DefaultObject->GetWidgetOffsets().Bottom - DefaultObject->GetWidgetOffsets().Top);
+			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
 			Pivot = DefaultObject->GetWidgetAlignment();
 		}
 	}

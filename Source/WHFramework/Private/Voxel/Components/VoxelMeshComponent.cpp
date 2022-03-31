@@ -58,14 +58,14 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency In
 			CenterOffset = FVector::ZeroVector;
 			break;
 		}
-		case EVoxelMeshType::PreviewItem:
+		case EVoxelMeshType::Preview:
 		{
 			BlockScale = 0.3f;
 			OffsetScale = 0;
 			CenterOffset = FVector::ZeroVector;
 			break;
 		}
-		case EVoxelMeshType::VitalityVoxel:
+		case EVoxelMeshType::Custom:
 		{
 			BlockScale = 1.f;
 			OffsetScale = 0;
@@ -77,7 +77,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency In
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	const UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+	UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
 	if(voxelData->bCustomMesh)
 	{
 		TArray<FVector> meshVertices, meshNormals;
@@ -107,7 +107,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 			}
 		}
 	}
-	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::PreviewItem || MeshType == EVoxelMeshType::VitalityVoxel)
+	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::Preview || MeshType == EVoxelMeshType::Custom)
 	{
 		Transparency = voxelData->Transparency;
 	}
@@ -123,12 +123,12 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 		{
 			case EVoxelMeshType::Chunk:
 			case EVoxelMeshType::PickUp:
-			case EVoxelMeshType::VitalityVoxel:
+			case EVoxelMeshType::Custom:
 			{
 				material = AVoxelModule::GetWorldData()->GetChunkMaterial(Transparency).Material;
 				break;
 			}
-			case EVoxelMeshType::PreviewItem:
+			case EVoxelMeshType::Preview:
 			{
 				material = UMaterialInstanceDynamic::Create(AVoxelModule::GetWorldData()->GetChunkMaterial(Transparency).Material, this);
 				Cast<UMaterialInstanceDynamic>(material)->SetScalarParameterValue(TEXT("Emissive"), 1);

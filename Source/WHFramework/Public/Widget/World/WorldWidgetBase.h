@@ -73,6 +73,9 @@ protected:
 	FAnchors WidgetAnchors;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
+	FVector2D WidgetDrawSize;
+	
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -114,6 +117,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	FAnchors GetWidgetAnchors() const { return WidgetAnchors; }
+
+	UFUNCTION(BlueprintPure)
+	FVector2D GetWidgetDrawSize() const { return WidgetDrawSize; }
 
 	UFUNCTION(BlueprintPure)
 	FMargin GetWidgetOffsets() const { return WidgetOffsets; }

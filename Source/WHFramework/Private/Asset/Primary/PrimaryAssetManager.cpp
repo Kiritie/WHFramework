@@ -21,7 +21,7 @@ UPrimaryAssetManager& UPrimaryAssetManager::Get()
 	}
 	else
 	{
-		WH_LOG(WHAsset, Fatal, TEXT("Invalid AssetManager in DefaultEngine.ini, must be ItemAssetManager!"));
+		WH_LOG(WHAsset, Fatal, TEXT("Invalid AssetManager in DefaultEngine.ini, must be PrimaryAssetManager!"));
 		return *NewObject<UPrimaryAssetManager>();
 	}
 }

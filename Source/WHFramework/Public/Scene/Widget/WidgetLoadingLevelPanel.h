@@ -38,7 +38,7 @@ private:
 	float LoadProgress;
 public:
 	UFUNCTION(BlueprintPure)
-	float GetLoadProgress() const { return LoadProgress; }
+	float GetLoadProgress(bool bSmoothness = false) const { return bSmoothness ? CurrentProgress : LoadProgress; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetLoadProgress(float InLoadProgress) { this->LoadProgress = InLoadProgress; }

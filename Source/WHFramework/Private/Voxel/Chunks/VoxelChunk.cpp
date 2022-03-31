@@ -866,7 +866,7 @@ bool AVoxelChunk::GenerateVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem)
 	if(SetVoxelComplex(InIndex, InVoxelItem, true))
 	{
 		SpawnAuxiliary(GetVoxelItem(InIndex));
-		const UVoxelAssetBase* VoxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+		UVoxelAssetBase* VoxelData = InVoxelItem.GetData<UVoxelAssetBase>();
 		if(VoxelData->GenerateSound)
 		{
 			UGameplayStatics::PlaySoundAtLocation(this, VoxelData->GenerateSound, IndexToLocation(InIndex));
@@ -885,7 +885,7 @@ bool AVoxelChunk::DestroyVoxel(const FVoxelItem& InVoxelItem)
 {
 	if (SetVoxelComplex(InVoxelItem.Index, FVoxelItem::EmptyVoxel, true))
 	{
-		const UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+		UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
 		if(voxelData->GenerateSound)
 		{
 			UGameplayStatics::PlaySoundAtLocation(this, voxelData->GenerateSound, IndexToLocation(InVoxelItem.Index));
@@ -933,7 +933,7 @@ bool AVoxelChunk::ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelIte
 {
 	if (SetVoxelComplex(InOldVoxelItem.Index, InNewVoxelItem, true))
 	{
-		const UVoxelAssetBase* VoxelData = InNewVoxelItem.GetData<UVoxelAssetBase>();
+		UVoxelAssetBase* VoxelData = InNewVoxelItem.GetData<UVoxelAssetBase>();
 		SpawnAuxiliary(GetVoxelItem(InOldVoxelItem.Index));
 		if(VoxelData->GenerateSound)
 		{
@@ -946,7 +946,7 @@ bool AVoxelChunk::ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelIte
 
 AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 {
-	const UVoxelAssetBase* VoxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+	UVoxelAssetBase* VoxelData = InVoxelItem.GetData<UVoxelAssetBase>();
 	if (VoxelMap.Contains(InVoxelItem.Index) && VoxelData->AuxiliaryClass)
 	{
 		FActorSpawnParameters spawnParams = FActorSpawnParameters();

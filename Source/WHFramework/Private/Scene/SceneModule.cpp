@@ -173,7 +173,7 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 	{
 		if(bCreateLoadingWidget)
 		{
-			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
+			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()), FParameter::MakeBoolean(false) };
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
@@ -222,7 +222,7 @@ void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevel
 		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
 		if(bCreateLoadingWidget)
 		{
-			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()) };
+			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()), FParameter::MakeBoolean(true) };
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		UE_LOG(LogTemp, Warning, TEXT("Start unload level: %s"), *LoadPackagePath);
