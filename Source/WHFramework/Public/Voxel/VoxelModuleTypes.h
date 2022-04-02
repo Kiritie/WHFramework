@@ -133,7 +133,14 @@ struct WHFRAMEWORK_API FIndex
 	GENERATED_BODY()
 
 public:
-	int X, Y, Z;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 X;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Y;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Z;
 
 	static const FIndex ZeroIndex;
 
@@ -146,7 +153,7 @@ public:
 		Z = 0;
 	}
 
-	FORCEINLINE FIndex(int InX, int InY, int InZ)
+	FORCEINLINE FIndex(int32 InX, int32 InY, int32 InZ)
 	{
 		X = InX;
 		Y = InY;

@@ -46,15 +46,15 @@ AWHPlayerController::AWHPlayerController()
 	ModuleNetCompMap.Add(UProcedureModuleNetworkComponent::StaticClass(), ProcedureModuleNetComp);
 	
 	bCameraControlAble = false;
+
 	bCameraMoveAble = true;
-	bCameraRotateAble = true;
-	bCameraZoomAble = true;
-
-	bUseNormalizedZoom = false;
-
+	bReverseCameraMove = false;
+	bClampCameraMove = false;
+	CameraMoveLimit = FBox(EForceInit::ForceInitToZero);
 	CameraMoveRate = 20.f;
 	CameraMoveSmooth = 5.f;
 
+	bCameraRotateAble = true;
 	CameraTurnRate = 60.f;
 	CameraLookUpRate = 60.f;
 	CameraRotateSmooth = 2.f;
@@ -62,6 +62,8 @@ AWHPlayerController::AWHPlayerController()
 	MaxCameraPinch = 89.f;
 	InitCameraPinch = -10.f;
 
+	bCameraZoomAble = true;
+	bUseNormalizedZoom = false;
 	CameraZoomRate = 150.f;
 	CameraZoomSmooth = 5.f;
 	MinCameraDistance = 100.f;
@@ -154,6 +156,7 @@ void AWHPlayerController::Tick(float DeltaTime)
 		GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
 	}
 }
+
 void AWHPlayerController::Turn(float InRate)
 {
 	if(InRate == 0.f) return;
@@ -181,7 +184,7 @@ void AWHPlayerController::PanH(float InRate)
 	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
 	{
 		const FRotator Rotation = GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * -1.f;
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (bReverseCameraMove ? -1.f : 1.f);
 		AddCameraMovementInput(Direction, InRate);
 	}
 }
@@ -193,7 +196,7 @@ void AWHPlayerController::PanV(float InRate)
 	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
 	{
 		const FRotator Rotation = GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -1.f;;
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (bReverseCameraMove ? -1.f : 1.f);
 		AddCameraMovementInput(Direction, InRate);
 	}
 }
@@ -361,7 +364,7 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 			const FRotator Rotation = GetControlRotation();
 			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
-			AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate);
+			AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (bReverseCameraMove ? -1.f : 1.f));
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
@@ -463,7 +466,7 @@ void AWHPlayerController::EndTrackTarget()
 
 void AWHPlayerController::SetCameraLocation(FVector InLocation, bool bInstant)
 {
-	TargetCameraLocation = InLocation;
+	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveLimit.Min, CameraMoveLimit.Max) : InLocation;
 	if(bInstant && GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
 	{
 		GetPawn()->SetActorLocation(TargetCameraLocation);

@@ -40,7 +40,7 @@ void UWorldWidgetComponent::BeginPlay()
 
 	if(bAutoCreate)
 	{
-		CreateWidget();
+		CreateWorldWidget();
 	}
 }
 
@@ -48,7 +48,7 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	DestroyWidget();
+	DestroyWorldWidget();
 }
 
 void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -78,6 +78,28 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		{
 			WorldWidget->OnRefresh();
 		}
+	}
+}
+
+void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
+{
+	Super::SetWidget(InWidget);
+
+	if(InWidget)
+	{
+		if(WorldWidget != InWidget)
+		{
+			WorldWidget = Cast<UWorldWidgetBase>(InWidget);
+			if(WorldWidget)
+			{
+				WorldWidget->OnCreate(GetOwner(), FVector::ZeroVector, this, WidgetParams);
+			}
+		}
+	}
+	else if(WorldWidget)
+	{
+		WorldWidget->OnDestroy();
+		WorldWidget = nullptr;
 	}
 }
 
@@ -171,15 +193,15 @@ void UWorldWidgetComponent::RefreshParams()
 }
 #endif
 
-void UWorldWidgetComponent::CreateWidget()
+void UWorldWidgetComponent::CreateWorldWidget()
 {
 	if(!WorldWidget && WorldWidgetClass)
 	{
-		switch (Space)
+		switch(Space)
 		{
 			case EWidgetSpace::World:
 			{
-				SetWidgetClass(WorldWidgetClass);
+				SetWorldWidgetClass(WorldWidgetClass, true);
 				break;
 			}
 			case EWidgetSpace::Screen:
@@ -191,7 +213,7 @@ void UWorldWidgetComponent::CreateWidget()
 	}
 }
 
-void UWorldWidgetComponent::DestroyWidget()
+void UWorldWidgetComponent::DestroyWorldWidget()
 {
 	if(WorldWidget)
 	{
@@ -199,7 +221,7 @@ void UWorldWidgetComponent::DestroyWidget()
 		{
 			case EWidgetSpace::World:
 			{
-				SetWidgetClass(nullptr);
+				SetWorldWidgetClass(nullptr, true);
 				break;
 			}
 			case EWidgetSpace::Screen:
@@ -212,25 +234,75 @@ void UWorldWidgetComponent::DestroyWidget()
 	}
 }
 
-void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
+void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 {
-	Super::SetWidget(InWidget);
-
-	if(InWidget)
+	switch(Space)
 	{
-		if(WorldWidget != InWidget)
+		case EWidgetSpace::World:
 		{
-			WorldWidget = Cast<UWorldWidgetBase>(InWidget);
-			if(WorldWidget)
-			{
-				WorldWidget->OnCreate(GetOwner(), FVector::ZeroVector, this, WidgetParams);
-			}
+			SetWidget(InWidget);
+			break;
+		}
+		case EWidgetSpace::Screen:
+		{
+			break;
 		}
 	}
-	else if(WorldWidget)
+}
+
+void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bCreate)
+{
+	switch(Space)
 	{
-		WorldWidget->OnDestroy();
-		WorldWidget = nullptr;
+		case EWidgetSpace::World:
+		{
+			if(WidgetClass != InWidgetClass)
+			{
+				WidgetClass = InWidgetClass;
+				if(WorldWidgetClass != InWidgetClass)
+				{
+					WorldWidgetClass = InWidgetClass;
+				}
+				if(bCreate)
+				{
+					if(FSlateApplication::IsInitialized())
+					{
+						if(HasBegunPlay() && !GetWorld()->bIsTearingDown)
+						{
+							if(WidgetClass)
+							{
+								UUserWidget* NewWidget = CreateWidget(GetWorld(), WidgetClass);
+								SetWidget(NewWidget);
+							}
+							else
+							{
+								SetWidget(nullptr);
+							}
+						}
+					}
+				}
+			}
+			break;
+		}
+		case EWidgetSpace::Screen:
+		{
+			if(WorldWidgetClass != InWidgetClass)
+			{
+				WorldWidgetClass = InWidgetClass;
+				if(bCreate)
+				{
+					if(WorldWidgetClass)
+					{
+						CreateWorldWidget();
+					}
+					else
+					{
+						DestroyWorldWidget();
+					}
+				}
+			}
+			break;
+		}
 	}
 }
 

@@ -23,7 +23,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	bWidgetAutoSize = false;
 	WidgetZOrder = -1;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
-	WidgetDrawSize = FVector2D();
+	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Tick;

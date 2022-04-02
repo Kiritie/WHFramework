@@ -19,7 +19,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetType = EWidgetType::None;
 	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
+	WidgetOpenFinishType = EWidgetOpenFinishType::Procedure;
+	WidgetOpenFinishTime = 0.f;
 	WidgetCloseType = EWidgetCloseType::Hidden;
+	WidgetCloseFinishType = EWidgetCloseFinishType::Procedure;
+	WidgetCloseFinishTime = 0.f;
 	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EWidgetState::None;
@@ -97,9 +101,15 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 		}
 	}
 
-	if(bInstant)
+	if(bInstant || WidgetOpenFinishType == EWidgetOpenFinishType::Instant)
 	{
 		FinishOpen(bInstant);
+	}
+	else if(WidgetOpenFinishType == EWidgetOpenFinishType::Delay)
+	{
+		FTimerDelegate TimerDelegate;
+		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, bInstant);
+		GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
 	}
 }
 
@@ -107,14 +117,21 @@ void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
 	WidgetState = EWidgetState::Closing;
 
-	if(bInstant)
+	if(bInstant || WidgetCloseFinishType == EWidgetCloseFinishType::Instant)
 	{
 		FinishClose(bInstant);
+	}
+	else if(WidgetCloseFinishType == EWidgetCloseFinishType::Delay)
+	{
+		FTimerDelegate TimerDelegate;
+		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, bInstant);
+		GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetRefreshTime, false);
 	}
 }
 
 void UUserWidgetBase::OnReset_Implementation()
 {
+	
 }
 
 void UUserWidgetBase::OnRefresh_Implementation()
@@ -136,6 +153,9 @@ void UUserWidgetBase::OnDestroy_Implementation()
 	{
 		InputModule->UpdateInputMode();
 	}
+	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)

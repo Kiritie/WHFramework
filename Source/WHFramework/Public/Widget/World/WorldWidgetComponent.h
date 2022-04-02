@@ -55,6 +55,8 @@ public:
 	
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	virtual void SetWidget(UUserWidget* InWidget) override;
+
 #if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -63,12 +65,16 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void CreateWidget();
+	void CreateWorldWidget();
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWidget();
+	void DestroyWorldWidget();
 
-	void SetWidget(UUserWidget* InWidget) override;
+	UFUNCTION(BlueprintCallable)
+	void SetWorldWidget(UUserWidget* InWidget);
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bCreate = false);
 
 public:
 	UFUNCTION(BlueprintCallable)

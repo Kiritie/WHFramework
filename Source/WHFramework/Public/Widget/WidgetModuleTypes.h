@@ -51,6 +51,20 @@ enum class EWidgetOpenType : uint8
 };
 
 /**
+* Widget打开完成类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetOpenFinishType : uint8
+{
+	/// 延时
+	Delay,
+	/// 瞬间
+	Instant,
+	/// 程序调用
+	Procedure
+};
+
+/**
 * Widget关闭类型
 */
 UENUM(BlueprintType)
@@ -62,6 +76,20 @@ enum class EWidgetCloseType : uint8
 	Collapsed,
 	/// 移除
 	Remove
+};
+
+/**
+* Widget关闭完成类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCloseFinishType : uint8
+{
+	/// 延时
+	Delay,
+	/// 瞬间
+	Instant,
+	/// 程序调用
+	Procedure
 };
 
 /**

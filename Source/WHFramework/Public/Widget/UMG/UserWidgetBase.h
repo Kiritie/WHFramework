@@ -81,7 +81,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
 	FName ParentName;
-	
+				
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetTickAble;
 
@@ -90,15 +90,27 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetType WidgetType;
-			
+
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetCreateType WidgetCreateType;
 	
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetOpenType WidgetOpenType;
+	
+	UPROPERTY(EditDefaultsOnly)
+	EWidgetOpenFinishType WidgetOpenFinishType;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
+	float WidgetOpenFinishTime;
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetCloseType WidgetCloseType;
+	
+	UPROPERTY(EditDefaultsOnly)
+	EWidgetCloseFinishType WidgetCloseFinishType;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
+	float WidgetCloseFinishTime;
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetRefreshType WidgetRefreshType;
@@ -125,6 +137,8 @@ protected:
 	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
 
 private:
+	FTimerHandle WidgetFinishOpenTimerHandle;
+	FTimerHandle WidgetFinishCloseTimerHandle;
 	FTimerHandle WidgetRefreshTimerHandle;
 
 public:

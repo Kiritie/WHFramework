@@ -94,17 +94,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl")
 	bool bCameraControlAble;
 
+	// Move
 	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Move")
 	bool bCameraMoveAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Rotate")
-	bool bCameraRotateAble;
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bReverseCameraMove;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Zoom")
-	bool bCameraZoomAble;
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bClampCameraMove;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
-	bool bUseNormalizedZoom;
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bClampCameraMove == true"), Category = "CameraControl|Move")
+	FBox CameraMoveLimit;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
@@ -112,11 +113,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveSmooth;
 
+	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraTurnRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraLookUpRate;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Rotate")
+	bool bCameraRotateAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraRotateSmooth;
@@ -129,6 +134,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float InitCameraPinch;
+
+	// Zoom
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Zoom")
+	bool bCameraZoomAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	bool bUseNormalizedZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float CameraZoomRate;
