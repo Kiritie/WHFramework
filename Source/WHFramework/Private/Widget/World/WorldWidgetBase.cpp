@@ -26,7 +26,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
-	WidgetRefreshType = EWidgetRefreshType::Tick;
+	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
@@ -103,7 +103,7 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 					{
 						BindWidgetPoint(this, InSceneComp);
 					}
-					else if(WidgetComponent->IsBindWidgetToSelf())
+					else if(WidgetComponent->IsBindToSelf())
 					{
 						BindWidgetPoint(this, WidgetComponent);
 					}

@@ -46,7 +46,7 @@ protected:
 	UWorldWidgetBase* WorldWidget;
 
 private:	
-	FRotator InitRotation;
+	FTransform InitTransform;
 
 public:
 	virtual void BeginPlay() override;
@@ -74,9 +74,15 @@ public:
 	void SetWorldWidget(UUserWidget* InWidget);
 
 	UFUNCTION(BlueprintCallable)
-	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bCreate = false);
+	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bRefresh = false);
 
 public:
+	UFUNCTION(BlueprintCallable)
+	bool IsAutoCreate() const { return bAutoCreate; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetAutoCreate(bool bInAutoCreate) { this->bAutoCreate = bInAutoCreate; }
+
 	UFUNCTION(BlueprintCallable)
 	bool IsOrientCamera() const { return bOrientCamera; }
 
@@ -84,10 +90,13 @@ public:
 	void SetOrientCamera(bool bInOrientCamera) { this->bOrientCamera = bInOrientCamera; }
 
 	UFUNCTION(BlueprintPure)
-	bool IsBindWidgetToSelf() const { return bBindToSelf; }
+	bool IsBindToSelf() const { return bBindToSelf; }
+	
+	UFUNCTION(BlueprintCallable)
+	void SetBindToSelf(bool bInBindToSelf) { this->bBindToSelf = bInBindToSelf; }
 	
 	UFUNCTION(BlueprintPure)
-	UWorldWidgetBase* GetWorldWidget() const { return WorldWidget; }
+	UUserWidget* GetWorldWidget() const;
 
 	UFUNCTION(BlueprintPure)
 	USceneComponent* GetWidgetPoint(FName InPointName) const;

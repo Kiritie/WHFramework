@@ -24,7 +24,7 @@ void UWorldWidgetComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	InitRotation = GetRelativeRotation();
+	InitTransform = GetRelativeTransform();
 
 	WidgetPoints.Add(GetFName(), this);
 	
@@ -61,13 +61,15 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	{
 		if(const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 		{
-			const FRotator TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetComponentLocation(), PlayerController->PlayerCameraManager->GetCameraLocation());
-			SetWorldRotation(FRotator(GetComponentRotation().Pitch, TargetRotation.Yaw, GetComponentRotation().Roll));
+			const FRotator TargetRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
+			SetWorldRotation(TargetRotation);
+			SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
 		}
 	}
 	else
 	{
-		SetRelativeRotation(InitRotation);
+		SetRelativeRotation(InitTransform.GetRotation());
+		SetRelativeScale3D(InitTransform.GetScale3D());
 	}
 
 	if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
@@ -250,7 +252,7 @@ void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 	}
 }
 
-void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bCreate)
+void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bRefresh)
 {
 	switch(Space)
 	{
@@ -263,7 +265,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidge
 				{
 					WorldWidgetClass = InWidgetClass;
 				}
-				if(bCreate)
+				if(bRefresh)
 				{
 					if(FSlateApplication::IsInitialized())
 					{
@@ -289,7 +291,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidge
 			if(WorldWidgetClass != InWidgetClass)
 			{
 				WorldWidgetClass = InWidgetClass;
-				if(bCreate)
+				if(bRefresh)
 				{
 					if(WorldWidgetClass)
 					{
@@ -304,6 +306,11 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidge
 			break;
 		}
 	}
+}
+
+UUserWidget* UWorldWidgetComponent::GetWorldWidget() const
+{
+	return Space == EWidgetSpace::World ? GetUserWidgetObject() : WorldWidget;
 }
 
 USceneComponent* UWorldWidgetComponent::GetWidgetPoint(FName InPointName) const
