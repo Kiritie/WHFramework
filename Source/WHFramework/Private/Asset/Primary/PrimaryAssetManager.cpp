@@ -3,12 +3,12 @@
 #include "Asset/Primary/PrimaryAssetManager.h"
 
 #include "AbilitySystemGlobals.h"
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 #include "Debug/DebugModuleTypes.h"
 
 UPrimaryAssetManager::UPrimaryAssetManager()
 {
-	UItemAssetBase::Empty = NewObject<UItemAssetBase>();
+	UItemDataBase::Empty = NewObject<UItemDataBase>();
 }
 
 UPrimaryAssetManager& UPrimaryAssetManager::Get()

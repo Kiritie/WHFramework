@@ -1,9 +1,9 @@
-#include "Ability/Character/CharacterAssetBase.h"
+#include "Ability/Character/CharacterDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UCharacterAssetBase::UCharacterAssetBase()
+UCharacterDataBase::UCharacterDataBase()
 {
 	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Character);
 	MaxCount = 1;

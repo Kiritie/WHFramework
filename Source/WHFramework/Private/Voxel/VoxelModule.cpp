@@ -13,7 +13,7 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
-#include "Voxel/Assets/VoxelData.h"
+#include "Voxel/Datas/VoxelData.h"
 
 AVoxelModule* AVoxelModule::Current = nullptr;
 FWorldSaveData* AVoxelModule::WorldData = nullptr;

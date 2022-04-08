@@ -3,7 +3,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelVirtualAuxiliary.h"
 #include "Components/BoxComponent.h"
-#include "Voxel/Assets/VoxelData.h"
+#include "Voxel/Datas/VoxelData.h"
 
 // Sets default values
 AVoxelVirtualAuxiliary::AVoxelVirtualAuxiliary()

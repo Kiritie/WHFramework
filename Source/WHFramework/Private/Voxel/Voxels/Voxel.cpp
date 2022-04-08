@@ -6,7 +6,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Asset/Primary/PrimaryAssetManager.h"
-#include "Voxel/Assets/VoxelData.h"
+#include "Voxel/Datas/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"

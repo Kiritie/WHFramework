@@ -1,12 +1,12 @@
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UItemAssetBase* UItemAssetBase::Empty = nullptr;
+UItemDataBase* UItemDataBase::Empty = nullptr;
 
-UItemAssetBase::UItemAssetBase()
+UItemDataBase::UItemDataBase()
 {
 	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::None);
 	Icon = nullptr;
@@ -16,7 +16,7 @@ UItemAssetBase::UItemAssetBase()
 	AbilityClass = nullptr;
 }
 
-bool UItemAssetBase::EqualType(EItemType InItemType) const
+bool UItemDataBase::EqualType(EItemType InItemType) const
 {
 	return Type == UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(InItemType);
 }

@@ -1,17 +1,17 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 
-#include "SkillAssetBase.generated.h"
+#include "SkillDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API USkillAssetBase : public UItemAssetBase
+class WHFRAMEWORK_API USkillDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	USkillAssetBase();
+	USkillDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

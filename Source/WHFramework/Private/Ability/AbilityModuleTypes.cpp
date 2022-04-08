@@ -1,7 +1,7 @@
 #include "Ability/AbilityModuleTypes.h"
 
 #include "Asset/AssetModuleBPLibrary.h"
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 
 void UTargetType::GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const
 {
@@ -26,9 +26,9 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-UItemAssetBase* FAbilityData::GetItemData() const
+UItemDataBase* FAbilityData::GetItemData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemAssetBase>(AbilityID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemDataBase>(AbilityID);
 }
 
 bool FGameplayEffectContainerSpec::HasValidTargets() const

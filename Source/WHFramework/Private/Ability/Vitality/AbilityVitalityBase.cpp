@@ -245,9 +245,9 @@ float AAbilityVitalityBase::GetMagicDamage() const
 	return AttributeSet->GetMagicDamage();
 }
 
-UVitalityAssetBase* AAbilityVitalityBase::GetVitalityData() const
+UVitalityDataBase* AAbilityVitalityBase::GetVitalityData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVitalityAssetBase>(AssetID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVitalityDataBase>(AssetID);
 }
 
 UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const

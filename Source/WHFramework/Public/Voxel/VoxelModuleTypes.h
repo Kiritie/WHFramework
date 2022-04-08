@@ -124,7 +124,7 @@ enum class EVoxelMeshType : uint8
 	// ?????
 	Preview,
 	// ????????
-	Custom
+	Vitality
 };
 
 USTRUCT(BlueprintType)

@@ -1,10 +1,10 @@
-#include "Ability/Item/Equip/EquipAssetBase.h"
+#include "Ability/Item/Equip/EquipDataBase.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UEquipAssetBase::UEquipAssetBase()
+UEquipDataBase::UEquipDataBase()
 {
 	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Equip);
 	MaxCount = 1;

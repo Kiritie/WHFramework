@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AssetModuleTypes.generated.h"
-class UItemAssetBase;
+class UItemDataBase;
 /**
  * ???????
  */
@@ -70,7 +70,7 @@ public:
 		return Cast<T>(GetData());
 	}
 
-	UItemAssetBase* GetData() const;
+	UItemDataBase* GetData() const;
 
 	FORCEINLINE virtual bool IsValid() const
 	{

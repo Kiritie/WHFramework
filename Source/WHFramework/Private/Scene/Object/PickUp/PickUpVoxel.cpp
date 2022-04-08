@@ -6,7 +6,7 @@
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Assets/VoxelData.h"
+#include "Voxel/Datas/VoxelData.h"
 
 // Sets default values
 APickUpVoxel::APickUpVoxel()

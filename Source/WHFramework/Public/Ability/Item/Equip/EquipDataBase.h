@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 
-#include "EquipAssetBase.generated.h"
+#include "EquipDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEquipAssetBase : public UItemAssetBase
+class WHFRAMEWORK_API UEquipDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	UEquipAssetBase();
+	UEquipDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

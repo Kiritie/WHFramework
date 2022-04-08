@@ -3,7 +3,7 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
-#include "CharacterAssetBase.h"
+#include "CharacterDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
@@ -219,7 +219,7 @@ public:
 		return Cast<T>(GetCharacterData());
 	}
 	
-	UCharacterAssetBase* GetCharacterData() const;
+	UCharacterDataBase* GetCharacterData() const;
 
 public:
 	UFUNCTION(BlueprintPure)

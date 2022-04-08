@@ -3,7 +3,7 @@
 
 #include "Scene/Object/PickUp/PickUpEquip.h"
 
-#include "Ability/Item/Equip/EquipAssetBase.h"
+#include "Ability/Item/Equip/EquipDataBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
@@ -25,7 +25,7 @@ void APickUpEquip::BeginPlay()
 void APickUpEquip::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UEquipAssetBase>()->EquipMesh);
+	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UEquipDataBase>()->EquipMesh);
 }
 
 void APickUpEquip::OnPickUp(IPickerInterface* InPicker)

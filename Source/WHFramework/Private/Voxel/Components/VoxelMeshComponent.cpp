@@ -5,7 +5,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Assets/VoxelData.h"
+#include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
 UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -65,7 +65,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency In
 			CenterOffset = FVector::ZeroVector;
 			break;
 		}
-		case EVoxelMeshType::Custom:
+		case EVoxelMeshType::Vitality:
 		{
 			BlockScale = 1.f;
 			OffsetScale = 0;
@@ -107,7 +107,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 			}
 		}
 	}
-	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::Preview || MeshType == EVoxelMeshType::Custom)
+	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::Preview || MeshType == EVoxelMeshType::Vitality)
 	{
 		Transparency = voxelData->Transparency;
 	}
@@ -123,7 +123,7 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 		{
 			case EVoxelMeshType::Chunk:
 			case EVoxelMeshType::PickUp:
-			case EVoxelMeshType::Custom:
+			case EVoxelMeshType::Vitality:
 			{
 				material = AVoxelModule::GetWorldData()->GetChunkMaterial(Transparency).Material;
 				break;

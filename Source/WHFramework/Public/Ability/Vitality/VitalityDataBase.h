@@ -1,17 +1,17 @@
 #pragma once
 
-#include "Asset/Primary/Item/ItemAssetBase.h"
+#include "Ability/Item/ItemDataBase.h"
 
-#include "VitalityAssetBase.generated.h"
+#include "VitalityDataBase.generated.h"
 
 class AAbilityVitalityBase;
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVitalityAssetBase : public UItemAssetBase
+class WHFRAMEWORK_API UVitalityDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	UVitalityAssetBase();
+	UVitalityDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -45,7 +45,7 @@ public:
 		return Item.GetData<T>();
 	}
 
-	UItemAssetBase* GetItemData() const
+	UItemDataBase* GetItemData() const
 	{
 		return Item.GetData();
 	}

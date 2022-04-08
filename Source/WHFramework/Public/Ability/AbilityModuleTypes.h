@@ -5,7 +5,7 @@
 
 #include "AbilityModuleTypes.generated.h"
 
-class UItemAssetBase;
+class UItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
 
@@ -200,7 +200,7 @@ public:
 		return Cast<T>(GetItemData());
 	}
 
-	UItemAssetBase* GetItemData() const;
+	UItemDataBase* GetItemData() const;
 };
 
 /**

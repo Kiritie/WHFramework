@@ -3,7 +3,7 @@
 
 #include "Scene/Object/PickUp/PickUpProp.h"
 
-#include "Ability/Item/Prop/PropAssetBase.h"
+#include "Ability/Item/Prop/PropDataBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
@@ -28,7 +28,7 @@ void APickUpProp::BeginPlay()
 void APickUpProp::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UPropAssetBase>()->PropMesh);
+	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UPropDataBase>()->PropMesh);
 }
 
 void APickUpProp::OnPickUp(IPickerInterface* InPicker)

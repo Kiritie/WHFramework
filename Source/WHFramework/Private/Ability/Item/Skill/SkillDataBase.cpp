@@ -1,9 +1,9 @@
-#include "Ability/Item/Skill/SkillAssetBase.h"
+#include "Ability/Item/Skill/SkillDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-USkillAssetBase::USkillAssetBase()
+USkillDataBase::USkillDataBase()
 {
 	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Skill);
 	MaxCount = 1;

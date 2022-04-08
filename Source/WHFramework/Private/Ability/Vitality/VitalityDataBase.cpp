@@ -1,9 +1,9 @@
-#include "Ability/Vitality/VitalityAssetBase.h"
+#include "Ability/Vitality/VitalityDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UVitalityAssetBase::UVitalityAssetBase()
+UVitalityDataBase::UVitalityDataBase()
 {
 	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Vitality);
 	MaxCount = 1;

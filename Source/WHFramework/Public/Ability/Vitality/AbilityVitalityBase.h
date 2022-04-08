@@ -5,7 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
-#include "VitalityAssetBase.h"
+#include "VitalityDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Object/SceneObjectInterface.h"
@@ -231,7 +231,7 @@ public:
 		return Cast<T>(GetVitalityData());
 	}
 	
-	UVitalityAssetBase* GetVitalityData() const;
+	UVitalityDataBase* GetVitalityData() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

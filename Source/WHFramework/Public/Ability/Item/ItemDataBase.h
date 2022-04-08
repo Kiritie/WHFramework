@@ -2,15 +2,15 @@
 
 #include "Asset/Primary/PrimaryAssetBase.h"
 
-#include "ItemAssetBase.generated.h"
+#include "ItemDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UItemAssetBase : public UPrimaryAssetBase
+class WHFRAMEWORK_API UItemDataBase : public UPrimaryAssetBase
 {
 	GENERATED_BODY()
 
 public:
-	UItemAssetBase();
+	UItemDataBase();
 	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -35,7 +35,7 @@ public:
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
 
 public:
-	static UItemAssetBase* Empty;
+	static UItemDataBase* Empty;
 
 public:	
 	virtual bool EqualType(EItemType InItemType) const;

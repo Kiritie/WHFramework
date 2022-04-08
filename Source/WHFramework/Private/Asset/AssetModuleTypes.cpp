@@ -4,7 +4,7 @@
 
 FItem FItem::Empty = FItem();
 
-UItemAssetBase* FItem::GetData() const
+UItemDataBase* FItem::GetData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemAssetBase>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemDataBase>(ID);
 }
