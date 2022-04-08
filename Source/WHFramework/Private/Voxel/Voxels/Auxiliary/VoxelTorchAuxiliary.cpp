@@ -4,7 +4,7 @@
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 #include "Components/PointLightComponent.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
@@ -28,5 +28,5 @@ void AVoxelTorchAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelI
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelAssetBase>()->GetFinalRange().Z * 0.5f * AVoxelModule::GetWorldData()->BlockSize);
+	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelData>()->GetFinalRange().Z * 0.5f * AVoxelModule::GetWorldData()->BlockSize);
 }

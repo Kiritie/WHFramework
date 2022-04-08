@@ -6,7 +6,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Asset/Primary/PrimaryAssetManager.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -36,7 +36,7 @@ UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 {
 	UVoxel* voxel = nullptr;
-	UVoxelAssetBase* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(InVoxelID);
+	UVoxelData* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(InVoxelID);
 	if(voxelData)
 	{
 		const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : StaticClass();
@@ -205,7 +205,7 @@ void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
 	
 }
 
-UVoxelAssetBase* UVoxel::GetData() const
+UVoxelData* UVoxel::GetData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(ID);
 }

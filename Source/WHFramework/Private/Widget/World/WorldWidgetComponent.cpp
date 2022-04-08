@@ -12,6 +12,7 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 
 	UPrimitiveComponent::SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	bRefreshEditorOnly = false;
 	bAutoCreate = true;
 	bOrientCamera = true;
 	bBindToSelf = true;

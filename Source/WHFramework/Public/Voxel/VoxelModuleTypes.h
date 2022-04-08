@@ -10,7 +10,7 @@
 
 #include "VoxelModuleTypes.generated.h"
 
-class UVoxelAssetBase;
+class UVoxelData;
 class AVoxelChunk;
 class AVoxelAuxiliary;
 class UVoxel;

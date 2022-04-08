@@ -19,13 +19,13 @@ APanelMediaPlayer::APanelMediaPlayer()
 		PanelMediaMesh->SetRelativeRotation(FRotator(0.0f,-90.0f,0.0f));
 		PanelMediaMesh->SetRelativeScale3D(FVector(2.0f,2.0f,2.0f));
 		
-		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("StaticMesh'/WHFramework/Media/Panel/SM_MediaPanel.SM_MediaPanel'"));
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("StaticMesh'/WHFramework/Media/Panel/SM_PanelMedia.SM_PanelMedia'"));
 		if(Mesh)
 		{
 			PanelMediaMesh->SetStaticMesh(Mesh);
 		}
 
-		UMaterial* Mat_PanelMaterial = LoadObject<UMaterial>(nullptr, TEXT("Material'/WHFramework/Media/Panel/Mat_PanelMediaMaterial.Mat_PanelMediaMaterial'"));
+		UMaterial* Mat_PanelMaterial = LoadObject<UMaterial>(nullptr, TEXT("Material'/WHFramework/Media/Panel/M_PanelMedia.M_PanelMedia'"));
 		if (Mat_PanelMaterial)
 		{
 			PanelMediaMesh->SetMaterial(1,Mat_PanelMaterial);
@@ -38,7 +38,7 @@ APanelMediaPlayer::APanelMediaPlayer()
 		Arrow->ArrowSize = 0.5f;
 	}
 
-	PanelMediaPlayer = LoadObject<UMediaPlayer>(nullptr, TEXT("MediaPlayer'/WHFramework/Media/Panel/PanelMediaPlayer.PanelMediaPlayer'"));
+	PanelMediaPlayer = LoadObject<UMediaPlayer>(nullptr, TEXT("MediaPlayer'/WHFramework/Media/Panel/MP_PanelMedia.MP_PanelMedia'"));
 }
 
 void APanelMediaPlayer::BeginPlay()

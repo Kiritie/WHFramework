@@ -3,15 +3,15 @@
 #include "Asset/Primary/Item/ItemAssetBase.h"
 #include "Voxel/VoxelModuleTypes.h"
 
-#include "VoxelAssetBase.generated.h"
+#include "VoxelData.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelAssetBase : public UItemAssetBase
+class WHFRAMEWORK_API UVoxelData : public UItemAssetBase
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelAssetBase();
+	UVoxelData();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

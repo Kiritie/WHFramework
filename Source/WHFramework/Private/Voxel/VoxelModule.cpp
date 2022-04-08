@@ -13,7 +13,7 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 
 AVoxelModule* AVoxelModule::Current = nullptr;
 FWorldSaveData* AVoxelModule::WorldData = nullptr;
@@ -236,9 +236,9 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
 	return EVoxelType::Empty; //Empty
 }
 
-UVoxelAssetBase* AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
+UVoxelData* AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelAssetBase>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
 }
 
 int AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)

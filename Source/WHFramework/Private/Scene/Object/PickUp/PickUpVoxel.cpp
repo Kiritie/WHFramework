@@ -6,7 +6,7 @@
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 
 // Sets default values
 APickUpVoxel::APickUpVoxel()
@@ -29,7 +29,7 @@ void APickUpVoxel::BeginPlay()
 void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	BoxComponent->SetBoxExtent(Item.GetData<UVoxelAssetBase>()->Range * AVoxelModule::GetWorldData()->BlockSize * (1 / Item.GetData<UVoxelAssetBase>()->Range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>()->Range * AVoxelModule::GetWorldData()->BlockSize * (1 / Item.GetData<UVoxelData>()->Range.Z) * 0.2f);
 	if(UVoxelMeshComponent* VoxelMeshComponent = Cast<UVoxelMeshComponent>(MeshComponent))
 	{
 		VoxelMeshComponent->Initialize(!bPreview ? EVoxelMeshType::PickUp : EVoxelMeshType::Preview);

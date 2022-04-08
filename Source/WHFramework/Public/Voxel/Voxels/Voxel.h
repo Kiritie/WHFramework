@@ -10,7 +10,7 @@
 class IVoxelAgentInterface;
 class AVoxelChunk;
 class IVoxelAgentInterface;
-class UVoxelAssetBase;
+class UVoxelData;
 
 /**
  * ����
@@ -102,7 +102,7 @@ protected:
 	AVoxelAuxiliary* Auxiliary;
 
 public:
-	UVoxelAssetBase* GetData() const;
+	UVoxelData* GetData() const;
 
 	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId GetID() const { return ID; }

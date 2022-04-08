@@ -19,10 +19,8 @@ public:
 	UWorldWidgetComponent();
 
 protected:
-#if WITH_EDITOR
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	bool bRefreshEditorOnly;
-#endif
 
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	TSubclassOf<UWorldWidgetBase> WorldWidgetClass;

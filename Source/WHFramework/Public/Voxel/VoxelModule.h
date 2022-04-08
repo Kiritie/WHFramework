@@ -11,7 +11,7 @@
 #include "VoxelModule.generated.h"
 
 class AVoxelChunk;
-class UVoxelAssetBase;
+class UVoxelData;
 class ACharacterBase;
 class UWorldTimerComponent;
 class USceneCaptureComponent2D;
@@ -135,7 +135,7 @@ public:
 
 	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
-	virtual UVoxelAssetBase* GetNoiseVoxelData(FIndex InIndex);
+	virtual UVoxelData* GetNoiseVoxelData(FIndex InIndex);
 
 	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
 

@@ -3,7 +3,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelEntityAuxiliary.h"
 #include "Components/BoxComponent.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 
 // Sets default values
 AVoxelEntityAuxiliary::AVoxelEntityAuxiliary()
@@ -31,5 +31,5 @@ void AVoxelEntityAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxel
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelAssetBase>()->GetFinalRange() * 0.5f);
+	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelData>()->GetFinalRange() * 0.5f);
 }

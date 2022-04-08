@@ -6,7 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 
 UVoxelDoor::UVoxelDoor()
 {

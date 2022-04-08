@@ -5,7 +5,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Voxels/VoxelAssetBase.h"
+#include "Voxel/Assets/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
 UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -77,7 +77,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency In
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+	UVoxelData* voxelData = InVoxelItem.GetData<UVoxelData>();
 	if(voxelData->bCustomMesh)
 	{
 		TArray<FVector> meshVertices, meshNormals;
@@ -173,7 +173,7 @@ void UVoxelMeshComponent::ClearData()
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFacing)
 {
 	FVector vertices[4];
-	FVector range = InVoxelItem.GetData<UVoxelAssetBase>()->GetFinalRange(InVoxelItem.Rotation, InVoxelItem.Scale);
+	FVector range = InVoxelItem.GetData<UVoxelData>()->GetFinalRange(InVoxelItem.Rotation, InVoxelItem.Scale);
 
 	switch (InFacing)
 	{
@@ -233,7 +233,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal)
 {
 	int32 verNum = Vertices.Num();
-	UVoxelAssetBase* voxelData = InVoxelItem.GetData<UVoxelAssetBase>();
+	UVoxelData* voxelData = InVoxelItem.GetData<UVoxelData>();
 	FVector2D uvCorner = voxelData->GetUVCorner(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData->Transparency).BlockUVSize);
 	FVector2D uvSpan = voxelData->GetUVSpan(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData->Transparency).BlockUVSize);
 	InNormal = InVoxelItem.Rotation.RotateVector(InNormal);
