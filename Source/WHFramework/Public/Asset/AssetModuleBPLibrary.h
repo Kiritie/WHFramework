@@ -70,9 +70,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// PrimaryAsset
 public:
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FPrimaryAssetType GetPrimaryAssetTypeByItemType(EItemType InItemType);
-
 	template<class T>
 	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{

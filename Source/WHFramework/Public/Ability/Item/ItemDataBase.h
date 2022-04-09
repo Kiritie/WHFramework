@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/AbilityModuleTypes.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 
 #include "ItemDataBase.generated.h"
@@ -34,9 +35,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
 
-public:
-	static UItemDataBase* Empty;
-
 public:	
-	virtual bool EqualType(EItemType InItemType) const;
+	virtual bool EqualType(EAbilityItemType InItemType) const;
 };

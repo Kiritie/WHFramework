@@ -15,7 +15,7 @@ AAbilityItemBase::AAbilityItemBase()
 
 	RootComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RootComponent"));
 
-	Item = FItem::Empty;
+	Item = FAbilityItem::Empty;
 	OwnerCharacter = nullptr;
 }
 

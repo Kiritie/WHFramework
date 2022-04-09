@@ -15,7 +15,7 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	OffsetScale = 1;
 	CenterOffset = FVector(0.5f);
 	MeshType = EVoxelMeshType::Chunk;
-	Transparency = ETransparency::Solid;
+	Transparency = EVoxelTransparency::Solid;
 	Vertices = TArray<FVector>();
 	Triangles = TArray<int32>();
 	Normals = TArray<FVector>();
@@ -24,7 +24,7 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	Tangents = TArray<FProcMeshTangent>();
 }
 
-void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency InTransparency /*= ETransparency::Solid*/)
+void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparency InTransparency /*= EVoxelTransparency::Solid*/)
 {
 	MeshType = InMeshType;
 	Transparency = InTransparency;
@@ -37,13 +37,13 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, ETransparency In
 			CenterOffset = FVector(0.5f);
 			switch (Transparency)
 			{
-				case ETransparency::Solid:
-				case ETransparency::SemiTransparent:
+				case EVoxelTransparency::Solid:
+				case EVoxelTransparency::SemiTransparent:
 				{
 					SetCollisionProfileName(TEXT("DW_SolidVoxel"));
 					break;
 				}
-				case ETransparency::Transparent:
+				case EVoxelTransparency::Transparent:
 				{
 					SetCollisionProfileName(TEXT("DW_TransVoxel"));
 					break;
@@ -103,7 +103,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 		{
 			if (!GetOwnerChunk() || GetOwnerChunk()->CheckAdjacent(InVoxelItem, (EDirection)i))
 			{
-				BuildFace(InVoxelItem, (EFacing)i);
+				BuildFace(InVoxelItem, (EVoxelFacing)i);
 			}
 		}
 	}
@@ -170,14 +170,14 @@ void UVoxelMeshComponent::ClearData()
 	Tangents.Empty();
 }
 
-void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFacing)
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing InFacing)
 {
 	FVector vertices[4];
 	FVector range = InVoxelItem.GetData<UVoxelData>()->GetFinalRange(InVoxelItem.Rotation, InVoxelItem.Scale);
 
 	switch (InFacing)
 	{
-		case EFacing::Up:
+		case EVoxelFacing::Up:
 		{
 			vertices[0] = FVector(-range.X, -range.Y, range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, -range.Y, range.Z) * 0.5f;
@@ -185,7 +185,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 			vertices[3] = FVector(-range.X, range.Y, range.Z) * 0.5f;
 			break;
 		}
-		case EFacing::Down:
+		case EVoxelFacing::Down:
 		{
 			vertices[0] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, range.Y, -range.Z) * 0.5f;
@@ -193,7 +193,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 			vertices[3] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EFacing::Forward:
+		case EVoxelFacing::Forward:
 		{
 			vertices[0] = FVector(range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, range.Y, range.Z) * 0.5f;
@@ -201,7 +201,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 			vertices[3] = FVector(range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EFacing::Back:
+		case EVoxelFacing::Back:
 		{
 			vertices[0] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(-range.X, -range.Y, range.Z) * 0.5f;
@@ -209,7 +209,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 			vertices[3] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EFacing::Left:
+		case EVoxelFacing::Left:
 		{
 			vertices[0] = FVector(range.X, -range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, -range.Y, range.Z) * 0.5f;
@@ -217,7 +217,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EFacing InFac
 			vertices[3] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EFacing::Right:
+		case EVoxelFacing::Right:
 		{
 			vertices[0] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(-range.X, range.Y, range.Z) * 0.5f;

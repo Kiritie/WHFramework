@@ -6,7 +6,7 @@
 
 UEquipDataBase::UEquipDataBase()
 {
-	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Equip);
+	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Equip);
 	MaxCount = 1;
 	EquipMesh = nullptr;
 	EquipClass = nullptr;

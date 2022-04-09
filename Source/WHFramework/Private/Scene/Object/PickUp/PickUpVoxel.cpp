@@ -26,7 +26,7 @@ void APickUpVoxel::BeginPlay()
 
 }
 
-void APickUpVoxel::Initialize(FItem InItem, bool bPreview /*= false*/)
+void APickUpVoxel::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
 	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>()->Range * AVoxelModule::GetWorldData()->BlockSize * (1 / Item.GetData<UVoxelData>()->Range.Z) * 0.2f);

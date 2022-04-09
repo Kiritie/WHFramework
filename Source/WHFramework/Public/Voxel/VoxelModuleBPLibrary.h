@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "VoxelModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Math/MathTypes.h"
 #include "VoxelModuleBPLibrary.generated.h"
 
 class AWebRequestModule;
@@ -19,16 +20,18 @@ class WHFRAMEWORK_API UVoxelModuleBPLibrary : public UBlueprintFunctionLibrary
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 public:
-	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static EDirection InvertDirection(EDirection InDirection);
 
-	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVector DirectionToVector(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
 
-	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FIndex DirectionToIndex(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
 
-	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
 };

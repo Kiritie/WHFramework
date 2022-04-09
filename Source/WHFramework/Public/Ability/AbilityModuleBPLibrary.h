@@ -7,7 +7,6 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
-class AWebRequestModule;
 /**
  * 
  */
@@ -15,4 +14,8 @@ UCLASS()
 class WHFRAMEWORK_API UAbilityModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static FPrimaryAssetType GetAssetIDByItemType(EAbilityItemType InItemType);
 };

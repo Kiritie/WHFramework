@@ -6,7 +6,7 @@
 
 UPropDataBase::UPropDataBase()
 {
-	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Prop);
+	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Prop);
 	MaxCount = 10;
 	PropMesh = nullptr;
 }

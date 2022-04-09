@@ -22,6 +22,17 @@ enum class EInputMode : uint8
 	GameAndUI_NotHideCursor
 };
 
+/**
+ * ????
+ */
+UENUM(BlueprintType)
+enum class EMouseButton : uint8
+{
+	Left,
+	Middle,
+	Right
+};
+
 struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
 {
 	FInputModeNone()

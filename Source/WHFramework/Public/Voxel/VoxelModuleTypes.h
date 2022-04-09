@@ -5,8 +5,10 @@
 #include "CoreMinimal.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Math/MathTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "Scene/SceneModuleTypes.h"
 
 #include "VoxelModuleTypes.generated.h"
 
@@ -14,15 +16,14 @@ class UVoxelData;
 class AVoxelChunk;
 class AVoxelAuxiliary;
 class UVoxel;
-/**
- * ????
- */
+
 UENUM(BlueprintType)
-enum class EMouseButton : uint8
+enum class EVoxelWorldState : uint8
 {
-	Left,
-	Middle,
-	Right
+	None,
+	Generating,
+	BasicGenerated,
+	FullGenerated
 };
 
 /**
@@ -73,21 +74,7 @@ enum class EVoxelType : uint8
  * ????
  */
 UENUM(BlueprintType)
-enum class EFacing : uint8
-{
-	Up,
-	Down,
-	Forward,
-	Back,
-	Left,
-	Right
-};
-
-/**
- * ????
- */
-UENUM(BlueprintType)
-enum class EDirection : uint8
+enum class EVoxelFacing : uint8
 {
 	Up,
 	Down,
@@ -101,7 +88,7 @@ enum class EDirection : uint8
  * ?????
  */
 UENUM(BlueprintType)
-enum class ETransparency : uint8
+enum class EVoxelTransparency : uint8
 {
 	// ???
 	Solid,
@@ -128,126 +115,7 @@ enum class EVoxelMeshType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FIndex
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 X;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Y;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Z;
-
-	static const FIndex ZeroIndex;
-
-	static const FIndex OneIndex;
-
-	FORCEINLINE FIndex()
-	{
-		X = 0;
-		Y = 0;
-		Z = 0;
-	}
-
-	FORCEINLINE FIndex(int32 InX, int32 InY, int32 InZ)
-	{
-		X = InX;
-		Y = InY;
-		Z = InZ;
-	}
-
-	FORCEINLINE FIndex(FVector InVector)
-	{
-		X = FMath::CeilToInt(InVector.X);
-		Y = FMath::CeilToInt(InVector.Y);
-		Z = FMath::CeilToInt(InVector.Z);
-	}
-
-	FORCEINLINE FIndex(const FString& InValue)
-	{
-		TArray<FString> tmpArr;
-		InValue.ParseIntoArray(tmpArr, TEXT(","));
-		X = FCString::Atoi(*tmpArr[0]);
-		Y = FCString::Atoi(*tmpArr[1]);
-		Z = FCString::Atoi(*tmpArr[2]);
-	}
-
-	FORCEINLINE FVector ToVector() const
-	{
-		return FVector(X, Y, Z);
-	}
-
-	FORCEINLINE FString ToString() const
-	{
-		return FString::Printf(TEXT("%d,%d,%d"), X, Y, Z);
-	}
-
-	FORCEINLINE static float Distance(FIndex A, FIndex B, bool bIgnoreZ = false)
-	{
-		if (bIgnoreZ) A.Z = B.Z = 0;
-		return FVector::Distance(A.ToVector(), B.ToVector());
-	}
-
-	FORCEINLINE friend bool operator==(const FIndex& A, const FIndex& B)
-	{
-		return (A.X == B.X) && (A.Y == B.Y) && (A.Z == B.Z);
-	}
-
-	FORCEINLINE friend bool operator!=(const FIndex& A, const FIndex& B)
-	{
-		return (A.X != B.X) || (A.Y != B.Y) || (A.Z != B.Z);
-	}
-
-	FORCEINLINE FIndex operator+(const FIndex& InIndex) const
-	{
-		return FIndex(X + InIndex.X, Y + InIndex.Y, Z + InIndex.Z);
-	}
-
-	FORCEINLINE FIndex operator-(const FIndex& InIndex) const
-	{
-		return FIndex(X - InIndex.X, Y - InIndex.Y, Z - InIndex.Z);
-	}
-
-	FORCEINLINE FIndex operator*(const FIndex& InIndex) const
-	{
-		return FIndex(X * InIndex.X, Y * InIndex.Y, Z * InIndex.Z);
-	}
-
-	FORCEINLINE FIndex operator/(const FIndex& InIndex) const
-	{
-		return FIndex(X / InIndex.X, Y / InIndex.Y, Z / InIndex.Z);
-	}
-
-	FORCEINLINE FIndex operator*(const int& InValue) const
-	{
-		return FIndex(X * InValue, Y * InValue, Z * InValue);
-	}
-
-	FORCEINLINE FIndex operator/(const int& InValue) const
-	{
-		return FIndex(X / InValue, Y / InValue, Z / InValue);
-	}
-
-	friend void operator<<(FStructuredArchive::FSlot Slot, FIndex& InValue)
-	{
-		FStructuredArchive::FRecord Record = Slot.EnterRecord();
-		Record << SA_VALUE(TEXT("X"), InValue.X);
-		Record << SA_VALUE(TEXT("Y"), InValue.Y);
-		Record << SA_VALUE(TEXT("Z"), InValue.Z);
-	}
-};
-
-FORCEINLINE uint32 GetTypeHash(const FIndex& InIndex)
-{
-	return FCrc::MemCrc_DEPRECATED(&InIndex, sizeof(InIndex));
-}
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FMeshUVData
+struct WHFRAMEWORK_API FVoxelMeshUVData
 {
 	GENERATED_BODY()
 
@@ -258,14 +126,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector2D UVSpan;
 
-
-	FORCEINLINE FMeshUVData()
+	FORCEINLINE FVoxelMeshUVData()
 	{
 		UVCorner = FVector2D::ZeroVector;
 		UVSpan = FVector2D::UnitVector;
 	}
 
-	FORCEINLINE FMeshUVData(FVector2D InUVCorner, FVector2D InUVSpan)
+	FORCEINLINE FVoxelMeshUVData(FVector2D InUVCorner, FVector2D InUVSpan)
 	{
 		UVCorner = InUVCorner;
 		UVSpan = InUVSpan;
@@ -273,7 +140,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelItem : public FItem
+struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 {
 	GENERATED_BODY()
 
@@ -311,16 +178,7 @@ public:
 		Auxiliary = nullptr;
 	}
 		
-	FVoxelItem(EVoxelType InVoxelType)
-	{
-		// ID = *FString::Printf(TEXT("Voxel_%d"), (int32)InVoxelType);
-		Index = FIndex::ZeroIndex;
-		Rotation = FRotator::ZeroRotator;
-		Scale = FVector::OneVector;
-		Params = TMap<FName, FParameter>();
-		Owner = nullptr;
-		Auxiliary = nullptr;
-	}
+	FVoxelItem(EVoxelType InVoxelType);
 
 	FVoxelItem(const FPrimaryAssetId& InID)
 	{
@@ -378,7 +236,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FChunkMaterial
+struct WHFRAMEWORK_API FVoxelChunkMaterial
 {
 	GENERATED_BODY()
 
@@ -389,34 +247,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector2D BlockUVSize;
 
-	FORCEINLINE FChunkMaterial()
+	FORCEINLINE FVoxelChunkMaterial()
 	{
 		Material = nullptr;
 		BlockUVSize = FVector2D(0.0625f, 0.5f);
 	}
-};
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Location;
-	
-	FORCEINLINE FPickUpSaveData()
+	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, FVector2D InBlockUVSize)
 	{
-		Item = FItem::Empty;
-		Location = FVector::ZeroVector;
+		Material = InMaterial;
+		BlockUVSize = InBlockUVSize;
 	}
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FChunkSaveData : public FSaveData
+struct WHFRAMEWORK_API FVoxelChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
@@ -430,7 +275,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
 
-	FORCEINLINE FChunkSaveData()
+	FORCEINLINE FVoxelChunkSaveData()
 	{
 		Index = FIndex::ZeroIndex;
 		VoxelItems = TArray<FVoxelItem>();
@@ -439,12 +284,12 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWorldBasicSaveData : public FSaveData
+struct WHFRAMEWORK_API FVoxelWorldBasicSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FWorldBasicSaveData()
+	FORCEINLINE FVoxelWorldBasicSaveData()
 	{
 		BlockSize = 80;
 		ChunkSize = 16;
@@ -459,7 +304,10 @@ public:
 		TerrainWaterVoxelHeight = 0.3f;
 		TerrainBedrockVoxelHeight = 0.02f;
 
-		ChunkMaterials = TArray<FChunkMaterial>();
+		ChunkMaterials = TArray<FVoxelChunkMaterial>();
+		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid'")), FVector2D(0.0625f, 0.5f)));
+		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent'")), FVector2D(0.0625f, 0.5f)));
+		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent'")), FVector2D(0.0625f, 0.5f)));
 
 		VitalityRaceDensity = 50.f;
 		CharacterRaceDensity = 50.f;
@@ -497,7 +345,7 @@ public:
 	FVector TerrainSandVoxelScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FChunkMaterial> ChunkMaterials;
+	TArray<FVoxelChunkMaterial> ChunkMaterials;
 							
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float VitalityRaceDensity;
@@ -507,18 +355,18 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWorldSaveData : public FWorldBasicSaveData
+struct WHFRAMEWORK_API FVoxelWorldSaveData : public FVoxelWorldBasicSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FWorldSaveData()
+	FORCEINLINE FVoxelWorldSaveData()
 	{
 		WorldSeed = 0;
 		TimeSeconds = 0.f;
 	}
 	
-	FORCEINLINE FWorldSaveData(FWorldBasicSaveData InBasicSaveData)
+	FORCEINLINE FVoxelWorldSaveData(FVoxelWorldBasicSaveData InBasicSaveData)
 	{
 		WorldSeed = 0;
 		TimeSeconds = 0;
@@ -543,7 +391,7 @@ public:
 	}
 
 public:
-	static FWorldSaveData Empty;
+	static FVoxelWorldSaveData Empty;
 	
 	UPROPERTY(BlueprintReadOnly)
 	int32 WorldSeed;
@@ -562,14 +410,14 @@ public:
 		return ChunkSize * ChunkHeightRange;
 	}
 
-	FORCEINLINE FChunkMaterial GetChunkMaterial(ETransparency Transparency) const
+	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency Transparency) const
 	{
 		const int32 Index = FMath::Clamp((int32)Transparency, 0, ChunkMaterials.Num());
 		if(ChunkMaterials.IsValidIndex(Index))
 		{
 			return ChunkMaterials[Index];
 		}
-		return FChunkMaterial();
+		return FVoxelChunkMaterial();
 	}
 
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const

@@ -24,5 +24,5 @@ protected:
 	virtual void OnPickUp(IPickerInterface* InPicker) override;
 
 public:
-	virtual void Initialize(FItem InItem, bool bPreview = false) override;
+	virtual void Initialize(FAbilityItem InItem, bool bPreview = false) override;
 };

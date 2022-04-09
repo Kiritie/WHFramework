@@ -19,6 +19,10 @@ public:
 
 	static UPrimaryAssetManager& Get();
 
+protected:
+	UPROPERTY(Transient)
+	TMap<FPrimaryAssetId, UPrimaryAssetBase*> AssetMap;
+
 public:
 	template<class T>
 	T* LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)

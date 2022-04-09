@@ -29,7 +29,7 @@ public:
 
 protected:
 	UPROPERTY(BlueprintReadWrite)
-	FItem Item;
+	FAbilityItem Item;
 
 	ISceneContainerInterface* Container;
 
@@ -60,12 +60,12 @@ public:
 
 	virtual FSaveData* ToData(bool bSaved = true) override;
 
-	virtual void Initialize(FItem InItem, bool bPreview = false);
+	virtual void Initialize(FAbilityItem InItem, bool bPreview = false);
 
 	virtual void RemoveFromContainer() override;
 
 public:
-	FItem& GetItem() { return Item; }
+	FAbilityItem& GetItem() { return Item; }
 	
 	virtual ISceneContainerInterface* GetContainer() const override { return Container; }
 

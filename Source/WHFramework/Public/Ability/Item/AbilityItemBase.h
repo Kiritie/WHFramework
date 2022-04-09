@@ -23,7 +23,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
-	FItem Item;
+	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 	AAbilityCharacterBase* OwnerCharacter;

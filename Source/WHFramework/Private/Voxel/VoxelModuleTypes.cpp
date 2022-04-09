@@ -3,18 +3,26 @@
 
 #include "Voxel/VoxelModuleTypes.h"
 
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelPlant.h"
 
-const FIndex FIndex::ZeroIndex = FIndex(0, 0, 0);
+FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
 
-const FIndex FIndex::OneIndex = FIndex(1, 1, 1);
+FVoxelItem FVoxelItem::EmptyVoxel = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Empty")));
 
-FWorldSaveData FWorldSaveData::Empty = FWorldSaveData();
+FVoxelItem FVoxelItem::UnknownVoxel = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
 
-FVoxelItem FVoxelItem::EmptyVoxel = FVoxelItem(EVoxelType::Empty);
-
-FVoxelItem FVoxelItem::UnknownVoxel = FVoxelItem(EVoxelType::Unknown);
+FVoxelItem::FVoxelItem(EVoxelType InVoxelType)
+{
+	ID = UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType);
+	Index = FIndex::ZeroIndex;
+	Rotation = FRotator::ZeroRotator;
+	Scale = FVector::OneVector;
+	Params = TMap<FName, FParameter>();
+	Owner = nullptr;
+	Auxiliary = nullptr;
+}
 
 bool FVoxelItem::IsValid() const
 {

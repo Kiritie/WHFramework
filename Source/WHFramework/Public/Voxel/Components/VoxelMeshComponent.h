@@ -31,7 +31,7 @@ public:
 	EVoxelMeshType MeshType;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	ETransparency Transparency;
+	EVoxelTransparency Transparency;
 
 private:
 	TArray<FVector> Vertices;
@@ -47,7 +47,7 @@ private:
 	TArray<FProcMeshTangent> Tangents;
 
 public:
-	void Initialize(EVoxelMeshType InMeshType, ETransparency InTransparency = ETransparency::Solid);
+	void Initialize(EVoxelMeshType InMeshType, EVoxelTransparency InTransparency = EVoxelTransparency::Solid);
 	
 	void BuildVoxel(const FVoxelItem& InVoxelItem);
 
@@ -58,7 +58,7 @@ public:
 	void ClearData();
 
 private:
-	void BuildFace(const FVoxelItem& InVoxelItem, EFacing InFacing);
+	void BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing InFacing);
 
 	void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal);
 

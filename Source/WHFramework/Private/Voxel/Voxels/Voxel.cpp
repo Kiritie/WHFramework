@@ -9,12 +9,12 @@
 #include "Voxel/Datas/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
 UVoxel* UVoxel::EmptyVoxel = nullptr;
-
 UVoxel* UVoxel::UnknownVoxel = nullptr;
 
 UVoxel::UVoxel()
@@ -29,8 +29,7 @@ UVoxel::UVoxel()
 
 UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 {
-	return SpawnVoxel(FPrimaryAssetId::FromString(FString::Printf(TEXT("Voxel:DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType))));
-	return nullptr;
+	return SpawnVoxel(UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType));
 }
 
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
@@ -180,7 +179,7 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 		{
 			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
 			{
-				FItem tmpItem = FItem(VoxelAgentPlayer->GetGeneratingVoxelItem(), 1);
+				FAbilityItem tmpItem = FAbilityItem(VoxelAgentPlayer->GetGeneratingVoxelItem(), 1);
 				return VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem);
 			}
 			break;

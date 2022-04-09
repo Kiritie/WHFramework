@@ -272,3 +272,131 @@ enum class EInteractAction : uint8
 	// 关闭
 	Close UMETA(DisplayName="关闭")
 };
+
+class UItemDataBase;
+/**
+ * ???????
+ */
+UENUM(BlueprintType)
+enum class EAbilityItemType : uint8
+{
+	// ??
+	None,
+	// ????
+	Voxel,
+	// ????
+	Prop,
+	// ???
+	Equip,
+	// ????
+	Skill,
+	// ????
+	Vitality,
+	// ????
+	Character
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItem
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Count;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level;
+
+	static FAbilityItem Empty;
+
+public:
+	FORCEINLINE FAbilityItem()
+	{
+		Count = 0;
+		Level = 0;
+	}
+		
+	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount, int32 InLevel = 0)
+	{
+		ID = InID;
+		Count = InCount;
+		Level = InLevel;
+	}
+	
+	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int InCount = -1)
+	{
+		ID = InItem.ID;
+		Count = InCount == -1 ? InItem.Count : InCount;
+		Level = InItem.Level;
+	}
+
+	virtual ~FAbilityItem() = default;
+
+	template<class T>
+	T* GetData() const
+	{
+		return Cast<T>(GetData());
+	}
+
+	UItemDataBase* GetData() const;
+
+	FORCEINLINE virtual bool IsValid() const
+	{
+		return ID.IsValid();
+	}
+
+	FORCEINLINE bool EqualType(FAbilityItem InItem) const
+	{
+		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
+	}
+
+	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
+	{
+		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level);
+	}
+
+	FORCEINLINE friend bool operator!=(const FAbilityItem& A, const FAbilityItem& B)
+	{
+		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level);
+	}
+
+	FORCEINLINE friend FAbilityItem operator+(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.EqualType(B))
+		{
+			A.Count += B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem operator-(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.EqualType(B))
+		{
+			A.Count -= B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem& operator+=(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.EqualType(B))
+		{
+			A.Count += B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem& operator-=(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.EqualType(B))
+		{
+			A.Count -= B.Count;
+		}
+		return A;
+	}
+};

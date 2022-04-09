@@ -5,7 +5,7 @@
 
 UCharacterDataBase::UCharacterDataBase()
 {
-	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Character);
+	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Character);
 	MaxCount = 1;
 	Range = FVector(1.f, 1.f, 2.f);
 	EXP = 50;

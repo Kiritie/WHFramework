@@ -8,7 +8,7 @@
 
 UPrimaryAssetManager::UPrimaryAssetManager()
 {
-	UItemDataBase::Empty = NewObject<UItemDataBase>();
+	AssetMap = TMap<FPrimaryAssetId, UPrimaryAssetBase*>();
 }
 
 UPrimaryAssetManager& UPrimaryAssetManager::Get()
@@ -35,13 +35,25 @@ void UPrimaryAssetManager::StartInitialLoading()
 
 UPrimaryAssetBase* UPrimaryAssetManager::LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
 {
-	FSoftObjectPath ItemPath = GetPrimaryAssetPath(InPrimaryAssetId);
+	UPrimaryAssetBase* LoadedItem = nullptr;
 
-	UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(ItemPath.TryLoad());
+	if(!AssetMap.Contains(InPrimaryAssetId))
+	{
+		FSoftObjectPath ItemPath = GetPrimaryAssetPath(InPrimaryAssetId);
+		LoadedItem = Cast<UPrimaryAssetBase>(ItemPath.TryLoad());
+		if(LoadedItem)
+		{
+			AssetMap.Add(InPrimaryAssetId, LoadedItem);
+		}
+	}
+	else
+	{
+		LoadedItem = AssetMap[InPrimaryAssetId];
+	}
 
-	if (bLogWarning && LoadedItem == nullptr)
+	if (bLogWarning && !LoadedItem)
 	{
 		WH_LOG(WHAsset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
 	}
-	return LoadedItem ? LoadedItem : UPrimaryAssetBase::Empty;
+	return LoadedItem;
 }

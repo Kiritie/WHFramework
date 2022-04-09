@@ -26,7 +26,7 @@ APickUp::APickUp()
 
 	MeshComponent = nullptr;
 
-	Item = FItem::Empty;
+	Item = FAbilityItem::Empty;
 	Container = nullptr;
 }
 
@@ -37,7 +37,7 @@ void APickUp::BeginPlay()
 
 }
 
-void APickUp::Initialize(FItem InItem, bool bPreview /*= false*/)
+void APickUp::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
 {
 	Item = InItem;
 	RotatingComponent->SetActive(!bPreview);

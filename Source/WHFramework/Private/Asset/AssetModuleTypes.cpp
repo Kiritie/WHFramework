@@ -2,9 +2,9 @@
 
 #include "Asset/AssetModuleBPLibrary.h"
 
-FItem FItem::Empty = FItem();
+FAbilityItem FAbilityItem::Empty = FAbilityItem();
 
-UItemDataBase* FItem::GetData() const
+UItemDataBase* FAbilityItem::GetData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemDataBase>(ID);
 }

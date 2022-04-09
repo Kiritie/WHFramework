@@ -3,6 +3,8 @@
 
 #include "Voxel/VoxelModuleBPLibrary.h"
 
+#include "Global/GlobalBPLibrary.h"
+
 EDirection UVoxelModuleBPLibrary::InvertDirection(EDirection InDirection)
 {
 	if ((int32)InDirection % 2 == 0)
@@ -39,4 +41,9 @@ FIndex UVoxelModuleBPLibrary::DirectionToIndex(EDirection InDirection, FRotator 
 FIndex UVoxelModuleBPLibrary::GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation /*= FRotator::ZeroRotator*/)
 {
 	return InIndex + DirectionToIndex(InDirection, InRotation);
+}
+
+FPrimaryAssetId UVoxelModuleBPLibrary::GetAssetIDByVoxelType(EVoxelType InVoxelType)
+{
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
 }

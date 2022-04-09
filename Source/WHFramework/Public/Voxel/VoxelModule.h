@@ -17,8 +17,6 @@ class UWorldTimerComponent;
 class USceneCaptureComponent2D;
 class UWorldWeatherComponent;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWorldGenerated, FVector, InPlayerLocation, bool, bPreview);
-
 /**
  * 体素模块
  */
@@ -60,14 +58,14 @@ public:
 	static AVoxelModule* Get();
 
 protected:
-	static FWorldSaveData* WorldData;
+	static FVoxelWorldSaveData* WorldData;
 public:
 	template<class T>
 	static T* GetWorldData()
 	{
 		return static_cast<T*>(GetWorldData());
 	}
-	static FWorldSaveData* GetWorldData();
+	static FVoxelWorldSaveData* GetWorldData();
 
 public:
 	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
@@ -83,38 +81,21 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkSpawnRange;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkSpawnDistance;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkSpawnSpeed;
-		
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkDestroySpeed;
-					
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkMapBuildSpeed;
-					
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkMapGenerateSpeed;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	int32 ChunkGenerateSpeed;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	float BasicPercentage;
-
-	UPROPERTY(VisibleAnywhere, Category = "World")
-	bool bBasicGenerated;
-
-	FRandomStream RandomStream;
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
+	EVoxelWorldState WorldState;
 public:
-	UPROPERTY(BlueprintAssignable)
-	FOnWorldGenerated OnWorldGenerated;
+	EVoxelWorldState GetWorldState() const { return WorldState; }
+
+	virtual void ChangeWorldState(EVoxelWorldState InWorldState);
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FRandomStream RandomStream;
+public:
+	FRandomStream GetRandomStream() const { return RandomStream; }
+
+	UFUNCTION(BlueprintCallable)
+	void InitRandomStream(int32 InDeltaSeed);
 
 public:
 	virtual void LoadData(FSaveData* InWorldData) override;
@@ -124,15 +105,6 @@ public:
 	virtual void UnloadData(bool bPreview = false);
 
 public:
-	UFUNCTION(BlueprintPure)
-	bool IsBasicGenerated() const { return bBasicGenerated; }
-	
-	UFUNCTION(BlueprintPure)
-	FRandomStream GetRandomStream() const { return RandomStream; }
-			
-	UFUNCTION(BlueprintCallable)
-	void InitRandomStream(int32 InDeltaSeed);
-
 	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
 	virtual UVoxelData* GetNoiseVoxelData(FIndex InIndex);
@@ -142,6 +114,33 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 protected:
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkSpawnRange;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkBasicSpawnRange;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkSpawnDistance;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkSpawnSpeed;
+				
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkDestroyDistance;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkDestroySpeed;
+					
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkMapBuildSpeed;
+					
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkMapGenerateSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkGenerateSpeed;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chunk")
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 	
@@ -208,8 +207,6 @@ public:
 	int GetChunkNum(bool bNeedGenerated = false) const;
 
 	float GetWorldLength() const;
-
-	int32 GetChunkDistance() const;
 
 	virtual bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
 

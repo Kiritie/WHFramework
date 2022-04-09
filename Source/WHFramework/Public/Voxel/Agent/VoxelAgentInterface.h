@@ -18,7 +18,7 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult, FItem& InItem) = 0;
+	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult, FAbilityItem& InItem) = 0;
 
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) = 0;
 
@@ -27,7 +27,7 @@ public:
 
 	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) = 0;
 
-	virtual FItem& GetGeneratingVoxelItem() = 0;
+	virtual FAbilityItem& GetGeneratingVoxelItem() = 0;
 
 	virtual FVoxelItem& GetSelectedVoxelItem() = 0;
 };

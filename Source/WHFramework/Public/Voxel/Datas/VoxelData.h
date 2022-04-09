@@ -24,7 +24,7 @@ public:
 	TSubclassOf<AVoxelAuxiliary> AuxiliaryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ETransparency Transparency;
+	EVoxelTransparency Transparency;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Range;
@@ -42,8 +42,8 @@ public:
 	TArray<FVector> MeshNormals;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FMeshUVData> MeshUVDatas;
-				
+	TArray<FVoxelMeshUVData> MeshUVDatas;
+			
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* GenerateSound;
 
@@ -74,27 +74,27 @@ public:
 		return range;
 	}
 
-	FORCEINLINE FVector2D GetUVCorner(EFacing InFacing, FVector2D InUVSize) const
+	FORCEINLINE FVector2D GetUVCorner(EVoxelFacing InFacing, FVector2D InUVSize) const
 	{
 		return GetUVCorner((int)InFacing, InUVSize);
 	}
 
 	FORCEINLINE FVector2D GetUVCorner(int InFaceIndex, FVector2D InUVSize) const
 	{
-		FMeshUVData uvData = FMeshUVData();
+		FVoxelMeshUVData uvData = FVoxelMeshUVData();
 		if (MeshUVDatas.Num() > InFaceIndex)
 			uvData = MeshUVDatas[InFaceIndex];
 		return FVector2D(uvData.UVCorner.X	 * InUVSize.X, (1 / InUVSize.Y - uvData.UVCorner.Y - uvData.UVSpan.Y) * InUVSize.Y);
 	}
 
-	FORCEINLINE FVector2D GetUVSpan(EFacing InFacing, FVector2D InUVSize) const
+	FORCEINLINE FVector2D GetUVSpan(EVoxelFacing InFacing, FVector2D InUVSize) const
 	{
 		return GetUVSpan((int)InFacing, InUVSize);
 	}
 
 	FORCEINLINE FVector2D GetUVSpan(int InFaceIndex, FVector2D InUVSize) const
 	{
-		FMeshUVData uvData = FMeshUVData();
+		FVoxelMeshUVData uvData = FVoxelMeshUVData();
 		if (MeshUVDatas.Num() > InFaceIndex)
 			uvData = MeshUVDatas[InFaceIndex];
 		return FVector2D(uvData.UVSpan.X * InUVSize.X, uvData.UVSpan.Y * InUVSize.Y);

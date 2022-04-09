@@ -1,7 +1,5 @@
 #include "Asset/Primary/PrimaryAssetBase.h"
 
-UPrimaryAssetBase* UPrimaryAssetBase::Empty = nullptr;
-
 UPrimaryAssetBase::UPrimaryAssetBase()
 {
 	

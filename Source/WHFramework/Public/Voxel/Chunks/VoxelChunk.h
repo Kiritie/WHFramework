@@ -81,9 +81,6 @@ protected:
 	TArray<AVoxelChunk*> Neighbors;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TMap<FIndex, FVoxelItem> VoxelMap;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TArray<APickUp*> PickUps;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
@@ -95,6 +92,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bGenerated;
 
+	TMap<FIndex, FVoxelItem> VoxelMap;
+	
 public:
 	FIndex GetIndex() const { return Index; }
 
@@ -204,7 +203,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	APickUp* SpawnPickUp(FItem InItem, FVector InLocation);
+	APickUp* SpawnPickUp(FAbilityItem InItem, FVector InLocation);
 
 	APickUp* SpawnPickUp(FPickUpSaveData InPickUpData);
 

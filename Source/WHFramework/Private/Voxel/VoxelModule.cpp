@@ -6,17 +6,19 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Voxel/EventHandle_ChangeVoxelWorldState.h"
+#include "Gameplay/WHPlayerInterface.h"
 #include "Main/MainModule.h"
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "SpawnPool/SpawnPoolModuleBPLibrary.h"
-#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Datas/VoxelData.h"
 
 AVoxelModule* AVoxelModule::Current = nullptr;
-FWorldSaveData* AVoxelModule::WorldData = nullptr;
+FVoxelWorldSaveData* AVoxelModule::WorldData = nullptr;
 
 // Sets default values
 AVoxelModule::AVoxelModule()
@@ -31,17 +33,16 @@ AVoxelModule::AVoxelModule()
 	VoxelsCapture->SetRelativeLocationAndRotation(FVector(0, 0, -500), FRotator(90, 0, 0));
 
 	ChunkSpawnRange = 7;
+	ChunkBasicSpawnRange = 1;
 	ChunkSpawnDistance = 3;
 
 	ChunkSpawnSpeed = 1000;
+	ChunkDestroyDistance = 1;
 	ChunkDestroySpeed = 10;
 	ChunkMapBuildSpeed = 10;
 	ChunkMapGenerateSpeed = 10;
 	ChunkGenerateSpeed = 1;
-	
-	BasicPercentage = 0.f;
 
-	bBasicGenerated = false;
 	ChunkSpawnBatch = 0;
 	LastGenerateIndex = FIndex(-1, -1, -1);
 	LastStayChunkIndex = FIndex::ZeroIndex;
@@ -108,7 +109,7 @@ AVoxelModule* AVoxelModule::Get()
 	return Current;
 }
 
-FWorldSaveData* AVoxelModule::GetWorldData()
+FVoxelWorldSaveData* AVoxelModule::GetWorldData()
 {
 	if(WorldData)
 	{
@@ -116,7 +117,7 @@ FWorldSaveData* AVoxelModule::GetWorldData()
 	}
 	else
 	{
-		return &FWorldSaveData::Empty;
+		return &FVoxelWorldSaveData::Empty;
 	}
 }
 
@@ -135,7 +136,9 @@ FVector AVoxelModule::ChunkIndexToLocation(FIndex InIndex)
 
 void AVoxelModule::LoadData(FSaveData* InWorldData)
 {
-	WorldData = static_cast<FWorldSaveData*>(InWorldData);
+	ChangeWorldState(EVoxelWorldState::Generating);
+	
+	WorldData = static_cast<FVoxelWorldSaveData*>(InWorldData);
 	RandomStream = FRandomStream(GetWorldData()->WorldSeed);
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
@@ -155,6 +158,8 @@ void AVoxelModule::UnloadData(bool bPreview)
 {
 	if(!bPreview)
 	{
+		ChangeWorldState(EVoxelWorldState::None);
+		
 		for (auto iter : ChunkMap)
 		{
 			if(iter.Value)
@@ -165,7 +170,6 @@ void AVoxelModule::UnloadData(bool bPreview)
 		ChunkMap.Empty();
 	
 		ChunkSpawnBatch = 0;
-		bBasicGenerated = false;
 		LastGenerateIndex = FIndex(-1, -1, -1);
 		LastStayChunkIndex = FIndex::ZeroIndex;
 
@@ -186,6 +190,27 @@ void AVoxelModule::UnloadData(bool bPreview)
 				Iter.Value->DestroyActors();
 			}
 		}
+	}
+}
+
+void AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
+{
+	if(WorldState != InWorldState)
+	{
+		WorldState = InWorldState;
+		switch(WorldState)
+		{
+			case EVoxelWorldState::BasicGenerated:
+			{
+				break;
+			}
+			case EVoxelWorldState::FullGenerated:
+			{
+				break;
+			}
+			default: break;
+		}
+		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
 	}
 }
 
@@ -266,7 +291,7 @@ void AVoxelModule::GeneratePreviews()
 	// 		auto pickUpItem = GetWorld()->SpawnActor<APickUpVoxel>(spawnParams);
 	// 		if (pickUpItem != nullptr)
 	// 		{
-	// 			pickUpItem->Initialize(FItem(voxelDatas[tmpIndex].ID, 1), true);
+	// 			pickUpItem->Initialize(FAbilityItem(voxelDatas[tmpIndex].ID, 1), true);
 	// 			pickUpItem->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 	// 			pickUpItem->SetActorLocation(FVector(x * GetWorldData()->BlockSize * 0.5f, y * GetWorldData()->BlockSize * 0.5f, 0));
 	// 			pickUpItem->SetActorRotation(FRotator(-70, 0, -180));
@@ -281,9 +306,9 @@ void AVoxelModule::GeneratePreviews()
 
 void AVoxelModule::GenerateTerrain()
 {
-	if(ACharacterBase* PlayerCharacter = UGlobalBPLibrary::GetPlayerCharacter<ACharacterBase>(this))
+	if(IWHPlayerInterface* Player = UGlobalBPLibrary::GetPlayerPawn<IWHPlayerInterface>(this))
 	{
-		FIndex chunkIndex = LocationToChunkIndex(PlayerCharacter->GetActorLocation(), true);
+		FIndex chunkIndex = LocationToChunkIndex(Cast<AActor>(Player)->GetActorLocation(), true);
 
 		if (LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(chunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
 		{
@@ -297,7 +322,7 @@ void AVoxelModule::GenerateTerrain()
 			{
 				FIndex index = iter->Key;
 				AVoxelChunk* chunk = iter->Value;
-				if (FIndex::Distance(chunkIndex, index, true) >= GetChunkDistance())
+				if (FIndex::Distance(chunkIndex, index, true) >= ChunkSpawnRange + ChunkDestroyDistance)
 				{
 					AddToDestroyQueue(chunk);
 				}
@@ -384,9 +409,15 @@ void AVoxelModule::GenerateTerrain()
 			}
 			ChunkGenerateQueue.RemoveAt(0, tmpNum);
 
-			if (!bBasicGenerated)
+			const float FullNum = FMath::Square(ChunkSpawnRange * 2) * GetWorldData()->ChunkHeightRange;
+			const float BasicNum = FMath::Square(ChunkBasicSpawnRange * 2) * GetWorldData()->ChunkHeightRange;
+			if(FullNum - ChunkGenerateQueue.Num() >= BasicNum)
 			{
-				bBasicGenerated = true;
+				ChangeWorldState(EVoxelWorldState::BasicGenerated);
+			}
+			if(ChunkGenerateQueue.Num() == 0)
+			{
+				ChangeWorldState(EVoxelWorldState::FullGenerated);
 			}
 		}
 	}
@@ -570,11 +601,6 @@ int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 float AVoxelModule::GetWorldLength() const
 {
 	return GetWorldData()->ChunkSize * ChunkSpawnRange * 2;
-}
-
-int32 AVoxelModule::GetChunkDistance() const
-{
-	return ChunkSpawnRange + ChunkSpawnDistance;
 }
 
 bool AVoxelModule::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult)

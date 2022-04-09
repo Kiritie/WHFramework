@@ -5,7 +5,7 @@
 
 UVitalityDataBase::UVitalityDataBase()
 {
-	Type = UAssetModuleBPLibrary::GetPrimaryAssetTypeByItemType(EItemType::Vitality);
+	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Vitality);
 	MaxCount = 1;
 	Range = FVector::OneVector;
 	EXP = 50;
