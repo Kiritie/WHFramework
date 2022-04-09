@@ -4,7 +4,7 @@
 #include "Input/InputModuleTypes.h"
 #include "Widgets/SViewport.h"
 
-void FInputModeNone::ApplyInputMode(FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
+void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
 {
 	TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();
 	if (ViewportWidget.IsValid())

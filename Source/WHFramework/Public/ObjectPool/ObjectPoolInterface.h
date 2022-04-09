@@ -27,4 +27,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void OnDespawn();
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	int32 GetLimit() const;
 };

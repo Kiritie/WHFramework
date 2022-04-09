@@ -4,6 +4,10 @@
 
 #include "CoreMinimal.h"
 
+#include "GameFramework/PlayerController.h"
+
+#include "InputModuleTypes.generated.h"
+
 /**
 * 输入模式
 */
@@ -39,7 +43,7 @@ struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
 	{}
 
 protected:
-	virtual void ApplyInputMode(FReply& SlateOperations, class UGameViewportClient& GameViewportClient) const override;
+	virtual void ApplyInputMode(class FReply& SlateOperations, class UGameViewportClient& GameViewportClient) const override;
 };
 
 struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGameAndUI

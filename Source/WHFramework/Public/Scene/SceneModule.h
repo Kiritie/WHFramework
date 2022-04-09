@@ -45,10 +45,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UWorldTimerComponent* WorldTimer;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UWorldWeatherComponent* WorldWeather;
 public:
 	UFUNCTION(BlueprintPure)

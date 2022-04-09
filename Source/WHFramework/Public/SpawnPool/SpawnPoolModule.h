@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "SpawnPool.h"
+#include "SpawnPoolInterface.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "SpawnPoolModule.generated.h"
@@ -58,7 +59,8 @@ public:
 		if (!SpawnPools.Contains(InType))
 		{
 			USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
-			SpawnPool->Initialize(Limit, InType);
+			const int32 TempLimit = ISpawnPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
+			SpawnPool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
 			SpawnPools.Add(InType, SpawnPool);
 		}
 		return Cast<T>(SpawnPools[InType]->Spawn());

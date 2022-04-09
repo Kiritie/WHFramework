@@ -51,7 +51,7 @@ void UAssetModuleBPLibrary::RemoveAllDataAsset()
 	}
 }
 
-UPrimaryAssetBase* UAssetModuleBPLibrary::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
+UPrimaryAssetBase* UAssetModuleBPLibrary::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass, bool bLogWarning)
 {
 	return UPrimaryAssetManager::Get().LoadAsset(InPrimaryAssetId, bLogWarning);
 }

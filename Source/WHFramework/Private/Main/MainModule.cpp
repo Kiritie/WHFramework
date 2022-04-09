@@ -99,9 +99,21 @@ void AMainModule::GenerateModules_Implementation()
 	GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
-		if(Iter->GetClass()->ImplementsInterface(UModule::StaticClass()) && !ModuleRefs.Contains(Iter))
+		if(const IModule* Module = Cast<IModule>(Iter))
 		{
-			ModuleRefs.Add(Iter);
+			if(!ModuleRefs.Contains(Iter))
+			{
+				ModuleRefs.Add(Iter);
+			}
+			const FName ModuleName = Module->Execute_GetModuleName(Iter);
+			if(!ModuleMap.Contains(ModuleName))
+			{
+				ModuleMap.Add(ModuleName, Iter);
+			}
+			else if(!ModuleMap[ModuleName])
+			{
+				ModuleMap[ModuleName] = Iter;
+			}
 		}
 	}
 
@@ -136,7 +148,7 @@ void AMainModule::GenerateModules_Implementation()
 			{
 				ModuleMap.Add(Module->Execute_GetModuleName(Module), Module);
 			}
-			Module->SetActorLabel(ModuleClasses[i]->GetDefaultObject<AModuleBase>()->Execute_GetModuleName(ModuleClasses[i]->GetDefaultObject<AModuleBase>()).ToString());
+			Module->SetActorLabel(Module->Execute_GetModuleName(Module).ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			Module->Execute_OnGenerate(Module);
 		}
@@ -182,6 +194,7 @@ void AMainModule::DestroyModules_Implementation()
 		}
 	}
 	ModuleRefs.Empty();
+	ModuleMap.Empty();
 	Modify();
 }
 #endif

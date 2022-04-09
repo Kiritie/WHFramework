@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "ObjectPool.h"
+#include "ObjectPoolInterface.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "ObjectPoolModule.generated.h"
@@ -58,7 +59,8 @@ public:
 		if (!ObjectPools.Contains(InType))
 		{
 			UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
-			ObjectPool->Initialize(Limit, InType);
+			const int32 TempLimit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
+			ObjectPool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
 			ObjectPools.Add(InType, ObjectPool);
 		}
 		return Cast<T>(ObjectPools[InType]->Spawn());

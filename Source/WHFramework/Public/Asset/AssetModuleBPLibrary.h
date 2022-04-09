@@ -73,8 +73,9 @@ public:
 	template<class T>
 	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{
-		return Cast<T>(LoadPrimaryAsset(InPrimaryAssetId, bLogWarning));
+		return Cast<T>(LoadPrimaryAsset(InPrimaryAssetId, T::StaticClass(), bLogWarning));
 	}
 	
-	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass"), Category = "AssetModuleBPLibrary")
+	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true);
 };

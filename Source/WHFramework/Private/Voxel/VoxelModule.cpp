@@ -23,8 +23,7 @@ FVoxelWorldSaveData* AVoxelModule::WorldData = nullptr;
 // Sets default values
 AVoxelModule::AVoxelModule()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	ModuleName = FName("VoxelModule");
 
 	VoxelsCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
 	VoxelsCapture->ProjectionType = ECameraProjectionMode::Orthographic;
@@ -193,7 +192,7 @@ void AVoxelModule::UnloadData(bool bPreview)
 	}
 }
 
-void AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
+bool AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
 {
 	if(WorldState != InWorldState)
 	{
@@ -211,7 +210,9 @@ void AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
 			default: break;
 		}
 		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
+		return true;
 	}
+	return false;
 }
 
 void AVoxelModule::InitRandomStream(int32 InDeltaSeed)

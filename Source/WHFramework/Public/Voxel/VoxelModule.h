@@ -20,7 +20,7 @@ class UWorldWeatherComponent;
 /**
  * 体素模块
  */
-UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
+UCLASS()
 class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
@@ -75,7 +75,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	USceneCaptureComponent2D* VoxelsCapture;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ protected:
 public:
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
-	virtual void ChangeWorldState(EVoxelWorldState InWorldState);
+	virtual bool ChangeWorldState(EVoxelWorldState InWorldState);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
