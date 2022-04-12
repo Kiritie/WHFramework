@@ -12,14 +12,24 @@
 UENUM(BlueprintType)
 enum class EWidgetType : uint8
 {
-	/// 无
-	None,
+	/// 默认
+	Default,
+	/// 主界面
+	Main,
+	/// 子界面
+	Child
+};
+
+/**
+* Widget分类
+*/
+UENUM(BlueprintType)
+enum class EWidgetCategory : uint8
+{
 	/// 常驻
 	Permanent,
 	/// 临时
-	Temporary,
-	/// 子界面
-	Child
+	Temporary
 };
 
 /**

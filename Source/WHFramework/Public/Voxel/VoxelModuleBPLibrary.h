@@ -18,20 +18,17 @@ class WHFRAMEWORK_API UVoxelModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
+	// Asset
+public:
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Index
 public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static EDirection InvertDirection(EDirection InDirection);
+	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FVector DirectionToVector(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FIndex DirectionToIndex(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
+	static FVector ChunkIndexToLocation(FIndex InIndex);
 };

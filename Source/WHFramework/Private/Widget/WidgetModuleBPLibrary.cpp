@@ -87,19 +87,19 @@ bool UWidgetModuleBPLibrary::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> I
 	return false;
 }
 
-void UWidgetModuleBPLibrary::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::CloseAllUserWidget(bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		WidgetModule->CloseAllUserWidget(InWidgetType, bInstant);
+		WidgetModule->CloseAllUserWidget(bInstant);
 	}
 }
 
-void UWidgetModuleBPLibrary::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
+void UWidgetModuleBPLibrary::CloseAllSlateWidget(bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		WidgetModule->CloseAllSlateWidget(InWidgetType, bInstant);
+		WidgetModule->CloseAllSlateWidget(bInstant);
 	}
 }
 

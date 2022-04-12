@@ -12,10 +12,17 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SSlateWidgetBase::SSlateWidgetBase()
 {
+	WidgetType = EWidgetType::Default;
+	WidgetCategory = EWidgetCategory::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
 	WidgetZOrder = 0;
-	WidgetType = EWidgetType::None;
+	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	bWidgetAutoSize = false;
+	WidgetDrawSize = FVector2D(0.f);
+	WidgetOffsets = FMargin(0.f);
+	WidgetAlignment = FVector2D(0.f);
+	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetRefreshType = EWidgetRefreshType::None;
@@ -53,11 +60,11 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	
 	switch (WidgetType)
 	{
-		case EWidgetType::Permanent:
+		case EWidgetCategory::Permanent:
 		{
 			SetVisibility(EVisibility::SelfHitTestInvisible);
 		}
-		case EWidgetType::Temporary:
+		case EWidgetCategory::Temporary:
 		{
 			//AddToViewport(WidgetZOrder);
 		}
@@ -138,6 +145,22 @@ void SSlateWidgetBase::Destroy()
 	//UWidgetModuleBPLibrary::DestroySlateWidget<SSlateWidgetBase>();
 }
 
+void SSlateWidgetBase::AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+}
+
+void SSlateWidgetBase::RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+}
+
+void SSlateWidgetBase::RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+}
+
+void SSlateWidgetBase::RefreshAllChild()
+{
+}
+
 void SSlateWidgetBase::FinishOpen(bool bInstant)
 {
 	WidgetState = EWidgetState::Opened;
@@ -151,12 +174,12 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 
 	switch (WidgetType)
 	{
-		case EWidgetType::Permanent:
+		case EWidgetCategory::Permanent:
 		{
 			SetVisibility(EVisibility::Hidden);
 			break;
 		}
-		case EWidgetType::Temporary:
+		case EWidgetCategory::Temporary:
 		{
 			if(!bInstant && GetLastWidget())
 			{

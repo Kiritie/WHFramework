@@ -21,6 +21,26 @@ class WHFRAMEWORK_API UWidgetModuleBPLibrary : public UBlueprintFunctionLibrary
 	// UserWidget
 public:
 	template<class T>
+	static T* GetMainUserWidget()
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->GetMainUserWidget<T>();
+		}
+		return nullptr;
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetMainUserWidget"))
+	static UUserWidgetBase* K2_GetMainUserWidget()
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->K2_GetMainUserWidget();
+		}
+		return nullptr;
+	}
+
+	template<class T>
 	static T* GetTemporaryUserWidget()
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -158,7 +178,7 @@ public:
 	static bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	static void CloseAllUserWidget(bool bInstant = false);
 
 	////////////////////////////////////////////////////
 	// SlateWidget
@@ -233,7 +253,7 @@ public:
 		return false;
 	}
 
-	static void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	static void CloseAllSlateWidget(bool bInstant = false);
 	
 	////////////////////////////////////////////////////
 	// Widget
@@ -264,7 +284,7 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
 	static UWorldWidgetBase* K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
 	template<class T>
@@ -316,7 +336,7 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWorldWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
 	static UWorldWidgetBase* K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
@@ -329,7 +349,7 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWidget"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidget"), Category = "WidgetModuleBPLibrary")
 	static bool K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
 	template<class T>

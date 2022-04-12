@@ -10,9 +10,11 @@
 #include "Event/Handle/Voxel/EventHandle_ChangeVoxelWorldState.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Main/MainModule.h"
+#include "Math/MathBPLibrary.h"
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "SpawnPool/SpawnPoolModuleBPLibrary.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -85,7 +87,17 @@ void AVoxelModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	GenerateTerrain();
+	switch(WorldState)
+	{
+		case EVoxelWorldState::Generating:
+		case EVoxelWorldState::BasicGenerated:
+		case EVoxelWorldState::FullGenerated:
+		{
+			GenerateTerrain();
+			break;
+		}
+		default: break;
+	}
 }
 
 void AVoxelModule::OnPause_Implementation()
@@ -120,17 +132,37 @@ FVoxelWorldSaveData* AVoxelModule::GetWorldData()
 	}
 }
 
-FIndex AVoxelModule::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
+float AVoxelModule::GetWorldLength() const
 {
-	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / GetWorldData()->GetChunkLength()),
-		FMath::FloorToInt(InLocation.Y / GetWorldData()->GetChunkLength()),
-		bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z / GetWorldData()->GetChunkLength()));
-	return chunkIndex;
+	return GetWorldData()->ChunkSize * ChunkSpawnRange * 2;
 }
 
-FVector AVoxelModule::ChunkIndexToLocation(FIndex InIndex)
+bool AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
 {
-	return InIndex.ToVector() * GetWorldData()->GetChunkLength();
+	if(WorldState != InWorldState)
+	{
+		WorldState = InWorldState;
+		switch(WorldState)
+		{
+			case EVoxelWorldState::BasicGenerated:
+			{
+				break;
+			}
+			case EVoxelWorldState::FullGenerated:
+			{
+				break;
+			}
+			default: break;
+		}
+		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
+		return true;
+	}
+	return false;
+}
+
+void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
+{
+	RandomStream.Initialize(GetWorldData()->WorldSeed + InDeltaSeed);
 }
 
 void AVoxelModule::LoadData(FSaveData* InWorldData)
@@ -192,86 +224,6 @@ void AVoxelModule::UnloadData(bool bPreview)
 	}
 }
 
-bool AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
-{
-	if(WorldState != InWorldState)
-	{
-		WorldState = InWorldState;
-		switch(WorldState)
-		{
-			case EVoxelWorldState::BasicGenerated:
-			{
-				break;
-			}
-			case EVoxelWorldState::FullGenerated:
-			{
-				break;
-			}
-			default: break;
-		}
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
-		return true;
-	}
-	return false;
-}
-
-void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
-{
-	RandomStream.Initialize(GetWorldData()->WorldSeed + InDeltaSeed);
-}
-
-EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
-{
-	const FVector offsetIndex = FVector(InIndex.X + GetWorldData()->WorldSeed, InIndex.Y + GetWorldData()->WorldSeed, InIndex.Z);
-	
-	const int plainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainPlainScale);
-	const int mountainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainMountainScale);
-	
-	const int baseHeight = FMath::Clamp(FMath::Max(plainHeight, mountainHeight) + int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBaseHeight), 0, GetWorldData()->GetWorldHeight() - 1);
-
-	const int stoneHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainStoneVoxelScale), 0, GetWorldData()->GetWorldHeight() - 1);
-	const int sandHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainSandVoxelScale), 0, GetWorldData()->GetWorldHeight() - 1);
-
-	const int waterHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainWaterVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
-	const int bedrockHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBedrockVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
-	
-	if (InIndex.Z < baseHeight)
-	{
-		if (InIndex.Z <= bedrockHeight)
-		{
-			return EVoxelType::Bedrock; //Bedrock
-		}
-		else if (InIndex.Z <= stoneHeight)
-		{
-			return EVoxelType::Stone; //Stone
-		}
-		return EVoxelType::Dirt; //Dirt
-	}
-	else if(InIndex.Z <= sandHeight)
-	{
-		return EVoxelType::Sand; //Sand
-	}
-	else if (InIndex.Z <= waterHeight)
-	{
-		return EVoxelType::Water; //Water
-	}
-	else if (InIndex.Z == baseHeight)
-	{
-		return EVoxelType::Grass; //Grass
-	}
-	return EVoxelType::Empty; //Empty
-}
-
-UVoxelData* AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
-}
-
-int AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
-{
-	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1) * GetWorldData()->GetWorldHeight() * InScale.Z;
-}
-
 void AVoxelModule::GeneratePreviews()
 {
 	// auto voxelDatas = UDWHelper::LoadVoxelDatas();
@@ -309,7 +261,7 @@ void AVoxelModule::GenerateTerrain()
 {
 	if(IWHPlayerInterface* Player = UGlobalBPLibrary::GetPlayerPawn<IWHPlayerInterface>(this))
 	{
-		FIndex chunkIndex = LocationToChunkIndex(Cast<AActor>(Player)->GetActorLocation(), true);
+		FIndex chunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(Cast<AActor>(Player)->GetActorLocation(), true);
 
 		if (LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(chunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
 		{
@@ -571,7 +523,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 
 AVoxelChunk* AVoxelModule::FindChunk(FVector InLocation)
 {
-	return FindChunk(LocationToChunkIndex(InLocation));
+	return FindChunk(UVoxelModuleBPLibrary::LocationToChunkIndex(InLocation));
 }
 
 AVoxelChunk* AVoxelModule::FindChunk(FIndex InIndex)
@@ -581,6 +533,73 @@ AVoxelChunk* AVoxelModule::FindChunk(FIndex InIndex)
 		return ChunkMap[InIndex];
 	}
 	return nullptr;
+}
+
+EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
+{
+	const FVector offsetIndex = FVector(InIndex.X + GetWorldData()->WorldSeed, InIndex.Y + GetWorldData()->WorldSeed, InIndex.Z);
+	
+	const int plainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainPlainScale);
+	const int mountainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainMountainScale);
+	
+	const int baseHeight = FMath::Clamp(FMath::Max(plainHeight, mountainHeight) + int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBaseHeight), 0, GetWorldData()->GetWorldHeight() - 1);
+
+	const int stoneHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainStoneVoxelScale), 0, GetWorldData()->GetWorldHeight() - 1);
+	const int sandHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainSandVoxelScale), 0, GetWorldData()->GetWorldHeight() - 1);
+
+	const int waterHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainWaterVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
+	const int bedrockHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBedrockVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
+	
+	if (InIndex.Z < baseHeight)
+	{
+		if (InIndex.Z <= bedrockHeight)
+		{
+			return EVoxelType::Bedrock; //Bedrock
+		}
+		else if (InIndex.Z <= stoneHeight)
+		{
+			return EVoxelType::Stone; //Stone
+		}
+		return EVoxelType::Dirt; //Dirt
+	}
+	else if(InIndex.Z <= sandHeight)
+	{
+		return EVoxelType::Sand; //Sand
+	}
+	else if (InIndex.Z <= waterHeight)
+	{
+		return EVoxelType::Water; //Water
+	}
+	else if (InIndex.Z == baseHeight)
+	{
+		return EVoxelType::Grass; //Grass
+	}
+	return EVoxelType::Empty; //Empty
+}
+
+UVoxelData* AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
+}
+
+int AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
+{
+	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1) * GetWorldData()->GetWorldHeight() * InScale.Z;
+}
+
+bool AVoxelModule::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+{
+	return false;
+}
+
+bool AVoxelModule::ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+{
+	return false;
+}
+
+bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult)
+{
+	return false;
 }
 
 int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
@@ -597,24 +616,4 @@ int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 		}
 	}
 	return num;
-}
-
-float AVoxelModule::GetWorldLength() const
-{
-	return GetWorldData()->ChunkSize * ChunkSpawnRange * 2;
-}
-
-bool AVoxelModule::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
-{
-	return false;
-}
-
-bool AVoxelModule::ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
-{
-	return false;
-}
-
-bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult)
-{
-	return false;
 }

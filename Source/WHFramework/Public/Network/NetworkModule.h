@@ -35,30 +35,4 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Execute Object Func
-public:
-	bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Execute Actor Func
-public:
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFunc(AActor* InActor, FName InFuncName);
-
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFuncOneParam(AActor* InActor, FName InFuncName, FParameter InParam);
-
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFuncTwoParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2);
-
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFuncThreeParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3);
-
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFuncFourParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4);
-
-	UFUNCTION(BlueprintCallable)
-	void ServerExecuteActorFuncFiveParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4, FParameter InParam5);
 };

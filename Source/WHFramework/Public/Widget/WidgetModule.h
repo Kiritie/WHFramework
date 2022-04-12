@@ -51,6 +51,9 @@ protected:
 
 private:
 	UPROPERTY(Transient)
+	UUserWidgetBase* MainUserWidget;
+
+	UPROPERTY(Transient)
 	UUserWidgetBase* TemporaryUserWidget;
 
 	UPROPERTY()
@@ -60,6 +63,12 @@ private:
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 public:
+	template<class T>
+	T* GetMainUserWidget() const { return Cast<T>(MainUserWidget); }
+	
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetMainUserWidget"))
+	UUserWidgetBase* K2_GetMainUserWidget() const { return MainUserWidget; }
+
 	template<class T>
 	T* GetTemporaryUserWidget() const { return Cast<T>(TemporaryUserWidget); }
 	
@@ -164,7 +173,11 @@ public:
 		{
 			if(UserWidget->GetWidgetState() != EWidgetState::Opening && UserWidget->GetWidgetState() != EWidgetState::Opened)
 			{
-				if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+				if(UserWidget->GetWidgetType() == EWidgetType::Main)
+				{
+					MainUserWidget = UserWidget;
+				}
+				if(!UserWidget->GetParentWidget() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 				{
 					if(TemporaryUserWidget)
 					{
@@ -190,7 +203,11 @@ public:
 		{
 			if(UserWidget->GetWidgetState() != EWidgetState::Closing && UserWidget->GetWidgetState() != EWidgetState::Closed)
 			{
-				if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+				if(UserWidget->GetWidgetType() == EWidgetType::Main)
+				{
+					MainUserWidget = nullptr;
+				}
+				if(!UserWidget->GetParentWidget() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 				{
 					TemporaryUserWidget = nullptr;
 				}
@@ -245,7 +262,7 @@ public:
 	bool K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	UFUNCTION(BlueprintCallable)
-	void CloseAllUserWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	void CloseAllUserWidget(bool bInstant = false);
 
 	////////////////////////////////////////////////////
 	// SlateWidget
@@ -307,7 +324,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(nullptr)))
 		{
-			if(SlateWidget->GetWidgetType() == EWidgetType::Temporary)
+			if(!SlateWidget->GetParentWidget() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 			{
 				if(TemporarySlateWidget)
 				{
@@ -327,7 +344,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			if(SlateWidget->GetWidgetType() == EWidgetType::Temporary)
+			if(!SlateWidget->GetParentWidget() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 			{
 				TemporarySlateWidget = nullptr;
 			}
@@ -369,7 +386,7 @@ public:
 		return false;
 	}
 
-	void CloseAllSlateWidget(EWidgetType InWidgetType = EWidgetType::None, bool bInstant = false);
+	void CloseAllSlateWidget(bool bInstant = false);
 	
 	////////////////////////////////////////////////////
 	// Widget
@@ -418,7 +435,7 @@ public:
 		return GetWorldWidgetByName<T>(WidgetName, InWidgetIndex);
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWidget", DeterminesOutputType = "InWidgetClass"))
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidget", DeterminesOutputType = "InWidgetClass"))
 	UWorldWidgetBase* K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const;
 
 	template<class T>
@@ -487,7 +504,7 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWorldWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
 	UWorldWidgetBase* K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
@@ -521,7 +538,7 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWidget"))
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidget"))
 	bool K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
 	template<class T>

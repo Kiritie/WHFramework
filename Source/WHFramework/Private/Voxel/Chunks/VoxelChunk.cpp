@@ -7,6 +7,7 @@
 #include "Character/Base/CharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Math/MathBPLibrary.h"
 #include "Scene/Object/PickUp/PickUp.h"
 #include "Scene/Object/PickUp/PickUpEquip.h"
 #include "Scene/Object/PickUp/PickUpProp.h"
@@ -464,10 +465,10 @@ void AVoxelChunk::UpdateNeighbors()
 {
 	for (int32 i = 0; i < 6; i++)
 	{
-		Neighbors[i] = AVoxelModule::Get()->FindChunk(Index + UVoxelModuleBPLibrary::DirectionToIndex((EDirection)i));
+		Neighbors[i] = AVoxelModule::Get()->FindChunk(Index + UMathBPLibrary::DirectionToIndex((EDirection)i));
 		if (Neighbors[i] != nullptr)
 		{
-			Neighbors[i]->Neighbors[(int32)UVoxelModuleBPLibrary::InvertDirection((EDirection)i)] = this;
+			Neighbors[i]->Neighbors[(int32)UMathBPLibrary::InvertDirection((EDirection)i)] = this;
 		}
 	}
 }
@@ -478,7 +479,7 @@ void AVoxelChunk::BreakNeighbors()
 	{
 		if (Neighbors[i] != nullptr)
 		{
-			Neighbors[i]->Neighbors[(int32)UVoxelModuleBPLibrary::InvertDirection((EDirection)i)] = nullptr;
+			Neighbors[i]->Neighbors[(int32)UMathBPLibrary::InvertDirection((EDirection)i)] = nullptr;
 			Neighbors[i] = nullptr;
 		}
 	}
@@ -623,7 +624,7 @@ bool AVoxelChunk::CheckAdjacent(const FVoxelItem& InVoxelItem, EDirection InDire
 
 	UVoxelData* voxelData = InVoxelItem.GetData<UVoxelData>();
 	
-	FVoxelItem& adjacentItem = GetVoxelItem(UVoxelModuleBPLibrary::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Rotation));
+	FVoxelItem& adjacentItem = GetVoxelItem(UMathBPLibrary::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Rotation));
 	UVoxelData* adjacentData = adjacentItem.GetData<UVoxelData>();
 
 	if(adjacentItem.IsValid())
@@ -803,7 +804,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	}
 	else if (InZ >= AVoxelModule::GetWorldData()->ChunkSize) {
 		if (Neighbors[(int32)EDirection::Up] == nullptr)
-			AVoxelModule::Get()->SpawnChunk(Index + UVoxelModuleBPLibrary::DirectionToIndex(EDirection::Up), !bGenerateMesh);
+			AVoxelModule::Get()->SpawnChunk(Index + UMathBPLibrary::DirectionToIndex(EDirection::Up), !bGenerateMesh);
 		if (Neighbors[(int32)EDirection::Up] != nullptr)
 			return Neighbors[(int32)EDirection::Up]->SetVoxelComplex(InX, InY, InZ - AVoxelModule::GetWorldData()->ChunkSize, InVoxelItem, bGenerateMesh);
 	}

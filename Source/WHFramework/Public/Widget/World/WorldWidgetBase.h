@@ -25,10 +25,14 @@ class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IWidgetInter
 public:
 	UWorldWidgetBase(const FObjectInitializer& ObjectInitializer);
 
-public:
-	void TickWidget_Implementation() override;
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
 
+public:
 	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+
+	void OnTick_Implementation(float DeltaSeconds) override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -59,18 +63,15 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
-
-	UPROPERTY(EditDefaultsOnly)
-	bool bWidgetTickAble;
-
-	UPROPERTY(EditDefaultsOnly)
-	bool bWidgetAutoSize;
 	
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
 	UPROPERTY(EditDefaultsOnly)
 	FAnchors WidgetAnchors;
+
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetAutoSize;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
 	FVector2D WidgetDrawSize;
@@ -107,34 +108,34 @@ private:
 	
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetWidgetName() const { return WidgetName; }
-
-	UFUNCTION(BlueprintPure)
-	bool IsWidgetAutoSize() const { return bWidgetAutoSize; }
+	virtual FName GetWidgetName() const override { return WidgetName; }
 	
 	UFUNCTION(BlueprintPure)
-	int32 GetWidgetZOrder() const { return WidgetZOrder; }
+	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	UFUNCTION(BlueprintPure)
-	FAnchors GetWidgetAnchors() const { return WidgetAnchors; }
+	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
 
 	UFUNCTION(BlueprintPure)
-	FVector2D GetWidgetDrawSize() const { return WidgetDrawSize; }
+	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 
 	UFUNCTION(BlueprintPure)
-	FMargin GetWidgetOffsets() const { return WidgetOffsets; }
+	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
 
 	UFUNCTION(BlueprintPure)
-	FVector2D GetWidgetAlignment() const { return WidgetAlignment; }
+	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EWidgetRefreshType GetWidgetRefreshType() const { return WidgetRefreshType; }
+	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetInputMode() const { return InputMode; }
+	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual AActor* GetOwnerActor() const { return OwnerActor; }
+	virtual EInputMode GetInputMode() const override { return InputMode; }
+
+	UFUNCTION(BlueprintPure)
+	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }

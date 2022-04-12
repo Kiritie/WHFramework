@@ -18,11 +18,6 @@ class WHFRAMEWORK_API UNetworkModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Execute Object Func
-public:
-	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Execute Actor Func
 public:
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")

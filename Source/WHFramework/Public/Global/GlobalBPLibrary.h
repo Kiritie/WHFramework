@@ -110,6 +110,11 @@ public:
 	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Execute Object Func
+public:
+	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
 public:
 	template<class T>

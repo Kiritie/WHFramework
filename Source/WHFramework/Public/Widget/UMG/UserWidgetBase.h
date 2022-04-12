@@ -20,10 +20,14 @@ class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IWidgetInterf
 public:
 	UUserWidgetBase(const FObjectInitializer& ObjectInitializer);
 
-public:
-	void TickWidget_Implementation() override;
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
 
+public:
 	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+
+	void OnTick_Implementation(float DeltaSeconds) override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -67,6 +71,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Destroy() override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RefreshAllChild() override;
 	
 protected:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -77,19 +93,34 @@ protected:
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
+	EWidgetType WidgetType;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType != EWidgetType::Child"))
+	EWidgetCategory WidgetCategory;
+
+	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
 	FName ParentName;
 				
 	UPROPERTY(EditDefaultsOnly)
-	bool bWidgetTickAble;
-
-	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly)
-	EWidgetType WidgetType;
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	FAnchors WidgetAnchors;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	bool bWidgetAutoSize;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child && bWidgetAutoSize == false"))
+	FVector2D WidgetDrawSize;
+	
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child && bWidgetAutoSize == false"))
+	FMargin WidgetOffsets;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	FVector2D WidgetAlignment;
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetCreateType WidgetCreateType;
@@ -143,6 +174,16 @@ private:
 
 public:
 	UFUNCTION(BlueprintPure)
+	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
+
+	UFUNCTION(BlueprintPure)
+	virtual EWidgetCategory GetWidgetCategory() const override
+	{
+		if(ParentWidget) return ParentWidget->GetWidgetCategory();
+		return WidgetCategory;
+	}
+
+	UFUNCTION(BlueprintPure)
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	UFUNCTION(BlueprintPure)
@@ -152,7 +193,19 @@ public:
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
+	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
+
+	UFUNCTION(BlueprintPure)
+	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
@@ -199,7 +252,4 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetChildWidgets(const TArray<TScriptInterface<IWidgetInterface>>& InChildWidgets) override { ChildWidgets = InChildWidgets; }
 };

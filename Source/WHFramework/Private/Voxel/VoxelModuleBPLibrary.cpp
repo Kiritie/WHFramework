@@ -3,47 +3,24 @@
 
 #include "Voxel/VoxelModuleBPLibrary.h"
 
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
-
-EDirection UVoxelModuleBPLibrary::InvertDirection(EDirection InDirection)
-{
-	if ((int32)InDirection % 2 == 0)
-		return (EDirection)((int32)InDirection + 1);
-	else
-		return (EDirection)((int32)InDirection - 1);
-}
-
-FVector UVoxelModuleBPLibrary::DirectionToVector(EDirection InDirection, FRotator InRotation /*= FRotator::ZeroRotator*/)
-{
-	switch (InDirection)
-	{
-		case EDirection::Up:
-			return InRotation.RotateVector(FVector::UpVector);
-		case EDirection::Down:
-			return InRotation.RotateVector(FVector::DownVector);
-		case EDirection::Forward:
-			return InRotation.RotateVector(FVector::ForwardVector);
-		case EDirection::Back:
-			return InRotation.RotateVector(FVector::BackwardVector);
-		case EDirection::Left:
-			return InRotation.RotateVector(FVector::LeftVector);
-		case EDirection::Right:
-			return InRotation.RotateVector(FVector::RightVector);
-	}
-	return FVector::ZeroVector;
-}
-
-FIndex UVoxelModuleBPLibrary::DirectionToIndex(EDirection InDirection, FRotator InRotation /*= FRotator::ZeroRotator*/)
-{
-	return FIndex(DirectionToVector(InDirection, InRotation));
-}
-
-FIndex UVoxelModuleBPLibrary::GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation /*= FRotator::ZeroRotator*/)
-{
-	return InIndex + DirectionToIndex(InDirection, InRotation);
-}
+#include "Voxel/VoxelModule.h"
 
 FPrimaryAssetId UVoxelModuleBPLibrary::GetAssetIDByVoxelType(EVoxelType InVoxelType)
 {
 	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
+}
+
+FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
+{
+	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / AVoxelModule::GetWorldData()->GetChunkLength()),
+		FMath::FloorToInt(InLocation.Y / AVoxelModule::GetWorldData()->GetChunkLength()),
+		bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z / AVoxelModule::GetWorldData()->GetChunkLength()));
+	return chunkIndex;
+}
+
+FVector UVoxelModuleBPLibrary::ChunkIndexToLocation(FIndex InIndex)
+{
+	return InIndex.ToVector() * AVoxelModule::GetWorldData()->GetChunkLength();
 }

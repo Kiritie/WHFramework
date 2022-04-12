@@ -145,6 +145,20 @@ FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputAction
 	return FText::GetEmpty();
 }
 
+bool UGlobalBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params)
+{
+	if (ensureEditor(InObject))
+	{
+		UFunction* Func = InObject->FindFunction(InFuncName);
+		if (ensureEditorMsgf(Func, TEXT("错误的函数调用, %s 对应函数名称 : %s ,并不存在"), *InObject->GetName(), *InFuncName.ToString()))
+		{
+			InObject->ProcessEvent(Func, Params);
+			return true;
+		}
+	}
+	return false;
+}
+
 UGameInstance* UGlobalBPLibrary::K2_GetGameInstance(const UObject* InWorldContext, TSubclassOf<UGameInstance> InClass)
 {
 	return UGameplayStatics::GetGameInstance(InWorldContext);

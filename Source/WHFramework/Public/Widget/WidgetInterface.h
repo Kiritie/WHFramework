@@ -48,6 +48,14 @@ public:
 
 	virtual void Reset() = 0;
 
+	virtual void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+
+	virtual void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+
+	virtual void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+
+	virtual void RefreshAllChild() = 0;
+
 protected:
 	virtual void FinishOpen(bool bInstant) = 0;
 
@@ -57,6 +65,8 @@ public:
 	virtual FName GetParentName() const = 0;
 
 	virtual EWidgetType GetWidgetType() const = 0;
+
+	virtual EWidgetCategory GetWidgetCategory() const = 0;
 
 	virtual EWidgetCreateType GetWidgetCreateType() const = 0;
 
@@ -75,6 +85,4 @@ public:
 	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) = 0;
 
 	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() = 0;
-
-	virtual void SetChildWidgets(const TArray<TScriptInterface<IWidgetInterface>>& InChildWidgets) = 0;
 };

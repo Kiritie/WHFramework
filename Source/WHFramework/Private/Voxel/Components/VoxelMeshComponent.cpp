@@ -227,7 +227,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 		}
 	}
 
-	BuildFace(InVoxelItem, vertices, (int32)InFacing, UVoxelModuleBPLibrary::DirectionToVector((EDirection)InFacing));
+	BuildFace(InVoxelItem, vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector((EDirection)InFacing));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal)

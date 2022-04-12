@@ -12,11 +12,17 @@
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bWidgetTickAble = false;
+	WidgetType = EWidgetType::Default;
+	WidgetCategory = EWidgetCategory::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
-	bWidgetTickAble = false;
 	WidgetZOrder = 0;
-	WidgetType = EWidgetType::None;
+	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	bWidgetAutoSize = false;
+	WidgetDrawSize = FVector2D(0.f);
+	WidgetOffsets = FMargin(0.f);
+	WidgetAlignment = FVector2D(0.f);
 	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetOpenFinishType = EWidgetOpenFinishType::Procedure;
@@ -24,7 +30,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetCloseFinishType = EWidgetCloseFinishType::Procedure;
 	WidgetCloseFinishTime = 0.f;
-	WidgetRefreshType = EWidgetRefreshType::None;
+	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EWidgetState::None;
 	InputMode = EInputMode::None;
@@ -34,17 +40,20 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<TScriptInterface<IWidgetInterface>>();
 }
 
-void UUserWidgetBase::TickWidget_Implementation()
+void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	
 }
 
 void UUserWidgetBase::OnCreate_Implementation()
 {
-	if(WidgetType == EWidgetType::Child)
+	if(WidgetType == EWidgetType::Child && !ParentName.IsNone())
 	{
 		ParentWidget = UWidgetModuleBPLibrary::GetUserWidgetByName<UUserWidgetBase>(ParentName);
-		ParentWidget->GetChildWidgets().Add(this);
+		if(ParentWidget)
+		{
+			ParentWidget->AddChild(this);
+		}
 	}
 }
 
@@ -59,8 +68,20 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 
 	switch(WidgetType)
 	{
-		case EWidgetType::Permanent:
-		case EWidgetType::Temporary:
+		case EWidgetType::Child:
+		{
+			if(!GetParent() && ParentWidget && ParentWidget->GetRootPanelWidget())
+			{
+				if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(ParentWidget->GetRootPanelWidget()->AddChild(this)))
+				{
+					CanvasPanelSlot->SetZOrder(WidgetZOrder);
+					CanvasPanelSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+					CanvasPanelSlot->SetOffsets(FMargin(0.f));
+				}
+			}
+			break;
+		}
+		default:
 		{
 			if(!IsInViewport())
 			{
@@ -68,19 +89,6 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 			}
 			break;
 		}
-		case EWidgetType::Child:
-		{
-			if(!GetParent() && ParentWidget && ParentWidget->GetRootPanelWidget())
-			{
-				if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(ParentWidget->GetRootPanelWidget()->AddChild(this)))
-				{
-					CanvasPanelSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
-					CanvasPanelSlot->SetOffsets(FMargin(0.f));
-				}
-			}
-			break;
-		}
-		default: break;
 	}
 	switch(WidgetOpenType)
 	{
@@ -147,7 +155,7 @@ void UUserWidgetBase::OnDestroy_Implementation()
 	}
 	if(ParentWidget)
 	{
-		ParentWidget->GetChildWidgets().Remove(this);
+		ParentWidget->RemoveChild(this);
 	}
 	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
 	{
@@ -206,11 +214,41 @@ void UUserWidgetBase::Destroy_Implementation()
 	UWidgetModuleBPLibrary::DestroyUserWidget<UUserWidgetBase>(GetClass());
 }
 
+void UUserWidgetBase::AddChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+	if(!ChildWidgets.Contains(InChildWidget))
+	{
+		ChildWidgets.Add(InChildWidget);
+	}
+}
+
+void UUserWidgetBase::RemoveChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+	if(ChildWidgets.Contains(InChildWidget))
+	{
+		ChildWidgets.Remove(InChildWidget);
+	}
+}
+
+void UUserWidgetBase::RemoveAllChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+{
+	ChildWidgets.Empty();
+}
+
+void UUserWidgetBase::RefreshAllChild_Implementation()
+{
+	for(auto Iter : ChildWidgets)
+	{
+		if(Iter)
+		{
+			Iter->Refresh();
+		}
+	}
+}
+
 void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
 {
 	WidgetState = EWidgetState::Opened;
-
-	Refresh();
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
@@ -243,15 +281,6 @@ void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
 		{
 			switch(WidgetType)
 			{
-				case EWidgetType::Permanent:
-				case EWidgetType::Temporary:
-				{
-					if(IsInViewport())
-					{
-						RemoveFromViewport();
-					}
-					break;
-				}
 				case EWidgetType::Child:
 				{
 					if(GetParent())
@@ -260,13 +289,20 @@ void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
 					}
 					break;
 				}
-				default: break;
+				default:
+				{
+					if(IsInViewport())
+					{
+						RemoveFromViewport();
+					}
+					break;
+				}
 			}
 			break;
 		}
 	}
 
-	if(WidgetType == EWidgetType::Temporary)
+	if(!GetParentWidget() && GetWidgetCategory() == EWidgetCategory::Temporary)
 	{
 		if(!bInstant && GetLastWidget())
 		{

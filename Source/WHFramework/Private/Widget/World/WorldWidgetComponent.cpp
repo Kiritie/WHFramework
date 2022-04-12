@@ -75,7 +75,7 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 	{
-		WorldWidget->Execute_TickWidget(WorldWidget);
+		WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
 		
 		if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{

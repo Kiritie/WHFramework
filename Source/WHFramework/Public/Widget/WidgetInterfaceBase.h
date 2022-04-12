@@ -8,6 +8,7 @@
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
+#include "Widgets/Layout/Anchors.h"
 #include "WidgetInterfaceBase.generated.h"
 
 // This class does not need to be modified.
@@ -27,10 +28,10 @@ class WHFRAMEWORK_API IWidgetInterfaceBase
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void TickWidget();
+	bool IsTickAble() const;
 
 	UFUNCTION(BlueprintNativeEvent)
-	bool IsTickAble() const;
+	void OnTick(float DeltaSeconds);
 
 public:
 	virtual void OnRefresh() = 0;
@@ -46,6 +47,16 @@ public:
 	virtual FName GetWidgetName() const = 0;
 
 	virtual int32 GetWidgetZOrder() const = 0;
+
+	virtual FAnchors GetWidgetAnchors() const = 0;
+
+	virtual bool IsWidgetAutoSize() const = 0;
+
+	virtual FVector2D GetWidgetDrawSize() const = 0;
+
+	virtual FMargin GetWidgetOffsets() const = 0;
+
+	virtual FVector2D GetWidgetAlignment() const = 0;
 
 	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
 

@@ -67,11 +67,6 @@ public:
 	}
 	static FVoxelWorldSaveData* GetWorldData();
 
-public:
-	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
-
-	static FVector ChunkIndexToLocation(FIndex InIndex);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
@@ -86,14 +81,18 @@ protected:
 public:
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
+	virtual float GetWorldLength() const;
+
+protected:
 	virtual bool ChangeWorldState(EVoxelWorldState InWorldState);
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
 	FRandomStream RandomStream;
 public:
 	FRandomStream GetRandomStream() const { return RandomStream; }
 
+protected:
 	UFUNCTION(BlueprintCallable)
 	void InitRandomStream(int32 InDeltaSeed);
 
@@ -103,13 +102,6 @@ public:
 	virtual FSaveData* ToData(bool bSaved = true) override;
 
 	virtual void UnloadData(bool bPreview = false);
-
-public:
-	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
-
-	virtual UVoxelData* GetNoiseVoxelData(FIndex InIndex);
-
-	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
@@ -203,14 +195,24 @@ public:
 
 	virtual AVoxelChunk* FindChunk(FIndex InIndex);
 
+	//////////////////////////////////////////////////////////////////////////
+	// Noise
 public:
-	int GetChunkNum(bool bNeedGenerated = false) const;
+	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
-	float GetWorldLength() const;
+	virtual UVoxelData* GetNoiseVoxelData(FIndex InIndex);
 
+	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Trace
+public:
 	virtual bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
 
 	virtual bool ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
 
 	virtual bool VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult);
+
+public:
+	int GetChunkNum(bool bNeedGenerated = false) const;
 };

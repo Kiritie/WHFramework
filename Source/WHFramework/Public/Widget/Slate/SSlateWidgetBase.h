@@ -52,19 +52,39 @@ public:
 
 	virtual void Destroy() override;
 
+	virtual void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+
+	virtual void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+
+	virtual void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	
+	virtual void RefreshAllChild() override;
+
 protected:
 	virtual void FinishOpen(bool bInstant) override;
 
 	virtual void FinishClose(bool bInstant) override;
 
 protected:
+	EWidgetType WidgetType;
+
+	EWidgetCategory WidgetCategory;
+
 	FName WidgetName;
 
 	FName ParentName;
 	
 	int32 WidgetZOrder;
 
-	EWidgetType WidgetType;
+	FAnchors WidgetAnchors;
+
+	bool bWidgetAutoSize;
+
+	FVector2D WidgetDrawSize;
+	
+	FMargin WidgetOffsets;
+
+	FVector2D WidgetAlignment;
 								
 	EWidgetCreateType WidgetCreateType;
 				
@@ -87,14 +107,26 @@ protected:
 	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
 
 public:
+	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
+		
+	virtual EWidgetCategory GetWidgetCategory() const override { return WidgetCategory; }
+
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	virtual FName GetParentName() const override { return ParentName; }
 
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
-	
-	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
-	
+
+	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+
+	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
+
+	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
+
+	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
+
+	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
+
 	virtual EWidgetState GetWidgetState() const override
 	{
 		if(ParentWidget && ParentWidget->GetWidgetState() == EWidgetState::Closed)
@@ -125,6 +157,4 @@ public:
 	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
 
 	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
-
-	virtual void SetChildWidgets(const TArray<TScriptInterface<IWidgetInterface>>& InChildWidgets) override { ChildWidgets = InChildWidgets; }
 };

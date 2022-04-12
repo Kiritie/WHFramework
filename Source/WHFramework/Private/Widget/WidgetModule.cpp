@@ -110,7 +110,7 @@ void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 		{
 			if(InterfaceWidget->Execute_IsTickAble(Iter))
 			{
-				InterfaceWidget->Execute_TickWidget(Iter);
+				InterfaceWidget->Execute_OnTick(Iter, DeltaSeconds);
 			}
 		}
 	}
@@ -210,33 +210,27 @@ bool AWidgetModule::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetCl
 	return DestroyUserWidget<UUserWidgetBase>(InWidgetClass);
 }
 
-void AWidgetModule::CloseAllUserWidget(EWidgetType InWidgetType, bool bInstant)
+void AWidgetModule::CloseAllUserWidget(bool bInstant)
 {
 	for (auto Iter : AllUserWidgets)
 	{
-		if(!Iter.Value) continue;
-		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
+		if(Iter.Value)
 		{
-			if (Iter.Value->GetWidgetType() == EWidgetType::Temporary)
-			{
-				TemporaryUserWidget = nullptr;
-			}
-			Iter.Value->OnClose(bInstant);
+			Iter.Value->SetLastWidget(nullptr);
+			Iter.Value->Close(bInstant);
 		}
 	}
 }
 
-void AWidgetModule::CloseAllSlateWidget(EWidgetType InWidgetType, bool bInstant)
+void AWidgetModule::CloseAllSlateWidget(bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)
 	{
-		if(!Iter.Value) continue;
-		if (InWidgetType == EWidgetType::None || Iter.Value->GetWidgetType() == InWidgetType)
+		if(Iter.Value)
 		{
 			Iter.Value->SetLastWidget(nullptr);
-			Iter.Value->OnClose(bInstant);
+			Iter.Value->Close(bInstant);
 		}
-		TemporarySlateWidget = nullptr;
 	}
 }
 

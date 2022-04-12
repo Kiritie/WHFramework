@@ -20,9 +20,9 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 {
 	WidgetName = NAME_None;
 	bWidgetTickAble = true;
-	bWidgetAutoSize = false;
 	WidgetZOrder = -1;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
@@ -36,7 +36,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, class USceneComponent*>();
 }
 
-void UWorldWidgetBase::TickWidget_Implementation()
+void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	if(GetWidgetSpace() == EWidgetSpace::Screen)
 	{
