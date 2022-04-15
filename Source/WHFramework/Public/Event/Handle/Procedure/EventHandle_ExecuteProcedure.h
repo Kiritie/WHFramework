@@ -20,7 +20,7 @@ public:
 
 public:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
-	class AProcedureBase* Procedure;
+	class UProcedureBase* Procedure;
 	
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
 	FName FuncName;

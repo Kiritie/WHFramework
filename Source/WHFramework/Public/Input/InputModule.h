@@ -47,10 +47,10 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintCallable)
-	void UpdateInputMode();
+	virtual void UpdateInputMode();
 
 	UFUNCTION(BlueprintCallable)
-	void SetGlobalInputMode(EInputMode InInputMode);
+	virtual void SetGlobalInputMode(EInputMode InInputMode);
 
 	UFUNCTION(BlueprintPure)
 	EInputMode GetGlobalInputMode() const { return GlobalInputMode; }

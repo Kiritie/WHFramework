@@ -19,9 +19,8 @@ UENUM(BlueprintType)
 enum class EProcedureState : uint8
 {
 	None,
-	Initialized,
-	Prepared,
 	Entered,
+	Executing,
 	Completed,
 	Leaved
 };
@@ -30,9 +29,26 @@ UENUM(BlueprintType)
 enum class EProcedureExecuteType : uint8
 {
 	None,
-	Server,
-	Local,
-	Inherit
+	Automatic,
+	Procedure,
+	MouseClick
+};
+
+UENUM(BlueprintType)
+enum class EProcedureLeaveType : uint8
+{
+	None,
+	Automatic,
+	Procedure
+};
+
+UENUM(BlueprintType)
+enum class EProcedureCompleteType : uint8
+{
+	None,
+	Skip,
+	Automatic,
+	Procedure
 };
 
 UENUM(BlueprintType)
@@ -49,8 +65,7 @@ enum class EProcedureGuideType : uint8
 {
 	None,
 	TimerOnce,
-	TimerLoop,
-	Listener,
+	TimerLoop
 };
 
 UENUM(BlueprintType)
@@ -60,4 +75,19 @@ enum class EProcedureTaskState : uint8
 	Preparing,
 	Executing,
 	Completed
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FProcedureListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	bool bExpanded;
+
+	FORCEINLINE FProcedureListItemStates()
+	{
+		bExpanded = true;
+	}
 };

@@ -11,12 +11,12 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API ARootProcedureBase : public AProcedureBase
+class WHFRAMEWORK_API URootProcedureBase : public UProcedureBase
 {
 	GENERATED_BODY()
 
 public:
-	ARootProcedureBase();
+	URootProcedureBase();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
@@ -28,17 +28,19 @@ public:
 #endif
 
 public:
-	virtual void ServerOnInitialize_Implementation() override;
+	virtual void OnInitialize_Implementation() override;
 	
-	virtual void ServerOnPrepare_Implementation() override;
+	virtual void OnRestore_Implementation() override;
 	
-	virtual void ServerOnEnter_Implementation(AProcedureBase* InLastProcedure) override;
+	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
 	
-	virtual void ServerOnRefresh_Implementation(float DeltaSeconds) override;
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void ServerOnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult) override;
+	virtual void OnGuide_Implementation() override;
+
+	virtual void OnExecute_Implementation() override;
+
+	virtual void OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult) override;
 	
-	virtual void ServerOnLeave_Implementation(AProcedureBase* InNextProcedure) override;
-	
-	virtual void ServerOnClear_Implementation() override;
+	virtual void OnLeave_Implementation() override;
 };

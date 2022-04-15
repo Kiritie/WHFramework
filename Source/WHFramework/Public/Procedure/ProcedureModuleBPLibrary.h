@@ -3,11 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ProcedureModuleTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 
 #include "ProcedureModuleBPLibrary.generated.h"
 
+class URootProcedureBase;
+class UProcedureBase;
 /**
  * 
  */
@@ -18,35 +21,33 @@ class WHFRAMEWORK_API UProcedureModuleBPLibrary : public UBlueprintFunctionLibra
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static class AProcedureBase* GetCurrentProcedure();
-	
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static class AProcedureBase* GetCurrentLocalProcedure();
-	
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static class AProcedureBase* GetCurrentParentProcedure();
+	static UProcedureBase* GetCurrentProcedure();
 
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static class ARootProcedureBase* GetCurrentRootProcedure();
+	static URootProcedureBase* GetCurrentRootProcedure();
+
+public:
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
+	static void StartProcedure(int32 InRootProcedureIndex = -1, bool bSkipProcedures = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ServerEnterProcedure(class AProcedureBase* InProcedure);
+	static void EndProcedure(bool bRestoreProcedures = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ServerLeaveProcedure(class AProcedureBase* InProcedure);
+	static void RestoreProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void LocalEnterProcedure(class AProcedureBase* InProcedure);
+	static void EnterProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void LocalLeaveProcedure(class AProcedureBase* InProcedure);
+	static void GuideProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ServerSkipCurrentProcedure();
+	static void ExecuteProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ServerSkipCurrentParentProcedure();
+	static void CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ServerSkipCurrentRootProcedure();
+	static void LeaveProcedure(UProcedureBase* InProcedure);
 };

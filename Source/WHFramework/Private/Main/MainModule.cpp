@@ -66,7 +66,7 @@ AMainModule::AMainModule()
 
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
 
-	Current = this;
+	//Current = this;
 }
 
 // Called when the game starts or when spawned
@@ -82,6 +82,8 @@ void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 
 	TerminationModules();
+
+	Current = nullptr;
 }
 
 // Called every frame
@@ -90,6 +92,20 @@ void AMainModule::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	RefreshModules(DeltaTime);
+}
+
+AMainModule* AMainModule::Get()
+{
+	if(!Current || !Current->IsValidLowLevel() || Current->GetWorld() != GWorld)
+	{
+		Current = Cast<AMainModule>(UGameplayStatics::GetActorOfClass(GWorld, AMainModule::StaticClass()));
+		// for(const FWorldContext& Context : GEngine->GetWorldContexts())
+		// {
+		// 	Current = Cast<AMainModule>(UGameplayStatics::GetActorOfClass(Context.World(), AMainModule::StaticClass()));
+		// 	if(Current) break;
+		// }
+	}
+	return Current;
 }
 
 #if WITH_EDITOR

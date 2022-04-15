@@ -8,7 +8,7 @@
 #include "WHProcedureEditorStyle.h"
 #include "Procedure/Base/ProcedureBase.h"
 
-DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemDelegate, TArray<TSharedPtr<FProcedureListItem>>)
+DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
 
 /**
  * 
@@ -30,17 +30,22 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TSubclassOf<AProcedureBase> CurrentProcedureClass;
+	TSubclassOf<UProcedureBase> CurrentProcedureClass;
 
 	TArray<TSharedPtr<FProcedureListItem>> ProcedureListItems;
 
 	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
 
-	FOnSelectProcedureListItemDelegate OnSelectProcedureListItemsDelegate;
+	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
 
 	bool bCurrentIsMultiMode = true;
 
 	bool bCurrentIsEditMode = false;
+
+	static FDelegateHandle RefreshDelegateHandle;
+
+public:
+	void Refresh();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
@@ -49,7 +54,7 @@ public:
 	
 	class AProcedureModule* ProcedureModule;
 		
-	AProcedureBase* CopiedProcedure;
+	UProcedureBase* CopiedProcedure;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
@@ -67,9 +72,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 private:
-	AProcedureBase* GenerateProcedure(TSubclassOf<AProcedureBase> InProcedureClass);
+	UProcedureBase* GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass);
 
-	AProcedureBase* DuplicateProcedure(AProcedureBase* InProcedure);
+	UProcedureBase* DuplicateProcedure(UProcedureBase* InProcedure);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Class Picker
@@ -106,6 +111,10 @@ private:
 	void TreeSelectionChanged(TSharedPtr<FProcedureListItem> TreeItem, ESelectInfo::Type SelectInfo);
 
 	void GetChildrenForTree(TSharedPtr<FProcedureListItem> TreeItem, TArray<TSharedPtr<FProcedureListItem>>& OutChildren);
+
+	void OnTreeItemExpansionChanged(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState);
+
+	void SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem);
 
 	void SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState);
 

@@ -3,17 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TickAbleWidgetInterface.h"
 
-#include "WidgetModuleTypes.h"
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
+#include "Widget/WidgetModuleTypes.h"
 #include "Widgets/Layout/Anchors.h"
-#include "WidgetInterfaceBase.generated.h"
+#include "BaseWidgetInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWidgetInterfaceBase : public UInterface
+class UBaseWidgetInterface : public UTickAbleWidgetInterface
 {
 	GENERATED_BODY()
 };
@@ -21,17 +22,11 @@ class UWidgetInterfaceBase : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IWidgetInterfaceBase
+class WHFRAMEWORK_API IBaseWidgetInterface : public ITickAbleWidgetInterface
 {
 	GENERATED_BODY()
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
-public:
-	UFUNCTION(BlueprintNativeEvent)
-	bool IsTickAble() const;
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnTick(float DeltaSeconds);
 
 public:
 	virtual void OnRefresh() = 0;

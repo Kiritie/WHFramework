@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Blueprint/UserWidget.h"
-#include "Widget/WidgetInterface.h"
+#include "Widget/Base/ScreenWidgetInterface.h"
 
 #include "UserWidgetBase.generated.h"
 
@@ -13,7 +13,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IWidgetInterface
+class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface
 {
 	GENERATED_BODY()
 
@@ -73,13 +73,13 @@ public:
 	void Destroy() override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void RefreshAllChild() override;
@@ -159,13 +159,13 @@ protected:
 	AActor* OwnerActor;
 	
 	UPROPERTY(Transient)
-	TScriptInterface<IWidgetInterface> LastWidget;
+	TScriptInterface<IScreenWidgetInterface> LastWidget;
 	
 	UPROPERTY(Transient)
-	TScriptInterface<IWidgetInterface> ParentWidget;
+	TScriptInterface<IScreenWidgetInterface> ParentWidget;
 	
 	UPROPERTY(Transient)
-	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
+	TArray<TScriptInterface<IScreenWidgetInterface>> ChildWidgets;
 
 private:
 	FTimerHandle WidgetFinishOpenTimerHandle;
@@ -239,17 +239,17 @@ public:
 	virtual class UPanelWidget* GetRootPanelWidget() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const override { return LastWidget; }
+	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const override { return LastWidget; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
+	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
 
 	UFUNCTION(BlueprintPure)
-	virtual TScriptInterface<IWidgetInterface> GetParentWidget() const override { return ParentWidget; }
+	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const override { return ParentWidget; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
 };

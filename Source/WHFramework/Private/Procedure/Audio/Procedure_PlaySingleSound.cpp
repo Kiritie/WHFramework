@@ -6,7 +6,7 @@
 #include "Engine/TargetPoint.h"
 #include "Audio/AudioModuleBPLibrary.h"
 
-AProcedure_PlaySingleSound::AProcedure_PlaySingleSound()
+UProcedure_PlaySingleSound::UProcedure_PlaySingleSound()
 {
 	ProcedureName = FName("PlaySingleSound");
 	ProcedureDisplayName = FText::FromString(TEXT("Single Sound"));
@@ -18,9 +18,9 @@ AProcedure_PlaySingleSound::AProcedure_PlaySingleSound()
 	Point = nullptr;
 }
 
-void AProcedure_PlaySingleSound::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
+void UProcedure_PlaySingleSound::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	Super::ServerOnEnter_Implementation(InLastProcedure);
+	Super::OnEnter_Implementation(InLastProcedure);
 	
 	if(Point)
 	{
@@ -32,9 +32,9 @@ void AProcedure_PlaySingleSound::ServerOnEnter_Implementation(AProcedureBase* In
 	}
 }
 
-void AProcedure_PlaySingleSound::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
+void UProcedure_PlaySingleSound::OnLeave_Implementation()
 {
-	Super::ServerOnLeave_Implementation(InNextProcedure);
+	Super::OnLeave_Implementation();
 	
 	UAudioModuleBPLibrary::StopSingleSound();
 }

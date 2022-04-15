@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UMG/UserWidgetBase.h"
 
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -37,7 +37,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	OwnerActor = nullptr;
 	LastWidget = nullptr;
 	ParentWidget = nullptr;
-	ChildWidgets = TArray<TScriptInterface<IWidgetInterface>>();
+	ChildWidgets = TArray<TScriptInterface<IScreenWidgetInterface>>();
 }
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -214,7 +214,7 @@ void UUserWidgetBase::Destroy_Implementation()
 	UWidgetModuleBPLibrary::DestroyUserWidget<UUserWidgetBase>(GetClass());
 }
 
-void UUserWidgetBase::AddChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void UUserWidgetBase::AddChild_Implementation(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 	if(!ChildWidgets.Contains(InChildWidget))
 	{
@@ -222,7 +222,7 @@ void UUserWidgetBase::AddChild_Implementation(const TScriptInterface<IWidgetInte
 	}
 }
 
-void UUserWidgetBase::RemoveChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void UUserWidgetBase::RemoveChild_Implementation(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 	if(ChildWidgets.Contains(InChildWidget))
 	{
@@ -230,7 +230,7 @@ void UUserWidgetBase::RemoveChild_Implementation(const TScriptInterface<IWidgetI
 	}
 }
 
-void UUserWidgetBase::RemoveAllChild_Implementation(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void UUserWidgetBase::RemoveAllChild_Implementation(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 	ChildWidgets.Empty();
 }

@@ -23,9 +23,14 @@ AProcedureModule::AProcedureModule()
 {
 	ModuleName = FName("ProcedureModule");
 
-	RootProcedures = TArray<ARootProcedureBase*>();
+	FirstRootProcedureIndex = -1;
+	CurrentRootProcedureIndex = -1;
 
-	RootProcedureIndex = 0;
+	RootProcedures = TArray<URootProcedureBase*>();
+
+	GlobalProcedureExecuteType = EProcedureExecuteType::None;
+	GlobalProcedureLeaveType = EProcedureLeaveType::None;
+	GlobalProcedureCompleteType = EProcedureCompleteType::None;
 }
 
 #if WITH_EDITOR
@@ -50,34 +55,38 @@ void AProcedureModule::OnInitialize_Implementation()
 	{
 		if(Iter)
 		{
-			Iter->NativeOnInitialize();
+			Iter->OnInitialize();
 		}
 	}
-
-	//ServerStartProcedure();
 }
 
 void AProcedureModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	StartProcedure();
 }
 
 void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if(HasAuthority())
+	if(CurrentProcedure)
 	{
-		if(CurrentProcedure && CurrentProcedure->GetProcedureState() == EProcedureState::Entered)
+		if(CurrentProcedure->GetProcedureState() != EProcedureState::Leaved)
 		{
-			CurrentProcedure->ServerOnRefresh(DeltaSeconds);
+			CurrentProcedure->OnRefresh(DeltaSeconds);
 		}
-	}
-	else
-	{
-		if(CurrentLocalProcedure && CurrentLocalProcedure->GetLocalProcedureState() == EProcedureState::Entered)
+		else if(CurrentProcedure->ParentProcedure)
 		{
-			CurrentLocalProcedure->LocalOnRefresh(DeltaSeconds);
+			if(CurrentProcedure->ParentProcedure->GetProcedureState() != EProcedureState::Leaved)
+			{
+				CurrentProcedure->ParentProcedure->OnRefresh(DeltaSeconds);
+			}
+		}
+		else if(CurrentProcedure->IsA(URootProcedureBase::StaticClass()))
+		{
+			StartProcedure(CurrentProcedure->ProcedureIndex + 1);
 		}
 	}
 }
@@ -92,189 +101,123 @@ void AProcedureModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AProcedureModule::ServerStartProcedure()
+void AProcedureModule::StartProcedure(int32 InRootProcedureIndex, bool bSkipProcedures)
 {
-	if(HasAuthority() && !bAllProcedureSpawned)
+	CurrentRootProcedureIndex = InRootProcedureIndex != -1 ? InRootProcedureIndex : FirstRootProcedureIndex;
+
+	if(bSkipProcedures)
 	{
-		SpawnAllProcedure();
-	}
-	if(HasAuthority() && RootProcedures.IsValidIndex(RootProcedureIndex))
-	{
-		if(RootProcedures[RootProcedureIndex])
+		for(int32 i = 0; i < CurrentRootProcedureIndex; i++)
 		{
-			RootProcedures[RootProcedureIndex]->ServerPrepare();
+			if(RootProcedures.IsValidIndex(i))
+			{
+				if(RootProcedures[i])
+				{
+					RootProcedures[i]->Complete(EProcedureExecuteResult::Skipped);
+				}
+			}
+		}
+	}
+	if(RootProcedures.IsValidIndex(CurrentRootProcedureIndex))
+	{
+		if(RootProcedures[CurrentRootProcedureIndex])
+		{
+			RootProcedures[CurrentRootProcedureIndex]->Enter();
 		}
 	}
 }
 
-void AProcedureModule::ServerEnterProcedure(AProcedureBase* InProcedure)
+void AProcedureModule::EndProcedure(bool bRestoreProcedures)
 {
-	if(!HasAuthority())
+	if(CurrentProcedure)
 	{
-		if(UProcedureModuleNetworkComponent* ProcedureModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UProcedureModuleNetworkComponent>())
-		{
-			ProcedureModuleNetworkComponent->ServerEnterProcedure(InProcedure);
-		}
-		return;
+		CurrentProcedure->Complete(EProcedureExecuteResult::Skipped);
+		CurrentProcedure->Leave();
+		CurrentProcedure = nullptr;
 	}
-	
-	if(InProcedure && InProcedure != CurrentProcedure && InProcedure->GetProcedureState() != EProcedureState::Entered)
+	CurrentRootProcedureIndex = -1;
+	if(bRestoreProcedures)
 	{
-		if(CurrentProcedure && CurrentProcedure != InProcedure->ParentProcedure)
+		for(auto Iter : RootProcedures)
 		{
-			CurrentProcedure->ServerOnLeave(InProcedure);
+			if(Iter)
+			{
+				Iter->Restore();
+			}
 		}
-		InProcedure->ServerOnEnter(CurrentProcedure);
+	}
+}
+
+void AProcedureModule::RestoreProcedure(UProcedureBase* InProcedure)
+{
+	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::None)
+	{
+		InProcedure->OnRestore();
+	}
+}
+
+void AProcedureModule::EnterProcedure(UProcedureBase* InProcedure)
+{
+	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Entered)
+	{
+		if(CurrentProcedure && !CurrentProcedure->IsParentOf(InProcedure))
+		{
+			CurrentProcedure->OnLeave();
+		}
+		InProcedure->OnEnter(CurrentProcedure);
+
 		CurrentProcedure = InProcedure;
 
-		if(CurrentProcedure->HasSubProcedure(false))
+		if(CurrentProcedure->IsA(URootProcedureBase::StaticClass()))
 		{
-			CurrentParentProcedure = CurrentProcedure;
-		}
-
-		if(CurrentProcedure->IsA(ARootProcedureBase::StaticClass()))
-		{
-			RootProcedureIndex = CurrentProcedure->ProcedureIndex;
+			CurrentRootProcedureIndex = CurrentProcedure->ProcedureIndex;
 		}
 	}
 }
 
-void AProcedureModule::ServerLeaveProcedure(AProcedureBase* InProcedure)
+void AProcedureModule::GuideProcedure(UProcedureBase* InProcedure)
 {
-	if(!HasAuthority())
+	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Leaved)
 	{
-		if(UProcedureModuleNetworkComponent* ProcedureModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UProcedureModuleNetworkComponent>())
-		{
-			ProcedureModuleNetworkComponent->ServerLeaveProcedure(InProcedure);
-		}
-		return;
+		InProcedure->OnGuide();
 	}
-	if(InProcedure && (InProcedure == CurrentProcedure || InProcedure == CurrentProcedure->ParentProcedure) && InProcedure->GetProcedureState() != EProcedureState::Leaved)
-	{
-		if(InProcedure->ParentProcedure)
-		{
-			CurrentProcedure->ServerOnLeave(InProcedure->ParentProcedure);
-			CurrentProcedure = InProcedure->ParentProcedure;
-		}
-		else
-		{
-			CurrentProcedure->ServerOnLeave(nullptr);
-		}
+}
 
-		if(CurrentProcedure->IsA(ARootProcedureBase::StaticClass()))
+void AProcedureModule::ExecuteProcedure(UProcedureBase* InProcedure)
+{
+	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Executing)
+	{
+		InProcedure->OnExecute();
+	}
+}
+
+void AProcedureModule::CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult)
+{
+	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Completed)
+	{
+		InProcedure->OnComplete(InProcedureExecuteResult);
+		for(auto Iter : InProcedure->SubProcedures)
 		{
-			const int32 Index = RootProcedureIndex + 1;
-			if(RootProcedures.IsValidIndex(Index))
+			if(Iter && Iter->GetProcedureState() != EProcedureState::Completed)
 			{
-				if(RootProcedures[Index])
-				{
-					RootProcedures[Index]->ServerPrepare();
-				}
+				Iter->OnComplete(InProcedureExecuteResult);
 			}
 		}
-
-		Execute_Pause(this);
 	}
 }
 
-void AProcedureModule::LocalEnterProcedure(AProcedureBase* InProcedure)
+void AProcedureModule::LeaveProcedure(UProcedureBase* InProcedure)
 {
-	if(InProcedure && InProcedure != CurrentLocalProcedure && InProcedure->GetLocalProcedureState() != EProcedureState::Entered)
+	if(InProcedure && /*(InProcedure == CurrentProcedure || InProcedure == CurrentProcedure->ParentProcedure) && */InProcedure->GetProcedureState() != EProcedureState::Leaved)
 	{
-		if(CurrentLocalProcedure && CurrentLocalProcedure != InProcedure->ParentProcedure)
-		{
-			CurrentLocalProcedure->LocalOnLeave(InProcedure);
-		}
-		InProcedure->LocalOnEnter(CurrentLocalProcedure);
-		CurrentLocalProcedure = InProcedure;
+		CurrentProcedure->OnLeave();
 	}
 }
 
-void AProcedureModule::LocalLeaveProcedure(AProcedureBase* InProcedure)
+#if WITH_EDITOR
+void AProcedureModule::OpenProcedureEditor()
 {
-	if(InProcedure && (InProcedure == CurrentLocalProcedure || InProcedure == CurrentLocalProcedure->ParentProcedure) && InProcedure->GetLocalProcedureState() != EProcedureState::Leaved)
-	{
-		if(InProcedure->ParentProcedure)
-		{
-			CurrentLocalProcedure->LocalOnLeave(InProcedure->ParentProcedure);
-			CurrentLocalProcedure = InProcedure->ParentProcedure;
-		}
-		else
-		{
-			CurrentLocalProcedure->LocalOnLeave(nullptr);
-		}
-	}
-}
-
-void AProcedureModule::ServerSkipProcedure(AProcedureBase* InProcedure)
-{
-	if(!InProcedure) return;
-	
-	if(!HasAuthority())
-	{
-		if(UProcedureModuleNetworkComponent* ProcedureModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UProcedureModuleNetworkComponent>())
-		{
-			ProcedureModuleNetworkComponent->ServerSkipProcedure(InProcedure);
-		}
-		return;
-	}
-	switch(InProcedure->GetProcedureState())
-	{
-		case EProcedureState::Entered:
-		{
-			InProcedure->ServerComplete(EProcedureExecuteResult::Skipped);
-			break;
-		}
-		case EProcedureState::Completed:
-		{
-			ServerLeaveProcedure(InProcedure);
-			break;
-		}
-		default: break;
-	}
-}
-
-void AProcedureModule::ServerSkipCurrentProcedure()
-{
-	ServerSkipProcedure(CurrentProcedure);
-}
-
-void AProcedureModule::ServerSkipCurrentParentProcedure()
-{
-	ServerSkipProcedure(CurrentParentProcedure);
-}
-
-void AProcedureModule::ServerSkipCurrentRootProcedure()
-{
-	ServerSkipProcedure(GetCurrentRootProcedure());
-}
-
-void AProcedureModule::SpawnAllProcedure()
-{
-	if(HasRootProcedure())
-	{
-		for (int32 i = 0; i < RootProcedures.Num(); i++)
-		{
-			if(RootProcedures[i])
-			{
-				FActorSpawnParameters ActorSpawnParameters = FActorSpawnParameters();
-				ActorSpawnParameters.Owner = this;
-				ActorSpawnParameters.Template = RootProcedures[i];
-				ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-				if(ARootProcedureBase* RootProcedure = GetWorld()->SpawnActor<ARootProcedureBase>(RootProcedures[i]->GetClass(), ActorSpawnParameters))
-				{
-					#if WITH_EDITOR
-					RootProcedure->SetActorLabel(RootProcedures[i]->ProcedureName.ToString());
-					#endif
-					RootProcedure->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-					RootProcedure->ServerOnInitialize();
-					RootProcedures[i] = RootProcedure;
-				}
-			}
-		}
-		bAllProcedureSpawned = true;
-	}
+	FGlobalTabmanager::Get()->TryInvokeTab(FName("WHProcedureEditor"));
 }
 
 void AProcedureModule::ClearAllProcedure()
@@ -293,12 +236,6 @@ void AProcedureModule::ClearAllProcedure()
 	RootProcedures.Empty();
 
 	Modify();
-}
-
-#if WITH_EDITOR
-void AProcedureModule::OpenProcedureEditor()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(FName("WHProcedureEditor"));
 }
 
 void AProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
@@ -321,27 +258,3 @@ void AProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& Ou
 	}
 }
 #endif
-
-bool AProcedureModule::HasRootProcedure() const
-{
-	return RootProcedures.Num() > 0;
-}
-
-ARootProcedureBase* AProcedureModule::GetCurrentRootProcedure() const
-{
-	if(RootProcedures.IsValidIndex(RootProcedureIndex))
-	{
-		return RootProcedures[RootProcedureIndex];
-	}
-	return nullptr;
-}
-
-void AProcedureModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
-	DOREPLIFETIME(AProcedureModule, CurrentProcedure);
-	DOREPLIFETIME(AProcedureModule, CurrentLocalProcedure);
-	DOREPLIFETIME(AProcedureModule, RootProcedureIndex);
-	DOREPLIFETIME(AProcedureModule, RootProcedures);
-}

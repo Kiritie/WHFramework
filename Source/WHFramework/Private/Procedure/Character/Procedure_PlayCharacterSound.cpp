@@ -5,7 +5,7 @@
 
 #include "Character/CharacterModuleBPLibrary.h"
 
-AProcedure_PlayCharacterSound::AProcedure_PlayCharacterSound()
+UProcedure_PlayCharacterSound::UProcedure_PlayCharacterSound()
 {
 	ProcedureName = FName("PlayCharacterSound");
 	ProcedureDisplayName = FText::FromString(TEXT("Character Sound"));
@@ -16,16 +16,16 @@ AProcedure_PlayCharacterSound::AProcedure_PlayCharacterSound()
 	Sound = nullptr;
 }
 
-void AProcedure_PlayCharacterSound::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
+void UProcedure_PlayCharacterSound::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	Super::ServerOnEnter_Implementation(InLastProcedure);
+	Super::OnEnter_Implementation(InLastProcedure);
 	
 	UCharacterModuleBPLibrary::PlayCharacterSound(CharacterName, Sound, true);
 }
 
-void AProcedure_PlayCharacterSound::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
+void UProcedure_PlayCharacterSound::OnLeave_Implementation()
 {
-	Super::ServerOnLeave_Implementation(InNextProcedure);
+	Super::OnLeave_Implementation();
 	
 	UCharacterModuleBPLibrary::StopCharacterSound(CharacterName);
 }

@@ -8,59 +8,62 @@
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
 
-ARootProcedureBase::ARootProcedureBase()
+URootProcedureBase::URootProcedureBase()
 {
 	ProcedureName = FName("RootProcedureBase");
 	ProcedureDisplayName = FText::FromString(TEXT("Root Procedure Base"));
 
 	ProcedureType = EProcedureType::Root;
-
-	ProcedureExecuteType = EProcedureExecuteType::Server;
 }
 
 #if WITH_EDITOR
-void ARootProcedureBase::OnGenerate()
+void URootProcedureBase::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void ARootProcedureBase::OnUnGenerate()
+void URootProcedureBase::OnUnGenerate()
 {
 	Super::OnUnGenerate();
 }
 #endif
 
-void ARootProcedureBase::ServerOnInitialize_Implementation()
+void URootProcedureBase::OnInitialize_Implementation()
 {
-	Super::ServerOnInitialize_Implementation();
+	Super::OnInitialize_Implementation();
 }
 
-void ARootProcedureBase::ServerOnPrepare_Implementation()
+void URootProcedureBase::OnRestore_Implementation()
 {
-	Super::ServerOnPrepare_Implementation();
+	Super::OnRestore_Implementation();
 }
 
-void ARootProcedureBase::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
+void URootProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	Super::ServerOnEnter_Implementation(InLastProcedure);
+	Super::OnEnter_Implementation(InLastProcedure);
 }
 
-void ARootProcedureBase::ServerOnRefresh_Implementation(float DeltaSeconds)
+void URootProcedureBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	Super::ServerOnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void ARootProcedureBase::ServerOnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
+void URootProcedureBase::OnGuide_Implementation()
 {
-	Super::ServerOnComplete_Implementation(InProcedureExecuteResult);
+	Super::OnGuide_Implementation();
 }
 
-void ARootProcedureBase::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
+void URootProcedureBase::OnExecute_Implementation()
 {
-	Super::ServerOnLeave_Implementation(InNextProcedure);
+	Super::OnExecute_Implementation();
 }
 
-void ARootProcedureBase::ServerOnClear_Implementation()
+void URootProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
 {
-	Super::ServerOnClear_Implementation();
+	Super::OnComplete_Implementation(InProcedureExecuteResult);
+}
+
+void URootProcedureBase::OnLeave_Implementation()
+{
+	Super::OnLeave_Implementation();
 }

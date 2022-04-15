@@ -10,22 +10,22 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AProcedure_PlayMediaPlayerMovie : public AProcedureBase
+class WHFRAMEWORK_API UProcedure_PlayMediaPlayerMovie : public UProcedureBase
 {
 	GENERATED_BODY()
 
 	
 public:
-	AProcedure_PlayMediaPlayerMovie();
+	UProcedure_PlayMediaPlayerMovie();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 public:
-	virtual void ServerOnInitialize_Implementation() override;
+	virtual void OnInitialize_Implementation() override;
 	
-	virtual void ServerOnEnter_Implementation(AProcedureBase* InLastProcedure) override;
+	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
 
-	virtual void ServerOnLeave_Implementation(AProcedureBase* InNextProcedure) override;
+	virtual void OnLeave_Implementation() override;
 
 protected:
 	UFUNCTION()

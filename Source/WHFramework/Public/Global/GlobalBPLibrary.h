@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Editor.h"
+#include "Engine/GameEngine.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -117,6 +119,17 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
 public:
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static UWorld* GetCurrentWorld()
+	{
+		UWorld* CurrentWorld = nullptr;
+		if (UGameEngine* GameEngine = Cast<UGameEngine>(GEngine))
+		{
+			CurrentWorld = GameEngine->GetGameWorld();
+		}
+		return CurrentWorld;
+	}
+
 	template<class T>
 	static T* GetGameInstance(const UObject* InWorldContext)
 	{

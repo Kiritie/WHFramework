@@ -42,7 +42,7 @@ protected:
 	static AMainModule* Current;
 
 public:
-	static AMainModule* Get() { return Current; }
+	static AMainModule* Get();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -91,9 +91,9 @@ public:
 	*/
 	static TArray<TScriptInterface<IModule>> GetAllModules()
 	{
-		if(Current && Current->IsValidLowLevel())
+		if(Get() && Get()->IsValidLowLevel())
 		{
-			return Current->ModuleRefs;
+			return Get()->ModuleRefs;
 		}
 		return TArray<TScriptInterface<IModule>>();
 	}
@@ -103,12 +103,12 @@ public:
 	template<class T>
 	static T* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass = T::StaticClass())
 	{
-		if(Current && Current->IsValidLowLevel())
+		if(Get() && Get()->IsValidLowLevel())
 		{
 			AModuleBase* ModuleBase = InModuleClass.GetDefaultObject();
- 			if(Current->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
+ 			if(Get()->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
 			{
-				return Cast<T>(Current->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
+				return Cast<T>(Get()->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
 			}
 		}
 		return nullptr;
@@ -119,11 +119,11 @@ public:
 	template<class T>
 	static T* GetModuleByName(const FName InModuleName)
 	{
-		if(Current && Current->IsValidLowLevel())
+		if(Get() && Get()->IsValidLowLevel())
 		{
-			if(Current->ModuleMap.Contains(InModuleName))
+			if(Get()->ModuleMap.Contains(InModuleName))
 			{
-				return Cast<T>(Current->ModuleMap[InModuleName].GetObject());
+				return Cast<T>(Get()->ModuleMap[InModuleName].GetObject());
 			}
 		}
 		return nullptr;
@@ -134,9 +134,9 @@ public:
 	template<class T>
 	static T* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
 	{
-		if(Current && Current->IsValidLowLevel())
+		if(Get() && Get()->IsValidLowLevel())
 		{
-			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Current))
+			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Get()))
 			{
 				return PlayerController->GetModuleNetCompByClass<T>(InModuleNetworkComponentClass);
 			}

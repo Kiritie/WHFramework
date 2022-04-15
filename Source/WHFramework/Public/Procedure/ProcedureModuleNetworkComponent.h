@@ -18,14 +18,4 @@ class WHFRAMEWORK_API UProcedureModuleNetworkComponent : public UModuleNetworkCo
 
 public:
 	UProcedureModuleNetworkComponent();
-
-public:
-	UFUNCTION(BlueprintCallable, Server, WithValidation, Reliable)
-	void ServerEnterProcedure(class AProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Server, WithValidation, Reliable)
-	void ServerLeaveProcedure(class AProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Server, WithValidation, Reliable)
-	void ServerSkipProcedure(class AProcedureBase* InProcedure);
 };

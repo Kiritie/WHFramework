@@ -6,21 +6,15 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
+#include "Gameplay/WHPlayerController.h"
+#include "Global/GlobalBPLibrary.h"
+#include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"
-#include "Net/UnrealNetwork.h"
 
-AProcedureBase::AProcedureBase()
+UProcedureBase::UProcedureBase()
 {
-	bReplicates = true;
-
-	PrimaryActorTick.bCanEverTick = false;
-
-#if WITH_EDITORONLY_DATA
-	bActorLabelEditable = false;
-#endif
-
 	ProcedureName = FName("ProcedureBase");
 	ProcedureDisplayName = FText::FromString(TEXT("Procedure Base"));
 	ProcedureDescription = FText::GetEmpty();
@@ -29,15 +23,25 @@ AProcedureBase::AProcedureBase()
 	ProcedureType = EProcedureType::Default;
 	ProcedureState = EProcedureState::None;
 
-	ProcedureExecuteType = EProcedureExecuteType::Inherit;
+	OperationTarget = nullptr;
+
+	CameraViewOffset = FVector::ZeroVector;
+	CameraViewYaw = 0.f;
+	CameraViewPitch = -25.f;
+	CameraViewDistance = 100.f;
+
 	ProcedureExecuteCondition = EProcedureExecuteResult::None;
-	ProcedureGuideType = EProcedureGuideType::None;
+	ProcedureExecuteResult = EProcedureExecuteResult::None;
 
-	bAutoEnterProcedure = false;
-	AutoEnterProcedureTime = 0.f;
+	ProcedureExecuteType = EProcedureExecuteType::Automatic;
+	AutoExecuteProcedureTime = 0.f;
 
-	bAutoLeaveProcedure = false;
+	ProcedureLeaveType = EProcedureLeaveType::Automatic;
 	AutoLeaveProcedureTime = 0.f;
+
+	ProcedureCompleteType = EProcedureCompleteType::Procedure;
+	AutoCompleteProcedureTime = 0.f;
+	ProcedureGuideType = EProcedureGuideType::None;
 
 	CurrentSubProcedureIndex = -1;
 
@@ -45,22 +49,22 @@ AProcedureBase::AProcedureBase()
 
 	bMergeSubProcedure = false;
 
-	SubProcedures = TArray<AProcedureBase*>();
+	SubProcedures = TArray<UProcedureBase*>();
 
 	ParentProcedure = nullptr;
 
 	ProcedureState = EProcedureState::None;
 
-	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
+	ProcedureListItemStates = FProcedureListItemStates();
 }
 
 #if WITH_EDITOR
-void AProcedureBase::OnGenerate()
+void UProcedureBase::OnGenerate()
 {
 	
 }
 
-void AProcedureBase::OnUnGenerate()
+void UProcedureBase::OnUnGenerate()
 {
 	for (auto Iter : SubProcedures)
 	{
@@ -74,123 +78,44 @@ void AProcedureBase::OnUnGenerate()
 }
 #endif
 
-void AProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
-{
-	OutProcedureListItem->Procedure = this;
-	for (int32 i = 0; i < SubProcedures.Num(); i++)
-	{
-		if(SubProcedures[i])
-		{
-			auto Item = MakeShared<FProcedureListItem>();
-			Item->ParentListItem = OutProcedureListItem;
-			OutProcedureListItem->SubListItems.Add(Item);
-			SubProcedures[i]->GenerateListItem(Item);
-		}
-	}
-}
-
-void AProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
-{
-	OutProcedureListItem->Procedure = this;
-	for (int32 i = 0; i < SubProcedures.Num(); i++)
-	{
-		if(SubProcedures[i])
-		{
-			SubProcedures[i]->ProcedureIndex = i;
-			SubProcedures[i]->ParentProcedure = this;
-			SubProcedures[i]->UpdateListItem(OutProcedureListItem->SubListItems[i]);
-		}
-	}
-}
-
-void AProcedureBase::NativeOnInitialize()
+void UProcedureBase::OnInitialize_Implementation()
 {
 	for (auto Iter : SubProcedures)
 	{
 		if (Iter)
 		{
-			Iter->NativeOnInitialize();
+			Iter->ParentProcedure = this;
+			Iter->OnInitialize();
 		}
 	}
 }
 
-void AProcedureBase::ServerOnInitialize_Implementation()
+void UProcedureBase::OnRestore_Implementation()
 {
-	for (int32 i = 0; i < SubProcedures.Num(); i++)
-	{
-		if(SubProcedures[i])
-		{
-			FActorSpawnParameters ActorSpawnParameters = FActorSpawnParameters();
-			ActorSpawnParameters.Owner = this;
-			ActorSpawnParameters.Template = SubProcedures[i];
-			ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ChangeProcedureState(EProcedureState::None);
 
-			if (AProcedureBase* ProcedureBase = GetWorld()->SpawnActor<AProcedureBase>(SubProcedures[i]->GetClass(), ActorSpawnParameters))
-			{
-				#if WITH_EDITOR
-				ProcedureBase->SetActorLabel(SubProcedures[i]->ProcedureName.ToString());
-				#endif
-				ProcedureBase->ParentProcedure = this;
-				ProcedureBase->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-				ProcedureBase->ServerOnInitialize();
-				SubProcedures[i] = ProcedureBase;
-			}
-		}
-	}
-
-	MultiOnInitialize();
-
-	ProcedureState = EProcedureState::Initialized;
-	OnRep_ProcedureState();
-}
-
-void AProcedureBase::MultiOnInitialize_Implementation()
-{
-	if(LocalProcedureState != EProcedureState::Initialized)
-	{
-		LocalOnInitialize();
-	}
-}
-
-void AProcedureBase::LocalOnInitialize_Implementation()
-{
-	LocalProcedureState = EProcedureState::Initialized;
-	OnChangeLocalProcedureState(LocalProcedureState);
-}
-
-void AProcedureBase::ServerOnPrepare_Implementation()
-{
 	CurrentSubProcedureIndex = -1;
 	CurrentProcedureTaskIndex = -1;
+
+	for (auto Iter : SubProcedures)
+	{
+		if (Iter)
+		{
+			Iter->OnRestore();
+		}
+	}
 
 	for(int32 i = 0; i < ProcedureTaskItems.Num(); i++)
 	{
 		ProcedureTaskItems[i].TaskState = EProcedureTaskState::None;
 	}
-	
-	MultiOnPrepare();
-
-	ProcedureState = EProcedureState::Prepared;
-	OnRep_ProcedureState();
 }
 
-void AProcedureBase::MultiOnPrepare_Implementation()
+void UProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	if(LocalProcedureState != EProcedureState::Prepared)
-	{
-		LocalOnPrepare();
-	}
-}
+	ChangeProcedureState(EProcedureState::Entered);
 
-void AProcedureBase::LocalOnPrepare_Implementation()
-{
-	LocalProcedureState = EProcedureState::Prepared;
-	OnChangeLocalProcedureState(LocalProcedureState);
-}
-
-void AProcedureBase::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
-{
-	GetWorld()->GetTimerManager().ClearTimer(AutoEnterTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
 	
 	if (ParentProcedure)
 	{
@@ -199,58 +124,47 @@ void AProcedureBase::ServerOnEnter_Implementation(AProcedureBase* InLastProcedur
 
 	ProcedureExecuteResult = EProcedureExecuteResult::None;
 
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			// Iter->ServerOnPrepare();
-			if (bMergeSubProcedure)
-			{
-				Iter->ServerOnEnter(InLastProcedure);
-			}
-		}
-	}
-
-	MultiOnEnter(InLastProcedure);
-
-	ProcedureState = EProcedureState::Entered;
-	OnRep_ProcedureState();
-}
-
-void AProcedureBase::MultiOnEnter_Implementation(AProcedureBase* InLastProcedure)
-{
-	if(LocalProcedureState != EProcedureState::Entered)
-	{
-		LocalOnEnter(InLastProcedure);
-	}
-}
-
-void AProcedureBase::LocalOnEnter_Implementation(AProcedureBase* InLastProcedure)
-{
-	LocalProcedureState = EProcedureState::Entered;
-	OnChangeLocalProcedureState(LocalProcedureState);
-
-	LocalProcedureExecuteResult = EProcedureExecuteResult::None;
-	LocalResetGuide();
-
 	switch(ProcedureGuideType)
 	{
 		case EProcedureGuideType::TimerOnce:
-		case EProcedureGuideType::TimerLoop:
 		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &AProcedureBase::LocalGuide, ProcedureGuideIntervalTime, false);
+			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UProcedureBase::Guide, ProcedureGuideIntervalTime, false);
 			break;
 		}
 		default: break;
 	}
+	ResetCameraView();
 
 	WH_LOG(WHProcedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()));
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+
+	if(ProcedureExecuteType == EProcedureExecuteType::Automatic && ProcedureState != EProcedureState::Executing)
+	{
+		if(AutoExecuteProcedureTime > 0.f)
+		{
+			GetWorld()->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UProcedureBase::Execute, AutoExecuteProcedureTime, false);
+		}
+		else
+		{
+			Execute();
+		}
+	}
+
+	if (bMergeSubProcedure)
+	{
+		for (auto Iter : SubProcedures)
+		{
+			if (Iter)
+			{
+				Iter->OnEnter(InLastProcedure);
+			}
+		}
+	}
 }
 
-void AProcedureBase::ServerOnRefresh_Implementation(float DeltaSeconds)
+void UProcedureBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if (HasSubProcedure(false))
 	{
@@ -259,43 +173,24 @@ void AProcedureBase::ServerOnRefresh_Implementation(float DeltaSeconds)
 			const int32 Index = CurrentSubProcedureIndex + 1;
 			if(SubProcedures.IsValidIndex(Index))
 			{
-				AProcedureBase* SubProcedure = SubProcedures[Index];
+				UProcedureBase* SubProcedure = SubProcedures[Index];
 				if(SubProcedure)
 				{
-					switch (SubProcedure->GetProcedureExecuteType())
+					if(SubProcedure->CheckProcedureCondition(GetCurrentSubProcedure()))
 					{
-						case EProcedureExecuteType::None:
-						{
-							SubProcedure->ServerComplete(EProcedureExecuteResult::Skipped);
-							CurrentSubProcedureIndex++;
-							break;
-						}
-						case EProcedureExecuteType::Server:
-						{
-							if(SubProcedure->CheckProcedureCondition(GetCurrentSubProcedure()))
-							{
-								SubProcedure->ServerPrepare();
-							}
-							else
-							{
-								SubProcedure->ServerComplete(EProcedureExecuteResult::Skipped);
-								CurrentSubProcedureIndex++;
-							}
-							break;
-						}
-						case EProcedureExecuteType::Local:
-						{
-							SubProcedure->MultiPrepare();
-							break;
-						}
-						default: break;
+						SubProcedure->Enter();
+					}
+					else
+					{
+						SubProcedure->Complete(EProcedureExecuteResult::Skipped);
+						CurrentSubProcedureIndex++;
 					}
 				}
 			}
 		}
 		else
 		{
-			ServerComplete(IsAllSubExecuteSucceed() ? EProcedureExecuteResult::Succeed : EProcedureExecuteResult::Failed);
+			Complete(IsAllSubExecuteSucceed() ? EProcedureExecuteResult::Succeed : EProcedureExecuteResult::Failed);
 		}
 	}
 	else if(HasProcedureTask())
@@ -336,413 +231,271 @@ void AProcedureBase::ServerOnRefresh_Implementation(float DeltaSeconds)
 		}
 		else
 		{
-			ServerComplete(EProcedureExecuteResult::Succeed);
-		}
-	}
-
-	MultiOnRefresh(DeltaSeconds);
-}
-
-void AProcedureBase::MultiOnRefresh_Implementation(float DeltaSeconds)
-{
-	LocalOnRefresh(DeltaSeconds);
-}
-
-void AProcedureBase::LocalOnRefresh_Implementation(float DeltaSeconds)
-{
-	if(GetProcedureExecuteType() == EProcedureExecuteType::Local)
-	{
-		if(HasSubProcedure(false))
-		{
-			if(!IsAllLocalSubCompleted())
-			{
-				const int32 Index = CurrentLocalSubProcedureIndex + 1;
-				if(SubProcedures.IsValidIndex(Index))
-				{
-					AProcedureBase* SubProcedure = SubProcedures[Index];
-					if(SubProcedure)
-					{
-						switch (SubProcedure->GetProcedureExecuteType())
-						{
-							case EProcedureExecuteType::None:
-							case EProcedureExecuteType::Server:
-							{
-								SubProcedure->LocalComplete(EProcedureExecuteResult::Skipped);
-								break;
-							}
-							case EProcedureExecuteType::Local:
-							{
-								if(SubProcedure->CheckProcedureCondition(GetCurrentLocalSubProcedure()))
-								{
-									SubProcedure->LocalPrepare();
-								}
-								else
-								{
-									SubProcedure->LocalComplete(EProcedureExecuteResult::Skipped);
-								}
-								break;
-							}
-							default: break;
-						}
-					}
-				}
-			}
-			else
-			{
-				LocalComplete();
-			}
+			Complete(EProcedureExecuteResult::Succeed);
 		}
 	}
 }
 
-
-void AProcedureBase::LocalOnGuide_Implementation(const FName& InListenerTaskName)
+void UProcedureBase::OnGuide_Implementation()
 {
-	
-}
+	ResetCameraView();
 
-void AProcedureBase::LocalOnStopGuide_Implementation(const FName& InListenerTaskName)
-{
-	
-}
-
-void AProcedureBase::ServerOnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	MultiOnComplete(InProcedureExecuteResult);
-	
 	switch(ProcedureGuideType)
 	{
-		case EProcedureGuideType::TimerOnce:
-		{
-			GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
-			break;
-		}
 		case EProcedureGuideType::TimerLoop:
 		{
-			GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UProcedureBase::OnGuide, ProcedureGuideIntervalTime, false);
 			break;
 		}
 		default: break;
 	}
-
-	ProcedureState = EProcedureState::Completed;
-	OnRep_ProcedureState();
 }
 
-void AProcedureBase::MultiOnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
+void UProcedureBase::OnExecute_Implementation()
 {
-	if(LocalProcedureState != EProcedureState::Completed)
-	{
-		LocalOnComplete(InProcedureExecuteResult);
-	}
-}
-
-void AProcedureBase::LocalOnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	LocalProcedureState = EProcedureState::Completed;
-	OnChangeLocalProcedureState(LocalProcedureState);
-}
-
-void AProcedureBase::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
-{
-	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
-
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			if (bMergeSubProcedure || Iter->ProcedureState == EProcedureState::Entered)
-			{
-				Iter->ServerOnLeave(InNextProcedure);
-			}
-			Iter->ServerOnClear();
-		}
-	}
-
-	MultiOnLeave(InNextProcedure);
-
-	ProcedureState = EProcedureState::Leaved;
-	OnRep_ProcedureState();
-}
-
-void AProcedureBase::MultiOnLeave_Implementation(AProcedureBase* InNextProcedure)
-{
-	if(LocalProcedureState != EProcedureState::Leaved)
-	{
-		LocalOnLeave(InNextProcedure);
-	}
-}
-
-void AProcedureBase::LocalOnLeave_Implementation(AProcedureBase* InNextProcedure)
-{
-	LocalProcedureState = EProcedureState::Leaved;
-	OnChangeLocalProcedureState(LocalProcedureState);
-
-	LocalStopGuide();
-
-	WH_LOG(WHProcedure, Log, TEXT("%s流程: %s"), LocalProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString());
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("%s流程: %s"), LocalProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString()));
-
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
-}
-
-void AProcedureBase::ServerOnClear_Implementation()
-{
-	MultiOnClear();
-}
-
-void AProcedureBase::MultiOnClear_Implementation()
-{
-	LocalOnClear();
-}
-
-void AProcedureBase::LocalOnClear_Implementation()
-{
-	GetWorld()->GetTimerManager().ClearTimer(AutoEnterTimerHandle); 
-	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
-}
-
-void AProcedureBase::ServerOnDestroy_Implementation()
-{
-	MultiOnDestroy();
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			Iter->ServerOnDestroy();
-			Iter->Destroy();
-		}
-	}
-}
-
-void AProcedureBase::MultiOnDestroy_Implementation()
-{
-	SubProcedures.Empty();
+	ChangeProcedureState(EProcedureState::Executing);
 	
-	LocalOnDestroy();
-}
-
-void AProcedureBase::LocalOnDestroy_Implementation()
-{
-	
-}
-
-void AProcedureBase::OnRep_ProcedureState()
-{
-	if(LocalProcedureState != ProcedureState)
+	if(ProcedureState != EProcedureState::Completed)
 	{
-		switch (ProcedureState)
+		switch(GetProcedureCompleteType())
 		{
-			case EProcedureState::Initialized:
+			case EProcedureCompleteType::Automatic:
 			{
-				LocalOnInitialize();
+				if(!HasSubProcedure(false))
+				{
+					if(AutoCompleteProcedureTime > 0.f)
+					{
+						GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UProcedureBase::Complete, EProcedureExecuteResult::Succeed), AutoCompleteProcedureTime, false);
+					}
+					else
+					{
+						Complete();
+					}
+				}
 				break;
 			}
-			case EProcedureState::Prepared:
+			case EProcedureCompleteType::Skip:
 			{
-				LocalOnPrepare();
-				break;
-			}
-			case EProcedureState::Entered:
-			{
-				LocalOnEnter(nullptr);
-				break;
-			}
-			case EProcedureState::Completed:
-			{
-				LocalOnComplete(LocalProcedureExecuteResult);
-				break;
-			}
-			case EProcedureState::Leaved:
-			{
-				LocalOnLeave(nullptr);
-				break;
+				Complete(EProcedureExecuteResult::Skipped);
 			}
 			default: break;
 		}
 	}
-	OnChangeProcedureState(ProcedureState);
 }
 
-void AProcedureBase::OnChangeProcedureState_Implementation(EProcedureState InProcedureState)
+void UProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
 {
-	
-}
+	ChangeProcedureState(EProcedureState::Completed);
 
-void AProcedureBase::OnChangeLocalProcedureState_Implementation(EProcedureState InProcedureState)
-{
-	
-}
+	ProcedureExecuteResult = InProcedureExecuteResult;
 
-EProcedureExecuteType AProcedureBase::GetProcedureExecuteType() const
-{
-	if(ProcedureExecuteType == EProcedureExecuteType::Inherit)
+	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
+
+	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+
+	if(GetProcedureLeaveType() == EProcedureLeaveType::Automatic && ProcedureState != EProcedureState::Leaved)
 	{
-		return ParentProcedure ? ParentProcedure->GetProcedureExecuteType() : EProcedureExecuteType::None;
+		if(ProcedureExecuteResult != EProcedureExecuteResult::Skipped && AutoLeaveProcedureTime > 0.f)
+		{
+			GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, this, &UProcedureBase::Leave, AutoLeaveProcedureTime, false);
+		}
+		else
+		{
+			Leave();
+		}
 	}
-	return ProcedureExecuteType;
 }
 
-bool AProcedureBase::CheckProcedureCondition(AProcedureBase* InProcedure) const
+void UProcedureBase::OnLeave_Implementation()
+{
+	ChangeProcedureState(EProcedureState::Leaved);
+
+	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
+	
+	WH_LOG(WHProcedure, Log, TEXT("%s流程: %s"), ProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString());
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("%s流程: %s"), ProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString()));
+
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+
+	if (bMergeSubProcedure)
+	{
+		for(auto Iter : SubProcedures)
+		{
+			if (Iter)
+			{
+				Iter->OnLeave();
+			}
+		}
+	}
+
+	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle); 
+	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
+}
+
+void UProcedureBase::ChangeProcedureState(EProcedureState InProcedureState)
+{
+	if(ProcedureState != InProcedureState)
+	{
+		ProcedureState = InProcedureState;
+		OnChangeProcedureState(ProcedureState);
+	}
+}
+
+void UProcedureBase::OnChangeProcedureState_Implementation(EProcedureState InProcedureState)
+{
+	
+}
+
+bool UProcedureBase::CheckProcedureCondition(UProcedureBase* InProcedure) const
 {
 	return ProcedureExecuteCondition == EProcedureExecuteResult::None || !InProcedure || InProcedure->ProcedureExecuteResult == ProcedureExecuteCondition;
 }
 
-bool AProcedureBase::CheckLocalProcedureCondition(AProcedureBase* InProcedure) const
+EProcedureExecuteType UProcedureBase::GetProcedureExecuteType() const
 {
-	return ProcedureExecuteCondition == EProcedureExecuteResult::None || !InProcedure || InProcedure->LocalProcedureExecuteResult == ProcedureExecuteCondition;
+	if(!HasSubProcedure(false))
+	{
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		{
+			if(ProcedureModule->GetGlobalProcedureExecuteType() != EProcedureExecuteType::None)
+			{
+				return ProcedureModule->GetGlobalProcedureExecuteType();
+			}
+		}
+	}
+	return ProcedureExecuteType;
 }
 
-void AProcedureBase::ServerPrepare()
+EProcedureLeaveType UProcedureBase::GetProcedureLeaveType() const
 {
-	if(ProcedureState == EProcedureState::Prepared) return;
-	
-	ServerOnPrepare();
-
-	if(bAutoEnterProcedure && ProcedureState != EProcedureState::Entered)
+	if(!HasSubProcedure(false))
 	{
-		if(AutoEnterProcedureTime > 0.f)
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 		{
-			GetWorld()->GetTimerManager().SetTimer(AutoEnterTimerHandle, FTimerDelegate::CreateStatic<AProcedureBase*>(&UProcedureModuleBPLibrary::ServerEnterProcedure, this), AutoEnterProcedureTime, false);
+			if(ProcedureModule->GetGlobalProcedureLeaveType() != EProcedureLeaveType::None)
+			{
+				return ProcedureModule->GetGlobalProcedureLeaveType();
+			}
+		}
+	}
+	return ProcedureLeaveType;
+}
+
+EProcedureCompleteType UProcedureBase::GetProcedureCompleteType() const
+{
+	if(!HasSubProcedure(false))
+	{
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		{
+			if(ProcedureModule->GetGlobalProcedureCompleteType() != EProcedureCompleteType::None)
+			{
+				return ProcedureModule->GetGlobalProcedureCompleteType();
+			}
+		}
+	}
+	return ProcedureCompleteType;
+}
+
+bool UProcedureBase::IsParentOf(UProcedureBase* InProcedure) const
+{
+	if(InProcedure && InProcedure->ParentProcedure)
+	{
+		if(InProcedure->ParentProcedure == this) return true;
+		return InProcedure->ParentProcedure->IsParentOf(InProcedure);
+	}
+	return false;
+}
+
+void UProcedureBase::Restore()
+{
+	UProcedureModuleBPLibrary::RestoreProcedure(this);
+}
+
+void UProcedureBase::Enter()
+{
+	UProcedureModuleBPLibrary::EnterProcedure(this);
+}
+
+void UProcedureBase::Guide()
+{
+	UProcedureModuleBPLibrary::GuideProcedure(this);
+}
+
+void UProcedureBase::Execute()
+{
+	UProcedureModuleBPLibrary::ExecuteProcedure(this);
+}
+
+void UProcedureBase::Complete(EProcedureExecuteResult InProcedureExecuteResult)
+{
+	UProcedureModuleBPLibrary::CompleteProcedure(this);
+}
+
+void UProcedureBase::Leave()
+{
+	UProcedureModuleBPLibrary::LeaveProcedure(this);
+}
+
+void UProcedureBase::GetCameraView()
+{
+	AWHPlayerController* PlayerController = nullptr;
+	for(const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Context.World());
+		if(PlayerController) break;
+	}
+
+	if(PlayerController)
+	{
+		if(OperationTarget)
+		{
+			CameraViewOffset = PlayerController->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
 		}
 		else
 		{
-			UProcedureModuleBPLibrary::ServerEnterProcedure(this);
+			CameraViewOffset = PlayerController->GetCurrentCameraLocation();
 		}
+		CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
+		CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
+		CameraViewDistance = PlayerController->GetCurrentCameraDistance();
+
+		Modify();
 	}
 }
 
-void AProcedureBase::MultiPrepare_Implementation()
+void UProcedureBase::ResetCameraView()
 {
-	if(!HasAuthority())
+	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 	{
-		LocalPrepare();
-	}
-}
-
-void AProcedureBase::LocalPrepare()
-{
-	if(LocalProcedureState == EProcedureState::Prepared) return;
-
-	LocalOnPrepare();
-
-	if(bAutoEnterProcedure && LocalProcedureState != EProcedureState::Entered)
-	{
-		if(AutoEnterProcedureTime > 0.f)
+		if(OperationTarget)
 		{
-			GetWorld()->GetTimerManager().SetTimer(AutoEnterTimerHandle, FTimerDelegate::CreateStatic<AProcedureBase*>(&UProcedureModuleBPLibrary::LocalEnterProcedure, this), AutoEnterProcedureTime, false);
+			PlayerController->SetCameraLocation(OperationTarget->GetActorLocation() + CameraViewOffset, bCameraViewInstant);
 		}
 		else
 		{
-			UProcedureModuleBPLibrary::ServerEnterProcedure(this);
+			PlayerController->SetCameraLocation(CameraViewOffset, bCameraViewInstant);
 		}
+		PlayerController->SetCameraRotationAndDistance(CameraViewYaw, CameraViewPitch, CameraViewDistance, bCameraViewInstant);
 	}
 }
 
-void AProcedureBase::LocalGuide()
+bool UProcedureBase::IsSubOf(UProcedureBase* InProcedure) const
 {
-	if(LocalProcedureState != EProcedureState::Entered) return;
-
-	LocalOnGuide(NAME_None);
-
-	switch(ProcedureGuideType)
+	if(InProcedure && ParentProcedure)
 	{
-		case EProcedureGuideType::TimerLoop:
-		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &AProcedureBase::LocalGuide, ProcedureGuideIntervalTime, false);
-			break;
-		}
-		default: break;
+		if(InProcedure == ParentProcedure) return true;
+		return ParentProcedure->IsSubOf(InProcedure);
 	}
+	return false;
 }
 
-void AProcedureBase::LocalResetGuide()
-{
-	GetWorld()->GetTimerManager().SetTimer(ResetGuideTimerHandle, this, &AProcedureBase::LocalResetGuideImpl, 1.f, false);
-}
-
-void AProcedureBase::LocalResetGuideImpl()
-{
-	
-}
-
-void AProcedureBase::LocalStopGuide()
-{
-	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
-}
-
-void AProcedureBase::ServerComplete(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(ProcedureState == EProcedureState::Completed) return;
-
-	ProcedureExecuteResult = InProcedureExecuteResult;
-
-	ServerOnComplete(InProcedureExecuteResult);
-
-	for(auto Iter : SubProcedures)
-	{
-		if(Iter)
-		{
-			Iter->ServerComplete(InProcedureExecuteResult);
-		}
-	}
-	
-	if(bAutoLeaveProcedure)
-	{
-		if(InProcedureExecuteResult != EProcedureExecuteResult::Skipped && AutoLeaveProcedureTime > 0.f)
-		{
-			GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, FTimerDelegate::CreateStatic<AProcedureBase*>(&UProcedureModuleBPLibrary::ServerLeaveProcedure, this), AutoLeaveProcedureTime, false);
-		}
-		else
-		{
-			UProcedureModuleBPLibrary::ServerLeaveProcedure(this);
-		}
-	}
-}
-
-void AProcedureBase::MultiComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(!HasAuthority())
-	{
-		LocalComplete(InProcedureExecuteResult);
-	}
-}
-
-void AProcedureBase::LocalComplete(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(LocalProcedureState == EProcedureState::Completed) return;
-
-	LocalProcedureExecuteResult = InProcedureExecuteResult;
-
-	LocalOnComplete(InProcedureExecuteResult);
-
-	for(auto Iter : SubProcedures)
-	{
-		if(Iter)
-		{
-			Iter->LocalOnComplete(InProcedureExecuteResult);
-		}
-	}
-
-	if(bAutoLeaveProcedure)
-	{
-		if(InProcedureExecuteResult != EProcedureExecuteResult::Skipped && AutoLeaveProcedureTime > 0.f)
-		{
-			GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, FTimerDelegate::CreateStatic<AProcedureBase*>(&UProcedureModuleBPLibrary::LocalLeaveProcedure, this), AutoLeaveProcedureTime, false);
-		}
-		else
-		{
-			UProcedureModuleBPLibrary::LocalLeaveProcedure(this);
-		}
-	}
-}
-
-bool AProcedureBase::HasSubProcedure(bool bIgnoreMerge) const
+bool UProcedureBase::HasSubProcedure(bool bIgnoreMerge) const
 {
 	return SubProcedures.Num() > 0 && (bIgnoreMerge || !bMergeSubProcedure);
 }
 
-AProcedureBase* AProcedureBase::GetCurrentSubProcedure() const
+UProcedureBase* UProcedureBase::GetCurrentSubProcedure() const
 {
 	if (SubProcedures.IsValidIndex(CurrentSubProcedureIndex))
 	{
@@ -751,16 +504,7 @@ AProcedureBase* AProcedureBase::GetCurrentSubProcedure() const
 	return nullptr;
 }
 
-AProcedureBase* AProcedureBase::GetCurrentLocalSubProcedure() const
-{
-	if (SubProcedures.IsValidIndex(CurrentLocalSubProcedureIndex))
-	{
-		return SubProcedures[CurrentLocalSubProcedureIndex];
-	}
-	return nullptr;
-}
-
-bool AProcedureBase::IsAllSubCompleted() const
+bool UProcedureBase::IsAllSubCompleted() const
 {
 	for (auto Iter : SubProcedures)
 	{
@@ -783,30 +527,7 @@ bool AProcedureBase::IsAllSubCompleted() const
 	return true;
 }
 
-bool AProcedureBase::IsAllLocalSubCompleted() const
-{
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			switch(Iter->LocalProcedureState)
-			{
-				case EProcedureState::Completed:
-				case EProcedureState::Leaved:
-				{
-					break;
-				}
-				default:
-				{
-					return false;
-				}
-			}
-		}
-	}
-	return true;
-}
-
-bool AProcedureBase::IsAllSubExecuteSucceed() const
+bool UProcedureBase::IsAllSubExecuteSucceed() const
 {
 	for (auto Iter : SubProcedures)
 	{
@@ -818,29 +539,12 @@ bool AProcedureBase::IsAllSubExecuteSucceed() const
 	return true;
 }
 
-bool AProcedureBase::IsAllLocalSubExecuteSucceed() const
-{
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter && Iter->LocalProcedureExecuteResult == EProcedureExecuteResult::Failed)
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-FName AProcedureBase::GetListenerTaskName(const FString& InTaskName) const
-{
-	return *FString::Printf(TEXT("%s_%s"), *ProcedureName.ToString(), *InTaskName);
-}
-
-bool AProcedureBase::HasProcedureTask() const
+bool UProcedureBase::HasProcedureTask() const
 {
 	return ProcedureTaskItems.Num() > 0;
 }
 
-bool AProcedureBase::IsAllTaskCompleted() const
+bool UProcedureBase::IsAllTaskCompleted() const
 {
 	for (auto Iter : ProcedureTaskItems)
 	{
@@ -852,31 +556,101 @@ bool AProcedureBase::IsAllTaskCompleted() const
 	return true;
 }
 
-FProcedureTaskItem& AProcedureBase::AddProcedureTask(const FName InTaskName, float InDurationTime, float InStartDelayTime)
+FProcedureTaskItem& UProcedureBase::AddProcedureTask(const FName InTaskName, float InDurationTime, float InStartDelayTime)
 {
 	ProcedureTaskItems.Add(FProcedureTaskItem(InTaskName, InDurationTime, InStartDelayTime));
 	return ProcedureTaskItems[ProcedureTaskItems.Num() - 1];
 }
 
-void AProcedureBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AProcedureBase, ProcedureName);
-	DOREPLIFETIME(AProcedureBase, ProcedureDisplayName);
-	DOREPLIFETIME(AProcedureBase, ProcedureDescription);
-	DOREPLIFETIME(AProcedureBase, ProcedureIndex);
-	DOREPLIFETIME(AProcedureBase, ProcedureState);
-	DOREPLIFETIME(AProcedureBase, ProcedureExecuteType);
-	DOREPLIFETIME(AProcedureBase, ProcedureExecuteCondition);
-	DOREPLIFETIME(AProcedureBase, ProcedureExecuteResult);
-	DOREPLIFETIME(AProcedureBase, bAutoEnterProcedure);
-	DOREPLIFETIME(AProcedureBase, AutoEnterProcedureTime);
-	DOREPLIFETIME(AProcedureBase, bAutoLeaveProcedure);
-	DOREPLIFETIME(AProcedureBase, AutoLeaveProcedureTime);
-	DOREPLIFETIME(AProcedureBase, ParentProcedure);
-	DOREPLIFETIME(AProcedureBase, bMergeSubProcedure);
-	DOREPLIFETIME(AProcedureBase, CurrentSubProcedureIndex);
-	DOREPLIFETIME(AProcedureBase, SubProcedures);
-	DOREPLIFETIME(AProcedureBase, CurrentProcedureTaskIndex);
+	OutProcedureListItem->Procedure = this;
+	for (int32 i = 0; i < SubProcedures.Num(); i++)
+	{
+		if(SubProcedures[i])
+		{
+			auto Item = MakeShared<FProcedureListItem>();
+			Item->ParentListItem = OutProcedureListItem;
+			OutProcedureListItem->SubListItems.Add(Item);
+			SubProcedures[i]->GenerateListItem(Item);
+		}
+	}
 }
+
+void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
+{
+	OutProcedureListItem->Procedure = this;
+	for (int32 i = 0; i < SubProcedures.Num(); i++)
+	{
+		if(SubProcedures[i])
+		{
+			SubProcedures[i]->ProcedureIndex = i;
+			SubProcedures[i]->ParentProcedure = this;
+			SubProcedures[i]->UpdateListItem(OutProcedureListItem->SubListItems[i]);
+		}
+	}
+}
+#if WITH_EDITOR
+bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
+{
+	if(InProperty)
+	{
+		FString PropertyName = InProperty->GetName();
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureExecuteType) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureCompleteType) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureLeaveType))
+		{
+			return !HasSubProcedure(false);
+		}
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoExecuteProcedureTime))
+		{
+			return !HasSubProcedure(false) && ProcedureExecuteType == EProcedureExecuteType::Automatic;
+		}
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoCompleteProcedureTime))
+		{
+			return !HasSubProcedure(false) && ProcedureCompleteType == EProcedureCompleteType::Automatic;
+		}
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoLeaveProcedureTime))
+		{
+			return !HasSubProcedure(false) && ProcedureLeaveType == EProcedureLeaveType::Automatic;
+		}
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideIntervalTime))
+		{
+			return ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop;
+		}
+	}
+
+	return Super::CanEditChange(InProperty);
+}
+
+void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	FProperty* Property = PropertyChangedEvent.MemberProperty;
+
+	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
+	{
+		auto PropertyName = Property->GetFName();
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, SubProcedures) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bMergeSubProcedure))
+		{
+			if(HasSubProcedure(false))
+			{
+				ProcedureExecuteType = EProcedureExecuteType::Automatic;
+				ProcedureCompleteType = EProcedureCompleteType::Automatic;
+				ProcedureLeaveType = EProcedureLeaveType::Automatic;
+				AutoExecuteProcedureTime = 0.f;
+				AutoCompleteProcedureTime = 0.f;
+				AutoLeaveProcedureTime = 0.f;
+			}
+		}
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif
