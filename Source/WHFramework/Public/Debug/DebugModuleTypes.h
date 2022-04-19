@@ -57,7 +57,7 @@ DEFINE_LOG_CATEGORY_STATIC(WHWebRequest, Log, All);
  * @param Duration 程持续时间
  * @param bNewerOnTop 更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor, float Duration = 1.5f, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true)
 {
 	if(GEngine)
 	{
