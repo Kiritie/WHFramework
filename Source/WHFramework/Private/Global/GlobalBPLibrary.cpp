@@ -7,6 +7,7 @@
 #include "GameFramework/InputSettings.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetStringLibrary.h"
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
@@ -132,6 +133,55 @@ bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InP
 	}
 
 	return OutResult.Num() == 0 ? false : true;
+}
+
+TArray<FString> UGlobalBPLibrary::NotNumberSymbols = TArray<FString>{ TEXT("."), TEXT(","), TEXT(" ") };
+
+bool UGlobalBPLibrary::TextIsNumber(const FText& InText)
+{
+	const FString TextStr = InText.ToString();
+	for(auto Iter : NotNumberSymbols)
+	{
+		if(TextStr.Contains(Iter))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+int32 UGlobalBPLibrary::TextToNumber(const FText& InText, TMap<int32, FString>& OutSymbols)
+{
+	FString TextStr = InText.ToString();
+	TArray<FString> TextArr = UKismetStringLibrary::GetCharacterArrayFromString(TextStr);
+	OutSymbols.Empty();
+	for(int32 i = TextArr.Num() - 1; i >= 0; i--)
+	{
+		if(NotNumberSymbols.Contains(TextArr[i]))
+		{
+			OutSymbols.Add(TextArr.Num() - i - 1, TextArr[i]);
+		}
+	}
+	for(auto Iter : NotNumberSymbols)
+	{
+		TextStr = TextStr.Replace(*Iter, *FString(""));
+	}
+	
+	return FCString::Atoi(*TextStr);
+}
+
+FText UGlobalBPLibrary::NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols)
+{
+	FString TextStr = FString::FromInt(InNumber);
+	for(auto Iter : InSymbols)
+	{
+		const int32 InsertIndex = TextStr.Len() - Iter.Key;
+		if(InsertIndex >= 0)
+		{
+			TextStr.InsertAt(InsertIndex, Iter.Value);
+		}
+	}
+	return FText::FromString(TextStr);
 }
 
 FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputActionName)

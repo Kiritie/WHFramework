@@ -305,9 +305,21 @@ public:
 		TerrainBedrockVoxelHeight = 0.02f;
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
-		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid'")), FVector2D(0.0625f, 0.5f)));
-		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent'")), FVector2D(0.0625f, 0.5f)));
-		ChunkMaterials.Add(FVoxelChunkMaterial(LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent'")), FVector2D(0.0625f, 0.5f)));
+		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid"));
+		// if(SolidMatFinder.Succeeded())
+		// {
+		// 	ChunkMaterials.Add(FVoxelChunkMaterial(SolidMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		// }
+		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent"));
+		// if(SemiTransparentMatFinder.Succeeded())
+		// {
+		// 	ChunkMaterials.Add(FVoxelChunkMaterial(SemiTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		// }
+		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent"));
+		// if(TransparentMatFinder.Succeeded())
+		// {
+		// 	ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		// }
 
 		VitalityRaceDensity = 50.f;
 		CharacterRaceDensity = 50.f;

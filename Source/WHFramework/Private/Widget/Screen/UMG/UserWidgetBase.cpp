@@ -133,7 +133,7 @@ void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 	{
 		FTimerDelegate TimerDelegate;
 		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, bInstant);
-		GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetRefreshTime, false);
+		GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
 	}
 }
 

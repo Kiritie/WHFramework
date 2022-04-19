@@ -437,6 +437,7 @@ void UProcedureBase::Leave()
 	UProcedureModuleBPLibrary::LeaveProcedure(this);
 }
 
+#if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
 	AWHPlayerController* PlayerController = nullptr;
@@ -463,6 +464,7 @@ void UProcedureBase::GetCameraView()
 		Modify();
 	}
 }
+#endif
 
 void UProcedureBase::ResetCameraView()
 {

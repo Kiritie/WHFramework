@@ -133,22 +133,22 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkGenerateSpeed;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chunk")
+	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 	
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<FIndex> ChunkSpawnQueue;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<AVoxelChunk*> ChunkMapBuildQueue;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<AVoxelChunk*> ChunkMapGenerateQueue;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<AVoxelChunk*> ChunkGenerateQueue;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<AVoxelChunk*> ChunkDestroyQueue;
 
 private:

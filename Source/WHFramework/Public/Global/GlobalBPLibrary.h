@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Editor.h"
 #include "Engine/GameEngine.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -104,11 +103,25 @@ public:
 	*/
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	// Text
+private:
+	static TArray<FString> NotNumberSymbols;
+public:
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool TextIsNumber(const FText& InText);
+
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static int32 TextToNumber(const FText& InText, TMap<int32, FString>& OutSymbols);
+
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Input
 public:
-	UFUNCTION(BlueprintPure, Category = "DWHelper")
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
 
 	//////////////////////////////////////////////////////////////////////////

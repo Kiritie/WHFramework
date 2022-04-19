@@ -263,7 +263,7 @@ void AWHPlayerController::TouchPressedImpl()
 	TouchLocationPrevious = FVector2D(-1.f, -1.f);
 	TouchPinchValuePrevious = -1.f;
 
-	GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
+	// GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
 }
 
 void AWHPlayerController::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
@@ -326,7 +326,7 @@ void AWHPlayerController::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 		default: break;
 	}
 
-	GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
+	// GEngine->AddOnScreenDebugMessage(0, 1.5f, FColor::Cyan, FString::FromInt(TouchPressedCount));
 }
 
 void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
