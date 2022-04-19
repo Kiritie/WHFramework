@@ -9,7 +9,7 @@
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
-#include "Widget/Base/BaseWidgetInterface.h"
+#include "Widget/Interfaces/BaseWidgetInterface.h"
 
 #include "WorldWidgetBase.generated.h"
 

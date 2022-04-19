@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Blueprint/UserWidget.h"
-#include "Widget/Base/ScreenWidgetInterface.h"
+#include "Widget/Interfaces/ScreenWidgetInterface.h"
 
 #include "UserWidgetBase.generated.h"
 

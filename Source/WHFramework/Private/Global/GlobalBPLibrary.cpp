@@ -166,7 +166,6 @@ int32 UGlobalBPLibrary::TextToNumber(const FText& InText, TMap<int32, FString>& 
 	{
 		TextStr = TextStr.Replace(*Iter, *FString(""));
 	}
-	
 	return FCString::Atoi(*TextStr);
 }
 
@@ -176,7 +175,7 @@ FText UGlobalBPLibrary::NumberToText(int32 InNumber, const TMap<int32, FString>&
 	for(auto Iter : InSymbols)
 	{
 		const int32 InsertIndex = TextStr.Len() - Iter.Key;
-		if(InsertIndex >= 0)
+		if(InsertIndex > 0)
 		{
 			TextStr.InsertAt(InsertIndex, Iter.Value);
 		}
