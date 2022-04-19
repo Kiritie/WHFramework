@@ -51,12 +51,12 @@ AWHPlayerController::AWHPlayerController()
 	bReverseCameraMove = false;
 	bClampCameraMove = false;
 	CameraMoveLimit = FBox(EForceInit::ForceInitToZero);
-	CameraMoveRate = 20.f;
+	CameraMoveRate = 2000.f;
 	CameraMoveSmooth = 5.f;
 
 	bCameraRotateAble = true;
-	CameraTurnRate = 60.f;
-	CameraLookUpRate = 60.f;
+	CameraTurnRate = 90.f;
+	CameraLookUpRate = 90.f;
 	CameraRotateSmooth = 2.f;
 	MinCameraPinch = -89.f;
 	MaxCameraPinch = 89.f;
@@ -76,6 +76,10 @@ AWHPlayerController::AWHPlayerController()
 	TrackPitchOffset = 0.f;
 	TrackDistance = 0.f;
 	TrackTargetMode = ETrackTargetMode::LocationOnly;
+
+	CurrentCameraLocation = FVector::ZeroVector;
+	CurrentCameraRotation = FRotator::ZeroRotator;
+	CurrentCameraDistance = 0.f;
 	
 	TargetCameraLocation = FVector::ZeroVector;
 	TargetCameraRotation = FRotator::ZeroRotator;
@@ -141,19 +145,28 @@ void AWHPlayerController::Tick(float DeltaTime)
 
 	TrackTarget();
 
-	if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()) && !GetPawn()->GetActorLocation().Equals(TargetCameraLocation))
+	if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
 	{
-		GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+		CurrentCameraLocation = GetPawn()->GetActorLocation();
+		if(!CurrentCameraLocation.Equals(TargetCameraLocation))
+		{
+			GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+		}
 	}
 
-	if(!GetControlRotation().Equals(TargetCameraRotation))
+	CurrentCameraRotation = GetControlRotation();
+	if(!CurrentCameraRotation.Equals(TargetCameraRotation))
 	{
 		SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
 	}
 
-	if(GetCameraBoom() && GetCameraBoom()->TargetArmLength != TargetCameraDistance)
+	if(GetCameraBoom())
 	{
-		GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+		CurrentCameraDistance = GetCameraBoom()->TargetArmLength;
+		if(CurrentCameraDistance != TargetCameraDistance)
+		{
+			GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+		}
 	}
 }
 
@@ -532,15 +545,6 @@ bool AWHPlayerController::IsControllingRotate() const
 bool AWHPlayerController::IsControllingZoom() const
 {
 	return GetInputAxisValue(FName("ZoomCam")) != 0.f || GetInputAxisValue(FName("PinchGesture")) != 0.f;
-}
-
-float AWHPlayerController::GetCameraDistance(bool bReally)
-{
-	if(GetCameraBoom())
-	{
-		return bReally ? GetCameraBoom()->TargetArmLength : TargetCameraDistance;
-	}
-	return 0.f;
 }
 
 USpringArmComponent* AWHPlayerController::GetCameraBoom()

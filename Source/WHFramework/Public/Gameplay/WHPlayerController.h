@@ -157,6 +157,27 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float InitCameraDistance;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera Stats
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
+	FVector CurrentCameraLocation;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
+	FVector TargetCameraLocation;
+
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
+	FRotator CurrentCameraRotation;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
+	FRotator TargetCameraRotation;
+
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
+	float CurrentCameraDistance;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
+	float TargetCameraDistance;
+
 private:
 	UPROPERTY()
 	AActor* TrackTargetActor;
@@ -166,10 +187,6 @@ private:
 	float TrackDistance;
 	bool TrackAllowControl;
 	ETrackTargetMode TrackTargetMode;
-
-	FVector TargetCameraLocation;
-	FRotator TargetCameraRotation;
-	float TargetCameraDistance;
 
 	int32 TouchPressedCount;
 	FVector2D TouchLocationPrevious;
@@ -246,9 +263,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsControllingZoom() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetCameraDistance(bool bReally = true);
 	
 	UFUNCTION(BlueprintPure)
 	class USpringArmComponent* GetCameraBoom();
@@ -358,6 +372,24 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
+	
+	UFUNCTION(BlueprintPure)
+	FVector GetCurrentCameraLocation() const { return CurrentCameraLocation; }
+
+	UFUNCTION(BlueprintPure)
+	FRotator GetCurrentCameraRotation() const { return CurrentCameraRotation; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCurrentCameraDistance() const { return CurrentCameraDistance; }
+	
+	UFUNCTION(BlueprintPure)
+	FVector GetTargetCameraLocation() const { return TargetCameraLocation; }
+
+	UFUNCTION(BlueprintPure)
+	FRotator GetTargetCameraRotation() const { return TargetCameraRotation; }
+
+	UFUNCTION(BlueprintPure)
+	float GetTargetCameraDistance() const { return TargetCameraDistance; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// PlayerController

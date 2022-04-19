@@ -17,10 +17,6 @@
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 void SProcedureMainWidget::Construct(const FArguments& InArgs)
 {
-	// for (const FWorldContext& Context : GEngine->GetWorldContexts())
-	// {
-	// 	if(MainModule && ProcedureModule) break;
-	// }
 	MainModule = UMainModuleBPLibrary::GetMainModule();
 	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>();
 

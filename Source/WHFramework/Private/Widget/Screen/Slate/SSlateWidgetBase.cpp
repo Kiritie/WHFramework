@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/Slate/SSlateWidgetBase.h"
+#include "Widget/Screen/Slate/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModule.h"
@@ -31,7 +31,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	OwnerActor = nullptr;
 	LastWidget = nullptr;
 	ParentWidget = nullptr;
-	ChildWidgets = TArray<TScriptInterface<IWidgetInterface>>();
+	ChildWidgets = TArray<TScriptInterface<IScreenWidgetInterface>>();
 }
 
 void SSlateWidgetBase::Construct(const FArguments& InArgs)
@@ -145,15 +145,15 @@ void SSlateWidgetBase::Destroy()
 	//UWidgetModuleBPLibrary::DestroySlateWidget<SSlateWidgetBase>();
 }
 
-void SSlateWidgetBase::AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void SSlateWidgetBase::AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 }
 
-void SSlateWidgetBase::RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void SSlateWidgetBase::RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 }
 
-void SSlateWidgetBase::RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget)
+void SSlateWidgetBase::RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
 {
 }
 

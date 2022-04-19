@@ -10,8 +10,7 @@
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Procedure/Base/ProcedureBase.h"
 
-
-AProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure()
+UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
@@ -20,25 +19,7 @@ AProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure()
 	return nullptr;
 }
 
-AProcedureBase* UProcedureModuleBPLibrary::GetCurrentLocalProcedure()
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		return ProcedureModule->GetCurrentLocalProcedure();
-	}
-	return nullptr;
-}
-
-AProcedureBase* UProcedureModuleBPLibrary::GetCurrentParentProcedure()
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		return ProcedureModule->GetCurrentParentProcedure();
-	}
-	return nullptr;
-}
-
-ARootProcedureBase* UProcedureModuleBPLibrary::GetCurrentRootProcedure()
+URootProcedureBase* UProcedureModuleBPLibrary::GetCurrentRootProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
@@ -47,58 +28,66 @@ ARootProcedureBase* UProcedureModuleBPLibrary::GetCurrentRootProcedure()
 	return nullptr;
 }
 
-void UProcedureModuleBPLibrary::ServerEnterProcedure(AProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::StartProcedure(int32 InRootProcedureIndex, bool bSkipProcedures)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerEnterProcedure(InProcedure);
+		ProcedureModule->StartProcedure(InRootProcedureIndex, bSkipProcedures);
 	}
 }
 
-void UProcedureModuleBPLibrary::ServerLeaveProcedure(AProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::EndProcedure(bool bRestoreProcedures)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerLeaveProcedure(InProcedure);
+		ProcedureModule->EndProcedure(bRestoreProcedures);
 	}
 }
 
-void UProcedureModuleBPLibrary::LocalEnterProcedure(AProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::RestoreProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerEnterProcedure(InProcedure);
+		ProcedureModule->RestoreProcedure(InProcedure);
 	}
 }
 
-void UProcedureModuleBPLibrary::LocalLeaveProcedure(AProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::EnterProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->LocalLeaveProcedure(InProcedure);
+		ProcedureModule->EnterProcedure(InProcedure);
 	}
 }
 
-void UProcedureModuleBPLibrary::ServerSkipCurrentProcedure()
+void UProcedureModuleBPLibrary::GuideProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerSkipCurrentProcedure();
+		ProcedureModule->GuideProcedure(InProcedure);
 	}
 }
 
-void UProcedureModuleBPLibrary::ServerSkipCurrentParentProcedure()
+void UProcedureModuleBPLibrary::ExecuteProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerSkipCurrentParentProcedure();
+		ProcedureModule->ExecuteProcedure(InProcedure);
 	}
 }
 
-void UProcedureModuleBPLibrary::ServerSkipCurrentRootProcedure()
+void UProcedureModuleBPLibrary::CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->ServerSkipCurrentRootProcedure();
+		ProcedureModule->CompleteProcedure(InProcedure, InProcedureExecuteResult);
+	}
+}
+
+void UProcedureModuleBPLibrary::LeaveProcedure(UProcedureBase* InProcedure)
+{
+	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	{
+		ProcedureModule->LeaveProcedure(InProcedure);
 	}
 }

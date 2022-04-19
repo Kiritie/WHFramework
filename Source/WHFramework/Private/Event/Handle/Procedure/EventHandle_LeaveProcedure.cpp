@@ -17,6 +17,6 @@ void UEventHandle_LeaveProcedure::Fill_Implementation(const TArray<FParameter>& 
 {
 	if(InParameters.IsValidIndex(0))
 	{
-		Procedure = InParameters[0].GetObjectValue<AProcedureBase>();
+		Procedure = InParameters[0].GetObjectValue<UProcedureBase>();
 	}
 }

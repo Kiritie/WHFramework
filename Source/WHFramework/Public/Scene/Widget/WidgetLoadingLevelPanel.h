@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UMG/UserWidgetBase.h"
 #include "WidgetLoadingLevelPanel.generated.h"
 
 /**

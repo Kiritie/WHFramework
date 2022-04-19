@@ -3,17 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "WidgetInterfaceBase.h"
+#include "BaseWidgetInterface.h"
 
-#include "WidgetModuleTypes.h"
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
-#include "WidgetInterface.generated.h"
+#include "ScreenWidgetInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWidgetInterface : public UWidgetInterfaceBase
+class UScreenWidgetInterface : public UBaseWidgetInterface
 {
 	GENERATED_BODY()
 };
@@ -21,7 +20,7 @@ class UWidgetInterface : public UWidgetInterfaceBase
 /**
  * 
  */
-class WHFRAMEWORK_API IWidgetInterface : public IWidgetInterfaceBase
+class WHFRAMEWORK_API IScreenWidgetInterface : public IBaseWidgetInterface
 {
 	GENERATED_BODY()
 
@@ -48,11 +47,11 @@ public:
 
 	virtual void Reset() = 0;
 
-	virtual void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+	virtual void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
 
-	virtual void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+	virtual void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
 
-	virtual void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) = 0;
+	virtual void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
 
 	virtual void RefreshAllChild() = 0;
 
@@ -76,13 +75,13 @@ public:
 
 	virtual EWidgetState GetWidgetState() const = 0;
 
-	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const = 0;
+	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const = 0;
 
-	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) = 0;
+	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) = 0;
 
-	virtual TScriptInterface<IWidgetInterface> GetParentWidget() const = 0;
+	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const = 0;
 
-	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) = 0;
+	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) = 0;
 
-	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() = 0;
+	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() = 0;
 };

@@ -11,8 +11,8 @@
 #include "Main/MainModule.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
-#include "Widget/Slate/SSlateWidgetBase.h"
-#include "Widget/UMG/UserWidgetBase.h"
+#include "Widget/Screen/Slate/SSlateWidgetBase.h"
+#include "Widget/Screen/UMG/UserWidgetBase.h"
 #include "World/WorldWidgetBase.h"
 #include "WidgetModule.generated.h"
 

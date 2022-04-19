@@ -18,7 +18,7 @@ void UEventHandle_ExecuteProcedure::OnDespawn_Implementation()
 
 bool UEventHandle_ExecuteProcedure::Filter_Implementation(UObject* InOwner, const FName InFuncName)
 {
-	if(InOwner->IsA(AProcedureBase::StaticClass()))
+	if(InOwner->IsA(UProcedureBase::StaticClass()))
 	{
 		return InOwner == Procedure && InFuncName == FuncName;
 	}
@@ -29,7 +29,7 @@ void UEventHandle_ExecuteProcedure::Fill_Implementation(const TArray<FParameter>
 {
 	if(InParameters.IsValidIndex(0))
 	{
-		Procedure = InParameters[0].GetObjectValue<AProcedureBase>();
+		Procedure = InParameters[0].GetObjectValue<UProcedureBase>();
 	}
 	if(InParameters.IsValidIndex(1))
 	{

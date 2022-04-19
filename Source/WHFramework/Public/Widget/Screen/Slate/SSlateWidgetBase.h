@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 
-#include "Widget/WidgetInterface.h"
+#include "Widget/Base/ScreenWidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"
 
 /**
  * 
  */
-class WHFRAMEWORK_API SSlateWidgetBase : public SCompoundWidget, public IWidgetInterface
+class WHFRAMEWORK_API SSlateWidgetBase : public SCompoundWidget, public IScreenWidgetInterface
 {
 public:
 	SLATE_BEGIN_ARGS(SSlateWidgetBase)
@@ -52,11 +52,11 @@ public:
 
 	virtual void Destroy() override;
 
-	virtual void AddChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	virtual void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 
-	virtual void RemoveChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	virtual void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 
-	virtual void RemoveAllChild(const TScriptInterface<IWidgetInterface>& InChildWidget) override;
+	virtual void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
 	
 	virtual void RefreshAllChild() override;
 
@@ -100,11 +100,11 @@ protected:
 
 	AActor* OwnerActor;
 	
-	TScriptInterface<IWidgetInterface> LastWidget;
+	TScriptInterface<IScreenWidgetInterface> LastWidget;
 	
-	TScriptInterface<IWidgetInterface> ParentWidget;
+	TScriptInterface<IScreenWidgetInterface> ParentWidget;
 	
-	TArray<TScriptInterface<IWidgetInterface>> ChildWidgets;
+	TArray<TScriptInterface<IScreenWidgetInterface>> ChildWidgets;
 
 public:
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
@@ -148,13 +148,13 @@ public:
 
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
-	virtual TScriptInterface<IWidgetInterface> GetLastWidget() const override { return LastWidget; }
+	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const override { return LastWidget; }
 
-	virtual void SetLastWidget(TScriptInterface<IWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
+	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
 
-	virtual TScriptInterface<IWidgetInterface> GetParentWidget() const override { return ParentWidget; }
+	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const override { return ParentWidget; }
 
-	virtual void SetParentWidget(TScriptInterface<IWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
 
-	virtual TArray<TScriptInterface<IWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
 };

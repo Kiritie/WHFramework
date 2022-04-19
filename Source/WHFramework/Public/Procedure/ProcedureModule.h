@@ -9,8 +9,8 @@
 
 #include "ProcedureModule.generated.h"
 
-class AProcedureBase;
-class ARootProcedureBase;
+class UProcedureBase;
+class URootProcedureBase;
 
 /**
  * 
@@ -20,7 +20,7 @@ UCLASS()
 class WHFRAMEWORK_API AProcedureModule : public AModuleBase
 {
 	GENERATED_BODY()
-		
+
 public:	
 	// ParamSets default values for this actor's properties
 	AProcedureModule();
@@ -48,49 +48,38 @@ public:
 	/// Procedure
 public:
 	UFUNCTION(BlueprintCallable)
-	void ServerStartProcedure();
+	void StartProcedure(int32 InRootProcedureIndex = -1, bool bSkipProcedures = false);
 
 	UFUNCTION(BlueprintCallable)
-	void ServerEnterProcedure(AProcedureBase* InProcedure);
+	void EndProcedure(bool bRestoreProcedures = false);
 
 	UFUNCTION(BlueprintCallable)
-	void ServerLeaveProcedure(AProcedureBase* InProcedure);
+	void RestoreProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
-	void LocalEnterProcedure(AProcedureBase* InProcedure);
+	void EnterProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
-	void LocalLeaveProcedure(AProcedureBase* InProcedure);
+	void GuideProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
-	void ServerSkipProcedure(AProcedureBase* InProcedure);
+	void ExecuteProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
-	void ServerSkipCurrentProcedure();
+	void CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
 
 	UFUNCTION(BlueprintCallable)
-	void ServerSkipCurrentParentProcedure();
-
-	UFUNCTION(BlueprintCallable)
-	void ServerSkipCurrentRootProcedure();
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Procedure/Menu
-protected:
-	bool bAllProcedureSpawned;
-	
-public:
-	UFUNCTION()
-	void SpawnAllProcedure();
-
-	UFUNCTION(CallInEditor, Category = "ProcedureModule")
-	void ClearAllProcedure();
+	void LeaveProcedure(UProcedureBase* InProcedure);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
+public:
 #if WITH_EDITOR
-	UFUNCTION(CallInEditor, Category = "ProcedureEditor")
+	UFUNCTION(CallInEditor, Category = "ProcedureModule")
 	void OpenProcedureEditor();
+
+	UFUNCTION(CallInEditor, Category = "ProcedureModule")
+	void ClearAllProcedure();
 
 	void GenerateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
@@ -98,55 +87,79 @@ public:
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
-	/// RootProcedure
-public:
+	/// Root Procedure
+protected:
+	/// 初始根流程索引
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Root Procedure")
+	int32 FirstRootProcedureIndex;
 	/// 当前根流程索引
-	UPROPERTY(EditAnywhere, Replicated)
-	int32 RootProcedureIndex;
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
+	int32 CurrentRootProcedureIndex;
 	/// 根流程
-	UPROPERTY(VisibleAnywhere, Replicated)
-	TArray<ARootProcedureBase*> RootProcedures;
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
+	TArray<URootProcedureBase*> RootProcedures;
+	
 public:
-	/**
-	 * 是否有根流程
-	 */
 	UFUNCTION(BlueprintPure)
-	bool HasRootProcedure() const;
+	int32 GetCurrentRootProcedureIndex() const { return CurrentRootProcedureIndex; }
 	/**
 	* 获取当前根流程
 	*/
 	UFUNCTION(BlueprintPure)
-	ARootProcedureBase* GetCurrentRootProcedure() const;
+	URootProcedureBase* GetCurrentRootProcedure() const
+	{
+		if(RootProcedures.IsValidIndex(CurrentRootProcedureIndex))
+		{
+			return RootProcedures[CurrentRootProcedureIndex];
+		}
+		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure)
+	TArray<URootProcedureBase*>& GetRootProcedures() { return RootProcedures; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Procedure
+	/// Current Procedure
 protected:
 	/// 当前流程 
-	UPROPERTY(VisibleAnywhere, Replicated, Transient)
-	AProcedureBase* CurrentProcedure;
-	/// 当前本地流程 
-	UPROPERTY(VisibleAnywhere, Replicated, Transient)
-	AProcedureBase* CurrentLocalProcedure;
-	/// 当前父流程
-	UPROPERTY(VisibleAnywhere, Replicated, Transient)
-	AProcedureBase* CurrentParentProcedure;
+	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Current Procedure")
+	UProcedureBase* CurrentProcedure;
 public:
 	/**
 	* 获取当前流程
 	*/
 	UFUNCTION(BlueprintPure)
-	AProcedureBase* GetCurrentProcedure() const { return CurrentProcedure; }
-	/**
-	* 获取当前本地流程
-	*/
-	UFUNCTION(BlueprintPure)
-	AProcedureBase* GetCurrentLocalProcedure() const { return CurrentLocalProcedure; }
-	/**
-	* 获取当前父流程
-	*/
-	UFUNCTION(BlueprintPure)
-	AProcedureBase* GetCurrentParentProcedure() const { return CurrentParentProcedure; }
-
+	UProcedureBase* GetCurrentProcedure() const { return CurrentProcedure; }
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Global Options
+protected:
+	/// 流程执行方式
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Global Options")
+	EProcedureExecuteType GlobalProcedureExecuteType;
+	/// 流程完成方式
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Global Options")
+	EProcedureCompleteType GlobalProcedureCompleteType;
+	/// 流程离开方式
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Global Options")
+	EProcedureLeaveType GlobalProcedureLeaveType;
+	
 public:
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UFUNCTION(BlueprintPure)
+	EProcedureExecuteType GetGlobalProcedureExecuteType() const { return GlobalProcedureExecuteType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetGlobalProcedureExecuteType(EProcedureExecuteType InGlobalProcedureExecuteType) { this->GlobalProcedureExecuteType = InGlobalProcedureExecuteType; }
+
+	UFUNCTION(BlueprintPure)
+	EProcedureCompleteType GetGlobalProcedureCompleteType() const { return GlobalProcedureCompleteType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetGlobalProcedureCompleteType(EProcedureCompleteType InGlobalProcedureCompleteType) { this->GlobalProcedureCompleteType = InGlobalProcedureCompleteType; }
+
+	UFUNCTION(BlueprintPure)
+	EProcedureLeaveType GetGlobalProcedureLeaveType() const { return GlobalProcedureLeaveType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetGlobalProcedureLeaveType(EProcedureLeaveType InGlobalProcedureLeaveType) { this->GlobalProcedureLeaveType = InGlobalProcedureLeaveType; }
 };

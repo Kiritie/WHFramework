@@ -6,7 +6,7 @@
 #include "Media/MediaModuleBPLibrary.h"
 #include "Media/MediaPlayer/MediaPlayerBase.h"
 
-AProcedure_PlayMediaPlayerMovie::AProcedure_PlayMediaPlayerMovie()
+UProcedure_PlayMediaPlayerMovie::UProcedure_PlayMediaPlayerMovie()
 {
 	ProcedureName = FName("PlayMediaPlayerMovie");
 	ProcedureDisplayName = FText::FromString(TEXT("Media Movie"));
@@ -17,30 +17,30 @@ AProcedure_PlayMediaPlayerMovie::AProcedure_PlayMediaPlayerMovie()
 	MovieName = NAME_None;
 }
 
-void AProcedure_PlayMediaPlayerMovie::ServerOnInitialize_Implementation()
+void UProcedure_PlayMediaPlayerMovie::OnInitialize_Implementation()
 {
-	Super::ServerOnInitialize_Implementation();
+	Super::OnInitialize_Implementation();
 }
 
-void AProcedure_PlayMediaPlayerMovie::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
+void UProcedure_PlayMediaPlayerMovie::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	Super::ServerOnEnter_Implementation(InLastProcedure);
+	Super::OnEnter_Implementation(InLastProcedure);
 
 	FOnMoviePlayFinishedSingleDelegate OnMoviePlayFinishedDelegate;
-	OnMoviePlayFinishedDelegate.BindDynamic(this, &AProcedure_PlayMediaPlayerMovie::ServerOnMoviePlayFinished);
+	OnMoviePlayFinishedDelegate.BindDynamic(this, &UProcedure_PlayMediaPlayerMovie::ServerOnMoviePlayFinished);
 	UMediaModuleBPLibrary::PlayMediaPlayerMovieWithDelegate(PlayerName, MovieName, OnMoviePlayFinishedDelegate, true);
 
 	UMediaModuleBPLibrary::PlayMediaPlayerMovie(PlayerName, MovieName, true);
 }
 
-void AProcedure_PlayMediaPlayerMovie::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
+void UProcedure_PlayMediaPlayerMovie::OnLeave_Implementation()
 {
-	Super::ServerOnLeave_Implementation(InNextProcedure);
+	Super::OnLeave_Implementation();
 
 	UMediaModuleBPLibrary::StopMediaPlayerMovie(PlayerName, true, true);
 }
 
-void AProcedure_PlayMediaPlayerMovie::ServerOnMoviePlayFinished(const FName& InMovieName)
+void UProcedure_PlayMediaPlayerMovie::ServerOnMoviePlayFinished(const FName& InMovieName)
 {
-	ServerComplete();
+	Complete();
 }

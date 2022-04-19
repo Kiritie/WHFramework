@@ -10,12 +10,12 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AProcedure_PlaySingleSound : public AProcedureBase
+class WHFRAMEWORK_API UProcedure_PlaySingleSound : public UProcedureBase
 {
 	GENERATED_BODY()
 
 public:
-	AProcedure_PlaySingleSound();
+	UProcedure_PlaySingleSound();
 
 public:
 	/// 声音
@@ -29,7 +29,7 @@ public:
 	class ATargetPoint* Point;
 
 public:
-	virtual void ServerOnEnter_Implementation(AProcedureBase* InLastProcedure) override;
+	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
 
-	virtual void ServerOnLeave_Implementation(AProcedureBase* InNextProcedure) override;
+	virtual void OnLeave_Implementation() override;
 };

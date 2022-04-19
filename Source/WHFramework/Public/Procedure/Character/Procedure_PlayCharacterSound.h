@@ -10,19 +10,19 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AProcedure_PlayCharacterSound : public AProcedureBase
+class WHFRAMEWORK_API UProcedure_PlayCharacterSound : public UProcedureBase
 {
 	GENERATED_BODY()
 
 public:
-	AProcedure_PlayCharacterSound();
+	UProcedure_PlayCharacterSound();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 public:
-	virtual void ServerOnEnter_Implementation(AProcedureBase* InLastProcedure) override;
+	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
 
-	virtual void ServerOnLeave_Implementation(AProcedureBase* InNextProcedure) override;
+	virtual void OnLeave_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Character

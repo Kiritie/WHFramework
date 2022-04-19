@@ -5,7 +5,7 @@
 
 #include "Character/CharacterModuleBPLibrary.h"
 
-AProcedure_PlayCharacterMontage::AProcedure_PlayCharacterMontage()
+UProcedure_PlayCharacterMontage::UProcedure_PlayCharacterMontage()
 {
 	ProcedureName = FName("PlayCharacterMontage");
 	ProcedureDisplayName = FText::FromString(TEXT("Character Montage"));
@@ -16,16 +16,16 @@ AProcedure_PlayCharacterMontage::AProcedure_PlayCharacterMontage()
 	Montage = nullptr;
 }
 
-void AProcedure_PlayCharacterMontage::ServerOnEnter_Implementation(AProcedureBase* InLastProcedure)
+void UProcedure_PlayCharacterMontage::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 {
-	Super::ServerOnEnter_Implementation(InLastProcedure);
+	Super::OnEnter_Implementation(InLastProcedure);
 	
 	UCharacterModuleBPLibrary::PlayCharacterMontage(CharacterName, Montage, true);
 }
 
-void AProcedure_PlayCharacterMontage::ServerOnLeave_Implementation(AProcedureBase* InNextProcedure)
+void UProcedure_PlayCharacterMontage::OnLeave_Implementation()
 {
-	Super::ServerOnLeave_Implementation(InNextProcedure);
+	Super::OnLeave_Implementation();
 	
 	UCharacterModuleBPLibrary::PlayCharacterMontage(CharacterName, Montage, true);
 }

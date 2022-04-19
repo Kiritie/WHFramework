@@ -8,8 +8,8 @@
 #include "Components/WidgetComponent.h"
 #include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
-#include "Widget/WidgetInterfaceBase.h"
 #include "Widget/WidgetModuleTypes.h"
+#include "Widget/Base/BaseWidgetInterface.h"
 
 #include "WorldWidgetBase.generated.h"
 
@@ -18,7 +18,7 @@ class UCanvasPanelSlot;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IWidgetInterfaceBase
+class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetInterface
 {
 	GENERATED_BODY()
 

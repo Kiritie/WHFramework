@@ -19,7 +19,7 @@ public:
 
 public:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
-	class AProcedureBase* Procedure;
+	class UProcedureBase* Procedure;
 	
 public:
 	virtual void OnDespawn_Implementation() override;

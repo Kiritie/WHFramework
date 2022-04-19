@@ -103,10 +103,10 @@ void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
 	TArray<UUserWidget*> InterfaceWidgets;
-	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UWidgetInterfaceBase::StaticClass(), false);
+	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UTickAbleWidgetInterface::StaticClass(), false);
 	for (auto Iter : InterfaceWidgets)
 	{
-		if(IWidgetInterfaceBase* InterfaceWidget = Cast<IWidgetInterfaceBase>(Iter))
+		if(ITickAbleWidgetInterface* InterfaceWidget = Cast<ITickAbleWidgetInterface>(Iter))
 		{
 			if(InterfaceWidget->Execute_IsTickAble(Iter))
 			{

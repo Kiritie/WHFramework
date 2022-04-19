@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 
 #include "Procedure/ProcedureModuleTypes.h"
-#include "UObject/NoExportTypes.h"
 #include "Debug/DebugModuleTypes.h"
 
 #include "ProcedureBase.generated.h"
@@ -13,13 +12,13 @@
 /**
  * 流程基类
  */
-UCLASS(hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API AProcedureBase : public AActor
+UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
+class WHFRAMEWORK_API UProcedureBase : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	AProcedureBase();
+	UProcedureBase();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
@@ -34,157 +33,141 @@ public:
 	 */
 	virtual void OnUnGenerate();
 #endif
-	/**
-	* 构建流程列表项
-	*/
-	virtual void GenerateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
-	/**
-	* 更新流程列表项
-	*/
-	virtual void UpdateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
 
 public:
-	/**
-	* 本地初始化
-	*/
-	virtual void NativeOnInitialize();
 	/**
 	 * 流程初始化
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnInitialize();
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnInitialize();
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnInitialize();
+	void OnInitialize();
 	/**
-	 * 流程准备
+	 * 流程还原
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnPrepare();
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnPrepare();
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnPrepare();
+	void OnRestore();
 	/**
-	 * 进入流程
+	 * 流程进入
 	 * @param InLastProcedure 上一个流程
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnEnter(AProcedureBase* InLastProcedure);
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnEnter(AProcedureBase* InLastProcedure);
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnEnter(AProcedureBase* InLastProcedure);
+	void OnEnter(UProcedureBase* InLastProcedure);
 	/**
 	 * 流程帧刷新
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnRefresh(float DeltaSeconds);
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnRefresh(float DeltaSeconds);
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnRefresh(float DeltaSeconds);
+	void OnRefresh(float DeltaSeconds);
 	/**
 	* 流程指引
 	*/
 	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnGuide(const FName& InListenerTaskName);
+	void OnGuide();
+	/**
+	 * 流程执行
+	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnStopGuide(const FName& InListenerTaskName);
+	void OnExecute();
 	/**
 	 * 流程完成
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnComplete(EProcedureExecuteResult InProcedureExecuteResult);
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnComplete(EProcedureExecuteResult InProcedureExecuteResult);
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnComplete(EProcedureExecuteResult InProcedureExecuteResult);
+	void OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
 	/**
-	 * 离开流程
-	 * @param InNextProcedure 下一个流程
+	 * 流程离开
 	 */
 	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnLeave(AProcedureBase* InNextProcedure);
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnLeave(AProcedureBase* InNextProcedure);
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnLeave(AProcedureBase* InNextProcedure);
-	/**
-	 * 清理流程
-	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnClear();
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnClear();
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnClear();
-	/**
-	 * 销毁流程
-	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void ServerOnDestroy();
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiOnDestroy();
-	UFUNCTION(BlueprintNativeEvent)
-	void LocalOnDestroy();
+	void OnLeave();
 
 public:
 	/**
-	* 准备流程
+	* 还原流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void ServerPrepare();
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiPrepare();
+	void Restore();
+	/**
+	* 进入流程
+	*/
 	UFUNCTION(BlueprintCallable)
-	void LocalPrepare();
+	void Enter();
 	/**
 	* 指引流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void LocalGuide();
+	void Guide();
+	/**
+	* 执行流程
+	*/
 	UFUNCTION(BlueprintCallable)
-	void LocalResetGuide();
-	UFUNCTION(BlueprintCallable)
-	void LocalResetGuideImpl();
-	UFUNCTION(BlueprintCallable)
-	void LocalStopGuide();
+	void Execute();
 	/**
 	 * 完成流程
 	 */
 	UFUNCTION(BlueprintCallable)
-	void ServerComplete(EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
-	UFUNCTION(BlueprintCallable, NetMulticast, Reliable)
-	void MultiComplete(EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
+	void Complete(EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
+	/**
+	* 离开流程
+	*/
 	UFUNCTION(BlueprintCallable)
-	void LocalComplete(EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
+	void Leave();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Procedure Name/Description
+	/// Operation Target
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
+	AActor* OperationTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	FVector CameraViewOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	float CameraViewYaw;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	float CameraViewPitch;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	float CameraViewDistance;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	bool bCameraViewInstant;
+	
+protected:
+#if WITH_EDITOR
+	/**
+	* 获取摄像机视角
+	*/
+	UFUNCTION(CallInEditor, Category = "Operation Target")
+	void GetCameraView();
+#endif
+	/**
+	* 还原摄像机视角
+	*/
+	UFUNCTION(BlueprintCallable)
+	void ResetCameraView();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Name/Description
 public:
 	/// 流程名称
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Name/Description")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FName ProcedureName;
 	/// 流程显示名称
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Name/Description")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FText ProcedureDisplayName;
 	/// 流程描述
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Name/Description")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FText ProcedureDescription;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Procedure Index/Type/State
+	/// Index/Type/State
 public:
 	/// 流程索引
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	int32 ProcedureIndex;
 	/// 流程类型
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	EProcedureType ProcedureType;
 	/// 流程状态
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_ProcedureState, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	EProcedureState ProcedureState;
 public:
 	/**
@@ -201,110 +184,89 @@ public:
 	* 当流程状态改变
 	*/
 	UFUNCTION()
-	void OnRep_ProcedureState();
+	void ChangeProcedureState(EProcedureState InProcedureState);
 	UFUNCTION(BlueprintNativeEvent)
 	void OnChangeProcedureState(EProcedureState InProcedureState);
-	
-public:
-	/// 本地流程状态
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Index/Type/State")
-	EProcedureState LocalProcedureState;
-public:
-	/**
-	* 获取本地流程状态
-	*/
-	UFUNCTION(BlueprintPure)
-	EProcedureState GetLocalProcedureState() const { return LocalProcedureState; }
-	/**
-	* 当本地流程状态改变
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnChangeLocalProcedureState(EProcedureState InProcedureState);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Auto Enter/Leave
-public:
-	/// 自动进入流程
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Auto Enter/Leave")
-	bool bAutoEnterProcedure;
-	/// 自动进入流程时间
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, meta = (EditCondition = "bAutoEnterProcedure"), Category = "Auto Enter/Leave")
-	float AutoEnterProcedureTime;
-	/// 自动离开流程
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Auto Enter/Leave")
-	bool bAutoLeaveProcedure;
-	/// 自动离开流程时间
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, meta = (EditCondition = "bAutoLeaveProcedure"), Category = "Auto Enter/Leave")
-	float AutoLeaveProcedureTime;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
 public:
-	/// 流程执行类型
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Execute/Guide")
-	EProcedureExecuteType ProcedureExecuteType;
 	/// 流程执行条件
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Execute/Guide")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EProcedureExecuteResult ProcedureExecuteCondition;
 	/// 流程执行结果
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "Execute/Guide")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EProcedureExecuteResult ProcedureExecuteResult;
-	/// 本地流程执行结果
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Execute/Guide")
-	EProcedureExecuteResult LocalProcedureExecuteResult;
+	/// 流程执行方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	EProcedureExecuteType ProcedureExecuteType;
+	/// 自动执行流程时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoExecuteProcedureTime;
+	/// 流程完成方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	EProcedureCompleteType ProcedureCompleteType;
+	/// 自动完成流程时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoCompleteProcedureTime;
+	/// 流程离开方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	EProcedureLeaveType ProcedureLeaveType;
+	/// 自动离开流程时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoLeaveProcedureTime;
 	/// 流程指引类型 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Execute/Guide")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EProcedureGuideType ProcedureGuideType;
 	/// 流程指引间隔时间 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "Execute/Guide")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	float ProcedureGuideIntervalTime;
 
 protected:
 	FTimerHandle StartGuideTimerHandle;
-	FTimerHandle ResetGuideTimerHandle;
 	
 public:
 	/**
-	* 获取流程执行类型
+	* 检测流程执行条件
 	*/
+	UFUNCTION(BlueprintPure)
+	bool CheckProcedureCondition(UProcedureBase* InProcedure) const;
+	
 	UFUNCTION(BlueprintPure)
 	EProcedureExecuteType GetProcedureExecuteType() const;
-	/**
-	* 检测流程执行条件
-	* 
-	*/
+
 	UFUNCTION(BlueprintPure)
-	bool CheckProcedureCondition(AProcedureBase* InProcedure) const;
-	/**
-	* 检测本地流程执行条件
-	* 
-	*/
+	EProcedureLeaveType GetProcedureLeaveType() const;
+
 	UFUNCTION(BlueprintPure)
-	bool CheckLocalProcedureCondition(AProcedureBase* InProcedure) const;
+	EProcedureCompleteType GetProcedureCompleteType() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ParentProcedure
 public:
 	/// 父流程 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "ParentProcedure")
-	AProcedureBase* ParentProcedure;
-	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentProcedure")
+	UProcedureBase* ParentProcedure;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsParentOf(UProcedureBase* InProcedure) const;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// SubProcedure
 public:
 	/// 是否合并子流程
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, Category = "SubProcedure")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubProcedure")
 	bool bMergeSubProcedure;
 	/// 当前子流程索引
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "SubProcedure")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubProcedure")
 	int32 CurrentSubProcedureIndex;
-	/// 当前本地子流程索引
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "SubProcedure")
-	int32 CurrentLocalSubProcedureIndex;
 	/// 子流程
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated, Category = "SubProcedure")
-	TArray<AProcedureBase*> SubProcedures;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubProcedure")
+	TArray<UProcedureBase*> SubProcedures;
 public:
+	UFUNCTION(BlueprintPure)
+	bool IsSubOf(UProcedureBase* InProcedure) const;
 	/**
 	* 是否有子流程
 	* @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubProcedure）
@@ -315,50 +277,26 @@ public:
 	 * 获取当前子流程
 	 */
 	UFUNCTION(BlueprintPure)
-	AProcedureBase* GetCurrentSubProcedure() const;
-	/**
-	* 获取当前本地子流程
-	*/
-	UFUNCTION(BlueprintPure)
-	AProcedureBase* GetCurrentLocalSubProcedure() const;
+	UProcedureBase* GetCurrentSubProcedure() const;
 	/**
 	* 是否已完成所有子流程
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsAllSubCompleted() const;
 	/**
-	* 是否已完成所有本地子流程
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAllLocalSubCompleted() const;
-	/**
 	* 是否已成功执行有子流程
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsAllSubExecuteSucceed() const;
-	/**
-	* 是否已成功执行所有本地子流程
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAllLocalSubExecuteSucceed() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureTask
 protected:
 	/// 当前流程任务项索引
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "ProcedureTask")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProcedureTask")
 	int32 CurrentProcedureTaskIndex;
 	/// 流程任务项
 	TArray<struct FProcedureTaskItem> ProcedureTaskItems;
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// ListenerTask
-protected:
-	/**
-	* 获取子菜单名称
-	*/
-	UFUNCTION(BlueprintPure)
-	FName GetListenerTaskName(const FString& InTaskName = TEXT("")) const;
 
 public:
 	/**
@@ -377,11 +315,29 @@ public:
 	struct FProcedureTaskItem& AddProcedureTask(const FName InTaskName, float InDurationTime = 0.f, float InDelayTime = 1.f);
 
 protected:
-	FTimerHandle AutoEnterTimerHandle;
+	FTimerHandle AutoExecuteTimerHandle;
 	FTimerHandle AutoLeaveTimerHandle;
+	FTimerHandle AutoCompleteTimerHandle;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ProcedureListItem
 public:
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UPROPERTY()
+	FProcedureListItemStates ProcedureListItemStates;
+public:
+	/**
+	* 构建流程列表项
+	*/
+	virtual void GenerateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
+	/**
+	* 更新流程列表项
+	*/
+	virtual void UpdateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
+
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* InProperty) const override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 };
 	
 /**
@@ -431,7 +387,7 @@ public:
 
 public:
 	template <typename... VarTypes>
-	FProcedureTaskItem& AddOnExecuteTaskFunc(class AProcedureBase* InProcedure, const FName InFuncName, VarTypes... Vars)
+	FProcedureTaskItem& AddOnExecuteTaskFunc(class UProcedureBase* InProcedure, const FName InFuncName, VarTypes... Vars)
 	{
 		if (InProcedure)
 		{
@@ -503,24 +459,29 @@ public:
 		SubListItems = TArray<TSharedPtr<FProcedureListItem>>();
 	}
 
-	AProcedureBase* Procedure;
+	UProcedureBase* Procedure;
 
 	TSharedPtr<FProcedureListItem> ParentListItem;
 
 	TArray<TSharedPtr<FProcedureListItem>> SubListItems;
 
 public:
+	FProcedureListItemStates& GetStates() const
+	{
+		return Procedure->ProcedureListItemStates;
+	}
+
 	int32& GetProcedureIndex() const
 	{
 		return Procedure->ProcedureIndex;
 	}
 
-	AProcedureBase* GetParentProcedure() const
+	UProcedureBase* GetParentProcedure() const
 	{
 		return Procedure->ParentProcedure;
 	}
 	
-	TArray<AProcedureBase*>& GetSubProcedures()const
+	TArray<UProcedureBase*>& GetSubProcedures()const
 	{
 		return Procedure->SubProcedures;
 	}
@@ -534,7 +495,7 @@ public:
 		}
 	}
 
-	TArray<AProcedureBase*>& GetParentSubProcedures() const
+	TArray<UProcedureBase*>& GetParentSubProcedures() const
 	{
 		return ParentListItem->GetSubProcedures();
 	}
