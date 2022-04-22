@@ -4,7 +4,9 @@
 #include "Procedure/Base/ProcedureBase.h"
 
 #include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Procedure/EventHandle_CompleteProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
+#include "Event/Handle/Procedure/EventHandle_ExecuteProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
@@ -20,15 +22,17 @@ UProcedureBase::UProcedureBase()
 	ProcedureDescription = FText::GetEmpty();
 
 	ProcedureIndex = 0;
+	ProcedureHierarchy = 0;
 	ProcedureType = EProcedureType::Default;
 	ProcedureState = EProcedureState::None;
 
 	OperationTarget = nullptr;
+	bTrackOperationTarget = false;
 
-	CameraViewOffset = FVector::ZeroVector;
-	CameraViewYaw = 0.f;
-	CameraViewPitch = -25.f;
-	CameraViewDistance = 100.f;
+	CameraViewOffset = FVector(-1.f);
+	CameraViewYaw = -1.f;
+	CameraViewPitch = -1.f;
+	CameraViewDistance = -1.f;
 
 	ProcedureExecuteCondition = EProcedureExecuteResult::None;
 	ProcedureExecuteResult = EProcedureExecuteResult::None;
@@ -66,19 +70,40 @@ void UProcedureBase::OnGenerate()
 
 void UProcedureBase::OnUnGenerate()
 {
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			Iter->OnUnGenerate();
-			Iter->ConditionalBeginDestroy();
-		}
-	}
-	SubProcedures.Empty();
+	ConditionalBeginDestroy();
+}
+
+void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
+{
+	InNewProcedure->OperationTarget = OperationTarget;
+	InNewProcedure->bTrackOperationTarget = bTrackOperationTarget;
+	InNewProcedure->CameraViewOffset = CameraViewOffset;
+	InNewProcedure->CameraViewYaw = CameraViewYaw;
+	InNewProcedure->CameraViewPitch = CameraViewPitch;
+	InNewProcedure->CameraViewDistance = CameraViewDistance;
+	InNewProcedure->bInstantCameraView = bInstantCameraView;
+	InNewProcedure->ProcedureName = ProcedureName;
+	InNewProcedure->ProcedureDisplayName = ProcedureDisplayName;
+	InNewProcedure->ProcedureDescription = ProcedureDescription;
+	InNewProcedure->ProcedureIndex = ProcedureIndex;
+	InNewProcedure->ProcedureHierarchy = ProcedureHierarchy;
+	InNewProcedure->ProcedureExecuteCondition = ProcedureExecuteCondition;
+	InNewProcedure->ProcedureExecuteType = ProcedureExecuteType;
+	InNewProcedure->AutoExecuteProcedureTime = AutoExecuteProcedureTime;
+	InNewProcedure->ProcedureCompleteType = ProcedureCompleteType;
+	InNewProcedure->AutoCompleteProcedureTime = AutoCompleteProcedureTime;
+	InNewProcedure->ProcedureLeaveType = ProcedureLeaveType;
+	InNewProcedure->AutoLeaveProcedureTime = AutoLeaveProcedureTime;
+	InNewProcedure->ProcedureGuideType = ProcedureGuideType;
+	InNewProcedure->ProcedureGuideIntervalTime = ProcedureGuideIntervalTime;
+	InNewProcedure->ParentProcedure = ParentProcedure;
+	InNewProcedure->bMergeSubProcedure = bMergeSubProcedure;
+	InNewProcedure->SubProcedures = SubProcedures;
+	InNewProcedure->ProcedureListItemStates = ProcedureListItemStates;
 }
 #endif
 
-void UProcedureBase::OnInitialize_Implementation()
+void UProcedureBase::OnInitialize()
 {
 	for (auto Iter : SubProcedures)
 	{
@@ -88,30 +113,34 @@ void UProcedureBase::OnInitialize_Implementation()
 			Iter->OnInitialize();
 		}
 	}
+
+	K2_OnInitialize();
 }
 
-void UProcedureBase::OnRestore_Implementation()
+void UProcedureBase::OnRestore()
 {
+	for(int32 i = SubProcedures.Num() - 1; i >= 0; i--)
+	{
+		if(SubProcedures[i])
+		{
+			SubProcedures[i]->OnRestore();
+		}
+	}
+
 	ChangeProcedureState(EProcedureState::None);
 
 	CurrentSubProcedureIndex = -1;
 	CurrentProcedureTaskIndex = -1;
 
-	for (auto Iter : SubProcedures)
-	{
-		if (Iter)
-		{
-			Iter->OnRestore();
-		}
-	}
-
 	for(int32 i = 0; i < ProcedureTaskItems.Num(); i++)
 	{
 		ProcedureTaskItems[i].TaskState = EProcedureTaskState::None;
 	}
+
+	K2_OnRestore();
 }
 
-void UProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 {
 	ChangeProcedureState(EProcedureState::Entered);
 
@@ -135,7 +164,7 @@ void UProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 	}
 	ResetCameraView();
 
-	WH_LOG(WHProcedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
+	WH_LOG(WH_Procedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()));
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
@@ -162,9 +191,11 @@ void UProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
 			}
 		}
 	}
+
+	K2_OnEnter(InLastProcedure);
 }
 
-void UProcedureBase::OnRefresh_Implementation(float DeltaSeconds)
+void UProcedureBase::OnRefresh()
 {
 	if (HasSubProcedure(false))
 	{
@@ -234,9 +265,11 @@ void UProcedureBase::OnRefresh_Implementation(float DeltaSeconds)
 			Complete(EProcedureExecuteResult::Succeed);
 		}
 	}
+
+	K2_OnRefresh();
 }
 
-void UProcedureBase::OnGuide_Implementation()
+void UProcedureBase::OnGuide()
 {
 	ResetCameraView();
 
@@ -249,12 +282,24 @@ void UProcedureBase::OnGuide_Implementation()
 		}
 		default: break;
 	}
+
+	K2_OnGuide();
 }
 
-void UProcedureBase::OnExecute_Implementation()
+void UProcedureBase::OnExecute()
 {
 	ChangeProcedureState(EProcedureState::Executing);
-	
+
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+
+	if(bTrackOperationTarget && OperationTarget)
+	{
+		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		{
+			PlayerController->StartTrackTarget(OperationTarget);
+		}
+	}
+
 	if(ProcedureState != EProcedureState::Completed)
 	{
 		switch(GetProcedureCompleteType())
@@ -281,9 +326,13 @@ void UProcedureBase::OnExecute_Implementation()
 			default: break;
 		}
 	}
+
+	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
+
+	K2_OnExecute();
 }
 
-void UProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
+void UProcedureBase::OnComplete(EProcedureExecuteResult InProcedureExecuteResult)
 {
 	ChangeProcedureState(EProcedureState::Completed);
 
@@ -292,6 +341,16 @@ void UProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedu
 	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
 
 	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+
+	if(bTrackOperationTarget && OperationTarget)
+	{
+		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		{
+			PlayerController->EndTrackTarget();
+		}
+	}
 
 	if(GetProcedureLeaveType() == EProcedureLeaveType::Automatic && ProcedureState != EProcedureState::Leaved)
 	{
@@ -304,15 +363,17 @@ void UProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedu
 			Leave();
 		}
 	}
+	
+	K2_OnComplete(InProcedureExecuteResult);
 }
 
-void UProcedureBase::OnLeave_Implementation()
+void UProcedureBase::OnLeave()
 {
 	ChangeProcedureState(EProcedureState::Leaved);
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WH_LOG(WHProcedure, Log, TEXT("%s流程: %s"), ProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString());
+	WH_LOG(WH_Procedure, Log, TEXT("%s流程: %s"), ProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("%s流程: %s"), ProcedureExecuteResult != EProcedureExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *ProcedureDisplayName.ToString()));
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
@@ -328,9 +389,9 @@ void UProcedureBase::OnLeave_Implementation()
 		}
 	}
 
-	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle); 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
-	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
+
+	K2_OnLeave();
 }
 
 void UProcedureBase::ChangeProcedureState(EProcedureState InProcedureState)
@@ -417,6 +478,11 @@ void UProcedureBase::Enter()
 	UProcedureModuleBPLibrary::EnterProcedure(this);
 }
 
+void UProcedureBase::Refresh()
+{
+	UProcedureModuleBPLibrary::RefreshProcedure(this);
+}
+
 void UProcedureBase::Guide()
 {
 	UProcedureModuleBPLibrary::GuideProcedure(this);
@@ -429,7 +495,7 @@ void UProcedureBase::Execute()
 
 void UProcedureBase::Complete(EProcedureExecuteResult InProcedureExecuteResult)
 {
-	UProcedureModuleBPLibrary::CompleteProcedure(this);
+	UProcedureModuleBPLibrary::CompleteProcedure(this, InProcedureExecuteResult);
 }
 
 void UProcedureBase::Leave()
@@ -440,7 +506,7 @@ void UProcedureBase::Leave()
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	AWHPlayerController* PlayerController = nullptr;
+	AWHPlayerController* PlayerController = nullptr/*UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(UGlobalBPLibrary::GetCurrentWorld())*/;
 	for(const FWorldContext& Context : GEngine->GetWorldContexts())
 	{
 		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Context.World());
@@ -470,15 +536,25 @@ void UProcedureBase::ResetCameraView()
 {
 	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 	{
-		if(OperationTarget)
+		if(CameraViewOffset != FVector(-1.f))
 		{
-			PlayerController->SetCameraLocation(OperationTarget->GetActorLocation() + CameraViewOffset, bCameraViewInstant);
+			if(OperationTarget)
+			{
+				PlayerController->SetCameraLocation(OperationTarget->GetActorLocation() + CameraViewOffset, bInstantCameraView);
+			}
+			else
+			{
+				PlayerController->SetCameraLocation(CameraViewOffset, bInstantCameraView);
+			}
 		}
-		else
+		if(CameraViewYaw != -1.f && CameraViewPitch != -1.f)
 		{
-			PlayerController->SetCameraLocation(CameraViewOffset, bCameraViewInstant);
+			PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, bInstantCameraView);
 		}
-		PlayerController->SetCameraRotationAndDistance(CameraViewYaw, CameraViewPitch, CameraViewDistance, bCameraViewInstant);
+		if(CameraViewDistance != -1.f)
+		{
+			PlayerController->SetCameraDistance(CameraViewDistance, bInstantCameraView);
+		}
 	}
 }
 
@@ -506,24 +582,18 @@ UProcedureBase* UProcedureBase::GetCurrentSubProcedure() const
 	return nullptr;
 }
 
+bool UProcedureBase::IsCompleted(bool bCheckSubs) const
+{
+	return (ProcedureState == EProcedureState::Completed || ProcedureState == EProcedureState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
+}
+
 bool UProcedureBase::IsAllSubCompleted() const
 {
 	for (auto Iter : SubProcedures)
 	{
-		if (Iter)
+		if (Iter && !Iter->IsCompleted())
 		{
-			switch(Iter->ProcedureState)
-			{
-				case EProcedureState::Completed:
-				case EProcedureState::Leaved:
-				{
-					break;
-				}
-				default:
-				{
-					return false;
-				}
-			}
+			return false;
 		}
 	}
 	return true;
@@ -587,6 +657,7 @@ void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureL
 		if(SubProcedures[i])
 		{
 			SubProcedures[i]->ProcedureIndex = i;
+			SubProcedures[i]->ProcedureHierarchy = ProcedureHierarchy + 1;
 			SubProcedures[i]->ParentProcedure = this;
 			SubProcedures[i]->UpdateListItem(OutProcedureListItem->SubListItems[i]);
 		}
@@ -601,29 +672,30 @@ bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureExecuteType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureCompleteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureLeaveType))
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureLeaveType) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideType))
 		{
 			return !HasSubProcedure(false);
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoExecuteProcedureTime))
 		{
-			return !HasSubProcedure(false) && ProcedureExecuteType == EProcedureExecuteType::Automatic;
+			return ProcedureExecuteType == EProcedureExecuteType::Automatic;
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoCompleteProcedureTime))
 		{
-			return !HasSubProcedure(false) && ProcedureCompleteType == EProcedureCompleteType::Automatic;
+			return ProcedureCompleteType == EProcedureCompleteType::Automatic;
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoLeaveProcedureTime))
 		{
-			return !HasSubProcedure(false) && ProcedureLeaveType == EProcedureLeaveType::Automatic;
+			return ProcedureLeaveType == EProcedureLeaveType::Automatic;
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideIntervalTime))
 		{
-			return ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop;
+			return !HasSubProcedure(false) && (ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop);
 		}
 	}
 
@@ -644,11 +716,11 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 			if(HasSubProcedure(false))
 			{
 				ProcedureExecuteType = EProcedureExecuteType::Automatic;
-				ProcedureCompleteType = EProcedureCompleteType::Automatic;
-				ProcedureLeaveType = EProcedureLeaveType::Automatic;
-				AutoExecuteProcedureTime = 0.f;
+				ProcedureCompleteType = EProcedureCompleteType::Procedure;
 				AutoCompleteProcedureTime = 0.f;
-				AutoLeaveProcedureTime = 0.f;
+				ProcedureLeaveType = EProcedureLeaveType::Automatic;
+				ProcedureGuideType = EProcedureGuideType::None;				
+				ProcedureGuideIntervalTime = 0.f;
 			}
 		}
 	}

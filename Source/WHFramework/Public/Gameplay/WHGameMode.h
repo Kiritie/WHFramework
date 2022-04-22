@@ -16,14 +16,26 @@ class WHFRAMEWORK_API AWHGameMode : public AGameModeBase
 public:
 	AWHGameMode();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Defaults
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Initialize();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Inherits
 public:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
-protected:
-	virtual void BeginPlay() override;
-
-public:
 	virtual void InitGameState() override;
 	
 	virtual APlayerController* SpawnPlayerController(ENetRole InRemoteRole, const FString& Options) override;
+
+public:
+	virtual APlayerController* Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
+
+	virtual void Logout(AController* Exiting) override;
+
+protected:
+	virtual void BeginPlay() override;
 };

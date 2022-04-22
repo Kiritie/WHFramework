@@ -7,7 +7,7 @@ AWHGameState::AWHGameState()
 	
 }
 
-void AWHGameState::Initialize()
+void AWHGameState::Initialize_Implementation()
 {
 	
 }

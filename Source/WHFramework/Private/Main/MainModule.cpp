@@ -241,7 +241,7 @@ void AMainModule::RefreshModules_Implementation(float DeltaSeconds)
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::Executing)
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::Running)
 		{
 			ModuleRefs[i]->Execute_OnRefresh(ModuleRefs[i].GetObject(), DeltaSeconds);
 		}

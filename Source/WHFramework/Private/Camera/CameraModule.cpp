@@ -16,6 +16,7 @@ ACameraModule::ACameraModule()
 	ModuleName = FName("CameraModule");
 
 	DefaultCameraClass = nullptr;
+	DefaultInstantSwitch = false;
 	CameraClasses = TArray<TSubclassOf<ACameraPawnBase>>();
 	CameraClasses.Add(ARoamCameraPawn::StaticClass());
 	Cameras = TArray<ACameraPawnBase*>();
@@ -88,7 +89,7 @@ void ACameraModule::OnPreparatory_Implementation()
 
 	if(DefaultCameraClass)
 	{
-		SwitchCamera<ACameraPawnBase>(DefaultCameraClass);
+		SwitchCamera<ACameraPawnBase>(DefaultInstantSwitch, DefaultCameraClass);
 	}
 }
 
@@ -124,15 +125,15 @@ ACameraPawnBase* ACameraModule::K2_GetCameraByName(const FName InCameraName) con
 	return nullptr;
 }
 
-void ACameraModule::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass)
+void ACameraModule::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
 {
 	if(!InClass) return;
 	
 	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
-	SwitchCameraByName(CameraName);
+	SwitchCameraByName(CameraName, bInstant);
 }
 
-void ACameraModule::SwitchCameraByName(const FName InCameraName)
+void ACameraModule::SwitchCameraByName(const FName InCameraName, bool bInstant)
 {
 	if(!CurrentCamera || CurrentCamera->GetCameraName() != InCameraName)
 	{
@@ -141,6 +142,10 @@ void ACameraModule::SwitchCameraByName(const FName InCameraName)
 			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 			{
 				PlayerController->Possess(Camera);
+				
+				PlayerController->SetCameraLocation(Camera->GetActorLocation(), bInstant);
+				PlayerController->SetCameraRotation(Camera->GetActorRotation().Yaw, -1, bInstant);
+				PlayerController->SetCameraDistance(-1, bInstant);
 			}
 			CurrentCamera = Camera;
 		}

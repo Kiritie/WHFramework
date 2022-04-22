@@ -16,9 +16,14 @@ class WHFRAMEWORK_API AWHGameState : public AGameStateBase
 public:
 	AWHGameState();
 
-public:	
-	virtual void Initialize();
+	//////////////////////////////////////////////////////////////////////////
+	/// Defaults
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Initialize();
 	
+	//////////////////////////////////////////////////////////////////////////
+	/// Inherits
 protected:
 	virtual void BeginPlay() override;
 };

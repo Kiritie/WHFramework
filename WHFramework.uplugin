@@ -25,7 +25,7 @@
 			]
 		},
 		{
-			"Name": "WHProcedureEditor",
+			"Name": "WHFrameworkEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
 		}

@@ -28,14 +28,14 @@ public:
 	void ServerStopMontageMulticast(AActor* InCharacter, class UAnimMontage* InMontage);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerTeleportToMulticast(AActor* InCharacter, FTransform InTransform);
+	void ServerTransformTowardsToMulticast(AActor* InCharacter, FTransform InTransform);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerRotationTowardsMulticast(AActor* InCharacter, FRotator InRotation, float InDuration = 1.f);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerAIMoveToMulticast(AActor* InCharacter, FVector InLocation, float InStopDistance);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerStopAIMoveMulticast(AActor* InCharacter);
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerRotationTowardsMulticast(AActor* InCharacter, FRotator InRotation, float InDuration = 1.f);
 };

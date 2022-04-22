@@ -16,16 +16,16 @@ UProcedure_PlayCharacterMontage::UProcedure_PlayCharacterMontage()
 	Montage = nullptr;
 }
 
-void UProcedure_PlayCharacterMontage::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void UProcedure_PlayCharacterMontage::OnEnter(UProcedureBase* InLastProcedure)
 {
-	Super::OnEnter_Implementation(InLastProcedure);
+	Super::OnEnter(InLastProcedure);
 	
 	UCharacterModuleBPLibrary::PlayCharacterMontage(CharacterName, Montage, true);
 }
 
-void UProcedure_PlayCharacterMontage::OnLeave_Implementation()
+void UProcedure_PlayCharacterMontage::OnLeave()
 {
-	Super::OnLeave_Implementation();
+	Super::OnLeave();
 	
 	UCharacterModuleBPLibrary::PlayCharacterMontage(CharacterName, Montage, true);
 }

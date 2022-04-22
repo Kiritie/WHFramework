@@ -17,14 +17,14 @@ UProcedure_PlayMediaPlayerMovie::UProcedure_PlayMediaPlayerMovie()
 	MovieName = NAME_None;
 }
 
-void UProcedure_PlayMediaPlayerMovie::OnInitialize_Implementation()
+void UProcedure_PlayMediaPlayerMovie::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void UProcedure_PlayMediaPlayerMovie::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void UProcedure_PlayMediaPlayerMovie::OnEnter(UProcedureBase* InLastProcedure)
 {
-	Super::OnEnter_Implementation(InLastProcedure);
+	Super::OnEnter(InLastProcedure);
 
 	FOnMoviePlayFinishedSingleDelegate OnMoviePlayFinishedDelegate;
 	OnMoviePlayFinishedDelegate.BindDynamic(this, &UProcedure_PlayMediaPlayerMovie::ServerOnMoviePlayFinished);
@@ -33,9 +33,9 @@ void UProcedure_PlayMediaPlayerMovie::OnEnter_Implementation(UProcedureBase* InL
 	UMediaModuleBPLibrary::PlayMediaPlayerMovie(PlayerName, MovieName, true);
 }
 
-void UProcedure_PlayMediaPlayerMovie::OnLeave_Implementation()
+void UProcedure_PlayMediaPlayerMovie::OnLeave()
 {
-	Super::OnLeave_Implementation();
+	Super::OnLeave();
 
 	UMediaModuleBPLibrary::StopMediaPlayerMovie(PlayerName, true, true);
 }

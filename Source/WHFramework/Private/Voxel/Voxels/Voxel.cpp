@@ -38,7 +38,7 @@ UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 	UVoxelData* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(InVoxelID);
 	if(voxelData)
 	{
-		const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : StaticClass();
+		const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : TSubclassOf<UVoxel>(StaticClass());
 		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
 		if(voxel) voxel->ID = InVoxelID;
 	}

@@ -14,18 +14,17 @@ class WHFRAMEWORK_API UProcedure_PlayMediaPlayerMovie : public UProcedureBase
 {
 	GENERATED_BODY()
 
-	
 public:
 	UProcedure_PlayMediaPlayerMovie();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 public:
-	virtual void OnInitialize_Implementation() override;
+	virtual void OnInitialize() override;
 	
-	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
+	virtual void OnEnter(UProcedureBase* InLastProcedure) override;
 
-	virtual void OnLeave_Implementation() override;
+	virtual void OnLeave() override;
 
 protected:
 	UFUNCTION()

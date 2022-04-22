@@ -21,7 +21,7 @@ UPrimaryAssetManager& UPrimaryAssetManager::Get()
 	}
 	else
 	{
-		WH_LOG(WHAsset, Fatal, TEXT("Invalid AssetManager in DefaultEngine.ini, must be PrimaryAssetManager!"));
+		WH_LOG(WH_Asset, Fatal, TEXT("Invalid AssetManager in DefaultEngine.ini, must be PrimaryAssetManager!"));
 		return *NewObject<UPrimaryAssetManager>();
 	}
 }
@@ -53,7 +53,7 @@ UPrimaryAssetBase* UPrimaryAssetManager::LoadAsset(const FPrimaryAssetId& InPrim
 
 	if (bLogWarning && !LoadedItem)
 	{
-		WH_LOG(WHAsset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
+		WH_LOG(WH_Asset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
 	}
 	return LoadedItem;
 }

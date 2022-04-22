@@ -10,9 +10,12 @@ UENUM(BlueprintType)
 enum class EModuleState : uint8
 {
 	None,
-	Executing,
-	Pausing
+	Initialized,
+	Running,
+	Paused
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -92,18 +95,8 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	FName GetModuleName() const;
 	/**
-	* 设置模块名称
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void SetModuleName(const FName InModuleName);
-	/**
 	* 获取模块状态
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	EModuleState GetModuleState() const;
-	/**
-	* 设置模块状态
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void SetModuleState(EModuleState InModuleState);
 };

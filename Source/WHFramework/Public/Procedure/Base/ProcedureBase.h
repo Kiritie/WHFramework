@@ -25,57 +25,69 @@ public:
 public:
 #if WITH_EDITOR
 	/**
-	 * 构建流程
+	 * 流程构建
 	 */
 	virtual void OnGenerate();
 	/**
-	 * 取消构建流程
+	 * 流程取消构建
 	 */
 	virtual void OnUnGenerate();
+	/**
+	 * 流程复制
+	 */
+	virtual void OnDuplicate(UProcedureBase* InNewProcedure);
 #endif
 
 public:
 	/**
 	 * 流程初始化
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize();
+	virtual void OnInitialize();
 	/**
 	 * 流程还原
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRestore();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRestore")
+	void K2_OnRestore();
+	virtual void OnRestore();
 	/**
 	 * 流程进入
 	 * @param InLastProcedure 上一个流程
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnEnter(UProcedureBase* InLastProcedure);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
+	void K2_OnEnter(UProcedureBase* InLastProcedure);
+	virtual void OnEnter(UProcedureBase* InLastProcedure);
 	/**
 	 * 流程帧刷新
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh(float DeltaSeconds);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	virtual void OnRefresh();
 	/**
 	* 流程指引
 	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnGuide();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
+	void K2_OnGuide();
+	virtual void OnGuide();
 	/**
 	 * 流程执行
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnExecute();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExecute")
+	void K2_OnExecute();
+	virtual void OnExecute();
 	/**
 	 * 流程完成
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnComplete")
+	void K2_OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
+	virtual void OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
 	/**
 	 * 流程离开
 	 */
-	UFUNCTION(BlueprintNativeEvent)
-	void OnLeave();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
+	void K2_OnLeave();
+	virtual void OnLeave();
 
 public:
 	/**
@@ -88,6 +100,11 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable)
 	void Enter();
+	/**
+	* 进入流程
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Refresh();
 	/**
 	* 指引流程
 	*/
@@ -114,6 +131,9 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
 	AActor* OperationTarget;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
+	bool bTrackOperationTarget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	FVector CameraViewOffset;
@@ -128,8 +148,8 @@ public:
 	float CameraViewDistance;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	bool bCameraViewInstant;
-	
+	bool bInstantCameraView;
+
 protected:
 #if WITH_EDITOR
 	/**
@@ -163,6 +183,9 @@ public:
 	/// 流程索引
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	int32 ProcedureIndex;
+	/// 流程层级
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	int32 ProcedureHierarchy;
 	/// 流程类型
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	EProcedureType ProcedureType;
@@ -278,6 +301,11 @@ public:
 	 */
 	UFUNCTION(BlueprintPure)
 	UProcedureBase* GetCurrentSubProcedure() const;
+	/**
+	* 是否已完成所有子流程
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCompleted(bool bCheckSubs = false) const;
 	/**
 	* 是否已完成所有子流程
 	*/
@@ -420,7 +448,7 @@ public:
 
 		OnExecuteDelegate.Broadcast();
 
-		WH_LOG(WHProcedure, Log, TEXT("ExecuteProcedureTask : TaskName = %s"), *TaskName.ToString());
+		WH_LOG(WH_Procedure, Log, TEXT("ExecuteProcedureTask : TaskName = %s"), *TaskName.ToString());
 	}
 
 	void TryComplete(float DeltaSeconds)

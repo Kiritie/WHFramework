@@ -16,6 +16,14 @@ class URootProcedureBase;
  * 
  */
 
+UENUM(BlueprintType)
+enum class EProcedureModuleState : uint8
+{
+	None,
+	Running,
+	Ended
+};
+
 UCLASS()
 class WHFRAMEWORK_API AProcedureModule : public AModuleBase
 {
@@ -44,8 +52,22 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
-	/// Procedure
+	/// ProcedureModule
+protected:
+	/// 自动开始流程
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
+	bool bAutoStartProcedure;
+
+	/// 自动开始流程
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule")
+	EProcedureModuleState ProcedureModuleState;
+public:
+	UFUNCTION(BlueprintPure)
+	EProcedureModuleState GetProcedureModuleState() const { return ProcedureModuleState; }
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void StartProcedure(int32 InRootProcedureIndex = -1, bool bSkipProcedures = false);
@@ -60,6 +82,9 @@ public:
 	void EnterProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
+	void RefreshProcedure(UProcedureBase* InProcedure);
+
+	UFUNCTION(BlueprintCallable)
 	void GuideProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
@@ -70,6 +95,10 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void LeaveProcedure(UProcedureBase* InProcedure);
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsAllProcedureCompleted();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
@@ -84,6 +113,8 @@ public:
 	void GenerateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
 	void UpdateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
+
+	void SetRootProcedureAt(int32 InIndex, URootProcedureBase* InRootProcedure);
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
@@ -149,17 +180,17 @@ public:
 	EProcedureExecuteType GetGlobalProcedureExecuteType() const { return GlobalProcedureExecuteType; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetGlobalProcedureExecuteType(EProcedureExecuteType InGlobalProcedureExecuteType) { this->GlobalProcedureExecuteType = InGlobalProcedureExecuteType; }
+	void SetGlobalProcedureExecuteType(EProcedureExecuteType InGlobalProcedureExecuteType);
 
 	UFUNCTION(BlueprintPure)
 	EProcedureCompleteType GetGlobalProcedureCompleteType() const { return GlobalProcedureCompleteType; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetGlobalProcedureCompleteType(EProcedureCompleteType InGlobalProcedureCompleteType) { this->GlobalProcedureCompleteType = InGlobalProcedureCompleteType; }
+	void SetGlobalProcedureCompleteType(EProcedureCompleteType InGlobalProcedureCompleteType);
 
 	UFUNCTION(BlueprintPure)
 	EProcedureLeaveType GetGlobalProcedureLeaveType() const { return GlobalProcedureLeaveType; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetGlobalProcedureLeaveType(EProcedureLeaveType InGlobalProcedureLeaveType) { this->GlobalProcedureLeaveType = InGlobalProcedureLeaveType; }
+	void SetGlobalProcedureLeaveType(EProcedureLeaveType InGlobalProcedureLeaveType);
 };

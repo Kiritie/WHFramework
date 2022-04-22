@@ -156,26 +156,47 @@ void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticas
 	
 }
 
-void ACharacterBase::TeleportTo(FTransform InTransform, bool bMulticast)
+void ACharacterBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiTeleportTo(InTransform);
+			MultiTransformTowards(InTransform);
 		}
 		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
-			CharacterModuleNetworkComponent->ServerTeleportToMulticast(this, InTransform);
+			CharacterModuleNetworkComponent->ServerTransformTowardsToMulticast(this, InTransform);
 		}
 		return;
 	}
 	SetActorTransform(InTransform);
 }
 
-void ACharacterBase::MultiTeleportTo_Implementation(FTransform InTransform)
+void ACharacterBase::MultiTransformTowards_Implementation(FTransform InTransform, float InDuration)
 {
-	TeleportTo(InTransform, false);
+	TransformTowards(InTransform, false);
+}
+
+void ACharacterBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
+{
+	if(bMulticast)
+	{
+		if(HasAuthority())
+		{
+			MultiRotationTowards(InRotation, InDuration);
+		}
+		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		{
+			CharacterModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
+		}
+		return;
+	}
+}
+
+void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, float InDuration)
+{
+	RotationTowards(InRotation, InDuration, false);
 }
 
 void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
@@ -218,27 +239,6 @@ void ACharacterBase::StopAIMove(bool bMulticast)
 void ACharacterBase::MultiStopAIMove_Implementation()
 {
 	StopAIMove(false);
-}
-
-void ACharacterBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
-{
-	if(bMulticast)
-	{
-		if(HasAuthority())
-		{
-			MultiRotationTowards(InRotation, InDuration);
-		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
-		}
-		return;
-	}
-}
-
-void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, float InDuration)
-{
-	RotationTowards(InRotation, InDuration, false);
 }
 
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -20,7 +20,7 @@ public:
 	UEventHandle_EnterProcedure();
 
 public:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
+	UPROPERTY(BlueprintReadOnly)
 	class UProcedureBase* Procedure;
 	
 public:

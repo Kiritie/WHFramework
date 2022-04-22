@@ -90,11 +90,18 @@ public:
 	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Teleport
+	/// Transform
 public:
-	virtual void TeleportTo(FTransform InTransform, bool bMulticast = false) override;
+	virtual void TransformTowards(FTransform InTransform, float InDuration = 1.f, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiTeleportTo(FTransform InTransform);
+	virtual void MultiTransformTowards(FTransform InTransform, float InDuration = 1.f);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Rotation
+public:
+	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) override;
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiRotationTowards(FRotator InRotation, float InDuration = 1.f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI Move
@@ -106,13 +113,6 @@ public:
 	virtual void StopAIMove(bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiStopAIMove();
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Rotation
-public:
-	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) override;
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiRotationTowards(FRotator InRotation, float InDuration = 1.f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

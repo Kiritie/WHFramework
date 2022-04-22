@@ -29,7 +29,7 @@
 // 	class ATargetPoint* Point;
 //
 // public:
-// 	virtual void ServerOnEnter_Implementation(UProcedureBase* InLastProcedure) override;
+// 	virtual void ServerOnEnter(UProcedureBase* InLastProcedure) override;
 //
-// 	virtual void ServerOnLeave_Implementation() override;
+// 	virtual void ServerOnLeave() override;
 // };

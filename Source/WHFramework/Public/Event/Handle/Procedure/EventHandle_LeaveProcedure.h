@@ -18,7 +18,7 @@ public:
 	UEventHandle_LeaveProcedure();
 
 public:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
+	UPROPERTY(BlueprintReadOnly)
 	class UProcedureBase* Procedure;
 	
 public:

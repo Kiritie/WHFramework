@@ -36,13 +36,13 @@ public:
 
 	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) = 0;
 
-	virtual void TeleportTo(FTransform InTransform, bool bMulticast = false) = 0;
+	virtual void TransformTowards(FTransform InTransform, float InDuration = 1.f, bool bMulticast = false) = 0;
+
+	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) = 0;
 
 	virtual void AIMoveTo(FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false) = 0;
 
 	virtual void StopAIMove(bool bMulticast = false) = 0;
-
-	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) = 0;
 
 public:
 	virtual FString GetNameC() const = 0;

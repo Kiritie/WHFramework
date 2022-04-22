@@ -52,13 +52,16 @@ protected:
 	EModuleState ModuleState;
 
 public:
+	UPROPERTY(BlueprintAssignable)
+	FModuleStateChanged OnModuleStateChanged;
+
+protected:
+	virtual void ChangeModuleState(EModuleState InModuleState);
+
+public:
 	virtual FName GetModuleName_Implementation() const override { return ModuleName; }
 
-	virtual void SetModuleName_Implementation(const FName InModuleName) override { ModuleName = InModuleName; }
-
 	virtual EModuleState GetModuleState_Implementation() const override { return ModuleState; }
-
-	virtual void SetModuleState_Implementation(EModuleState InModuleState) override { ModuleState = InModuleState; }
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

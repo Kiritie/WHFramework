@@ -18,9 +18,9 @@
 // 	Point = nullptr;
 // }
 //
-// void UProcedure_PlaySingleSound::ServerOnEnter_Implementation(UProcedureBase* InLastProcedure)
+// void UProcedure_PlaySingleSound::ServerOnEnter(UProcedureBase* InLastProcedure)
 // {
-// 	Super::ServerOnEnter_Implementation(InLastProcedure);
+// 	Super::ServerOnEnter(InLastProcedure);
 // 	
 // 	if(Point)
 // 	{
@@ -32,9 +32,9 @@
 // 	}
 // }
 //
-// void UProcedure_PlaySingleSound::ServerOnLeave_Implementation()
+// void UProcedure_PlaySingleSound::ServerOnLeave()
 // {
-// 	Super::ServerOnLeave_Implementation();
+// 	Super::ServerOnLeave();
 // 	
 // 	UAudioModuleBPLibrary::StopSingleSound(this);
 // }

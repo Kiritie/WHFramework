@@ -15,6 +15,10 @@ ARoamCameraPawn::ARoamCameraPawn()
 {
 	CameraName = FName("RoamCamera");
 
+	bUseControllerRotationPitch = true;
+	bUseControllerRotationYaw = true;
+	bUseControllerRotationRoll = true;
+
 	Sphere = CreateDefaultSubobject<USphereComponent>(FName("Sphere"));
 	Sphere->InitSphereRadius(35.0f);
 	Sphere->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);

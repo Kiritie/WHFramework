@@ -10,10 +10,8 @@ AWHGameMode::AWHGameMode()
 	
 }
 
-void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+void AWHGameMode::Initialize_Implementation()
 {
-	Super::InitGame(MapName, Options, ErrorMessage);
-
 	AMainModule* MainModule = AMainModule::Get();
 	if(MainModule && MainModule->IsValidLowLevel())
 	{
@@ -21,9 +19,11 @@ void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 	}
 }
 
-void AWHGameMode::BeginPlay()
+void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
-	Super::BeginPlay();
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	Initialize();
 }
 
 void AWHGameMode::InitGameState()
@@ -45,4 +45,19 @@ APlayerController* AWHGameMode::SpawnPlayerController(ENetRole InRemoteRole, con
 		WHPlayerController->Initialize();
 	}
 	return PlayerController;
+}
+
+APlayerController* AWHGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	return Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
+}
+
+void AWHGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+}
+
+void AWHGameMode::BeginPlay()
+{
+	Super::BeginPlay();
 }

@@ -29,7 +29,7 @@ public:
 	class ATargetPoint* Point;
 
 public:
-	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
+	virtual void OnEnter(UProcedureBase* InLastProcedure) override;
 
-	virtual void OnLeave_Implementation() override;
+	virtual void OnLeave() override;
 };

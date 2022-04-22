@@ -17,20 +17,20 @@ public:
 	ACameraPawnBase();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UCameraComponent* Camera;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class USpringArmComponent* CameraBoom;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UPawnMovementComponent* MovementComponent;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Default")
+	UPROPERTY(EditAnywhere)
 	FName CameraName;
 
-	UPROPERTY(EditAnywhere, Category = "Default")
+	UPROPERTY(EditAnywhere)
 	ECameraCollisionMode CameraCollisionMode;
 
 protected:

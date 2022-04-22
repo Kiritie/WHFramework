@@ -16,16 +16,16 @@ UProcedure_PlayCharacterSound::UProcedure_PlayCharacterSound()
 	Sound = nullptr;
 }
 
-void UProcedure_PlayCharacterSound::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void UProcedure_PlayCharacterSound::OnEnter(UProcedureBase* InLastProcedure)
 {
-	Super::OnEnter_Implementation(InLastProcedure);
+	Super::OnEnter(InLastProcedure);
 	
 	UCharacterModuleBPLibrary::PlayCharacterSound(CharacterName, Sound, true);
 }
 
-void UProcedure_PlayCharacterSound::OnLeave_Implementation()
+void UProcedure_PlayCharacterSound::OnLeave()
 {
-	Super::OnLeave_Implementation();
+	Super::OnLeave();
 	
 	UCharacterModuleBPLibrary::StopCharacterSound(CharacterName);
 }

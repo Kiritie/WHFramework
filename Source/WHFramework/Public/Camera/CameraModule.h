@@ -44,6 +44,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	TSubclassOf<ACameraPawnBase> DefaultCameraClass;
 
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCameraClass != nullptr"), Category = "Camera")
+	bool DefaultInstantSwitch;
+
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	TArray<TSubclassOf<ACameraPawnBase>> CameraClasses;
 	
@@ -77,16 +80,16 @@ public:
 	ACameraPawnBase* K2_GetCameraByName(const FName InCameraName) const;
 
 	template<class T>
-	void SwitchCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	void SwitchCamera(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
 	{
-		K2_SwitchCamera(InClass);
+		K2_SwitchCamera(InClass, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable, DisplayName = "SwitchCamera")
-	void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass);
+	void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByName(const FName InCameraName);
+	void SwitchCameraByName(const FName InCameraName, bool bInstant = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -18,9 +18,9 @@ UProcedure_PlaySingleSound::UProcedure_PlaySingleSound()
 	Point = nullptr;
 }
 
-void UProcedure_PlaySingleSound::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void UProcedure_PlaySingleSound::OnEnter(UProcedureBase* InLastProcedure)
 {
-	Super::OnEnter_Implementation(InLastProcedure);
+	Super::OnEnter(InLastProcedure);
 	
 	if(Point)
 	{
@@ -32,9 +32,9 @@ void UProcedure_PlaySingleSound::OnEnter_Implementation(UProcedureBase* InLastPr
 	}
 }
 
-void UProcedure_PlaySingleSound::OnLeave_Implementation()
+void UProcedure_PlaySingleSound::OnLeave()
 {
-	Super::OnLeave_Implementation();
+	Super::OnLeave();
 	
 	UAudioModuleBPLibrary::StopSingleSound();
 }

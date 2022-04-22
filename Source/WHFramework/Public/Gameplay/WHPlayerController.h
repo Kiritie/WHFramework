@@ -20,7 +20,7 @@ class UModuleNetworkComponent;
 /**
  * 
  */
-UCLASS()
+UCLASS(hidecategories = (Tick, ComponentTick, Replication, ComponentReplication, Activation, Variable, Game, Physics, Rendering, Collision, Actor, Input, Tags, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API AWHPlayerController : public APlayerController
 {
 
@@ -31,30 +31,36 @@ public:
 	AWHPlayerController();
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Defaults
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Initialize();
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Components
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UWidgetInteractionComponent* WidgetInteractionComp;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UAudioModuleNetworkComponent* AudioModuleNetComp;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UCameraModuleNetworkComponent* CameraModuleNetComp;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UCharacterModuleNetworkComponent* CharacterModuleNetComp;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UEventModuleNetworkComponent* EventModuleNetComp;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UMediaModuleNetworkComponent* MediaModuleNetComp;
 		
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UNetworkModuleNetworkComponent* NetworkModuleNetComp;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UProcedureModuleNetworkComponent* ProcedureModuleNetComp;
 
 private:
@@ -70,12 +76,9 @@ public:
 		}
 		return nullptr;
 	}
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
-public:	
-	virtual void Initialize();
 	
+	//////////////////////////////////////////////////////////////////////////
+	/// Inherits
 protected:
 	virtual void BeginPlay() override;
 
@@ -95,7 +98,7 @@ protected:
 	bool bCameraControlAble;
 
 	// Move
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bCameraMoveAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
@@ -115,13 +118,13 @@ protected:
 
 	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	bool bCameraRotateAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraTurnRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraLookUpRate;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Rotate")
-	bool bCameraRotateAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraRotateSmooth;
@@ -136,7 +139,7 @@ protected:
 	float InitCameraPinch;
 
 	// Zoom
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraControlAble == true"), Category = "CameraControl|Zoom")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bCameraZoomAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -228,7 +231,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, FVector InLocationOffset = FVector::ZeroVector, float InYawOffset = 0.f, float InPitchOffset = 0.f, float InDistance = 0.f, bool bAllowControl = true, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, FVector InLocationOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget();

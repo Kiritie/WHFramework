@@ -93,7 +93,7 @@ AWHPlayerController::AWHPlayerController()
 	TouchPinchValuePrevious = -1.f;
 }
 
-void AWHPlayerController::Initialize()
+void AWHPlayerController::Initialize_Implementation()
 {
 	
 }
@@ -128,8 +128,6 @@ void AWHPlayerController::SetupInputComponent()
 void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-
-	SetCameraLocation(InPawn->GetActorLocation(), true);
 }
 
 void AWHPlayerController::OnUnPossess()
@@ -463,10 +461,10 @@ void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMo
 	{
 		TrackTargetActor = InTargetActor;
 		TrackTargetMode = InTrackTargetMode;
-		TrackLocationOffset = InLocationOffset;
-		TrackYawOffset = InYawOffset;
-		TrackPitchOffset = InPitchOffset;
-		TrackDistance = InDistance;
+		TrackLocationOffset = InLocationOffset == FVector(-1.f) ? GetTargetCameraLocation() - InTargetActor->GetActorLocation() : InLocationOffset;
+		TrackYawOffset = InYawOffset == -1.f ? GetTargetCameraRotation().Yaw - InTargetActor->GetActorRotation().Yaw : InYawOffset;
+		TrackPitchOffset = InPitchOffset == -1.f ? GetTargetCameraRotation().Pitch - InTargetActor->GetActorRotation().Pitch : InYawOffset;
+		TrackDistance = InDistance == -1.f ? GetTargetCameraDistance() : InDistance;
 		TrackAllowControl = bAllowControl;
 		TrackTarget(bInstant);
 	}

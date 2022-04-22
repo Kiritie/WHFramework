@@ -29,12 +29,21 @@ void UCharacterModuleNetworkComponent::ServerStopMontageMulticast_Implementation
 	}
 }
 
-bool UCharacterModuleNetworkComponent::ServerTeleportToMulticast_Validate(AActor* InCharacter, FTransform InTransform) { return true; }
-void UCharacterModuleNetworkComponent::ServerTeleportToMulticast_Implementation(AActor* InCharacter, FTransform InTransform)
+bool UCharacterModuleNetworkComponent::ServerTransformTowardsToMulticast_Validate(AActor* InCharacter, FTransform InTransform) { return true; }
+void UCharacterModuleNetworkComponent::ServerTransformTowardsToMulticast_Implementation(AActor* InCharacter, FTransform InTransform)
 {
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
-		Character->TeleportTo(InTransform, true);
+		Character->TransformTowards(InTransform, true);
+	}
+}
+
+bool UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Validate(AActor* InCharacter, FRotator InRotation, float InDuration) { return true; }
+void UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Implementation(AActor* InCharacter, FRotator InRotation, float InDuration)
+{
+	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
+	{
+		Character->RotationTowards(InRotation, InDuration, true);
 	}
 }
 
@@ -53,14 +62,5 @@ void UCharacterModuleNetworkComponent::ServerStopAIMoveMulticast_Implementation(
 	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
 	{
 		Character->StopAIMove(true);
-	}
-}
-
-bool UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Validate(AActor* InCharacter, FRotator InRotation, float InDuration) { return true; }
-void UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Implementation(AActor* InCharacter, FRotator InRotation, float InDuration)
-{
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->RotationTowards(InRotation, InDuration, true);
 	}
 }

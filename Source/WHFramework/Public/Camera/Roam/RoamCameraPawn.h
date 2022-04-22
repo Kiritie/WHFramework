@@ -7,7 +7,7 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "RoamCameraPawn.generated.h"
 
-UCLASS()
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API ARoamCameraPawn : public ACameraPawnBase, public IWHPlayerInterface
 {
 	GENERATED_BODY()
@@ -16,7 +16,7 @@ public:
 	ARoamCameraPawn();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class USphereComponent* Sphere;
 
 protected:

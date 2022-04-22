@@ -28,19 +28,19 @@ public:
 #endif
 
 public:
-	virtual void OnInitialize_Implementation() override;
+	virtual void OnInitialize() override;
 	
-	virtual void OnRestore_Implementation() override;
+	virtual void OnRestore() override;
 	
-	virtual void OnEnter_Implementation(UProcedureBase* InLastProcedure) override;
+	virtual void OnEnter(UProcedureBase* InLastProcedure) override;
 	
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+	virtual void OnRefresh() override;
 
-	virtual void OnGuide_Implementation() override;
+	virtual void OnGuide() override;
 
-	virtual void OnExecute_Implementation() override;
+	virtual void OnExecute() override;
 
-	virtual void OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult) override;
+	virtual void OnComplete(EProcedureExecuteResult InProcedureExecuteResult) override;
 	
-	virtual void OnLeave_Implementation() override;
+	virtual void OnLeave() override;
 };

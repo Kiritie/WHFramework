@@ -28,42 +28,42 @@ void URootProcedureBase::OnUnGenerate()
 }
 #endif
 
-void URootProcedureBase::OnInitialize_Implementation()
+void URootProcedureBase::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void URootProcedureBase::OnRestore_Implementation()
+void URootProcedureBase::OnRestore()
 {
-	Super::OnRestore_Implementation();
+	Super::OnRestore();
 }
 
-void URootProcedureBase::OnEnter_Implementation(UProcedureBase* InLastProcedure)
+void URootProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 {
-	Super::OnEnter_Implementation(InLastProcedure);
+	Super::OnEnter(InLastProcedure);
 }
 
-void URootProcedureBase::OnRefresh_Implementation(float DeltaSeconds)
+void URootProcedureBase::OnRefresh()
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh();
 }
 
-void URootProcedureBase::OnGuide_Implementation()
+void URootProcedureBase::OnGuide()
 {
-	Super::OnGuide_Implementation();
+	Super::OnGuide();
 }
 
-void URootProcedureBase::OnExecute_Implementation()
+void URootProcedureBase::OnExecute()
 {
-	Super::OnExecute_Implementation();
+	Super::OnExecute();
 }
 
-void URootProcedureBase::OnComplete_Implementation(EProcedureExecuteResult InProcedureExecuteResult)
+void URootProcedureBase::OnComplete(EProcedureExecuteResult InProcedureExecuteResult)
 {
-	Super::OnComplete_Implementation(InProcedureExecuteResult);
+	Super::OnComplete(InProcedureExecuteResult);
 }
 
-void URootProcedureBase::OnLeave_Implementation()
+void URootProcedureBase::OnLeave()
 {
-	Super::OnLeave_Implementation();
+	Super::OnLeave();
 }

@@ -58,7 +58,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	WidgetState = EWidgetState::Opening;
 	
-	switch (WidgetType)
+	switch (WidgetCategory)
 	{
 		case EWidgetCategory::Permanent:
 		{
@@ -172,7 +172,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 {
 	WidgetState = EWidgetState::Closed;
 
-	switch (WidgetType)
+	switch (WidgetCategory)
 	{
 		case EWidgetCategory::Permanent:
 		{

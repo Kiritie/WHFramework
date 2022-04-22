@@ -19,16 +19,11 @@ public:
 	UEventHandle_ExecuteProcedure();
 
 public:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
+	UPROPERTY(BlueprintReadOnly)
 	class UProcedureBase* Procedure;
-	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (InstanceEditable, ExposeOnSpawn))
-	FName FuncName;
 
 public:
 	virtual void OnDespawn_Implementation() override;
-
-	virtual bool Filter_Implementation(UObject* InOwner, const FName InFuncName) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParameters) override;
 };

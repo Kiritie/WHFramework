@@ -135,7 +135,7 @@ void ACharacterModule::TeleportCharacterTo(const FString& InCharacterName, FTran
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
-		Character->TeleportTo(InTransform, bMulticast);
+		Character->TransformTowards(InTransform, bMulticast);
 	}
 }
 

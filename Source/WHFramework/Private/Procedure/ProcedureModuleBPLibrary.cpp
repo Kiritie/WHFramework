@@ -60,6 +60,14 @@ void UProcedureModuleBPLibrary::EnterProcedure(UProcedureBase* InProcedure)
 	}
 }
 
+void UProcedureModuleBPLibrary::RefreshProcedure(UProcedureBase* InProcedure)
+{
+	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	{
+		ProcedureModule->RefreshProcedure(InProcedure);
+	}
+}
+
 void UProcedureModuleBPLibrary::GuideProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())

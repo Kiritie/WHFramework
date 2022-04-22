@@ -17,6 +17,7 @@ ACameraPawnBase::ACameraPawnBase()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetRelativeTransform(FTransform::Identity);
 	CameraBoom->bUsePawnControlRotation = true;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(FName("Camera"));

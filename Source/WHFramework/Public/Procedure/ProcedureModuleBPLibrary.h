@@ -40,6 +40,9 @@ public:
 	static void EnterProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
+	static void RefreshProcedure(UProcedureBase* InProcedure);
+
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
 	static void GuideProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")

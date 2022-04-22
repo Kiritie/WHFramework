@@ -81,7 +81,7 @@ UDataAssetBase* AAssetModule::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InD
 
 bool AAssetModule::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	if(!InDataAssetClass) return nullptr;
+	if(!InDataAssetClass) return false;
 
 	if(InDataAssetName.IsNone()) InDataAssetName = InDataAssetClass.GetDefaultObject()->GetDataAssetName();
 
