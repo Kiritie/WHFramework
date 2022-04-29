@@ -192,13 +192,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// SceneContainer
 public:
-	virtual void SpawnSceneObject(ISceneObjectInterface* InSceneObject) override;
-	
-	virtual void AddSceneObject(ISceneObjectInterface* InSceneObject) override;
+	virtual void AddSceneActor(AActor* InActor) override;
 
-	virtual void RemoveSceneObject(ISceneObjectInterface* InSceneObject) override;
+	virtual void RemoveSceneActor(AActor* InActor) override;
 
-	virtual void DestroySceneObject(ISceneObjectInterface* InSceneObject) override;
+	virtual void DestroySceneActor(AActor* InActor) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp

@@ -37,8 +37,8 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	
 	// stats
 	AssetID = FPrimaryAssetId();
-	Name = TEXT("");
-	RaceID = TEXT("");
+	Name = NAME_None;
+	RaceID = NAME_None;
 	Level = 0;
 	EXP = 50;
 	BaseEXP = 100;
@@ -166,13 +166,13 @@ bool AAbilityVitalityBase::IsDead() const
 	return bDead;
 }
 
-void AAbilityVitalityBase::SetNameV(const FString& InName)
+void AAbilityVitalityBase::SetNameV(FName InName)
 {
 	Name = InName;
 	HandleNameChanged(InName);
 }
 
-void AAbilityVitalityBase::SetRaceID(const FString& InRaceID)
+void AAbilityVitalityBase::SetRaceID(FName InRaceID)
 {
 	RaceID = InRaceID;
 	HandleRaceIDChanged(InRaceID);
@@ -212,7 +212,7 @@ int32 AAbilityVitalityBase::GetTotalEXP() const
 
 FString AAbilityVitalityBase::GetHeadInfo() const
 {
-	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name);
+	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
 float AAbilityVitalityBase::GetHealth() const
@@ -450,12 +450,12 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 	}
 }
 
-void AAbilityVitalityBase::HandleNameChanged(const FString& NewValue)
+void AAbilityVitalityBase::HandleNameChanged(FName NewValue)
 {
 	
 }
 
-void AAbilityVitalityBase::HandleRaceIDChanged(const FString& NewValue)
+void AAbilityVitalityBase::HandleRaceIDChanged(FName NewValue)
 {
 	
 }

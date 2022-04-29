@@ -43,6 +43,7 @@ public class WHFrameworkEditor : ModuleRules
 				"UnrealEd",
 				"ToolMenus",
 				"CoreUObject",
+				"AssetRegistry",
 				"AssetTools",
 				"Engine",
 				"Kismet",

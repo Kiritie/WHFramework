@@ -31,4 +31,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
 	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
+	
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float EvaluateByCurve(UCurveFloat* InCurve, float InTime, float InDuration);
+	
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float EvaluateByEaseType(EEaseType InEaseType, float InTime, float InDuration);
+
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float BounceEaseIn(float InTime, float InDuration, float IUnusedOvershootOrAmplitude, float InUnusedPeriod);
+	
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float BounceEaseInOut(float InTime, float InDuration, float InUnusedOvershootOrAmplitude, float InUnusedPeriod);
+	
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float BounceEaseOut(float InTime, float InDuration, float InUnusedOvershootOrAmplitude, float InUnusedPeriod);
 };

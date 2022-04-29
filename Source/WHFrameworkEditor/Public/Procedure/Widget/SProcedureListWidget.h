@@ -9,6 +9,7 @@
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
 
+class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
 
 /**
@@ -20,7 +21,6 @@ public:
 	SLATE_BEGIN_ARGS(SProcedureListWidget)
 	{}
 	
-	SLATE_ARGUMENT(class AMainModule*, MainModule)
 	SLATE_ARGUMENT(class AProcedureModule*, ProcedureModule)
 
 	SLATE_END_ARGS()
@@ -30,10 +30,12 @@ public:
 
 	void Refresh();
 
+	virtual ~SProcedureListWidget() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TSubclassOf<UProcedureBase> CurrentProcedureClass;
+	TSubclassOf<UProcedureBase> SelectedProcedureClass;
 
 	TArray<TSharedPtr<FProcedureListItem>> ProcedureListItems;
 
@@ -41,18 +43,16 @@ public:
 
 	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
 
-	bool bCurrentIsMultiMode = true;
+	bool bMultiMode = true;
 
-	bool bCurrentIsEditMode = false;
+	bool bEditMode = false;
 
-	static FDelegateHandle RefreshDelegateHandle;
+	FDelegateHandle RefreshDelegateHandle;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	class AMainModule* MainModule;
-	
-	class AProcedureModule* ProcedureModule;
+	AProcedureModule* ProcedureModule;
 		
 	UProcedureBase* CopiedProcedure;
 
@@ -107,7 +107,9 @@ public:
 	/// Tree View
 private:
 	void UpdateTreeView(bool bRegenerate = false);
-	
+		
+	void UpdateSelection();
+
 	TSharedRef<ITableRow> GenerateTreeRow(TSharedPtr<FProcedureListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable);
 
 	void TreeItemScrolledIntoView(TSharedPtr<FProcedureListItem> TreeItem, const TSharedPtr<ITableRow>& Widget);
@@ -126,6 +128,8 @@ private:
 	/// Buttons
 private:
 	FReply OnEditProcedureItemButtonClicked();
+
+	FReply OnNewProcedureClassButtonClicked();
 
 	FReply OnNewProcedureItemButtonClicked();
 

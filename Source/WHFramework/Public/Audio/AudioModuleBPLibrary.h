@@ -25,6 +25,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
 	static void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"), Category = "AudioModuleBPLibrary")
+	static void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
 	static void PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);

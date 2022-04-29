@@ -8,7 +8,7 @@
 #include "VitalityDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
@@ -23,7 +23,7 @@ class UAttributeSetBase;
  * ������������
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneObjectInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -41,10 +41,10 @@ protected:
 	FPrimaryAssetId AssetID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FString Name;
+	FName Name;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FString RaceID;
+	FName RaceID;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 Level;
@@ -169,16 +169,16 @@ public:
 	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
 
 	UFUNCTION(BlueprintPure)
-	virtual FString GetNameV() const override { return Name; }
+	virtual FName GetNameV() const override { return Name; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNameV(const FString& InName) override;
+	virtual void SetNameV(FName InName) override;
 	
 	UFUNCTION(BlueprintPure)
-	virtual FString GetRaceID() const override { return RaceID; }
+	virtual FName GetRaceID() const override { return RaceID; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetRaceID(const FString& InRaceID) override;
+	virtual void SetRaceID(FName InRaceID) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetLevelV(int32 InLevel) override;
@@ -250,9 +250,9 @@ public:
 public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 		
-	virtual void HandleNameChanged(const FString& NewValue) override;
+	virtual void HandleNameChanged(FName NewValue) override;
 
-	virtual void HandleRaceIDChanged(const FString& NewValue) override;
+	virtual void HandleRaceIDChanged(FName NewValue) override;
 
 	virtual void HandleLevelChanged(int32 NewValue, int32 DeltaValue = 0) override;
 

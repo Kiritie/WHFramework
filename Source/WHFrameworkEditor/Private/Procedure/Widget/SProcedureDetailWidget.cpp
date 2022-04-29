@@ -21,7 +21,7 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 	ListWidget->OnSelectProcedureListItemsDelegate.BindRaw(this, &SProcedureDetailWidget::OnSelectProcedureListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-	
+
 	FDetailsViewArgs DetailsViewArgs;
 	DetailsViewArgs.bUpdatesFromSelection = false;
 	DetailsViewArgs.bLockable = false;
@@ -30,7 +30,7 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 	DetailsViewArgs.bHideSelectionTip = false;
 
 	DetailsView = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
-	
+
 	ChildSlot
 	[
 		SNew(SBorder)
@@ -48,9 +48,9 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 				.AutoHeight()
 				[
 					SNew(SHorizontalBox)
-							
+
 					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)	
+					.VAlign(VAlign_Fill)
 					.HAlign(HAlign_Center)
 					.AutoWidth()
 					.Padding(5.f, 2.f, 5.f, 2.f)
@@ -66,8 +66,8 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 				.FillHeight(1)
 				[
 					SNew(SVerticalBox)
-					
-					+ SVerticalBox::Slot()	
+
+					+ SVerticalBox::Slot()
 					.VAlign(VAlign_Fill)
 					.HAlign(HAlign_Fill)
 					[
@@ -77,7 +77,7 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-	
+
 	UpdateDetailsView();
 }
 

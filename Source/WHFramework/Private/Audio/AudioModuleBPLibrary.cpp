@@ -32,6 +32,14 @@ void UAudioModuleBPLibrary::PlaySingleSound2D(USoundBase* InSound, float InVolum
 	}
 }
 
+void UAudioModuleBPLibrary::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume, bool bMulticast)
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		return AudioModule->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinishedDelegate, InVolume, bMulticast);
+	}
+}
+
 void UAudioModuleBPLibrary::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())

@@ -25,12 +25,12 @@ public:
 	 * 当前是否为播放状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static bool IsPlaying() { return GWorld->HasBegunPlay(); }
+	static bool IsPlaying();
 	/*
 	 * 当前是否为运行状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static bool IsRunning() { return GIsRunning; }
+	static bool IsRunning() { return GIsPlayInEditorWorld; }
 	/*
 	 * 当前是否为编辑器状态运行
 	 */
@@ -132,6 +132,27 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
 public:
+	template<class T>
+	static T* GetObjectInExistedWorld(TFunction<UObject*(UWorld*)>&& Callback, bool bInEditor = false)
+	{
+		for(const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			if(!bInEditor && Context.World()->IsGameWorld() || bInEditor && Context.World()->IsEditorWorld())
+			{
+				if(T* Object = Cast<T>(Callback(Context.World())))
+				{
+					return Object;
+				}
+			}
+		}
+		return nullptr;
+	}
+
+	static UWorld* GetWorldFromObjectExisted(const UObject* InObject)
+	{
+		return InObject->GetWorld();
+	}
+
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static UWorld* GetCurrentWorld()
 	{
@@ -172,6 +193,7 @@ public:
 	{
 		return Cast<T>(UGameplayStatics::GetPlayerController(InWorldContext, InPlayerIndex));
 	}
+	
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerController", WorldContext = "InWorldContext", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APlayerController* K2_GetPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass, int32 InPlayerIndex = 0);
 

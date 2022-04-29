@@ -7,9 +7,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 
 UProcedureGraphSchema::UProcedureGraphSchema(const FObjectInitializer& ObjectInitializer)
-: Super(ObjectInitializer)
-{
-}
+	: Super(ObjectInitializer) {}
 
 UK2Node_VariableGet* UProcedureGraphSchema::SpawnVariableGetNode(const FVector2D GraphPosition, class UEdGraph* ParentGraph, FName VariableName, UStruct* Source) const
 {

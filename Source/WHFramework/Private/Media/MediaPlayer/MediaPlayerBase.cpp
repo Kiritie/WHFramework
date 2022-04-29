@@ -16,26 +16,18 @@ AMediaPlayerBase::AMediaPlayerBase()
 	PlayerName = NAME_None;
 
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
-
-	ScenePoint = CreateDefaultSubobject<USceneComponent>(FName("ScenePoint"));
-	ScenePoint->SetupAttachment(RootComponent);
 }
 
 void AMediaPlayerBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	USceneModuleBPLibrary::SetSceneObject(PlayerName, this);
+	USceneModuleBPLibrary::AddSceneActor(this);
 }
 
 void AMediaPlayerBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-}
-
-USceneComponent* AMediaPlayerBase::GetScenePoint() const
-{
-	return ScenePoint;
 }
 
 void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bMulticast)

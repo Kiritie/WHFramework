@@ -6,13 +6,13 @@
 
 #include "PhysicsVolumeTypes.h"
 #include "GameFramework/PhysicsVolume.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 #include "SpawnPool/SpawnPoolInterface.h"
 
 #include "PhysicsVolumeBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneObjectInterface, public ISpawnPoolInterface
+class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public ISpawnPoolInterface
 {
 	GENERATED_BODY()
 	
@@ -24,6 +24,9 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "PhysicsVolume")
 	FName VolumeName;
+public:
+	UFUNCTION(BlueprintPure)
+	FName GetVolumeName() const { return VolumeName; }
 
 protected:
 	virtual void BeginPlay() override;

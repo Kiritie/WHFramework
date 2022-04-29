@@ -5,7 +5,7 @@
 #include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "PickUp.generated.h"
 
@@ -19,7 +19,7 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class WHFRAMEWORK_API APickUp : public AActor, public ISceneObjectInterface, public ISaveDataInterface
+class WHFRAMEWORK_API APickUp : public AActor, public ISceneActorInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -31,7 +31,8 @@ protected:
 	UPROPERTY(BlueprintReadWrite)
 	FAbilityItem Item;
 
-	ISceneContainerInterface* Container;
+	UPROPERTY(Transient)
+	AActor* Container;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -62,14 +63,14 @@ public:
 
 	virtual void Initialize(FAbilityItem InItem, bool bPreview = false);
 
-	virtual void RemoveFromContainer() override;
+	virtual void RemoveFromContainer_Implementation() override;
 
 public:
 	FAbilityItem& GetItem() { return Item; }
 	
-	virtual ISceneContainerInterface* GetContainer() const override { return Container; }
+	virtual AActor* GetContainer_Implementation() const override { return Container; }
 
-	virtual void SetContainer(ISceneContainerInterface* InContainer) override { Container = InContainer; }
+	virtual void SetContainer_Implementation(AActor* InContainer) override { Container = InContainer; }
 	
 	UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 

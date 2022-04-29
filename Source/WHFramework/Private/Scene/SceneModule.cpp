@@ -10,10 +10,11 @@
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "Scene/Components/WorldWeatherComponent.h"
-#include "Scene/Object/SceneObjectInterface.h"
-#include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
+#include "Scene/Actor/SceneActorInterface.h"
+#include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
@@ -34,7 +35,8 @@ ASceneModule::ASceneModule()
 
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
-	SceneObjects = TMap<FName, TScriptInterface<ISceneObjectInterface>>();
+	SceneActors = TArray<AActor*>();
+	SceneActorMap = TMap<FName, AActor*>();
 
 	TargetPoints = TMap<FName, ATargetPoint*>();
 	
@@ -71,6 +73,11 @@ void ASceneModule::OnDestroy_Implementation()
 void ASceneModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : SceneActors)
+	{
+		AddSceneActor(Iter);
+	}
 
 	for(auto Iter : DefaultPhysicsVolumes)
 	{
@@ -166,6 +173,7 @@ void ASceneModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
 }
+
 void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
@@ -282,34 +290,102 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakeString(InLevelPath.ToString()) });
 }
 
-bool ASceneModule::HasSceneObject(FName InName, bool bEnsured) const
+bool ASceneModule::HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured) const
 {
-	if(SceneObjects.Contains(InName)) return true;
+	if(!InClass) return false;
+	
+	if(InClass->ImplementsInterface(USceneActorInterface::StaticClass()))
+	{
+		return HasSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InClass->GetDefaultObject()), bEnsured);
+	}
+	return false;
+}
+
+bool ASceneModule::HasSceneActorByName(FName InName, bool bEnsured) const
+{
+	if(SceneActorMap.Contains(InName)) return true;
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-TScriptInterface<ISceneObjectInterface> ASceneModule::GetSceneObject(FName InName, bool bEnsured) const
+AActor* ASceneModule::GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured) const
 {
-	if(HasSceneObject(InName, bEnsured))
+	if(!InClass) return nullptr;
+	
+	if(InClass->ImplementsInterface(USceneActorInterface::StaticClass()))
 	{
-		return SceneObjects[InName];
+		return GetSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InClass->GetDefaultObject()), InClass, bEnsured);
 	}
 	return nullptr;
 }
 
-void ASceneModule::SetSceneObject(FName InName, TScriptInterface<ISceneObjectInterface> InObject)
+AActor* ASceneModule::GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
-	if(SceneObjects.Contains(InName))
+	if(HasSceneActorByName(InName, bEnsured))
 	{
-		SceneObjects[InName] = InObject;
+		return SceneActorMap[InName];
 	}
-	else
+	return nullptr;
+}
+
+void ASceneModule::AddSceneActor(AActor* InActor)
+{
+	if(!InActor) return;
+
+	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
 	{
-		SceneObjects.Add(InName, InObject);
+		AddSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor), InActor);
 	}
-	if(InObject.GetObject() && InObject.GetObject()->IsValidLowLevel())
+}
+
+void ASceneModule::AddSceneActorByName(FName InName, AActor* InActor)
+{
+	if(!InActor) return;
+
+	if(!SceneActorMap.Contains(InName))
 	{
-		SetScenePoint(InName, InObject->GetScenePoint());
+		SceneActorMap.Add(InName, InActor);
+		AddScenePoint(InName, InActor->GetRootComponent());
+	}
+}
+
+void ASceneModule::RemoveSceneActor(AActor* InActor)
+{
+	if(!InActor) return;
+
+	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
+	{
+		RemoveSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor));
+	}
+}
+
+void ASceneModule::RemoveSceneActorByName(FName InName)
+{
+	if(SceneActorMap.Contains(InName))
+	{
+		SceneActorMap.Remove(InName);
+		RemoveScenePoint(InName);
+	}
+}
+
+void ASceneModule::DestroySceneActor(AActor* InActor)
+{
+	if(!InActor) return;
+
+	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
+	{
+		DestroySceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor));
+	}
+}
+
+void ASceneModule::DestroySceneActorByName(FName InName)
+{
+	if(SceneActorMap.Contains(InName))
+	{
+		if(SceneActorMap[InName])
+		{
+			SceneActorMap[InName]->Destroy();
+		}
+		SceneActorMap.Remove(InName);
 	}
 }
 
@@ -328,19 +404,23 @@ ATargetPoint* ASceneModule::GetTargetPoint(FName InName, bool bEnsured) const
 	return nullptr;
 }
 
-void ASceneModule::SetTargetPoint(FName InName, ATargetPoint* InPoint)
+void ASceneModule::AddTargetPoint(FName InName, ATargetPoint* InPoint)
 {
-	if(TargetPoints.Contains(InName))
-	{
-		TargetPoints[InName] = InPoint;
-	}
-	else
+	if(!TargetPoints.Contains(InName))
 	{
 		TargetPoints.Add(InName, InPoint);
 	}
 	if(InPoint && InPoint->IsValidLowLevel())
 	{
-		SetScenePoint(InName, InPoint->GetRootComponent());
+		AddScenePoint(InName, InPoint->GetRootComponent());
+	}
+}
+
+void ASceneModule::RemoveTargetPoint(FName InName)
+{
+	if(TargetPoints.Contains(InName))
+	{
+		TargetPoints.Remove(InName);
 	}
 }
 
@@ -359,42 +439,88 @@ USceneComponent* ASceneModule::GetScenePoint(FName InName, bool bEnsured) const
 	return nullptr;
 }
 
-void ASceneModule::SetScenePoint(FName InName, USceneComponent* InSceneComp)
+void ASceneModule::AddScenePoint(FName InName, USceneComponent* InSceneComp)
 {
-	if(ScenePoints.Contains(InName))
-	{
-		ScenePoints[InName] = InSceneComp;
-	}
-	else
+	if(!ScenePoints.Contains(InName))
 	{
 		ScenePoints.Add(InName, InSceneComp);
 	}
 }
 
-bool ASceneModule::HasPhysicsVolume(FName InName, bool bEnsured) const
+inline void ASceneModule::RemoveScenePoint(FName InName)
+{
+	if(ScenePoints.Contains(InName))
+	{
+		ScenePoints.Remove(InName);
+	}
+}
+
+bool ASceneModule::HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
+{
+	if(!InClass) return false;
+
+	if(APhysicsVolumeBase* DefaultPhysicsVolume = Cast<APhysicsVolumeBase>(InClass->GetDefaultObject()))
+	{
+		return HasPhysicsVolumeByName(DefaultPhysicsVolume->GetVolumeName(), bEnsured);
+	}
+	return false;
+}
+
+bool ASceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
 {
 	if(PhysicsVolumes.Contains(InName)) return true;
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-APhysicsVolumeBase* ASceneModule::GetPhysicsVolume(FName InName, bool bEnsured) const
+APhysicsVolumeBase* ASceneModule::GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
 {
-	if(HasPhysicsVolume(InName, bEnsured))
+	if(!InClass) return nullptr;
+
+	if(APhysicsVolumeBase* DefaultPhysicsVolume = Cast<APhysicsVolumeBase>(InClass->GetDefaultObject()))
+	{
+		return GetPhysicsVolumeByName(DefaultPhysicsVolume->GetVolumeName(), InClass, bEnsured);
+	}
+	return nullptr;
+}
+
+APhysicsVolumeBase* ASceneModule::GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
+{
+	if(HasPhysicsVolumeByName(InName, bEnsured))
 	{
 		return PhysicsVolumes[InName];
 	}
 	return nullptr;
 }
 
-void ASceneModule::SetPhysicsVolume(FName InName, APhysicsVolumeBase* InPhysicsVolume)
+void ASceneModule::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
+{
+	if(!InPhysicsVolume) return;
+	
+	AddPhysicsVolumeByName(InPhysicsVolume->GetVolumeName(), InPhysicsVolume);
+}
+
+void ASceneModule::AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume)
+{
+	if(!InPhysicsVolume) return;
+	
+	if(!PhysicsVolumes.Contains(InName))
+	{
+		PhysicsVolumes.Add(InName, InPhysicsVolume);
+	}
+}
+
+void ASceneModule::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
+{
+	if(!InPhysicsVolume) return;
+
+	RemovePhysicsVolumeByName(InPhysicsVolume->GetVolumeName());
+}
+
+void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 {
 	if(PhysicsVolumes.Contains(InName))
 	{
-		PhysicsVolumes[InName] = InPhysicsVolume;
-	}
-	else
-	{
-		PhysicsVolumes.Add(InName, InPhysicsVolume);
+		PhysicsVolumes.Remove(InName);
 	}
 }
 

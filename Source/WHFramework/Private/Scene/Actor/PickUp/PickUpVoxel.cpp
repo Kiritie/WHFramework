@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Object/PickUp/PickUpVoxel.h"
+#include "Scene/Actor/PickUp/PickUpVoxel.h"
 
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"

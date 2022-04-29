@@ -1,13 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Object/Countdown/CountdownBase.h"
+#include "Scene/Actor/Countdown/CountdownBase.h"
 
 #include "TimerManager.h"
 #include "Engine/TargetPoint.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
-#include "Scene/Object/Countdown/CountdownTypes.h"
+#include "Scene/Actor/Countdown/CountdownTypes.h"
 
 void FCountdownHelper::StartCountdown(const UObject* WorldContext)
 {

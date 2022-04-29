@@ -92,6 +92,17 @@ public:
 	virtual TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const override;
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Text
+	UFUNCTION(BlueprintCallable)
+	virtual void SetTextParameter(FName InName, const FText InValue) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	virtual FText GetTextParameter(FName InName, bool bEnsured = true) const override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	virtual TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const override;
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Boolean
 	UFUNCTION(BlueprintCallable)
 	virtual void SetBooleanParameter(FName InName, bool InValue) override;

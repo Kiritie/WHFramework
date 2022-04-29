@@ -40,13 +40,13 @@ public:
 public:
 	virtual FPrimaryAssetId GetAssetID() const = 0;
 	
-	virtual FString GetNameV() const = 0;
+	virtual FName GetNameV() const = 0;
 
-	virtual void SetNameV(const FString& InName) = 0;
+	virtual void SetNameV(FName InName) = 0;
 		
-	virtual FString GetRaceID() const = 0;
+	virtual FName GetRaceID() const = 0;
 
-	virtual void SetRaceID(const FString& InRaceID) = 0;
+	virtual void SetRaceID(FName InRaceID) = 0;
 	
 	virtual int32 GetLevelV() const = 0;
 
@@ -110,9 +110,9 @@ public:
 public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 		
-	virtual void HandleNameChanged(const FString& NewValue) = 0;
+	virtual void HandleNameChanged(FName NewValue) = 0;
 
-	virtual void HandleRaceIDChanged(const FString& NewValue) = 0;
+	virtual void HandleRaceIDChanged(FName NewValue) = 0;
 	
 	virtual void HandleLevelChanged(int32 NewValue, int32 DeltaValue = 0) = 0;
 

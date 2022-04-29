@@ -8,6 +8,42 @@
 
 #define DEG_2_RAD (0.01745329f)
 
+UENUM(BlueprintType)
+enum class EEaseType : uint8
+{
+	Linear = 0,
+	InSine = 1,
+	InQuad = 2,
+	InCubic = 3,
+	InQuart = 4,
+	InQuint = 5,
+	InExpo = 6,
+	InCirc = 7,
+	InElastic = 8,
+	InBack = 9,
+	InBounce = 10,
+	OutQuad = 31,
+	OutSine = 32,
+	OutCubic = 33,
+	OutQuart = 34,
+	OutQuint = 35,
+	OutExpo = 36,
+	OutCirc = 37,
+	OutElastic = 38,
+	OutBack = 39,
+	OutBounce = 40,
+	InOutQuad = 61,
+	InOutSine = 62,
+	InOutCubic = 63,
+	InOutQuart = 64,
+	InOutQuint = 65,
+	InOutExpo = 66,
+	InOutCirc = 67,
+	InOutElastic = 68,
+	InOutBack = 69,
+	InOutBounce = 70
+};
+
 /**
  * ????
  */

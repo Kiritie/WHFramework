@@ -28,30 +28,27 @@ FProcedureEditor::~FProcedureEditor()
 	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
 }
 
-void FProcedureEditor::InitProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr< IToolkitHost >& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FProcedureEditor::InitProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
 {
 	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
 
-	for (auto Blueprint : InBlueprints)
-	{
-		EnsureProcedureBlueprintIsUpToDate(Blueprint);
-	}
+	for(auto Blueprint : InBlueprints) { EnsureProcedureBlueprintIsUpToDate(Blueprint); }
 }
 
 void FProcedureEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
 {
-#if WITH_EDITORONLY_DATA
-	for (UEdGraph* Graph : Blueprint->UbergraphPages)
+	#if WITH_EDITORONLY_DATA
+	for(UEdGraph* Graph : Blueprint->UbergraphPages)
 	{
 		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
-		if (Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
+		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
 		{
 			check(!Graph->Schema->GetClass()->IsChildOf(UProcedureGraphSchema::StaticClass()));
 			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
 			break;
 		}
 	}
-#endif
+	#endif
 }
 
 // FRED_TODO: don't merge this back
@@ -60,15 +57,9 @@ void FProcedureEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
 // 	return GetToolkitFName();
 // }
 
-FName FProcedureEditor::GetToolkitFName() const
-{
-	return FName("ProcedureEditor");
-}
+FName FProcedureEditor::GetToolkitFName() const { return FName("ProcedureEditor"); }
 
-FText FProcedureEditor::GetBaseToolkitName() const
-{
-	return LOCTEXT("ProcedureEditorAppLabel", "Procedure Editor");
-}
+FText FProcedureEditor::GetBaseToolkitName() const { return LOCTEXT("ProcedureEditorAppLabel", "Procedure Editor"); }
 
 FText FProcedureEditor::GetToolkitName() const
 {
@@ -91,31 +82,19 @@ FText FProcedureEditor::GetToolkitToolTipText() const
 {
 	const UObject* EditingObject = GetEditingObject();
 
-	check (EditingObject != NULL);
+	check(EditingObject != NULL);
 
 	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
 }
 
-FString FProcedureEditor::GetWorldCentricTabPrefix() const
-{
-	return TEXT("ProcedureEditor");
-}
+FString FProcedureEditor::GetWorldCentricTabPrefix() const { return TEXT("ProcedureEditor"); }
 
-FLinearColor FProcedureEditor::GetWorldCentricTabColorScale() const
-{
-	return FLinearColor::White;
-}
+FLinearColor FProcedureEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
 
 UBlueprint* FProcedureEditor::GetBlueprintObj() const
 {
 	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-	for (int32 i = 0; i < EditingObjs.Num(); ++i)
-	{
-		if (EditingObjs[i]->IsA<UProcedureBlueprint>()) 
-		{ 
-			return (UBlueprint*)EditingObjs[i]; 
-		}
-	}
+	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UProcedureBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
 	return nullptr;
 }
 
@@ -125,4 +104,3 @@ FString FProcedureEditor::GetDocumentationLink() const
 }
 
 #undef LOCTEXT_NAMESPACE
-

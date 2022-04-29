@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 #include "UObject/Interface.h"
 #include "SceneContainerInterface.generated.h"
 
@@ -23,11 +23,23 @@ class WHFRAMEWORK_API ISceneContainerInterface
 	GENERATED_BODY()
 
 public:
-	virtual void SpawnSceneObject(ISceneObjectInterface* InSceneObject) = 0;
+	virtual bool HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return false; }
 
-	virtual void AddSceneObject(ISceneObjectInterface* InSceneObject) = 0;
+	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const { return false; }
 
-	virtual void RemoveSceneObject(ISceneObjectInterface* InSceneObject) = 0;
+	virtual AActor* GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return nullptr; }
 
-	virtual void DestroySceneObject(ISceneObjectInterface* InSceneObject) = 0;
+	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const { return nullptr; }
+
+	virtual void AddSceneActor(AActor* InActor) { }
+
+	virtual void AddSceneActorByName(FName InName, AActor* InActor) { }
+
+	virtual void RemoveSceneActor(AActor* InActor) { }
+
+	virtual void RemoveSceneActorByName(FName InName) { }
+
+	virtual void DestroySceneActor(AActor* InActor) { }
+
+	virtual void DestroySceneActorByName(FName InName) { }
 };

@@ -52,53 +52,53 @@ public:
 	void RemoveCharacterFromList(TScriptInterface<ICharacterInterface> InCharacter);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveCharacterFromListByName(const FString& InCharacterName);
+	void RemoveCharacterFromListByName(FName InCharacterName);
 
 	UFUNCTION(BlueprintPure)
-	TScriptInterface<ICharacterInterface> GetCharacterByName(const FString& InCharacterName) const;
+	TScriptInterface<ICharacterInterface> GetCharacterByName(FName InCharacterName) const;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayCharacterSound(const FString& InCharacterName, class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	void PlayCharacterSound(FName InCharacterName, class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable)
-	void StopCharacterSound(const FString& InCharacterName);
+	void StopCharacterSound(FName InCharacterName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayCharacterMontage(const FString& InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
+	void PlayCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
 	UFUNCTION(BlueprintCallable)
-	void PlayCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast = false);
+	void PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable)
-	void StopCharacterMontage(const FString& InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
+	void StopCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
 	UFUNCTION(BlueprintCallable)
-	void StopCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast = false);
+	void StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Teleport
 public:
 	UFUNCTION(BlueprintCallable)
-	void TeleportCharacterTo(const FString& InCharacterName, FTransform InTransform, bool bMulticast = false);
+	void TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI Move
 public:
 	UFUNCTION(BlueprintCallable)
-	void AIMoveCharacterTo(const FString& InCharacterName, FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false);
+	void AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
-	void StopCharacterAIMove(const FString& InCharacterName, bool bMulticast = false);
+	void StopCharacterAIMove(FName InCharacterName, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Rotation
 public:
 	UFUNCTION(BlueprintCallable)
-	void RotationCharacterTowards(const FString& InCharacterName, FRotator InRotation, float InDuration = 1.f, bool bMulticast = false);
+	void RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration = 1.f, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

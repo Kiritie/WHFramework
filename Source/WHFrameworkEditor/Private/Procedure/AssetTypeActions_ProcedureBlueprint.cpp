@@ -9,42 +9,33 @@
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"
 
-FAssetTypeActions_ProcedureBlueprint::FAssetTypeActions_ProcedureBlueprint(EAssetTypeCategories::Type InAssetCategory)
-{
-	AssetCategory = InAssetCategory;
-}
+FAssetTypeActions_ProcedureBlueprint::FAssetTypeActions_ProcedureBlueprint(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
 
-FText FAssetTypeActions_ProcedureBlueprint::GetName() const
-{
-	return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_ProcedureBlueprint", "Procedure Blueprint"); 
-}
+FText FAssetTypeActions_ProcedureBlueprint::GetName() const { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_ProcedureBlueprint", "Procedure Blueprint"); }
 
-FColor FAssetTypeActions_ProcedureBlueprint::GetTypeColor() const
-{
-	return FColor(0, 96, 128);
-}
+FColor FAssetTypeActions_ProcedureBlueprint::GetTypeColor() const { return FColor(0, 96, 128); }
 
-void FAssetTypeActions_ProcedureBlueprint::OpenAssetEditor( const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor )
+void FAssetTypeActions_ProcedureBlueprint::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
 {
 	EToolkitMode::Type Mode = EditWithinLevelEditor.IsValid() ? EToolkitMode::WorldCentric : EToolkitMode::Standalone;
 
-	for (auto ObjIt = InObjects.CreateConstIterator(); ObjIt; ++ObjIt)
+	for(auto ObjIt = InObjects.CreateConstIterator(); ObjIt; ++ObjIt)
 	{
 		auto Blueprint = Cast<UBlueprint>(*ObjIt);
-		if (Blueprint )
+		if(Blueprint)
 		{
 			bool bLetOpen = true;
-			if (!Blueprint->ParentClass)
+			if(!Blueprint->ParentClass)
 			{
 				bLetOpen = EAppReturnType::Yes == FMessageDialog::Open(
-					EAppMsgType::YesNo, 
+					EAppMsgType::YesNo,
 					LOCTEXT("FailedToLoadProcedureBlueprintWithContinue", "Procedure Blueprint could not be loaded because it derives from an invalid class.  Check to make sure the parent class for this blueprint hasn't been removed! Do you want to continue (it can crash the editor)?")
 				);
 			}
-		
-			if (bLetOpen)
+
+			if(bLetOpen)
 			{
-				TSharedRef< FProcedureEditor > NewEditor(new FProcedureEditor());
+				TSharedRef<FProcedureEditor> NewEditor(new FProcedureEditor());
 
 				TArray<UBlueprint*> Blueprints;
 				Blueprints.Add(Blueprint);
@@ -52,10 +43,7 @@ void FAssetTypeActions_ProcedureBlueprint::OpenAssetEditor( const TArray<UObject
 				NewEditor->InitProcedureEditor(Mode, EditWithinLevelEditor, Blueprints, ShouldUseDataOnlyEditor(Blueprint));
 			}
 		}
-		else
-		{
-			FMessageDialog::Open( EAppMsgType::Ok, LOCTEXT("FailedToLoadProcedureBlueprint", "Procedure Blueprint could not be loaded because it derives from an invalid class.  Check to make sure the parent class for this blueprint hasn't been removed!"));
-		}
+		else { FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("FailedToLoadProcedureBlueprint", "Procedure Blueprint could not be loaded because it derives from an invalid class.  Check to make sure the parent class for this blueprint hasn't been removed!")); }
 	}
 }
 
@@ -68,10 +56,7 @@ bool FAssetTypeActions_ProcedureBlueprint::ShouldUseDataOnlyEditor(const UBluepr
 		&& !Blueprint->bIsNewlyCreated;
 }
 
-UClass* FAssetTypeActions_ProcedureBlueprint::GetSupportedClass() const
-{ 
-	return UProcedureBlueprint::StaticClass(); 
-}
+UClass* FAssetTypeActions_ProcedureBlueprint::GetSupportedClass() const { return UProcedureBlueprint::StaticClass(); }
 
 UFactory* FAssetTypeActions_ProcedureBlueprint::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
 {

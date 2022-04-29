@@ -15,26 +15,47 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 {
 	MainWidget = InArgs._MainWidget;
 	ListWidget = InArgs._ListWidget;
-	
+
 	if(!MainWidget || !ListWidget) return;
 
 	FSlateIcon Icon(FName("WidgetProcedureEditorStyle"), "Icon.Empty");
+
+	FToolBarBuilder ToolBarBuilder_Editor(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
+
+	ToolBarBuilder_Editor.BeginSection("Editor");
+	{
+		#if WITH_SLATE_DEBUGGING
+		ToolBarBuilder_Editor.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &SProcedureToolbarWidget::OnPreviewModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Preview Mode")),
+			FText::FromString(TEXT("Toggle Preview Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+		#endif
+	}
+	ToolBarBuilder_Editor.EndSection();
 
 	FToolBarBuilder ToolBarBuilder_View(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
 
 	ToolBarBuilder_View.BeginSection("View");
 	{
-#if WITH_SLATE_DEBUGGING
+		#if WITH_SLATE_DEBUGGING
 		ToolBarBuilder_View.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateLambda([this]()
-				{
+				FExecuteAction::CreateLambda([this](){
 					MainWidget->bShowListPanel = !MainWidget->bShowListPanel;
 					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowListPanel"), MainWidget->bShowListPanel, GProcedureEditorIni);
 				}),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this]()
-				{
+				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bShowListPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
@@ -46,14 +67,12 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 		);
 		ToolBarBuilder_View.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateLambda([this]()
-				{
+				FExecuteAction::CreateLambda([this](){
 					MainWidget->bShowDetailPanel = !MainWidget->bShowDetailPanel;
 					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowDetailPanel"), MainWidget->bShowDetailPanel, GProcedureEditorIni);
 				}),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this]()
-				{
+				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bShowDetailPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
@@ -65,14 +84,12 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 		);
 		ToolBarBuilder_View.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateLambda([this]()
-				{
+				FExecuteAction::CreateLambda([this](){
 					MainWidget->bShowStatusPanel = !MainWidget->bShowStatusPanel;
 					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowStatusPanel"), MainWidget->bShowStatusPanel, GProcedureEditorIni);
 				}),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this]()
-				{
+				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bShowStatusPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
@@ -82,7 +99,7 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 			Icon,
 			EUserInterfaceActionType::ToggleButton
 		);
-#endif
+		#endif
 	}
 	ToolBarBuilder_View.EndSection();
 
@@ -90,14 +107,13 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 
 	ToolBarBuilder_List.BeginSection("List");
 	{
-#if WITH_SLATE_DEBUGGING
+		#if WITH_SLATE_DEBUGGING
 		ToolBarBuilder_List.AddToolBarButton(
 			FUIAction(
 				FExecuteAction::CreateRaw(this, &SProcedureToolbarWidget::OnMultiModeToggled),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this]()
-				{
-					return ListWidget->bCurrentIsMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
@@ -110,9 +126,8 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 			FUIAction(
 				FExecuteAction::CreateRaw(this, &SProcedureToolbarWidget::OnEditModeToggled),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this]()
-				{
-					return ListWidget->bCurrentIsEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
@@ -121,7 +136,7 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 			Icon,
 			EUserInterfaceActionType::ToggleButton
 		);
-#endif
+		#endif
 	}
 	ToolBarBuilder_List.EndSection();
 
@@ -146,6 +161,26 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 				.Padding(5.f, 0.f, 0.f, 0.f)
 				[
 					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("Editor:")))
+					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
+				]
+
+				+ SHorizontalBox::Slot()
+				.VAlign(VAlign_Center)
+				.HAlign(HAlign_Left)
+				.AutoWidth()
+				.Padding(FMargin(5.f, 0.f))
+				[
+					ToolBarBuilder_Editor.MakeWidget()
+				]
+
+				+ SHorizontalBox::Slot()
+				.VAlign(VAlign_Center)
+				.HAlign(HAlign_Left)
+				.AutoWidth()
+				.Padding(5.f, 0.f, 0.f, 0.f)
+				[
+					SNew(STextBlock)
 					.Text(FText::FromString(TEXT("View:")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]
@@ -158,7 +193,7 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 				[
 					ToolBarBuilder_View.MakeWidget()
 				]
-	
+
 				+ SHorizontalBox::Slot()
 				.VAlign(VAlign_Center)
 				.HAlign(HAlign_Left)
@@ -181,6 +216,11 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+}
+
+void SProcedureToolbarWidget::OnPreviewModeToggled()
+{
+	MainWidget->TogglePreviewMode();
 }
 
 void SProcedureToolbarWidget::OnMultiModeToggled()

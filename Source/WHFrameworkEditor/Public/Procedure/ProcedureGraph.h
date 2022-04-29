@@ -12,4 +12,3 @@ class UProcedureGraph : public UEdGraph
 {
 	GENERATED_UCLASS_BODY()
 };
-

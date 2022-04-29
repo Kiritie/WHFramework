@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
+bool GIsPlaying = false;
+
 /*
 * 数据保存档案
 */

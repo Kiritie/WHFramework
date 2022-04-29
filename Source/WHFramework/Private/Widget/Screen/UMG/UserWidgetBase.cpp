@@ -33,6 +33,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EWidgetState::None;
+	WidgetParams = TArray<FParameter>();
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 	LastWidget = nullptr;
@@ -43,6 +44,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	
+}
+
+void UUserWidgetBase::OnStateChanged_Implementation(EWidgetState InWidgetState)
+{
+	OnWidgetStateChanged.Broadcast(InWidgetState);
 }
 
 void UUserWidgetBase::OnCreate_Implementation()
@@ -64,7 +70,9 @@ void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 
 void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
 {
+	WidgetParams = InParams;
 	WidgetState = EWidgetState::Opening;
+	OnStateChanged(WidgetState);
 
 	switch(WidgetType)
 	{
@@ -124,6 +132,7 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
 	WidgetState = EWidgetState::Closing;
+	OnStateChanged(WidgetState);
 
 	if(bInstant || WidgetCloseFinishType == EWidgetCloseFinishType::Instant)
 	{
@@ -249,6 +258,7 @@ void UUserWidgetBase::RefreshAllChild_Implementation()
 void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
 {
 	WidgetState = EWidgetState::Opened;
+	OnStateChanged(WidgetState);
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
@@ -264,6 +274,7 @@ void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
 void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
 {
 	WidgetState = EWidgetState::Closed;
+	OnStateChanged(WidgetState);
 
 	switch(WidgetCloseType)
 	{

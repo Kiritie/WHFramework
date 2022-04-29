@@ -68,13 +68,16 @@ void ASpawnPoolModule::DespawnActor(AActor* InActor)
 
 	UClass* TmpClass = InActor->GetClass();
 	
-	if (!SpawnPools.Contains(TmpClass))
+	if(TmpClass->ImplementsInterface(USpawnPoolInterface::StaticClass()))
 	{
-		USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
-		SpawnPool->Initialize(Limit, TmpClass);
-		SpawnPools.Add(TmpClass, SpawnPool);
+		if (!SpawnPools.Contains(TmpClass))
+		{
+			USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
+			SpawnPool->Initialize(Limit, TmpClass);
+			SpawnPools.Add(TmpClass, SpawnPool);
+		}
+		SpawnPools[TmpClass]->Despawn(InActor);
 	}
-	SpawnPools[TmpClass]->Despawn(InActor);
 }
 
 void ASpawnPoolModule::ClearAllActor()

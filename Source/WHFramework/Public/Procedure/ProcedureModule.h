@@ -29,18 +29,18 @@ class WHFRAMEWORK_API AProcedureModule : public AModuleBase
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	// ParamSets default values for this actor's properties
 	AProcedureModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
-#if WITH_EDITOR
+	#if WITH_EDITOR
 	virtual void OnGenerate_Implementation() override;
 
 	virtual void OnDestroy_Implementation() override;
-#endif
+	#endif
 
 	virtual void OnInitialize_Implementation() override;
 
@@ -61,9 +61,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
 	bool bAutoStartProcedure;
 
-	/// 自动开始流程
+	/// 流程模块状态
 	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule")
 	EProcedureModuleState ProcedureModuleState;
+
 public:
 	UFUNCTION(BlueprintPure)
 	EProcedureModuleState GetProcedureModuleState() const { return ProcedureModuleState; }
@@ -96,6 +97,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void LeaveProcedure(UProcedureBase* InProcedure);
 
+	UFUNCTION(BlueprintCallable)
+	void ClearAllProcedure();
+
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsAllProcedureCompleted();
@@ -103,19 +107,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
-#if WITH_EDITOR
-	UFUNCTION(CallInEditor, Category = "ProcedureModule")
-	void OpenProcedureEditor();
-
-	UFUNCTION(CallInEditor, Category = "ProcedureModule")
-	void ClearAllProcedure();
-
+	#if WITH_EDITOR
 	void GenerateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
 	void UpdateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
-	void SetRootProcedureAt(int32 InIndex, URootProcedureBase* InRootProcedure);
-#endif
+	void SetRootProcedureItem(int32 InIndex, URootProcedureBase* InRootProcedure);
+	#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Root Procedure
@@ -129,10 +127,11 @@ protected:
 	/// 根流程
 	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
 	TArray<URootProcedureBase*> RootProcedures;
-	
+
 public:
 	UFUNCTION(BlueprintPure)
 	int32 GetCurrentRootProcedureIndex() const { return CurrentRootProcedureIndex; }
+
 	/**
 	* 获取当前根流程
 	*/
@@ -161,7 +160,7 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UProcedureBase* GetCurrentProcedure() const { return CurrentProcedure; }
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Global Options
 protected:
@@ -174,7 +173,7 @@ protected:
 	/// 流程离开方式
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Global Options")
 	EProcedureLeaveType GlobalProcedureLeaveType;
-	
+
 public:
 	UFUNCTION(BlueprintPure)
 	EProcedureExecuteType GetGlobalProcedureExecuteType() const { return GlobalProcedureExecuteType; }

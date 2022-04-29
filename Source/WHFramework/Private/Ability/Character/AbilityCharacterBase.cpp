@@ -53,8 +53,8 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	bDead = true;
 
 	// stats
-	Name = TEXT("");
-	RaceID = TEXT("");
+	Name = NAME_None;
+	RaceID = NAME_None;
 	Level = 0;
 	EXP = 0;
 	BaseEXP = 100;
@@ -404,13 +404,13 @@ UCharacterDataBase* AAbilityCharacterBase::GetCharacterData() const
 	return UAssetModuleBPLibrary::LoadPrimaryAsset<UCharacterDataBase>(AssetID);
 }
 
-void AAbilityCharacterBase::SetNameV(const FString& InName)
+void AAbilityCharacterBase::SetNameV(FName InName)
 {
 	Name = InName;
 	HandleNameChanged(InName);
 }
 
-void AAbilityCharacterBase::SetRaceID(const FString& InRaceID)
+void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 {
 	RaceID = InRaceID;
 	HandleRaceIDChanged(InRaceID);
@@ -450,7 +450,7 @@ int32 AAbilityCharacterBase::GetTotalEXP() const
 
 FString AAbilityCharacterBase::GetHeadInfo() const
 {
-	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name);
+	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
 float AAbilityCharacterBase::GetHealth() const
@@ -576,11 +576,11 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 	}
 }
 
-void AAbilityCharacterBase::HandleNameChanged(const FString& NewValue)
+void AAbilityCharacterBase::HandleNameChanged(FName NewValue)
 {
 }
 
-void AAbilityCharacterBase::HandleRaceIDChanged(const FString& NewValue)
+void AAbilityCharacterBase::HandleRaceIDChanged(FName NewValue)
 {
 }
 

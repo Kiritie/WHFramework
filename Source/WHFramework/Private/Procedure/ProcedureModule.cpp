@@ -26,12 +26,12 @@ AProcedureModule::AProcedureModule()
 {
 	ModuleName = FName("ProcedureModule");
 
-	bAutoStartProcedure = true;
+	bAutoStartProcedure = false;
 
 	ProcedureModuleState = EProcedureModuleState::None;
 
-	FirstRootProcedureIndex = -1;
-	CurrentRootProcedureIndex = -1;
+	FirstRootProcedureIndex = 0;
+	CurrentRootProcedureIndex = 0;
 
 	RootProcedures = TArray<URootProcedureBase*>();
 
@@ -170,8 +170,6 @@ void AProcedureModule::StartProcedure(int32 InRootProcedureIndex, bool bSkipProc
 
 void AProcedureModule::EndProcedure(bool bRestoreProcedures)
 {
-	if(CurrentRootProcedureIndex == -1) return;
-	
 	if(ProcedureModuleState != EProcedureModuleState::Ended)
 	{
 		ProcedureModuleState = EProcedureModuleState::Ended;
@@ -197,7 +195,7 @@ void AProcedureModule::EndProcedure(bool bRestoreProcedures)
 	}
 	if(bRestoreProcedures)
 	{
-		CurrentRootProcedureIndex = -1;
+		CurrentRootProcedureIndex = 0;
 		CurrentProcedure = nullptr;
 	}
 }
@@ -212,7 +210,7 @@ void AProcedureModule::RestoreProcedure(UProcedureBase* InProcedure)
 
 void AProcedureModule::EnterProcedure(UProcedureBase* InProcedure)
 {
-	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Entered)
+	if(InProcedure && InProcedure->GetProcedureState() == EProcedureState::None)
 	{
 		if(CurrentProcedure && !CurrentProcedure->IsParentOf(InProcedure))
 		{
@@ -239,7 +237,7 @@ void AProcedureModule::RefreshProcedure(UProcedureBase* InProcedure)
 
 void AProcedureModule::GuideProcedure(UProcedureBase* InProcedure)
 {
-	if(InProcedure && !InProcedure->IsCompleted())
+	if(InProcedure && InProcedure->IsEntered())
 	{
 		InProcedure->OnGuide();
 	}
@@ -247,7 +245,7 @@ void AProcedureModule::GuideProcedure(UProcedureBase* InProcedure)
 
 void AProcedureModule::ExecuteProcedure(UProcedureBase* InProcedure)
 {
-	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Executing)
+	if(InProcedure && InProcedure->GetProcedureState() == EProcedureState::Entered)
 	{
 		InProcedure->OnExecute();
 	}
@@ -257,16 +255,13 @@ void AProcedureModule::CompleteProcedure(UProcedureBase* InProcedure, EProcedure
 {
 	if(!InProcedure) return;
 	
-	if(!InProcedure->IsCompleted())
+	if(InProcedure->IsEntered() && !InProcedure->IsCompleted())
 	{
 		InProcedure->OnComplete(InProcedureExecuteResult);
 	}
 	for(auto Iter : InProcedure->SubProcedures)
 	{
-		if(Iter && !Iter->IsCompleted())
-		{
-			Iter->OnComplete(InProcedureExecuteResult);
-		}
+		if(Iter) Iter->Complete(InProcedureExecuteResult);
 	}
 }
 
@@ -274,7 +269,7 @@ void AProcedureModule::LeaveProcedure(UProcedureBase* InProcedure)
 {
 	if(!InProcedure) return;
 	
-	if(InProcedure->GetProcedureState() == EProcedureState::Executing)
+	if(InProcedure->GetProcedureState() != EProcedureState::Completed)
 	{
 		InProcedure->Complete(EProcedureExecuteResult::Skipped);
 	}
@@ -289,24 +284,6 @@ void AProcedureModule::LeaveProcedure(UProcedureBase* InProcedure)
 			}
 		}
 	}
-}
-
-bool AProcedureModule::IsAllProcedureCompleted()
-{
-	for(auto Iter : RootProcedures)
-	{
-		if(!Iter->IsCompleted(true))
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-#if WITH_EDITOR
-void AProcedureModule::OpenProcedureEditor()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(FName("ProcedureEditor"));
 }
 
 void AProcedureModule::ClearAllProcedure()
@@ -327,6 +304,19 @@ void AProcedureModule::ClearAllProcedure()
 	Modify();
 }
 
+bool AProcedureModule::IsAllProcedureCompleted()
+{
+	for(auto Iter : RootProcedures)
+	{
+		if(!Iter->IsCompleted(true))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+#if WITH_EDITOR
 void AProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
@@ -348,7 +338,7 @@ void AProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& Ou
 	}
 }
 
-void AProcedureModule::SetRootProcedureAt(int32 InIndex, URootProcedureBase* InRootProcedure)
+void AProcedureModule::SetRootProcedureItem(int32 InIndex, URootProcedureBase* InRootProcedure)
 {
 	if(RootProcedures.IsValidIndex(InIndex))
 	{

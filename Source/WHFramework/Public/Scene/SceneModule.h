@@ -4,9 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "SceneModuleTypes.h"
+#include "Container/SceneContainerInterface.h"
 
 #include "Main/Base/ModuleBase.h"
-#include "Object/PhysicsVolume/PhysicsVolumeTypes.h"
+#include "Actor/PhysicsVolume/PhysicsVolumeTypes.h"
 
 #include "SceneModule.generated.h"
 
@@ -16,7 +17,7 @@ class UWorldTimerComponent;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API ASceneModule : public AModuleBase
+class WHFRAMEWORK_API ASceneModule : public AModuleBase, public ISceneContainerInterface
 {
 	GENERATED_BODY()
 
@@ -64,16 +65,16 @@ protected:
 	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
 	
 public:
-	UFUNCTION(BlueprintCallable, Category = "SceneObject")
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
 	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintCallable, Category = "SceneObject")
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
 	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintPure, Category = "SceneObject")
+	UFUNCTION(BlueprintPure, Category = "SceneActor")
 	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
 
-	UFUNCTION(BlueprintPure, Category = "SceneObject")
+	UFUNCTION(BlueprintPure, Category = "SceneActor")
 	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
 
 protected:
@@ -84,20 +85,44 @@ protected:
 	void OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
 
 	//////////////////////////////////////////////////////////////////////////
-    /// Scene Object
+    /// Scene Actor
 protected:
-	UPROPERTY(EditAnywhere, Category = "SceneObject")
-	TMap<FName, TScriptInterface<class ISceneObjectInterface>> SceneObjects;
+	UPROPERTY(EditAnywhere, Category = "SceneActor")
+	TArray<AActor*> SceneActors;
+
+	UPROPERTY(EditAnywhere, Category = "SceneActor")
+	TMap<FName, AActor*> SceneActorMap;
 
 public:
-	UFUNCTION(BlueprintPure, Category = "SceneObject")
-	bool HasSceneObject(FName InName, bool bEnsured = true) const;
+	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	virtual bool HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintPure, Category = "SceneObject")
-	TScriptInterface<class ISceneObjectInterface> GetSceneObject(FName InName, bool bEnsured = true) const;
+	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
-	void SetSceneObject(FName InName, TScriptInterface<class ISceneObjectInterface> InObject);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
+	virtual AActor* GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
+	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void AddSceneActor(AActor* InActor) override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void AddSceneActorByName(FName InName, AActor* InActor) override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void RemoveSceneActor(AActor* InActor) override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void RemoveSceneActorByName(FName InName) override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void DestroySceneActor(AActor* InActor) override;
+
+	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	virtual void DestroySceneActorByName(FName InName) override;
 
 	//////////////////////////////////////////////////////////////////////////
     /// Target Point
@@ -113,7 +138,10 @@ public:
 	ATargetPoint* GetTargetPoint(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
-	void SetTargetPoint(FName InName, ATargetPoint* InPoint);
+	void AddTargetPoint(FName InName, ATargetPoint* InPoint);
+
+	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
+	void RemoveTargetPoint(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Point
@@ -129,27 +157,45 @@ public:
 	USceneComponent* GetScenePoint(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
-	void SetScenePoint(FName InName, USceneComponent* InSceneComp);
+	void AddScenePoint(FName InName, USceneComponent* InSceneComp);
+
+	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
+	void RemoveScenePoint(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Physics Volume
 protected:
 	UPROPERTY(EditAnywhere, Category = "PhysicsVolumes")
-	TMap<FName, class APhysicsVolumeBase*> PhysicsVolumes;
+	TMap<FName, APhysicsVolumeBase*> PhysicsVolumes;
 
 	UPROPERTY(EditAnywhere, Category = "PhysicsVolumes")
 	TArray<FPhysicsVolumeData> DefaultPhysicsVolumes;
 
 public:
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
-	bool HasPhysicsVolume(FName InName, bool bEnsured = true) const;
+	bool HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 	
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
-	class APhysicsVolumeBase* GetPhysicsVolume(FName InName, bool bEnsured = true) const;
+	bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true) const;
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	APhysicsVolumeBase* GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
-	void SetPhysicsVolume(FName InName, class APhysicsVolumeBase* InPhysicsVolume);
+	void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 	
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
+
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
+
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void RemovePhysicsVolumeByName(FName InName);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline
 protected:

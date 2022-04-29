@@ -36,6 +36,8 @@ public:
 
 	virtual void OnReset() = 0;
 
+	virtual void OnStateChanged(EWidgetState InWidgetChange) = 0;
+
 public:
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
 	

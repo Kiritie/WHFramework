@@ -14,6 +14,7 @@ class FMenuBuilder;
 class FWHFrameworkEditorModule : public IModuleInterface
 {
 public:
+
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
@@ -33,6 +34,18 @@ private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 
 	TArray< TSharedPtr<IAssetTypeActions> > CreatedAssetTypeActions;
+
+	FDelegateHandle BeginPIEDelegateHandle;
+
+	FDelegateHandle EndPIEDelegateHandle;
+
+public:
+	bool bPlaying;
+
+private:
+	void OnBeginPIE(bool bIsSimulating);
+
+	void OnEndPIE(bool bIsSimulating);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureEditor

@@ -46,6 +46,11 @@ public:
 	void OnDestroy();
 // #endif
 	/**
+	* 当状态改变
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnStateChanged(EModuleState InModuleState);
+	/**
 	* 当初始化
 	*/
 	UFUNCTION(BlueprintNativeEvent)

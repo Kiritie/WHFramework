@@ -8,10 +8,12 @@
 #include "Camera/Base/CameraPawnBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Components/WidgetInteractionComponent.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleNetworkComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Math/MathBPLibrary.h"
 #include "Media/MediaModuleNetworkComponent.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 #include "Procedure/ProcedureModule.h"
@@ -69,6 +71,19 @@ AWHPlayerController::AWHPlayerController()
 	MinCameraDistance = 100.f;
 	MaxCameraDistance = 300.f;
 	InitCameraDistance = 150.f;
+
+	CameraDoMoveTime = 0.f;
+	CameraDoMoveDuration = 0.f;
+	CameraDoMoveEaseType = EEaseType::Linear;
+	CameraDoMoveLocation = FVector::ZeroVector;
+	CameraDoRotateTime = 0.f;
+	CameraDoRotateDuration = 0.f;
+	CameraDoRotateRotation = FRotator::ZeroRotator;
+	CameraDoRotateEaseType = EEaseType::Linear;
+	CameraDoZoomTime = 0.f;
+	CameraDoZoomDuration = 0.f;
+	CameraDoZoomDistance = 0.f;
+	CameraDoZoomEaseType = EEaseType::Linear;
 
 	TrackTargetActor = nullptr;
 	TrackLocationOffset = FVector::ZeroVector;
@@ -148,14 +163,38 @@ void AWHPlayerController::Tick(float DeltaTime)
 		CurrentCameraLocation = GetPawn()->GetActorLocation();
 		if(!CurrentCameraLocation.Equals(TargetCameraLocation))
 		{
-			GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+			if(CameraDoMoveDuration != 0.f)
+			{
+				CameraDoMoveTime = FMath::Clamp(CameraDoMoveTime + DeltaTime, 0.f, CameraDoMoveDuration);
+				GetPawn()->SetActorLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathBPLibrary::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
+			}
+			else
+			{
+				GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+			}
+		}
+		else if(CameraDoMoveDuration != 0.f)
+		{
+			StopDoCameraLocation();
 		}
 	}
 
 	CurrentCameraRotation = GetControlRotation();
 	if(!CurrentCameraRotation.Equals(TargetCameraRotation))
 	{
-		SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
+		if(CameraDoRotateDuration != 0.f)
+		{
+			CameraDoRotateTime = FMath::Clamp(CameraDoRotateTime + DeltaTime, 0.f, CameraDoRotateDuration);
+			SetControlRotation(FMath::Lerp(CameraDoRotateRotation, TargetCameraRotation, UMathBPLibrary::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration)));
+		}
+		else
+		{
+			SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
+		}
+	}
+	else if(CameraDoRotateDuration != 0.f)
+	{
+		StopDoCameraRotation();
 	}
 
 	if(GetCameraBoom())
@@ -163,7 +202,19 @@ void AWHPlayerController::Tick(float DeltaTime)
 		CurrentCameraDistance = GetCameraBoom()->TargetArmLength;
 		if(CurrentCameraDistance != TargetCameraDistance)
 		{
-			GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+			if(CameraDoZoomDuration != 0.f)
+			{
+				CameraDoZoomTime = FMath::Clamp(CameraDoZoomTime + DeltaTime, 0.f, CameraDoZoomDuration);
+				GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetCameraDistance, UMathBPLibrary::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
+			}
+			else
+			{
+				GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+			}
+		}
+		else if(CameraDoZoomDuration != 0.f)
+		{
+			StopDoCameraDistance();
 		}
 	}
 }
@@ -453,7 +504,7 @@ void AWHPlayerController::TrackTarget(bool bInstant)
 	}
 }
 
-void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
+void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
 	if(!InTargetActor) return;
 
@@ -461,9 +512,9 @@ void AWHPlayerController::StartTrackTarget(AActor* InTargetActor, ETrackTargetMo
 	{
 		TrackTargetActor = InTargetActor;
 		TrackTargetMode = InTrackTargetMode;
-		TrackLocationOffset = InLocationOffset == FVector(-1.f) ? GetTargetCameraLocation() - InTargetActor->GetActorLocation() : InLocationOffset;
-		TrackYawOffset = InYawOffset == -1.f ? GetTargetCameraRotation().Yaw - InTargetActor->GetActorRotation().Yaw : InYawOffset;
-		TrackPitchOffset = InPitchOffset == -1.f ? GetTargetCameraRotation().Pitch - InTargetActor->GetActorRotation().Pitch : InYawOffset;
+		TrackLocationOffset = InLocationOffset == FVector(-1.f) ? GetTargetCameraLocation() - InTargetActor->GetActorLocation() : InTrackTargetSpace == ETrackTargetSpace::Local ? InLocationOffset : InLocationOffset - InTargetActor->GetActorLocation();
+		TrackYawOffset = InYawOffset == -1.f ? GetTargetCameraRotation().Yaw - InTargetActor->GetActorRotation().Yaw : InTrackTargetSpace == ETrackTargetSpace::Local ? InYawOffset : InYawOffset - InTargetActor->GetActorRotation().Yaw;
+		TrackPitchOffset = InPitchOffset == -1.f ? GetTargetCameraRotation().Pitch - InTargetActor->GetActorRotation().Pitch : InTrackTargetSpace == ETrackTargetSpace::Local ? InPitchOffset : InPitchOffset - InTargetActor->GetActorRotation().Pitch;
 		TrackDistance = InDistance == -1.f ? GetTargetCameraDistance() : InDistance;
 		TrackAllowControl = bAllowControl;
 		TrackTarget(bInstant);
@@ -480,8 +531,34 @@ void AWHPlayerController::SetCameraLocation(FVector InLocation, bool bInstant)
 	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveLimit.Min, CameraMoveLimit.Max) : InLocation;
 	if(bInstant && GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
 	{
+		CurrentCameraLocation = TargetCameraLocation;
 		GetPawn()->SetActorLocation(TargetCameraLocation);
 	}
+	StopDoCameraLocation();
+}
+
+void AWHPlayerController::DoCameraLocation(FVector InLocation, float InDuration, EEaseType InEaseType)
+{
+	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveLimit.Min, CameraMoveLimit.Max) : InLocation;
+	if(InDuration > 0.f)
+	{
+		CameraDoMoveTime = 0.f;
+		CameraDoMoveDuration = InDuration;
+		CameraDoMoveLocation = CurrentCameraLocation;
+		CameraDoMoveEaseType = InEaseType;
+	}
+	else if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
+	{
+		CurrentCameraLocation = TargetCameraLocation;
+		GetPawn()->SetActorLocation(TargetCameraLocation);
+	}
+}
+
+void AWHPlayerController::StopDoCameraLocation()
+{
+	CameraDoMoveTime = 0.f;
+	CameraDoMoveDuration = 0.f;
+	CameraDoMoveLocation = FVector::ZeroVector;
 }
 
 void AWHPlayerController::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
@@ -490,23 +567,103 @@ void AWHPlayerController::SetCameraRotation(float InYaw, float InPitch, bool bIn
 	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPinch : InPitch, MinCameraPinch, MaxCameraPinch), InYaw == -1.f ? CurrentRot.Yaw : InYaw, CurrentRot.Roll);
 	if(bInstant)
 	{
+		CurrentCameraRotation = TargetCameraRotation;
 		SetControlRotation(TargetCameraRotation);
 	}
+	StopDoCameraRotation();
+}
+
+void AWHPlayerController::DoCameraRotation(float InYaw, float InPitch, float InDuration, EEaseType InEaseType)
+{
+	const FRotator CurrentRot = GetControlRotation();
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPinch : InPitch, MinCameraPinch, MaxCameraPinch), InYaw == -1.f ? CurrentRot.Yaw : InYaw, CurrentRot.Roll);
+	if(InDuration > 0.f)
+	{
+		CameraDoRotateTime = 0.f;
+		CameraDoRotateDuration = InDuration;
+		CameraDoRotateRotation = CurrentCameraRotation;
+		CameraDoRotateEaseType = InEaseType;
+	}
+	else
+	{
+		CurrentCameraRotation = TargetCameraRotation;
+		SetControlRotation(TargetCameraRotation);
+	}
+}
+
+void AWHPlayerController::StopDoCameraRotation()
+{
+	CameraDoRotateTime = 0.f;
+	CameraDoRotateDuration = 0.f;
+	CameraDoRotateRotation = FRotator::ZeroRotator;
 }
 
 void AWHPlayerController::SetCameraDistance(float InDistance, bool bInstant)
 {
 	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance) : InitCameraDistance;
-	if(GetCameraBoom() && bInstant)
+	if(bInstant && GetCameraBoom())
 	{
+		CurrentCameraDistance = TargetCameraDistance;
 		GetCameraBoom()->TargetArmLength = TargetCameraDistance;
 	}
+	StopDoCameraDistance();
+}
+
+void AWHPlayerController::DoCameraDistance(float InDistance, float InDuration, EEaseType InEaseType)
+{
+	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance) : InitCameraDistance;
+	if(InDuration > 0.f)
+	{
+		CameraDoZoomTime = 0.f;
+		CameraDoZoomDuration = InDuration;
+		CameraDoZoomDistance = CurrentCameraDistance;
+		CameraDoZoomEaseType = InEaseType;
+	}
+	else if(GetCameraBoom())
+	{
+		CurrentCameraDistance = TargetCameraDistance;
+		GetCameraBoom()->TargetArmLength = TargetCameraDistance;
+	}
+}
+
+void AWHPlayerController::StopDoCameraDistance()
+{
+	CameraDoZoomTime = 0.f;
+	CameraDoZoomDuration = 0.f;
+	CameraDoZoomDistance = 0.f;
 }
 
 void AWHPlayerController::SetCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, bool bInstant)
 {
 	SetCameraRotation(InYaw, InPitch, bInstant);
 	SetCameraDistance(InDistance, bInstant);
+}
+
+void AWHPlayerController::DoCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, float InDuration)
+{
+	DoCameraRotation(InYaw, InPitch, InDuration);
+	DoCameraDistance(InDistance, InDuration);
+}
+
+void AWHPlayerController::SetCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, bool bInstant)
+{
+	SetCameraLocation(InLocation, bInstant);
+	SetCameraRotation(InYaw, InPitch, bInstant);
+	SetCameraDistance(InDistance, bInstant);
+}
+
+void AWHPlayerController::DoCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType)
+{
+	DoCameraLocation(InLocation, InDuration, InEaseType);
+	DoCameraRotation(InYaw, InPitch, InDuration, InEaseType);
+	DoCameraDistance(InDistance, InDuration, InEaseType);
+}
+
+void AWHPlayerController::StopDoCameraTransform()
+{
+	StopDoCameraLocation();
+	StopDoCameraRotation();
+	StopDoCameraDistance();
 }
 
 void AWHPlayerController::AddCameraRotationInput(float InYaw, float InPitch)

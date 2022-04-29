@@ -3,11 +3,18 @@
 
 #include "Global/GlobalBPLibrary.h"
 
+#include "WHFramework.h"
 #include "Debug/DebugModuleTypes.h"
 #include "GameFramework/InputSettings.h"
 #include "Global/GlobalTypes.h"
+#include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
+
+bool UGlobalBPLibrary::IsPlaying()
+{
+	return GIsPlaying;
+}
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {

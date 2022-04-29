@@ -63,9 +63,14 @@ protected:
 private:
 	FTimerHandle SingleSoundStopTimerHandle;
 
+	FOnSoundPlayFinishedDelegate OnSoundPlayFinishedDelegate;
+
 public:
 	UFUNCTION(BlueprintCallable)
 	virtual void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"))
+	virtual void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
@@ -76,6 +81,9 @@ public:
 protected:
 	UFUNCTION()
 	virtual void OnRep_SingleSoundParams();
+
+	UFUNCTION()
+	virtual void OnSingleSoundPlayFinished();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Global BGSound

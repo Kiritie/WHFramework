@@ -31,10 +31,7 @@ AActor* USpawnPool::Spawn()
 		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		Actor = GetWorld()->SpawnActor<AActor>(Type, ActorSpawnParameters);
 	}
-	if(ISpawnPoolInterface* Interface = Cast<ISpawnPoolInterface>(Actor))
-	{
-		Interface->Execute_OnSpawn(Actor);
-	}
+	ISpawnPoolInterface::Execute_OnSpawn(Actor);
 	return Actor;
 }
 
@@ -49,10 +46,7 @@ void USpawnPool::Despawn(AActor* InActor)
 		Queue.Enqueue(InActor);
 		Count++;
 	}
-	if(ISpawnPoolInterface* Interface = Cast<ISpawnPoolInterface>(InActor))
-	{
-		Interface->Execute_OnDespawn(InActor);
-	}
+	ISpawnPoolInterface::Execute_OnDespawn(InActor);
 }
 
 void USpawnPool::Clear()

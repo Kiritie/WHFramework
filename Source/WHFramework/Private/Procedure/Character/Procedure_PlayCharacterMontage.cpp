@@ -12,7 +12,7 @@ UProcedure_PlayCharacterMontage::UProcedure_PlayCharacterMontage()
 
 	ProcedureType = EProcedureType::Standalone;
 
-	CharacterName = TEXT("");
+	CharacterName = NAME_None;
 	Montage = nullptr;
 }
 

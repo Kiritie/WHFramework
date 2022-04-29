@@ -145,6 +145,33 @@ TArray<FString> FParameters::GetStringParameters(FName InName, bool bEnsured) co
 	return TmpArr;
 }
 
+void FParameters::SetTextParameter(FName InName, FText InValue)
+{
+	SetParameter(InName, FParameter::MakeText(InValue));
+}
+
+FText FParameters::GetTextParameter(FName InName, bool bEnsured) const
+{
+	if(HasParameter(InName, bEnsured))
+	{
+		return GetParameter(InName, bEnsured).GetTextValue();
+	}
+	return FText::GetEmpty();
+}
+
+TArray<FText> FParameters::GetTextParameters(FName InName, bool bEnsured) const
+{
+	TArray<FText> TmpArr = TArray<FText>();
+	if(HasParameter(InName, bEnsured))
+	{
+		for (auto Iter : GetParameters(InName, bEnsured))
+		{
+			TmpArr.Add(Iter.GetTextValue());
+		}
+	}
+	return TmpArr;
+}
+
 void FParameters::SetBooleanParameter(FName InName, bool InValue)
 {
 	SetParameter(InName, FParameter::MakeBoolean(InValue));

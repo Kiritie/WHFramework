@@ -89,6 +89,9 @@ protected:
 	float WidgetRefreshTime;
 	
 	UPROPERTY(EditDefaultsOnly)
+	TArray<FParameter> WidgetParams;
+
+	UPROPERTY(EditDefaultsOnly)
 	EInputMode InputMode;
 
 	UPROPERTY(Transient)
@@ -130,6 +133,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
+	
+	UFUNCTION(BlueprintPure)
+	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetInputMode() const override { return InputMode; }

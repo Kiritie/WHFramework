@@ -77,6 +77,22 @@ enum class EProcedureTaskState : uint8
 	Completed
 };
 
+UENUM(BlueprintType)
+enum class EProcedureCameraViewMode : uint8
+{
+	None,
+	Instant,
+	Smooth,
+	Duration
+};
+
+UENUM(BlueprintType)
+enum class EProcedureCameraViewSpace : uint8
+{
+	Local,
+	World
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FProcedureListItemStates
 {
@@ -91,3 +107,5 @@ public:
 		bExpanded = true;
 	}
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnProcedureStateChanged, EProcedureState, InProcedureState);

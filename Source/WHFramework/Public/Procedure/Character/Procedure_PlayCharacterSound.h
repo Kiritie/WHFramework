@@ -29,7 +29,7 @@ public:
 public:
 	/// 角色名称
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character")
-	FString CharacterName;
+	FName CharacterName;
 	/// 声音
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character")
 	class USoundBase* Sound;

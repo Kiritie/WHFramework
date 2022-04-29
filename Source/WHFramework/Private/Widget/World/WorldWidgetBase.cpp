@@ -28,6 +28,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
+	WidgetParams = TArray<FParameter>();
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 	WidgetIndex = 0;
@@ -57,6 +58,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	OwnerActor = InOwner;
+	WidgetParams = InParams;
 	
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{

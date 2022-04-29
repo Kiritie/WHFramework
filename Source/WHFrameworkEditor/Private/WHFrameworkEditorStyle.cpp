@@ -7,11 +7,11 @@
 #include "Slate/SlateGameResources.h"
 #include "Interfaces/IPluginManager.h"
 
-TSharedPtr< FSlateStyleSet > FWHFrameworkEditorStyle::StyleInstance = NULL;
+TSharedPtr<FSlateStyleSet> FWHFrameworkEditorStyle::StyleInstance = NULL;
 
 void FWHFrameworkEditorStyle::Initialize()
 {
-	if (!StyleInstance.IsValid())
+	if(!StyleInstance.IsValid())
 	{
 		StyleInstance = Create();
 		FSlateStyleRegistry::RegisterSlateStyle(*StyleInstance);
@@ -41,9 +41,9 @@ const FVector2D Icon16x16(16.0f, 16.0f);
 const FVector2D Icon20x20(20.0f, 20.0f);
 const FVector2D Icon40x40(40.0f, 40.0f);
 
-TSharedRef< FSlateStyleSet > FWHFrameworkEditorStyle::Create()
+TSharedRef<FSlateStyleSet> FWHFrameworkEditorStyle::Create()
 {
-	TSharedRef< FSlateStyleSet > Style = MakeShareable(new FSlateStyleSet("WHFrameworkEditorStyle"));
+	TSharedRef<FSlateStyleSet> Style = MakeShareable(new FSlateStyleSet("WHFrameworkEditorStyle"));
 	Style->SetContentRoot(IPluginManager::Get().FindPlugin("WHFramework")->GetBaseDir() / TEXT("Resources"));
 
 	Style->Set("WHFrameworkEditor.OpenProcedureEditorWindow", new IMAGE_BRUSH(TEXT("Icon40"), Icon40x40));
@@ -59,7 +59,7 @@ TSharedRef< FSlateStyleSet > FWHFrameworkEditorStyle::Create()
 
 void FWHFrameworkEditorStyle::ReloadTextures()
 {
-	if (FSlateApplication::IsInitialized())
+	if(FSlateApplication::IsInitialized())
 	{
 		FSlateApplication::Get().GetRenderer()->ReloadTextureResources();
 	}

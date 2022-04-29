@@ -30,14 +30,21 @@ void AModuleBase::OnDestroy_Implementation()
 }
 #endif
 
+void AModuleBase::OnStateChanged_Implementation(EModuleState InModuleState)
+{
+	OnModuleStateChanged.Broadcast(InModuleState);
+}
+
 void AModuleBase::OnInitialize_Implementation()
 {
-	ChangeModuleState(EModuleState::Initialized);
+	ModuleState = EModuleState::Initialized;
+	Execute_OnStateChanged(this, ModuleState);
 }
 
 void AModuleBase::OnPreparatory_Implementation()
 {
-	ChangeModuleState(EModuleState::Running);
+	ModuleState = EModuleState::Running;
+	Execute_OnStateChanged(this, ModuleState);
 }
 
 void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -47,12 +54,14 @@ void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AModuleBase::OnPause_Implementation()
 {
-	ChangeModuleState(EModuleState::Paused);
+	ModuleState = EModuleState::Paused;
+	Execute_OnStateChanged(this, ModuleState);
 }
 
 void AModuleBase::OnUnPause_Implementation()
 {
-	ChangeModuleState(EModuleState::Running);
+	ModuleState = EModuleState::Running;
+	Execute_OnStateChanged(this, ModuleState);
 }
 
 void AModuleBase::OnTermination_Implementation()
@@ -74,13 +83,6 @@ void AModuleBase::UnPause_Implementation()
 	{
 		Execute_OnUnPause(this);
 	}
-}
-
-void AModuleBase::ChangeModuleState(EModuleState InModuleState)
-{
-	ModuleState = InModuleState;
-	
-	OnModuleStateChanged.Broadcast(InModuleState);
 }
 
 void AModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

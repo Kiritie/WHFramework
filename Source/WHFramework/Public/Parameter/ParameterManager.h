@@ -53,7 +53,14 @@ public:
 	virtual FString GetStringParameter(FName InName, bool bEnsured = true) const = 0;
 
 	virtual TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const = 0;
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	virtual void SetTextParameter(FName InName, const FText InValue) = 0;
+
+	virtual FText GetTextParameter(FName InName, bool bEnsured = true) const = 0;
+
+	virtual TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const = 0;
+
 	//////////////////////////////////////////////////////////////////////////
 	virtual void SetBooleanParameter(FName InName, bool InValue) = 0;
 

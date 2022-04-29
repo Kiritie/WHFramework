@@ -1,11 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Object/PickUp/PickUp.h"
+#include "Scene/Actor/PickUp/PickUp.h"
 
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
-#include "Scene/Object/PickUp/PickerInterface.h"
+#include "Scene/Actor/PickUp/PickerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -44,11 +44,11 @@ void APickUp::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
 	BoxComponent->SetCollisionEnabled(!bPreview ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
-void APickUp::RemoveFromContainer()
+void APickUp::RemoveFromContainer_Implementation()
 {
 	if(Container)
 	{
-		Container->RemoveSceneObject(this);
+		Cast<ISceneContainerInterface>(Container)->RemoveSceneActor(this);
 		Container= nullptr;
 	}
 }
@@ -71,7 +71,7 @@ void APickUp::OnPickUp(IPickerInterface* InPicker)
 	{
 		InPicker->PickUp(this);
 	}
-	RemoveFromContainer();
+	Execute_RemoveFromContainer(this);
 }
 
 void APickUp::LoadData(FSaveData* InSaveData)

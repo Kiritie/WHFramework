@@ -10,6 +10,7 @@ class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSoundsPlayFinishedDelegate);
 DECLARE_DYNAMIC_DELEGATE(FOnSoundsPlayFinishedSingleDelegate);
+DECLARE_DYNAMIC_DELEGATE(FOnSoundPlayFinishedDelegate);
 
 UENUM(BlueprintType)
 enum class EBGSoundState : uint8

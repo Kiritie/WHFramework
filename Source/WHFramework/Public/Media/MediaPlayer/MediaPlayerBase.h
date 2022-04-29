@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Media/MediaModuleTypes.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "MediaPlayerBase.generated.h"
 
@@ -13,7 +13,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API AMediaPlayerBase : public AActor, public ISceneObjectInterface
+class WHFRAMEWORK_API AMediaPlayerBase : public AActor, public ISceneActorInterface
 {
 	GENERATED_BODY()
 	
@@ -25,15 +25,6 @@ protected:
 	
 public:
 	virtual void Tick(float DeltaSeconds) override;
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Scene
-protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
-	USceneComponent* ScenePoint;
-
-public:
-	virtual USceneComponent* GetScenePoint() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
@@ -44,6 +35,10 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetPlayerName() const { return PlayerName; }
+
+	virtual FName GetObjectName_Implementation() const override { return PlayerName; }
+
+	virtual void SetObjectName_Implementation(FName InName) override { PlayerName = InName; }
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Movie

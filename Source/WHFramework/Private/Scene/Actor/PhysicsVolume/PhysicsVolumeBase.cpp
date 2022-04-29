@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Object/PhysicsVolume/PhysicsVolumeBase.h"
+#include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
 #include "TimerManager.h"
 #include "Engine/TargetPoint.h"

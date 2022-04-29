@@ -27,72 +27,72 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 class SProcedureBlueprintCreateDialog : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SProcedureBlueprintCreateDialog){}
+	SLATE_BEGIN_ARGS(SProcedureBlueprintCreateDialog) { }
 
 	SLATE_END_ARGS()
 
-		/** Constructs this widget with InArgs */
-		void Construct(const FArguments& InArgs)
+	/** Constructs this widget with InArgs */
+	void Construct(const FArguments& InArgs)
 	{
-			bOkClicked = false;
-			ParentClass = UProcedureBase::StaticClass();
+		bOkClicked = false;
+		ParentClass = UProcedureBase::StaticClass();
 
-			ChildSlot
+		ChildSlot
+		[
+			SNew(SBorder)
+			.Visibility(EVisibility::Visible)
+			.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
+			[
+				SNew(SBox)
+				.Visibility(EVisibility::Visible)
+				.WidthOverride(500.0f)
 				[
-					SNew(SBorder)
-					.Visibility(EVisibility::Visible)
-					.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					.FillHeight(1)
 					[
-						SNew(SBox)
-						.Visibility(EVisibility::Visible)
-						.WidthOverride(500.0f)
+						SNew(SBorder)
+						.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+						.Content()
 						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot()
-							.FillHeight(1)
-							[
-								SNew(SBorder)
-								.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
-								.Content()
-								[
-									SAssignNew(ParentClassContainer, SVerticalBox)
-								]
-							]
-
-							// Ok/Cancel buttons
-							+ SVerticalBox::Slot()
-								.AutoHeight()
-								.HAlign(HAlign_Right)
-								.VAlign(VAlign_Bottom)
-								.Padding(8)
-								[
-									SNew(SUniformGridPanel)
-									.SlotPadding(FEditorStyle::GetMargin("StandardDialog.SlotPadding"))
-									.MinDesiredSlotWidth(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
-									.MinDesiredSlotHeight(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
-									+ SUniformGridPanel::Slot(0, 0)
-									[
-										SNew(SButton)
-										.HAlign(HAlign_Center)
-										.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
-										.OnClicked(this, &SProcedureBlueprintCreateDialog::OkClicked)
-										.Text(LOCTEXT("CreateProcedureBlueprintOk", "OK"))
-									]
-									+ SUniformGridPanel::Slot(1, 0)
-										[
-											SNew(SButton)
-											.HAlign(HAlign_Center)
-											.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
-											.OnClicked(this, &SProcedureBlueprintCreateDialog::CancelClicked)
-											.Text(LOCTEXT("CreateProcedureBlueprintCancel", "Cancel"))
-										]
-								]
+							SAssignNew(ParentClassContainer, SVerticalBox)
 						]
 					]
-				];
 
-			MakeParentClassPicker();
-		}
+					// Ok/Cancel buttons
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Bottom)
+					.Padding(8)
+					[
+						SNew(SUniformGridPanel)
+						.SlotPadding(FEditorStyle::GetMargin("StandardDialog.SlotPadding"))
+						.MinDesiredSlotWidth(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
+						.MinDesiredSlotHeight(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
+						+ SUniformGridPanel::Slot(0, 0)
+						[
+							SNew(SButton)
+							.HAlign(HAlign_Center)
+							.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+							.OnClicked(this, &SProcedureBlueprintCreateDialog::OkClicked)
+							.Text(LOCTEXT("CreateProcedureBlueprintOk", "OK"))
+						]
+						+ SUniformGridPanel::Slot(1, 0)
+						[
+							SNew(SButton)
+							.HAlign(HAlign_Center)
+							.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+							.OnClicked(this, &SProcedureBlueprintCreateDialog::CancelClicked)
+							.Text(LOCTEXT("CreateProcedureBlueprintCancel", "Cancel"))
+						]
+					]
+				]
+			]
+		];
+
+		MakeParentClassPicker();
+	}
 
 	/** Sets properties for the supplied ProcedureBlueprintFactory */
 	bool ConfigureProperties(TWeakObjectPtr<UProcedureBlueprintFactory> InProcedureBlueprintFactory)
@@ -120,17 +120,17 @@ private:
 	{
 	public:
 		/** All children of these classes will be included unless filtered out by another setting. */
-		TSet< const UClass* > AllowedChildrenOfClasses;
+		TSet<const UClass*> AllowedChildrenOfClasses;
 
-		FProcedureBlueprintParentFilter() {}
+		FProcedureBlueprintParentFilter() { }
 
-		virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
+		virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef<FClassViewerFilterFuncs> InFilterFuncs) override
 		{
 			// If it appears on the allowed child-of classes list (or there is nothing on that list)
 			return InFilterFuncs->IfInChildOfClassesSet(AllowedChildrenOfClasses, InClass) != EFilterReturn::Failed;
 		}
 
-		virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef< const IUnloadedBlueprintData > InUnloadedClassData, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
+		virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef<const IUnloadedBlueprintData> InUnloadedClassData, TSharedRef<FClassViewerFilterFuncs> InFilterFuncs) override
 		{
 			// If it appears on the allowed child-of classes list (or there is nothing on that list)
 			return InFilterFuncs->IfInChildOfClassesSet(AllowedChildrenOfClasses, InUnloadedClassData) != EFilterReturn::Failed;
@@ -152,7 +152,7 @@ private:
 
 		TSharedPtr<FProcedureBlueprintParentFilter> Filter = MakeShareable(new FProcedureBlueprintParentFilter);
 
-		// All child child classes of UProcedure are valid.
+		// All child child classes of UProcedureBase are valid.
 		Filter->AllowedChildrenOfClasses.Add(UProcedureBase::StaticClass());
 		Options.ClassFilter = Filter;
 
@@ -166,21 +166,18 @@ private:
 			];
 
 		ParentClassContainer->AddSlot()
-			[
-				ClassViewerModule.CreateClassViewer(Options, FOnClassPicked::CreateSP(this, &SProcedureBlueprintCreateDialog::OnClassPicked))
-			];
+		[
+			ClassViewerModule.CreateClassViewer(Options, FOnClassPicked::CreateSP(this, &SProcedureBlueprintCreateDialog::OnClassPicked))
+		];
 	}
 
 	/** Handler for when a parent class is selected */
-	void OnClassPicked(UClass* ChosenClass)
-	{
-		ParentClass = ChosenClass;
-	}
+	void OnClassPicked(UClass* ChosenClass) { ParentClass = ChosenClass; }
 
 	/** Handler for when ok is clicked */
 	FReply OkClicked()
 	{
-		if (ProcedureBlueprintFactory.IsValid())
+		if(ProcedureBlueprintFactory.IsValid())
 		{
 			ProcedureBlueprintFactory->BlueprintType = BPTYPE_Normal;
 			ProcedureBlueprintFactory->ParentClass = ParentClass.Get();
@@ -194,10 +191,7 @@ private:
 	void CloseDialog(bool bWasPicked = false)
 	{
 		bOkClicked = bWasPicked;
-		if (PickerWindow.IsValid())
-		{
-			PickerWindow.Pin()->RequestDestroyWindow();
-		}
+		if(PickerWindow.IsValid()) { PickerWindow.Pin()->RequestDestroyWindow(); }
 	}
 
 	/** Handler for when cancel is clicked */
@@ -209,7 +203,7 @@ private:
 
 	FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 	{
-		if (InKeyEvent.GetKey() == EKeys::Escape)
+		if(InKeyEvent.GetKey() == EKeys::Escape)
 		{
 			CloseDialog();
 			return FReply::Handled();
@@ -261,37 +255,31 @@ UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* In
 	check(Class->IsChildOf(UProcedureBlueprint::StaticClass()));
 
 	// If they selected an interface, force the parent class to be UInterface
-	if (BlueprintType == BPTYPE_Interface)
-	{
-		ParentClass = UInterface::StaticClass();
-	}
+	if(BlueprintType == BPTYPE_Interface) { ParentClass = UInterface::StaticClass(); }
 
-	if ( ( ParentClass == NULL ) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf(UProcedureBase::StaticClass()) )
+	if((ParentClass == NULL) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf(UProcedureBase::StaticClass()))
 	{
 		FFormatNamedArguments Args;
-		Args.Add( TEXT("ClassName"), (ParentClass != NULL) ? FText::FromString( ParentClass->GetName() ) : LOCTEXT("Null", "(null)") );
-		FMessageDialog::Open( EAppMsgType::Ok, FText::Format( LOCTEXT("CannotCreateProcedureBlueprint", "Cannot create a Procedure Blueprint based on the class '{ClassName}'."), Args ) );
+		Args.Add(TEXT("ClassName"), (ParentClass != NULL) ? FText::FromString(ParentClass->GetName()) : LOCTEXT("Null", "(null)"));
+		FMessageDialog::Open(EAppMsgType::Ok, FText::Format(LOCTEXT("CannotCreateProcedureBlueprint", "Cannot create a Procedure Blueprint based on the class '{ClassName}'."), Args));
 		return NULL;
 	}
 	else
 	{
 		UProcedureBlueprint* NewBP = CastChecked<UProcedureBlueprint>(FKismetEditorUtilities::CreateBlueprint(ParentClass, InParent, Name, BlueprintType, UProcedureBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(), CallingContext));
 
-		if (NewBP)
+		if(NewBP)
 		{
 			UProcedureBlueprint* ProcedureBP = UProcedureBlueprint::FindRootProcedureBlueprint(NewBP);
-			if (ProcedureBP == NULL)
+			if(ProcedureBP == NULL)
 			{
 				const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();
 
 				// Only allow a Procedure graph if there isn't one in a parent blueprint
 				UEdGraph* NewGraph = FBlueprintEditorUtils::CreateNewGraph(NewBP, TEXT("Procedure Graph"), UProcedureGraph::StaticClass(), UProcedureGraphSchema::StaticClass());
-#if WITH_EDITORONLY_DATA
-				if (NewBP->UbergraphPages.Num())
-				{
-					FBlueprintEditorUtils::RemoveGraphs(NewBP, NewBP->UbergraphPages);
-				}
-#endif
+				#if WITH_EDITORONLY_DATA
+				if(NewBP->UbergraphPages.Num()) { FBlueprintEditorUtils::RemoveGraphs(NewBP, NewBP->UbergraphPages); }
+				#endif
 				FBlueprintEditorUtils::AddUbergraphPage(NewBP, NewGraph);
 				NewBP->LastEditedDocuments.Add(NewGraph);
 				NewGraph->bAllowDeletion = false;
@@ -316,9 +304,6 @@ UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* In
 	}
 }
 
-UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
-{
-	return FactoryCreateNew(Class, InParent, Name, Flags, Context, Warn, NAME_None);
-}
+UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn) { return FactoryCreateNew(Class, InParent, Name, Flags, Context, Warn, NAME_None); }
 
 #undef LOCTEXT_NAMESPACE

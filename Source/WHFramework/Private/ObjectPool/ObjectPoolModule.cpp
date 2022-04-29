@@ -67,14 +67,17 @@ void AObjectPoolModule::DespawnObject(UObject* InObject)
 	if(!InObject) return;
 
 	UClass* TmpClass = InObject->GetClass();
-	
-	if (!ObjectPools.Contains(TmpClass))
+
+	if(TmpClass->ImplementsInterface(UObjectPoolInterface::StaticClass()))
 	{
-		UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
-		ObjectPool->Initialize(Limit, TmpClass);
-		ObjectPools.Add(TmpClass, ObjectPool);
+		if (!ObjectPools.Contains(TmpClass))
+		{
+			UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
+			ObjectPool->Initialize(Limit, TmpClass);
+			ObjectPools.Add(TmpClass, ObjectPool);
+		}
+		ObjectPools[TmpClass]->Despawn(InObject);
 	}
-	ObjectPools[TmpClass]->Despawn(InObject);
 }
 
 void AObjectPoolModule::ClearAllObject()

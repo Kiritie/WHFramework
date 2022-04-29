@@ -23,17 +23,17 @@ class WHFRAMEWORK_API UMainModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static AMainModule* GetMainModule();
+	static AMainModule* GetMainModule(bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static TArray<TScriptInterface<IModule>> GetAllModules();
+	static TArray<TScriptInterface<IModule>> GetAllModules(bool bInEditor = false);
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
-	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static TScriptInterface<IModule> GetModuleByName(const FName InModuleName);
+	static TScriptInterface<IModule> GetModuleByName(const FName InModuleName, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass);
+	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass, bool bInEditor = false);
 };

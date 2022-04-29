@@ -12,7 +12,7 @@ UProcedure_PlayCharacterSound::UProcedure_PlayCharacterSound()
 
 	ProcedureType = EProcedureType::Standalone;
 
-	CharacterName = TEXT("");
+	CharacterName = NAME_None;
 	Sound = nullptr;
 }
 

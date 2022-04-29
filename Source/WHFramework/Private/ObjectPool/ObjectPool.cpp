@@ -30,10 +30,7 @@ UObject* UObjectPool::Spawn()
 		Object = NewObject<UObject>(GetTransientPackage(), Type);
 		Object->AddToRoot();
 	}
-	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(Object))
-	{
-		Interface->Execute_OnSpawn(Object);
-	}
+	IObjectPoolInterface::Execute_OnSpawn(Object);
 	return Object;
 }
 
@@ -49,10 +46,7 @@ void UObjectPool::Despawn(UObject* InObject)
 		Queue.Enqueue(InObject);
 		Count++;
 	}
-	if(IObjectPoolInterface* Interface = Cast<IObjectPoolInterface>(InObject))
-	{
-		Interface->Execute_OnDespawn(InObject);
-	}
+	IObjectPoolInterface::Execute_OnDespawn(InObject);
 }
 
 void UObjectPool::Clear()

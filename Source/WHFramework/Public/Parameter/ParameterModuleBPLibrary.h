@@ -66,7 +66,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static TArray<FString> GetStringParameters(FName InName, bool bEnsured = true);
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	/// Text
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
+	static void SetTextParameter(FName InName, const FText InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static FText GetTextParameter(FName InName, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static TArray<FText> GetTextParameters(FName InName, bool bEnsured = true);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Boolean
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
@@ -160,6 +171,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static FString GetStringValue(const FParameter& InParameter);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static FText GetTextValue(const FParameter& InParameter);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static bool GetBooleanValue(const FParameter& InParameter);

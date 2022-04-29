@@ -13,6 +13,7 @@ enum class EParameterType : uint8
 	Integer,
 	Float,
 	String,
+	Text,
 	Boolean,
 	Vector,
 	Rotator,
@@ -33,6 +34,7 @@ public:
 		IntegerValue = 0;
 		FloatValue = 0.f;
 		StringValue = TEXT("");
+		TextValue = FText::GetEmpty();
 		BooleanValue = false;
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
@@ -53,6 +55,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::String"))
 	FString StringValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (MultiLine = "true", EditCondition = "ParameterType == EParameterType::Text"))
+	FText TextValue;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Boolean"))
 	bool BooleanValue;
@@ -87,6 +92,10 @@ public:
 	FString GetStringValue() const { return StringValue; }
 
 	void SetStringValue(const FString& InStringValue) { this->StringValue = InStringValue; }
+
+	FText GetTextValue() const { return TextValue; }
+
+	void SetTextValue(const FText InTextValue) { this->TextValue = InTextValue; }
 
 	bool GetBooleanValue() const { return BooleanValue; }
 
@@ -140,6 +149,14 @@ public:
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::String;
 		Parameter.SetStringValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeText(const FText InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Text;
+		Parameter.SetTextValue(InValue);
 		return Parameter;
 	}
 
@@ -257,7 +274,14 @@ public:
 	FString GetStringParameter(FName InName, bool bEnsured = true) const;
 
 	TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const;
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	void SetTextParameter(FName InName, FText InValue);
+
+	FText GetTextParameter(FName InName, bool bEnsured = true) const;
+
+	TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const;
+
 	//////////////////////////////////////////////////////////////////////////
 	void SetBooleanParameter(FName InName, bool InValue);
 

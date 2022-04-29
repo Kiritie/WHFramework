@@ -10,10 +10,13 @@
 #include "ToolMenus.h"
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/AssetTypeActions_ProcedureBlueprint.h"
+#include "Procedure/ProcedureDetailsPanel.h"
 #include "Procedure/ProcedureEditorSettings.h"
 #include "Procedure/ProcedureEditorTypes.h"
+#include "Procedure/ProcedureModuleDetailsPanel.h"
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 
 static const FName ProcedureEditorTabName("ProcedureEditor");
@@ -26,22 +29,34 @@ void FWHFrameworkEditorModule::StartupModule()
 
 	RegisterSettings();
 
+	if(BeginPIEDelegateHandle.IsValid())
+	{
+		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+	}
+	BeginPIEDelegateHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &FWHFrameworkEditorModule::OnBeginPIE);
+
+	if(EndPIEDelegateHandle.IsValid())
+	{
+		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+	}
+	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &FWHFrameworkEditorModule::OnEndPIE);
+
 	FWHFrameworkEditorStyle::Initialize();
 	FWHFrameworkEditorStyle::ReloadTextures();
 
 	FWHFrameworkEditorCommands::Register();
-	
+
 	PluginCommands = MakeShareable(new FUICommandList);
-	
+
 	PluginCommands->MapAction(
 		FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow,
 		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedProcedureEditorButton),
 		FCanExecuteAction());
-	
+
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
 
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnProcedureEditorTab))
-		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "ProcedureEditor"))
+		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 
 	// Register asset types
@@ -49,6 +64,11 @@ void FWHFrameworkEditorModule::StartupModule()
 	EAssetTypeCategories::Type AssetCategory = AssetTools.RegisterAdvancedAssetCategory(FName("WHFramework"), FText::FromString(TEXT("WHFramework")));
 	TSharedRef<IAssetTypeActions> PBAction = MakeShareable(new FAssetTypeActions_ProcedureBlueprint(AssetCategory));
 	RegisterAssetTypeAction(AssetTools, PBAction);
+
+	// Register the details customizer
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailsPanel::MakeInstance));
+	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureModuleDetailsPanel::MakeInstance));
 }
 
 void FWHFrameworkEditorModule::ShutdownModule()
@@ -60,7 +80,17 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	{
 		UnRegisterSettings();
 	}
-	
+
+	if(BeginPIEDelegateHandle.IsValid())
+	{
+		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+	}
+
+	if(EndPIEDelegateHandle.IsValid())
+	{
+		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+	}
+
 	UToolMenus::UnRegisterStartupCallback(this);
 
 	UToolMenus::UnregisterOwner(this);
@@ -72,17 +102,27 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ProcedureEditorTabName);
 
 	// Unregister asset type actions
-	if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
+	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{
-		IAssetTools& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools").Get();
-		for (auto& AssetTypeAction : CreatedAssetTypeActions)
+		IAssetTools& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
+		for(auto& AssetTypeAction : CreatedAssetTypeActions)
 		{
-			if (AssetTypeAction.IsValid())
+			if(AssetTypeAction.IsValid())
 			{
 				AssetToolsModule.UnregisterAssetTypeActions(AssetTypeAction.ToSharedRef());
 			}
 		}
 	}
+
+	// Unregister the details customization
+	if(FModuleManager::Get().IsModuleLoaded(TEXT("PropertyEditor")))
+	{
+		FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureBase"));
+		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureModule"));
+		PropertyModule.NotifyCustomizationModuleChanged();
+	}
+
 	CreatedAssetTypeActions.Empty();
 }
 
@@ -140,7 +180,7 @@ void FWHFrameworkEditorModule::UnRegisterSettings()
 bool FWHFrameworkEditorModule::HandleSettingsSaved()
 {
 	UProcedureEditorSettings* ProcedureEditorSetting = GetMutableDefault<UProcedureEditorSettings>();
-	
+
 	ProcedureEditorSetting->SaveConfig();
 
 	return true;
@@ -150,6 +190,16 @@ void FWHFrameworkEditorModule::RegisterAssetTypeAction(class IAssetTools& AssetT
 {
 	AssetTools.RegisterAssetTypeActions(Action);
 	CreatedAssetTypeActions.Add(Action);
+}
+
+void FWHFrameworkEditorModule::OnBeginPIE(bool bIsSimulating)
+{
+	bPlaying = true;
+}
+
+void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
+{
+	bPlaying = false;
 }
 
 void FWHFrameworkEditorModule::OnClickedProcedureEditorButton()
@@ -166,5 +216,5 @@ TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnProcedureEditorTab(const F
 }
 
 #undef LOCTEXT_NAMESPACE
-	
+
 IMPLEMENT_MODULE(FWHFrameworkEditorModule, WHFrameworkEditor)

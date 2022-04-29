@@ -31,6 +31,9 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
+	void OnStateChanged(EWidgetState InWidgetState) override;
+
+	UFUNCTION(BlueprintNativeEvent)
 	void OnCreate() override;
 
 	UFUNCTION(BlueprintNativeEvent)
@@ -149,6 +152,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 
+	UPROPERTY(VisibleAnywhere)
+	TArray<FParameter> WidgetParams;
+
 	UPROPERTY(EditDefaultsOnly)
 	EInputMode InputMode;
 
@@ -157,7 +163,7 @@ protected:
 
 	UPROPERTY(Transient)
 	AActor* OwnerActor;
-	
+
 	UPROPERTY(Transient)
 	TScriptInterface<IScreenWidgetInterface> LastWidget;
 	
@@ -166,6 +172,9 @@ protected:
 	
 	UPROPERTY(Transient)
 	TArray<TScriptInterface<IScreenWidgetInterface>> ChildWidgets;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnWidgetStateChanged OnWidgetStateChanged;
 
 private:
 	FTimerHandle WidgetFinishOpenTimerHandle;
@@ -228,7 +237,10 @@ public:
 		}
 		return WidgetState;
 	}
-
+	
+	UFUNCTION(BlueprintPure)
+	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+	
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
@@ -252,4 +264,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+
+	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
 };

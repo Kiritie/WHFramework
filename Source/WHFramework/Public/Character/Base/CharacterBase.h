@@ -7,7 +7,7 @@
 #include "CharacterInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "CharacterBase.generated.h"
 
@@ -15,7 +15,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneObjectInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneActorInterface
 {
 	GENERATED_BODY()
 	
@@ -29,23 +29,18 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Scene
-protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
-	USceneComponent* ScenePoint;
-
-public:
-	virtual USceneComponent* GetScenePoint() const override { return ScenePoint; }
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
-	FString Name;
+	FName Name;
 public:
-	virtual FString GetNameC() const override { return Name; }
+	virtual FName GetNameC() const override { return Name; }
 
-	virtual void SetNameC(const FString& InName) override { Name = InName; }
+	virtual void SetNameC(FName InName) override { Name = InName; }
+
+	virtual FName GetObjectName_Implementation() const override { return Name; }
+
+	virtual void SetObjectName_Implementation(FName InName) override { Name = InName; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim

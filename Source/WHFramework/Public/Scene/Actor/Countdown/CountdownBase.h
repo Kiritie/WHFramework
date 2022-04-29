@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Scene/Object/SceneObjectInterface.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "CountdownBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API ACountdownBase : public AActor, public ISceneObjectInterface
+class WHFRAMEWORK_API ACountdownBase : public AActor, public ISceneActorInterface
 {
 	GENERATED_BODY()
 	

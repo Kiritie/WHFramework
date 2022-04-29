@@ -8,8 +8,6 @@
 // UProcedureGraph
 
 UProcedureGraph::UProcedureGraph(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
-{
-}
+	: Super(ObjectInitializer) {}
 
 #undef LOCTEXT_NAMESPACE

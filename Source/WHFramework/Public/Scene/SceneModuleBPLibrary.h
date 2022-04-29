@@ -8,6 +8,7 @@
 
 #include "SceneModuleBPLibrary.generated.h"
 
+class APhysicsVolumeBase;
 /**
  * 
  */
@@ -32,15 +33,36 @@ public:
 	static float GetAsyncUnloadLevelProgress(FName InLevelPath);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Scene Object
+	/// Scene Actor
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static bool HasSceneObject(FName InName, bool bEnsured = true);
+	static bool HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static TScriptInterface<class ISceneObjectInterface> GetSceneObject(FName InName, bool bEnsured = true);
+	static bool HasSceneActorByName(FName InName, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
+	static AActor* GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
+	static AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SetSceneObject(FName InName, TScriptInterface<class ISceneObjectInterface> InObject);
+	static void AddSceneActor(AActor* InActor);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void AddSceneActorByName(FName InName, AActor* InActor);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void RemoveSceneActor(AActor* InActor);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void RemoveSceneActorByName(FName InName);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void DestroySceneActor(AActor* InActor);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void DestroySceneActorByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Target Point
@@ -51,7 +73,10 @@ public:
 	static class ATargetPoint* GetTargetPoint(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SetTargetPoint(FName InName, class ATargetPoint* InPoint);
+	static void AddTargetPoint(FName InName, class ATargetPoint* InPoint);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void RemoveTargetPoint(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Point
@@ -62,16 +87,34 @@ public:
 	static USceneComponent* GetScenePoint(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SetScenePoint(FName InName, USceneComponent* InSceneComp);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Scene Point
-	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static bool HasPhysicsVolume(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static class APhysicsVolumeBase* GetPhysicsVolume(FName InName, bool bEnsured = true);
+	static void AddScenePoint(FName InName, USceneComponent* InSceneComp);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SetPhysicsVolume(FName InName, class APhysicsVolumeBase* InPhysicsVolume);
+	static void RemoveScenePoint(FName InName);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Physics Volume
+	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	bool HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
+	
+	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true);
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	APhysicsVolumeBase* GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true);
+
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
+	
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
+
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
+
+	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	void RemovePhysicsVolumeByName(FName InName);
 };

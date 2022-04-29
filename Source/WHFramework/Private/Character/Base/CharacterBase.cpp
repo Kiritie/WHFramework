@@ -19,11 +19,8 @@ ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
 
-	Name = TEXT("");
+	Name = NAME_None;
 	Anim = nullptr;
-
-	ScenePoint = CreateDefaultSubobject<USceneComponent>(FName("ScenePoint"));
-	ScenePoint->SetupAttachment(RootComponent);
 
 	SingleSound = CreateDefaultSubobject<UAudioComponent>(FName("SingleSound"));
 	SingleSound->SetupAttachment(RootComponent);
@@ -33,7 +30,7 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	USceneModuleBPLibrary::SetSceneObject(*Name, this);
+	USceneModuleBPLibrary::AddSceneActor(this);
 
 	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
 }

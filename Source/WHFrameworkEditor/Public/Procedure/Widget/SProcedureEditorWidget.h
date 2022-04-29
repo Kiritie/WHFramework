@@ -22,6 +22,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	bool bPreviewMode = false;
 	bool bShowListPanel = true;
 	bool bShowDetailPanel = true;
 	bool bShowStatusPanel = true;
@@ -29,8 +30,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	class AMainModule* MainModule;
-
 	class AProcedureModule* ProcedureModule;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -43,4 +42,17 @@ protected:
 	TSharedPtr<class SProcedureDetailWidget> DetailWidget;
 
 	TSharedPtr<class SProcedureStatusWidget> StatusWidget;
+
+private:
+	FDelegateHandle BeginPIEDelegateHandle;
+	FDelegateHandle EndPIEDelegateHandle;
+
+public:
+	void TogglePreviewMode();
+
+	void OnBeginPIE(bool bIsSimulating);
+
+	void OnEndPIE(bool bIsSimulating);
+
+	void SetIsPreviewMode(bool bIsPreviewMode);
 };

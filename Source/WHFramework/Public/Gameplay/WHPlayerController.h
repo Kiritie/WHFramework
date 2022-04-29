@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Math/MathTypes.h"
 
 #include "WHPlayerController.generated.h"
 
@@ -14,6 +15,13 @@ enum class ETrackTargetMode : uint8
 	LocationAndRotation,
 	LocationAndRotationAndDistance,
 	LocationAndRotationAndDistanceOnce
+};
+
+UENUM(BlueprintType)
+enum class ETrackTargetSpace : uint8
+{
+	Local,
+	World
 };
 
 class UModuleNetworkComponent;
@@ -182,6 +190,18 @@ protected:
 	float TargetCameraDistance;
 
 private:
+	float CameraDoMoveTime;
+	float CameraDoMoveDuration;
+	FVector CameraDoMoveLocation;
+	EEaseType CameraDoMoveEaseType;
+	float CameraDoRotateTime;
+	float CameraDoRotateDuration;
+	FRotator CameraDoRotateRotation;
+	EEaseType CameraDoRotateEaseType;
+	float CameraDoZoomTime;
+	float CameraDoZoomDuration;
+	float CameraDoZoomDistance;
+	EEaseType CameraDoZoomEaseType;
 	UPROPERTY()
 	AActor* TrackTargetActor;
 	FVector TrackLocationOffset;
@@ -231,7 +251,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, FVector InLocationOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget();
@@ -240,13 +260,43 @@ public:
 	virtual void SetCameraLocation(FVector InLocation, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraLocation(FVector InLocation, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraLocation();
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraRotation(float InYaw = -1.f, float InPitch = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraRotation(float InYaw = -1.f, float InPitch = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraRotation();
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraDistance(float InDistance = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraDistance(float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraDistance();
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraTransform();
 
 	UFUNCTION(BlueprintCallable)
 	virtual void AddCameraMovementInput(FVector InDirection, float InValue);

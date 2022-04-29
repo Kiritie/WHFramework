@@ -151,3 +151,5 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<class UWorldWidgetBase*> WorldWidgets;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EWidgetState, InWidgetState);

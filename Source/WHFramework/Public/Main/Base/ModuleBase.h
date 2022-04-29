@@ -26,6 +26,8 @@ public:
 	virtual void OnDestroy_Implementation() override;
 #endif
 
+	virtual void OnStateChanged_Implementation(EModuleState InModuleState) override;
+
 	virtual void OnInitialize_Implementation() override;
 
 	virtual void OnPreparatory_Implementation() override;
@@ -54,9 +56,6 @@ protected:
 public:
 	UPROPERTY(BlueprintAssignable)
 	FModuleStateChanged OnModuleStateChanged;
-
-protected:
-	virtual void ChangeModuleState(EModuleState InModuleState);
 
 public:
 	virtual FName GetModuleName_Implementation() const override { return ModuleName; }

@@ -4,6 +4,7 @@
 #include "Camera/CameraModule.h"
 
 #include "Camera/Roam/RoamCameraPawn.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
@@ -144,8 +145,8 @@ void ACameraModule::SwitchCameraByName(const FName InCameraName, bool bInstant)
 				PlayerController->Possess(Camera);
 				
 				PlayerController->SetCameraLocation(Camera->GetActorLocation(), bInstant);
-				PlayerController->SetCameraRotation(Camera->GetActorRotation().Yaw, -1, bInstant);
-				PlayerController->SetCameraDistance(-1, bInstant);
+				PlayerController->SetCameraRotation(Camera->GetActorRotation().Yaw, Camera->GetActorRotation().Pitch, bInstant);
+				PlayerController->SetCameraDistance(Camera->GetCameraBoom()->TargetArmLength, bInstant);
 			}
 			CurrentCamera = Camera;
 		}

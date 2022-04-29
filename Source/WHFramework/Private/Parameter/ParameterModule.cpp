@@ -113,6 +113,21 @@ TArray<FString> AParameterModule::GetStringParameters(FName InName, bool bEnsure
 	return Parameters.GetStringParameters(InName, bEnsured);
 }
 
+void AParameterModule::SetTextParameter(FName InName, const FText InValue)
+{
+	Parameters.SetTextParameter(InName, InValue);
+}
+
+FText AParameterModule::GetTextParameter(FName InName, bool bEnsured) const
+{
+	return Parameters.GetTextParameter(InName, bEnsured);
+}
+
+TArray<FText> AParameterModule::GetTextParameters(FName InName, bool bEnsured) const
+{
+	return Parameters.GetTextParameters(InName, bEnsured);
+}
+
 void AParameterModule::SetBooleanParameter(FName InName, bool InValue)
 {
 	Parameters.SetBooleanParameter(InName, InValue);

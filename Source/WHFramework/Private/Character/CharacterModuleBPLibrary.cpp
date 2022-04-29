@@ -24,7 +24,7 @@ void UCharacterModuleBPLibrary::RemoveCharacterFromList(TScriptInterface<ICharac
 	}
 }
 
-void UCharacterModuleBPLibrary::RemoveCharacterFromListByName(const FString& InCharacterName)
+void UCharacterModuleBPLibrary::RemoveCharacterFromListByName(FName InCharacterName)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -32,7 +32,7 @@ void UCharacterModuleBPLibrary::RemoveCharacterFromListByName(const FString& InC
 	}
 }
 
-TScriptInterface<ICharacterInterface> UCharacterModuleBPLibrary::GetCharacterByName(const FString& InCharacterName)
+TScriptInterface<ICharacterInterface> UCharacterModuleBPLibrary::GetCharacterByName(FName InCharacterName)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -41,7 +41,7 @@ TScriptInterface<ICharacterInterface> UCharacterModuleBPLibrary::GetCharacterByN
 	return nullptr;
 }
 
-void UCharacterModuleBPLibrary::PlayCharacterSound(const FString& InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
+void UCharacterModuleBPLibrary::PlayCharacterSound(FName InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -49,7 +49,7 @@ void UCharacterModuleBPLibrary::PlayCharacterSound(const FString& InCharacterNam
 	}
 }
 
-void UCharacterModuleBPLibrary::StopCharacterSound(const FString& InCharacterName)
+void UCharacterModuleBPLibrary::StopCharacterSound(FName InCharacterName)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -57,7 +57,7 @@ void UCharacterModuleBPLibrary::StopCharacterSound(const FString& InCharacterNam
 	}
 }
 
-void UCharacterModuleBPLibrary::PlayCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void UCharacterModuleBPLibrary::PlayCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -65,7 +65,7 @@ void UCharacterModuleBPLibrary::PlayCharacterMontage(const FString& InCharacterN
 	}
 }
 
-void UCharacterModuleBPLibrary::PlayCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
+void UCharacterModuleBPLibrary::PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -73,7 +73,7 @@ void UCharacterModuleBPLibrary::PlayCharacterMontageByName(const FString& InChar
 	}
 }
 
-void UCharacterModuleBPLibrary::StopCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void UCharacterModuleBPLibrary::StopCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -81,7 +81,7 @@ void UCharacterModuleBPLibrary::StopCharacterMontage(const FString& InCharacterN
 	}
 }
 
-void UCharacterModuleBPLibrary::StopCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
+void UCharacterModuleBPLibrary::StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -89,7 +89,7 @@ void UCharacterModuleBPLibrary::StopCharacterMontageByName(const FString& InChar
 	}
 }
 
-void UCharacterModuleBPLibrary::TeleportCharacterTo(const FString& InCharacterName, FTransform InTransform, bool bMulticast)
+void UCharacterModuleBPLibrary::TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -97,7 +97,7 @@ void UCharacterModuleBPLibrary::TeleportCharacterTo(const FString& InCharacterNa
 	}
 }
 
-void UCharacterModuleBPLibrary::AIMoveCharacterTo(const FString& InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
+void UCharacterModuleBPLibrary::AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -105,7 +105,7 @@ void UCharacterModuleBPLibrary::AIMoveCharacterTo(const FString& InCharacterName
 	}
 }
 
-void UCharacterModuleBPLibrary::StopCharacterAIMove(const FString& InCharacterName, bool bMulticast)
+void UCharacterModuleBPLibrary::StopCharacterAIMove(FName InCharacterName, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{
@@ -113,7 +113,7 @@ void UCharacterModuleBPLibrary::StopCharacterAIMove(const FString& InCharacterNa
 	}
 }
 
-void UCharacterModuleBPLibrary::RotationCharacterTowards(const FString& InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
+void UCharacterModuleBPLibrary::RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
 {
 	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
 	{

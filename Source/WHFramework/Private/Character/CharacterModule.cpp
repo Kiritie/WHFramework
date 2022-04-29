@@ -66,12 +66,12 @@ void ACharacterModule::RemoveCharacterFromList(TScriptInterface<ICharacterInterf
 	}
 }
 
-void ACharacterModule::RemoveCharacterFromListByName(const FString& InCharacterName)
+void ACharacterModule::RemoveCharacterFromListByName(FName InCharacterName)
 {
 	RemoveCharacterFromList(GetCharacterByName(InCharacterName));
 }
 
-TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(const FString& InCharacterName) const
+TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(FName InCharacterName) const
 {
 	for (auto Iter : Characters)
 	{
@@ -83,7 +83,7 @@ TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(const
 	return nullptr;
 }
 
-void ACharacterModule::PlayCharacterSound(const FString& InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
+void ACharacterModule::PlayCharacterSound(FName InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -91,7 +91,7 @@ void ACharacterModule::PlayCharacterSound(const FString& InCharacterName, USound
 	}
 }
 
-void ACharacterModule::StopCharacterSound(const FString& InCharacterName)
+void ACharacterModule::StopCharacterSound(FName InCharacterName)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -99,7 +99,7 @@ void ACharacterModule::StopCharacterSound(const FString& InCharacterName)
 	}
 }
 
-void ACharacterModule::PlayCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void ACharacterModule::PlayCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -107,7 +107,7 @@ void ACharacterModule::PlayCharacterMontage(const FString& InCharacterName, UAni
 	}
 }
 
-void ACharacterModule::PlayCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
+void ACharacterModule::PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -115,7 +115,7 @@ void ACharacterModule::PlayCharacterMontageByName(const FString& InCharacterName
 	}
 }
 
-void ACharacterModule::StopCharacterMontage(const FString& InCharacterName, UAnimMontage* InMontage, bool bMulticast)
+void ACharacterModule::StopCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -123,7 +123,7 @@ void ACharacterModule::StopCharacterMontage(const FString& InCharacterName, UAni
 	}
 }
 
-void ACharacterModule::StopCharacterMontageByName(const FString& InCharacterName, const FName InMontageName, bool bMulticast)
+void ACharacterModule::StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -131,7 +131,7 @@ void ACharacterModule::StopCharacterMontageByName(const FString& InCharacterName
 	}
 }
 
-void ACharacterModule::TeleportCharacterTo(const FString& InCharacterName, FTransform InTransform, bool bMulticast)
+void ACharacterModule::TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -139,7 +139,7 @@ void ACharacterModule::TeleportCharacterTo(const FString& InCharacterName, FTran
 	}
 }
 
-void ACharacterModule::AIMoveCharacterTo(const FString& InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
+void ACharacterModule::AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -147,7 +147,7 @@ void ACharacterModule::AIMoveCharacterTo(const FString& InCharacterName, FVector
 	}
 }
 
-void ACharacterModule::StopCharacterAIMove(const FString& InCharacterName, bool bMulticast)
+void ACharacterModule::StopCharacterAIMove(FName InCharacterName, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{
@@ -155,7 +155,7 @@ void ACharacterModule::StopCharacterAIMove(const FString& InCharacterName, bool 
 	}
 }
 
-void ACharacterModule::RotationCharacterTowards(const FString& InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
+void ACharacterModule::RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
 {
 	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
 	{

@@ -2,24 +2,27 @@
 
 
 #include "Procedure/Widget/SProcedureListWidget.h"
+
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "SSkeletonWidget.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
+#include "Procedure/ProcedureBlueprintFactory.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/ProcedureModule.h"
+#include "Procedure/Base/ProcedureBlueprint.h"
 #include "Procedure/Base/RootProcedureBase.h"
 #include "Procedure/Widget/SProcedureListItemWidget.h"
-#include "Slate/Private/Widgets/Views/SListPanel.h"
+#include "Procedure/Window/SCreateProcedureBlueprintDialog.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FDelegateHandle SProcedureListWidget::RefreshDelegateHandle = FDelegateHandle();
-
 void SProcedureListWidget::Construct(const FArguments& InArgs)
 {
-	MainModule = InArgs._MainModule;
 	ProcedureModule = InArgs._ProcedureModule;
 
 	if(RefreshDelegateHandle.IsValid())
@@ -27,17 +30,17 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
 	}
 	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureListWidget::Refresh);
-	
-	if(!MainModule || !ProcedureModule) return;
 
-	if (!TreeView.IsValid())
+	if(!ProcedureModule) return;
+
+	if(!TreeView.IsValid())
 	{
 		SAssignNew(TreeView, STreeView< TSharedPtr<FProcedureListItem> >)
 			.TreeItemsSource(&ProcedureListItems)
 			.OnGenerateRow(this, &SProcedureListWidget::GenerateTreeRow)
 			.OnItemScrolledIntoView(this, &SProcedureListWidget::TreeItemScrolledIntoView)
 			.ItemHeight(18)
-			.SelectionMode_Lambda([this](){ return bCurrentIsMultiMode ? ESelectionMode::Multi : ESelectionMode::SingleToggle; })
+			.SelectionMode_Lambda([this](){ return bMultiMode ? ESelectionMode::Multi : ESelectionMode::SingleToggle; })
 			.OnSelectionChanged(this, &SProcedureListWidget::TreeSelectionChanged)
 			.OnGetChildren(this, &SProcedureListWidget::GetChildrenForTree)
 			.OnExpansionChanged(this, &SProcedureListWidget::OnTreeItemExpansionChanged)
@@ -49,10 +52,10 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	if(!ScrollBar.IsValid())
 	{
 		SAssignNew(ScrollBar, SScrollBar)
-		.Thickness(FVector2D(9.0f, 9.0f));
+			.Thickness(FVector2D(9.0f, 9.0f));
 	}
 
-	CurrentProcedureClass = nullptr;
+	SelectedProcedureClass = nullptr;
 
 	ClassViewerOptions.bShowBackgroundBorder = false;
 	ClassViewerOptions.bShowUnloadedBlueprints = true;
@@ -68,21 +71,15 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	ProcedureClassFilter->IncludeParentClass = URootProcedureBase::StaticClass();
 	ClassViewerOptions.ClassFilter = ProcedureClassFilter;
 
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bDefaultIsMultiMode"), bCurrentIsMultiMode, GProcedureEditorIni);
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bDefaultIsEditMode"), bCurrentIsEditMode, GProcedureEditorIni);
-
-	SetIsMultiMode(bCurrentIsMultiMode);
-	SetIsEditMode(bCurrentIsEditMode);
-
 	SAssignNew(ClassPickButton, SComboButton)
-	.OnGetMenuContent(this, &SProcedureListWidget::GenerateClassPicker)
-	.ContentPadding(FMargin(2.0f, 2.0f))
-	.ToolTipText(this, &SProcedureListWidget::GetPickedClassName)
-	.ButtonContent()
-	[
-		SNew(STextBlock)
-		.Text(this, &SProcedureListWidget::GetPickedClassName)
-	];
+		.OnGetMenuContent(this, &SProcedureListWidget::GenerateClassPicker)
+		.ContentPadding(FMargin(2.0f, 2.0f))
+		.ToolTipText(this, &SProcedureListWidget::GetPickedClassName)
+		.ButtonContent()
+		[
+			SNew(STextBlock)
+			.Text(this, &SProcedureListWidget::GetPickedClassName)
+		];
 
 	ChildSlot
 	[
@@ -101,10 +98,10 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 				.AutoHeight()
 				[
 					SNew(SHorizontalBox)
-							
+
 					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)	
-					.HAlign(HAlign_Center)	
+					.VAlign(VAlign_Fill)
+					.HAlign(HAlign_Center)
 					.Padding(5.f, 2.f, 5.f, 2.f)
 					[
 						SNew(STextBlock)
@@ -129,7 +126,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.Text(FText::FromString(TEXT("Class: ")))
 						.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 					]
-					
+
 					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Fill)
 					.HAlign(HAlign_Fill)
@@ -147,9 +144,22 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Edit")))
-						.IsEnabled_Lambda([this](){ return CurrentProcedureClass && SelectedProcedureListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return SelectedProcedureClass && SelectedProcedureListItems.Num() == 1; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnEditProcedureItemButtonClicked)
+					]
+
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Fill)
+					.HAlign(HAlign_Fill)
+					.AutoWidth()
+					.Padding(2.f, 0, 0, 0)
+					[
+						SNew(SButton)
+						.HAlign(HAlign_Center)
+						.Text(FText::FromString(TEXT("New")))
+						.ClickMethod(EButtonClickMethod::MouseDown)
+						.OnClicked(this, &SProcedureListWidget::OnNewProcedureClassButtonClicked)
 					]
 				]
 
@@ -168,7 +178,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("New")))
-						.IsEnabled_Lambda([this](){ return !bCurrentIsEditMode && SelectedProcedureListItems.Num() <= 1; ; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedProcedureListItems.Num() <= 1;; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnNewProcedureItemButtonClicked)
 					]
@@ -180,7 +190,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bCurrentIsEditMode && SelectedProcedureListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedProcedureListItems.Num() == 1; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnInsertProcedureItemButtonClicked)
 					]
@@ -192,7 +202,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bCurrentIsEditMode && SelectedProcedureListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedProcedureListItems.Num() == 1; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnAppendProcedureItemButtonClicked)
 					]
@@ -241,15 +251,15 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 				.FillHeight(1)
 				[
 					SNew(SHorizontalBox)
-					
-					+ SHorizontalBox::Slot()	
+
+					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Fill)
 					.HAlign(HAlign_Fill)
 					.FillWidth(1)
 					[
 						TreeView.ToSharedRef()
 					]
-					
+
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					[
@@ -332,8 +342,10 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.Text(FText::FromString(TEXT("Move Down")))
-						.IsEnabled_Lambda([this](){ return SelectedProcedureListItems.Num() == 1 &&
-							SelectedProcedureListItems[0]->GetProcedureIndex() < (SelectedProcedureListItems[0]->GetParentProcedure() ? SelectedProcedureListItems[0]->GetParentSubProcedures().Num() : ProcedureModule->GetRootProcedures().Num()) - 1; })
+						.IsEnabled_Lambda([this](){
+							return SelectedProcedureListItems.Num() == 1 &&
+								SelectedProcedureListItems[0]->GetProcedureIndex() < (SelectedProcedureListItems[0]->GetParentProcedure() ? SelectedProcedureListItems[0]->GetParentSubProcedures().Num() : ProcedureModule->GetRootProcedures().Num()) - 1;
+						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnMoveDownProcedureItemButtonClicked)
 					]
@@ -343,17 +355,34 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	];
 
 	Refresh();
+
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bMultiMode"), bMultiMode, GProcedureEditorIni);
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bEditMode"), bEditMode, GProcedureEditorIni);
+
+	SetIsMultiMode(bMultiMode);
+	SetIsEditMode(bEditMode);
 }
 
 void SProcedureListWidget::Refresh()
 {
+	if(!ProcedureModule || !ProcedureModule->IsValidLowLevel()) return;
+
 	UpdateTreeView(true);
+	UpdateSelection();
+}
+
+SProcedureListWidget::~SProcedureListWidget()
+{
+	if(RefreshDelegateHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
+	}
 }
 
 UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	UProcedureBase* NewProcedure = NewObject<UProcedureBase>(ProcedureModule, InProcedureClass, NAME_None);
-	
+
 	// NewProcedure->ProcedureName = *CurrentProcedureClass->GetName().Replace(TEXT("Procedure_"), TEXT(""));
 	// NewProcedure->ProcedureDisplayName = FText::FromName(NewProcedure->ProcedureName);
 
@@ -384,12 +413,12 @@ TSharedRef<SWidget> SProcedureListWidget::GenerateClassPicker()
 		.WidthOverride(280)
 		[
 			SNew(SVerticalBox)
-			+SVerticalBox::Slot()
+			+ SVerticalBox::Slot()
 			.AutoHeight()
 			.MaxHeight(500)
 			[
 				FModuleManager::LoadModuleChecked<FClassViewerModule>("ClassViewer").CreateClassViewer(ClassViewerOptions, OnPicked)
-			]		
+			]
 		];
 }
 
@@ -397,9 +426,9 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 {
 	ClassPickButton->SetIsOpen(false);
 
-	if(!bCurrentIsEditMode)
+	if(!bEditMode)
 	{
-		CurrentProcedureClass = InClass;
+		SelectedProcedureClass = InClass;
 	}
 	else if(SelectedProcedureListItems.Num() > 0)
 	{
@@ -409,7 +438,7 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 			{
 				UProcedureBase* OldProcedure = SelectedProcedureListItems[i]->Procedure;
 				UProcedureBase* NewProcedure = GenerateProcedure(InClass);
-				
+
 				if(NewProcedure && OldProcedure)
 				{
 					OldProcedure->OnDuplicate(NewProcedure);
@@ -419,7 +448,7 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 					}
 					else if(URootProcedureBase* NewRootProcedure = Cast<URootProcedureBase>(NewProcedure))
 					{
-						ProcedureModule->SetRootProcedureAt(OldProcedure->ProcedureIndex, NewRootProcedure);
+						ProcedureModule->SetRootProcedureItem(OldProcedure->ProcedureIndex, NewRootProcedure);
 					}
 					OldProcedure->OnUnGenerate();
 					Refresh();
@@ -427,32 +456,32 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 			}
 
 			ProcedureModule->Modify();
-			
+
 			OnSelectProcedureListItemsDelegate.Execute(SelectedProcedureListItems);
-			CurrentProcedureClass = InClass;
+			SelectedProcedureClass = InClass;
 		}
 	}
 }
 
 FText SProcedureListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedProcedureListItems.Num() <= 1 ? (CurrentProcedureClass ? CurrentProcedureClass->GetName() : TEXT("None")) : TEXT("Multiple Values"));
+	return FText::FromString(SelectedProcedureListItems.Num() <= 1 ? (SelectedProcedureClass ? SelectedProcedureClass->GetName() : TEXT("None")) : TEXT("Multiple Values"));
 }
 
 void SProcedureListWidget::ToggleEditMode()
 {
-	SetIsEditMode(!bCurrentIsEditMode);
+	SetIsEditMode(!bEditMode);
 }
 
 void SProcedureListWidget::SetIsEditMode(bool bInIsEditMode)
 {
-	bCurrentIsEditMode = bInIsEditMode;
-	if(bCurrentIsEditMode)
+	bEditMode = bInIsEditMode;
+	if(bEditMode)
 	{
 		if(SelectedProcedureListItems.Num() > 0)
 		{
-			CurrentProcedureClass = SelectedProcedureListItems[0]->Procedure->GetClass();
-			if(CurrentProcedureClass->IsChildOf(URootProcedureBase::StaticClass()))
+			SelectedProcedureClass = SelectedProcedureListItems[0]->Procedure->GetClass();
+			if(SelectedProcedureClass->IsChildOf(URootProcedureBase::StaticClass()))
 			{
 				ProcedureClassFilter->IncludeParentClass = URootProcedureBase::StaticClass();
 				ProcedureClassFilter->UnIncludeParentClass = nullptr;
@@ -467,7 +496,7 @@ void SProcedureListWidget::SetIsEditMode(bool bInIsEditMode)
 		{
 			ProcedureClassFilter->IncludeParentClass = nullptr;
 			ProcedureClassFilter->UnIncludeParentClass = nullptr;
-			CurrentProcedureClass = nullptr;
+			SelectedProcedureClass = nullptr;
 		}
 	}
 	else
@@ -476,31 +505,31 @@ void SProcedureListWidget::SetIsEditMode(bool bInIsEditMode)
 		{
 			ProcedureClassFilter->IncludeParentClass = UProcedureBase::StaticClass();
 			ProcedureClassFilter->UnIncludeParentClass = URootProcedureBase::StaticClass();
-			CurrentProcedureClass = UProcedureBase::StaticClass();
+			SelectedProcedureClass = UProcedureBase::StaticClass();
 		}
 		else
 		{
 			ProcedureClassFilter->IncludeParentClass = URootProcedureBase::StaticClass();
 			ProcedureClassFilter->UnIncludeParentClass = nullptr;
-			CurrentProcedureClass = URootProcedureBase::StaticClass();
+			SelectedProcedureClass = URootProcedureBase::StaticClass();
 		}
 	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bDefaultIsEditMode"), bCurrentIsEditMode, GProcedureEditorIni);
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bEditMode"), bEditMode, GProcedureEditorIni);
 }
 
 void SProcedureListWidget::ToggleMultiMode()
 {
-	SetIsMultiMode(!bCurrentIsMultiMode);
+	SetIsMultiMode(!bMultiMode);
 }
 
 void SProcedureListWidget::SetIsMultiMode(bool bIsMultiMode)
 {
-	bCurrentIsMultiMode = bIsMultiMode;
-	if(!bCurrentIsMultiMode)
+	bMultiMode = bIsMultiMode;
+	if(!bMultiMode)
 	{
 		TreeView->ClearSelection();
 	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bDefaultIsMultiMode"), bCurrentIsMultiMode, GProcedureEditorIni);
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bMultiMode"), bMultiMode, GProcedureEditorIni);
 }
 
 int32 SProcedureListWidget::GetTotalProcedureNum() const
@@ -521,12 +550,12 @@ int32 SProcedureListWidget::GetSelectedProcedureNum() const
 
 void SProcedureListWidget::UpdateTreeView(bool bRegenerate)
 {
-	if(!MainModule || !ProcedureModule) return;
+	if(!ProcedureModule) return;
 
 	if(bRegenerate)
 	{
 		ProcedureModule->GenerateListItem(ProcedureListItems);
-		for (auto Iter : ProcedureListItems)
+		for(auto Iter : ProcedureListItems)
 		{
 			SetTreeItemExpansionRecursive(Iter);
 		}
@@ -535,69 +564,19 @@ void SProcedureListWidget::UpdateTreeView(bool bRegenerate)
 	{
 		ProcedureModule->UpdateListItem(ProcedureListItems);
 	}
-	
+
 	TreeView->RequestTreeRefresh();
 }
 
-TSharedRef<ITableRow> SProcedureListWidget::GenerateTreeRow( TSharedPtr<FProcedureListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable )
-{
-	check(TreeItem.IsValid());
-
-	return SNew(STableRow<TSharedPtr<FProcedureListItem>>, OwnerTable)
-	[
-		SNew(SProcedureListItemWidget, TreeItem)
-	];
-}
-
-void SProcedureListWidget::TreeItemScrolledIntoView( TSharedPtr<FProcedureListItem> TreeItem, const TSharedPtr<ITableRow>& Widget )
-{
-	
-}
-
-void SProcedureListWidget::GetChildrenForTree( TSharedPtr< FProcedureListItem > TreeItem, TArray< TSharedPtr<FProcedureListItem> >& OutChildren )
-{
-	OutChildren = TreeItem->SubListItems;
-}
-
-void SProcedureListWidget::OnTreeItemExpansionChanged( TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState )
-{
-	if(TreeItem->GetStates().bExpanded != bInExpansionState)
-	{
-		TreeItem->GetStates().bExpanded = bInExpansionState;
-
-		TreeItem->Procedure->Modify();
-	}
-}
-
-void SProcedureListWidget::SetTreeItemExpansionRecursive( TSharedPtr<FProcedureListItem> TreeItem )
-{
-	TreeView->SetItemExpansion(TreeItem, TreeItem->GetStates().bExpanded);
-
-	for(auto Iter : TreeItem->SubListItems)
-	{
-		SetTreeItemExpansionRecursive( Iter );
-	}
-}
-
-void SProcedureListWidget::SetTreeItemExpansionRecursive( TSharedPtr< FProcedureListItem > TreeItem, bool bInExpansionState )
-{
-	TreeView->SetItemExpansion(TreeItem, bInExpansionState);
-
-	for(auto Iter : TreeItem->SubListItems)
-	{
-		SetTreeItemExpansionRecursive( Iter, bInExpansionState );
-	}
-}
-
-void SProcedureListWidget::TreeSelectionChanged( TSharedPtr< FProcedureListItem > TreeItem, ESelectInfo::Type SelectInfo )
+void SProcedureListWidget::UpdateSelection()
 {
 	const TArray<TSharedPtr<FProcedureListItem>> SelectedItems = TreeView->GetSelectedItems();
 
 	if(SelectedItems.Num() > 0)
 	{
 		SelectedProcedureListItems = SelectedItems;
-		CurrentProcedureClass = !bCurrentIsEditMode ? UProcedureBase::StaticClass() : SelectedProcedureListItems[0]->Procedure->GetClass();
-		if(CurrentProcedureClass->IsChildOf(URootProcedureBase::StaticClass()))
+		SelectedProcedureClass = !bEditMode ? UProcedureBase::StaticClass() : SelectedProcedureListItems[0]->Procedure->GetClass();
+		if(SelectedProcedureClass->IsChildOf(URootProcedureBase::StaticClass()))
 		{
 			ProcedureClassFilter->IncludeParentClass = URootProcedureBase::StaticClass();
 			ProcedureClassFilter->UnIncludeParentClass = nullptr;
@@ -610,7 +589,7 @@ void SProcedureListWidget::TreeSelectionChanged( TSharedPtr< FProcedureListItem 
 	}
 	else
 	{
-		CurrentProcedureClass = !bCurrentIsEditMode ? URootProcedureBase::StaticClass() : nullptr;
+		SelectedProcedureClass = !bEditMode ? URootProcedureBase::StaticClass() : nullptr;
 		ProcedureClassFilter->IncludeParentClass = URootProcedureBase::StaticClass();
 		ProcedureClassFilter->UnIncludeParentClass = nullptr;
 		SelectedProcedureListItems.Empty();
@@ -622,28 +601,119 @@ void SProcedureListWidget::TreeSelectionChanged( TSharedPtr< FProcedureListItem 
 	}
 }
 
+TSharedRef<ITableRow> SProcedureListWidget::GenerateTreeRow(TSharedPtr<FProcedureListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)
+{
+	check(TreeItem.IsValid());
+
+	return SNew(STableRow<TSharedPtr<FProcedureListItem>>, OwnerTable)
+	[
+		SNew(SProcedureListItemWidget, TreeItem)
+	];
+}
+
+void SProcedureListWidget::TreeItemScrolledIntoView(TSharedPtr<FProcedureListItem> TreeItem, const TSharedPtr<ITableRow>& Widget) { }
+
+void SProcedureListWidget::GetChildrenForTree(TSharedPtr<FProcedureListItem> TreeItem, TArray<TSharedPtr<FProcedureListItem>>& OutChildren)
+{
+	OutChildren = TreeItem->SubListItems;
+}
+
+void SProcedureListWidget::OnTreeItemExpansionChanged(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState)
+{
+	if(TreeItem->GetStates().bExpanded != bInExpansionState)
+	{
+		TreeItem->GetStates().bExpanded = bInExpansionState;
+
+		TreeItem->Procedure->Modify();
+	}
+}
+
+void SProcedureListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem)
+{
+	TreeView->SetItemExpansion(TreeItem, TreeItem->GetStates().bExpanded);
+
+	for(auto Iter : TreeItem->SubListItems)
+	{
+		SetTreeItemExpansionRecursive(Iter);
+	}
+}
+
+void SProcedureListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState)
+{
+	TreeView->SetItemExpansion(TreeItem, bInExpansionState);
+
+	for(auto Iter : TreeItem->SubListItems)
+	{
+		SetTreeItemExpansionRecursive(Iter, bInExpansionState);
+	}
+}
+
+void SProcedureListWidget::TreeSelectionChanged(TSharedPtr<FProcedureListItem> TreeItem, ESelectInfo::Type SelectInfo)
+{
+	UpdateSelection();
+}
+
 FReply SProcedureListWidget::OnEditProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
-	if (CurrentProcedureClass->ClassGeneratedBy)
+	if(SelectedProcedureClass->ClassGeneratedBy)
 	{
-		GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset( CurrentProcedureClass->ClassGeneratedBy );
+		GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(SelectedProcedureClass->ClassGeneratedBy);
 	}
 	else
 	{
-		FSourceCodeNavigation::NavigateToClass(CurrentProcedureClass);
-
+		FSourceCodeNavigation::NavigateToClass(SelectedProcedureClass);
 	}
+	return FReply::Handled();
+}
+
+FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
+{
+	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
+
+	FString DefaultAssetPath = TEXT("/Game");
+	
+	GConfig->GetString(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("DefaultAssetPath"), DefaultAssetPath, GProcedureEditorIni);
+
+	UProcedureBlueprintFactory* ProcedureBlueprintFactory = NewObject<UProcedureBlueprintFactory>(GetTransientPackage(), UProcedureBlueprintFactory::StaticClass());
+
+	const TSharedRef<SCreateProcedureBlueprintDialog> NewProcedureClassDlg = SNew(SCreateProcedureBlueprintDialog)
+	.DefaultAssetPath(FText::FromString(DefaultAssetPath))
+	.BlueprintFactory(ProcedureBlueprintFactory);
+
+	if(NewProcedureClassDlg->ShowModal() != EAppReturnType::Cancel)
+	{
+		DefaultAssetPath = NewProcedureClassDlg->GetAssetPath();
+
+		const FString AssetName = NewProcedureClassDlg->GetAssetName();
+	
+		const FString PackageName = NewProcedureClassDlg->GetPackageName();
+
+		GConfig->SetString(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("DefaultAssetPath"), *DefaultAssetPath, GProcedureEditorIni);
+
+		ProcedureBlueprintFactory->ParentClass = SelectedProcedureClass;
+	
+		if(UProcedureBlueprint* ProcedureBlueprintAsset = Cast<UProcedureBlueprint>(AssetTools->CreateAsset(AssetName, DefaultAssetPath, UProcedureBlueprint::StaticClass(), ProcedureBlueprintFactory, FName("ContentBrowserNewAsset"))))
+		{
+			TArray<UObject*> ObjectsToSyncTo;
+			ObjectsToSyncTo.Add(ProcedureBlueprintAsset);
+
+			GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
+
+			SelectedProcedureClass = ProcedureBlueprintAsset->GetClass();
+		}
+	}
+
 	return FReply::Handled();
 }
 
 FReply SProcedureListWidget::OnNewProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
-	UProcedureBase* NewProcedure = GenerateProcedure(CurrentProcedureClass);
-	
+	UProcedureBase* NewProcedure = GenerateProcedure(SelectedProcedureClass);
+
 	const auto Item = MakeShared<FProcedureListItem>();
 	Item->Procedure = NewProcedure;
 
@@ -685,12 +755,12 @@ FReply SProcedureListWidget::OnNewProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	if(SelectedProcedureListItems.Num() > 0)
 	{
-		UProcedureBase* NewProcedure = GenerateProcedure(CurrentProcedureClass);
-	
+		UProcedureBase* NewProcedure = GenerateProcedure(SelectedProcedureClass);
+
 		const auto Item = MakeShared<FProcedureListItem>();
 		Item->Procedure = NewProcedure;
 		Item->ParentListItem = SelectedProcedureListItems[0]->ParentListItem;
@@ -709,7 +779,7 @@ FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 
 			ProcedureModule->Modify();
 		}
-		
+
 		TreeView->SetSelection(Item);
 		UpdateTreeView();
 	}
@@ -719,12 +789,12 @@ FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	if(SelectedProcedureListItems.Num() > 0)
 	{
-		UProcedureBase* NewProcedure = GenerateProcedure(CurrentProcedureClass);
-	
+		UProcedureBase* NewProcedure = GenerateProcedure(SelectedProcedureClass);
+
 		const auto Item = MakeShared<FProcedureListItem>();
 		Item->Procedure = NewProcedure;
 		Item->ParentListItem = SelectedProcedureListItems[0]->ParentListItem;
@@ -743,7 +813,7 @@ FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 
 			ProcedureModule->Modify();
 		}
-		
+
 		TreeView->SetSelection(Item);
 		UpdateTreeView();
 	}
@@ -753,7 +823,7 @@ FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnCopyProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	CopiedProcedure = DuplicateProcedure(SelectedProcedureListItems[0]->Procedure);
 
@@ -762,7 +832,7 @@ FReply SProcedureListWidget::OnCopyProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnPasteProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule || !CopiedProcedure) return FReply::Unhandled();
+	if(!ProcedureModule || !CopiedProcedure) return FReply::Unhandled();
 
 	const auto Item = MakeShared<FProcedureListItem>();
 	Item->Procedure = CopiedProcedure;
@@ -792,7 +862,7 @@ FReply SProcedureListWidget::OnPasteProcedureItemButtonClicked()
 
 		ProcedureModule->Modify();
 	}
-	
+
 	if(Item->ParentListItem)
 	{
 		TreeView->SetItemExpansion(Item->ParentListItem, true);
@@ -807,12 +877,12 @@ FReply SProcedureListWidget::OnPasteProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnDuplicateProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	if(SelectedProcedureListItems.Num() > 0)
 	{
 		UProcedureBase* NewProcedure = DuplicateProcedure(SelectedProcedureListItems[0]->Procedure);
-	
+
 		const auto Item = MakeShared<FProcedureListItem>();
 		Item->Procedure = NewProcedure;
 		Item->ParentListItem = SelectedProcedureListItems[0]->ParentListItem;
@@ -831,7 +901,7 @@ FReply SProcedureListWidget::OnDuplicateProcedureItemButtonClicked()
 
 			ProcedureModule->Modify();
 		}
-		
+
 		TreeView->SetSelection(Item);
 		UpdateTreeView();
 	}
@@ -841,7 +911,7 @@ FReply SProcedureListWidget::OnDuplicateProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnExpandAllProcedureItemButtonClicked()
 {
-	for (auto Iter : ProcedureListItems)
+	for(auto Iter : ProcedureListItems)
 	{
 		SetTreeItemExpansionRecursive(Iter, true);
 	}
@@ -851,7 +921,7 @@ FReply SProcedureListWidget::OnExpandAllProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnCollapseAllProcedureItemButtonClicked()
 {
-	for (auto Iter : ProcedureListItems)
+	for(auto Iter : ProcedureListItems)
 	{
 		SetTreeItemExpansionRecursive(Iter, false);
 	}
@@ -861,7 +931,7 @@ FReply SProcedureListWidget::OnCollapseAllProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to remove selected procedures?"))) != EAppReturnType::Yes) return FReply::Handled();
 
@@ -897,12 +967,12 @@ FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnClearAllProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule) return FReply::Unhandled();
+	if(!ProcedureModule) return FReply::Unhandled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to clear all procedures?"))) != EAppReturnType::Yes) return FReply::Handled();
 
 	ProcedureModule->ClearAllProcedure();
-	
+
 	UpdateTreeView(true);
 
 	return FReply::Handled();
@@ -910,8 +980,8 @@ FReply SProcedureListWidget::OnClearAllProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnMoveUpProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule || SelectedProcedureListItems.Num() == 0 || SelectedProcedureListItems[0]->GetProcedureIndex() == 0) return FReply::Unhandled();
-	
+	if(!ProcedureModule || SelectedProcedureListItems.Num() == 0 || SelectedProcedureListItems[0]->GetProcedureIndex() == 0) return FReply::Unhandled();
+
 	if(SelectedProcedureListItems[0]->GetParentProcedure())
 	{
 		const auto TmpProcedure = SelectedProcedureListItems[0]->GetParentSubProcedures()[SelectedProcedureListItems[0]->GetProcedureIndex()];
@@ -938,13 +1008,13 @@ FReply SProcedureListWidget::OnMoveUpProcedureItemButtonClicked()
 
 		UpdateTreeView();
 	}
-	
+
 	return FReply::Handled();
 }
 
 FReply SProcedureListWidget::OnMoveDownProcedureItemButtonClicked()
 {
-	if(!MainModule || !ProcedureModule || SelectedProcedureListItems.Num() == 0) return FReply::Unhandled();
+	if(!ProcedureModule || SelectedProcedureListItems.Num() == 0) return FReply::Unhandled();
 
 	if(SelectedProcedureListItems[0]->GetParentProcedure())
 	{

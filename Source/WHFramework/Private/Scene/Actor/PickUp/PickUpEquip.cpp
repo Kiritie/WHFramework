@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Object/PickUp/PickUpEquip.h"
+#include "Scene/Actor/PickUp/PickUpEquip.h"
 
 #include "Ability/Item/Equip/EquipDataBase.h"
 #include "Components/BoxComponent.h"

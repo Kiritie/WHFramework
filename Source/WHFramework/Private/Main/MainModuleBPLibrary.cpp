@@ -6,27 +6,27 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
-AMainModule* UMainModuleBPLibrary::GetMainModule()
+AMainModule* UMainModuleBPLibrary::GetMainModule(bool bInEditor)
 {
-	return AMainModule::Get();
+	return AMainModule::Get(bInEditor);
 }
 
-TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModules()
+TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModules(bool bInEditor)
 {
-	return AMainModule::GetAllModules();
+	return AMainModule::GetAllModules(bInEditor);
 }
 
-AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor)
 {
-	return AMainModule::GetModuleByClass<AModuleBase>(InModuleClass);
+	return AMainModule::GetModuleByClass<AModuleBase>(bInEditor, InModuleClass);
 }
 
-TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InModuleName)
+TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InModuleName, bool bInEditor)
 {
-	return AMainModule::GetModuleByName<UObject>(InModuleName);
+	return AMainModule::GetModuleByName<UObject>(InModuleName, bInEditor);
 }
 
-UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass( TSubclassOf<UModuleNetworkComponent> InModuleClass)
+UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass( TSubclassOf<UModuleNetworkComponent> InModuleClass, bool bInEditor)
 {
-	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(InModuleClass);
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(bInEditor, InModuleClass);
 }

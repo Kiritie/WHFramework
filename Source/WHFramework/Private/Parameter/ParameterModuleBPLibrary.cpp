@@ -134,6 +134,35 @@ TArray<FString> UParameterModuleBPLibrary::GetStringParameters(FName InName, boo
 }
 
 //////////////////////////////////////////////////////////////////////////
+void UParameterModuleBPLibrary::SetTextParameter(FName InName, const FText InValue)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		ParameterModule->SetTextParameter(InName, InValue);
+	}
+}
+
+FText UParameterModuleBPLibrary::GetTextParameter(FName InName, bool bEnsured)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		return ParameterModule->GetTextParameter(InName, bEnsured);
+	}
+	if(bEnsured) ensureEditor(false);
+	return FText::GetEmpty();
+}
+
+TArray<FText> UParameterModuleBPLibrary::GetTextParameters(FName InName, bool bEnsured)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		return ParameterModule->GetTextParameters(InName, bEnsured);
+	}
+	if(bEnsured) ensureEditor(false);
+	return TArray<FText>();
+}
+
+//////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::SetBooleanParameter(FName InName, bool InValue)
 {
 	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
@@ -331,6 +360,11 @@ float UParameterModuleBPLibrary::GetFloatValue(const FParameter& InParameter)
 FString UParameterModuleBPLibrary::GetStringValue(const FParameter& InParameter)
 {
 	return InParameter.GetStringValue();
+}
+
+FText UParameterModuleBPLibrary::GetTextValue(const FParameter& InParameter)
+{
+	return InParameter.GetTextValue();
 }
 
 bool UParameterModuleBPLibrary::GetBooleanValue(const FParameter& InParameter)

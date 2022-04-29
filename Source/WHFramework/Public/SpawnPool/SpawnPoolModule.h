@@ -54,7 +54,7 @@ public:
 	template<class T>
 	T* SpawnActor(TSubclassOf<AActor> InType = T::StaticClass())
 	{
-		if(!InType) return nullptr;
+		if(!InType || !InType->ImplementsInterface(USpawnPoolInterface::StaticClass())) return nullptr;
 
 		if (!SpawnPools.Contains(InType))
 		{

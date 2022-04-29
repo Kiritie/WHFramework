@@ -18,6 +18,7 @@ AAudioModule::AAudioModule()
 	
 	SingleSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("SingleSoundComponent"));
 	SingleSoundComponent->SetupAttachment(RootComponent);
+	SingleSoundComponent->OnAudioFinished.AddDynamic(this, &AAudioModule::OnSingleSoundPlayFinished);
 
 	bAutoPlayGlobalBGSound = true;
 
@@ -134,6 +135,12 @@ void AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool b
 	}
 }
 
+void AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume, bool bMulticast)
+{
+	PlaySingleSound2D(InSound, InVolume, bMulticast);
+	OnSoundPlayFinishedDelegate = InOnSoundPlayFinishedDelegate;
+}
+
 void AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
 {
 	if(!InSound) return;
@@ -159,6 +166,7 @@ void AAudioModule::StopSingleSound()
 {
 	SingleSoundParams.Sound = nullptr;
 	OnRep_SingleSoundParams();
+	OnSingleSoundPlayFinished();
 	GetWorld()->GetTimerManager().ClearTimer(SingleSoundStopTimerHandle);
 }
 
@@ -185,6 +193,15 @@ void AAudioModule::OnRep_SingleSoundParams()
 	if(!HasAuthority())
 	{
 		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &AAudioModule::StopSingleSound, SingleSoundParams.Sound->GetDuration());
+	}
+}
+
+void AAudioModule::OnSingleSoundPlayFinished()
+{
+	if(OnSoundPlayFinishedDelegate.IsBound())
+	{
+		OnSoundPlayFinishedDelegate.Execute();
+		OnSoundPlayFinishedDelegate.Clear();
 	}
 }
 

@@ -42,7 +42,7 @@ protected:
 	static AMainModule* Current;
 
 public:
-	static AMainModule* Get();
+	static AMainModule* Get(bool bInEditor = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -85,15 +85,17 @@ private:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
+	bool bInEditor;
+
 public:
 	/**
 	* 获取所有模块
 	*/
-	static TArray<TScriptInterface<IModule>> GetAllModules()
+	static TArray<TScriptInterface<IModule>> GetAllModules(bool bInEditor = false)
 	{
-		if(Get() && Get()->IsValidLowLevel())
+		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{
-			return Get()->ModuleRefs;
+			return Get(bInEditor)->ModuleRefs;
 		}
 		return TArray<TScriptInterface<IModule>>();
 	}
@@ -101,14 +103,14 @@ public:
 	 * 通过类型获取模块
 	 */
 	template<class T>
-	static T* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass = T::StaticClass())
+	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<AModuleBase> InModuleClass = T::StaticClass())
 	{
-		if(Get() && Get()->IsValidLowLevel())
+		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{
 			AModuleBase* ModuleBase = InModuleClass.GetDefaultObject();
- 			if(Get()->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
+ 			if(Get(bInEditor)->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
 			{
-				return Cast<T>(Get()->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
+				return Cast<T>(Get(bInEditor)->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
 			}
 		}
 		return nullptr;
@@ -117,13 +119,13 @@ public:
 	* 通过名称获取模块
 	*/
 	template<class T>
-	static T* GetModuleByName(const FName InModuleName)
+	static T* GetModuleByName(const FName InModuleName, bool bInEditor = false)
 	{
-		if(Get() && Get()->IsValidLowLevel())
+		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{
-			if(Get()->ModuleMap.Contains(InModuleName))
+			if(Get(bInEditor)->ModuleMap.Contains(InModuleName))
 			{
-				return Cast<T>(Get()->ModuleMap[InModuleName].GetObject());
+				return Cast<T>(Get(bInEditor)->ModuleMap[InModuleName].GetObject());
 			}
 		}
 		return nullptr;
@@ -132,9 +134,9 @@ public:
 	* 通过类型获取模块网络组件
 	*/
 	template<class T>
-	static T* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
+	static T* GetModuleNetworkComponentByClass(bool bInEditor = false, TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
 	{
-		if(Get() && Get()->IsValidLowLevel())
+		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{
 			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Get()))
 			{

@@ -10,9 +10,9 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 {
 	ListWidget = InArgs._ListWidget;
-	
+
 	if(!ListWidget) return;
-	
+
 	ChildSlot
 	[
 		SNew(SBorder)
@@ -27,7 +27,7 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 			.FillHeight(1)
 			[
 				SNew(SHorizontalBox)
-				
+
 				+ SHorizontalBox::Slot()
 				.VAlign(VAlign_Fill)
 				.HAlign(HAlign_Left)
@@ -37,26 +37,27 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 					.Text(FText::FromString(TEXT("List:  ")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]
-				
+
 				+ SHorizontalBox::Slot()
 				.VAlign(VAlign_Fill)
 				.HAlign(HAlign_Left)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalProcedureNum())); } )
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalProcedureNum())); })
 				]
-				
+
 				+ SHorizontalBox::Slot()
 				.VAlign(VAlign_Fill)
 				.HAlign(HAlign_Left)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedProcedureNum())); } )
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedProcedureNum())); })
 				]
 			]
 		]
 	];
 }
+
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

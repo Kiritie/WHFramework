@@ -8,10 +8,10 @@
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Math/MathBPLibrary.h"
-#include "Scene/Object/PickUp/PickUp.h"
-#include "Scene/Object/PickUp/PickUpEquip.h"
-#include "Scene/Object/PickUp/PickUpProp.h"
-#include "Scene/Object/PickUp/PickUpVoxel.h"
+#include "Scene/Actor/PickUp/PickUp.h"
+#include "Scene/Actor/PickUp/PickUpEquip.h"
+#include "Scene/Actor/PickUp/PickUpProp.h"
+#include "Scene/Actor/PickUp/PickUpVoxel.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -977,30 +977,25 @@ void AVoxelChunk::DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary)
 	}
 }
 
-void AVoxelChunk::SpawnSceneObject(ISceneObjectInterface* InSceneObject)
+void AVoxelChunk::AddSceneActor(AActor* InActor)
 {
-	
-}
-
-void AVoxelChunk::AddSceneObject(ISceneObjectInterface* InSceneObject)
-{
-	if(APickUp* PickUp = Cast<APickUp>(InSceneObject))
+	if(APickUp* PickUp = Cast<APickUp>(InActor))
 	{
 		AttachPickUp(PickUp);
 	}
 }
 
-void AVoxelChunk::RemoveSceneObject(ISceneObjectInterface* InSceneObject)
+void AVoxelChunk::RemoveSceneActor(AActor* InActor)
 {
-	if(APickUp* PickUp = Cast<APickUp>(InSceneObject))
+	if(APickUp* PickUp = Cast<APickUp>(InActor))
 	{
 		DetachPickUp(PickUp);
 	}
 }
 
-void AVoxelChunk::DestroySceneObject(ISceneObjectInterface* InSceneObject)
+void AVoxelChunk::DestroySceneActor(AActor* InActor)
 {
-	if(APickUp* PickUp = Cast<APickUp>(InSceneObject))
+	if(APickUp* PickUp = Cast<APickUp>(InActor))
 	{
 		DestroyPickUp(PickUp);
 	}

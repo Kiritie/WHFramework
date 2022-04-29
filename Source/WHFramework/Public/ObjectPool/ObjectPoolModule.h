@@ -54,7 +54,7 @@ public:
 	template<class T>
 	T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(!InType) return nullptr;
+		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
 
 		if (!ObjectPools.Contains(InType))
 		{

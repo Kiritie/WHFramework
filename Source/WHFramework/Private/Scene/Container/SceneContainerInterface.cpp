@@ -3,4 +3,4 @@
 
 #include "Scene/Container/SceneContainerInterface.h"
 
-// Add default functionality here for any ISceneObject functions that are not pure virtual.
+// Add default functionality here for any ISceneActor functions that are not pure virtual.

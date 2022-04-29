@@ -6,6 +6,7 @@
 
 #include "Procedure/ProcedureModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Math/MathTypes.h"
 
 #include "ProcedureBase.generated.h"
 
@@ -39,6 +40,12 @@ public:
 #endif
 
 public:
+	/**
+	* 流程状态改变
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
+	void K2_OnStateChanged(EProcedureState InProcedureState);
+	virtual void OnStateChanged(EProcedureState InProcedureState);
 	/**
 	 * 流程初始化
 	 */
@@ -129,11 +136,23 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	AActor* OperationTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
-	bool bTrackOperationTarget;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
+	bool bTrackTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	EProcedureCameraViewMode CameraViewMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	EProcedureCameraViewSpace CameraViewSpace;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "CameraViewMode == EProcedureCameraViewMode::Duration"), Category = "Operation Target|Camera View")
+	EEaseType CameraViewEaseType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "CameraViewMode == EProcedureCameraViewMode::Duration"), Category = "Operation Target|Camera View")
+	float CameraViewDuration;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	FVector CameraViewOffset;
@@ -147,15 +166,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	float CameraViewDistance;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	bool bInstantCameraView;
-
-protected:
+public:
 #if WITH_EDITOR
 	/**
 	* 获取摄像机视角
 	*/
-	UFUNCTION(CallInEditor, Category = "Operation Target")
 	void GetCameraView();
 #endif
 	/**
@@ -174,7 +189,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FText ProcedureDisplayName;
 	/// 流程描述
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
 	FText ProcedureDescription;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -192,6 +207,10 @@ public:
 	/// 流程状态
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
 	EProcedureState ProcedureState;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnProcedureStateChanged OnProcedureStateChanged;
+
 public:
 	/**
 	* 获取流程类型
@@ -204,12 +223,15 @@ public:
 	UFUNCTION(BlueprintPure)
 	EProcedureState GetProcedureState() const { return ProcedureState; }
 	/**
-	* 当流程状态改变
+	* 是否已进入
 	*/
-	UFUNCTION()
-	void ChangeProcedureState(EProcedureState InProcedureState);
-	UFUNCTION(BlueprintNativeEvent)
-	void OnChangeProcedureState(EProcedureState InProcedureState);
+	UFUNCTION(BlueprintPure)
+	bool IsEntered() const;
+	/**
+	* 是否已完成
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCompleted(bool bCheckSubs = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
@@ -288,8 +310,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubProcedure")
 	TArray<UProcedureBase*> SubProcedures;
 public:
-	UFUNCTION(BlueprintPure)
-	bool IsSubOf(UProcedureBase* InProcedure) const;
 	/**
 	* 是否有子流程
 	* @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubProcedure）
@@ -302,10 +322,10 @@ public:
 	UFUNCTION(BlueprintPure)
 	UProcedureBase* GetCurrentSubProcedure() const;
 	/**
-	* 是否已完成所有子流程
-	*/
+	 * 是否是子流程
+	 */
 	UFUNCTION(BlueprintPure)
-	bool IsCompleted(bool bCheckSubs = false) const;
+	bool IsSubOf(UProcedureBase* InProcedure) const;
 	/**
 	* 是否已完成所有子流程
 	*/

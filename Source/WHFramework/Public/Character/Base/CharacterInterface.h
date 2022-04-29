@@ -45,9 +45,9 @@ public:
 	virtual void StopAIMove(bool bMulticast = false) = 0;
 
 public:
-	virtual FString GetNameC() const = 0;
+	virtual FName GetNameC() const = 0;
 	
-	virtual void SetNameC(const FString& InName) = 0;
+	virtual void SetNameC(FName InName) = 0;
 
 	virtual class UCharacterAnim* GetAnim() const = 0;
 };

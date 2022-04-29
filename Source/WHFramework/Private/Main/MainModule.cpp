@@ -66,6 +66,7 @@ AMainModule::AMainModule()
 
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
 
+	bInEditor = false;
 	//Current = this;
 }
 
@@ -94,16 +95,14 @@ void AMainModule::Tick(float DeltaTime)
 	RefreshModules(DeltaTime);
 }
 
-AMainModule* AMainModule::Get()
+AMainModule* AMainModule::Get(bool bInEditor)
 {
-	if(!Current || !Current->IsValidLowLevel() || Current->GetWorld() != GWorld)
+	if(!Current || !Current->IsValidLowLevel() || Current->bInEditor != bInEditor)
 	{
-		Current = Cast<AMainModule>(UGameplayStatics::GetActorOfClass(GWorld, AMainModule::StaticClass()));
-		// for(const FWorldContext& Context : GEngine->GetWorldContexts())
-		// {
-		// 	Current = Cast<AMainModule>(UGameplayStatics::GetActorOfClass(Context.World(), AMainModule::StaticClass()));
-		// 	if(Current) break;
-		// }
+		Current = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
+			return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
+		}, bInEditor);
+		if(Current) Current->bInEditor = bInEditor;
 	}
 	return Current;
 }
