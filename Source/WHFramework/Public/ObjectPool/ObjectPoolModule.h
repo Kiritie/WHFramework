@@ -6,7 +6,10 @@
 
 #include "ObjectPool.h"
 #include "ObjectPoolInterface.h"
+#include "Actor/ActorPool.h"
 #include "Main/Base/ModuleBase.h"
+#include "Widget/WidgetPool.h"
+#include "Widget/Interfaces/BaseWidgetInterface.h"
 
 #include "ObjectPoolModule.generated.h"
 
@@ -52,13 +55,40 @@ protected:
 
 public:
 	template<class T>
+	bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return false;
+
+		if (ObjectPools.Contains(InType))
+		{
+			return ObjectPools[InType]->GetCount() > 0;
+		}
+		return false;
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Has Object"))
+	bool K2_HasObject(TSubclassOf<UObject> InType);
+	
+	template<class T>
 	T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
 
 		if (!ObjectPools.Contains(InType))
 		{
-			UObjectPool* ObjectPool = NewObject<UObjectPool>(this);
+			UObjectPool* ObjectPool = nullptr;
+			if(InType->IsChildOf(AActor::StaticClass()))
+			{
+				ObjectPool = NewObject<UActorPool>(this);
+			}
+			else if(InType->ImplementsInterface(UBaseWidgetInterface::StaticClass()))
+			{
+				ObjectPool = NewObject<UWidgetPool>(this);
+			}
+			else
+			{
+				ObjectPool = NewObject<UObjectPool>(this);
+			}
 			const int32 TempLimit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
 			ObjectPool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
 			ObjectPools.Add(InType, ObjectPool);

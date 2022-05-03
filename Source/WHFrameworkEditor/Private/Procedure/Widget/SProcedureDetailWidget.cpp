@@ -38,7 +38,7 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 		[
 			SNew(SBox)
-			.WidthOverride(400)
+			.WidthOverride(420)
 			[
 				SNew(SVerticalBox)
 

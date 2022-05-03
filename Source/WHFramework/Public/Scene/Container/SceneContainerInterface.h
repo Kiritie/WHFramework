@@ -23,11 +23,11 @@ class WHFRAMEWORK_API ISceneContainerInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return false; }
+	virtual bool HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return false; }
 
 	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const { return false; }
 
-	virtual AActor* GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return nullptr; }
+	virtual AActor* GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const { return nullptr; }
 
 	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const { return nullptr; }
 

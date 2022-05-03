@@ -7,7 +7,6 @@
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
-class AWidgetModule;
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SSlateWidgetBase::SSlateWidgetBase()
@@ -16,6 +15,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetCategory = EWidgetCategory::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
+	ChildNames = TArray<FName>();
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;
@@ -26,12 +26,12 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetRefreshType = EWidgetRefreshType::None;
-	WidgetState = EWidgetState::None;
+	WidgetState = EScreenWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
 	LastWidget = nullptr;
 	ParentWidget = nullptr;
-	ChildWidgets = TArray<TScriptInterface<IScreenWidgetInterface>>();
+	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
 void SSlateWidgetBase::Construct(const FArguments& InArgs)
@@ -44,7 +44,7 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-void SSlateWidgetBase::OnCreate()
+void SSlateWidgetBase::OnCreate(AActor* InOwner)
 {
 	
 }
@@ -56,7 +56,7 @@ void SSlateWidgetBase::OnInitialize(AActor* InOwner)
 
 void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	WidgetState = EWidgetState::Opening;
+	WidgetState = EScreenWidgetState::Opening;
 	
 	switch (WidgetCategory)
 	{
@@ -79,7 +79,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 void SSlateWidgetBase::OnClose(bool bInstant)
 {
-	WidgetState = EWidgetState::Closing;
+	WidgetState = EScreenWidgetState::Closing;
 
 	if(bInstant)
 	{
@@ -95,7 +95,11 @@ void SSlateWidgetBase::OnRefresh()
 {
 }
 
-void SSlateWidgetBase::OnDestroy()
+void SSlateWidgetBase::OnDestroy(bool bRecovery)
+{
+}
+
+void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
@@ -115,9 +119,9 @@ void SSlateWidgetBase::Close(bool bInstant)
 
 void SSlateWidgetBase::Toggle(bool bInstant)
 {
-	if(WidgetState == EWidgetState::Opening || WidgetState == EWidgetState::Closing) return;
+	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Closing) return;
 	
-	if(WidgetState != EWidgetState::Opened)
+	if(WidgetState != EScreenWidgetState::Opened)
 	{
 		Open(nullptr, bInstant);
 	}
@@ -134,43 +138,27 @@ void SSlateWidgetBase::Reset()
 
 void SSlateWidgetBase::Refresh()
 {
-	if(WidgetState == EWidgetState::Opened)
+	if(WidgetState == EScreenWidgetState::Opened)
 	{
 		OnRefresh();
 	}
 }
 
-void SSlateWidgetBase::Destroy()
+void SSlateWidgetBase::Destroy(bool bRecovery)
 {
 	//UWidgetModuleBPLibrary::DestroySlateWidget<SSlateWidgetBase>();
 }
 
-void SSlateWidgetBase::AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
-{
-}
-
-void SSlateWidgetBase::RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
-{
-}
-
-void SSlateWidgetBase::RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget)
-{
-}
-
-void SSlateWidgetBase::RefreshAllChild()
-{
-}
-
 void SSlateWidgetBase::FinishOpen(bool bInstant)
 {
-	WidgetState = EWidgetState::Opened;
+	WidgetState = EScreenWidgetState::Opened;
 
 	Refresh();
 }
 
 void SSlateWidgetBase::FinishClose(bool bInstant)
 {
-	WidgetState = EWidgetState::Closed;
+	WidgetState = EScreenWidgetState::Closed;
 
 	switch (WidgetCategory)
 	{
@@ -194,6 +182,18 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 	{
 		InputModule->UpdateInputMode();
 	}
+}
+
+void SSlateWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)
+{
+}
+
+void SSlateWidgetBase::RemoveChild(IScreenWidgetInterface* InChildWidget)
+{
+}
+
+void SSlateWidgetBase::RemoveAllChild()
+{
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

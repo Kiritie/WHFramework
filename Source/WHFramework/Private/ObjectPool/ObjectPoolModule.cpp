@@ -57,6 +57,11 @@ void AObjectPoolModule::OnTermination_Implementation()
 	ClearAllObject();
 }
 
+bool AObjectPoolModule::K2_HasObject(TSubclassOf<UObject> InType)
+{
+	return HasObject<UObject>(InType);
+}
+
 UObject* AObjectPoolModule::K2_SpawnObject(TSubclassOf<UObject> InType)
 {
 	return SpawnObject<UObject>(InType);

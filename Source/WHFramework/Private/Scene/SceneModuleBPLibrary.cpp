@@ -41,11 +41,11 @@ float USceneModuleBPLibrary::GetAsyncUnloadLevelProgress(FName InLevelPath)
 	return 0.f;
 }
 
-bool USceneModuleBPLibrary::HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured)
+bool USceneModuleBPLibrary::HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasSceneActor(InClass, bEnsured);
+		return SceneModule->HasSceneActorByClass(InClass, bEnsured);
 	}
 	return false;
 }
@@ -59,11 +59,11 @@ bool USceneModuleBPLibrary::HasSceneActorByName(FName InName, bool bEnsured)
 	return false;
 }
 
-AActor* USceneModuleBPLibrary::GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured)
+AActor* USceneModuleBPLibrary::GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->GetSceneActor(InClass, bEnsured);
+		return SceneModule->GetSceneActorByClass(InClass, bEnsured);
 	}
 	return nullptr;
 }
@@ -125,79 +125,79 @@ void USceneModuleBPLibrary::DestroySceneActorByName(FName InName)
 	}
 }
 
-bool USceneModuleBPLibrary::HasTargetPoint(FName InName, bool bEnsured)
+bool USceneModuleBPLibrary::HasTargetPointByName(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasTargetPoint(InName, bEnsured);
+		return SceneModule->HasTargetPointByName(InName, bEnsured);
 	}
 	return false;
 }
 
-ATargetPoint* USceneModuleBPLibrary::GetTargetPoint(FName InName, bool bEnsured)
+ATargetPoint* USceneModuleBPLibrary::GetTargetPointByName(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->GetTargetPoint(InName, bEnsured);
+		return SceneModule->GetTargetPointByName(InName, bEnsured);
 	}
 	return nullptr;
 }
 
-void USceneModuleBPLibrary::AddTargetPoint(FName InName, ATargetPoint* InPoint)
+void USceneModuleBPLibrary::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		SceneModule->AddTargetPoint(InName, InPoint);
+		SceneModule->AddTargetPointByName(InName, InPoint);
 	}
 }
 
-void USceneModuleBPLibrary::RemoveTargetPoint(FName InName)
+void USceneModuleBPLibrary::RemoveTargetPointByName(FName InName)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		SceneModule->RemoveTargetPoint(InName);
+		SceneModule->RemoveTargetPointByName(InName);
 	}
 }
 
-bool USceneModuleBPLibrary::HasScenePoint(FName InName, bool bEnsured)
+bool USceneModuleBPLibrary::HasScenePointByName(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasScenePoint(InName, bEnsured);
+		return SceneModule->HasScenePointByName(InName, bEnsured);
 	}
 	return false;
 }
 
-USceneComponent* USceneModuleBPLibrary::GetScenePoint(FName InName, bool bEnsured)
+USceneComponent* USceneModuleBPLibrary::GetScenePointByName(FName InName, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->GetScenePoint(InName, bEnsured);
+		return SceneModule->GetScenePointByName(InName, bEnsured);
 	}
 	return nullptr;
 }
 
-void USceneModuleBPLibrary::AddScenePoint(FName InName, USceneComponent* InSceneComp)
+void USceneModuleBPLibrary::AddScenePointByName(FName InName, USceneComponent* InSceneComp)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		SceneModule->AddScenePoint(InName, InSceneComp);
+		SceneModule->AddScenePointByName(InName, InSceneComp);
 	}
 }
 
-void USceneModuleBPLibrary::RemoveScenePoint(FName InName)
+void USceneModuleBPLibrary::RemoveScenePointByName(FName InName)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		SceneModule->RemoveScenePoint(InName);
+		SceneModule->RemoveScenePointByName(InName);
 	}
 }
 
-bool USceneModuleBPLibrary::HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+bool USceneModuleBPLibrary::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasPhysicsVolume(InClass, bEnsured);
+		return SceneModule->HasPhysicsVolumeByClass(InClass, bEnsured);
 	}
 	return false;
 }
@@ -211,11 +211,11 @@ bool USceneModuleBPLibrary::HasPhysicsVolumeByName(FName InName, bool bEnsured)
 	return false;
 }
 
-APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->GetPhysicsVolume(InClass, bEnsured);
+		return SceneModule->GetPhysicsVolumeByClass(InClass, bEnsured);
 	}
 	return nullptr;
 }

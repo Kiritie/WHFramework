@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Blueprint/UserWidget.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 #include "Widget/Interfaces/ScreenWidgetInterface.h"
 
 #include "UserWidgetBase.generated.h"
@@ -13,7 +14,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface
+class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 
@@ -25,16 +26,20 @@ protected:
 	bool bWidgetTickAble;
 
 public:
-	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
-	void OnTick_Implementation(float DeltaSeconds) override;
+	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
+public:
+	virtual int32 GetLimit_Implementation() const override { return 0; }
+
+	virtual void OnSpawn_Implementation() override;
+
+	virtual void OnDespawn_Implementation() override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnStateChanged(EWidgetState InWidgetState) override;
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate() override;
+	void OnCreate(AActor* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnInitialize(AActor* InOwner = nullptr) override;
@@ -52,7 +57,10 @@ public:
 	void OnRefresh() override;
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy() override;
+	void OnDestroy(bool bRecovery = false) override;
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
@@ -73,19 +81,7 @@ public:
 	void Refresh() override;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Destroy() override;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RefreshAllChild() override;
+	void Destroy(bool bRecovery = false) override;
 	
 protected:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -93,6 +89,29 @@ protected:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void FinishClose(bool bInstant) override;
+
+public:
+	void AddChild(IScreenWidgetInterface* InChildWidget) override;
+
+	void RemoveChild(IScreenWidgetInterface* InChildWidget) override;
+
+	void RemoveAllChild() override;
+
+	template<class T>
+	T* GetChild(int32 InIndex) const
+	{
+		return Cast<T>(GetChild(T::StaticClass(), InIndex));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
+	UUserWidgetBase* GetChild(TSubclassOf<UUserWidgetBase> InWidgetClass, int32 InIndex) const
+	{
+		if(ChildWidgets.IsValidIndex(InIndex))
+		{
+			return Cast<UUserWidgetBase>(ChildWidgets[InIndex]);
+		}
+		return nullptr;
+	}
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -106,7 +125,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
 	FName ParentName;
-				
+		
+	UPROPERTY(EditDefaultsOnly)
+	TArray<FName> ChildNames;
+		
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
@@ -159,19 +181,16 @@ protected:
 	EInputMode InputMode;
 
 	UPROPERTY(Transient)
-	EWidgetState WidgetState;
+	EScreenWidgetState WidgetState;
 
 	UPROPERTY(Transient)
 	AActor* OwnerActor;
 
-	UPROPERTY(Transient)
-	TScriptInterface<IScreenWidgetInterface> LastWidget;
+	IScreenWidgetInterface* LastWidget;
 	
-	UPROPERTY(Transient)
-	TScriptInterface<IScreenWidgetInterface> ParentWidget;
+	IScreenWidgetInterface* ParentWidget;
 	
-	UPROPERTY(Transient)
-	TArray<TScriptInterface<IScreenWidgetInterface>> ChildWidgets;
+	TArray<IScreenWidgetInterface*> ChildWidgets;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnWidgetStateChanged OnWidgetStateChanged;
@@ -197,6 +216,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FName GetParentName() const override { return ParentName; }
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FName> GetChildNames() const override { return ChildNames; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
@@ -229,11 +251,11 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EWidgetState GetWidgetState() const override
+	virtual EScreenWidgetState GetWidgetState() const override
 	{
-		if(ParentWidget && ParentWidget->GetWidgetState() == EWidgetState::Closed)
+		if(ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
 		{
-			return EWidgetState::Closed;
+			return EScreenWidgetState::Closed;
 		}
 		return WidgetState;
 	}
@@ -247,23 +269,21 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
-	UFUNCTION(BlueprintPure)
-	virtual class UPanelWidget* GetRootPanelWidget() const override;
+	virtual IScreenWidgetInterface* GetLastWidget() const override { return LastWidget; }
+
+	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
+
+	virtual IScreenWidgetInterface* GetParentWidget() const override { return ParentWidget; }
+
+	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 
 	UFUNCTION(BlueprintPure)
-	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const override { return LastWidget; }
+	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
-
-	UFUNCTION(BlueprintPure)
-	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const override { return ParentWidget; }
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
-
-	UFUNCTION(BlueprintPure)
-	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
 
 	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
+
+	UFUNCTION(BlueprintPure)
+	virtual class UPanelWidget* GetRootPanelWidget() const override;
 };

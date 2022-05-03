@@ -31,7 +31,7 @@ void UWorldTimerComponent::UpdateTimer()
 {
 	TimeSeconds = FMath::TruncToInt(UGameplayStatics::GetTimeSeconds(this));
 
-	float RemainSeconds = 0;
+	double RemainSeconds = 0;
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
 
 	UpdateLight(RemainSeconds/ (SecondsOfDay / 24));

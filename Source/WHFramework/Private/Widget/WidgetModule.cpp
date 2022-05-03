@@ -57,19 +57,23 @@ void AWidgetModule::OnInitialize_Implementation()
 			{
 				UserWidgetClassMap.Add(WidgetName, Iter);
 			}
-			switch(Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetCreateType())
+			const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
+			if(DefaultObject->GetWidgetType() != EWidgetType::Child)
 			{
-				case EWidgetCreateType::AutoCreate:
+				switch(DefaultObject->GetWidgetCreateType())
 				{
-					CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
-					break;
+					case EWidgetCreateType::AutoCreate:
+					{
+						CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
+						break;
+					}
+					case EWidgetCreateType::AutoCreateAndOpen:
+					{
+						OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
+						break;
+					}
+					default: break;
 				}
-				case EWidgetCreateType::AutoCreateAndOpen:
-				{
-					OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
-					break;
-				}
-				default: break;
 			}
 		}
 	}
@@ -119,7 +123,7 @@ void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(!Iter.Value) continue;
 		UUserWidgetBase* UserWidget = Iter.Value;
-		if (UserWidget && UserWidget->GetWidgetState() == EWidgetState::Opened && UserWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+		if (UserWidget && UserWidget->GetWidgetState() == EScreenWidgetState::Opened && UserWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{
 			UserWidget->Refresh();
 		}
@@ -128,7 +132,7 @@ void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(!Iter.Value) continue;
 		TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && SlateWidget->GetWidgetState() == EWidgetState::Opened && SlateWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && SlateWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{
 			SlateWidget->Refresh();
 		}
@@ -154,6 +158,11 @@ void AWidgetModule::OnPause_Implementation()
 void AWidgetModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+bool AWidgetModule::K2_HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+{
+	return HasUserWidgetClass<UUserWidgetBase>(InWidgetClass);
 }
 
 bool AWidgetModule::K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
@@ -195,6 +204,11 @@ bool AWidgetModule::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass
 	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, InWidgetClass);
 }
 
+bool AWidgetModule::K2_OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
+{
+	return OpenUserWidgetByName(InWidgetName, &InParams, bInstant);
+}
+
 bool AWidgetModule::K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
 	return CloseUserWidget<UUserWidgetBase>(bInstant, InWidgetClass);
@@ -205,9 +219,9 @@ bool AWidgetModule::K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetCla
 	return ToggleUserWidget<UUserWidgetBase>(bInstant, InWidgetClass);
 }
 
-bool AWidgetModule::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool AWidgetModule::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass,  bool bRecovery)
 {
-	return DestroyUserWidget<UUserWidgetBase>(InWidgetClass);
+	return DestroyUserWidget<UUserWidgetBase>(bRecovery, InWidgetClass);
 }
 
 void AWidgetModule::CloseAllUserWidget(bool bInstant)
@@ -261,17 +275,22 @@ TArray<UWorldWidgetBase*> AWidgetModule::K2_GetWorldWidgetsByName(FName InWidget
 
 UWorldWidgetBase* AWidgetModule::K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
-	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InLocation, InSceneComp, const_cast<TArray<FParameter>*>(&InParams), InWidgetClass);
+	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InLocation, InSceneComp, &InParams, InWidgetClass);
 }
 
-bool AWidgetModule::K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
+UWorldWidgetBase* AWidgetModule::K2_CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
-	return DestroyWorldWidget<UWorldWidgetBase>(InWidgetIndex, InWidgetClass);
+	return CreateWorldWidgetByName<UWorldWidgetBase>(InWidgetName, InOwner, InLocation, InSceneComp, &InParams, InWidgetClass);
 }
 
-void AWidgetModule::K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass)
+bool AWidgetModule::K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
 {
-	return DestroyWorldWidgets<UWorldWidgetBase>(InWidgetClass);
+	return DestroyWorldWidget<UWorldWidgetBase>(InWidgetIndex, bRecovery, InWidgetClass);
+}
+
+void AWidgetModule::K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
+{
+	return DestroyWorldWidgets<UWorldWidgetBase>(bRecovery, InWidgetClass);
 }
 
 EInputMode AWidgetModule::GetNativeInputMode() const
@@ -281,7 +300,7 @@ EInputMode AWidgetModule::GetNativeInputMode() const
     {
     	if(!Iter.Value) continue;
         const UUserWidgetBase* UserWidget = Iter.Value;
-    	if (UserWidget && UserWidget->GetWidgetState() == EWidgetState::Opened && (int32)UserWidget->GetInputMode() > (int32)TmpInputMode)
+    	if (UserWidget && UserWidget->GetWidgetState() == EScreenWidgetState::Opened && (int32)UserWidget->GetInputMode() > (int32)TmpInputMode)
     	{
     		TmpInputMode = UserWidget->GetInputMode();
     	}
@@ -290,7 +309,7 @@ EInputMode AWidgetModule::GetNativeInputMode() const
 	{
 		if(!Iter.Value) continue;
 		const TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && SlateWidget->GetWidgetState() == EWidgetState::Opened && (int32)SlateWidget->GetInputMode() > (int32)TmpInputMode)
+		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && (int32)SlateWidget->GetInputMode() > (int32)TmpInputMode)
 		{
 			TmpInputMode = SlateWidget->GetInputMode();
 		}

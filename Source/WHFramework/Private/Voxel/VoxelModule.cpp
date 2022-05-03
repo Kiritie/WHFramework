@@ -11,9 +11,10 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
-#include "SpawnPool/SpawnPoolModuleBPLibrary.h"
+#include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
@@ -75,7 +76,7 @@ void AVoxelModule::OnInitialize_Implementation()
 	UVoxel::EmptyVoxel = UVoxel::SpawnVoxel(EVoxelType::Empty);
 	UVoxel::UnknownVoxel = UVoxel::SpawnVoxel(EVoxelType::Unknown);
 	
-	USpawnPoolModuleBPLibrary::DespawnActor(USpawnPoolModuleBPLibrary::SpawnActor<AVoxelChunk>());
+	UObjectPoolModuleBPLibrary::DespawnObject(UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>());
 }
 
 void AVoxelModule::OnPreparatory_Implementation()
@@ -195,7 +196,7 @@ void AVoxelModule::UnloadData(bool bPreview)
 		{
 			if(iter.Value)
 			{
-				USpawnPoolModuleBPLibrary::DespawnActor(iter.Value);
+				UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
 			}
 		}
 		ChunkMap.Empty();
@@ -448,7 +449,7 @@ void AVoxelModule::DestroyChunk(AVoxelChunk* InChunk)
 
 	ChunkMap.Remove(InChunk->GetIndex());
 
-	USpawnPoolModuleBPLibrary::DespawnActor(InChunk);
+	UObjectPoolModuleBPLibrary::DespawnObject(InChunk);
 }
 
 void AVoxelModule::AddToSpawnQueue(FIndex InIndex)
@@ -495,7 +496,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 {
 	if (ChunkMap.Contains(InIndex)) return ChunkMap[InIndex];
 
-	auto chunk = USpawnPoolModuleBPLibrary::SpawnActor<AVoxelChunk>();
+	auto chunk = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>();
 	if (chunk)
 	{
 		chunk->SetActorLocationAndRotation(InIndex.ToVector() * GetWorldData()->GetChunkLength(), FRotator::ZeroRotator);

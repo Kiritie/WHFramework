@@ -55,6 +55,16 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	}
 }
 
+void UWorldWidgetBase::OnSpawn_Implementation()
+{
+	
+}
+
+void UWorldWidgetBase::OnDespawn_Implementation()
+{
+	
+}
+
 void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	OwnerActor = InOwner;
@@ -120,7 +130,7 @@ void UWorldWidgetBase::OnRefresh_Implementation()
 	
 }
 
-void UWorldWidgetBase::OnDestroy_Implementation()
+void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 {
 	if(IsInViewport())
 	{
@@ -139,6 +149,15 @@ void UWorldWidgetBase::OnDestroy_Implementation()
 	{
 		InputModule->UpdateInputMode();
 	}
+
+	if(bRecovery)
+	{
+		UObjectPoolModuleBPLibrary::DespawnObject(this);
+	}
+	else
+	{
+		ConditionalBeginDestroy();
+	}
 }
 
 void UWorldWidgetBase::Refresh_Implementation()
@@ -148,9 +167,9 @@ void UWorldWidgetBase::Refresh_Implementation()
 	OnRefresh();
 }
 
-void UWorldWidgetBase::Destroy_Implementation()
+void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 {
-	UWidgetModuleBPLibrary::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, GetClass());
+	UWidgetModuleBPLibrary::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
 }
 
 void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, USceneComponent* InSceneComp)

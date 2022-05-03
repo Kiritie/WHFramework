@@ -26,7 +26,7 @@ class WHFRAMEWORK_API IScreenWidgetInterface : public IBaseWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnCreate() = 0;
+	virtual void OnCreate(AActor* InOwner = nullptr) = 0;
 
 	virtual void OnInitialize(AActor* InOwner = nullptr) = 0;
 
@@ -36,7 +36,7 @@ public:
 
 	virtual void OnReset() = 0;
 
-	virtual void OnStateChanged(EWidgetState InWidgetChange) = 0;
+	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
@@ -49,21 +49,22 @@ public:
 
 	virtual void Reset() = 0;
 
-	virtual void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
-
-	virtual void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
-
-	virtual void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) = 0;
-
-	virtual void RefreshAllChild() = 0;
-
 protected:
 	virtual void FinishOpen(bool bInstant) = 0;
 
 	virtual void FinishClose(bool bInstant) = 0;
 
 public:
+	virtual void AddChild(IScreenWidgetInterface* InChildWidget) = 0;
+
+	virtual void RemoveChild(IScreenWidgetInterface* InChildWidget) = 0;
+
+	virtual void RemoveAllChild() = 0;
+
+public:
 	virtual FName GetParentName() const = 0;
+
+	virtual TArray<FName> GetChildNames() const = 0;
 
 	virtual EWidgetType GetWidgetType() const = 0;
 
@@ -75,15 +76,17 @@ public:
 
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
-	virtual EWidgetState GetWidgetState() const = 0;
+	virtual EScreenWidgetState GetWidgetState() const = 0;
 
-	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const = 0;
+	virtual IScreenWidgetInterface* GetLastWidget() const = 0;
 
-	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) = 0;
+	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) = 0;
 
-	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const = 0;
+	virtual IScreenWidgetInterface* GetParentWidget() const = 0;
 
-	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) = 0;
+	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) = 0;
 
-	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() = 0;
+	virtual int32 GetChildNum() const = 0;
+
+	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() = 0;
 };

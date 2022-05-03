@@ -63,7 +63,7 @@ public:
 	template<class T>
 	static T* GetWorldData()
 	{
-		return static_cast<T*>(GetWorldData());
+		return static_cast<T*>(WorldData);
 	}
 	static FVoxelWorldSaveData* GetWorldData();
 

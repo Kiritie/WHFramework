@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "SpawnPool.generated.h"
+#include "ReferencePool.generated.h"
 
 /**
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API USpawnPool : public UObject
+class WHFRAMEWORK_API UReferencePool : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	USpawnPool();
+	UReferencePool();
 
 private:
 	/// 限制大小

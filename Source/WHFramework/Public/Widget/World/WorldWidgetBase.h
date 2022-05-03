@@ -7,6 +7,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/WidgetComponent.h"
 #include "Input/InputModuleTypes.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Widget/Interfaces/BaseWidgetInterface.h"
@@ -18,7 +19,7 @@ class UCanvasPanelSlot;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetInterface
+class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 
@@ -30,9 +31,16 @@ protected:
 	bool bWidgetTickAble;
 
 public:
-	bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
-	void OnTick_Implementation(float DeltaSeconds) override;
+	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
+public:
+	virtual int32 GetLimit_Implementation() const override { return 0; }
+
+	virtual void OnSpawn_Implementation() override;
+
+	virtual void OnDespawn_Implementation() override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -42,14 +50,14 @@ public:
 	void OnRefresh();
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy();
+	void OnDestroy(bool bRecovery = false);
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Refresh();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Destroy();
+	void Destroy(bool bRecovery = false);
 	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void BindWidgetPoint(UWidget* InWidget, class USceneComponent* InSceneComp);

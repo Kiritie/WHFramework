@@ -27,10 +27,16 @@ UObject* UObjectPool::Spawn()
 	}
 	else
 	{
-		Object = NewObject<UObject>(GetTransientPackage(), Type);
-		Object->AddToRoot();
+		Object = SpawnImpl();
 	}
 	IObjectPoolInterface::Execute_OnSpawn(Object);
+	return Object;
+}
+
+UObject* UObjectPool::SpawnImpl()
+{
+	UObject* Object = NewObject<UObject>(GetTransientPackage(), Type);
+	Object->AddToRoot();
 	return Object;
 }
 
@@ -38,8 +44,7 @@ void UObjectPool::Despawn(UObject* InObject)
 {
 	if(Count >= Limit)
 	{
-		InObject->RemoveFromRoot();
-		InObject->ConditionalBeginDestroy();
+		DespawnImpl(InObject);
 	}
 	else
 	{
@@ -47,6 +52,12 @@ void UObjectPool::Despawn(UObject* InObject)
 		Count++;
 	}
 	IObjectPoolInterface::Execute_OnDespawn(InObject);
+}
+
+void UObjectPool::DespawnImpl(UObject* InObject)
+{
+	InObject->RemoveFromRoot();
+	InObject->ConditionalBeginDestroy();
 }
 
 void UObjectPool::Clear()

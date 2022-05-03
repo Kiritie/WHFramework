@@ -61,14 +61,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
 	bool bAutoStartProcedure;
 
-	/// 流程模块状态
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule")
-	EProcedureModuleState ProcedureModuleState;
-
-public:
-	UFUNCTION(BlueprintPure)
-	EProcedureModuleState GetProcedureModuleState() const { return ProcedureModuleState; }
-
 public:
 	UFUNCTION(BlueprintCallable)
 	void StartProcedure(int32 InRootProcedureIndex = -1, bool bSkipProcedures = false);
@@ -119,13 +111,13 @@ public:
 	/// Root Procedure
 protected:
 	/// 初始根流程索引
-	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Root Procedure")
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Root")
 	int32 FirstRootProcedureIndex;
 	/// 当前根流程索引
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root")
 	int32 CurrentRootProcedureIndex;
 	/// 根流程
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root")
 	TArray<URootProcedureBase*> RootProcedures;
 
 public:
@@ -152,9 +144,16 @@ public:
 	/// Current Procedure
 protected:
 	/// 当前流程 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Current Procedure")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Stats")
 	UProcedureBase* CurrentProcedure;
+
+	/// 流程模块状态
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Stats")
+	EProcedureModuleState ProcedureModuleState;
+
 public:
+	UFUNCTION(BlueprintPure)
+	EProcedureModuleState GetProcedureModuleState() const { return ProcedureModuleState; }
 	/**
 	* 获取当前流程
 	*/

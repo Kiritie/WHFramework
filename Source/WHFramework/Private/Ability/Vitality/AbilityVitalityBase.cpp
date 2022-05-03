@@ -24,9 +24,9 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
 	SetRootComponent(BoxComponent);
 
-	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-
-	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
+	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	//
+	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
 	
 	Interaction = CreateDefaultSubobject<UVitalityInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);

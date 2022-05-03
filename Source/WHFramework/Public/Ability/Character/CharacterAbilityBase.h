@@ -3,6 +3,7 @@
 
 #include "CharacterAbilityBase.generated.h"
 
+class AAbilityCharacterBase;
 /**
  * 角色Ability基类
  */
@@ -22,6 +23,12 @@ protected:
 	bool bAutoEndAbility;
 
 public:
-	UFUNCTION(BlueprintPure)
-	class AAbilityCharacterBase* GetOwnerCharacter() const;
+	template<class T>
+	T* GetOwnerCharacter() const
+	{
+		return Cast<T>(GetOwningActorFromActorInfo());
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
+	AAbilityCharacterBase* GetOwnerCharacter(TSubclassOf<AAbilityCharacterBase> InOwnerClass = nullptr) const;
 };

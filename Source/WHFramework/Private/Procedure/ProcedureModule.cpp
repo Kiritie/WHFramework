@@ -28,12 +28,13 @@ AProcedureModule::AProcedureModule()
 
 	bAutoStartProcedure = false;
 
-	ProcedureModuleState = EProcedureModuleState::None;
-
 	FirstRootProcedureIndex = 0;
 	CurrentRootProcedureIndex = 0;
 
 	RootProcedures = TArray<URootProcedureBase*>();
+
+	ProcedureModuleState = EProcedureModuleState::None;
+	CurrentProcedure = nullptr;
 
 	GlobalProcedureExecuteType = EProcedureExecuteType::None;
 	GlobalProcedureLeaveType = EProcedureLeaveType::None;

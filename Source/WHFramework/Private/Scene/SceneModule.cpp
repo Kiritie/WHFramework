@@ -290,7 +290,7 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakeString(InLevelPath.ToString()) });
 }
 
-bool ASceneModule::HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured) const
+bool ASceneModule::HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured) const
 {
 	if(!InClass) return false;
 	
@@ -307,7 +307,7 @@ bool ASceneModule::HasSceneActorByName(FName InName, bool bEnsured) const
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-AActor* ASceneModule::GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured) const
+AActor* ASceneModule::GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured) const
 {
 	if(!InClass) return nullptr;
 	
@@ -344,7 +344,7 @@ void ASceneModule::AddSceneActorByName(FName InName, AActor* InActor)
 	if(!SceneActorMap.Contains(InName))
 	{
 		SceneActorMap.Add(InName, InActor);
-		AddScenePoint(InName, InActor->GetRootComponent());
+		AddScenePointByName(InName, InActor->GetRootComponent());
 	}
 }
 
@@ -363,7 +363,7 @@ void ASceneModule::RemoveSceneActorByName(FName InName)
 	if(SceneActorMap.Contains(InName))
 	{
 		SceneActorMap.Remove(InName);
-		RemoveScenePoint(InName);
+		RemoveScenePointByName(InName);
 	}
 }
 
@@ -389,22 +389,22 @@ void ASceneModule::DestroySceneActorByName(FName InName)
 	}
 }
 
-bool ASceneModule::HasTargetPoint(FName InName, bool bEnsured) const
+bool ASceneModule::HasTargetPointByName(FName InName, bool bEnsured) const
 {
 	if(TargetPoints.Contains(InName)) return true;
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-ATargetPoint* ASceneModule::GetTargetPoint(FName InName, bool bEnsured) const
+ATargetPoint* ASceneModule::GetTargetPointByName(FName InName, bool bEnsured) const
 {
-	if(HasTargetPoint(InName, bEnsured))
+	if(HasTargetPointByName(InName, bEnsured))
 	{
 		return TargetPoints[InName];
 	}
 	return nullptr;
 }
 
-void ASceneModule::AddTargetPoint(FName InName, ATargetPoint* InPoint)
+void ASceneModule::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
 {
 	if(!TargetPoints.Contains(InName))
 	{
@@ -412,11 +412,11 @@ void ASceneModule::AddTargetPoint(FName InName, ATargetPoint* InPoint)
 	}
 	if(InPoint && InPoint->IsValidLowLevel())
 	{
-		AddScenePoint(InName, InPoint->GetRootComponent());
+		AddScenePointByName(InName, InPoint->GetRootComponent());
 	}
 }
 
-void ASceneModule::RemoveTargetPoint(FName InName)
+void ASceneModule::RemoveTargetPointByName(FName InName)
 {
 	if(TargetPoints.Contains(InName))
 	{
@@ -424,22 +424,22 @@ void ASceneModule::RemoveTargetPoint(FName InName)
 	}
 }
 
-bool ASceneModule::HasScenePoint(FName InName, bool bEnsured) const
+bool ASceneModule::HasScenePointByName(FName InName, bool bEnsured) const
 {
 	if(ScenePoints.Contains(InName)) return true;
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-USceneComponent* ASceneModule::GetScenePoint(FName InName, bool bEnsured) const
+USceneComponent* ASceneModule::GetScenePointByName(FName InName, bool bEnsured) const
 {
-	if(HasScenePoint(InName, bEnsured))
+	if(HasScenePointByName(InName, bEnsured))
 	{
 		return ScenePoints[InName];
 	}
 	return nullptr;
 }
 
-void ASceneModule::AddScenePoint(FName InName, USceneComponent* InSceneComp)
+void ASceneModule::AddScenePointByName(FName InName, USceneComponent* InSceneComp)
 {
 	if(!ScenePoints.Contains(InName))
 	{
@@ -447,7 +447,7 @@ void ASceneModule::AddScenePoint(FName InName, USceneComponent* InSceneComp)
 	}
 }
 
-inline void ASceneModule::RemoveScenePoint(FName InName)
+inline void ASceneModule::RemoveScenePointByName(FName InName)
 {
 	if(ScenePoints.Contains(InName))
 	{
@@ -455,7 +455,7 @@ inline void ASceneModule::RemoveScenePoint(FName InName)
 	}
 }
 
-bool ASceneModule::HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
+bool ASceneModule::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
 {
 	if(!InClass) return false;
 
@@ -472,7 +472,7 @@ bool ASceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
 	return bEnsured ? ensureEditor(false) : false;
 }
 
-APhysicsVolumeBase* ASceneModule::GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
+APhysicsVolumeBase* ASceneModule::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
 {
 	if(!InClass) return nullptr;
 

@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "SpawnPool/SpawnPoolInterface.h"
 #include "GameFramework/Actor.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
@@ -19,7 +19,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AActor, public ISpawnPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelChunk : public AActor, public IObjectPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	

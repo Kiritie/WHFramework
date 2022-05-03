@@ -17,7 +17,7 @@
 #include "LatentAction/LatentActionModule.h"
 #include "Media/MediaModule.h"
 #include "Network/NetworkModule.h"
-#include "SpawnPool/SpawnPoolModule.h"
+#include "ReferencePool/ReferencePoolModule.h"
 #include "Parameter/ParameterModule.h"
 #include "ObjectPool/ObjectPoolModule.h"
 #include "WebRequest/WebRequestModule.h"
@@ -55,9 +55,9 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AObjectPoolModule::StaticClass());
 	ModuleClasses.Add(AParameterModule::StaticClass());
 	ModuleClasses.Add(AProcedureModule::StaticClass());
+	ModuleClasses.Add(AReferencePoolModule::StaticClass());
 	ModuleClasses.Add(ASaveGameModule::StaticClass());
 	ModuleClasses.Add(ASceneModule::StaticClass());
-	ModuleClasses.Add(ASpawnPoolModule::StaticClass());
 	ModuleClasses.Add(AVoxelModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());

@@ -95,13 +95,13 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure, Category = "SceneActor")
-	virtual bool HasSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
+	virtual bool HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintPure, Category = "SceneActor")
 	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
-	virtual AActor* GetSceneActor(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
+	virtual AActor* GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
 	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
@@ -132,16 +132,16 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure, Category = "TargetPoint")
-	bool HasTargetPoint(FName InName, bool bEnsured = true) const;
+	bool HasTargetPointByName(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure, Category = "TargetPoint")
-	ATargetPoint* GetTargetPoint(FName InName, bool bEnsured = true) const;
+	ATargetPoint* GetTargetPointByName(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
-	void AddTargetPoint(FName InName, ATargetPoint* InPoint);
+	void AddTargetPointByName(FName InName, ATargetPoint* InPoint);
 
 	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
-	void RemoveTargetPoint(FName InName);
+	void RemoveTargetPointByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Point
@@ -151,16 +151,16 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ScenePoint")
-	bool HasScenePoint(FName InName, bool bEnsured = true) const;
+	bool HasScenePointByName(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure, Category = "ScenePoint")
-	USceneComponent* GetScenePoint(FName InName, bool bEnsured = true) const;
+	USceneComponent* GetScenePointByName(FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
-	void AddScenePoint(FName InName, USceneComponent* InSceneComp);
+	void AddScenePointByName(FName InName, USceneComponent* InSceneComp);
 
 	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
-	void RemoveScenePoint(FName InName);
+	void RemoveScenePointByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Physics Volume
@@ -173,13 +173,13 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
-	bool HasPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
+	bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 	
 	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
 	bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true) const;
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
-	APhysicsVolumeBase* GetPhysicsVolume(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
+	APhysicsVolumeBase* GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
 	APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true) const;

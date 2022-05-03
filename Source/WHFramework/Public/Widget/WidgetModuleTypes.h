@@ -119,10 +119,10 @@ enum class EWidgetRefreshType : uint8
 };
 
 /**
-* Widget状态
+* 屏幕Widget状态
 */
 UENUM(BlueprintType)
-enum class EWidgetState : uint8
+enum class EScreenWidgetState : uint8
 {
 	/// 无
 	None,
@@ -152,4 +152,4 @@ public:
 	TArray<class UWorldWidgetBase*> WorldWidgets;
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EWidgetState, InWidgetState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);

@@ -25,9 +25,9 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-
-	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
+	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	//
+	// AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 	
 	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -83,7 +83,7 @@ void AAbilityCharacterBase::BeginPlay()
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 
 	AbilitySystem->InitAbilityActorInfo(this, this);
-
+	
 	Spawn();
 }
 

@@ -7,7 +7,7 @@ UCharacterAbilityBase::UCharacterAbilityBase()
 	bAutoEndAbility = true;
 }
 
-AAbilityCharacterBase* UCharacterAbilityBase::GetOwnerCharacter() const
+AAbilityCharacterBase* UCharacterAbilityBase::GetOwnerCharacter(TSubclassOf<AAbilityCharacterBase> InOwnerClass) const
 {
-	return Cast<AAbilityCharacterBase>(GetOwningActorFromActorInfo());
+	return GetOwnerCharacter<AAbilityCharacterBase>();
 }

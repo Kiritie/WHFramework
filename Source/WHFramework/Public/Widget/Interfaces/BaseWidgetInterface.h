@@ -31,12 +31,12 @@ class WHFRAMEWORK_API IBaseWidgetInterface : public ITickAbleWidgetInterface
 public:
 	virtual void OnRefresh() = 0;
 
-	virtual void OnDestroy() = 0;
+	virtual void OnDestroy(bool bRecovery = false) = 0;
 
 public:
 	virtual void Refresh() = 0;
 
-	virtual void Destroy() = 0;
+	virtual void Destroy(bool bRecovery = false) = 0;
 
 public:
 	virtual FName GetWidgetName() const = 0;

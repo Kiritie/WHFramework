@@ -23,7 +23,7 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
-	virtual void OnCreate() override;
+	virtual void OnCreate(AActor* InOwner = nullptr) override;
 	
 	virtual void OnInitialize(AActor* InOwner = nullptr) override;
 
@@ -35,7 +35,9 @@ public:
 	
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy() override;
+	virtual void OnDestroy(bool bRecovery = false) override;
+
+	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
@@ -50,20 +52,28 @@ public:
 
 	virtual void Refresh() override;
 
-	virtual void Destroy() override;
-
-	virtual void AddChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-
-	virtual void RemoveChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-
-	virtual void RemoveAllChild(const TScriptInterface<IScreenWidgetInterface>& InChildWidget) override;
-	
-	virtual void RefreshAllChild() override;
+	virtual void Destroy(bool bRecovery = false) override;
 
 protected:
 	virtual void FinishOpen(bool bInstant) override;
 
 	virtual void FinishClose(bool bInstant) override;
+
+public:
+	virtual void AddChild(IScreenWidgetInterface* InChildWidget) override;
+
+	virtual void RemoveChild(IScreenWidgetInterface* InChildWidget) override;
+
+	virtual void RemoveAllChild() override;
+	
+	virtual SSlateWidgetBase* GetChild(int32 InIndex) const
+	{
+		if(ChildWidgets.IsValidIndex(InIndex))
+		{
+			return Cast<SSlateWidgetBase>(ChildWidgets[InIndex]);
+		}
+		return nullptr;
+	}
 
 protected:
 	EWidgetType WidgetType;
@@ -73,7 +83,9 @@ protected:
 	FName WidgetName;
 
 	FName ParentName;
-	
+
+	TArray<FName> ChildNames;
+
 	int32 WidgetZOrder;
 
 	FAnchors WidgetAnchors;
@@ -96,15 +108,15 @@ protected:
 
 	EInputMode InputMode;
 
-	EWidgetState WidgetState;
+	EScreenWidgetState WidgetState;
 
 	AActor* OwnerActor;
 	
-	TScriptInterface<IScreenWidgetInterface> LastWidget;
+	IScreenWidgetInterface* LastWidget;
 	
-	TScriptInterface<IScreenWidgetInterface> ParentWidget;
+	IScreenWidgetInterface* ParentWidget;
 	
-	TArray<TScriptInterface<IScreenWidgetInterface>> ChildWidgets;
+	TArray<IScreenWidgetInterface*> ChildWidgets;
 
 public:
 	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
@@ -114,6 +126,8 @@ public:
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	virtual FName GetParentName() const override { return ParentName; }
+
+	virtual TArray<FName> GetChildNames() const override { return ChildNames; }
 
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
@@ -127,11 +141,11 @@ public:
 
 	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
 
-	virtual EWidgetState GetWidgetState() const override
+	virtual EScreenWidgetState GetWidgetState() const override
 	{
-		if(ParentWidget && ParentWidget->GetWidgetState() == EWidgetState::Closed)
+		if(ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
 		{
-			return EWidgetState::Closed;
+			return EScreenWidgetState::Closed;
 		}
 		return WidgetState;
 	}
@@ -148,13 +162,15 @@ public:
 
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
-	virtual TScriptInterface<IScreenWidgetInterface> GetLastWidget() const override { return LastWidget; }
+	virtual IScreenWidgetInterface* GetLastWidget() const override { return LastWidget; }
 
-	virtual void SetLastWidget(TScriptInterface<IScreenWidgetInterface> InLastWidget) override { LastWidget = InLastWidget; }
+	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
 
-	virtual TScriptInterface<IScreenWidgetInterface> GetParentWidget() const override { return ParentWidget; }
+	virtual IScreenWidgetInterface* GetParentWidget() const override { return ParentWidget; }
 
-	virtual void SetParentWidget(TScriptInterface<IScreenWidgetInterface> InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 
-	virtual TArray<TScriptInterface<IScreenWidgetInterface>>& GetChildWidgets() override { return ChildWidgets; }
+	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
+
+	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
 };

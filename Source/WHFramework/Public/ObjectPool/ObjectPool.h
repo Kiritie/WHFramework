@@ -18,7 +18,7 @@ class WHFRAMEWORK_API UObjectPool : public UObject
 public:
 	UObjectPool();
 
-private:
+protected:
 	/// 限制大小
 	UPROPERTY(VisibleAnywhere)
 	int32 Limit;
@@ -37,20 +37,22 @@ public:
 	* @param InLimit 限制大小
 	* @param InType 类型
 	*/
-	void Initialize(int32 InLimit, TSubclassOf<UObject> InType);
+	virtual void Initialize(int32 InLimit, TSubclassOf<UObject> InType);
 	/**
 	* 生成对象
 	*/
-	UObject* Spawn();
+	virtual UObject* Spawn();
+	virtual UObject* SpawnImpl();
 	/**
 	* 回收对象
 	* @param InObject 对象
 	*/
-	void Despawn(UObject* InObject);
+	virtual void Despawn(UObject* InObject);
+	virtual void DespawnImpl(UObject* InObject);
 	/**
 	* 清理对象
 	*/
-	void Clear();
+	virtual void Clear();
 
 public:
 	int32 GetLimit() const;

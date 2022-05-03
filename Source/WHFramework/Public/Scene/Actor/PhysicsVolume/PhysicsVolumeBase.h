@@ -7,12 +7,12 @@
 #include "PhysicsVolumeTypes.h"
 #include "GameFramework/PhysicsVolume.h"
 #include "Scene/Actor/SceneActorInterface.h"
-#include "SpawnPool/SpawnPoolInterface.h"
+#include "ReferencePool/ReferencePoolInterface.h"
 
 #include "PhysicsVolumeBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public ISpawnPoolInterface
+class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public IReferencePoolInterface
 {
 	GENERATED_BODY()
 	

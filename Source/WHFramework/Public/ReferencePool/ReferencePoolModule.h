@@ -4,20 +4,20 @@
 
 #include "CoreMinimal.h"
 
-#include "SpawnPool.h"
-#include "SpawnPoolInterface.h"
+#include "ReferencePool.h"
+#include "ReferencePoolInterface.h"
 #include "Main/Base/ModuleBase.h"
 
-#include "SpawnPoolModule.generated.h"
+#include "ReferencePoolModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API ASpawnPoolModule : public AModuleBase
+class WHFRAMEWORK_API AReferencePoolModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
 public:	
 	// ParamSets default values for this actor's properties
-	ASpawnPoolModule();
+	AReferencePoolModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -41,36 +41,48 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// SpawnPool
+	/// ReferencePool
 protected:
 	/// 单个对象池上限
 	UPROPERTY(EditAnywhere)
 	int32 Limit;
 
 	UPROPERTY(VisibleAnywhere, Transient)
-	TMap<UClass*, USpawnPool*> SpawnPools;
+	TMap<UClass*, UReferencePool*> ReferencePools;
 
 public:
 	template<class T>
-	T* SpawnActor(TSubclassOf<AActor> InType = T::StaticClass())
+	bool HasReference(TSubclassOf<AActor> InType = T::StaticClass())
 	{
-		if(!InType || !InType->ImplementsInterface(USpawnPoolInterface::StaticClass())) return nullptr;
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return false;
 
-		if (!SpawnPools.Contains(InType))
+		if (ReferencePools.Contains(InType))
 		{
-			USpawnPool* SpawnPool = NewObject<USpawnPool>(this);
-			const int32 TempLimit = ISpawnPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-			SpawnPool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
-			SpawnPools.Add(InType, SpawnPool);
+			return ReferencePools[InType]->GetCount() > 0;
 		}
-		return Cast<T>(SpawnPools[InType]->Spawn());
+		return false;
+	}
+	
+	template<class T>
+	T* SpawnReference(TSubclassOf<AActor> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return nullptr;
+
+		if (!ReferencePools.Contains(InType))
+		{
+			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
+			const int32 TempLimit = IReferencePoolInterface::Execute_GetLimit(InType.GetDefaultObject());
+			ReferencePool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
+			ReferencePools.Add(InType, ReferencePool);
+		}
+		return Cast<T>(ReferencePools[InType]->Spawn());
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Actor"))
-	AActor* K2_SpawnActor(TSubclassOf<AActor> InType);
+	AActor* K2_SpawnReference(TSubclassOf<AActor> InType);
 
 	UFUNCTION(BlueprintCallable)
-	void DespawnActor(AActor* InActor);
+	void DespawnReference(AActor* InActor);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllActor();

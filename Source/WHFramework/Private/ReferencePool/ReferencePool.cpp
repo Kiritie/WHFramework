@@ -1,23 +1,23 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "SpawnPool/SpawnPool.h"
+#include "ReferencePool/ReferencePool.h"
 
-#include "SpawnPool/SpawnPoolInterface.h"
+#include "ReferencePool/ReferencePoolInterface.h"
 
-USpawnPool::USpawnPool()
+UReferencePool::UReferencePool()
 {
 	Limit = 100;
 	Type = nullptr;
 }
 
-void USpawnPool::Initialize(int32 InLimit, TSubclassOf<AActor> InType)
+void UReferencePool::Initialize(int32 InLimit, TSubclassOf<AActor> InType)
 {
 	Limit = InLimit;
 	Type = InType;
 }
 
-AActor* USpawnPool::Spawn()
+AActor* UReferencePool::Spawn()
 {
 	AActor* Actor;
 	if(Count > 0)
@@ -31,11 +31,11 @@ AActor* USpawnPool::Spawn()
 		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		Actor = GetWorld()->SpawnActor<AActor>(Type, ActorSpawnParameters);
 	}
-	ISpawnPoolInterface::Execute_OnSpawn(Actor);
+	IReferencePoolInterface::Execute_OnSpawn(Actor);
 	return Actor;
 }
 
-void USpawnPool::Despawn(AActor* InActor)
+void UReferencePool::Despawn(AActor* InActor)
 {
 	if(Count >= Limit)
 	{
@@ -46,10 +46,10 @@ void USpawnPool::Despawn(AActor* InActor)
 		Queue.Enqueue(InActor);
 		Count++;
 	}
-	ISpawnPoolInterface::Execute_OnDespawn(InActor);
+	IReferencePoolInterface::Execute_OnDespawn(InActor);
 }
 
-void USpawnPool::Clear()
+void UReferencePool::Clear()
 {
 	AActor* Actor;
 	while(Queue.Dequeue(Actor))
@@ -62,12 +62,12 @@ void USpawnPool::Clear()
 	Queue.Empty();
 }
 
-int32 USpawnPool::GetLimit() const
+int32 UReferencePool::GetLimit() const
 {
 	return Limit;
 }
 
-int32 USpawnPool::GetCount() const
+int32 UReferencePool::GetCount() const
 {
 	return Count;
 }

@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "SpawnPoolInterface.generated.h"
+#include "ReferencePoolInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class USpawnPoolInterface : public UInterface
+class UReferencePoolInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -16,7 +16,7 @@ class USpawnPoolInterface : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API ISpawnPoolInterface
+class WHFRAMEWORK_API IReferencePoolInterface
 {
 	GENERATED_BODY()
 
