@@ -17,19 +17,13 @@
 #include "Procedure/Base/ProcedureBlueprint.h"
 #include "Procedure/Base/RootProcedureBase.h"
 #include "Procedure/Widget/SProcedureListItemWidget.h"
-#include "Procedure/Window/SCreateProcedureBlueprintDialog.h"
+#include "Procedure/Widget/Window/SCreateProcedureBlueprintDialog.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void SProcedureListWidget::Construct(const FArguments& InArgs)
 {
 	ProcedureModule = InArgs._ProcedureModule;
-
-	if(RefreshDelegateHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
-	}
-	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureListWidget::Refresh);
 
 	if(!ProcedureModule) return;
 
@@ -88,7 +82,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 		[
 			SNew(SBox)
-			.MaxDesiredWidth(420)
+			.WidthOverride(420)
 			[
 				SNew(SVerticalBox)
 
@@ -142,7 +136,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					.Padding(2.f, 0, 0, 0)
 					[
 						SNew(SButton)
-						.ContentPadding(FMargin(0.f, 2.f))
+						.ContentPadding(FMargin(2.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("New")))
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -156,7 +150,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					.Padding(2.f, 0, 0, 0)
 					[
 						SNew(SButton)
-						.ContentPadding(FMargin(0.f, 2.f))
+						.ContentPadding(FMargin(2.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Edit")))
 						.IsEnabled_Lambda([this](){ return SelectedProcedureClass && SelectedProcedureListItems.Num() == 1; })
@@ -288,6 +282,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Expand")))
 						.IsEnabled_Lambda([this](){ return ProcedureModule->GetRootProcedures().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -300,6 +295,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Collapse")))
 						.IsEnabled_Lambda([this](){ return ProcedureModule->GetRootProcedures().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -312,6 +308,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
 						.IsEnabled_Lambda([this](){ return ProcedureModule->GetRootProcedures().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -324,6 +321,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Remove")))
 						.IsEnabled_Lambda([this](){ return SelectedProcedureListItems.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -336,6 +334,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Up")))
 						.IsEnabled_Lambda([this](){ return SelectedProcedureListItems.Num() == 1 && SelectedProcedureListItems[0]->GetProcedureIndex() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
@@ -348,6 +347,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
+						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
 							return SelectedProcedureListItems.Num() == 1 &&
@@ -370,20 +370,27 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	SetIsEditMode(bEditMode);
 }
 
-void SProcedureListWidget::Refresh()
+void SProcedureListWidget::OnCreate()
 {
-	if(!ProcedureModule || !ProcedureModule->IsValidLowLevel()) return;
+	SEditorSlateWidgetBase::OnCreate();
+}
+
+void SProcedureListWidget::OnReset()
+{
+	SEditorSlateWidgetBase::OnReset();
+}
+
+void SProcedureListWidget::OnRefresh()
+{
+	SEditorSlateWidgetBase::OnRefresh();
 
 	UpdateTreeView(true);
 	UpdateSelection();
 }
 
-SProcedureListWidget::~SProcedureListWidget()
+void SProcedureListWidget::OnDestroy()
 {
-	if(RefreshDelegateHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
-	}
+	SEditorSlateWidgetBase::OnDestroy();
 }
 
 UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass)

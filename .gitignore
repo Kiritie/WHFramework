@@ -2,6 +2,9 @@
 .vs/
 .idea/
  
+# Version Controls
+.svn/
+
 # Compiled Object files
 *.slo
 *.lo

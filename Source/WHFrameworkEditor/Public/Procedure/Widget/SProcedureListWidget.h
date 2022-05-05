@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SCompoundWidget.h"
 #include "ClassViewerModule.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
+#include "Widget/SEditorSlateWidgetBase.h"
 
 class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
@@ -15,22 +15,25 @@ DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureListWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SProcedureListWidget : public SEditorSlateWidgetBase
 {
 public:
-	SLATE_BEGIN_ARGS(SProcedureListWidget)
-	{}
-	
-	SLATE_ARGUMENT(class AProcedureModule*, ProcedureModule)
+	SLATE_BEGIN_ARGS(SProcedureListWidget) {}
+
+		SLATE_ARGUMENT(class AProcedureModule*, ProcedureModule)
 
 	SLATE_END_ARGS()
 
-	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
 
-	void Refresh();
+public:
+	virtual void OnCreate() override;
 
-	virtual ~SProcedureListWidget() override;
+	virtual void OnReset() override;
+
+	virtual void OnRefresh() override;
+
+	virtual void OnDestroy() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
@@ -47,13 +50,11 @@ public:
 
 	bool bEditMode = false;
 
-	FDelegateHandle RefreshDelegateHandle;
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
 	AProcedureModule* ProcedureModule;
-		
+
 	UProcedureBase* CopiedProcedure;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -107,7 +108,7 @@ public:
 	/// Tree View
 private:
 	void UpdateTreeView(bool bRegenerate = false);
-		
+
 	void UpdateSelection();
 
 	TSharedRef<ITableRow> GenerateTreeRow(TSharedPtr<FProcedureListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable);

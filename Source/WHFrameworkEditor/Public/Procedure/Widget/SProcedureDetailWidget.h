@@ -4,28 +4,35 @@
 
 #include "CoreMinimal.h"
 
-#include "Widgets/SCompoundWidget.h"
 #include "Procedure/Base/ProcedureBase.h"
+#include "Widget/SEditorSlateWidgetBase.h"
 
 class SProcedureListWidget;
 class AProcedureModule;
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureDetailWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SProcedureDetailWidget : public SEditorSlateWidgetBase
 {
 public:
-	SLATE_BEGIN_ARGS(SProcedureDetailWidget)
-	{}
+	SLATE_BEGIN_ARGS(SProcedureDetailWidget) {}
 
-	SLATE_ARGUMENT(AProcedureModule*, ProcedureModule)
-	
-	SLATE_ARGUMENT(TSharedPtr<SProcedureListWidget>, ListWidget)
-	
+		SLATE_ARGUMENT(AProcedureModule*, ProcedureModule)
+
+		SLATE_ARGUMENT(TSharedPtr<SProcedureListWidget>, ListWidget)
+
 	SLATE_END_ARGS()
 
-	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
+
+public:
+	virtual void OnCreate() override;
+
+	virtual void OnReset() override;
+
+	virtual void OnRefresh() override;
+
+	virtual void OnDestroy() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats

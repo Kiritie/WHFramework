@@ -111,13 +111,13 @@ public:
 	/// Root Procedure
 protected:
 	/// 初始根流程索引
-	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Root")
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Root Procedure")
 	int32 FirstRootProcedureIndex;
 	/// 当前根流程索引
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
 	int32 CurrentRootProcedureIndex;
 	/// 根流程
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Root Procedure")
 	TArray<URootProcedureBase*> RootProcedures;
 
 public:
@@ -141,14 +141,14 @@ public:
 	TArray<URootProcedureBase*>& GetRootProcedures() { return RootProcedures; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Current Procedure
+	/// Procedure Stats
 protected:
 	/// 当前流程 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Stats")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Procedure Stats")
 	UProcedureBase* CurrentProcedure;
 
 	/// 流程模块状态
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Stats")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
 	EProcedureModuleState ProcedureModuleState;
 
 public:

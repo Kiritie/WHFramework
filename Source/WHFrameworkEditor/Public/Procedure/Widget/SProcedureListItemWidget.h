@@ -13,9 +13,8 @@
 class WHFRAMEWORKEDITOR_API SProcedureListItemWidget : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SProcedureListItemWidget)
-	{}
-	
+	SLATE_BEGIN_ARGS(SProcedureListItemWidget) {}
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */

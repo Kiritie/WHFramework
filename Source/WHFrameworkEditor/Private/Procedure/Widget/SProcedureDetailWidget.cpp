@@ -81,6 +81,26 @@ void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 	UpdateDetailsView();
 }
 
+void SProcedureDetailWidget::OnCreate()
+{
+	SEditorSlateWidgetBase::OnCreate();
+}
+
+void SProcedureDetailWidget::OnReset()
+{
+	SEditorSlateWidgetBase::OnReset();
+}
+
+void SProcedureDetailWidget::OnRefresh()
+{
+	SEditorSlateWidgetBase::OnRefresh();
+}
+
+void SProcedureDetailWidget::OnDestroy()
+{
+	SEditorSlateWidgetBase::OnDestroy();
+}
+
 void SProcedureDetailWidget::UpdateDetailsView()
 {
 	if(SelectedProcedureListItems.Num() > 0)

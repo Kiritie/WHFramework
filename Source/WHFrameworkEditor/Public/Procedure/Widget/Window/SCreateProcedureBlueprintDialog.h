@@ -3,10 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Widget/Window/SEditorWindowWidgetBase.h"
 
 class UFactory;
 
-class SCreateProcedureBlueprintDialog : public SWindow
+class SCreateProcedureBlueprintDialog : public SEditorWindowWidgetBase
 {
 public:
 	SCreateProcedureBlueprintDialog();

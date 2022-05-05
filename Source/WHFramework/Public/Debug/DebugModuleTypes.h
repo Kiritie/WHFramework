@@ -47,14 +47,14 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Parameter, Log, All);
 // 流程
 DEFINE_LOG_CATEGORY_STATIC(WH_Procedure, Log, All);
 
+// 引用池
+DEFINE_LOG_CATEGORY_STATIC(WH_ReferencePool, Log, All);
+
 // 存档
 DEFINE_LOG_CATEGORY_STATIC(WH_SaveGame, Log, All);
 
 // 场景
 DEFINE_LOG_CATEGORY_STATIC(WH_Scene, Log, All);
-
-// 生成池
-DEFINE_LOG_CATEGORY_STATIC(WH_ReferencePool, Log, All);
 
 // 体素
 DEFINE_LOG_CATEGORY_STATIC(WH_oxel, Log, All);
@@ -105,12 +105,5 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  * @param Duration 持续时间
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true)
-{
-	if(GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, Duration, DisplayColor, Message, bNewerOnTop);
-	}
-	UE_LOG(WH_Debug, Log, TEXT("%s"), *Message);
-}
+void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true);
 

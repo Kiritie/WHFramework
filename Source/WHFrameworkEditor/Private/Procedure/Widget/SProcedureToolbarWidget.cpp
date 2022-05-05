@@ -6,6 +6,8 @@
 #include "SlateOptMacros.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Procedure/ProcedureEditorSettings.h"
+#include "Procedure/Widget/SProcedureToolbarWidget.h"
+
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 
@@ -231,6 +233,26 @@ void SProcedureToolbarWidget::OnMultiModeToggled()
 void SProcedureToolbarWidget::OnEditModeToggled()
 {
 	ListWidget->ToggleEditMode();
+}
+
+void SProcedureToolbarWidget::OnCreate()
+{
+	SEditorSlateWidgetBase::OnCreate();
+}
+
+void SProcedureToolbarWidget::OnReset()
+{
+	SEditorSlateWidgetBase::OnReset();
+}
+
+void SProcedureToolbarWidget::OnRefresh()
+{
+	SEditorSlateWidgetBase::OnRefresh();
+}
+
+void SProcedureToolbarWidget::OnDestroy()
+{
+	SEditorSlateWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

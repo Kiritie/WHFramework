@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Procedure/Window/SCreateProcedureBlueprintDialog.h"
+#include "Procedure/Widget/Window/SCreateProcedureBlueprintDialog.h"
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
@@ -19,6 +19,9 @@ inline SCreateProcedureBlueprintDialog::SCreateProcedureBlueprintDialog()
 {
 	BlueprintFactory = nullptr;
 	UserResponse = EAppReturnType::Cancel;
+
+	WindowTitle = LOCTEXT("SCreateProcedureBlueprintDialog_Title", "Create New Procedure Blueprint");
+	WindowSize = FVector2D(450, 450);
 }
 
 void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
@@ -40,11 +43,10 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
 	SWindow::Construct(SWindow::FArguments()
-		.Title(LOCTEXT("SCreateProcedureBlueprintDialog_Title", "Create New Procedure Blueprint"))
-		.SupportsMinimize(false)
-		.SupportsMaximize(false)
-		//.SizingRule( ESizingRule::Autosized )
-		.ClientSize(FVector2D(450, 450))
+		// .Title(LOCTEXT("SCreateProcedureBlueprintDialog_Title", "Create New Procedure Blueprint"))
+		// .SupportsMinimize(false)
+		// .SupportsMaximize(false)
+		// .ClientSize(FVector2D(450, 450))
 		[
 			SNew(SVerticalBox)
 

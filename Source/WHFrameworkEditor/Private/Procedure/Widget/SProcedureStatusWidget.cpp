@@ -60,4 +60,24 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 	];
 }
 
+void SProcedureStatusWidget::OnCreate()
+{
+	SEditorSlateWidgetBase::OnCreate();
+}
+
+void SProcedureStatusWidget::OnReset()
+{
+	SEditorSlateWidgetBase::OnReset();
+}
+
+void SProcedureStatusWidget::OnRefresh()
+{
+	SEditorSlateWidgetBase::OnRefresh();
+}
+
+void SProcedureStatusWidget::OnDestroy()
+{
+	SEditorSlateWidgetBase::OnDestroy();
+}
+
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION
