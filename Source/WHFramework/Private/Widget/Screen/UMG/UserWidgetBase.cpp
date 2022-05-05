@@ -259,7 +259,7 @@ void UUserWidgetBase::Reset_Implementation()
 
 void UUserWidgetBase::Refresh_Implementation()
 {
-	if(WidgetState != EScreenWidgetState::Opened || WidgetRefreshType == EWidgetRefreshType::None) return;
+	if(WidgetRefreshType == EWidgetRefreshType::None) return;
 
 	OnRefresh();
 }

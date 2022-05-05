@@ -12,15 +12,17 @@ struct WHFRAMEWORK_API FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	bool bSaved;
-
-	UPROPERTY()
-	TArray<uint8> Datas;
-
 	FORCEINLINE FSaveData()
 	{
 		bSaved = false;
 		Datas = TArray<uint8>();
 	}
+
+	virtual ~FSaveData() { }
+
+	UPROPERTY()
+	bool bSaved;
+
+	UPROPERTY()
+	TArray<uint8> Datas;
 };

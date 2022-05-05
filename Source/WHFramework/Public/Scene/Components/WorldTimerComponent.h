@@ -36,7 +36,7 @@ protected:
 	float SunsetTime;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	int TimeSeconds;
+	float TimeSeconds;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
 	int CurrentDay;

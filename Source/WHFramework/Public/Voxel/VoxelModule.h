@@ -51,12 +51,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Static
-protected:
-	static AVoxelModule* Current;
-public:
-	static AVoxelModule* Get();
-
+	// Data
 protected:
 	static FVoxelWorldSaveData* WorldData;
 public:
@@ -77,14 +72,21 @@ protected:
 	// World
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
+	EVoxelWorldMode WorldMode;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
 	EVoxelWorldState WorldState;
 public:
+	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
+
+	virtual void SetWorldMode(EVoxelWorldMode InWorldMode);
+
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
 	virtual float GetWorldLength() const;
 
 protected:
-	virtual bool ChangeWorldState(EVoxelWorldState InWorldState);
+	virtual void OnWorldStateChanged();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
@@ -101,7 +103,7 @@ public:
 
 	virtual FSaveData* ToData(bool bSaved = true) override;
 
-	virtual void UnloadData(bool bPreview = false);
+	virtual void UnloadData();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
@@ -200,7 +202,7 @@ public:
 public:
 	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
-	virtual UVoxelData* GetNoiseVoxelData(FIndex InIndex);
+	virtual UVoxelData& GetNoiseVoxelData(FIndex InIndex);
 
 	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
 

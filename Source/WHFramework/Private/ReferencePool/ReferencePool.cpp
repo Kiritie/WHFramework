@@ -7,67 +7,47 @@
 
 UReferencePool::UReferencePool()
 {
-	Limit = 100;
 	Type = nullptr;
+	Object = nullptr;
 }
 
-void UReferencePool::Initialize(int32 InLimit, TSubclassOf<AActor> InType)
+void UReferencePool::Initialize(TSubclassOf<UObject> InType)
 {
-	Limit = InLimit;
 	Type = InType;
 }
 
-AActor* UReferencePool::Spawn()
+UObject& UReferencePool::Get()
 {
-	AActor* Actor;
-	if(Count > 0)
+	if(!Object)
 	{
-		Queue.Dequeue(Actor);
-		Count--;
+		Object = NewObject<UObject>(this, Type);
 	}
-	else
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		Actor = GetWorld()->SpawnActor<AActor>(Type, ActorSpawnParameters);
-	}
-	IReferencePoolInterface::Execute_OnSpawn(Actor);
-	return Actor;
+	return *Object;
 }
 
-void UReferencePool::Despawn(AActor* InActor)
+void UReferencePool::Set(UObject* InObject)
 {
-	if(Count >= Limit)
+	Object = InObject;
+}
+
+void UReferencePool::Reset()
+{
+	if(Object)
 	{
-		InActor->Destroy();
+		IReferencePoolInterface::Execute_OnReset(Object);
 	}
-	else
-	{
-		Queue.Enqueue(InActor);
-		Count++;
-	}
-	IReferencePoolInterface::Execute_OnDespawn(InActor);
 }
 
 void UReferencePool::Clear()
 {
-	AActor* Actor;
-	while(Queue.Dequeue(Actor))
+	if(Object)
 	{
-		if(Actor)
-		{
-			Actor->Destroy();
-		}
+		Object->ConditionalBeginDestroy();
+		Object = nullptr;
 	}
-	Queue.Empty();
 }
 
-int32 UReferencePool::GetLimit() const
+bool UReferencePool::IsEmpty() const
 {
-	return Limit;
-}
-
-int32 UReferencePool::GetCount() const
-{
-	return Count;
+	return !Object;
 }

@@ -14,15 +14,14 @@ USaveGameBase::USaveGameBase()
 	bLoaded = false;
 }
 
-void USaveGameBase::OnCreate_Implementation()
+void USaveGameBase::OnCreate_Implementation(int32 InSaveIndex)
 {
-	
+	SaveIndex = InSaveIndex;
 }
 
-void USaveGameBase::OnSave_Implementation(int32 InIndex)
+void USaveGameBase::OnSave_Implementation()
 {
 	bSaved = true;
-	SaveIndex = InIndex;
 }
 
 void USaveGameBase::OnLoad_Implementation()
@@ -48,9 +47,9 @@ void USaveGameBase::OnDestroy_Implementation()
 	
 }
 
-void USaveGameBase::Save(int32 InIndex, bool bRefresh)
+void USaveGameBase::Save(bool bRefresh)
 {
-	USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(InIndex, bRefresh, GetClass());
+	USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(bRefresh, GetClass());
 }
 
 void USaveGameBase::Load()

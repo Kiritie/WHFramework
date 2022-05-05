@@ -10,7 +10,6 @@ AReferencePoolModule::AReferencePoolModule()
 {
 	ModuleName = FName("ReferencePoolModule");
 
-	Limit = 100;
 	ReferencePools = TMap<UClass*, UReferencePool*>();
 }
 
@@ -54,37 +53,15 @@ void AReferencePoolModule::OnUnPause_Implementation()
 void AReferencePoolModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
-	ClearAllActor();
+	ClearAllReference();
 }
 
-AActor* AReferencePoolModule::K2_SpawnReference(TSubclassOf<AActor> InType)
-{
-	return SpawnReference<AActor>(InType);
-}
-
-void AReferencePoolModule::DespawnReference(AActor* InActor)
-{
-	if(!InActor) return;
-
-	UClass* TmpClass = InActor->GetClass();
-	
-	if(TmpClass->ImplementsInterface(UReferencePoolInterface::StaticClass()))
-	{
-		if (!ReferencePools.Contains(TmpClass))
-		{
-			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
-			ReferencePool->Initialize(Limit, TmpClass);
-			ReferencePools.Add(TmpClass, ReferencePool);
-		}
-		ReferencePools[TmpClass]->Despawn(InActor);
-	}
-}
-
-void AReferencePoolModule::ClearAllActor()
+void AReferencePoolModule::ClearAllReference()
 {
 	for (auto Iter : ReferencePools)
 	{
 		Iter.Value->Clear();
+		Iter.Value->ConditionalBeginDestroy();
 	}
 	ReferencePools.Empty();
 }

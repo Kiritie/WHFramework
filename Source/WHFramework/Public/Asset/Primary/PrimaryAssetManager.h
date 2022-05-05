@@ -4,6 +4,7 @@
 
 #include "PrimaryAssetBase.h"
 #include "Engine/AssetManager.h"
+#include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 #include "PrimaryAssetManager.generated.h"
 
 UCLASS()
@@ -31,5 +32,17 @@ public:
 	}
 	
 	UPrimaryAssetBase* LoadAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true);
-};
 
+	template<class T>
+	T& LoadAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
+	{
+		if(T* Asset = LoadAsset<T>(InPrimaryAssetId, bLogWarning))
+		{
+			return *Asset;
+		}
+		else
+		{
+			return UReferencePoolModuleBPLibrary::GetReference<T>();
+		}
+	}
+};

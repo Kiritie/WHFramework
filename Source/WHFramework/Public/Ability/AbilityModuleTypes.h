@@ -195,12 +195,12 @@ public:
 
 public:
 	template<class T>
-	T* GetItemData() const
+	T& GetItemData() const
 	{
-		return Cast<T>(GetItemData());
+		return static_cast<T&>(GetItemData());
 	}
 
-	UItemDataBase* GetItemData() const;
+	UItemDataBase& GetItemData() const;
 };
 
 /**
@@ -337,12 +337,12 @@ public:
 	virtual ~FAbilityItem() = default;
 
 	template<class T>
-	T* GetData() const
+	T& GetData() const
 	{
-		return Cast<T>(GetData());
+		return static_cast<T&>(GetData());
 	}
 
-	UItemDataBase* GetData() const;
+	UItemDataBase& GetData() const;
 
 	FORCEINLINE virtual bool IsValid() const
 	{

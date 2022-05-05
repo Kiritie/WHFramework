@@ -20,20 +20,20 @@ void USaveGameModuleBPLibrary::SetUserIndex(int32 InUserIndex)
 	}
 }
 
-FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InIndex)
+FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->GetSaveSlotName(InSaveName, InIndex);
+		return SaveGameModule->GetSaveSlotName(InSaveName, InSaveIndex);
 	}
 	return TEXT("");
 }
 
-bool USaveGameModuleBPLibrary::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
+bool USaveGameModuleBPLibrary::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_HasSaveGame(InSaveGameClass, InIndex);
+		return SaveGameModule->K2_HasSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
 }
@@ -47,29 +47,29 @@ USaveGameBase* USaveGameModuleBPLibrary::K2_GetSaveGame(TSubclassOf<USaveGameBas
 	return nullptr;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass);
+		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return nullptr;
 }
 
-bool USaveGameModuleBPLibrary::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex, bool bRefresh)
+bool USaveGameModuleBPLibrary::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_SaveSaveGame(InSaveGameClass, InIndex, bRefresh);
+		return SaveGameModule->K2_SaveSaveGame(InSaveGameClass, bRefresh);
 	}
 	return false;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
+USaveGameBase* USaveGameModuleBPLibrary::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_LoadSaveGame(InSaveGameClass, InIndex);
+		return SaveGameModule->K2_LoadSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return nullptr;
 }
@@ -101,11 +101,11 @@ bool USaveGameModuleBPLibrary::K2_RefreshSaveGame(TSubclassOf<USaveGameBase> InS
 	return false;
 }
 
-bool USaveGameModuleBPLibrary::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
+bool USaveGameModuleBPLibrary::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_DestroySaveGame(InSaveGameClass, InIndex);
+		return SaveGameModule->K2_DestroySaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
 }

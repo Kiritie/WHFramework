@@ -53,10 +53,12 @@ AWHPlayerController::AWHPlayerController()
 	bReverseCameraMove = false;
 	bClampCameraMove = false;
 	CameraMoveLimit = FBox(EForceInit::ForceInitToZero);
+	CameraPanMoveKey = FKey("MiddleMouseButton");
 	CameraMoveRate = 2000.f;
 	CameraMoveSmooth = 5.f;
 
 	bCameraRotateAble = true;
+	CameraRotateKey = FKey("RightMouseButton");
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
 	CameraRotateSmooth = 2.f;
@@ -66,6 +68,7 @@ AWHPlayerController::AWHPlayerController()
 
 	bCameraZoomAble = true;
 	bUseNormalizedZoom = false;
+	CameraZoomKey = FKey();
 	CameraZoomRate = 150.f;
 	CameraZoomSmooth = 5.f;
 	MinCameraDistance = 100.f;
@@ -223,7 +226,7 @@ void AWHPlayerController::Turn(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsInputKeyDown(FKey(TEXT("RightMouseButton"))))
+	if(!CameraRotateKey.IsValid() || IsInputKeyDown(CameraRotateKey))
 	{
 		AddCameraRotationInput(InRate, 0.f);
 	}
@@ -233,7 +236,7 @@ void AWHPlayerController::LookUp(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsInputKeyDown(FKey(TEXT("RightMouseButton"))))
+	if(!CameraRotateKey.IsValid() || IsInputKeyDown(CameraRotateKey))
 	{
 		AddCameraRotationInput(0.f, -InRate);
 	}
@@ -243,7 +246,7 @@ void AWHPlayerController::PanH(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
+	if(!CameraPanMoveKey.IsValid() || IsInputKeyDown(CameraPanMoveKey))
 	{
 		const FRotator Rotation = GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (bReverseCameraMove ? -1.f : 1.f);
@@ -255,7 +258,7 @@ void AWHPlayerController::PanV(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))))
+	if(!CameraPanMoveKey.IsValid() || IsInputKeyDown(CameraPanMoveKey))
 	{
 		const FRotator Rotation = GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (bReverseCameraMove ? -1.f : 1.f);
@@ -267,7 +270,10 @@ void AWHPlayerController::ZoomCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	AddCameraDistanceInput(InRate);
+	if(!CameraZoomKey.IsValid() || IsInputKeyDown(CameraZoomKey))
+	{
+		AddCameraDistanceInput(InRate);
+	}
 }
 
 void AWHPlayerController::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
@@ -689,12 +695,12 @@ void AWHPlayerController::AddCameraMovementInput(FVector InDirection, float InVa
 
 bool AWHPlayerController::IsControllingMove() const
 {
-	return IsInputKeyDown(FKey(TEXT("MiddleMouseButton"))) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || TouchPressedCount == 2;
+	return !CameraPanMoveKey.IsValid() || IsInputKeyDown(CameraPanMoveKey) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || TouchPressedCount == 2;
 }
 
 bool AWHPlayerController::IsControllingRotate() const
 {
-	return IsInputKeyDown(FKey(TEXT("RightMouseButton"))) || TouchPressedCount == 1;
+	return !CameraRotateKey.IsValid() || IsInputKeyDown(CameraRotateKey) || TouchPressedCount == 1;
 }
 
 bool AWHPlayerController::IsControllingZoom() const
