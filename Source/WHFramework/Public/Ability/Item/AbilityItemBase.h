@@ -40,12 +40,12 @@ public:
 
 public:
 	template<class T >
-	T* GetItemData() const
+	T& GetItemData() const
 	{
 		return Item.GetData<T>();
 	}
 
-	UItemDataBase* GetItemData() const
+	UItemDataBase& GetItemData() const
 	{
 		return Item.GetData();
 	}

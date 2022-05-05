@@ -19,21 +19,51 @@ class WHFRAMEWORK_API UReferencePoolModuleBPLibrary : public UBlueprintFunctionL
 
 public:
 	template<class T>
-	static T* SpawnReference(TSubclassOf<AActor> InType = T::StaticClass())
+	static bool HasReference(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
-			return ReferencePoolModule->SpawnReference<T>(InType);
+			return ReferencePoolModule->HasReference<T>(InType);
 		}
-		return nullptr;
+		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Actor"), Category = "ReferencePoolModuleBPLibrary")
-	static AActor* K2_SpawnReference(TSubclassOf<AActor> InType);
+	template<class T>
+	static T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		{
+			return ReferencePoolModule->GetReference<T>(InType);
+		}
+		return *NewObject<T>();
+	}
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModuleBPLibrary")
-	static void DespawnReference(AActor* InActor);
+	template<class T>
+	static void SetReference(UObject* InObject, TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		{
+			ReferencePoolModule->SetReference<T>(InObject, InType);
+		}
+	}
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModuleBPLibrary")
-	static void ClearAllActor();
+	template<class T>
+	static void ResetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		{
+			ReferencePoolModule->ResetReference<T>(InType);
+		}
+	}
+
+	template<class T>
+	static void ClearReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		{
+			ReferencePoolModule->ClearReference<T>(InType);
+		}
+	}
+
+	static void ClearAllReference();
 };

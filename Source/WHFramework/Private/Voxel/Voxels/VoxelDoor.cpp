@@ -40,9 +40,9 @@ void UVoxelDoor::OpenTheDoor()
 	Rotation += FRotator(0, -90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetData()->OperationSounds.Num() > 0)
+	if(GetData().OperationSounds.Num() > 0)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData()->OperationSounds[0], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[0], Owner->IndexToLocation(Index));
 	}
 }
 
@@ -52,9 +52,9 @@ void UVoxelDoor::CloseTheDoor()
 	Rotation += FRotator(0, 90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
-	if(GetData()->OperationSounds.Num() > 1)
+	if(GetData().OperationSounds.Num() > 1)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData()->OperationSounds[1], Owner->IndexToLocation(Index));
+		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[1], Owner->IndexToLocation(Index));
 	}
 }
 
@@ -104,7 +104,7 @@ bool UVoxelDoor::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& 
 		case EMouseButton::Right:
 		{
 			FHitResult hitResult;
-			if (!AVoxelModule::Get()->VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
+			if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
 			{
 				OpenOrClose();
 				return true;

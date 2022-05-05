@@ -18,6 +18,13 @@ class AVoxelAuxiliary;
 class UVoxel;
 
 UENUM(BlueprintType)
+enum class EVoxelWorldMode : uint8
+{
+	Game,
+	Preview,
+};
+
+UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
@@ -412,6 +419,8 @@ public:
 	int32 TimeSeconds;
 
 public:
+	virtual void Initialize();
+
 	FORCEINLINE float GetChunkLength() const
 	{
 		return ChunkSize * BlockSize;

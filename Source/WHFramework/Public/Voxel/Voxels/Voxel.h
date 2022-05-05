@@ -103,7 +103,7 @@ protected:
 	AVoxelAuxiliary* Auxiliary;
 
 public:
-	UVoxelData* GetData() const;
+	UVoxelData& GetData() const;
 
 	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId GetID() const { return ID; }

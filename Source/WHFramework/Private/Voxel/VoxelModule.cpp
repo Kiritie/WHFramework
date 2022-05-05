@@ -20,7 +20,6 @@
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Datas/VoxelData.h"
 
-AVoxelModule* AVoxelModule::Current = nullptr;
 FVoxelWorldSaveData* AVoxelModule::WorldData = nullptr;
 
 // Sets default values
@@ -33,6 +32,9 @@ AVoxelModule::AVoxelModule()
 	VoxelsCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
 	VoxelsCapture->SetupAttachment(RootComponent);
 	VoxelsCapture->SetRelativeLocationAndRotation(FVector(0, 0, -500), FRotator(90, 0, 0));
+
+	WorldMode = EVoxelWorldMode::Game;
+	WorldState = EVoxelWorldState::None;
 
 	ChunkSpawnRange = 7;
 	ChunkBasicSpawnRange = 1;
@@ -53,8 +55,6 @@ AVoxelModule::AVoxelModule()
 	ChunkMapBuildQueue = TArray<AVoxelChunk*>();
 	ChunkGenerateQueue = TArray<AVoxelChunk*>();
 	ChunkDestroyQueue = TArray<AVoxelChunk*>();
-
-	Current = this;
 }
 
 #if WITH_EDITOR
@@ -116,11 +116,6 @@ void AVoxelModule::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-AVoxelModule* AVoxelModule::Get()
-{
-	return Current;
-}
-
 FVoxelWorldSaveData* AVoxelModule::GetWorldData()
 {
 	if(WorldData)
@@ -133,32 +128,32 @@ FVoxelWorldSaveData* AVoxelModule::GetWorldData()
 	}
 }
 
+void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
+{
+	WorldMode = InWorldMode;
+	OnWorldStateChanged();
+}
+
 float AVoxelModule::GetWorldLength() const
 {
 	return GetWorldData()->ChunkSize * ChunkSpawnRange * 2;
 }
 
-bool AVoxelModule::ChangeWorldState(EVoxelWorldState InWorldState)
+void AVoxelModule::OnWorldStateChanged()
 {
-	if(WorldState != InWorldState)
+	switch(WorldState)
 	{
-		WorldState = InWorldState;
-		switch(WorldState)
+		case EVoxelWorldState::BasicGenerated:
 		{
-			case EVoxelWorldState::BasicGenerated:
-			{
-				break;
-			}
-			case EVoxelWorldState::FullGenerated:
-			{
-				break;
-			}
-			default: break;
+			break;
 		}
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
-		return true;
+		case EVoxelWorldState::FullGenerated:
+		{
+			break;
+		}
+		default: break;
 	}
-	return false;
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
 }
 
 void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
@@ -168,7 +163,8 @@ void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
 
 void AVoxelModule::LoadData(FSaveData* InWorldData)
 {
-	ChangeWorldState(EVoxelWorldState::Generating);
+	WorldState = EVoxelWorldState::Generating;
+	OnWorldStateChanged();
 	
 	WorldData = static_cast<FVoxelWorldSaveData*>(InWorldData);
 	RandomStream = FRandomStream(GetWorldData()->WorldSeed);
@@ -179,48 +175,71 @@ void AVoxelModule::LoadData(FSaveData* InWorldData)
 			WorldTimer->SetTimeSeconds(GetWorldData()->TimeSeconds);
 		}
 	}
+
+	switch(WorldMode)
+	{
+		case EVoxelWorldMode::Game:
+		{
+			for(auto Iter : ChunkMap)
+			{
+				if(Iter.Value && Iter.Value->IsGenerated())
+				{
+					Iter.Value->SpawnActors();
+				}
+			}
+			break;
+		}
+		default: break;
+	}
 }
 
 FSaveData* AVoxelModule::ToData(bool bSaved)
 {
+	WorldData->bSaved = bSaved;
 	return WorldData;
 }
 
-void AVoxelModule::UnloadData(bool bPreview)
+void AVoxelModule::UnloadData()
 {
-	if(!bPreview)
+	switch(WorldMode)
 	{
-		ChangeWorldState(EVoxelWorldState::None);
+		case EVoxelWorldMode::Game:
+		{
+			WorldState = EVoxelWorldState::None;
+			OnWorldStateChanged();
 		
-		for (auto iter : ChunkMap)
-		{
-			if(iter.Value)
+			for (auto iter : ChunkMap)
 			{
-				UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
+				if(iter.Value)
+				{
+					UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
+				}
 			}
-		}
-		ChunkMap.Empty();
+			ChunkMap.Empty();
 	
-		ChunkSpawnBatch = 0;
-		LastGenerateIndex = FIndex(-1, -1, -1);
-		LastStayChunkIndex = FIndex::ZeroIndex;
+			ChunkSpawnBatch = 0;
+			LastGenerateIndex = FIndex(-1, -1, -1);
+			LastStayChunkIndex = FIndex::ZeroIndex;
 
-		ChunkSpawnQueue.Empty();
-		ChunkMapBuildQueue.Empty();
-		ChunkMapGenerateQueue.Empty();
-		ChunkGenerateQueue.Empty();
-		ChunkDestroyQueue.Empty();
+			ChunkSpawnQueue.Empty();
+			ChunkMapBuildQueue.Empty();
+			ChunkMapGenerateQueue.Empty();
+			ChunkGenerateQueue.Empty();
+			ChunkDestroyQueue.Empty();
 
-		WorldData = nullptr;
-	}
-	else
-	{
-		for(auto Iter : ChunkMap)
+			WorldData = nullptr;
+			break;
+		}
+		case EVoxelWorldMode::Preview:
 		{
-			if(Iter.Value && Iter.Value->IsGenerated())
+			for(auto Iter : ChunkMap)
 			{
-				Iter.Value->DestroyActors();
+				if(Iter.Value && Iter.Value->IsGenerated())
+				{
+					Iter.Value->DestroyActors();
+				}
 			}
+			break;
 		}
 	}
 }
@@ -367,11 +386,19 @@ void AVoxelModule::GenerateTerrain()
 			const float BasicNum = FMath::Square(ChunkBasicSpawnRange * 2) * GetWorldData()->ChunkHeightRange;
 			if(FullNum - ChunkGenerateQueue.Num() >= BasicNum)
 			{
-				ChangeWorldState(EVoxelWorldState::BasicGenerated);
+				if(WorldState != EVoxelWorldState::BasicGenerated)
+				{
+					WorldState = EVoxelWorldState::BasicGenerated;
+					OnWorldStateChanged();
+				}
 			}
 			if(ChunkGenerateQueue.Num() == 0)
 			{
-				ChangeWorldState(EVoxelWorldState::FullGenerated);
+				if(WorldState != EVoxelWorldState::FullGenerated)
+				{
+					WorldState = EVoxelWorldState::FullGenerated;
+					OnWorldStateChanged();
+				}
 			}
 		}
 	}
@@ -425,7 +452,7 @@ void AVoxelModule::GenerateChunk(AVoxelChunk* InChunk)
 {
 	if (!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
 	
-	InChunk->Generate(false);
+	InChunk->Generate();
 }
 
 void AVoxelModule::DestroyChunk(AVoxelChunk* InChunk)
@@ -578,9 +605,9 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
 	return EVoxelType::Empty; //Empty
 }
 
-UVoxelData* AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
+UVoxelData& AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
 }
 
 int AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)

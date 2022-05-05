@@ -399,9 +399,9 @@ UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 	return Interaction;
 }
 
-UCharacterDataBase* AAbilityCharacterBase::GetCharacterData() const
+UCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UCharacterDataBase>(AssetID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UCharacterDataBase>(AssetID);
 }
 
 void AAbilityCharacterBase::SetNameV(FName InName)

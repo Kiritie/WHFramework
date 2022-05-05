@@ -35,10 +35,10 @@ UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
 UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 {
 	UVoxel* voxel = nullptr;
-	UVoxelData* voxelData = UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(InVoxelID);
-	if(voxelData)
+	const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
+	if(voxelData.IsValid())
 	{
-		const TSubclassOf<UVoxel> tmpClass = voxelData->VoxelClass ? voxelData->VoxelClass : TSubclassOf<UVoxel>(StaticClass());
+		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : TSubclassOf<UVoxel>(StaticClass());
 		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
 		if(voxel) voxel->ID = InVoxelID;
 	}
@@ -204,7 +204,7 @@ void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
 	
 }
 
-UVoxelData* UVoxel::GetData() const
+UVoxelData& UVoxel::GetData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UVoxelData>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
 }

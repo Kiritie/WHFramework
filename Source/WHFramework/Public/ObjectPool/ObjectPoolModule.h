@@ -17,19 +17,19 @@ UCLASS()
 class WHFRAMEWORK_API AObjectPoolModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// ParamSets default values for this actor's properties
 	AObjectPoolModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
-#if WITH_EDITOR
+	#if WITH_EDITOR
 	virtual void OnGenerate_Implementation() override;
 
 	virtual void OnDestroy_Implementation() override;
-#endif
+	#endif
 
 	virtual void OnInitialize_Implementation() override;
 
@@ -59,7 +59,7 @@ public:
 	{
 		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return false;
 
-		if (ObjectPools.Contains(InType))
+		if(ObjectPools.Contains(InType))
 		{
 			return ObjectPools[InType]->GetCount() > 0;
 		}
@@ -68,13 +68,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Has Object"))
 	bool K2_HasObject(TSubclassOf<UObject> InType);
-	
+
 	template<class T>
 	T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
 
-		if (!ObjectPools.Contains(InType))
+		if(!ObjectPools.Contains(InType))
 		{
 			UObjectPool* ObjectPool = nullptr;
 			if(InType->IsChildOf(AActor::StaticClass()))
@@ -90,7 +90,7 @@ public:
 				ObjectPool = NewObject<UObjectPool>(this);
 			}
 			const int32 TempLimit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-			ObjectPool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
+			ObjectPool->Initialize(TempLimit != 0 ? TempLimit : Limit, InType);
 			ObjectPools.Add(InType, ObjectPool);
 		}
 		return Cast<T>(ObjectPools[InType]->Spawn());
@@ -101,6 +101,20 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject);
+
+	template<class T>
+	void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
+
+		if(ObjectPools.Contains(InType))
+		{
+			ObjectPools[InType]->Clear();
+		}
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Clear Object"))
+	void K2_ClearObject(TSubclassOf<UObject> InType);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllObject();

@@ -85,11 +85,17 @@ void AObjectPoolModule::DespawnObject(UObject* InObject)
 	}
 }
 
+void AObjectPoolModule::K2_ClearObject(TSubclassOf<UObject> InType)
+{
+	ClearObject<UObject>(InType);
+}
+
 void AObjectPoolModule::ClearAllObject()
 {
 	for (auto Iter : ObjectPools)
 	{
 		Iter.Value->Clear();
+		Iter.Value->ConditionalBeginDestroy();
 	}
 	ObjectPools.Empty();
 }

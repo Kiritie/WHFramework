@@ -7,27 +7,10 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "ReferencePool/ReferencePoolModule.h"
 
-AActor* UReferencePoolModuleBPLibrary::K2_SpawnReference(TSubclassOf<AActor> InType)
+void UReferencePoolModuleBPLibrary::ClearAllReference()
 {
 	if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 	{
-		return ReferencePoolModule->K2_SpawnReference(InType);
-	}
-	return nullptr;
-}
-
-void UReferencePoolModuleBPLibrary::DespawnReference(AActor* InActor)
-{
-	if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
-	{
-		ReferencePoolModule->DespawnReference(InActor);
-	}
-}
-
-void UReferencePoolModuleBPLibrary::ClearAllActor()
-{
-	if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
-	{
-		ReferencePoolModule->ClearAllActor();
+		ReferencePoolModule->ClearAllReference();
 	}
 }

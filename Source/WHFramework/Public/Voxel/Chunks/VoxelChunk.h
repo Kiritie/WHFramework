@@ -112,7 +112,7 @@ public:
 
 	virtual FSaveData* ToData(bool bSaved = true) override;
 
-	virtual void Generate(bool bPreview = false);
+	virtual void Generate();
 
 	virtual void BuildMap();
 
@@ -123,7 +123,7 @@ public:
 	virtual void DestroyActors();
 
 protected:
-	virtual void OnGenerated(bool bPreview = false);
+	virtual void OnGenerated();
 
 	void GenerateNeighbors(FIndex InIndex);
 

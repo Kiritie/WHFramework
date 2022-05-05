@@ -14,19 +14,19 @@ UCLASS()
 class WHFRAMEWORK_API AReferencePoolModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// ParamSets default values for this actor's properties
 	AReferencePoolModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
-#if WITH_EDITOR
+	#if WITH_EDITOR
 	virtual void OnGenerate_Implementation() override;
 
 	virtual void OnDestroy_Implementation() override;
-#endif
+	#endif
 
 	virtual void OnInitialize_Implementation() override;
 
@@ -43,47 +43,71 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ReferencePool
 protected:
-	/// 单个对象池上限
-	UPROPERTY(EditAnywhere)
-	int32 Limit;
-
 	UPROPERTY(VisibleAnywhere, Transient)
 	TMap<UClass*, UReferencePool*> ReferencePools;
 
 public:
 	template<class T>
-	bool HasReference(TSubclassOf<AActor> InType = T::StaticClass())
+	bool HasReference(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return false;
 
-		if (ReferencePools.Contains(InType))
+		if(ReferencePools.Contains(InType))
 		{
-			return ReferencePools[InType]->GetCount() > 0;
+			return ReferencePools[InType]->IsEmpty();
 		}
 		return false;
 	}
-	
-	template<class T>
-	T* SpawnReference(TSubclassOf<AActor> InType = T::StaticClass())
-	{
-		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return nullptr;
 
-		if (!ReferencePools.Contains(InType))
+	template<class T>
+	T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return *NewObject<T>();
+
+		if(!ReferencePools.Contains(InType))
 		{
 			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
-			const int32 TempLimit = IReferencePoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-			ReferencePool->Initialize(TempLimit != 0 ? TempLimit: Limit, InType);
+			ReferencePool->Initialize(InType);
 			ReferencePools.Add(InType, ReferencePool);
 		}
-		return Cast<T>(ReferencePools[InType]->Spawn());
+		return static_cast<T&>(ReferencePools[InType]->Get());
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Actor"))
-	AActor* K2_SpawnReference(TSubclassOf<AActor> InType);
+	template<class T>
+	void SetReference(UObject* InObject, TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
 
-	UFUNCTION(BlueprintCallable)
-	void DespawnReference(AActor* InActor);
+		if(!ReferencePools.Contains(InType))
+		{
+			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
+			ReferencePool->Initialize(InType);
+			ReferencePools.Add(InType, ReferencePool);
+		}
+		return Cast<T>(ReferencePools[InType]->Set(InObject));
+	}
 
-	UFUNCTION(BlueprintCallable)
-	void ClearAllActor();
+	template<class T>
+	void ResetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
+
+		if(ReferencePools.Contains(InType))
+		{
+			ReferencePools[InType]->Reset();
+		}
+	}
+
+	template<class T>
+	void ClearReference(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
+
+		if(ReferencePools.Contains(InType))
+		{
+			ReferencePools[InType]->Clear();
+		}
+	}
+
+	void ClearAllReference();
 };

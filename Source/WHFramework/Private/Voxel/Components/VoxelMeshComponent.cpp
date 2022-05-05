@@ -77,11 +77,11 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparen
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	UVoxelData* voxelData = InVoxelItem.GetData<UVoxelData>();
-	if(voxelData->bCustomMesh)
+	UVoxelData& voxelData = InVoxelItem.GetData<UVoxelData>();
+	if(voxelData.bCustomMesh)
 	{
 		TArray<FVector> meshVertices, meshNormals;
-		if (voxelData->GetMeshDatas(meshVertices, meshNormals, InVoxelItem.Rotation, InVoxelItem.Scale))
+		if (voxelData.GetMeshDatas(meshVertices, meshNormals, InVoxelItem.Rotation, InVoxelItem.Scale))
 		{
 			for (int i = 0; i < meshVertices.Num(); i++)
 			{
@@ -109,7 +109,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 	}
 	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::Preview || MeshType == EVoxelMeshType::Vitality)
 	{
-		Transparency = voxelData->Transparency;
+		Transparency = voxelData.Transparency;
 	}
 }
 
@@ -173,7 +173,7 @@ void UVoxelMeshComponent::ClearData()
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing InFacing)
 {
 	FVector vertices[4];
-	FVector range = InVoxelItem.GetData<UVoxelData>()->GetFinalRange(InVoxelItem.Rotation, InVoxelItem.Scale);
+	FVector range = InVoxelItem.GetData<UVoxelData>().GetFinalRange(InVoxelItem.Rotation, InVoxelItem.Scale);
 
 	switch (InFacing)
 	{
@@ -233,12 +233,12 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal)
 {
 	int32 verNum = Vertices.Num();
-	UVoxelData* voxelData = InVoxelItem.GetData<UVoxelData>();
-	FVector2D uvCorner = voxelData->GetUVCorner(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData->Transparency).BlockUVSize);
-	FVector2D uvSpan = voxelData->GetUVSpan(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData->Transparency).BlockUVSize);
+	UVoxelData& voxelData = InVoxelItem.GetData<UVoxelData>();
+	FVector2D uvCorner = voxelData.GetUVCorner(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData.Transparency).BlockUVSize);
+	FVector2D uvSpan = voxelData.GetUVSpan(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData.Transparency).BlockUVSize);
 	InNormal = InVoxelItem.Rotation.RotateVector(InNormal);
 
-	FVector center = voxelData->GetCeilRange(InVoxelItem.Rotation, InVoxelItem.Scale) * (CenterOffset + InVoxelItem.Rotation.RotateVector(voxelData->Offset) * OffsetScale);
+	FVector center = voxelData.GetCeilRange(InVoxelItem.Rotation, InVoxelItem.Scale) * (CenterOffset + InVoxelItem.Rotation.RotateVector(voxelData.Offset) * OffsetScale);
 	for (int32 i = 0; i < 4; i++)
 	{
 		Vertices.Add((InVoxelItem.Index.ToVector() + center + InVoxelItem.Rotation.RotateVector(InVertices[i] * InVoxelItem.Scale)) * AVoxelModule::GetWorldData()->BlockSize * BlockScale);

@@ -28,7 +28,7 @@ void APickUpProp::BeginPlay()
 void APickUpProp::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
 {
 	Super::Initialize(InItem, bPreview);
-	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UPropDataBase>()->PropMesh);
+	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UPropDataBase>().PropMesh);
 }
 
 void APickUpProp::OnPickUp(IPickerInterface* InPicker)

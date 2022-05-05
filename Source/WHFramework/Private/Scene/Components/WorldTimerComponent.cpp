@@ -12,10 +12,10 @@ UWorldTimerComponent::UWorldTimerComponent()
 	SkyLight = nullptr;
 	SunLight = nullptr;
 
-	SecondsOfDay = 300;
-	TimeSeconds = 0;
-	SunriseTime = 6;
-	SunsetTime = 18;
+	SecondsOfDay = 300.f;
+	SunriseTime = 6.f;
+	SunsetTime = 18.f;
+	TimeSeconds = 0.f;
 	CurrentDay = 0;
 	CurrentHour = 0;
 	CurrentMinute = 0;
@@ -29,16 +29,16 @@ void UWorldTimerComponent::BeginPlay()
 
 void UWorldTimerComponent::UpdateTimer()
 {
-	TimeSeconds = FMath::TruncToInt(UGameplayStatics::GetTimeSeconds(this));
-
 	double RemainSeconds = 0;
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
 
-	UpdateLight(RemainSeconds/ (SecondsOfDay / 24));
+	UpdateLight(RemainSeconds / SecondsOfDay / 24 / 24 * 360 + 200);
 
 	CurrentHour = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 24, RemainSeconds);
 	CurrentMinute = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 60, RemainSeconds);
 	CurrentSeconds = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 60 / 60, RemainSeconds);
+
+	TimeSeconds += GetWorld()->GetDeltaSeconds();
 }
 
 void UWorldTimerComponent::SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer /*= true*/)

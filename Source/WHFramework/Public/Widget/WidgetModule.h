@@ -201,7 +201,7 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidgetByName"))
 	bool InitializeUserWidgetByName(FName InWidgetName, AActor* InOwner)
 	{
-		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InWidgetName) ? GetUserWidgetByName<UUserWidgetBase>(InWidgetName) : CreateUserWidgetByName<UUserWidgetBase>(InWidgetName, InOwner))
+		if(UUserWidgetBase* UserWidget = GetUserWidgetByName<UUserWidgetBase>(InWidgetName))
 		{
 			UserWidget->OnInitialize(InOwner);
 			return true;

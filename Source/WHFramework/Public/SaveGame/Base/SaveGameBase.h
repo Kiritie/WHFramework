@@ -18,10 +18,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate();
+	void OnCreate(int32 InSaveIndex);
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnSave(int32 InIndex);
+	void OnSave();
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnLoad();
@@ -40,7 +40,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void Save(int32 InIndex, bool bRefresh = false);
+	void Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
 	void Load();
@@ -70,6 +70,9 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	int32 GetSaveIndex() const { return SaveIndex; }
+	
+	UFUNCTION(BlueprintCallable)
+	void SetSaveIndex(int32 InSaveIndex) { this->SaveIndex = InSaveIndex; }
 
 protected:
 	UPROPERTY()

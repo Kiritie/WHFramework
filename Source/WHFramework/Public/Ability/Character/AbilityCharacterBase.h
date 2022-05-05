@@ -214,12 +214,12 @@ public:
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
 	template<class T>
-	T* GetCharacterData() const
+	T& GetCharacterData() const
 	{
-		return Cast<T>(GetCharacterData());
+		return static_cast<T&>(GetCharacterData());
 	}
 	
-	UCharacterDataBase* GetCharacterData() const;
+	UCharacterDataBase& GetCharacterData() const;
 
 public:
 	UFUNCTION(BlueprintPure)

@@ -34,6 +34,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
 	static void DespawnObject(UObject* InObject);
 
+	template<class T>
+	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+		{
+			ObjectPoolModule->ClearObject<T>(InType);
+		}
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Clear Object"), Category = "ObjectPoolModuleBPLibrary")
+	static void K2_ClearObject(TSubclassOf<UObject> InType);
+
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
 	static void ClearAllObject();
 };

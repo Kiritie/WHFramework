@@ -107,11 +107,8 @@ public:
 	{
 		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{
-			AModuleBase* ModuleBase = InModuleClass.GetDefaultObject();
- 			if(Get(bInEditor)->ModuleMap.Contains(ModuleBase->Execute_GetModuleName(ModuleBase)))
-			{
-				return Cast<T>(Get(bInEditor)->ModuleMap[ModuleBase->Execute_GetModuleName(ModuleBase)].GetObject());
-			}
+			const FName ModuleName = IModule::Execute_GetModuleName(InModuleClass.GetDefaultObject());
+			return GetModuleByName<T>(ModuleName, bInEditor);
 		}
 		return nullptr;
 	}

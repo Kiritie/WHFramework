@@ -226,12 +226,12 @@ public:
 	virtual float GetMagicDamage() const override;
 
 	template<class T>
-	T* GetVitalityData() const
+	T& GetVitalityData() const
 	{
-		return Cast<T>(GetVitalityData());
+		return static_cast<T&>(GetVitalityData());
 	}
 	
-	UVitalityDataBase* GetVitalityData() const;
+	UVitalityDataBase& GetVitalityData() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

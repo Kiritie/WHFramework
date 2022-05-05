@@ -50,9 +50,9 @@ void ASaveGameModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-bool ASaveGameModule::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass,  int32 InIndex) const
+bool ASaveGameModule::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass,  int32 InSaveIndex) const
 {
-	return HasSaveGame<USaveGameBase>(InIndex, InSaveGameClass);
+	return HasSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
 USaveGameBase* ASaveGameModule::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const
@@ -60,19 +60,19 @@ USaveGameBase* ASaveGameModule::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSave
 	return GetSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
-	return CreateSaveGame<USaveGameBase>(InSaveGameClass);
+	return CreateSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex, bool bRefresh)
+bool ASaveGameModule::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
 {
-	return SaveSaveGame<USaveGameBase>(InIndex,  bRefresh, InSaveGameClass);
+	return SaveSaveGame<USaveGameBase>(bRefresh, InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
+USaveGameBase* ASaveGameModule::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
-	return LoadSaveGame<USaveGameBase>(InIndex, InSaveGameClass);
+	return LoadSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
 bool ASaveGameModule::K2_UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
@@ -90,14 +90,14 @@ bool ASaveGameModule::K2_RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameCl
 	return RefreshSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InIndex)
+bool ASaveGameModule::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
-	return DestroySaveGame<USaveGameBase>(InIndex, InSaveGameClass);
+	return DestroySaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
-FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InIndex) const
+FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InSaveIndex) const
 {
-	return FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex);
+	return InSaveIndex > 0 ? FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InSaveIndex) : FString::Printf(TEXT("SaveGame_%s"), *InSaveName.ToString());
 }
 
 void ASaveGameModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

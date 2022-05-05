@@ -18,40 +18,36 @@ public:
 	UReferencePool();
 
 private:
-	/// 限制大小
+	/// 引用类型
 	UPROPERTY(VisibleAnywhere)
-	int32 Limit;
-	/// Actor类型
-	UPROPERTY(VisibleAnywhere)
-	TSubclassOf<AActor> Type;
-	/// Actor数量
-	UPROPERTY(VisibleAnywhere)
-	int32 Count;
-	/// Actor列表
-	TQueue<AActor*> Queue;
+	TSubclassOf<UObject> Type;
+	/// 引用对象
+	UPROPERTY()
+	UObject* Object;
 
 public:
 	/**
 	* 初始化
-	* @param InLimit 限制大小
 	* @param InType 类型
 	*/
-	void Initialize(int32 InLimit, TSubclassOf<AActor> InType);
+	void Initialize(TSubclassOf<UObject> InType);
 	/**
-	* 生成Actor
+	* 获取引用
 	*/
-	AActor* Spawn();
+	UObject& Get();
 	/**
-	* 回收Actor
+	* 设置引用
 	*/
-	void Despawn(AActor* InActor);
+	void Set(UObject* InObject);
 	/**
-	* 清理Actor
+	* 重置引用
+	*/
+	void Reset();
+	/**
+	* 清理引用
 	*/
 	void Clear();
 
 public:
-	int32 GetLimit() const;
-
-	int32 GetCount() const;
+	bool IsEmpty() const;
 };

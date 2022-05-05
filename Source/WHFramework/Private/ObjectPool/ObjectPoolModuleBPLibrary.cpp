@@ -23,6 +23,14 @@ void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
 	}
 }
 
+void UObjectPoolModuleBPLibrary::K2_ClearObject(TSubclassOf<UObject> InType)
+{
+	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	{
+		ObjectPoolModule->K2_ClearObject(InType);
+	}
+}
+
 void UObjectPoolModuleBPLibrary::ClearAllObject()
 {
 	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())

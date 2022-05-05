@@ -119,6 +119,9 @@ protected:
 	FBox CameraMoveLimit;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	FKey CameraPanMoveKey;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
@@ -127,6 +130,9 @@ protected:
 	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	bool bCameraRotateAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	FKey CameraRotateKey;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraTurnRate;
@@ -152,6 +158,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bUseNormalizedZoom;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	FKey CameraZoomKey;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float CameraZoomRate;

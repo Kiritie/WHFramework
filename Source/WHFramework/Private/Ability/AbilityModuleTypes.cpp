@@ -26,9 +26,9 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-UItemDataBase* FAbilityData::GetItemData() const
+UItemDataBase& FAbilityData::GetItemData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAsset<UItemDataBase>(AbilityID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UItemDataBase>(AbilityID);
 }
 
 bool FGameplayEffectContainerSpec::HasValidTargets() const

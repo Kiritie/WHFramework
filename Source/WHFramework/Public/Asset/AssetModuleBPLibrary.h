@@ -78,4 +78,10 @@ public:
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass"), Category = "AssetModuleBPLibrary")
 	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true);
+	
+	template<class T>
+	static T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
+	{
+		return UPrimaryAssetManager::Get().LoadAssetRef<T>(InPrimaryAssetId, bLogWarning);
+	}
 };
