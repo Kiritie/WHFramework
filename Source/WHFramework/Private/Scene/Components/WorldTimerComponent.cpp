@@ -29,16 +29,12 @@ void UWorldTimerComponent::BeginPlay()
 
 void UWorldTimerComponent::UpdateTimer()
 {
-<<<<<<< HEAD
 	TimeSeconds = FMath::TruncToInt(UGameplayStatics::GetTimeSeconds(this));
 
 	float RemainSeconds = 0;
-=======
-	double RemainSeconds = 0;
->>>>>>> 1adb8b86cec47a2022ebe48c69964589666e1336
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
 
-	UpdateLight(RemainSeconds / SecondsOfDay / 24 / 24 * 360 + 200);
+	UpdateLight(RemainSeconds / SecondsOfDay * 360 + 200);
 
 	CurrentHour = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 24, RemainSeconds);
 	CurrentMinute = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 60, RemainSeconds);
