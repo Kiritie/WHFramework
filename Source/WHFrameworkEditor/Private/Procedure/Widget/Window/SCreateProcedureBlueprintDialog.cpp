@@ -15,7 +15,7 @@
 /////////////////////////////////////////////////
 // select folder dialog
 //////////////////////////////////////////////////
-inline SCreateProcedureBlueprintDialog::SCreateProcedureBlueprintDialog()
+SCreateProcedureBlueprintDialog::SCreateProcedureBlueprintDialog()
 {
 	BlueprintFactory = nullptr;
 	UserResponse = EAppReturnType::Cancel;
@@ -42,11 +42,8 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-	SWindow::Construct(SWindow::FArguments()
-		// .Title(LOCTEXT("SCreateProcedureBlueprintDialog_Title", "Create New Procedure Blueprint"))
-		// .SupportsMinimize(false)
-		// .SupportsMaximize(false)
-		// .ClientSize(FVector2D(450, 450))
+	SEditorWindowWidgetBase::Construct(SEditorWindowWidgetBase::FArguments()
+		.WindowArgs(SWindow::FArguments()
 		[
 			SNew(SVerticalBox)
 
@@ -75,7 +72,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 				]
 			]
 
-			+SVerticalBox::Slot()
+			+ SVerticalBox::Slot()
 			.Padding(2)
 			.AutoHeight()
 			[
@@ -83,7 +80,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 				.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
 				[
 					SNew(SHorizontalBox)
-					+SHorizontalBox::Slot()
+					+ SHorizontalBox::Slot()
 					.Padding(2)
 					.HAlign(HAlign_Left)
 					.VAlign(VAlign_Center)
@@ -92,16 +89,16 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 						SNew(STextBlock).Text(LOCTEXT("SelectPathDialog_AssetName", "Asset Name: "))
 					]
 
-					+SHorizontalBox::Slot()
+					+ SHorizontalBox::Slot()
 					.Padding(2)
 					.HAlign(HAlign_Fill)
 					.FillWidth(1.f)
 					[
 						SNew(SEditableTextBox)
-							.Text_Lambda([this](){ return FText::FromString(AssetName); })
-							.IsReadOnly(false)
-							.RevertTextOnEscape(true)
-							.OnTextChanged(this, &SCreateProcedureBlueprintDialog::SetAssetName)
+						.Text_Lambda([this](){ return FText::FromString(AssetName); })
+						.IsReadOnly(false)
+						.RevertTextOnEscape(true)
+						.OnTextChanged(this, &SCreateProcedureBlueprintDialog::SetAssetName)
 					]
 				]
 			]
@@ -132,7 +129,8 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 					.OnClicked(this, &SCreateProcedureBlueprintDialog::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
-		]);
+		])
+	);
 
 	OnPathChange(AssetPath.ToString());
 }
@@ -176,6 +174,7 @@ FString SCreateProcedureBlueprintDialog::GetAssetName()
 {
 	return AssetName;
 }
+
 FString SCreateProcedureBlueprintDialog::GetPackageName()
 {
 	return PackageName;

@@ -13,11 +13,12 @@ SEditorWindowWidgetBase::SEditorWindowWidgetBase()
 
 void SEditorWindowWidgetBase::Construct(const FArguments& InArgs)
 {
-	SWindow::Construct(SWindow::FArguments()
-		.Title(WindowTitle)
-		.SupportsMinimize(false)
-		.SupportsMaximize(false)
-		.ClientSize(WindowSize));
+	auto WindowArgs = InArgs._WindowArgs;
+	WindowArgs.Title(WindowTitle);
+	WindowArgs.SupportsMinimize(false);
+	WindowArgs.SupportsMaximize(false);
+	WindowArgs.ClientSize(WindowSize);
+	SWindow::Construct(WindowArgs);
 }
 
 #undef LOCTEXT_NAMESPACE

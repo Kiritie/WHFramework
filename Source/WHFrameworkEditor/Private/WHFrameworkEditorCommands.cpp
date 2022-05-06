@@ -7,6 +7,8 @@
 void FWHFrameworkEditorCommands::RegisterCommands()
 {
 	UI_COMMAND(OpenProcedureEditorWindow, "Procedure Editor", "Bring up ProcedureEditor window", EUserInterfaceActionType::Button, FInputGesture());
+
+	UI_COMMAND(OpenStepEditorWindow, "Step Editor", "Bring up StepEditor window", EUserInterfaceActionType::Button, FInputGesture());
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -20,4 +20,6 @@ public:
 
 public:
 	TSharedPtr< FUICommandInfo > OpenProcedureEditorWindow;
+
+	TSharedPtr< FUICommandInfo > OpenStepEditorWindow;
 };

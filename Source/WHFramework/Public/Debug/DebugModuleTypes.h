@@ -56,8 +56,11 @@ DEFINE_LOG_CATEGORY_STATIC(WH_SaveGame, Log, All);
 // 场景
 DEFINE_LOG_CATEGORY_STATIC(WH_Scene, Log, All);
 
+// 步骤
+DEFINE_LOG_CATEGORY_STATIC(WH_Step, Log, All);
+
 // 体素
-DEFINE_LOG_CATEGORY_STATIC(WH_oxel, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(WH_Voxel, Log, All);
 
 // Web请求
 DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);

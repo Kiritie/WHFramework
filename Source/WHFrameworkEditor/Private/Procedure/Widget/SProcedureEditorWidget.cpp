@@ -20,6 +20,8 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
+	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	
 	const FWHFrameworkEditorModule& WHFrameworkModule = FModuleManager::GetModuleChecked<FWHFrameworkEditorModule>(FName("WHFrameworkEditor"));
 	const bool bPlaying = WHFrameworkModule.bPlaying;
 
@@ -46,19 +48,23 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 		SAssignNew(ListWidget, SProcedureListWidget)
 			.ProcedureModule(ProcedureModule)
 			.Visibility_Lambda([this](){ return bShowListPanel ? EVisibility::Visible : EVisibility::Collapsed; });
+		AddChild(ListWidget);
 
 		SAssignNew(DetailWidget, SProcedureDetailWidget)
 			.ProcedureModule(ProcedureModule)
 			.ListWidget(ListWidget)
 			.Visibility_Lambda([this](){ return bShowDetailPanel ? EVisibility::Visible : EVisibility::Collapsed; });
+		AddChild(DetailWidget);
 
 		SAssignNew(StatusWidget, SProcedureStatusWidget)
 			.ListWidget(ListWidget)
 			.Visibility_Lambda([this](){ return bShowStatusPanel ? EVisibility::Visible : EVisibility::Collapsed; });
+		AddChild(StatusWidget);
 
 		SAssignNew(ToolbarWidget, SProcedureToolbarWidget)
 			.MainWidget(SharedThis(this))
 			.ListWidget(ListWidget);
+		AddChild(ToolbarWidget);
 
 		ChildSlot
 		[
@@ -165,7 +171,7 @@ void SProcedureEditorWidget::OnCreate()
 	{
 		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
 	}
-	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureListWidget::Refresh);
+	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
 }
 
 void SProcedureEditorWidget::OnReset()

@@ -48,6 +48,8 @@ TSharedRef<FSlateStyleSet> FWHFrameworkEditorStyle::Create()
 
 	Style->Set("WHFrameworkEditor.OpenProcedureEditorWindow", new IMAGE_BRUSH(TEXT("Icon40"), Icon40x40));
 
+	Style->Set("WHFrameworkEditor.OpenStepEditorWindow", new IMAGE_BRUSH(TEXT("Icon40"), Icon40x40));
+
 	return Style;
 }
 

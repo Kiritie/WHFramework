@@ -13,6 +13,8 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 {
+	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+
 	ListWidget = InArgs._ListWidget;
 	ProcedureModule = InArgs._ProcedureModule;
 

@@ -9,7 +9,10 @@ class SEditorWindowWidgetBase : public SWindow
 public:
 	SEditorWindowWidgetBase();
 
-	SLATE_BEGIN_ARGS(SEditorWindowWidgetBase) { }
+	SLATE_BEGIN_ARGS(SEditorWindowWidgetBase)
+			: _WindowArgs() { }
+
+		SLATE_ARGUMENT(SWindow::FArguments, WindowArgs)
 
 	SLATE_END_ARGS()
 

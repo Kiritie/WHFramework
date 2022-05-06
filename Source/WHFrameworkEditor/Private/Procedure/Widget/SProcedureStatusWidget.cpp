@@ -9,6 +9,8 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 {
+	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+
 	ListWidget = InArgs._ListWidget;
 
 	if(!ListWidget) return;

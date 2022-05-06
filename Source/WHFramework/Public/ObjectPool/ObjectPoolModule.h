@@ -76,7 +76,7 @@ public:
 
 		if(!ObjectPools.Contains(InType))
 		{
-			UObjectPool* ObjectPool = nullptr;
+			UObjectPool* ObjectPool;
 			if(InType->IsChildOf(AActor::StaticClass()))
 			{
 				ObjectPool = NewObject<UActorPool>(this);

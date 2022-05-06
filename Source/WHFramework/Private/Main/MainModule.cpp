@@ -25,6 +25,7 @@
 #include "Procedure/ProcedureModule.h"
 #include "SaveGame/SaveGameModule.h"
 #include "Scene/SceneModule.h"
+#include "Step/StepModule.h"
 #include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
@@ -58,6 +59,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AReferencePoolModule::StaticClass());
 	ModuleClasses.Add(ASaveGameModule::StaticClass());
 	ModuleClasses.Add(ASceneModule::StaticClass());
+	ModuleClasses.Add(AStepModule::StaticClass());
 	ModuleClasses.Add(AVoxelModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());

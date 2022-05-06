@@ -18,8 +18,16 @@
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/ProcedureModuleDetailsPanel.h"
 #include "Procedure/Widget/SProcedureEditorWidget.h"
+#include "Step/AssetTypeActions_StepBlueprint.h"
+#include "Step/StepDetailsPanel.h"
+#include "Step/StepEditorSettings.h"
+#include "Step/StepEditorTypes.h"
+#include "Step/StepModuleDetailsPanel.h"
+#include "Step/Widget/SStepEditorWidget.h"
 
 static const FName ProcedureEditorTabName("ProcedureEditor");
+
+static const FName StepEditorTabName("StepEditor");
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -27,8 +35,7 @@ void FWHFrameworkEditorModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 
-	RegisterSettings();
-
+	// 初始化代理
 	if(BeginPIEDelegateHandle.IsValid())
 	{
 		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
@@ -41,11 +48,17 @@ void FWHFrameworkEditorModule::StartupModule()
 	}
 	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &FWHFrameworkEditorModule::OnEndPIE);
 
+	// 初始化代理
 	FWHFrameworkEditorStyle::Initialize();
 	FWHFrameworkEditorStyle::ReloadTextures();
 
+	// 初始化代理
 	FWHFrameworkEditorCommands::Register();
 
+	// 初始化代理
+	RegisterSettings();
+
+	// 初始化代理
 	PluginCommands = MakeShareable(new FUICommandList);
 
 	PluginCommands->MapAction(
@@ -53,22 +66,42 @@ void FWHFrameworkEditorModule::StartupModule()
 		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedProcedureEditorButton),
 		FCanExecuteAction());
 
+	PluginCommands->MapAction(
+		FWHFrameworkEditorCommands::Get().OpenStepEditorWindow,
+		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedStepEditorButton),
+		FCanExecuteAction());
+
+	// 初始化代理
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
 
+	// 初始化代理
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnProcedureEditorTab))
 		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StepEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnStepEditorTab))
+	.SetDisplayName(LOCTEXT("FStepEditorTabTitle", "Step Editor"))
+	.SetMenuType(ETabSpawnerMenuType::Hidden);
+
 	// Register asset types
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+
 	EAssetTypeCategories::Type AssetCategory = AssetTools.RegisterAdvancedAssetCategory(FName("WHFramework"), FText::FromString(TEXT("WHFramework")));
+
 	TSharedRef<IAssetTypeActions> PBAction = MakeShareable(new FAssetTypeActions_ProcedureBlueprint(AssetCategory));
 	RegisterAssetTypeAction(AssetTools, PBAction);
 
+	TSharedRef<IAssetTypeActions> SBAction = MakeShareable(new FAssetTypeActions_StepBlueprint(AssetCategory));
+	RegisterAssetTypeAction(AssetTools, SBAction);
+
 	// Register the details customizer
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailsPanel::MakeInstance));
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureModuleDetailsPanel::MakeInstance));
+
+	PropertyModule.RegisterCustomClassLayout(TEXT("StepBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FStepDetailsPanel::MakeInstance));
+	PropertyModule.RegisterCustomClassLayout(TEXT("StepModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FStepModuleDetailsPanel::MakeInstance));
 }
 
 void FWHFrameworkEditorModule::ShutdownModule()
@@ -118,8 +151,13 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("PropertyEditor")))
 	{
 		FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureBase"));
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureModule"));
+	
+		PropertyModule.UnregisterCustomClassLayout(TEXT("StepBase"));
+		PropertyModule.UnregisterCustomClassLayout(TEXT("StepModule"));
+	
 		PropertyModule.NotifyCustomizationModuleChanged();
 	}
 
@@ -136,6 +174,7 @@ void FWHFrameworkEditorModule::RegisterMenus()
 		{
 			FToolMenuSection& Section = Menu->FindOrAddSection("WHFramework");
 			Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow, PluginCommands);
+			Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
 		}
 	}
 
@@ -144,8 +183,11 @@ void FWHFrameworkEditorModule::RegisterMenus()
 		{
 			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("WHFramework");
 			{
-				FToolMenuEntry& Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow));
-				Entry.SetCommandList(PluginCommands);
+				FToolMenuEntry& Entry1 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow));
+				Entry1.SetCommandList(PluginCommands);
+
+				FToolMenuEntry& Entry2 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow));
+				Entry2.SetCommandList(PluginCommands);
 			}
 		}
 	}
@@ -157,14 +199,21 @@ void FWHFrameworkEditorModule::RegisterSettings()
 	{
 		GProcedureEditorIni = GConfig->GetDestIniFilename(TEXT("ProcedureEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
 
-		// ISettingsContainerPtr SettingsContainer = SettingsModule->GetContainer(FName("Project"));
-		// SettingsContainer->DescribeCategory(FName("ProcedureEditor"), FText::FromString(TEXT("ProcedureEditor")), FText::FromString(TEXT("ProcedureEditor")));
+		ISettingsSectionPtr SettingsSection1 = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Procedure Editor"), FText::FromString(TEXT("Procedure Editor")), FText::FromString(TEXT("Configure the procedure editor plugin")), GetMutableDefault<UProcedureEditorSettings>());
 
-		ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Procedure Editor"), FText::FromString(TEXT("Procedure Editor")), FText::FromString(TEXT("Configure the procedure editor plugin")), GetMutableDefault<UProcedureEditorSettings>());
-
-		if(SettingsSection.IsValid())
+		if(SettingsSection1.IsValid())
 		{
-			SettingsSection->OnModified().BindRaw(this, &FWHFrameworkEditorModule::HandleSettingsSaved);
+			SettingsSection1->OnModified().BindRaw(this, &FWHFrameworkEditorModule::HandleSettingsSaved);
+		}
+		
+		///
+		GStepEditorIni = GConfig->GetDestIniFilename(TEXT("StepEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
+
+		ISettingsSectionPtr SettingsSection2 = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Step Editor"), FText::FromString(TEXT("Step Editor")), FText::FromString(TEXT("Configure the Step editor plugin")), GetMutableDefault<UStepEditorSettings>());
+
+		if(SettingsSection2.IsValid())
+		{
+			SettingsSection2->OnModified().BindRaw(this, &FWHFrameworkEditorModule::HandleSettingsSaved);
 		}
 	}
 }
@@ -174,6 +223,7 @@ void FWHFrameworkEditorModule::UnRegisterSettings()
 	if(ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(FName("Settings")))
 	{
 		SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Procedure Editor"));
+		SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Step Editor"));
 	}
 }
 
@@ -182,6 +232,10 @@ bool FWHFrameworkEditorModule::HandleSettingsSaved()
 	UProcedureEditorSettings* ProcedureEditorSetting = GetMutableDefault<UProcedureEditorSettings>();
 
 	ProcedureEditorSetting->SaveConfig();
+
+	UStepEditorSettings* StepEditorSetting = GetMutableDefault<UStepEditorSettings>();
+
+	StepEditorSetting->SaveConfig();
 
 	return true;
 }
@@ -212,6 +266,19 @@ TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnProcedureEditorTab(const F
 	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
 	[
 		SAssignNew(ProcedureEditorWidget, SProcedureEditorWidget)
+	];
+}
+
+void FWHFrameworkEditorModule::OnClickedStepEditorButton()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(StepEditorTabName);
+}
+
+TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnStepEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
+	[
+		SAssignNew(StepEditorWidget, SStepEditorWidget)
 	];
 }
 
