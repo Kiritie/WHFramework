@@ -36,7 +36,7 @@ public:
 
 	virtual void Initialize(const FPhysicsVolumeData& InPhysicsVolumeData);
 
-	virtual void OnSpawn_Implementation() override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation() override;
 };

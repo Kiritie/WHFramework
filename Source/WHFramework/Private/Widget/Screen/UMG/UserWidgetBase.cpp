@@ -48,7 +48,7 @@ void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	
 }
 
-void UUserWidgetBase::OnSpawn_Implementation()
+void UUserWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	
 }

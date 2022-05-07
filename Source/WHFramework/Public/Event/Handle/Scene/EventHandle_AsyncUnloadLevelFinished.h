@@ -27,5 +27,5 @@ public:
 public:
 	virtual void OnDespawn_Implementation() override;
 
-	virtual void Fill_Implementation(const TArray<FParameter>& InParameters) override;
+	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 };

@@ -35,7 +35,7 @@ void APhysicsVolumeBase::Initialize(const FPhysicsVolumeData& InPhysicsVolumeDat
 	bPhysicsOnContact = InPhysicsVolumeData.bPhysicsOnContact;
 }
 
-void APhysicsVolumeBase::OnSpawn_Implementation()
+void APhysicsVolumeBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 }
 

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "DebugModuleBPLibrary.h"
 
 // 编辑器
 DEFINE_LOG_CATEGORY_STATIC(WH_Editor, Log, All);
@@ -68,12 +69,6 @@ DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);
 // UI
 DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 
-// 打印
-#define WH_LOG(CategoryName, Verbosity, Format, ...) \
-{ \
-	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
-}
-
 // 断言实现
 #define WH_ENSURE_IMPL(Capture, InExpression, InFormat, ...) \
 (LIKELY(!!(InExpression)) || (([Capture] () ->bool \
@@ -101,6 +96,12 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 	#define ensureEditorMsgf( InExpression, InFormat, ... ) WH_ENSURE_IMPL(&, InExpression, InFormat, ##__VA_ARGS__)
 #endif
 
+// 打印
+#define WH_LOG(CategoryName, Verbosity, Format, ...) \
+{ \
+	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
+}
+
 /*
  * 输出调试信息到游戏窗口
  * @param Message 消息内容
@@ -108,5 +109,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  * @param Duration 持续时间
  * @param bNewerOnTop 不更新在顶部
  */
-void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true);
-
+FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true)
+{
+	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, bNewerOnTop);
+}

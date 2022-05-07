@@ -4,9 +4,15 @@
 
 UWorldWeatherComponent::UWorldWeatherComponent()
 {
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UWorldWeatherComponent::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void UWorldWeatherComponent::UpdateWeather(float DeltaSeconds)
+{
+	
 }

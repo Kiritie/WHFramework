@@ -4,6 +4,9 @@
 #include "Event/Manager/EventManagerBase.h"
 
 #include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Global/EventHandle_BeginPlay.h"
+#include "Event/Handle/Global/EventHandle_EndPlay.h"
+#include "Global/GlobalTypes.h"
 
 // ParamSets default values
 AEventManagerBase::AEventManagerBase()
@@ -16,8 +19,20 @@ AEventManagerBase::AEventManagerBase()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
 
-// Called when the game starts or when spawned
-void AEventManagerBase::BeginPlay()
+void AEventManagerBase::OnInitialize_Implementation()
 {
-	Super::BeginPlay();
+	UEventModuleBPLibrary::SubscribeEvent(UEventHandle_BeginPlay::StaticClass(), this, FName("OnBeginPlay"));
+	UEventModuleBPLibrary::SubscribeEvent(UEventHandle_EndPlay::StaticClass(), this, FName("OnEndPlay"));
+}
+
+void AEventManagerBase::OnBeginPlay_Implementation(UObject* InSender, UEventHandle_BeginPlay* InEventHandle)
+{
+	GIsPlaying = true;
+	GIsSimulating = InEventHandle->bIsSimulating;
+}
+
+void AEventManagerBase::OnEndPlay_Implementation(UObject* InSender, UEventHandle_EndPlay* InEventHandle)
+{
+	GIsPlaying = false;
+	GIsSimulating = false;
 }

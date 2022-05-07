@@ -2,3 +2,10 @@
 
 
 #include "Global/GlobalTypes.h"
+
+#if WITH_EDITOR
+bool GIsPlaying = false;
+#else
+bool GIsPlaying = true;
+#endif
+bool GIsSimulating = false;

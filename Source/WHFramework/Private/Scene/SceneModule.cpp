@@ -156,11 +156,11 @@ void ASceneModule::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(WorldTimer)
 	{
-		WorldTimer->UpdateTimer();
+		WorldTimer->UpdateTimer(DeltaSeconds);
 	}
 	if (WorldWeather)
 	{
-		WorldWeather->UpdateWeather();
+		WorldWeather->UpdateWeather(DeltaSeconds);
 	}
 }
 

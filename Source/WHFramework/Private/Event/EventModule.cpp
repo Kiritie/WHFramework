@@ -18,6 +18,8 @@
 AEventModule::AEventModule()
 {
 	ModuleName = FName("EventModule");
+	
+	EventManagerClass = AEventManagerBase::StaticClass();
 }
 
 #if WITH_EDITOR
@@ -126,14 +128,14 @@ void AEventModule::UnsubscribeAllEvent()
 	EventHandleInfos.Empty();
 }
 
-void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters)
+void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams)
 {
-	BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParameters ? *InParameters : TArray<FParameter>());
+	BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParams ? *InParams : TArray<FParameter>());
 }
 
-void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters)
+void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	if(!InSender || !InEventHandleClass) return;
+	if(!InEventHandleClass) return;
 
 	if(!EventHandleInfos.Contains(InEventHandleClass))
 	{
@@ -146,7 +148,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InEventHandleClass, InParameters);
+				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InEventHandleClass, InParams);
 				return;
 			}
 		}
@@ -154,7 +156,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InEventHandleClass, InParameters);
+				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InEventHandleClass, InParams);
 				return;
 			}
 		}
@@ -162,28 +164,28 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InEventHandleClass, InParameters);
+				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InEventHandleClass, InParams);
 				return;
 			}
 		}
 		default: break;
 	}
 	
-	EventHandleInfos[InEventHandleClass].EventHandleDelegate.ExecuteIfBound(InEventHandleClass, InSender, InParameters);
+	EventHandleInfos[InEventHandleClass].EventHandleDelegate.ExecuteIfBound(InEventHandleClass, InSender, InParams);
 }
 
-void AEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParameters)
+void AEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParameters);
+	BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParams);
 }
 
-void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParameters)
+void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	if(!EventHandleInfos.Contains(InEventHandleClass)) return;
 	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(InEventHandleClass))
+	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(nullptr, InEventHandleClass))
 	{
-		EventHandle->Fill(InParameters);
+		EventHandle->Fill(InParams);
 		
 		struct
 		{
@@ -219,6 +221,7 @@ void AEventModule::SpawnEventManager()
 		EventManager = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
         if(EventManager)
         {
+        	EventManager->OnInitialize();
 #if(WITH_EDITOR)
         	EventManager->SetActorLabel(TEXT("EventManager"));
 #endif

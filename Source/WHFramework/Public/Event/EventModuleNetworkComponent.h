@@ -23,11 +23,11 @@ public:
 	
 public:
 	UFUNCTION(Client, Reliable, WithValidation)
-	void ClientBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters);
+	void ClientBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams);
 	
 	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters);
+	void ServerBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerBroadcastEventMulticast(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters);
+	void ServerBroadcastEventMulticast(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams);
 };

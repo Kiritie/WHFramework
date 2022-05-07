@@ -14,10 +14,10 @@ void UEventHandle_AsyncUnloadLevelFinished::OnDespawn_Implementation()
 {
 }
 
-void UEventHandle_AsyncUnloadLevelFinished::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_AsyncUnloadLevelFinished::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		LevelPath = *InParameters[0].GetStringValue();
+		LevelPath = *InParams[0].GetStringValue();
 	}
 }

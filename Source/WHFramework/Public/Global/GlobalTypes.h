@@ -5,7 +5,8 @@
 #include "CoreMinimal.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
-bool GIsPlaying = false;
+extern WHFRAMEWORK_API bool GIsPlaying;
+extern WHFRAMEWORK_API bool GIsSimulating;
 
 /*
 * 数据保存档案

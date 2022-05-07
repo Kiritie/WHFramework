@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GlobalTypes.h"
 #include "Engine/GameEngine.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -25,12 +26,17 @@ public:
 	 * 当前是否为播放状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static bool IsPlaying();
+	static bool IsPlaying() { return GIsPlaying; }
+	/*
+	 * 当前是否为模拟状态
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsSimulating() { return GIsSimulating; }
 	/*
 	 * 当前是否为运行状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static bool IsRunning() { return GIsPlayInEditorWorld; }
+	static bool IsRunning() { return GIsRunning; }
 	/*
 	 * 当前是否为编辑器状态运行
 	 */

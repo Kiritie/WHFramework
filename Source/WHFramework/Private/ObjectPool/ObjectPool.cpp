@@ -17,7 +17,7 @@ void UObjectPool::Initialize(int32 InLimit, TSubclassOf<UObject> InType)
 	Type = InType;
 }
 
-UObject* UObjectPool::Spawn()
+UObject* UObjectPool::Spawn(const TArray<FParameter>& InParams)
 {
 	UObject* Object;
 	if(Count > 0)
@@ -29,7 +29,7 @@ UObject* UObjectPool::Spawn()
 	{
 		Object = SpawnImpl();
 	}
-	IObjectPoolInterface::Execute_OnSpawn(Object);
+	IObjectPoolInterface::Execute_OnSpawn(Object, InParams);
 	return Object;
 }
 

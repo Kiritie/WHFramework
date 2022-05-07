@@ -14,10 +14,10 @@ void UEventHandle_CompleteStep::OnDespawn_Implementation()
 	Step = nullptr;
 }
 
-void UEventHandle_CompleteStep::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_CompleteStep::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		Step = InParameters[0].GetObjectValue<UStepBase>();
+		Step = InParams[0].GetObjectValue<UStepBase>();
 	}
 }

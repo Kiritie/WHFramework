@@ -21,11 +21,8 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
-	
-	const FWHFrameworkEditorModule& WHFrameworkModule = FModuleManager::GetModuleChecked<FWHFrameworkEditorModule>(FName("WHFrameworkEditor"));
-	const bool bPlaying = WHFrameworkModule.bPlaying;
 
-	StepModule = AMainModule::GetModuleByClass<AStepModule>(!bPlaying);
+	StepModule = AMainModule::GetModuleByClass<AStepModule>(!UGlobalBPLibrary::IsPlaying());
 
 	if(BeginPIEDelegateHandle.IsValid())
 	{
@@ -136,7 +133,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 
-		SetIsPreviewMode(bPlaying);
+		SetIsPreviewMode(UGlobalBPLibrary::IsPlaying());
 	}
 	else
 	{

@@ -27,6 +27,9 @@ protected:
 	ADirectionalLight* SunLight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	float TimeSeconds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
 	float SecondsOfDay;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
@@ -34,9 +37,6 @@ protected:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
 	float SunsetTime;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	float TimeSeconds;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
 	int CurrentDay;
@@ -57,8 +57,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer = true);
 
-	UFUNCTION(BlueprintCallable)
-	void UpdateTimer();
+	void UpdateTimer(float DeltaSeconds = 0.f);
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent)

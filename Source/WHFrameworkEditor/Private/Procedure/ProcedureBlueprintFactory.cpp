@@ -270,7 +270,7 @@ UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* In
 
 		if(NewBP)
 		{
-			UProcedureBlueprint* ProcedureBP = UProcedureBlueprint::FindRootProcedureBlueprint(NewBP);
+			UProcedureBlueprint* ProcedureBP = UProcedureBlueprint::FindProcedureBlueprint(NewBP);
 			if(ProcedureBP == NULL)
 			{
 				const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();

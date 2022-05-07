@@ -12,29 +12,29 @@ UEventModuleNetworkComponent::UEventModuleNetworkComponent()
 	
 }
 
-bool UEventModuleNetworkComponent::ClientBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters) { return true; }
-void UEventModuleNetworkComponent::ClientBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters)
+bool UEventModuleNetworkComponent::ClientBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams) { return true; }
+void UEventModuleNetworkComponent::ClientBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams)
 {
 	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
-		EventModule->BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParameters);
+		EventModule->BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParams);
 	}
 }
 
-bool UEventModuleNetworkComponent::ServerBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters) { return true; }
-void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters)
+bool UEventModuleNetworkComponent::ServerBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams) { return true; }
+void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams)
 {
 	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
-		EventModule->BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParameters);
+		EventModule->BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParams);
 	}
 }
 
-bool UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters) { return true; }
-void UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParameters)
+bool UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams) { return true; }
+void UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InEventHandleClass, const TArray<FParameter>& InParams)
 {
 	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
 	{
-		EventModule->MultiBroadcastEvent(InEventHandleClass, InSender, InParameters);
+		EventModule->MultiBroadcastEvent(InEventHandleClass, InSender, InParams);
 	}
 }

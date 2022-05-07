@@ -38,7 +38,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Events
 public:
-	virtual void OnSpawn_Implementation() override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 	
 	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 

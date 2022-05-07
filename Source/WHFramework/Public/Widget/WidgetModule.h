@@ -169,7 +169,7 @@ public:
 		
 		if(!AllUserWidgets.Contains(InWidgetName))
 		{
-			if(UUserWidgetBase* UserWidget = UObjectPoolModuleBPLibrary::SpawnObject<UUserWidgetBase>(UserWidgetClassMap[InWidgetName]))
+			if(UUserWidgetBase* UserWidget = UObjectPoolModuleBPLibrary::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InWidgetName]))
 			{
 				AllUserWidgets.Add(InWidgetName, UserWidget);
 				UserWidget->OnCreate();
@@ -580,7 +580,7 @@ public:
 	{
 		if(!WorldWidgetClassMap.Contains(InWidgetName)) return nullptr;
 
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleBPLibrary::SpawnObject<UWorldWidgetBase>(WorldWidgetClassMap[InWidgetName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleBPLibrary::SpawnObject<UWorldWidgetBase>(nullptr, WorldWidgetClassMap[InWidgetName]))
 		{
 			if(!AllWorldWidgets.Contains(InWidgetName))
 			{

@@ -60,6 +60,17 @@ protected:
 	/// 自动开始步骤
 	UPROPERTY(EditAnywhere, Category = "StepModule")
 	bool bAutoStartStep;
+	
+	/// 步骤模块状态
+	UPROPERTY(VisibleAnywhere, Category = "StepModule")
+	EStepModuleState StepModuleState;
+
+public:
+	/**
+	* 获取步骤模块状态
+	*/
+	UFUNCTION(BlueprintPure)
+	EStepModuleState GetStepModuleState() const { return StepModuleState; }
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -111,10 +122,10 @@ public:
 	/// Root Step
 protected:
 	/// 当前根步骤索引
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Step")
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Steps")
 	int32 CurrentRootStepIndex;
 	/// 根步骤
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Step")
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Steps")
 	TArray<URootStepBase*> RootSteps;
 
 public:
@@ -148,10 +159,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Transient, Category = "StepModule|Step Stats")
 	UStepBase* CurrentStep;
 
-	/// 步骤模块状态
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
-	EStepModuleState StepModuleState;
-
 public:
 	/**
 	* 获取初始步骤
@@ -168,11 +175,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UStepBase* GetCurrentStep() const { return CurrentStep; }
-	/**
-	* 获取步骤模块状态
-	*/
-	UFUNCTION(BlueprintPure)
-	EStepModuleState GetStepModuleState() const { return StepModuleState; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Global Options

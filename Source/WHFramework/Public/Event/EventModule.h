@@ -52,17 +52,17 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeAllEvent();
 
-	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters = nullptr);
+	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParameters"))
-	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParameters);
+	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams);
 
 protected:
 	UFUNCTION()
-	void ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParameters);
+	void ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Event Manager

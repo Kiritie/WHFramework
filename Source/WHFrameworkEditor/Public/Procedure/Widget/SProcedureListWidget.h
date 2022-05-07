@@ -55,8 +55,6 @@ public:
 public:
 	AProcedureModule* ProcedureModule;
 
-	UProcedureBase* CopiedProcedure;
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
@@ -68,7 +66,7 @@ public:
 
 	TSharedPtr<FProcedureClassFilter> ProcedureClassFilter;
 
-	TSharedPtr<STreeView<TSharedPtr<FProcedureListItem>>> TreeView;
+	TSharedPtr<SListView<TSharedPtr<FProcedureListItem>>> ListView;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
@@ -105,25 +103,17 @@ public:
 	int32 GetSelectedProcedureNum() const;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Tree View
+	/// List View
 private:
-	void UpdateTreeView(bool bRegenerate = false);
+	void UpdateListView(bool bRegenerate = false);
 
 	void UpdateSelection();
 
-	TSharedRef<ITableRow> GenerateTreeRow(TSharedPtr<FProcedureListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable);
+	TSharedRef<ITableRow> GenerateListRow(TSharedPtr<FProcedureListItem> ListItem, const TSharedRef<STableViewBase>& OwnerTable);
 
-	void TreeItemScrolledIntoView(TSharedPtr<FProcedureListItem> TreeItem, const TSharedPtr<ITableRow>& Widget);
+	void ListItemScrolledIntoView(TSharedPtr<FProcedureListItem> ListItem, const TSharedPtr<ITableRow>& Widget);
 
-	void TreeSelectionChanged(TSharedPtr<FProcedureListItem> TreeItem, ESelectInfo::Type SelectInfo);
-
-	void GetChildrenForTree(TSharedPtr<FProcedureListItem> TreeItem, TArray<TSharedPtr<FProcedureListItem>>& OutChildren);
-
-	void OnTreeItemExpansionChanged(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState);
-
-	void SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem);
-
-	void SetTreeItemExpansionRecursive(TSharedPtr<FProcedureListItem> TreeItem, bool bInExpansionState);
+	void ListSelectionChanged(TSharedPtr<FProcedureListItem> ListItem, ESelectInfo::Type SelectInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Buttons
@@ -137,16 +127,6 @@ private:
 	FReply OnInsertProcedureItemButtonClicked();
 
 	FReply OnAppendProcedureItemButtonClicked();
-
-	FReply OnCopyProcedureItemButtonClicked();
-
-	FReply OnPasteProcedureItemButtonClicked();
-
-	FReply OnDuplicateProcedureItemButtonClicked();
-
-	FReply OnExpandAllProcedureItemButtonClicked();
-
-	FReply OnCollapseAllProcedureItemButtonClicked();
 
 	FReply OnRemoveProcedureItemButtonClicked();
 

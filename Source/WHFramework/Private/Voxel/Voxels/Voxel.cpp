@@ -39,7 +39,7 @@ UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
 	if(voxelData.IsValid())
 	{
 		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : TSubclassOf<UVoxel>(StaticClass());
-		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(tmpClass);
+		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(nullptr, tmpClass);
 		if(voxel) voxel->ID = InVoxelID;
 	}
 	return voxel;
@@ -125,7 +125,7 @@ FVoxelItem UVoxel::ToItem()
 	return voxelItem;
 }
 
-void UVoxel::OnSpawn_Implementation()
+void UVoxel::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	
 }

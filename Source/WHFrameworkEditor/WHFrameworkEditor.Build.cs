@@ -41,6 +41,7 @@ public class WHFrameworkEditor : ModuleRules
 				"Projects",
 				"InputCore",
 				"UnrealEd",
+				"KismetCompiler",
 				"ToolMenus",
 				"CoreUObject",
 				"AssetRegistry",

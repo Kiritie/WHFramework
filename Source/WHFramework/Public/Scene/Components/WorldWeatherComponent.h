@@ -23,6 +23,5 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent)
-	void UpdateWeather();
+	void UpdateWeather(float DeltaSeconds = 0.f);
 };

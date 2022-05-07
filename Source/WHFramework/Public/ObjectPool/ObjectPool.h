@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Parameter/ParameterModuleTypes.h"
 
 #include "UObject/NoExportTypes.h"
 #include "ObjectPool.generated.h"
@@ -41,7 +42,7 @@ public:
 	/**
 	* 生成对象
 	*/
-	virtual UObject* Spawn();
+	virtual UObject* Spawn(const TArray<FParameter>& InParams);
 	virtual UObject* SpawnImpl();
 	/**
 	* 回收对象

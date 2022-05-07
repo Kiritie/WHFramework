@@ -9,13 +9,15 @@
 
 UWorldTimerComponent::UWorldTimerComponent()
 {
+	PrimaryComponentTick.bCanEverTick = false;
+	
 	SkyLight = nullptr;
 	SunLight = nullptr;
 
+	TimeSeconds = 0.f;
 	SecondsOfDay = 300.f;
 	SunriseTime = 6.f;
 	SunsetTime = 18.f;
-	TimeSeconds = 0.f;
 	CurrentDay = 0;
 	CurrentHour = 0;
 	CurrentMinute = 0;
@@ -27,9 +29,18 @@ void UWorldTimerComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
-void UWorldTimerComponent::UpdateTimer()
+void UWorldTimerComponent::SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer /*= true*/)
 {
-	TimeSeconds = FMath::TruncToInt(UGameplayStatics::GetTimeSeconds(this));
+	TimeSeconds = InTimeSeconds;
+	if (bUpdateTimer)
+	{
+		UpdateTimer();
+	}
+}
+
+void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)
+{
+	TimeSeconds += DeltaSeconds;
 
 	float RemainSeconds = 0;
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
@@ -41,13 +52,4 @@ void UWorldTimerComponent::UpdateTimer()
 	CurrentSeconds = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 60 / 60, RemainSeconds);
 
 	TimeSeconds += GetWorld()->GetDeltaSeconds();
-}
-
-void UWorldTimerComponent::SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer /*= true*/)
-{
-	TimeSeconds = InTimeSeconds;
-	if (bUpdateTimer)
-	{
-		UpdateTimer();
-	}
 }

@@ -70,7 +70,7 @@ public:
 	bool K2_HasObject(TSubclassOf<UObject> InType);
 
 	template<class T>
-	T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
+	T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
 
@@ -93,11 +93,11 @@ public:
 			ObjectPool->Initialize(TempLimit != 0 ? TempLimit : Limit, InType);
 			ObjectPools.Add(InType, ObjectPool);
 		}
-		return Cast<T>(ObjectPools[InType]->Spawn());
+		return Cast<T>(ObjectPools[InType]->Spawn(InParams ? *InParams : TArray<FParameter>()));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", DisplayName = "Spawn Object"))
-	UObject* K2_SpawnObject(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams", DisplayName = "Spawn Object"))
+	UObject* K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject);

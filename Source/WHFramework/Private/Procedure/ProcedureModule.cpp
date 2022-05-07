@@ -7,7 +7,7 @@
 #include "Engine/TargetPoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Procedure/Base/RootProcedureBase.h"
+#include "Procedure/Base/ProcedureBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Character/CharacterModuleBPLibrary.h"
 #include "Character/CharacterModuleTypes.h"
@@ -27,18 +27,14 @@ AProcedureModule::AProcedureModule()
 	ModuleName = FName("ProcedureModule");
 
 	bAutoStartProcedure = false;
-
-	FirstRootProcedureIndex = 0;
-	CurrentRootProcedureIndex = 0;
-
-	RootProcedures = TArray<URootProcedureBase*>();
-
 	ProcedureModuleState = EProcedureModuleState::None;
-	CurrentProcedure = nullptr;
 
-	GlobalProcedureExecuteType = EProcedureExecuteType::None;
-	GlobalProcedureLeaveType = EProcedureLeaveType::None;
-	GlobalProcedureCompleteType = EProcedureCompleteType::None;
+	Procedures = TArray<UProcedureBase*>();
+	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>(); 
+
+	FirstProcedure = nullptr;
+	CurrentProcedure = nullptr;
+	CurrentProcedureIndex = 0;
 }
 
 #if WITH_EDITOR
@@ -59,7 +55,7 @@ void AProcedureModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	for(auto Iter : RootProcedures)
+	for(auto Iter : Procedures)
 	{
 		if(Iter)
 		{
@@ -86,34 +82,27 @@ void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(CurrentProcedure)
 		{
-			if(!CurrentProcedure->IsA(URootProcedureBase::StaticClass()))
+			const int32 Index = CurrentProcedureIndex + 1;
+			if(Procedures.IsValidIndex(Index))
 			{
-				if(CurrentProcedure->GetProcedureState() != EProcedureState::Leaved)
+				UProcedureBase* Procedure = Procedures[Index];
+				if(Procedure && Procedure->GetProcedureEnterType() == EProcedureEnterType::Automatic)
 				{
-					CurrentProcedure->Refresh();
-				}
-				else if(CurrentProcedure->ParentProcedure)
-				{
-					if(CurrentProcedure->ParentProcedure->GetProcedureState() != EProcedureState::Leaved)
+					if(Procedure->CheckProcedureCondition(GetCurrentProcedure()))
 					{
-						CurrentProcedure->ParentProcedure->Refresh();
+						Procedure->Enter();
 					}
-					else if(CurrentProcedure->ParentProcedure->IsA(URootProcedureBase::StaticClass()))
+					else
 					{
-						StartProcedure(CurrentProcedure->ParentProcedure->ProcedureIndex + 1, false);
+						Procedure->Complete(EProcedureExecuteResult::Skipped);
+						CurrentProcedureIndex++;
 					}
 				}
 			}
-			else
+
+			if(CurrentProcedure->GetProcedureState() != EProcedureState::Leaved)
 			{
-				if(CurrentProcedure->GetProcedureState() != EProcedureState::Leaved)
-				{
-					CurrentProcedure->Refresh();
-				}
-				else
-				{
-					StartProcedure(CurrentProcedure->ProcedureIndex + 1, false);
-				}
+				CurrentProcedure->Refresh();
 			}
 		}
 	}
@@ -136,37 +125,37 @@ void AProcedureModule::OnTermination_Implementation()
 	EndProcedure();
 }
 
-void AProcedureModule::StartProcedure(int32 InRootProcedureIndex, bool bSkipProcedures)
+void AProcedureModule::StartProcedure(int32 InProcedureIndex, bool bSkipProcedures)
 {
-	const int32 TargetRootProcedureIndex = InRootProcedureIndex != -1 ? InRootProcedureIndex : FirstRootProcedureIndex;
+	InProcedureIndex = InProcedureIndex != -1 ? InProcedureIndex : FirstProcedure ? FirstProcedure->ProcedureIndex : 0;
 
-	if(!RootProcedures.IsValidIndex(TargetRootProcedureIndex)) return;
+	if(!Procedures.IsValidIndex(InProcedureIndex)) return;
 	
 	if(ProcedureModuleState != EProcedureModuleState::Running)
 	{
 		ProcedureModuleState = EProcedureModuleState::Running;
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(CurrentRootProcedureIndex)});
+		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(CurrentProcedureIndex)});
 	}
 
-	for(int32 i = CurrentRootProcedureIndex; i <= TargetRootProcedureIndex; i++)
+	for(int32 i = CurrentProcedureIndex; i <= InProcedureIndex; i++)
 	{
-		if(RootProcedures.IsValidIndex(i))
+		if(Procedures.IsValidIndex(i))
 		{
-			if(RootProcedures[i])
+			if(Procedures[i])
 			{
-				if(i == TargetRootProcedureIndex)
+				if(i == InProcedureIndex)
 				{
-					RootProcedures[TargetRootProcedureIndex]->Enter();
+					Procedures[InProcedureIndex]->Enter();
 				}
 				else if(bSkipProcedures)
 				{
-					RootProcedures[i]->Complete(EProcedureExecuteResult::Skipped);
+					Procedures[i]->Complete(EProcedureExecuteResult::Skipped);
 				}
 			}
 		}
 	}
 
-	CurrentRootProcedureIndex = TargetRootProcedureIndex;
+	CurrentProcedureIndex = InProcedureIndex;
 }
 
 void AProcedureModule::EndProcedure(bool bRestoreProcedures)
@@ -177,26 +166,26 @@ void AProcedureModule::EndProcedure(bool bRestoreProcedures)
 		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndProcedure::StaticClass(), EEventNetType::Single, this);
 	}
 
-	for(int32 i = CurrentRootProcedureIndex; i >= 0; i--)
+	for(int32 i = CurrentProcedureIndex; i >= 0; i--)
 	{
-		if(RootProcedures.IsValidIndex(i))
+		if(Procedures.IsValidIndex(i))
 		{
-			if(RootProcedures[i])
+			if(Procedures[i])
 			{
-				if(i == CurrentRootProcedureIndex)
+				if(i == CurrentProcedureIndex)
 				{
-					RootProcedures[i]->Complete(EProcedureExecuteResult::Skipped);
+					Procedures[i]->Complete(EProcedureExecuteResult::Skipped);
 				}
 				if(bRestoreProcedures)
 				{
-					RootProcedures[i]->Restore();
+					Procedures[i]->Restore();
 				}
 			}
 		}
 	}
 	if(bRestoreProcedures)
 	{
-		CurrentRootProcedureIndex = 0;
+		CurrentProcedureIndex = 0;
 		CurrentProcedure = nullptr;
 	}
 }
@@ -209,22 +198,51 @@ void AProcedureModule::RestoreProcedure(UProcedureBase* InProcedure)
 	}
 }
 
+void AProcedureModule::RestoreProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Restore();
+	}
+}
+
+void AProcedureModule::RestoreProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Restore();
+	}
+}
+
 void AProcedureModule::EnterProcedure(UProcedureBase* InProcedure)
 {
 	if(InProcedure && InProcedure->GetProcedureState() == EProcedureState::None)
 	{
-		if(CurrentProcedure && !CurrentProcedure->IsParentOf(InProcedure))
+		if(CurrentProcedure)
 		{
 			CurrentProcedure->Leave();
 		}
 		InProcedure->OnEnter(CurrentProcedure);
 
-		if(InProcedure->IsA(URootProcedureBase::StaticClass()))
-		{
-			CurrentRootProcedureIndex = InProcedure->ProcedureIndex;
-		}
+		CurrentProcedureIndex = InProcedure->ProcedureIndex;
 
 		CurrentProcedure = InProcedure;
+	}
+}
+
+void AProcedureModule::EnterProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Enter();
+	}
+}
+
+void AProcedureModule::EnterProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Enter();
 	}
 }
 
@@ -236,11 +254,43 @@ void AProcedureModule::RefreshProcedure(UProcedureBase* InProcedure)
 	}
 }
 
+void AProcedureModule::RefreshProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Refresh();
+	}
+}
+
+void AProcedureModule::RefreshProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Refresh();
+	}
+}
+
 void AProcedureModule::GuideProcedure(UProcedureBase* InProcedure)
 {
 	if(InProcedure && InProcedure->IsEntered())
 	{
 		InProcedure->OnGuide();
+	}
+}
+
+void AProcedureModule::GuideProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Guide();
+	}
+}
+
+void AProcedureModule::GuideProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Guide();
 	}
 }
 
@@ -252,6 +302,22 @@ void AProcedureModule::ExecuteProcedure(UProcedureBase* InProcedure)
 	}
 }
 
+void AProcedureModule::ExecuteProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Execute();
+	}
+}
+
+void AProcedureModule::ExecuteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Execute();
+	}
+}
+
 void AProcedureModule::CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult)
 {
 	if(!InProcedure) return;
@@ -260,9 +326,21 @@ void AProcedureModule::CompleteProcedure(UProcedureBase* InProcedure, EProcedure
 	{
 		InProcedure->OnComplete(InProcedureExecuteResult);
 	}
-	for(auto Iter : InProcedure->SubProcedures)
+}
+
+void AProcedureModule::CompleteProcedureByIndex(int32 InProcedureIndex, EProcedureExecuteResult InProcedureExecuteResult)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
 	{
-		if(Iter) Iter->Complete(InProcedureExecuteResult);
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Complete(InProcedureExecuteResult);
+	}
+}
+
+void AProcedureModule::CompleteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass, EProcedureExecuteResult InProcedureExecuteResult)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Complete(InProcedureExecuteResult);
 	}
 }
 
@@ -277,9 +355,9 @@ void AProcedureModule::LeaveProcedure(UProcedureBase* InProcedure)
 	if(InProcedure->GetProcedureState() != EProcedureState::Leaved)
 	{
 		InProcedure->OnLeave();
-		if(InProcedure->IsA(URootProcedureBase::StaticClass()))
+		if(InProcedure->IsA(UProcedureBase::StaticClass()))
 		{
-			if(InProcedure->ProcedureIndex == RootProcedures.Num() - 1)
+			if(InProcedure->ProcedureIndex == Procedures.Num() - 1)
 			{
 				EndProcedure();
 			}
@@ -287,9 +365,25 @@ void AProcedureModule::LeaveProcedure(UProcedureBase* InProcedure)
 	}
 }
 
+void AProcedureModule::LeaveProcedureByIndex(int32 InProcedureIndex)
+{
+	if(HasProcedureByIndex(InProcedureIndex))
+	{
+		GetProcedureByIndex<UProcedureBase>(InProcedureIndex)->Leave();
+	}
+}
+
+void AProcedureModule::LeaveProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	{
+		GetProcedureByClass<UProcedureBase>(InProcedureClass)->Leave();
+	}
+}
+
 void AProcedureModule::ClearAllProcedure()
 {
-	for(auto Iter : RootProcedures)
+	for(auto Iter : Procedures)
 	{
 		if(Iter)
 		{
@@ -300,16 +394,16 @@ void AProcedureModule::ClearAllProcedure()
 		}
 	}
 	
-	RootProcedures.Empty();
+	Procedures.Empty();
 
 	Modify();
 }
 
 bool AProcedureModule::IsAllProcedureCompleted()
 {
-	for(auto Iter : RootProcedures)
+	for(auto Iter : Procedures)
 	{
-		if(!Iter->IsCompleted(true))
+		if(!Iter->IsCompleted())
 		{
 			return false;
 		}
@@ -317,69 +411,48 @@ bool AProcedureModule::IsAllProcedureCompleted()
 	return true;
 }
 
+UProcedureBase* AProcedureModule::K2_GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const
+{
+	return GetProcedureByIndex<UProcedureBase>(InProcedureIndex);
+}
+
+bool AProcedureModule::K2_HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+{
+	return HasProcedureByClass<UProcedureBase>(InProcedureClass);
+}
+
+UProcedureBase* AProcedureModule::K2_GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+{
+	return GetProcedureByClass<UProcedureBase>(InProcedureClass);
+}
+
 #if WITH_EDITOR
+
 void AProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
-	for (int32 i = 0; i < RootProcedures.Num(); i++)
+	for (int32 i = 0; i < Procedures.Num(); i++)
 	{
 		auto Item = MakeShared<FProcedureListItem>();
-		RootProcedures[i]->GenerateListItem(Item);
+		Procedures[i]->GenerateListItem(Item);
 		OutProcedureListItems.Add(Item);
 	}
 }
 
 void AProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
-	for (int32 i = 0; i < RootProcedures.Num(); i++)
+	for (int32 i = 0; i < Procedures.Num(); i++)
 	{
-		RootProcedures[i]->ProcedureIndex = i;
-		RootProcedures[i]->ProcedureHierarchy = 0;
-		RootProcedures[i]->UpdateListItem(OutProcedureListItems[i]);
+		Procedures[i]->ProcedureIndex = i;
+		Procedures[i]->UpdateListItem(OutProcedureListItems[i]);
 	}
 }
 
-void AProcedureModule::SetRootProcedureItem(int32 InIndex, URootProcedureBase* InRootProcedure)
+void AProcedureModule::SetProcedureItem(int32 InIndex, UProcedureBase* InProcedure)
 {
-	if(RootProcedures.IsValidIndex(InIndex))
+	if(Procedures.IsValidIndex(InIndex))
 	{
-		RootProcedures[InIndex] = InRootProcedure;
+		Procedures[InIndex] = InProcedure;
 	}
 }
 #endif
-
-void AProcedureModule::SetGlobalProcedureExecuteType(EProcedureExecuteType InGlobalProcedureExecuteType)
-{
-	if(GlobalProcedureExecuteType != InGlobalProcedureExecuteType)
-	{
-		GlobalProcedureExecuteType = InGlobalProcedureExecuteType;
-		if(CurrentProcedure && CurrentProcedure->GetProcedureExecuteType() == EProcedureExecuteType::Automatic && CurrentProcedure->GetProcedureState() == EProcedureState::Entered)
-		{
-			CurrentProcedure->Execute();
-		}
-	}
-}
-
-void AProcedureModule::SetGlobalProcedureCompleteType(EProcedureCompleteType InGlobalProcedureCompleteType)
-{
-	if(GlobalProcedureCompleteType != InGlobalProcedureCompleteType)
-	{
-		GlobalProcedureCompleteType = InGlobalProcedureCompleteType;
-		if(CurrentProcedure && CurrentProcedure->GetProcedureCompleteType() == EProcedureCompleteType::Automatic && CurrentProcedure->GetProcedureState() == EProcedureState::Executing)
-		{
-			CurrentProcedure->Complete();
-		}
-	}
-}
-
-void AProcedureModule::SetGlobalProcedureLeaveType(EProcedureLeaveType InGlobalProcedureLeaveType)
-{
-	if(GlobalProcedureLeaveType != InGlobalProcedureLeaveType)
-	{
-		GlobalProcedureLeaveType = InGlobalProcedureLeaveType;
-		if(CurrentProcedure && CurrentProcedure->GetProcedureLeaveType() == EProcedureLeaveType::Automatic && CurrentProcedure->GetProcedureState() == EProcedureState::Completed)
-		{
-			CurrentProcedure->Leave();
-		}
-	}
-}

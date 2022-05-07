@@ -140,7 +140,7 @@ void AVoxelChunk::Tick(float DeltaTime)
 
 }
 
-void AVoxelChunk::OnSpawn_Implementation()
+void AVoxelChunk::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 }
 

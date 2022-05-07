@@ -21,9 +21,8 @@ UProcedureBase::UProcedureBase()
 	ProcedureDisplayName = FText::FromString(TEXT("Procedure Base"));
 	ProcedureDescription = FText::GetEmpty();
 
+	bFirstProcedure = false;
 	ProcedureIndex = 0;
-	ProcedureHierarchy = 0;
-	ProcedureType = EProcedureType::Default;
 	ProcedureState = EProcedureState::None;
 
 	OperationTarget = nullptr;
@@ -37,6 +36,8 @@ UProcedureBase::UProcedureBase()
 	CameraViewYaw = 0.f;
 	CameraViewPitch = 0.f;
 	CameraViewDistance = 0.f;
+	
+	ProcedureEnterType = EProcedureEnterType::Automatic;
 
 	ProcedureExecuteCondition = EProcedureExecuteResult::None;
 	ProcedureExecuteResult = EProcedureExecuteResult::None;
@@ -51,16 +52,6 @@ UProcedureBase::UProcedureBase()
 	AutoCompleteProcedureTime = 0.f;
 	ProcedureGuideType = EProcedureGuideType::None;
 
-	CurrentSubProcedureIndex = -1;
-
-	CurrentProcedureTaskIndex = -1;
-
-	bMergeSubProcedure = false;
-
-	SubProcedures = TArray<UProcedureBase*>();
-
-	ParentProcedure = nullptr;
-
 	ProcedureState = EProcedureState::None;
 
 	ProcedureListItemStates = FProcedureListItemStates();
@@ -74,11 +65,25 @@ void UProcedureBase::OnGenerate()
 
 void UProcedureBase::OnUnGenerate()
 {
+	if(bFirstProcedure)
+	{
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(true))
+		{
+			if(ProcedureModule->GetFirstProcedure() == this)
+			{
+				ProcedureModule->SetFirstProcedure(nullptr);
+			}
+		}
+	}
 	ConditionalBeginDestroy();
 }
 
 void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
 {
+	InNewProcedure->ProcedureName = ProcedureName;
+	InNewProcedure->ProcedureDisplayName = ProcedureDisplayName;
+	InNewProcedure->ProcedureDescription = ProcedureDescription;
+	InNewProcedure->ProcedureIndex = ProcedureIndex;
 	InNewProcedure->OperationTarget = OperationTarget;
 	InNewProcedure->bTrackTarget = bTrackTarget;
 	InNewProcedure->CameraViewMode = CameraViewMode;
@@ -89,11 +94,7 @@ void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
 	InNewProcedure->CameraViewYaw = CameraViewYaw;
 	InNewProcedure->CameraViewPitch = CameraViewPitch;
 	InNewProcedure->CameraViewDistance = CameraViewDistance;
-	InNewProcedure->ProcedureName = ProcedureName;
-	InNewProcedure->ProcedureDisplayName = ProcedureDisplayName;
-	InNewProcedure->ProcedureDescription = ProcedureDescription;
-	InNewProcedure->ProcedureIndex = ProcedureIndex;
-	InNewProcedure->ProcedureHierarchy = ProcedureHierarchy;
+	InNewProcedure->ProcedureEnterType = ProcedureEnterType;
 	InNewProcedure->ProcedureExecuteCondition = ProcedureExecuteCondition;
 	InNewProcedure->ProcedureExecuteType = ProcedureExecuteType;
 	InNewProcedure->AutoExecuteProcedureTime = AutoExecuteProcedureTime;
@@ -103,9 +104,6 @@ void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
 	InNewProcedure->AutoLeaveProcedureTime = AutoLeaveProcedureTime;
 	InNewProcedure->ProcedureGuideType = ProcedureGuideType;
 	InNewProcedure->ProcedureGuideIntervalTime = ProcedureGuideIntervalTime;
-	InNewProcedure->ParentProcedure = ParentProcedure;
-	InNewProcedure->bMergeSubProcedure = bMergeSubProcedure;
-	InNewProcedure->SubProcedures = SubProcedures;
 	InNewProcedure->ProcedureListItemStates = ProcedureListItemStates;
 }
 #endif
@@ -118,15 +116,6 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 
 void UProcedureBase::OnInitialize()
 {
-	for (auto Iter : SubProcedures)
-	{
-		if(Iter)
-		{
-			Iter->ParentProcedure = this;
-			Iter->OnInitialize();
-		}
-	}
-
 	K2_OnInitialize();
 }
 
@@ -135,23 +124,7 @@ void UProcedureBase::OnRestore()
 	ProcedureState = EProcedureState::None;
 	OnStateChanged(ProcedureState);
 
-	CurrentSubProcedureIndex = -1;
-	CurrentProcedureTaskIndex = -1;
-
-	for(int32 i = 0; i < ProcedureTaskItems.Num(); i++)
-	{
-		ProcedureTaskItems[i].TaskState = EProcedureTaskState::None;
-	}
-
 	K2_OnRestore();
-
-	for(int32 i = SubProcedures.Num() - 1; i >= 0; i--)
-	{
-		if(SubProcedures[i])
-		{
-			SubProcedures[i]->OnRestore();
-		}
-	}
 }
 
 void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
@@ -160,11 +133,6 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	OnStateChanged(ProcedureState);
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
-	
-	if(ParentProcedure)
-	{
-		ParentProcedure->CurrentSubProcedureIndex = ProcedureIndex;
-	}
 
 	ProcedureExecuteResult = EProcedureExecuteResult::None;
 
@@ -187,17 +155,6 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
 
-	if(bMergeSubProcedure)
-	{
-		for (auto Iter : SubProcedures)
-		{
-			if(Iter)
-			{
-				Iter->OnEnter(InLastProcedure);
-			}
-		}
-	}
-
 	if(ProcedureExecuteType == EProcedureExecuteType::Automatic && ProcedureState != EProcedureState::Executing)
 	{
 		if(AutoExecuteProcedureTime > 0.f)
@@ -213,75 +170,6 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 void UProcedureBase::OnRefresh()
 {
-	if(HasSubProcedure(false))
-	{
-		if(!IsAllSubCompleted())
-		{
-			const int32 Index = CurrentSubProcedureIndex + 1;
-			if(SubProcedures.IsValidIndex(Index))
-			{
-				UProcedureBase* SubProcedure = SubProcedures[Index];
-				if(SubProcedure)
-				{
-					if(SubProcedure->CheckProcedureCondition(GetCurrentSubProcedure()))
-					{
-						SubProcedure->Enter();
-					}
-					else
-					{
-						SubProcedure->Complete(EProcedureExecuteResult::Skipped);
-						CurrentSubProcedureIndex++;
-					}
-				}
-			}
-		}
-		else
-		{
-			Complete(IsAllSubExecuteSucceed() ? EProcedureExecuteResult::Succeed : EProcedureExecuteResult::Failed);
-		}
-	}
-	else if(HasProcedureTask())
-	{
-		if(!IsAllTaskCompleted())
-		{
-			const int32 Index = CurrentProcedureTaskIndex + 1;
-			if(ProcedureTaskItems.IsValidIndex(Index))
-			{
-				FProcedureTaskItem& TaskItem = ProcedureTaskItems[Index];
-				if(TaskItem.IsValid())
-				{
-					switch(TaskItem.TaskState)
-					{
-						case EProcedureTaskState::None:
-						{
-							TaskItem.Prepare();
-							break;
-						}
-						case EProcedureTaskState::Preparing:
-						{
-							TaskItem.TryExecute(GetWorld()->GetDeltaSeconds());
-							break;
-						}
-						case EProcedureTaskState::Executing:
-						{
-							TaskItem.TryComplete(GetWorld()->GetDeltaSeconds());
-							break;
-						}
-						case EProcedureTaskState::Completed:
-						{
-							CurrentProcedureTaskIndex++;
-							break;
-						}
-					}
-				}
-			}
-		}
-		else
-		{
-			Complete(EProcedureExecuteResult::Succeed);
-		}
-	}
-
 	K2_OnRefresh();
 }
 
@@ -327,16 +215,13 @@ void UProcedureBase::OnExecute()
 		{
 			case EProcedureCompleteType::Automatic:
 			{
-				if(!HasSubProcedure(false))
+				if(AutoCompleteProcedureTime > 0.f)
 				{
-					if(AutoCompleteProcedureTime > 0.f)
-					{
-						GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UProcedureBase::Complete, EProcedureExecuteResult::Succeed), AutoCompleteProcedureTime, false);
-					}
-					else
-					{
-						Complete();
-					}
+					GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UProcedureBase::Complete, EProcedureExecuteResult::Succeed), AutoCompleteProcedureTime, false);
+				}
+				else
+				{
+					Complete();
 				}
 				break;
 			}
@@ -398,17 +283,6 @@ void UProcedureBase::OnLeave()
 	K2_OnLeave();
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
-
-	if(bMergeSubProcedure)
-	{
-		for(auto Iter : SubProcedures)
-		{
-			if(Iter)
-			{
-				Iter->OnLeave();
-			}
-		}
-	}
 }
 
 bool UProcedureBase::IsEntered() const
@@ -416,104 +290,9 @@ bool UProcedureBase::IsEntered() const
 	return ProcedureState == EProcedureState::Entered || ProcedureState == EProcedureState::Executing;
 }
 
-bool UProcedureBase::IsCompleted(bool bCheckSubs) const
+bool UProcedureBase::IsCompleted() const
 {
-	return (ProcedureState == EProcedureState::Completed || ProcedureState == EProcedureState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
-}
-
-bool UProcedureBase::CheckProcedureCondition(UProcedureBase* InProcedure) const
-{
-	return ProcedureExecuteCondition == EProcedureExecuteResult::None || !InProcedure || InProcedure->ProcedureExecuteResult == ProcedureExecuteCondition;
-}
-
-EProcedureExecuteType UProcedureBase::GetProcedureExecuteType() const
-{
-	if(!HasSubProcedure(false))
-	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-		{
-			if(ProcedureModule->GetGlobalProcedureExecuteType() != EProcedureExecuteType::None)
-			{
-				return ProcedureModule->GetGlobalProcedureExecuteType();
-			}
-		}
-	}
-	return ProcedureExecuteType;
-}
-
-EProcedureLeaveType UProcedureBase::GetProcedureLeaveType() const
-{
-	if(!HasSubProcedure(false))
-	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-		{
-			if(ProcedureModule->GetGlobalProcedureLeaveType() != EProcedureLeaveType::None)
-			{
-				return ProcedureModule->GetGlobalProcedureLeaveType();
-			}
-		}
-	}
-	return ProcedureLeaveType;
-}
-
-EProcedureCompleteType UProcedureBase::GetProcedureCompleteType() const
-{
-	if(!HasSubProcedure(false))
-	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-		{
-			if(ProcedureModule->GetGlobalProcedureCompleteType() != EProcedureCompleteType::None)
-			{
-				return ProcedureModule->GetGlobalProcedureCompleteType();
-			}
-		}
-	}
-	return ProcedureCompleteType;
-}
-
-bool UProcedureBase::IsParentOf(UProcedureBase* InProcedure) const
-{
-	if(InProcedure && InProcedure->ParentProcedure)
-	{
-		if(InProcedure->ParentProcedure == this) return true;
-		return InProcedure->ParentProcedure->IsParentOf(InProcedure);
-	}
-	return false;
-}
-
-void UProcedureBase::Restore()
-{
-	UProcedureModuleBPLibrary::RestoreProcedure(this);
-}
-
-void UProcedureBase::Enter()
-{
-	UProcedureModuleBPLibrary::EnterProcedure(this);
-}
-
-void UProcedureBase::Refresh()
-{
-	UProcedureModuleBPLibrary::RefreshProcedure(this);
-}
-
-void UProcedureBase::Guide()
-{
-	UProcedureModuleBPLibrary::GuideProcedure(this);
-}
-
-void UProcedureBase::Execute()
-{
-	UProcedureModuleBPLibrary::ExecuteProcedure(this);
-}
-
-void UProcedureBase::Complete(EProcedureExecuteResult InProcedureExecuteResult)
-{
-	UProcedureModuleBPLibrary::CompleteProcedure(this, InProcedureExecuteResult);
-}
-
-void UProcedureBase::Leave()
-{
-	UProcedureModuleBPLibrary::LeaveProcedure(this);
+	return (ProcedureState == EProcedureState::Completed || ProcedureState == EProcedureState::Leaved);
 }
 
 #if WITH_EDITOR
@@ -563,120 +342,62 @@ void UProcedureBase::ResetCameraView()
 	}
 }
 
-bool UProcedureBase::HasSubProcedure(bool bIgnoreMerge) const
+bool UProcedureBase::CheckProcedureCondition(UProcedureBase* InProcedure) const
 {
-	return SubProcedures.Num() > 0 && (bIgnoreMerge || !bMergeSubProcedure);
+	return ProcedureExecuteCondition == EProcedureExecuteResult::None || !InProcedure || InProcedure->ProcedureExecuteResult == ProcedureExecuteCondition;
 }
 
-UProcedureBase* UProcedureBase::GetCurrentSubProcedure() const
+void UProcedureBase::Restore()
 {
-	if(SubProcedures.IsValidIndex(CurrentSubProcedureIndex))
-	{
-		return SubProcedures[CurrentSubProcedureIndex];
-	}
-	return nullptr;
+	UProcedureModuleBPLibrary::RestoreProcedure(this);
 }
 
-bool UProcedureBase::IsSubOf(UProcedureBase* InProcedure) const
+void UProcedureBase::Enter()
 {
-	if(InProcedure && ParentProcedure)
-	{
-		if(InProcedure == ParentProcedure) return true;
-		return ParentProcedure->IsSubOf(InProcedure);
-	}
-	return false;
+	UProcedureModuleBPLibrary::EnterProcedure(this);
 }
 
-bool UProcedureBase::IsAllSubCompleted() const
+void UProcedureBase::Refresh()
 {
-	for (auto Iter : SubProcedures)
-	{
-		if(Iter && !Iter->IsCompleted())
-		{
-			return false;
-		}
-	}
-	return true;
+	UProcedureModuleBPLibrary::RefreshProcedure(this);
 }
 
-bool UProcedureBase::IsAllSubExecuteSucceed() const
+void UProcedureBase::Guide()
 {
-	for (auto Iter : SubProcedures)
-	{
-		if(Iter && Iter->ProcedureExecuteResult == EProcedureExecuteResult::Failed)
-		{
-			return false;
-		}
-	}
-	return true;
+	UProcedureModuleBPLibrary::GuideProcedure(this);
 }
 
-bool UProcedureBase::HasProcedureTask() const
+void UProcedureBase::Execute()
 {
-	return ProcedureTaskItems.Num() > 0;
+	UProcedureModuleBPLibrary::ExecuteProcedure(this);
 }
 
-bool UProcedureBase::IsAllTaskCompleted() const
+void UProcedureBase::Complete(EProcedureExecuteResult InProcedureExecuteResult)
 {
-	for (auto Iter : ProcedureTaskItems)
-	{
-		if(Iter.TaskState != EProcedureTaskState::Completed)
-		{
-			return false;
-		}
-	}
-	return true;
+	UProcedureModuleBPLibrary::CompleteProcedure(this, InProcedureExecuteResult);
 }
 
-FProcedureTaskItem& UProcedureBase::AddProcedureTask(const FName InTaskName, float InDurationTime, float InStartDelayTime)
+void UProcedureBase::Leave()
 {
-	ProcedureTaskItems.Add(FProcedureTaskItem(InTaskName, InDurationTime, InStartDelayTime));
-	return ProcedureTaskItems[ProcedureTaskItems.Num() - 1];
+	UProcedureModuleBPLibrary::LeaveProcedure(this);
 }
 
 void UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
 {
 	OutProcedureListItem->Procedure = this;
-	for (int32 i = 0; i < SubProcedures.Num(); i++)
-	{
-		if(SubProcedures[i])
-		{
-			auto Item = MakeShared<FProcedureListItem>();
-			Item->ParentListItem = OutProcedureListItem;
-			OutProcedureListItem->SubListItems.Add(Item);
-			SubProcedures[i]->GenerateListItem(Item);
-		}
-	}
 }
 
 void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
 {
 	OutProcedureListItem->Procedure = this;
-	for (int32 i = 0; i < SubProcedures.Num(); i++)
-	{
-		if(SubProcedures[i])
-		{
-			SubProcedures[i]->ProcedureIndex = i;
-			SubProcedures[i]->ProcedureHierarchy = ProcedureHierarchy + 1;
-			SubProcedures[i]->ParentProcedure = this;
-			SubProcedures[i]->UpdateListItem(OutProcedureListItem->SubListItems[i]);
-		}
-	}
 }
+
 #if WITH_EDITOR
 bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
 		FString PropertyName = InProperty->GetName();
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureExecuteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureCompleteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureLeaveType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideType))
-		{
-			return !HasSubProcedure(false);
-		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, AutoExecuteProcedureTime))
 		{
@@ -695,7 +416,7 @@ bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideIntervalTime))
 		{
-			return !HasSubProcedure(false) && (ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop);
+			return ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop;
 		}
 	}
 
@@ -710,17 +431,22 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 	{
 		auto PropertyName = Property->GetFName();
 
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, SubProcedures) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bMergeSubProcedure))
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{
-			if(HasSubProcedure(false))
+			if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(true))
 			{
-				ProcedureExecuteType = EProcedureExecuteType::Automatic;
-				ProcedureCompleteType = EProcedureCompleteType::Procedure;
-				AutoCompleteProcedureTime = 0.f;
-				ProcedureLeaveType = EProcedureLeaveType::Automatic;
-				ProcedureGuideType = EProcedureGuideType::None;				
-				ProcedureGuideIntervalTime = 0.f;
+				if(bFirstProcedure)
+				{
+					if(ProcedureModule->GetFirstProcedure())
+					{
+						ProcedureModule->GetFirstProcedure()->bFirstProcedure = false;
+					}
+					ProcedureModule->SetFirstProcedure(this);
+				}
+				else if(ProcedureModule->GetFirstProcedure() == this)
+				{
+					ProcedureModule->SetFirstProcedure(nullptr);
+				}
 			}
 		}
 	}

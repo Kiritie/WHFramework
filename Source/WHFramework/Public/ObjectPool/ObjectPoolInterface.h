@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
 #include "ObjectPoolInterface.generated.h"
 
@@ -26,7 +27,7 @@ public:
 	int32 GetLimit() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnSpawn();
+	void OnSpawn(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void OnDespawn();

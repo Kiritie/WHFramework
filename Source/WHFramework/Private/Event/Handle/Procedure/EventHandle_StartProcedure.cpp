@@ -6,18 +6,18 @@
 UEventHandle_StartProcedure::UEventHandle_StartProcedure()
 {
 	EventType = EEventType::Multicast;
-	RootProcedureIndex = -1;
+	ProcedureIndex = -1;
 }
 
 void UEventHandle_StartProcedure::OnDespawn_Implementation()
 {
-	RootProcedureIndex = -1;
+	ProcedureIndex = -1;
 }
 
-void UEventHandle_StartProcedure::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_StartProcedure::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		RootProcedureIndex = InParameters[0].GetIntegerValue();
+		ProcedureIndex = InParams[0].GetIntegerValue();
 	}
 }

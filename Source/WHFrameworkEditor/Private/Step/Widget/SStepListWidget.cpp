@@ -177,7 +177,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("New")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() <= 1;; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() <= 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnNewStepItemButtonClicked)
 					]
@@ -190,7 +190,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnInsertStepItemButtonClicked)
 					]
@@ -203,7 +203,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnAppendStepItemButtonClicked)
 					]
@@ -671,7 +671,7 @@ void SStepListWidget::TreeSelectionChanged(TSharedPtr<FStepListItem> TreeItem, E
 
 FReply SStepListWidget::OnEditStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(SelectedStepClass->ClassGeneratedBy)
 	{
@@ -726,7 +726,7 @@ FReply SStepListWidget::OnNewStepClassButtonClicked()
 
 FReply SStepListWidget::OnNewStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	UStepBase* NewStep = GenerateStep(SelectedStepClass);
 
@@ -771,7 +771,7 @@ FReply SStepListWidget::OnNewStepItemButtonClicked()
 
 FReply SStepListWidget::OnInsertStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -805,7 +805,7 @@ FReply SStepListWidget::OnInsertStepItemButtonClicked()
 
 FReply SStepListWidget::OnAppendStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -839,7 +839,7 @@ FReply SStepListWidget::OnAppendStepItemButtonClicked()
 
 FReply SStepListWidget::OnCopyStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	CopiedStep = DuplicateStep(SelectedStepListItems[0]->Step);
 
@@ -848,7 +848,7 @@ FReply SStepListWidget::OnCopyStepItemButtonClicked()
 
 FReply SStepListWidget::OnPasteStepItemButtonClicked()
 {
-	if(!StepModule || !CopiedStep) return FReply::Unhandled();
+	if(!StepModule || !CopiedStep) return FReply::Handled();
 
 	const auto Item = MakeShared<FStepListItem>();
 	Item->Step = CopiedStep;
@@ -893,7 +893,7 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 
 FReply SStepListWidget::OnDuplicateStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -947,7 +947,7 @@ FReply SStepListWidget::OnCollapseAllStepItemButtonClicked()
 
 FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to remove selected steps?"))) != EAppReturnType::Yes) return FReply::Handled();
 
@@ -983,7 +983,7 @@ FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 
 FReply SStepListWidget::OnClearAllStepItemButtonClicked()
 {
-	if(!StepModule) return FReply::Unhandled();
+	if(!StepModule) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to clear all steps?"))) != EAppReturnType::Yes) return FReply::Handled();
 
@@ -996,7 +996,7 @@ FReply SStepListWidget::OnClearAllStepItemButtonClicked()
 
 FReply SStepListWidget::OnMoveUpStepItemButtonClicked()
 {
-	if(!StepModule || SelectedStepListItems.Num() == 0 || SelectedStepListItems[0]->GetStepIndex() == 0) return FReply::Unhandled();
+	if(!StepModule || SelectedStepListItems.Num() == 0 || SelectedStepListItems[0]->GetStepIndex() == 0) return FReply::Handled();
 
 	if(SelectedStepListItems[0]->GetParentStep())
 	{
@@ -1030,7 +1030,7 @@ FReply SStepListWidget::OnMoveUpStepItemButtonClicked()
 
 FReply SStepListWidget::OnMoveDownStepItemButtonClicked()
 {
-	if(!StepModule || SelectedStepListItems.Num() == 0) return FReply::Unhandled();
+	if(!StepModule || SelectedStepListItems.Num() == 0) return FReply::Handled();
 
 	if(SelectedStepListItems[0]->GetParentStep())
 	{
@@ -1047,7 +1047,6 @@ FReply SStepListWidget::OnMoveDownStepItemButtonClicked()
 
 			UpdateTreeView();
 		}
-		else return FReply::Unhandled();
 	}
 	else
 	{
@@ -1064,7 +1063,6 @@ FReply SStepListWidget::OnMoveDownStepItemButtonClicked()
 
 			UpdateTreeView();
 		}
-		else return FReply::Unhandled();
 	}
 
 	return FReply::Handled();

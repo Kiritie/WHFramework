@@ -12,6 +12,6 @@ void UEventHandle_EndStep::OnDespawn_Implementation()
 {
 }
 
-void UEventHandle_EndStep::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_EndStep::Fill_Implementation(const TArray<FParameter>& InParams)
 {
 }

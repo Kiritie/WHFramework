@@ -10,10 +10,10 @@ UEventHandle_ChangeVoxelWorldState::UEventHandle_ChangeVoxelWorldState()
 	WorldState = EVoxelWorldState::None;
 }
 
-void UEventHandle_ChangeVoxelWorldState::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_ChangeVoxelWorldState::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		WorldState = *InParameters[0].GetPointerValue<EVoxelWorldState>();
+		WorldState = *InParams[0].GetPointerValue<EVoxelWorldState>();
 	}
 }

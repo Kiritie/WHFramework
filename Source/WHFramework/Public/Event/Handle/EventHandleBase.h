@@ -26,7 +26,7 @@ public:
 	EEventType EventType;
 
 public:
-	virtual void OnSpawn_Implementation() override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 	
 	virtual void OnDespawn_Implementation() override;
 
@@ -35,5 +35,5 @@ public:
 	bool Filter(UObject* InOwner, const FName InFuncName);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void Fill(const TArray<FParameter>& InParameters);
+	void Fill(const TArray<FParameter>& InParams);
 };

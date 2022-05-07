@@ -13,10 +13,10 @@ void UEventHandle_LeaveProcedure::OnDespawn_Implementation()
 	Procedure = nullptr;
 }
 
-void UEventHandle_LeaveProcedure::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_LeaveProcedure::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		Procedure = InParameters[0].GetObjectValue<UProcedureBase>();
+		Procedure = InParams[0].GetObjectValue<UProcedureBase>();
 	}
 }

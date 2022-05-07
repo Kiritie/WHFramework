@@ -14,10 +14,10 @@ void UEventHandle_StartStep::OnDespawn_Implementation()
 	RootStepIndex = -1;
 }
 
-void UEventHandle_StartStep::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_StartStep::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		RootStepIndex = InParameters[0].GetIntegerValue();
+		RootStepIndex = InParams[0].GetIntegerValue();
 	}
 }

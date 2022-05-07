@@ -77,6 +77,16 @@ void UStepBase::OnGenerate()
 
 void UStepBase::OnUnGenerate()
 {
+	if(bFirstStep)
+	{
+		if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>(true))
+		{
+			if(StepModule->GetFirstStep() == this)
+			{
+				StepModule->SetFirstStep(nullptr);
+			}
+		}
+	}
 	ConditionalBeginDestroy();
 }
 
@@ -85,7 +95,6 @@ void UStepBase::OnDuplicate(UStepBase* InNewStep)
 	InNewStep->StepName = StepName;
 	InNewStep->StepDisplayName = StepDisplayName;
 	InNewStep->StepDescription = StepDescription;
-	InNewStep->bFirstStep = bFirstStep;
 	InNewStep->StepIndex = StepIndex;
 	InNewStep->StepHierarchy = StepHierarchy;
 	InNewStep->OperationTarget = OperationTarget;

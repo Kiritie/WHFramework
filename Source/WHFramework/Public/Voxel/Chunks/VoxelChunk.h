@@ -44,7 +44,7 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	virtual void OnSpawn_Implementation() override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation() override;
 

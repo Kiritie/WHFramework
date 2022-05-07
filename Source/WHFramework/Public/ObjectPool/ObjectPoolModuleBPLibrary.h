@@ -19,17 +19,17 @@ class WHFRAMEWORK_API UObjectPoolModuleBPLibrary : public UBlueprintFunctionLibr
 
 public:
 	template<class T>
-	static T* SpawnObject(TSubclassOf<UObject> InType = T::StaticClass())
+	static T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 		{
-			return ObjectPoolModule->SpawnObject<T>(InType);
+			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", DisplayName = "Spawn Object"), Category = "ObjectPoolModuleBPLibrary")
-	static UObject* K2_SpawnObject(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams", DisplayName = "Spawn Object"), Category = "ObjectPoolModuleBPLibrary")
+	static UObject* K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
 	static void DespawnObject(UObject* InObject);

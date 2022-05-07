@@ -28,8 +28,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void UnsubscribeAllEvent();
 
-	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParameters = nullptr);
+	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParameters"), Category = "EventModuleBPLibrary")
-	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParameters);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "EventModuleBPLibrary")
+	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams);
 };

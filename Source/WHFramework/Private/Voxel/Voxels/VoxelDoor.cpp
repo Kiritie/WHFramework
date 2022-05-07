@@ -68,7 +68,7 @@ void UVoxelDoor::SetOpened(bool InValue)
 	Params[FName("bOpened")].SetBooleanValue(InValue);
 }
 
-void UVoxelDoor::OnSpawn_Implementation()
+void UVoxelDoor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Params.Add(FName("bOpened"), FParameter::MakeBoolean(false));
 }

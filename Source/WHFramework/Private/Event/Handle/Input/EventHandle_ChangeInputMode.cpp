@@ -14,10 +14,10 @@ void UEventHandle_ChangeInputMode::OnDespawn_Implementation()
 {
 }
 
-void UEventHandle_ChangeInputMode::Fill_Implementation(const TArray<FParameter>& InParameters)
+void UEventHandle_ChangeInputMode::Fill_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InParameters.IsValidIndex(0))
+	if(InParams.IsValidIndex(0))
 	{
-		InputMode = *InParameters[0].GetPointerValue<EInputMode>();
+		InputMode = *InParams[0].GetPointerValue<EInputMode>();
 	}
 }

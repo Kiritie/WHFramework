@@ -10,6 +10,9 @@
 #include "ToolMenus.h"
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Global/EventHandle_BeginPlay.h"
+#include "Event/Handle/Global/EventHandle_EndPlay.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/AssetTypeActions_ProcedureBlueprint.h"
@@ -34,7 +37,7 @@ static const FName StepEditorTabName("StepEditor");
 void FWHFrameworkEditorModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-
+	
 	// 初始化代理
 	if(BeginPIEDelegateHandle.IsValid())
 	{
@@ -248,12 +251,12 @@ void FWHFrameworkEditorModule::RegisterAssetTypeAction(class IAssetTools& AssetT
 
 void FWHFrameworkEditorModule::OnBeginPIE(bool bIsSimulating)
 {
-	bPlaying = true;
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_BeginPlay::StaticClass(), EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeBoolean(bIsSimulating) });
 }
 
 void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
 {
-	bPlaying = false;
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndPlay::StaticClass(), EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeBoolean(bIsSimulating) });
 }
 
 void FWHFrameworkEditorModule::OnClickedProcedureEditorButton()

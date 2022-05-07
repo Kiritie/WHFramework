@@ -40,9 +40,6 @@ private:
 
 	FDelegateHandle EndPIEDelegateHandle;
 
-public:
-	bool bPlaying;
-
 private:
 	void OnBeginPIE(bool bIsSimulating);
 

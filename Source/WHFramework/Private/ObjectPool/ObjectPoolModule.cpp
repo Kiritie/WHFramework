@@ -62,9 +62,9 @@ bool AObjectPoolModule::K2_HasObject(TSubclassOf<UObject> InType)
 	return HasObject<UObject>(InType);
 }
 
-UObject* AObjectPoolModule::K2_SpawnObject(TSubclassOf<UObject> InType)
+UObject* AObjectPoolModule::K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
-	return SpawnObject<UObject>(InType);
+	return SpawnObject<UObject>(&InParams);
 }
 
 void AObjectPoolModule::DespawnObject(UObject* InObject)

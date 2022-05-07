@@ -13,7 +13,7 @@ UProcedureBlueprint::UProcedureBlueprint(const FObjectInitializer& ObjectInitial
 #if WITH_EDITOR
 
 /** Returns the most base gameplay ability blueprint for a given blueprint (if it is inherited from another ability blueprint, returning null if only native / non-ability BP classes are it's parent) */
-UProcedureBlueprint* UProcedureBlueprint::FindRootProcedureBlueprint(UProcedureBlueprint* DerivedBlueprint)
+UProcedureBlueprint* UProcedureBlueprint::FindProcedureBlueprint(UProcedureBlueprint* DerivedBlueprint)
 {
 	UProcedureBlueprint* ParentBP = NULL;
 

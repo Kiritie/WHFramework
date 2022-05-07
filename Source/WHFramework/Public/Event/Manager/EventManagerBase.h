@@ -7,6 +7,8 @@
 
 #include "EventManagerBase.generated.h"
 
+class UEventHandle_EndPlay;
+class UEventHandle_BeginPlay;
 UCLASS()
 class WHFRAMEWORK_API AEventManagerBase : public AActor
 {
@@ -16,7 +18,14 @@ public:
 	// ParamSets default values for this actor's properties
 	AEventManagerBase();
 
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnInitialize();
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	UFUNCTION(BlueprintNativeEvent)
+	void OnBeginPlay(UObject* InSender, UEventHandle_BeginPlay* InEventHandle);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnEndPlay(UObject* InSender, UEventHandle_EndPlay* InEventHandle);
 };

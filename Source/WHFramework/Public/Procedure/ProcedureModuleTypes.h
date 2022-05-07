@@ -8,14 +8,6 @@
 #include "ProcedureModuleTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EProcedureType : uint8
-{
-	Root,
-	Default,
-	Standalone
-};
-
-UENUM(BlueprintType)
 enum class EProcedureState : uint8
 {
 	None,
@@ -26,12 +18,19 @@ enum class EProcedureState : uint8
 };
 
 UENUM(BlueprintType)
+enum class EProcedureEnterType : uint8
+{
+	None,
+	Automatic,
+	Procedure
+};
+
+UENUM(BlueprintType)
 enum class EProcedureExecuteType : uint8
 {
 	None,
 	Automatic,
-	Procedure,
-	MouseClick
+	Procedure
 };
 
 UENUM(BlueprintType)
@@ -99,12 +98,8 @@ struct WHFRAMEWORK_API FProcedureListItemStates
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	bool bExpanded;
-
 	FORCEINLINE FProcedureListItemStates()
 	{
-		bExpanded = true;
 	}
 };
 

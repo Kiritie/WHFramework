@@ -134,6 +134,52 @@ public:
 	void Leave();
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Name/Description
+public:
+	/// 流程名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FName ProcedureName;
+	/// 流程显示名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FText ProcedureDisplayName;
+	/// 流程描述
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
+	FText ProcedureDescription;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Index/Type/State
+public:
+	/// 是否为开始流程
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	bool bFirstProcedure;
+	/// 流程索引
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	int32 ProcedureIndex;
+	/// 流程状态
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	EProcedureState ProcedureState;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnProcedureStateChanged OnProcedureStateChanged;
+
+public:
+	/**
+	* 获取流程状态
+	*/
+	UFUNCTION(BlueprintPure)
+	EProcedureState GetProcedureState() const { return ProcedureState; }
+	/**
+	* 是否已进入
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsEntered() const;
+	/**
+	* 是否已完成
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCompleted() const;
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
@@ -180,60 +226,6 @@ public:
 	void ResetCameraView();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Name/Description
-public:
-	/// 流程名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FName ProcedureName;
-	/// 流程显示名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FText ProcedureDisplayName;
-	/// 流程描述
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
-	FText ProcedureDescription;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Index/Type/State
-public:
-	/// 流程索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	int32 ProcedureIndex;
-	/// 流程层级
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	int32 ProcedureHierarchy;
-	/// 流程类型
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	EProcedureType ProcedureType;
-	/// 流程状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	EProcedureState ProcedureState;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnProcedureStateChanged OnProcedureStateChanged;
-
-public:
-	/**
-	* 获取流程类型
-	*/
-	UFUNCTION(BlueprintPure)
-	EProcedureType GetProcedureType() const { return ProcedureType; }
-	/**
-	* 获取流程状态
-	*/
-	UFUNCTION(BlueprintPure)
-	EProcedureState GetProcedureState() const { return ProcedureState; }
-	/**
-	* 是否已进入
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsEntered() const;
-	/**
-	* 是否已完成
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsCompleted(bool bCheckSubs = false) const;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
 public:
 	/// 流程执行条件
@@ -242,6 +234,9 @@ public:
 	/// 流程执行结果
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EProcedureExecuteResult ProcedureExecuteResult;
+	/// 流程进入方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	EProcedureEnterType ProcedureEnterType;
 	/// 流程执行方式
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EProcedureExecuteType ProcedureExecuteType;
@@ -276,91 +271,18 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool CheckProcedureCondition(UProcedureBase* InProcedure) const;
-	
+		
 	UFUNCTION(BlueprintPure)
-	EProcedureExecuteType GetProcedureExecuteType() const;
+	EProcedureEnterType GetProcedureEnterType() const { return ProcedureEnterType; }
 
 	UFUNCTION(BlueprintPure)
-	EProcedureLeaveType GetProcedureLeaveType() const;
+	EProcedureExecuteType GetProcedureExecuteType() const { return ProcedureExecuteType; }
 
 	UFUNCTION(BlueprintPure)
-	EProcedureCompleteType GetProcedureCompleteType() const;
+	EProcedureLeaveType GetProcedureLeaveType() const { return ProcedureLeaveType; }
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ParentProcedure
-public:
-	/// 父流程 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentProcedure")
-	UProcedureBase* ParentProcedure;
-
-public:
 	UFUNCTION(BlueprintPure)
-	bool IsParentOf(UProcedureBase* InProcedure) const;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// SubProcedure
-public:
-	/// 是否合并子流程
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubProcedure")
-	bool bMergeSubProcedure;
-	/// 当前子流程索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubProcedure")
-	int32 CurrentSubProcedureIndex;
-	/// 子流程
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubProcedure")
-	TArray<UProcedureBase*> SubProcedures;
-public:
-	/**
-	* 是否有子流程
-	* @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubProcedure）
-	*/
-	UFUNCTION(BlueprintPure)
-	bool HasSubProcedure(bool bIgnoreMerge = true) const;
-	/**
-	 * 获取当前子流程
-	 */
-	UFUNCTION(BlueprintPure)
-	UProcedureBase* GetCurrentSubProcedure() const;
-	/**
-	 * 是否是子流程
-	 */
-	UFUNCTION(BlueprintPure)
-	bool IsSubOf(UProcedureBase* InProcedure) const;
-	/**
-	* 是否已完成所有子流程
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAllSubCompleted() const;
-	/**
-	* 是否已成功执行有子流程
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAllSubExecuteSucceed() const;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ProcedureTask
-protected:
-	/// 当前流程任务项索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProcedureTask")
-	int32 CurrentProcedureTaskIndex;
-	/// 流程任务项
-	TArray<struct FProcedureTaskItem> ProcedureTaskItems;
-
-public:
-	/**
-	* 是否有流程任务
-	*/
-	UFUNCTION(BlueprintPure)
-	bool HasProcedureTask() const;
-	/**
-	* 是否已完成所有流程任务
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAllTaskCompleted() const;
-	/**
-	* 添加流程任务
-	*/
-	struct FProcedureTaskItem& AddProcedureTask(const FName InTaskName, float InDurationTime = 0.f, float InDelayTime = 1.f);
+	EProcedureCompleteType GetProcedureCompleteType() const { return ProcedureCompleteType; }
 
 protected:
 	FTimerHandle AutoExecuteTimerHandle;
@@ -387,112 +309,6 @@ public:
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 };
-	
-/**
-* 流程任务项
-*/
-struct FProcedureTaskItem
-{
-public:
-	FProcedureTaskItem()
-	{
-		TaskState = EProcedureTaskState::None;
-		TaskName = NAME_None;
-		DurationTime = 0.f;
-		DelayTime = 1.f;
-		RemainTime = 0.f;
-	}
-
-	FProcedureTaskItem(const FName InTaskName, float InDurationTime, float InDelayTime)
-	{
-		TaskState = EProcedureTaskState::None;
-		TaskName = InTaskName;
-		DurationTime = InDurationTime;
-		DelayTime = InDelayTime;
-		RemainTime = 0.f;
-	}
-
-public:
-	/// 任务状态
-	EProcedureTaskState TaskState;
-	/// 任务名称
-	FName TaskName;
-	
-	/// 持续时间
-	float DurationTime;
-	/// 延迟时间
-	float DelayTime;
-	/// 剩余时间
-	float RemainTime;
-
-	DECLARE_DELEGATE_RetVal(bool, FOnCheckProcedureTaskDelegate);
-	/// 任务检测代理
-	FOnCheckProcedureTaskDelegate OnCheckDelegate;
-
-	DECLARE_MULTICAST_DELEGATE(FOnExecuteProcedureTaskDelegate);
-	/// 任务执行代理
-	FOnExecuteProcedureTaskDelegate OnExecuteDelegate;
-
-public:
-	template <typename... VarTypes>
-	FProcedureTaskItem& AddOnExecuteTaskFunc(class UProcedureBase* InProcedure, const FName InFuncName, VarTypes... Vars)
-	{
-		if (InProcedure)
-		{
-			UFunction* Func = InProcedure->FindFunction(InFuncName);
-			if (ensureEditor(Func))
-			{
-				OnExecuteDelegate.Add(FOnExecuteProcedureTaskDelegate::FDelegate::CreateUFunction(InProcedure, InFuncName, Vars...));
-			}
-		}
-		return *this;
-	}
-
-	bool IsValid() const
-	{
-		return !TaskName.IsNone();
-	}
-
-	void Prepare()
-	{
-		TaskState = EProcedureTaskState::Preparing;
-		RemainTime = DelayTime;
-	}
-
-	void TryExecute(float DeltaSeconds)
-	{
-		if(!Refresh(DeltaSeconds)) return;
-
-		TaskState = EProcedureTaskState::Executing;
-		RemainTime = DurationTime;
-
-		OnExecuteDelegate.Broadcast();
-
-		WH_LOG(WH_Procedure, Log, TEXT("ExecuteProcedureTask : TaskName = %s"), *TaskName.ToString());
-	}
-
-	void TryComplete(float DeltaSeconds)
-	{
-		if(!OnCheckDelegate.IsBound())
-		{
-			if(Refresh(DeltaSeconds))
-			{
-				TaskState = EProcedureTaskState::Completed;
-			}
-		}
-		else if(OnCheckDelegate.Execute())
-		{
-			TaskState = EProcedureTaskState::Completed;
-		}
-	}
-
-private:
-	bool Refresh(float DeltaSeconds)
-	{
-		RemainTime -= DeltaSeconds;
-		return RemainTime <= 0;
-	}
-};
 
 /**
  * 流程列表项
@@ -503,15 +319,9 @@ public:
 	FProcedureListItem()
 	{
 		Procedure = nullptr;
-		ParentListItem = nullptr; 
-		SubListItems = TArray<TSharedPtr<FProcedureListItem>>();
 	}
 
 	UProcedureBase* Procedure;
-
-	TSharedPtr<FProcedureListItem> ParentListItem;
-
-	TArray<TSharedPtr<FProcedureListItem>> SubListItems;
 
 public:
 	FProcedureListItemStates& GetStates() const
@@ -522,34 +332,5 @@ public:
 	int32& GetProcedureIndex() const
 	{
 		return Procedure->ProcedureIndex;
-	}
-
-	UProcedureBase* GetParentProcedure() const
-	{
-		return Procedure->ParentProcedure;
-	}
-	
-	TArray<UProcedureBase*>& GetSubProcedures()const
-	{
-		return Procedure->SubProcedures;
-	}
-	
-	void GetSubProcedureNum(int32& OutNum) const
-	{
-		OutNum += SubListItems.Num();
-		for(auto Iter : SubListItems)
-		{
-			Iter->GetSubProcedureNum(OutNum);
-		}
-	}
-
-	TArray<UProcedureBase*>& GetParentSubProcedures() const
-	{
-		return ParentListItem->GetSubProcedures();
-	}
-	
-	TArray<TSharedPtr<FProcedureListItem>>& GetParentSubListItems() const
-	{
-		return ParentListItem->SubListItems;
 	}
 };
