@@ -17,9 +17,6 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
 
-	MainWidget = InArgs._MainWidget;
-	ListWidget = InArgs._ListWidget;
-
 	if(!MainWidget || !ListWidget) return;
 
 	FSlateIcon Icon(FName("WidgetProcedureEditorStyle"), "Icon.Empty");

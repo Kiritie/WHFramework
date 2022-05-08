@@ -6,6 +6,12 @@
 
 #include "Widgets/SCompoundWidget.h"
 
+enum class EEditorWidgetType : uint8
+{
+	Main,
+	Child
+};
+
 /**
  * 
  */
@@ -19,6 +25,18 @@ public:
 	SEditorSlateWidgetBase();
 
 	void Construct(const FArguments& InArgs);
+
+protected:
+	virtual void OnWindowActivated();
+	
+	virtual void OnWindowDeactivated();
+	
+	virtual void OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow);
+
+private:
+	FDelegateHandle OnWindowActivatedHandle;
+	FDelegateHandle OnWindowDeactivatedHandle;
+	FDelegateHandle OnWindowClosedHandle;
 
 public:
 	virtual void OnCreate();
@@ -52,15 +70,25 @@ public:
 		return nullptr;
 	}
 
+	virtual TSharedPtr<SWindow> GetOwnerWindow();
+
 protected:
 	FName WidgetName;
 
+	EEditorWidgetType WidgetType;
+
+	TSharedPtr<SEditorSlateWidgetBase> ParentWidget;
+
 	TArray<TSharedPtr<SEditorSlateWidgetBase>> ChildWidgets;
 
+	TMap<FName, TSharedPtr<SEditorSlateWidgetBase>> ChildWidgetMap;
+
 public:
-	virtual FName GetWidgetName() const { return WidgetName; }
+	FName GetWidgetName() const { return WidgetName; }
 
-	virtual int32 GetChildNum() const { return ChildWidgets.Num(); }
+	int32 GetChildNum() const { return ChildWidgets.Num(); }
 
-	virtual TArray<TSharedPtr<SEditorSlateWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
+	TSharedPtr<SEditorSlateWidgetBase> GetParentWidget() const { return ParentWidget; }
+
+	TArray<TSharedPtr<SEditorSlateWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
 };

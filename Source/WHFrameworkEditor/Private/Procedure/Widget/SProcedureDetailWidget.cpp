@@ -7,18 +7,27 @@
 #include "SlateOptMacros.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureBase.h"
+#include "Procedure/Widget/SProcedureEditorWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+SProcedureDetailWidget::SProcedureDetailWidget()
+{
+	WidgetName = FName("ProcedureDetailWidget");
+	WidgetType = EEditorWidgetType::Child;
+	ProcedureModule = nullptr;
+	ListWidget = nullptr;
+}
 
 void SProcedureDetailWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
 
-	ListWidget = InArgs._ListWidget;
 	ProcedureModule = InArgs._ProcedureModule;
+	ListWidget = InArgs._ListWidget;
 
-	if(!ProcedureModule || !ProcedureModule->IsValidLowLevel() || !ListWidget) return;
+	if(!ProcedureModule || !ListWidget) return;
 
 	ListWidget->OnSelectProcedureListItemsDelegate.BindRaw(this, &SProcedureDetailWidget::OnSelectProcedureListItem);
 

@@ -15,6 +15,8 @@ class AProcedureModule;
 class WHFRAMEWORKEDITOR_API SProcedureDetailWidget : public SEditorSlateWidgetBase
 {
 public:
+	SProcedureDetailWidget();
+	
 	SLATE_BEGIN_ARGS(SProcedureDetailWidget) {}
 
 		SLATE_ARGUMENT(AProcedureModule*, ProcedureModule)

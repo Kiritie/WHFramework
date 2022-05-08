@@ -189,7 +189,6 @@ void SStepEditorWidget::OnRefresh()
 		{
 			ListWidget->StepModule = StepModule;
 		}
-
 		SEditorSlateWidgetBase::OnRefresh();
 	}
 }

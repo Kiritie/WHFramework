@@ -40,7 +40,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
-protected:
+public:
 	TSharedPtr<class SProcedureToolbarWidget> ToolbarWidget;
 
 	TSharedPtr<class SProcedureListWidget> ListWidget;
@@ -50,9 +50,10 @@ protected:
 	TSharedPtr<class SProcedureStatusWidget> StatusWidget;
 
 private:
-	FDelegateHandle RefreshDelegateHandle;
-	FDelegateHandle BeginPIEDelegateHandle;
-	FDelegateHandle EndPIEDelegateHandle;
+	FDelegateHandle OnBeginPIEHandle;
+	FDelegateHandle OnEndPIEHandle;
+	FDelegateHandle OnOpenLevelHandle;
+	FDelegateHandle OnBlueprintCompiledHandle;
 
 public:
 	void TogglePreviewMode();

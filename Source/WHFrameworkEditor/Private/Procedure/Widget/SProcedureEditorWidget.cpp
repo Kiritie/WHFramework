@@ -24,17 +24,17 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 
 	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!UGlobalBPLibrary::IsPlaying());
 
-	if(BeginPIEDelegateHandle.IsValid())
+	if(OnBeginPIEHandle.IsValid())
 	{
-		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
 	}
-	BeginPIEDelegateHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SProcedureEditorWidget::OnBeginPIE);
+	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SProcedureEditorWidget::OnBeginPIE);
 
-	if(EndPIEDelegateHandle.IsValid())
+	if(OnEndPIEHandle.IsValid())
 	{
-		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
-	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &SProcedureEditorWidget::OnEndPIE);
+	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SProcedureEditorWidget::OnEndPIE);
 
 	if(ProcedureModule)
 	{
@@ -164,10 +164,18 @@ void SProcedureEditorWidget::OnCreate()
 {
 	SEditorSlateWidgetBase::OnCreate();
 
-	if(RefreshDelegateHandle.IsValid())
+	if(OnOpenLevelHandle.IsValid())
 	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
+		GEditor->OnPreviewFeatureLevelChanged().Remove(OnOpenLevelHandle);
 	}
+
+	if(OnBlueprintCompiledHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
+	}
+	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
+
+
 	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
 }
 
@@ -179,18 +187,23 @@ void SProcedureEditorWidget::OnReset()
 void SProcedureEditorWidget::OnRefresh()
 {
 	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!bPreviewMode);
+
 	if(ProcedureModule)
 	{
-		if(DetailWidget)
-		{
-			DetailWidget->ProcedureModule = ProcedureModule;
-		}
 		if(ListWidget)
 		{
 			ListWidget->ProcedureModule = ProcedureModule;
 		}
+		if(DetailWidget)
+		{
+			DetailWidget->ProcedureModule = ProcedureModule;
+		}
 
 		SEditorSlateWidgetBase::OnRefresh();
+	}
+	else
+	{
+		Destroy();
 	}
 }
 
@@ -198,19 +211,19 @@ void SProcedureEditorWidget::OnDestroy()
 {
 	SEditorSlateWidgetBase::OnDestroy();
 
-	if(RefreshDelegateHandle.IsValid())
+	if(OnBlueprintCompiledHandle.IsValid())
 	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
 	}
 
-	if(BeginPIEDelegateHandle.IsValid())
+	if(OnBeginPIEHandle.IsValid())
 	{
-		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
 	}
 
-	if(EndPIEDelegateHandle.IsValid())
+	if(OnEndPIEHandle.IsValid())
 	{
-		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
 }
 
@@ -239,21 +252,8 @@ void SProcedureEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 {
 	if(bPreviewMode != bIsPreviewMode)
 	{
-		if(AProcedureModule* _ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!bIsPreviewMode))
-		{
-			bPreviewMode = bIsPreviewMode;
-			ProcedureModule = _ProcedureModule;
-			if(ListWidget)
-			{
-				DetailWidget->ProcedureModule = ProcedureModule;
-			}
-			if(ListWidget)
-			{
-				ListWidget->ProcedureModule = ProcedureModule;
-				ListWidget->Refresh();
-			}
-			SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
-		}
+		Refresh();
+		SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
 	}
 }
 
