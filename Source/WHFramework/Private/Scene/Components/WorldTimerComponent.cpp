@@ -42,7 +42,12 @@ void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)
 {
 	TimeSeconds += DeltaSeconds;
 
+	#if ENGINE_MAJOR_VERSION == 4
 	float RemainSeconds = 0;
+	#else if ENGINE_MAJOR_VERSION == 5
+	double RemainSeconds = 0;
+	#endif
+	
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
 
 	UpdateLight(RemainSeconds / SecondsOfDay * 360 + 200);

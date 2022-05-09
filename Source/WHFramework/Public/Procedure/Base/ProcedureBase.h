@@ -6,6 +6,7 @@
 
 #include "Procedure/ProcedureModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Global/GlobalTypes.h"
 #include "Math/MathTypes.h"
 
 #include "ProcedureBase.generated.h"
@@ -218,6 +219,10 @@ public:
 	* 获取摄像机视角
 	*/
 	void GetCameraView();
+	/**
+	* 设置摄像机视角
+	*/
+	void SetCameraView(FCameraParams InCameraParams);
 #endif
 	/**
 	* 还原摄像机视角

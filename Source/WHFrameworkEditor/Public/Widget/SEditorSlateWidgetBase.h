@@ -18,11 +18,11 @@ enum class EEditorWidgetType : uint8
 class WHFRAMEWORKEDITOR_API SEditorSlateWidgetBase : public SCompoundWidget
 {
 public:
+	SEditorSlateWidgetBase();
+
 	SLATE_BEGIN_ARGS(SEditorSlateWidgetBase) {}
 
 	SLATE_END_ARGS()
-
-	SEditorSlateWidgetBase();
 
 	void Construct(const FArguments& InArgs);
 

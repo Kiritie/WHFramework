@@ -6,6 +6,9 @@
 // 编辑器
 DEFINE_LOG_CATEGORY_STATIC(WH_Editor, Log, All);
 
+// 控制器
+DEFINE_LOG_CATEGORY_STATIC(WH_Controller, Log, All);
+
 // 能力
 DEFINE_LOG_CATEGORY_STATIC(WH_Ability, Log, All);
 

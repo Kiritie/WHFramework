@@ -41,7 +41,7 @@ void FProcedureModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& Detail
 		[
 			SNew(SButton)
 			.Text(FText::FromString(TEXT("Open Procedure Editor")))
-			.OnClicked(FOnClicked::CreateSP(this, &FProcedureModuleDetailsPanel::OnExecuteAction))
+			.OnClicked(FOnClicked::CreateSP(this, &FProcedureModuleDetailsPanel::OnOnClickOpenProcedureEditorButton))
 		]
 	];
 
@@ -52,7 +52,7 @@ void FProcedureModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& Detail
 		];
 }
 
-FReply FProcedureModuleDetailsPanel::OnExecuteAction()
+FReply FProcedureModuleDetailsPanel::OnOnClickOpenProcedureEditorButton()
 {
 	FGlobalTabmanager::Get()->TryInvokeTab(FName("ProcedureEditor"));
 

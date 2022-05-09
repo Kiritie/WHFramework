@@ -9,6 +9,7 @@
 #include "SourceCodeNavigation.h"
 #include "SSkeletonWidget.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Global/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Step/StepBlueprintFactory.h"
@@ -17,9 +18,20 @@
 #include "Step/Base/StepBlueprint.h"
 #include "Step/Base/RootStepBase.h"
 #include "Step/Widget/SStepListItemWidget.h"
-#include "Step/Widget/Window/SCreateStepBlueprintDialog.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+SStepListWidget::SStepListWidget()
+{
+	WidgetName = FName("StepListWidget");
+	WidgetType = EEditorWidgetType::Child;
+
+	bMultiMode = true;
+	bEditMode = false;
+
+	StepModule = nullptr;
+	CopiedStep = nullptr;
+}
 
 void SStepListWidget::Construct(const FArguments& InArgs)
 {
@@ -363,10 +375,10 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 		]
 	];
 
-	Refresh();
-
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bMultiMode"), bMultiMode, GStepEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditMode"), bEditMode, GStepEditorIni);
+
+	UpdateTreeView(true);
 
 	SetIsMultiMode(bMultiMode);
 	SetIsEditMode(bEditMode);
@@ -388,6 +400,7 @@ void SStepListWidget::OnRefresh()
 
 	UpdateTreeView(true);
 	UpdateSelection();
+	SetIsEditMode(bEditMode);
 }
 
 void SStepListWidget::OnDestroy()
@@ -694,21 +707,19 @@ FReply SStepListWidget::OnNewStepClassButtonClicked()
 
 	UStepBlueprintFactory* StepBlueprintFactory = NewObject<UStepBlueprintFactory>(GetTransientPackage(), UStepBlueprintFactory::StaticClass());
 
-	const TSharedRef<SCreateStepBlueprintDialog> NewStepClassDlg = SNew(SCreateStepBlueprintDialog)
+	const TSharedRef<SCreateBlueprintAssetDialog> CreateBlueprintAssetDialog = SNew(SCreateBlueprintAssetDialog)
 	.DefaultAssetPath(FText::FromString(DefaultAssetPath))
 	.BlueprintFactory(StepBlueprintFactory);
 
-	if(NewStepClassDlg->ShowModal() != EAppReturnType::Cancel)
+	if(CreateBlueprintAssetDialog->ShowModal() != EAppReturnType::Cancel)
 	{
-		DefaultAssetPath = NewStepClassDlg->GetAssetPath();
+		DefaultAssetPath = CreateBlueprintAssetDialog->GetAssetPath();
 
-		const FString AssetName = NewStepClassDlg->GetAssetName();
+		const FString AssetName = CreateBlueprintAssetDialog->GetAssetName();
 	
-		const FString PackageName = NewStepClassDlg->GetPackageName();
+		const FString PackageName = CreateBlueprintAssetDialog->GetPackageName();
 
 		GConfig->SetString(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("DefaultAssetPath"), *DefaultAssetPath, GStepEditorIni);
-
-		StepBlueprintFactory->ParentClass = SelectedStepClass;
 	
 		if(UStepBlueprint* StepBlueprintAsset = Cast<UStepBlueprint>(AssetTools->CreateAsset(AssetName, DefaultAssetPath, UStepBlueprint::StaticClass(), StepBlueprintFactory, FName("ContentBrowserNewAsset"))))
 		{
@@ -717,7 +728,7 @@ FReply SStepListWidget::OnNewStepClassButtonClicked()
 
 			GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
 
-			SelectedStepClass = StepBlueprintAsset->GetClass();
+			//SelectedStepClass = StepBlueprintAsset->GetClass();
 		}
 	}
 

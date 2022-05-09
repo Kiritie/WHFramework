@@ -7,13 +7,20 @@
 #include "Templates/SubclassOf.h"
 #include "Engine/Blueprint.h"
 #include "Factories/Factory.h"
-#include "Global/Blueprint/Factory/BlueprintFactoryBase.h"
-#include "ProcedureBlueprintFactory.generated.h"
+#include "BlueprintFactoryBase.generated.h"
 
 UCLASS(HideCategories=Object, MinimalAPI)
-class UProcedureBlueprintFactory : public UBlueprintFactoryBase
+class UBlueprintFactoryBase : public UFactory
 {
 	GENERATED_UCLASS_BODY()
+
+	// The type of blueprint that will be created
+	UPROPERTY(EditAnywhere, Category=BlueprintFactoryBase)
+	TEnumAsByte<enum EBlueprintType> BlueprintType;
+
+	// The parent class of the created blueprint
+	UPROPERTY(EditAnywhere, Category=BlueprintFactoryBase)
+	TSubclassOf<class UObject> ParentClass;
 
 	//~ Begin UFactory Interface
 	virtual bool ConfigureProperties() override;

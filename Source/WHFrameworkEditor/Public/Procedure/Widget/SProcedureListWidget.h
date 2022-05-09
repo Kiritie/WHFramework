@@ -18,6 +18,8 @@ DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr
 class WHFRAMEWORKEDITOR_API SProcedureListWidget : public SEditorSlateWidgetBase
 {
 public:
+	SProcedureListWidget();
+	
 	SLATE_BEGIN_ARGS(SProcedureListWidget) {}
 
 		SLATE_ARGUMENT(class AProcedureModule*, ProcedureModule)
@@ -46,9 +48,9 @@ public:
 
 	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
 
-	bool bMultiMode = true;
+	bool bMultiMode;
 
-	bool bEditMode = false;
+	bool bEditMode;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs

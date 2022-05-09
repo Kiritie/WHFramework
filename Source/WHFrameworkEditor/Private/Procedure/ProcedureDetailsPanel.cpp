@@ -40,7 +40,15 @@ void FProcedureDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayout
 		[
 			SNew(SButton)
 			.Text(FText::FromString(TEXT("Get Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FProcedureDetailsPanel::OnExecuteAction))
+			.OnClicked(FOnClicked::CreateSP(this, &FProcedureDetailsPanel::OnClickGetCameraViewButton))
+		]
+
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		[
+			SNew(SButton)
+			.Text(FText::FromString(TEXT("Paste Camera View")))
+			.OnClicked(FOnClicked::CreateSP(this, &FProcedureDetailsPanel::OnClickPasteCameraViewButton))
 		]
 	];
 
@@ -51,9 +59,28 @@ void FProcedureDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayout
 		];
 }
 
-FReply FProcedureDetailsPanel::OnExecuteAction()
+FReply FProcedureDetailsPanel::OnClickGetCameraViewButton()
 {
-	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList) { if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get())) { Procedure->GetCameraView(); } }
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	{
+		if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get()))
+		{
+			Procedure->GetCameraView();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+FReply FProcedureDetailsPanel::OnClickPasteCameraViewButton()
+{
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	{
+		if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get()))
+		{
+			Procedure->SetCameraView(GCopiedCameraData);
+		}
+	}
 
 	return FReply::Handled();
 }

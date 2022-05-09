@@ -5,6 +5,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Procedure/ProcedureBlueprintFactory.h"
 #include "Procedure/ProcedureEditor.h"
+#include "Procedure/Base/ProcedureBase.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"

@@ -18,6 +18,19 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SStepEditorWidget::SStepEditorWidget()
+{
+	WidgetName = FName("StepEditorWidget");
+	WidgetType = EEditorWidgetType::Main;
+
+	bPreviewMode = false;
+	bShowListPanel = true;
+	bShowDetailPanel = true;
+	bShowStatusPanel = true;
+
+	StepModule = nullptr;
+}
+
 void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());

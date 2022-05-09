@@ -11,6 +11,8 @@
 class WHFRAMEWORKEDITOR_API SProcedureStatusWidget : public SEditorSlateWidgetBase
 {
 public:
+	SProcedureStatusWidget();
+	
 	SLATE_BEGIN_ARGS(SProcedureStatusWidget) {}
 	
 		SLATE_ARGUMENT(TSharedPtr<class SProcedureListWidget>, ListWidget)

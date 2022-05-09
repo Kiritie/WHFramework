@@ -13,6 +13,12 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SStepToolbarWidget::SStepToolbarWidget()
+{
+	WidgetName = FName("StepToolbarWidget");
+	WidgetType = EEditorWidgetType::Child;
+}
+
 void SStepToolbarWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());

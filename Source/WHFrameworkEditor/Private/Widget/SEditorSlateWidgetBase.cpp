@@ -38,17 +38,20 @@ void SEditorSlateWidgetBase::OnWindowDeactivated()
 
 void SEditorSlateWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 {
-	if(OnWindowActivatedHandle.IsValid())
+	if(GetOwnerWindow())
 	{
-		GetOwnerWindow()->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
-	}
-	if(OnWindowDeactivatedHandle.IsValid())
-	{
-		GetOwnerWindow()->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
-	}
-	if(OnWindowClosedHandle.IsValid())
-	{
-		GetOwnerWindow()->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
+		if(OnWindowActivatedHandle.IsValid())
+		{
+			GetOwnerWindow()->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
+		}
+		if(OnWindowDeactivatedHandle.IsValid())
+		{
+			GetOwnerWindow()->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
+		}
+		if(OnWindowClosedHandle.IsValid())
+		{
+			GetOwnerWindow()->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
+		}
 	}
 }
 
@@ -56,9 +59,12 @@ void SEditorSlateWidgetBase::OnCreate()
 {
 	if(WidgetType == EEditorWidgetType::Main)
 	{
-		OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowActivated);
-		OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowDeactivated);
-		OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowClosed);
+		if(GetOwnerWindow())
+		{
+			OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowActivated);
+			OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowDeactivated);
+			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowClosed);
+		}
 	}
 }
 
@@ -94,7 +100,10 @@ void SEditorSlateWidgetBase::Destroy()
 	{
 		case EEditorWidgetType::Main:
 		{
-			FSlateApplicationBase::Get().RequestDestroyWindow(GetOwnerWindow().ToSharedRef());
+			if(GetOwnerWindow())
+			{
+				FSlateApplicationBase::Get().RequestDestroyWindow(GetOwnerWindow().ToSharedRef());
+			}
 			break;
 		}
 		case EEditorWidgetType::Child:

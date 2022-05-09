@@ -22,7 +22,9 @@ public:
 	// End of IDetailCustomization interface
 
 protected:
-	FReply OnExecuteAction();
+	FReply OnClickGetCameraViewButton();
+	
+	FReply OnClickPasteCameraViewButton();
 
 private:
 	TArray< TWeakObjectPtr< UObject > > SelectedObjectsList;

@@ -11,6 +11,8 @@
 class WHFRAMEWORKEDITOR_API SProcedureEditorWidget : public SEditorSlateWidgetBase
 {
 public:
+	SProcedureEditorWidget();
+	
 	SLATE_BEGIN_ARGS(SProcedureEditorWidget) {}
 	SLATE_END_ARGS()
 
@@ -28,10 +30,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	bool bPreviewMode = false;
-	bool bShowListPanel = true;
-	bool bShowDetailPanel = true;
-	bool bShowStatusPanel = true;
+	bool bPreviewMode;
+	bool bShowListPanel;
+	bool bShowDetailPanel;
+	bool bShowStatusPanel;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs

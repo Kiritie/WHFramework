@@ -9,3 +9,5 @@ bool GIsPlaying = false;
 bool GIsPlaying = true;
 #endif
 bool GIsSimulating = false;
+
+FCameraParams GCopiedCameraData = FCameraParams();

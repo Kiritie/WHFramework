@@ -20,7 +20,7 @@ class WHFRAMEWORK_API UGlobalBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
-	// States
+	// State
 public:
 	/*
 	 * 当前是否为播放状态
@@ -42,6 +42,15 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static bool IsEditor() { return GIsEditor; }
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Data
+public:
+	/*
+	 * 获取已复制的摄像机参数
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static FCameraParams GetCopiedCameraParams() { return GCopiedCameraData; }
 
 	//////////////////////////////////////////////////////////////////////////
 	// Enum

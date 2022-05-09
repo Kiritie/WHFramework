@@ -7,6 +7,12 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SStepStatusWidget::SStepStatusWidget()
+{
+	WidgetName = FName("StepStatusWidget");
+	WidgetType = EEditorWidgetType::Child;
+}
+
 void SStepStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());

@@ -15,6 +15,8 @@ class AStepModule;
 class WHFRAMEWORKEDITOR_API SStepDetailWidget : public SEditorSlateWidgetBase
 {
 public:
+	SStepDetailWidget();
+	
 	SLATE_BEGIN_ARGS(SStepDetailWidget) {}
 
 		SLATE_ARGUMENT(AStepModule*, StepModule)

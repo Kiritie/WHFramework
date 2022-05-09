@@ -7,6 +7,12 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SProcedureStatusWidget::SProcedureStatusWidget()
+{
+	WidgetName = FName("ProcedureStatusWidget");
+	WidgetType = EEditorWidgetType::Child;
+}
+
 void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());

@@ -13,6 +13,7 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_BeginPlay.h"
 #include "Event/Handle/Global/EventHandle_EndPlay.h"
+#include "Gameplay/PlayerControllerDetailsPanel.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/AssetTypeActions_ProcedureBlueprint.h"
@@ -38,7 +39,7 @@ void FWHFrameworkEditorModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 	
-	// 初始化代理
+	// Register delegates
 	if(BeginPIEDelegateHandle.IsValid())
 	{
 		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
@@ -51,17 +52,16 @@ void FWHFrameworkEditorModule::StartupModule()
 	}
 	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &FWHFrameworkEditorModule::OnEndPIE);
 
-	// 初始化代理
+	// Register settings
+	RegisterSettings();
+
+	// Register styles
 	FWHFrameworkEditorStyle::Initialize();
 	FWHFrameworkEditorStyle::ReloadTextures();
 
-	// 初始化代理
+	// Register commands
 	FWHFrameworkEditorCommands::Register();
 
-	// 初始化代理
-	RegisterSettings();
-
-	// 初始化代理
 	PluginCommands = MakeShareable(new FUICommandList);
 
 	PluginCommands->MapAction(
@@ -74,10 +74,10 @@ void FWHFrameworkEditorModule::StartupModule()
 		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedStepEditorButton),
 		FCanExecuteAction());
 
-	// 初始化代理
+	// Register menus
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
 
-	// 初始化代理
+	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnProcedureEditorTab))
 		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
@@ -99,6 +99,8 @@ void FWHFrameworkEditorModule::StartupModule()
 
 	// Register the details customizer
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+
+	PropertyModule.RegisterCustomClassLayout(TEXT("WHPlayerController"), FOnGetDetailCustomizationInstance::CreateStatic(&FPlayerControllerDetailsPanel::MakeInstance));
 
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailsPanel::MakeInstance));
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureModuleDetailsPanel::MakeInstance));
@@ -155,6 +157,8 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	{
 		FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
 
+		PropertyModule.UnregisterCustomClassLayout(TEXT("WHPlayerController"));
+
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureBase"));
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureModule"));
 	
@@ -172,26 +176,22 @@ void FWHFrameworkEditorModule::RegisterMenus()
 	// Owner will be used for cleanup in call to UToolMenus::UnregisterOwner
 	FToolMenuOwnerScoped OwnerScoped(this);
 
+	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
 	{
-		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
-		{
-			FToolMenuSection& Section = Menu->FindOrAddSection("WHFramework");
-			Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow, PluginCommands);
-			Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
-		}
+		FToolMenuSection& Section = Menu->FindOrAddSection("WHFramework");
+		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow, PluginCommands);
+		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
 	}
 
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar");
 	{
-		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar");
+		FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("WHFramework");
 		{
-			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("WHFramework");
-			{
-				FToolMenuEntry& Entry1 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow));
-				Entry1.SetCommandList(PluginCommands);
+			FToolMenuEntry& Entry1 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow));
+			Entry1.SetCommandList(PluginCommands);
 
-				FToolMenuEntry& Entry2 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow));
-				Entry2.SetCommandList(PluginCommands);
-			}
+			FToolMenuEntry& Entry2 = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow));
+			Entry2.SetCommandList(PluginCommands);
 		}
 	}
 }

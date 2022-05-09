@@ -11,7 +11,10 @@
 class WHFRAMEWORKEDITOR_API SStepStatusWidget : public SEditorSlateWidgetBase
 {
 public:
+	SStepStatusWidget();
+
 	SLATE_BEGIN_ARGS(SStepStatusWidget) {}
+
 		SLATE_ARGUMENT(TSharedPtr<class SStepListWidget>, ListWidget)
 
 	SLATE_END_ARGS()

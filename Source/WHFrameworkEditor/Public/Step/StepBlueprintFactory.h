@@ -7,20 +7,13 @@
 #include "Templates/SubclassOf.h"
 #include "Engine/Blueprint.h"
 #include "Factories/Factory.h"
+#include "Global/Blueprint/Factory/BlueprintFactoryBase.h"
 #include "StepBlueprintFactory.generated.h"
 
 UCLASS(HideCategories=Object, MinimalAPI)
-class UStepBlueprintFactory : public UFactory
+class UStepBlueprintFactory : public UBlueprintFactoryBase
 {
 	GENERATED_UCLASS_BODY()
-
-	// The type of blueprint that will be created
-	UPROPERTY(EditAnywhere, Category=StepBlueprintFactory)
-	TEnumAsByte<enum EBlueprintType> BlueprintType;
-
-	// The parent class of the created blueprint
-	UPROPERTY(EditAnywhere, Category=StepBlueprintFactory)
-	TSubclassOf<class UStepBase> ParentClass;
 
 	//~ Begin UFactory Interface
 	virtual bool ConfigureProperties() override;

@@ -22,7 +22,7 @@ public:
 	// End of IDetailCustomization interface
 
 protected:
-	FReply OnExecuteAction();
+	FReply OnClickOpenStepEditorButton();
 
 private:
 	TArray< TWeakObjectPtr< UObject > > SelectedObjectsList;

@@ -11,6 +11,8 @@
 class WHFRAMEWORKEDITOR_API SStepToolbarWidget : public SEditorSlateWidgetBase
 {
 public:
+	SStepToolbarWidget();
+	
 	SLATE_BEGIN_ARGS(SStepToolbarWidget) {}
 
 		SLATE_ARGUMENT(TSharedPtr<class SStepEditorWidget>, MainWidget)

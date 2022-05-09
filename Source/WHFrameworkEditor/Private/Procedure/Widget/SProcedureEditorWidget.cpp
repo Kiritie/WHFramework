@@ -18,6 +18,19 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SProcedureEditorWidget::SProcedureEditorWidget()
+{
+	WidgetName = FName("ProcedureEditorWidget");
+	WidgetType = EEditorWidgetType::Main;
+
+	bPreviewMode = false;
+	bShowListPanel = true;
+	bShowDetailPanel = true;
+	bShowStatusPanel = true;
+
+	ProcedureModule = nullptr;
+}
+
 void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
@@ -176,7 +189,7 @@ void SProcedureEditorWidget::OnCreate()
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
 
 
-	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
+	//RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
 }
 
 void SProcedureEditorWidget::OnReset()

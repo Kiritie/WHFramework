@@ -17,7 +17,6 @@ SProcedureDetailWidget::SProcedureDetailWidget()
 	WidgetName = FName("ProcedureDetailWidget");
 	WidgetType = EEditorWidgetType::Child;
 	ProcedureModule = nullptr;
-	ListWidget = nullptr;
 }
 
 void SProcedureDetailWidget::Construct(const FArguments& InArgs)

@@ -18,6 +18,8 @@ DECLARE_DELEGATE_OneParam(FOnSelectStepListItemsDelegate, TArray<TSharedPtr<FSte
 class WHFRAMEWORKEDITOR_API SStepListWidget : public SEditorSlateWidgetBase
 {
 public:
+	SStepListWidget();
+	
 	SLATE_BEGIN_ARGS(SStepListWidget) {}
 
 		SLATE_ARGUMENT(class AStepModule*, StepModule)

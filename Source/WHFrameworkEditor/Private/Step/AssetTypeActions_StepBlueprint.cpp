@@ -5,6 +5,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Step/StepBlueprintFactory.h"
 #include "Step/StepEditor.h"
+#include "Step/Base/StepBase.h"
 #include "Step/Base/StepBlueprint.h"
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"

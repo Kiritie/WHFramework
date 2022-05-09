@@ -9,10 +9,10 @@
 enum class ECheckBoxState : uint8;
 class IDetailLayoutBuilder;
 
-class FProcedureModuleDetailsPanel : public IDetailCustomization
+class FPlayerControllerDetailsPanel : public IDetailCustomization
 {
 public:
-	FProcedureModuleDetailsPanel();
+	FPlayerControllerDetailsPanel();
 
 	// Makes a new instance of this detail layout class for a specific detail view requesting it
 	static TSharedRef<IDetailCustomization> MakeInstance();
@@ -22,7 +22,7 @@ public:
 	// End of IDetailCustomization interface
 
 protected:
-	FReply OnOnClickOpenProcedureEditorButton();
+	FReply OnClickCopyCameraParamsButton();
 
 private:
 	TArray< TWeakObjectPtr< UObject > > SelectedObjectsList;

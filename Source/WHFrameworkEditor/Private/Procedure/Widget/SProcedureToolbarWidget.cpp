@@ -13,9 +13,18 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SProcedureToolbarWidget::SProcedureToolbarWidget()
+{
+	WidgetName = FName("ProcedureToolbarWidget");
+	WidgetType = EEditorWidgetType::Child;
+}
+
 void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+
+	MainWidget = InArgs._MainWidget;
+	ListWidget = InArgs._ListWidget;
 
 	if(!MainWidget || !ListWidget) return;
 

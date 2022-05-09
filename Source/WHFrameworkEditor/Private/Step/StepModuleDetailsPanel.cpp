@@ -41,7 +41,7 @@ void FStepModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayou
 		[
 			SNew(SButton)
 			.Text(FText::FromString(TEXT("Open Step Editor")))
-			.OnClicked(FOnClicked::CreateSP(this, &FStepModuleDetailsPanel::OnExecuteAction))
+			.OnClicked(FOnClicked::CreateSP(this, &FStepModuleDetailsPanel::OnClickOpenStepEditorButton))
 		]
 	];
 
@@ -52,7 +52,7 @@ void FStepModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayou
 		];
 }
 
-FReply FStepModuleDetailsPanel::OnExecuteAction()
+FReply FStepModuleDetailsPanel::OnClickOpenStepEditorButton()
 {
 	FGlobalTabmanager::Get()->TryInvokeTab(FName("StepEditor"));
 

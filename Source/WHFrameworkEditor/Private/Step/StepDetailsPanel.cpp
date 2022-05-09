@@ -40,7 +40,15 @@ void FStepDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuild
 		[
 			SNew(SButton)
 			.Text(FText::FromString(TEXT("Get Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FStepDetailsPanel::OnExecuteAction))
+			.OnClicked(FOnClicked::CreateSP(this, &FStepDetailsPanel::OnClickGetCameraViewButton))
+		]
+
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		[
+			SNew(SButton)
+			.Text(FText::FromString(TEXT("Paste Camera View")))
+			.OnClicked(FOnClicked::CreateSP(this, &FStepDetailsPanel::OnClickPasteCameraViewButton))
 		]
 	];
 
@@ -51,9 +59,28 @@ void FStepDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuild
 		];
 }
 
-FReply FStepDetailsPanel::OnExecuteAction()
+FReply FStepDetailsPanel::OnClickGetCameraViewButton()
 {
-	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList) { if(UStepBase* Step = Cast<UStepBase>(SelectedObject.Get())) { Step->GetCameraView(); } }
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	{
+		if(UStepBase* Step = Cast<UStepBase>(SelectedObject.Get()))
+		{
+			Step->GetCameraView();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+FReply FStepDetailsPanel::OnClickPasteCameraViewButton()
+{
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	{
+		if(UStepBase* Step = Cast<UStepBase>(SelectedObject.Get()))
+		{
+			Step->SetCameraView(GCopiedCameraData);
+		}
+	}
 
 	return FReply::Handled();
 }

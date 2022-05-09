@@ -11,6 +11,8 @@
 class WHFRAMEWORKEDITOR_API SStepEditorWidget : public SEditorSlateWidgetBase
 {
 public:
+	SStepEditorWidget();
+	
 	SLATE_BEGIN_ARGS(SStepEditorWidget) {}
 	SLATE_END_ARGS()
 

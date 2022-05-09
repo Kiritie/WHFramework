@@ -307,17 +307,38 @@ void UProcedureBase::GetCameraView()
 		if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 		{
 			CameraViewOffset = PlayerController->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 		}
 		else
 		{
 			CameraViewOffset = PlayerController->GetCurrentCameraLocation();
+			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
+			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
 		}
-		CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
-		CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
 		CameraViewDistance = PlayerController->GetCurrentCameraDistance();
 
 		Modify();
 	}
+}
+
+void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
+{
+	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
+	{
+		CameraViewOffset = InCameraParams.CameraLocation - OperationTarget->GetActorLocation();
+		CameraViewYaw = InCameraParams.CameraRotation.Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = InCameraParams.CameraRotation.Pitch - OperationTarget->GetActorRotation().Pitch;
+	}
+	else
+	{
+		CameraViewOffset = InCameraParams.CameraLocation;
+		CameraViewYaw = InCameraParams.CameraRotation.Yaw;
+		CameraViewPitch = InCameraParams.CameraRotation.Pitch;
+	}
+	CameraViewDistance = InCameraParams.CameraDistance;
+
+	Modify();
 }
 #endif
 

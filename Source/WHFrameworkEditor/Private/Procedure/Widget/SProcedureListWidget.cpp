@@ -9,6 +9,7 @@
 #include "SourceCodeNavigation.h"
 #include "SSkeletonWidget.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Global/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Procedure/ProcedureBlueprintFactory.h"
@@ -17,9 +18,19 @@
 #include "Procedure/Base/ProcedureBlueprint.h"
 #include "Procedure/Base/ProcedureBase.h"
 #include "Procedure/Widget/SProcedureListItemWidget.h"
-#include "Procedure/Widget/Window/SCreateProcedureBlueprintDialog.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+SProcedureListWidget::SProcedureListWidget()
+{
+	WidgetName = FName("ProcedureListWidget");
+	WidgetType = EEditorWidgetType::Child;
+
+	bMultiMode = true;
+	bEditMode = false;
+
+	ProcedureModule = nullptr;
+}
 
 void SProcedureListWidget::Construct(const FArguments& InArgs)
 {
@@ -295,10 +306,10 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 		]
 	];
 
-	Refresh();
-
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bMultiMode"), bMultiMode, GProcedureEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bEditMode"), bEditMode, GProcedureEditorIni);
+
+	UpdateListView(true);
 
 	SetIsMultiMode(bMultiMode);
 	SetIsEditMode(bEditMode);
@@ -322,6 +333,7 @@ void SProcedureListWidget::OnRefresh()
 
 	UpdateListView(true);
 	UpdateSelection();
+	SetIsEditMode(bEditMode);
 }
 
 void SProcedureListWidget::OnDestroy()
@@ -545,21 +557,19 @@ FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
 
 	UProcedureBlueprintFactory* ProcedureBlueprintFactory = NewObject<UProcedureBlueprintFactory>(GetTransientPackage(), UProcedureBlueprintFactory::StaticClass());
 
-	const TSharedRef<SCreateProcedureBlueprintDialog> NewProcedureClassDlg = SNew(SCreateProcedureBlueprintDialog)
+	const TSharedRef<SCreateBlueprintAssetDialog> CreateBlueprintAssetDialog = SNew(SCreateBlueprintAssetDialog)
 	.DefaultAssetPath(FText::FromString(DefaultAssetPath))
 	.BlueprintFactory(ProcedureBlueprintFactory);
 
-	if(NewProcedureClassDlg->ShowModal() != EAppReturnType::Cancel)
+	if(CreateBlueprintAssetDialog->ShowModal() != EAppReturnType::Cancel)
 	{
-		DefaultAssetPath = NewProcedureClassDlg->GetAssetPath();
+		DefaultAssetPath = CreateBlueprintAssetDialog->GetAssetPath();
 
-		const FString AssetName = NewProcedureClassDlg->GetAssetName();
+		const FString AssetName = CreateBlueprintAssetDialog->GetAssetName();
 	
-		const FString PackageName = NewProcedureClassDlg->GetPackageName();
+		const FString PackageName = CreateBlueprintAssetDialog->GetPackageName();
 
 		GConfig->SetString(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("DefaultAssetPath"), *DefaultAssetPath, GProcedureEditorIni);
-
-		ProcedureBlueprintFactory->ParentClass = SelectedProcedureClass;
 	
 		if(UProcedureBlueprint* ProcedureBlueprintAsset = Cast<UProcedureBlueprint>(AssetTools->CreateAsset(AssetName, DefaultAssetPath, UProcedureBlueprint::StaticClass(), ProcedureBlueprintFactory, FName("ContentBrowserNewAsset"))))
 		{
@@ -568,7 +578,7 @@ FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
 
 			GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
 
-			SelectedProcedureClass = ProcedureBlueprintAsset->GetClass();
+			//SelectedProcedureClass = ProcedureBlueprintAsset->GetClass();
 		}
 	}
 
