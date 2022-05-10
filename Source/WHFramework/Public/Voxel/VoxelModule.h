@@ -109,6 +109,9 @@ public:
 	// Chunk
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
+	TSubclassOf<AVoxelChunk> ChunkSpawnClass;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkSpawnRange;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -135,6 +138,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkGenerateSpeed;
 
+protected:
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 	

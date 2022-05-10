@@ -111,7 +111,12 @@ AWHPlayerController::AWHPlayerController()
 	TouchPinchValuePrevious = -1.f;
 }
 
-void AWHPlayerController::Initialize_Implementation()
+void AWHPlayerController::OnInitialize_Implementation()
+{
+	
+}
+
+void AWHPlayerController::OnPreparatory_Implementation()
 {
 	
 }
@@ -119,6 +124,8 @@ void AWHPlayerController::Initialize_Implementation()
 void AWHPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	OnPreparatory();
 }
 
 void AWHPlayerController::SetupInputComponent()

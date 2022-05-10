@@ -7,9 +7,9 @@
 #include "ObjectPool.h"
 #include "ObjectPoolInterface.h"
 #include "Actor/ActorPool.h"
+#include "Blueprint/UserWidget.h"
 #include "Main/Base/ModuleBase.h"
 #include "Widget/WidgetPool.h"
-#include "Widget/Interfaces/BaseWidgetInterface.h"
 
 #include "ObjectPoolModule.generated.h"
 
@@ -81,7 +81,7 @@ public:
 			{
 				ObjectPool = NewObject<UActorPool>(this);
 			}
-			else if(InType->ImplementsInterface(UBaseWidgetInterface::StaticClass()))
+			else if(InType->IsChildOf(UUserWidget::StaticClass()))
 			{
 				ObjectPool = NewObject<UWidgetPool>(this);
 			}

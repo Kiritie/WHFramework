@@ -128,11 +128,6 @@ void AEventModule::UnsubscribeAllEvent()
 	EventHandleInfos.Empty();
 }
 
-void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams)
-{
-	BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParams ? *InParams : TArray<FParameter>());
-}
-
 void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	if(!InEventHandleClass) return;

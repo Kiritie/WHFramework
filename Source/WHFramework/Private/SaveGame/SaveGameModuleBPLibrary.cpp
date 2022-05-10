@@ -47,11 +47,11 @@ USaveGameBase* USaveGameModuleBPLibrary::K2_GetSaveGame(TSubclassOf<USaveGameBas
 	return nullptr;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad);
 	}
 	return nullptr;
 }
@@ -61,6 +61,24 @@ bool USaveGameModuleBPLibrary::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSave
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
 		return SaveGameModule->K2_SaveSaveGame(InSaveGameClass, bRefresh);
+	}
+	return false;
+}
+
+bool USaveGameModuleBPLibrary::SaveSaveGames(TArray<TSubclassOf<USaveGameBase>> InSaveGameClass, bool bRefresh)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->SaveSaveGames(InSaveGameClass, bRefresh);
+	}
+	return false;
+}
+
+bool USaveGameModuleBPLibrary::SaveAllSaveGame(bool bRefresh)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->SaveAllSaveGame(bRefresh);
 	}
 	return false;
 }

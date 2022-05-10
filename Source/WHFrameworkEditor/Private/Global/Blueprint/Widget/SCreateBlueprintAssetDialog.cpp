@@ -54,7 +54,11 @@ void SCreateBlueprintAssetDialog::Construct(const FArguments& InArgs)
 
 	ClassFilter = MakeShareable(new FBlueprintParentClassFilter);
 	ClassFilter->IncludeParentClass = BlueprintFactory->ParentClass;
+	#if ENGINE_MAJOR_VERSION == 4
 	ClassViewerOptions.ClassFilter = ClassFilter;
+	#else if ENGINE_MAJOR_VERSION == 5
+	ClassViewerOptions.ClassFilters.Add(ClassFilter.ToSharedRef());
+	#endif
 
 	SAssignNew(ClassPickButton, SComboButton)
 		.OnGetMenuContent(this, &SCreateBlueprintAssetDialog::GenerateClassPicker)

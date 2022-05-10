@@ -93,7 +93,7 @@ public:
 	USaveGameBase* K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const;
 
 	template<class T>
-	T* CreateSaveGame(int32 InSaveIndex = 0, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* CreateSaveGame(int32 InSaveIndex = 0, bool bAutoLoad = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		if(!InSaveGameClass) return nullptr;
 		
@@ -104,6 +104,10 @@ public:
 			{
 				AllSaveGames.Add(SaveName, SaveGame);
 				SaveGame->OnCreate(InSaveIndex);
+				if(bAutoLoad)
+				{
+					SaveGame->Load();
+				}
 				return Cast<T>(SaveGame);
 			}
 		}
@@ -111,7 +115,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateSaveGame", DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0);
+	USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0, bool bAutoLoad = false);
 
 	template<class T>
 	bool SaveSaveGame(bool bRefresh = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
@@ -125,7 +129,7 @@ public:
 			{
 				if(bRefresh)
 				{
-					RefreshSaveGame<T>(InSaveGameClass);
+					SaveGame->OnRefresh();
 				}
 				SaveGame->OnSave();
 				return UGameplayStatics::SaveGameToSlot(SaveGame, GetSaveSlotName(SaveName, SaveGame->GetSaveIndex()), UserIndex);
@@ -137,6 +141,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
 	bool K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh = false);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
+	bool SaveSaveGames(TArray<TSubclassOf<USaveGameBase>> InSaveGameClass, bool bRefresh = false);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
+	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
 	T* LoadSaveGame(int32 InSaveIndex = 0, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
@@ -224,7 +234,7 @@ public:
 	bool K2_RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass);
 
 	template<class T>
-	bool DestroySaveGame(int32 InSaveIndex, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool DestroySaveGame(int32 InSaveIndex = 0, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		if(!InSaveGameClass) return false;
 
@@ -248,7 +258,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroySaveGame"))
-	bool K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
+	bool K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0);
 
 	UFUNCTION(BlueprintPure)
 	FString GetSaveSlotName(FName InSaveName, int32 InSaveIndex) const;

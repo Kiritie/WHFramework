@@ -60,14 +60,39 @@ USaveGameBase* ASaveGameModule::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSave
 	return GetSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
 {
-	return CreateSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
+	return CreateSaveGame<USaveGameBase>(InSaveIndex, bAutoLoad, InSaveGameClass);
 }
 
 bool ASaveGameModule::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
 {
 	return SaveSaveGame<USaveGameBase>(bRefresh, InSaveGameClass);
+}
+
+bool ASaveGameModule::SaveSaveGames(TArray<TSubclassOf<USaveGameBase>> InSaveGameClass, bool bRefresh)
+{
+	bool bIsAllSaved = true;
+	for(auto Iter : InSaveGameClass)
+	{
+		if(!SaveSaveGame<USaveGameBase>(bRefresh, Iter))
+		{
+			bIsAllSaved = false;
+		}
+	}
+	return bIsAllSaved;
+}
+bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
+{
+	bool bIsAllSaved = true;
+	for(auto Iter : AllSaveGames)
+	{
+		if(!Iter.Value->Save(bRefresh))
+		{
+			bIsAllSaved = false;
+		}
+	}
+	return bIsAllSaved;
 }
 
 USaveGameBase* ASaveGameModule::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)

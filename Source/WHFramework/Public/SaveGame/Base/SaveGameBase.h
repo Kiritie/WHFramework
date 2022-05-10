@@ -40,22 +40,22 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void Save(bool bRefresh = false);
+	bool Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
-	void Load();
+	bool Load();
 
 	UFUNCTION(BlueprintCallable)
-	void Unload();
+	bool Unload();
 
 	UFUNCTION(BlueprintCallable)
-	void Reset();
+	bool Reset();
 
 	UFUNCTION(BlueprintCallable)
-	void Refresh();
+	bool Refresh();
 
 	UFUNCTION(BlueprintCallable)
-	void Destroy();
+	bool Destroy();
 
 protected:
 	UPROPERTY(EditDefaultsOnly)

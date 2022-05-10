@@ -47,32 +47,32 @@ void USaveGameBase::OnDestroy_Implementation()
 	
 }
 
-void USaveGameBase::Save(bool bRefresh)
+bool USaveGameBase::Save(bool bRefresh)
 {
-	USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(bRefresh, GetClass());
+	return USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(bRefresh, GetClass());
 }
 
-void USaveGameBase::Load()
+bool USaveGameBase::Load()
 {
-	USaveGameModuleBPLibrary::LoadSaveGame<USaveGameBase>(SaveIndex, GetClass());
+	return USaveGameModuleBPLibrary::LoadSaveGame<USaveGameBase>(SaveIndex, GetClass()) != nullptr;
 }
 
-void USaveGameBase::Unload()
+bool USaveGameBase::Unload()
 {
-	USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(GetClass());
 }
 
-void USaveGameBase::Reset()
+bool USaveGameBase::Reset()
 {
-	USaveGameModuleBPLibrary::ResetSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::ResetSaveGame<USaveGameBase>(GetClass());
 }
 
-void USaveGameBase::Refresh()
+bool USaveGameBase::Refresh()
 {
-	USaveGameModuleBPLibrary::RefreshSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::RefreshSaveGame<USaveGameBase>(GetClass());
 }
 
-void USaveGameBase::Destroy()
+bool USaveGameBase::Destroy()
 {
-	USaveGameModuleBPLibrary::DestroySaveGame<USaveGameBase>(SaveIndex, GetClass());
+	return USaveGameModuleBPLibrary::DestroySaveGame<USaveGameBase>(SaveIndex, GetClass());
 }

@@ -54,186 +54,58 @@ UProcedureBase* UProcedureModuleBPLibrary::K2_GetProcedureByClass(TSubclassOf<UP
 	return nullptr;
 }
 
-void UProcedureModuleBPLibrary::StartProcedure(int32 InProcedureIndex, bool bSkipProcedures)
+void UProcedureModuleBPLibrary::SwitchProcedure(UProcedureBase* InProcedure)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->StartProcedure(InProcedureIndex, bSkipProcedures);
+		ProcedureModule->SwitchProcedure(InProcedure);
 	}
 }
 
-void UProcedureModuleBPLibrary::EndProcedure(bool bRestoreProcedures)
+void UProcedureModuleBPLibrary::SwitchProcedureByIndex(int32 InProcedureIndex)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->EndProcedure(bRestoreProcedures);
+		ProcedureModule->SwitchProcedureByIndex(InProcedureIndex);
 	}
 }
 
-void UProcedureModuleBPLibrary::RestoreProcedure(UProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->RestoreProcedure(InProcedure);
+		ProcedureModule->SwitchProcedureByClass(InProcedureClass);
 	}
 }
 
-void UProcedureModuleBPLibrary::RestoreProcedureByIndex(int32 InProcedureIndex)
+void UProcedureModuleBPLibrary::SwitchFirstProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->RestoreProcedureByIndex(InProcedureIndex);
+		ProcedureModule->SwitchFirstProcedure();
 	}
 }
 
-void UProcedureModuleBPLibrary::RestoreProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+void UProcedureModuleBPLibrary::SwitchLastProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->RestoreProcedureByClass(InProcedureClass);
+		ProcedureModule->SwitchLastProcedure();
 	}
 }
 
-void UProcedureModuleBPLibrary::EnterProcedure(UProcedureBase* InProcedure)
+void UProcedureModuleBPLibrary::SwitchNextProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->EnterProcedure(InProcedure);
+		ProcedureModule->SwitchNextProcedure();
 	}
 }
 
-void UProcedureModuleBPLibrary::EnterProcedureByIndex(int32 InProcedureIndex)
+void UProcedureModuleBPLibrary::GuideCurrentProcedure()
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		ProcedureModule->EnterProcedureByIndex(InProcedureIndex);
-	}
-}
-
-void UProcedureModuleBPLibrary::EnterProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->EnterProcedureByClass(InProcedureClass);
-	}
-}
-
-void UProcedureModuleBPLibrary::RefreshProcedure(UProcedureBase* InProcedure)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->RefreshProcedure(InProcedure);
-	}
-}
-
-void UProcedureModuleBPLibrary::RefreshProcedureByIndex(int32 InProcedureIndex)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->RefreshProcedureByIndex(InProcedureIndex);
-	}
-}
-
-void UProcedureModuleBPLibrary::RefreshProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->RefreshProcedureByClass(InProcedureClass);
-	}
-}
-
-void UProcedureModuleBPLibrary::GuideProcedure(UProcedureBase* InProcedure)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->GuideProcedure(InProcedure);
-	}
-}
-
-void UProcedureModuleBPLibrary::GuideProcedureByIndex(int32 InProcedureIndex)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->GuideProcedureByIndex(InProcedureIndex);
-	}
-}
-
-void UProcedureModuleBPLibrary::GuideProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->GuideProcedureByClass(InProcedureClass);
-	}
-}
-
-void UProcedureModuleBPLibrary::ExecuteProcedure(UProcedureBase* InProcedure)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->ExecuteProcedure(InProcedure);
-	}
-}
-
-void UProcedureModuleBPLibrary::ExecuteProcedureByIndex(int32 InProcedureIndex)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->ExecuteProcedureByIndex(InProcedureIndex);
-	}
-}
-
-void UProcedureModuleBPLibrary::ExecuteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->ExecuteProcedureByClass(InProcedureClass);
-	}
-}
-
-void UProcedureModuleBPLibrary::CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->CompleteProcedure(InProcedure, InProcedureExecuteResult);
-	}
-}
-
-void UProcedureModuleBPLibrary::CompleteProcedureByIndex(int32 InProcedureIndex, EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->CompleteProcedureByIndex(InProcedureIndex, InProcedureExecuteResult);
-	}
-}
-
-void UProcedureModuleBPLibrary::CompleteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass, EProcedureExecuteResult InProcedureExecuteResult)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->CompleteProcedureByClass(InProcedureClass, InProcedureExecuteResult);
-	}
-}
-
-void UProcedureModuleBPLibrary::LeaveProcedure(UProcedureBase* InProcedure)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->LeaveProcedure(InProcedure);
-	}
-}
-
-void UProcedureModuleBPLibrary::LeaveProcedureByIndex(int32 InProcedureIndex)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->LeaveProcedureByIndex(InProcedureIndex);
-	}
-}
-
-void UProcedureModuleBPLibrary::LeaveProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		ProcedureModule->LeaveProcedureByClass(InProcedureClass);
+		ProcedureModule->GuideCurrentProcedure();
 	}
 }

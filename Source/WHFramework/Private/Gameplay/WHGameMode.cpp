@@ -10,7 +10,7 @@ AWHGameMode::AWHGameMode()
 	
 }
 
-void AWHGameMode::Initialize_Implementation()
+void AWHGameMode::OnInitialize_Implementation()
 {
 	AMainModule* MainModule = AMainModule::Get();
 	if(MainModule && MainModule->IsValidLowLevel())
@@ -19,11 +19,16 @@ void AWHGameMode::Initialize_Implementation()
 	}
 }
 
+void AWHGameMode::OnPreparatory_Implementation()
+{
+	
+}
+
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
-	Initialize();
+	OnInitialize();
 }
 
 void AWHGameMode::InitGameState()
@@ -32,7 +37,7 @@ void AWHGameMode::InitGameState()
 
 	if(AWHGameState* WHGameState = Cast<AWHGameState>(GameState))
 	{
-		WHGameState->Initialize();
+		WHGameState->OnInitialize();
 	}
 }
 
@@ -42,7 +47,7 @@ APlayerController* AWHGameMode::SpawnPlayerController(ENetRole InRemoteRole, con
 	
 	if(AWHPlayerController* WHPlayerController = Cast<AWHPlayerController>(PlayerController))
 	{
-		WHPlayerController->Initialize();
+		WHPlayerController->OnInitialize();
 	}
 	return PlayerController;
 }
@@ -60,4 +65,6 @@ void AWHGameMode::Logout(AController* Exiting)
 void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	OnPreparatory_Implementation();
 }

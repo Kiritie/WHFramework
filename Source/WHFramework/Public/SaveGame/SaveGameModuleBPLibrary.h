@@ -59,17 +59,17 @@ public:
 	static USaveGameBase* K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass);
 
 	template<class T>
-	static T* CreateSaveGame(int32 InSaveIndex = 0, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static T* CreateSaveGame(int32 InSaveIndex = 0, bool bAutoLoad = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 		{
-			return SaveGameModule->CreateSaveGame<T>(InSaveIndex, InSaveGameClass);
+			return SaveGameModule->CreateSaveGame<T>(InSaveIndex, bAutoLoad, InSaveGameClass);
 		}
 		return nullptr;
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateSaveGame", DeterminesOutputType = "InSaveGameClass"), Category = "SaveGameModuleBPLibrary")
-	static USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0);
+	static USaveGameBase* K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0, bool bAutoLoad = false);
 
 	template<class T>
 	static bool SaveSaveGame(bool bRefresh = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
@@ -83,6 +83,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"), Category = "SaveGameModuleBPLibrary")
 	static bool K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh = false);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"), Category = "SaveGameModuleBPLibrary")
+	static bool SaveSaveGames(TArray<TSubclassOf<USaveGameBase>> InSaveGameClass, bool bRefresh = false);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"), Category = "SaveGameModuleBPLibrary")
+	static bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
 	static T* LoadSaveGame(int32 InSaveIndex = 0, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

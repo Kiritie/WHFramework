@@ -7,7 +7,12 @@ AWHGameState::AWHGameState()
 	
 }
 
-void AWHGameState::Initialize_Implementation()
+void AWHGameState::OnInitialize_Implementation()
+{
+	
+}
+
+void AWHGameState::OnPreparatory_Implementation()
 {
 	
 }
@@ -15,5 +20,5 @@ void AWHGameState::Initialize_Implementation()
 void AWHGameState::BeginPlay()
 {
 	Super::BeginPlay();
-
+	OnPreparatory();
 }

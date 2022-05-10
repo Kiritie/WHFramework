@@ -24,6 +24,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static UProcedureBase* GetCurrentProcedure();
 	
+public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static bool HasProcedureByIndex(int32 InProcedureIndex);
 
@@ -65,78 +66,29 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void StartProcedure(int32 InProcedureIndex = -1, bool bSkipProcedures = false);
+	static void SwitchProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void EndProcedure(bool bRestoreProcedures = false);
+	static void SwitchProcedureByIndex(int32 InProcedureIndex);
 
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RestoreProcedure(UProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RestoreProcedureByIndex(int32 InProcedureIndex);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RestoreProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void EnterProcedure(UProcedureBase* InProcedure);
+	template<class T>
+	static void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
+	{
+		SwitchProcedureByClass(InProcedureClass);
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void EnterProcedureByIndex(int32 InProcedureIndex);
+	static void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void EnterProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RefreshProcedure(UProcedureBase* InProcedure);
+	static void SwitchFirstProcedure();
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RefreshProcedureByIndex(int32 InProcedureIndex);
+	static void SwitchLastProcedure();
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void RefreshProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void GuideProcedure(UProcedureBase* InProcedure);
+	static void SwitchNextProcedure();
 
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void GuideProcedureByIndex(int32 InProcedureIndex);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void GuideProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ExecuteProcedure(UProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ExecuteProcedureByIndex(int32 InProcedureIndex);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void ExecuteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void CompleteProcedure(UProcedureBase* InProcedure, EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void CompleteProcedureByIndex(int32 InProcedureIndex, EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void CompleteProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass, EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
-
-	//////////////////////////////////////////////////////////////////////////
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void LeaveProcedure(UProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void LeaveProcedureByIndex(int32 InProcedureIndex);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
-	static void LeaveProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
+	static void GuideCurrentProcedure();
 };

@@ -58,6 +58,10 @@ void AStepModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
+	if(!FirstStep && RootSteps.Num() > 0)
+	{
+		FirstStep = RootSteps[0];
+	}
 	for(auto Iter : RootSteps)
 	{
 		if(Iter)
@@ -211,7 +215,7 @@ void AStepModule::EndStep(bool bRestoreSteps)
 	if(StepModuleState != EStepModuleState::Ended)
 	{
 		StepModuleState = EStepModuleState::Ended;
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndStep::StaticClass(), EEventNetType::Single, this);
+		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_EndStep>(EEventNetType::Single, this);
 	}
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)

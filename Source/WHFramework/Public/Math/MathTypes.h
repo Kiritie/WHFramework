@@ -8,6 +8,8 @@
 
 #define DEG_2_RAD (0.01745329f)
 
+#define Vector_Empty FVector(MAX_flt)
+
 UENUM(BlueprintType)
 enum class EEaseType : uint8
 {
