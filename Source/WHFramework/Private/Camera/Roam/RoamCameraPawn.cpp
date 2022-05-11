@@ -24,6 +24,12 @@ ARoamCameraPawn::ARoamCameraPawn()
 	Sphere->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	RootComponent = Sphere;
 	
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetRelativeTransform(FTransform::Identity);
+
+	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
+	
 	MovementComponent = CreateDefaultSubobject<UPawnMovementComponent, UFloatingPawnMovement>(FName("MovementComponent"));
 	MovementComponent->UpdatedComponent = Sphere;
 }
