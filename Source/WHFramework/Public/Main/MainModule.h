@@ -85,6 +85,7 @@ private:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
+	UPROPERTY()
 	bool bInEditor;
 
 public:

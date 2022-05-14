@@ -485,21 +485,50 @@ void UStepBase::SetCameraView(FCameraParams InCameraParams)
 
 void UStepBase::ResetCameraView()
 {
-	if(CameraViewMode == EStepCameraViewMode::None) return;
-	
 	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
 	{
-		if(CameraViewMode == EStepCameraViewMode::Duration)
+		FVector CameraLocation;
+		float CameraYaw;
+		float CameraPitch;
+		float CameraDistance;
+		if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 		{
-			PlayerController->DoCameraLocation(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget ? OperationTarget->GetActorLocation() + CameraViewOffset : CameraViewOffset, CameraViewDuration, CameraViewEaseType);
-			PlayerController->DoCameraRotation(CameraViewYaw, CameraViewPitch, CameraViewDuration, CameraViewEaseType);
-			PlayerController->DoCameraDistance(CameraViewDistance, CameraViewDuration, CameraViewEaseType);
+			CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
+			CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
+			CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
+			CameraDistance = CameraViewDistance;
 		}
 		else
 		{
-			PlayerController->SetCameraLocation(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget ? OperationTarget->GetActorLocation() + CameraViewOffset : CameraViewOffset, CameraViewMode == EStepCameraViewMode::Instant);
-			PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, CameraViewMode == EStepCameraViewMode::Instant);
-			PlayerController->SetCameraDistance(CameraViewDistance, CameraViewMode == EStepCameraViewMode::Instant);
+			CameraLocation = CameraViewOffset;
+			CameraYaw = CameraViewYaw;
+			CameraPitch = CameraViewPitch;
+			CameraDistance = CameraViewDistance;
+		}
+		switch(CameraViewMode)
+		{
+			case EStepCameraViewMode::Instant:
+			{
+				PlayerController->SetCameraLocation(CameraLocation, true);
+				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+				PlayerController->SetCameraDistance(CameraViewDistance, true);
+				break;
+			}
+			case EStepCameraViewMode::Smooth:
+			{
+				PlayerController->SetCameraLocation(CameraLocation, false);
+				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+				PlayerController->SetCameraDistance(CameraViewDistance, false);
+				break;
+			}
+			case EStepCameraViewMode::Duration:
+			{
+				PlayerController->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+				PlayerController->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+				PlayerController->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+				break;
+			}
+			default: break;
 		}
 	}
 }

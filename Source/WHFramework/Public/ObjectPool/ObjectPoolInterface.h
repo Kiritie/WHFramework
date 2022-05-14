@@ -26,7 +26,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	int32 GetLimit() const;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
 	void OnSpawn(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)

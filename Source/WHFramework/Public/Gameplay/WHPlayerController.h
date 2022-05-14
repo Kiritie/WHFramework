@@ -109,6 +109,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bCameraMoveAble;
 
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraMoveAble == true"), Category = "CameraControl|Move")
+	bool bCameraMoveControlAble;
+
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bReverseCameraMove;
 
@@ -130,6 +133,9 @@ protected:
 	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	bool bCameraRotateAble;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Move")
+	bool bCameraRotateControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	FKey CameraRotateKey;
@@ -155,6 +161,9 @@ protected:
 	// Zoom
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bCameraZoomAble;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraZoomAble == true"), Category = "CameraControl|Move")
+	bool bCameraZoomControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bUseNormalizedZoom;
@@ -343,10 +352,22 @@ public:
 	void SetCameraMoveAble(bool bInCameraMoveAble) { this->bCameraMoveAble = bInCameraMoveAble; }
 
 	UFUNCTION(BlueprintPure)
+	bool IsCameraMoveControlAble() const { return bCameraMoveControlAble; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraMoveControlAble(bool bInCameraMoveControlAble) { this->bCameraMoveControlAble = bInCameraMoveControlAble; }
+
+	UFUNCTION(BlueprintPure)
 	bool IsCameraRotateAble() const { return bCameraRotateAble; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetCameraRotateAble(bool bInCameraRotateAble) { this->bCameraRotateAble = bInCameraRotateAble; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsCameraRotateControlAble() const { return bCameraRotateControlAble; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraRotateControlAble(bool bInCameraRotateControlAble) { this->bCameraRotateControlAble = bInCameraRotateControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraZoomAble() const { return bCameraZoomAble; }
@@ -354,8 +375,11 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetCameraZoomAble(bool bInCameraZoomAble) { this->bCameraZoomAble = bInCameraZoomAble; }
 
+	UFUNCTION(BlueprintPure)
+	bool IsCameraZoomControlAble() const { return bCameraZoomControlAble; }
+
 	UFUNCTION(BlueprintCallable)
-	void SetCameraControlStates(bool bInCameraControlAble, bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble);
+	void SetCameraZoomControlAble(bool bInCameraZoomControlAble) { this->bCameraZoomControlAble = bInCameraZoomControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }
