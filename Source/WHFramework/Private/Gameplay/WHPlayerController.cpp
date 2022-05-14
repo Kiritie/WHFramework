@@ -50,6 +50,7 @@ AWHPlayerController::AWHPlayerController()
 	bCameraControlAble = false;
 
 	bCameraMoveAble = true;
+	bCameraMoveControlAble = true;
 	bReverseCameraMove = false;
 	bClampCameraMove = false;
 	CameraMoveLimit = FBox(EForceInit::ForceInitToZero);
@@ -58,6 +59,7 @@ AWHPlayerController::AWHPlayerController()
 	CameraMoveSmooth = 5.f;
 
 	bCameraRotateAble = true;
+	bCameraRotateControlAble = true;
 	CameraRotateKey = FKey("RightMouseButton");
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
@@ -67,6 +69,7 @@ AWHPlayerController::AWHPlayerController()
 	InitCameraPinch = -10.f;
 
 	bCameraZoomAble = true;
+	bCameraZoomControlAble = true;
 	bUseNormalizedZoom = false;
 	CameraZoomKey = FKey();
 	CameraZoomRate = 150.f;
@@ -168,63 +171,72 @@ void AWHPlayerController::Tick(float DeltaTime)
 
 	TrackTarget();
 
-	if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
+	if(bCameraMoveAble)
 	{
-		CurrentCameraLocation = GetPawn()->GetActorLocation();
-		if(!CurrentCameraLocation.Equals(TargetCameraLocation))
+		if(GetPawn() && GetPawn()->IsA(ACameraPawnBase::StaticClass()))
 		{
-			if(CameraDoMoveDuration != 0.f)
+			CurrentCameraLocation = GetPawn()->GetActorLocation();
+			if(!CurrentCameraLocation.Equals(TargetCameraLocation))
 			{
-				CameraDoMoveTime = FMath::Clamp(CameraDoMoveTime + DeltaTime, 0.f, CameraDoMoveDuration);
-				GetPawn()->SetActorLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathBPLibrary::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
+				if(CameraDoMoveDuration != 0.f)
+				{
+					CameraDoMoveTime = FMath::Clamp(CameraDoMoveTime + DeltaTime, 0.f, CameraDoMoveDuration);
+					GetPawn()->SetActorLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathBPLibrary::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
+				}
+				else
+				{
+					GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+				}
 			}
-			else
+			else if(CameraDoMoveDuration != 0.f)
 			{
-				GetPawn()->SetActorLocation(CameraMoveSmooth == 0 ? TargetCameraLocation : FMath::VInterpTo(GetPawn()->GetActorLocation(), TargetCameraLocation, DeltaTime, CameraMoveSmooth));
+				StopDoCameraLocation();
 			}
-		}
-		else if(CameraDoMoveDuration != 0.f)
-		{
-			StopDoCameraLocation();
 		}
 	}
 
-	CurrentCameraRotation = GetControlRotation();
-	if(!CurrentCameraRotation.Equals(TargetCameraRotation))
+	if(bCameraRotateAble)
 	{
-		if(CameraDoRotateDuration != 0.f)
+		CurrentCameraRotation = GetControlRotation();
+		if(!CurrentCameraRotation.Equals(TargetCameraRotation))
 		{
-			CameraDoRotateTime = FMath::Clamp(CameraDoRotateTime + DeltaTime, 0.f, CameraDoRotateDuration);
-			SetControlRotation(FMath::Lerp(CameraDoRotateRotation, TargetCameraRotation, UMathBPLibrary::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration)));
-		}
-		else
-		{
-			SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
-		}
-	}
-	else if(CameraDoRotateDuration != 0.f)
-	{
-		StopDoCameraRotation();
-	}
-
-	if(GetCameraBoom())
-	{
-		CurrentCameraDistance = GetCameraBoom()->TargetArmLength;
-		if(CurrentCameraDistance != TargetCameraDistance)
-		{
-			if(CameraDoZoomDuration != 0.f)
+			if(CameraDoRotateDuration != 0.f)
 			{
-				CameraDoZoomTime = FMath::Clamp(CameraDoZoomTime + DeltaTime, 0.f, CameraDoZoomDuration);
-				GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetCameraDistance, UMathBPLibrary::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
+				CameraDoRotateTime = FMath::Clamp(CameraDoRotateTime + DeltaTime, 0.f, CameraDoRotateDuration);
+				SetControlRotation(FMath::Lerp(CameraDoRotateRotation, TargetCameraRotation, UMathBPLibrary::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration)));
 			}
 			else
 			{
-				GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+				SetControlRotation(CameraRotateSmooth == 0 ? TargetCameraRotation : FMath::RInterpTo(GetControlRotation(), TargetCameraRotation, DeltaTime, CameraRotateSmooth));
 			}
 		}
-		else if(CameraDoZoomDuration != 0.f)
+		else if(CameraDoRotateDuration != 0.f)
 		{
-			StopDoCameraDistance();
+			StopDoCameraRotation();
+		}
+	}
+
+	if(bCameraZoomAble)
+	{
+		if(GetCameraBoom())
+		{
+			CurrentCameraDistance = GetCameraBoom()->TargetArmLength;
+			if(CurrentCameraDistance != TargetCameraDistance)
+			{
+				if(CameraDoZoomDuration != 0.f)
+				{
+					CameraDoZoomTime = FMath::Clamp(CameraDoZoomTime + DeltaTime, 0.f, CameraDoZoomDuration);
+					GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetCameraDistance, UMathBPLibrary::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
+				}
+				else
+				{
+					GetCameraBoom()->TargetArmLength = CameraZoomSmooth == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaTime, bUseNormalizedZoom ? UKismetMathLibrary::NormalizeToRange(GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSmooth : CameraZoomSmooth);
+				}
+			}
+			else if(CameraDoZoomDuration != 0.f)
+			{
+				StopDoCameraDistance();
+			}
 		}
 	}
 }
@@ -681,21 +693,21 @@ void AWHPlayerController::StopDoCameraTransform()
 
 void AWHPlayerController::AddCameraRotationInput(float InYaw, float InPitch)
 {
-	if(!bCameraRotateAble) return;
+	if(!bCameraRotateAble || !bCameraRotateControlAble) return;
 
 	SetCameraRotation(TargetCameraRotation.Yaw + InYaw * CameraTurnRate * GetWorld()->GetDeltaSeconds(), TargetCameraRotation.Pitch + InPitch * CameraLookUpRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void AWHPlayerController::AddCameraDistanceInput(float InValue)
 {
-	if(!bCameraZoomAble) return;
+	if(!bCameraZoomAble || !bCameraZoomControlAble) return;
 
 	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void AWHPlayerController::AddCameraMovementInput(FVector InDirection, float InValue)
 {
-	if(!bCameraMoveAble) return;
+	if(!bCameraMoveAble || !bCameraMoveControlAble) return;
 
 	SetCameraLocation(TargetCameraLocation + InDirection * CameraMoveRate * InValue * GetWorld()->GetDeltaSeconds(), false);
 }
@@ -722,14 +734,6 @@ USpringArmComponent* AWHPlayerController::GetCameraBoom()
 		CameraBoom = Cast<USpringArmComponent>(GetPawn()->GetComponentByClass(USpringArmComponent::StaticClass()));
 	}
 	return CameraBoom;
-}
-
-void AWHPlayerController::SetCameraControlStates(bool bInCameraControlAble, bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble)
-{
-	bCameraControlAble = bInCameraControlAble;
-	bCameraMoveAble = bInCameraMoveAble;
-	bCameraRotateAble = bInCameraRotateAble;
-	bCameraZoomAble = bInCameraZoomAble;
 }
 
 void AWHPlayerController::MoveForward(float InValue)

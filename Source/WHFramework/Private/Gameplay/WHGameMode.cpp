@@ -12,8 +12,7 @@ AWHGameMode::AWHGameMode()
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-	AMainModule* MainModule = AMainModule::Get();
-	if(MainModule && MainModule->IsValidLowLevel())
+	if(AMainModule* MainModule = AMainModule::Get())
 	{
 		MainModule->InitializeModules();
 	}

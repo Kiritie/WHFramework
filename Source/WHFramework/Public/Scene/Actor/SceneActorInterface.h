@@ -6,7 +6,6 @@
 #include "UObject/Interface.h"
 #include "SceneActorInterface.generated.h"
 
-class ISceneContainerInterface;
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class USceneActorInterface : public UInterface

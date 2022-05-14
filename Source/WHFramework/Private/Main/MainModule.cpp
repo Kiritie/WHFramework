@@ -99,7 +99,7 @@ void AMainModule::Tick(float DeltaTime)
 
 AMainModule* AMainModule::Get(bool bInEditor)
 {
-	if(!Current || !Current->IsValidLowLevel() || Current->bInEditor != bInEditor)
+	// if(!Current || !Current->IsValidLowLevel() || Current->bInEditor != bInEditor)
 	{
 		Current = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
 			return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());

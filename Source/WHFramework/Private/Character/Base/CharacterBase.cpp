@@ -3,6 +3,7 @@
 
 #include "Character/Base/CharacterBase.h"
 
+#include "AIController.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Components/AudioComponent.h"
@@ -14,6 +15,7 @@
 #include "Character/Base/CharacterAnim.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Tasks/AITask_MoveTo.h"
 
 ACharacterBase::ACharacterBase()
 {
@@ -210,6 +212,7 @@ void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMu
 		}
 		return;
 	}
+	UAITask_MoveTo::AIMoveTo(Cast<AAIController>(GetController()), InLocation);
 }
 
 void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InStopDistance)
