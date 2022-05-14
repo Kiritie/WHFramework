@@ -430,7 +430,7 @@ void AVoxelChunk::OnGenerated()
 	
 	switch(AMainModule::GetModuleByClass<AVoxelModule>()->GetWorldMode())
 	{
-		case EVoxelWorldMode::Game:
+		case EVoxelWorldMode::Normal:
 		{
 			SpawnActors();
 			break;

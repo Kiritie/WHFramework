@@ -12,51 +12,7 @@ enum class EProcedureState : uint8
 {
 	None,
 	Entered,
-	Executing,
-	Completed,
 	Leaved
-};
-
-UENUM(BlueprintType)
-enum class EProcedureEnterType : uint8
-{
-	None,
-	Automatic,
-	Procedure
-};
-
-UENUM(BlueprintType)
-enum class EProcedureExecuteType : uint8
-{
-	None,
-	Automatic,
-	Procedure
-};
-
-UENUM(BlueprintType)
-enum class EProcedureLeaveType : uint8
-{
-	None,
-	Automatic,
-	Procedure
-};
-
-UENUM(BlueprintType)
-enum class EProcedureCompleteType : uint8
-{
-	None,
-	Skip,
-	Automatic,
-	Procedure
-};
-
-UENUM(BlueprintType)
-enum class EProcedureExecuteResult : uint8
-{
-	None,
-	Succeed,
-	Failed,
-	Skipped
 };
 
 UENUM(BlueprintType)
@@ -65,15 +21,6 @@ enum class EProcedureGuideType : uint8
 	None,
 	TimerOnce,
 	TimerLoop
-};
-
-UENUM(BlueprintType)
-enum class EProcedureTaskState : uint8
-{
-	None,
-	Preparing,
-	Executing,
-	Completed
 };
 
 UENUM(BlueprintType)

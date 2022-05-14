@@ -77,7 +77,11 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 
 	StepClassFilter = MakeShareable(new FStepClassFilter);
 	StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
+	#if ENGINE_MAJOR_VERSION == 4
 	ClassViewerOptions.ClassFilter = StepClassFilter;
+	#else if ENGINE_MAJOR_VERSION == 5
+	ClassViewerOptions.ClassFilters.Add(StepClassFilter.ToSharedRef());
+	#endif
 
 	SAssignNew(ClassPickButton, SComboButton)
 		.OnGetMenuContent(this, &SStepListWidget::GenerateClassPicker)

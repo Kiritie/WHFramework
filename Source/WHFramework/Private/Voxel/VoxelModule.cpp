@@ -33,9 +33,11 @@ AVoxelModule::AVoxelModule()
 	VoxelsCapture->SetupAttachment(RootComponent);
 	VoxelsCapture->SetRelativeLocationAndRotation(FVector(0, 0, -500), FRotator(90, 0, 0));
 
-	WorldMode = EVoxelWorldMode::Game;
+	WorldMode = EVoxelWorldMode::Normal;
 	WorldState = EVoxelWorldState::None;
 
+	ChunkSpawnClass = AVoxelChunk::StaticClass();
+	
 	ChunkSpawnRange = 7;
 	ChunkBasicSpawnRange = 1;
 	ChunkSpawnDistance = 3;
@@ -75,8 +77,8 @@ void AVoxelModule::OnInitialize_Implementation()
 
 	UVoxel::EmptyVoxel = UVoxel::SpawnVoxel(EVoxelType::Empty);
 	UVoxel::UnknownVoxel = UVoxel::SpawnVoxel(EVoxelType::Unknown);
-	
-	UObjectPoolModuleBPLibrary::DespawnObject(UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>());
+
+	UObjectPoolModuleBPLibrary::DespawnObject(UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>(nullptr, ChunkSpawnClass));
 }
 
 void AVoxelModule::OnPreparatory_Implementation()
@@ -153,7 +155,7 @@ void AVoxelModule::OnWorldStateChanged()
 		}
 		default: break;
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter> { FParameter::MakePointer(&WorldState) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakePointer(&WorldState)});
 }
 
 void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
@@ -163,9 +165,11 @@ void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
 
 void AVoxelModule::LoadData(FSaveData* InWorldData)
 {
+	if(WorldState != EVoxelWorldState::None) return;
+
 	WorldState = EVoxelWorldState::Generating;
 	OnWorldStateChanged();
-	
+
 	WorldData = static_cast<FVoxelWorldSaveData*>(InWorldData);
 	RandomStream = FRandomStream(GetWorldData()->WorldSeed);
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
@@ -178,7 +182,7 @@ void AVoxelModule::LoadData(FSaveData* InWorldData)
 
 	switch(WorldMode)
 	{
-		case EVoxelWorldMode::Game:
+		case EVoxelWorldMode::Normal:
 		{
 			for(auto Iter : ChunkMap)
 			{
@@ -201,14 +205,16 @@ FSaveData* AVoxelModule::ToData(bool bSaved)
 
 void AVoxelModule::UnloadData()
 {
+	if(WorldState == EVoxelWorldState::None) return;
+
 	switch(WorldMode)
 	{
-		case EVoxelWorldMode::Game:
+		case EVoxelWorldMode::Normal:
 		{
 			WorldState = EVoxelWorldState::None;
 			OnWorldStateChanged();
-		
-			for (auto iter : ChunkMap)
+
+			for(auto iter : ChunkMap)
 			{
 				if(iter.Value)
 				{
@@ -216,7 +222,7 @@ void AVoxelModule::UnloadData()
 				}
 			}
 			ChunkMap.Empty();
-	
+
 			ChunkSpawnBatch = 0;
 			LastGenerateIndex = FIndex(-1, -1, -1);
 			LastStayChunkIndex = FIndex::ZeroIndex;
@@ -283,48 +289,48 @@ void AVoxelModule::GenerateTerrain()
 	{
 		FIndex chunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(Cast<AActor>(Player)->GetActorLocation(), true);
 
-		if (LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(chunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
+		if(LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(chunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
 		{
 			GenerateChunks(chunkIndex);
 		}
 
-		if (chunkIndex != LastStayChunkIndex)
+		if(chunkIndex != LastStayChunkIndex)
 		{
 			LastStayChunkIndex = chunkIndex;
-			for (auto iter = ChunkMap.CreateConstIterator(); iter; ++iter)
+			for(auto iter = ChunkMap.CreateConstIterator(); iter; ++iter)
 			{
 				FIndex index = iter->Key;
 				AVoxelChunk* chunk = iter->Value;
-				if (FIndex::Distance(chunkIndex, index, true) >= ChunkSpawnRange + ChunkDestroyDistance)
+				if(FIndex::Distance(chunkIndex, index, true) >= ChunkSpawnRange + ChunkDestroyDistance)
 				{
 					AddToDestroyQueue(chunk);
 				}
-				else if (ChunkDestroyQueue.Contains(chunk))
+				else if(ChunkDestroyQueue.Contains(chunk))
 				{
 					ChunkDestroyQueue.Remove(chunk);
 				}
 			}
 		}
 
-		if (ChunkDestroyQueue.Num() > 0)
+		if(ChunkDestroyQueue.Num() > 0)
 		{
 			const int32 tmpNum = FMath::Min(ChunkDestroyQueue.Num(), ChunkDestroySpeed);
-			for (int32 i = 0; i < tmpNum; i++)
+			for(int32 i = 0; i < tmpNum; i++)
 			{
 				DestroyChunk(ChunkDestroyQueue[i]);
 			}
 			ChunkDestroyQueue.RemoveAt(0, tmpNum);
 		}
-		else if (ChunkSpawnQueue.Num() > 0)
+		else if(ChunkSpawnQueue.Num() > 0)
 		{
 			const int32 tmpNum = FMath::Min(ChunkSpawnQueue.Num(), ChunkSpawnSpeed);
-			for (int32 i = 0; i < tmpNum; i++)
+			for(int32 i = 0; i < tmpNum; i++)
 			{
 				SpawnChunk(ChunkSpawnQueue[i]);
 			}
 			ChunkSpawnQueue.RemoveAt(0, tmpNum);
 		}
-		else if (ChunkMapBuildQueue.Num() > 0)
+		else if(ChunkMapBuildQueue.Num() > 0)
 		{
 			// TArray<AVoxelChunk*> tmpArr;
 			// for(int32 i = 0; i < ChunkMapBuildQueue.Num(); i++)
@@ -354,29 +360,29 @@ void AVoxelModule::GenerateTerrain()
 			// 	}
 			// }
 			const int32 tmpNum = FMath::Min(ChunkMapBuildQueue.Num(), ChunkMapBuildSpeed);
-			for (int32 i = 0; i < tmpNum; i++)
+			for(int32 i = 0; i < tmpNum; i++)
 			{
 				BuildChunkMap(ChunkMapBuildQueue[i]);
 			}
 			ChunkMapBuildQueue.RemoveAt(0, tmpNum);
 		}
-		else if (ChunkMapGenerateQueue.Num() > 0)
+		else if(ChunkMapGenerateQueue.Num() > 0)
 		{
 			// if(ChunkMapBuildTasks.Num() > 0)
 			// {
 			// 	ChunkMapBuildTasks.Empty();
 			// }
 			const int32 tmpNum = FMath::Min(ChunkMapGenerateQueue.Num(), ChunkMapGenerateSpeed);
-			for (int32 i = 0; i < tmpNum; i++)
+			for(int32 i = 0; i < tmpNum; i++)
 			{
 				GenerateChunkMap(ChunkMapGenerateQueue[i]);
 			}
 			ChunkMapGenerateQueue.RemoveAt(0, tmpNum);
 		}
-		else if (ChunkGenerateQueue.Num() > 0)
+		else if(ChunkGenerateQueue.Num() > 0)
 		{
 			const int32 tmpNum = FMath::Min(ChunkGenerateQueue.Num(), ChunkGenerateSpeed);
-			for (int32 i = 0; i < tmpNum; i++)
+			for(int32 i = 0; i < tmpNum; i++)
 			{
 				GenerateChunk(ChunkGenerateQueue[i]);
 			}
@@ -406,23 +412,23 @@ void AVoxelModule::GenerateTerrain()
 
 void AVoxelModule::GenerateChunks(FIndex InIndex)
 {
-	if (ChunkSpawnQueue.Num() > 0) return;
+	if(ChunkSpawnQueue.Num() > 0) return;
 
-	for (int32 x = InIndex.X - ChunkSpawnRange; x < InIndex.X + ChunkSpawnRange; x++)
+	for(int32 x = InIndex.X - ChunkSpawnRange; x < InIndex.X + ChunkSpawnRange; x++)
 	{
-		for (int32 y = InIndex.Y - ChunkSpawnRange; y < InIndex.Y + ChunkSpawnRange; y++)
+		for(int32 y = InIndex.Y - ChunkSpawnRange; y < InIndex.Y + ChunkSpawnRange; y++)
 		{
-			for (int32 z = 0; z < GetWorldData()->ChunkHeightRange ; z++)
+			for(int32 z = 0; z < GetWorldData()->ChunkHeightRange; z++)
 			{
 				AddToSpawnQueue(FIndex(x, y, z));
 			}
 		}
 	}
 
-	ChunkSpawnQueue.Sort([InIndex](const FIndex& A, const FIndex& B) {
+	ChunkSpawnQueue.Sort([InIndex](const FIndex& A, const FIndex& B){
 		float lengthA = FIndex::Distance(InIndex, A, true);
 		float lengthB = FIndex::Distance(InIndex, B, true);
-		if (lengthA == lengthB) return A.Z < B.Z;
+		if(lengthA == lengthB) return A.Z < B.Z;
 		return lengthA < lengthB;
 	});
 
@@ -432,7 +438,7 @@ void AVoxelModule::GenerateChunks(FIndex InIndex)
 
 void AVoxelModule::BuildChunkMap(AVoxelChunk* InChunk)
 {
-	if (!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
+	if(!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
 
 	InChunk->BuildMap();
 
@@ -441,7 +447,7 @@ void AVoxelModule::BuildChunkMap(AVoxelChunk* InChunk)
 
 void AVoxelModule::GenerateChunkMap(AVoxelChunk* InChunk)
 {
-	if (!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
+	if(!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
 
 	InChunk->GenerateMap();
 
@@ -450,26 +456,26 @@ void AVoxelModule::GenerateChunkMap(AVoxelChunk* InChunk)
 
 void AVoxelModule::GenerateChunk(AVoxelChunk* InChunk)
 {
-	if (!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
-	
+	if(!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
+
 	InChunk->Generate();
 }
 
 void AVoxelModule::DestroyChunk(AVoxelChunk* InChunk)
 {
-	if (!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
+	if(!InChunk || !ChunkMap.Contains(InChunk->GetIndex())) return;
 
-	if (ChunkMapBuildQueue.Contains(InChunk))
+	if(ChunkMapBuildQueue.Contains(InChunk))
 	{
 		ChunkMapBuildQueue.Remove(InChunk);
 	}
 
-	if (ChunkMapGenerateQueue.Contains(InChunk))
+	if(ChunkMapGenerateQueue.Contains(InChunk))
 	{
 		ChunkMapGenerateQueue.Remove(InChunk);
 	}
 
-	if (ChunkGenerateQueue.Contains(InChunk))
+	if(ChunkGenerateQueue.Contains(InChunk))
 	{
 		ChunkGenerateQueue.Remove(InChunk);
 	}
@@ -481,7 +487,7 @@ void AVoxelModule::DestroyChunk(AVoxelChunk* InChunk)
 
 void AVoxelModule::AddToSpawnQueue(FIndex InIndex)
 {
-	if (!ChunkMap.Contains(InIndex) && !ChunkSpawnQueue.Contains(InIndex))
+	if(!ChunkMap.Contains(InIndex) && !ChunkSpawnQueue.Contains(InIndex))
 	{
 		ChunkSpawnQueue.Add(InIndex);
 	}
@@ -489,7 +495,7 @@ void AVoxelModule::AddToSpawnQueue(FIndex InIndex)
 
 void AVoxelModule::AddToMapBuildQueue(AVoxelChunk* InChunk)
 {
-	if (ChunkMap.Contains(InChunk->GetIndex()) && !ChunkMapBuildQueue.Contains(InChunk))
+	if(ChunkMap.Contains(InChunk->GetIndex()) && !ChunkMapBuildQueue.Contains(InChunk))
 	{
 		ChunkMapBuildQueue.Add(InChunk);
 	}
@@ -497,7 +503,7 @@ void AVoxelModule::AddToMapBuildQueue(AVoxelChunk* InChunk)
 
 void AVoxelModule::AddToMapGenerateQueue(AVoxelChunk* InChunk)
 {
-	if (ChunkMap.Contains(InChunk->GetIndex()) && !ChunkMapGenerateQueue.Contains(InChunk))
+	if(ChunkMap.Contains(InChunk->GetIndex()) && !ChunkMapGenerateQueue.Contains(InChunk))
 	{
 		ChunkMapGenerateQueue.Add(InChunk);
 	}
@@ -505,7 +511,7 @@ void AVoxelModule::AddToMapGenerateQueue(AVoxelChunk* InChunk)
 
 void AVoxelModule::AddToGenerateQueue(AVoxelChunk* InChunk)
 {
-	if (ChunkMap.Contains(InChunk->GetIndex()) && !ChunkGenerateQueue.Contains(InChunk))
+	if(ChunkMap.Contains(InChunk->GetIndex()) && !ChunkGenerateQueue.Contains(InChunk))
 	{
 		ChunkGenerateQueue.Add(InChunk);
 	}
@@ -513,7 +519,7 @@ void AVoxelModule::AddToGenerateQueue(AVoxelChunk* InChunk)
 
 void AVoxelModule::AddToDestroyQueue(AVoxelChunk* InChunk)
 {
-	if (ChunkMap.Contains(InChunk->GetIndex()) && !ChunkDestroyQueue.Contains(InChunk))
+	if(ChunkMap.Contains(InChunk->GetIndex()) && !ChunkDestroyQueue.Contains(InChunk))
 	{
 		ChunkDestroyQueue.Add(InChunk);
 	}
@@ -521,32 +527,32 @@ void AVoxelModule::AddToDestroyQueue(AVoxelChunk* InChunk)
 
 AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 {
-	if (ChunkMap.Contains(InIndex)) return ChunkMap[InIndex];
-
-	auto chunk = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>();
-	if (chunk)
+	if(ChunkMap.Contains(InIndex)) return ChunkMap[InIndex];
+	
+	AVoxelChunk* Chunk = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>(nullptr, ChunkSpawnClass);
+	if(Chunk)
 	{
-		chunk->SetActorLocationAndRotation(InIndex.ToVector() * GetWorldData()->GetChunkLength(), FRotator::ZeroRotator);
-		
-		ChunkMap.Add(InIndex, chunk);
+		Chunk->SetActorLocationAndRotation(InIndex.ToVector() * GetWorldData()->GetChunkLength(), FRotator::ZeroRotator);
 
-		chunk->Initialize(InIndex, ChunkSpawnBatch);
-		chunk->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+		ChunkMap.Add(InIndex, Chunk);
 
-		if (bAddToQueue)
+		Chunk->Initialize(InIndex, ChunkSpawnBatch);
+		Chunk->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+
+		if(bAddToQueue)
 		{
-			AddToMapBuildQueue(chunk);
+			AddToMapBuildQueue(Chunk);
 
-			for(auto Iter : chunk->GetNeighbors())
+			for(auto Iter : Chunk->GetNeighbors())
 			{
-				if(Iter && Iter->GetBatch() != chunk->GetBatch())
+				if(Iter && Iter->GetBatch() != Chunk->GetBatch())
 				{
 					AddToGenerateQueue(Iter);
 				}
 			}
 		}
 	}
-	return chunk;
+	return Chunk;
 }
 
 AVoxelChunk* AVoxelModule::FindChunk(FVector InLocation)
@@ -556,7 +562,7 @@ AVoxelChunk* AVoxelModule::FindChunk(FVector InLocation)
 
 AVoxelChunk* AVoxelModule::FindChunk(FIndex InIndex)
 {
-	if (ChunkMap.Contains(InIndex))
+	if(ChunkMap.Contains(InIndex))
 	{
 		return ChunkMap[InIndex];
 	}
@@ -566,10 +572,10 @@ AVoxelChunk* AVoxelModule::FindChunk(FIndex InIndex)
 EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
 {
 	const FVector offsetIndex = FVector(InIndex.X + GetWorldData()->WorldSeed, InIndex.Y + GetWorldData()->WorldSeed, InIndex.Z);
-	
+
 	const int plainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainPlainScale);
 	const int mountainHeight = GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainMountainScale);
-	
+
 	const int baseHeight = FMath::Clamp(FMath::Max(plainHeight, mountainHeight) + int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBaseHeight), 0, GetWorldData()->GetWorldHeight() - 1);
 
 	const int stoneHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, GetWorldData()->TerrainStoneVoxelScale), 0, GetWorldData()->GetWorldHeight() - 1);
@@ -577,14 +583,14 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
 
 	const int waterHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainWaterVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
 	const int bedrockHeight = FMath::Clamp(int32(GetWorldData()->GetWorldHeight() * GetWorldData()->TerrainBedrockVoxelHeight), 0, GetWorldData()->GetWorldHeight() - 1);
-	
-	if (InIndex.Z < baseHeight)
+
+	if(InIndex.Z < baseHeight)
 	{
-		if (InIndex.Z <= bedrockHeight)
+		if(InIndex.Z <= bedrockHeight)
 		{
 			return EVoxelType::Bedrock; //Bedrock
 		}
-		else if (InIndex.Z <= stoneHeight)
+		else if(InIndex.Z <= stoneHeight)
 		{
 			return EVoxelType::Stone; //Stone
 		}
@@ -594,11 +600,11 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
 	{
 		return EVoxelType::Sand; //Sand
 	}
-	else if (InIndex.Z <= waterHeight)
+	else if(InIndex.Z <= waterHeight)
 	{
 		return EVoxelType::Water; //Water
 	}
-	else if (InIndex.Z == baseHeight)
+	else if(InIndex.Z == baseHeight)
 	{
 		return EVoxelType::Grass; //Grass
 	}
@@ -633,11 +639,11 @@ bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoi
 int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 {
 	int32 num = 0;
-	for (auto iter = ChunkMap.CreateConstIterator(); iter; ++iter)
+	for(auto iter = ChunkMap.CreateConstIterator(); iter; ++iter)
 	{
 		if(AVoxelChunk* chunk = iter->Value)
 		{
-			if (!bNeedGenerated || chunk->IsGenerated())
+			if(!bNeedGenerated || chunk->IsGenerated())
 			{
 				num++;
 			}

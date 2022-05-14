@@ -8,6 +8,7 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalTypes.h"
 #include "Math/MathTypes.h"
+#include "Parameter/ParameterModuleTypes.h"
 
 #include "ProcedureBase.generated.h"
 
@@ -54,12 +55,6 @@ public:
 	void K2_OnInitialize();
 	virtual void OnInitialize();
 	/**
-	 * 流程还原
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRestore")
-	void K2_OnRestore();
-	virtual void OnRestore();
-	/**
 	 * 流程进入
 	 * @param InLastProcedure 上一个流程
 	 */
@@ -79,60 +74,24 @@ public:
 	void K2_OnGuide();
 	virtual void OnGuide();
 	/**
-	 * 流程执行
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExecute")
-	void K2_OnExecute();
-	virtual void OnExecute();
-	/**
-	 * 流程完成
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnComplete")
-	void K2_OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
-	virtual void OnComplete(EProcedureExecuteResult InProcedureExecuteResult);
-	/**
 	 * 流程离开
+	 * @param InNextProcedure 下一个流程
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
-	void K2_OnLeave();
-	virtual void OnLeave();
+	void K2_OnLeave(UProcedureBase* InNextProcedure);
+	virtual void OnLeave(UProcedureBase* InNextProcedure);
 
 public:
 	/**
-	* 还原流程
+	* 切换到上一个流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void Restore();
+	void SwitchLastProcedure();
 	/**
-	* 进入流程
+	* 切换到下一个流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void Enter();
-	/**
-	* 进入流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void Refresh();
-	/**
-	* 指引流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void Guide();
-	/**
-	* 执行流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void Execute();
-	/**
-	 * 完成流程
-	 */
-	UFUNCTION(BlueprintCallable)
-	void Complete(EProcedureExecuteResult InProcedureExecuteResult = EProcedureExecuteResult::Succeed);
-	/**
-	* 离开流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void Leave();
+	void SwitchNextProcedure();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description
@@ -148,20 +107,29 @@ public:
 	FText ProcedureDescription;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Index/Type/State
+	/// Index/State/Guide
 public:
 	/// 是否为开始流程
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
 	bool bFirstProcedure;
 	/// 流程索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
 	int32 ProcedureIndex;
 	/// 流程状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
 	EProcedureState ProcedureState;
+	/// 流程指引类型
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
+	EProcedureGuideType ProcedureGuideType;
+	/// 流程指引间隔时间 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
+	float ProcedureGuideIntervalTime;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnProcedureStateChanged OnProcedureStateChanged;
+
+protected:
+	FTimerHandle StartGuideTimerHandle;
 
 public:
 	/**
@@ -169,16 +137,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	EProcedureState GetProcedureState() const { return ProcedureState; }
-	/**
-	* 是否已进入
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsEntered() const;
-	/**
-	* 是否已完成
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsCompleted() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target
@@ -229,70 +187,6 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable)
 	void ResetCameraView();
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Execute/Guide
-public:
-	/// 流程执行条件
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureExecuteResult ProcedureExecuteCondition;
-	/// 流程执行结果
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureExecuteResult ProcedureExecuteResult;
-	/// 流程进入方式
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureEnterType ProcedureEnterType;
-	/// 流程执行方式
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureExecuteType ProcedureExecuteType;
-	/// 自动执行流程时间
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
-	float AutoExecuteProcedureTime;
-	/// 流程完成方式
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureCompleteType ProcedureCompleteType;
-	/// 自动完成流程时间
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
-	float AutoCompleteProcedureTime;
-	/// 流程离开方式
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureLeaveType ProcedureLeaveType;
-	/// 自动离开流程时间
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
-	float AutoLeaveProcedureTime;
-	/// 流程指引类型 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	EProcedureGuideType ProcedureGuideType;
-	/// 流程指引间隔时间 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	float ProcedureGuideIntervalTime;
-
-protected:
-	FTimerHandle StartGuideTimerHandle;
-	
-public:
-	/**
-	* 检测流程执行条件
-	*/
-	UFUNCTION(BlueprintPure)
-	bool CheckProcedureCondition(UProcedureBase* InProcedure) const;
-		
-	UFUNCTION(BlueprintPure)
-	EProcedureEnterType GetProcedureEnterType() const { return ProcedureEnterType; }
-
-	UFUNCTION(BlueprintPure)
-	EProcedureExecuteType GetProcedureExecuteType() const { return ProcedureExecuteType; }
-
-	UFUNCTION(BlueprintPure)
-	EProcedureLeaveType GetProcedureLeaveType() const { return ProcedureLeaveType; }
-
-	UFUNCTION(BlueprintPure)
-	EProcedureCompleteType GetProcedureCompleteType() const { return ProcedureCompleteType; }
-
-protected:
-	FTimerHandle AutoExecuteTimerHandle;
-	FTimerHandle AutoLeaveTimerHandle;
-	FTimerHandle AutoCompleteTimerHandle;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureListItem

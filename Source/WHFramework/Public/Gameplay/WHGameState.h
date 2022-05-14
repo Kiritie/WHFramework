@@ -20,8 +20,11 @@ public:
 	/// Defaults
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void Initialize();
+	void OnInitialize();
 	
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPreparatory();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Inherits
 protected:
