@@ -142,10 +142,10 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
 	bool K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
+	UFUNCTION(BlueprintCallable)
 	bool SaveSaveGames(TArray<TSubclassOf<USaveGameBase>> InSaveGameClass, bool bRefresh = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SaveSaveGame"))
+	UFUNCTION(BlueprintCallable)
 	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
