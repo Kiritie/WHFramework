@@ -122,7 +122,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::MakeParentClassPicker()
 	// All child child classes of UBase are valid.
 	Filter->AllowedChildrenOfClasses.Add(SupportedClass.Get());
 	#if ENGINE_MAJOR_VERSION == 4
-	Options.ClassFilter = StepClassFilter;
+	Options.ClassFilter = Filter;
 	#else if ENGINE_MAJOR_VERSION == 5
 	Options.ClassFilters.Add(Filter.ToSharedRef());
 	#endif
