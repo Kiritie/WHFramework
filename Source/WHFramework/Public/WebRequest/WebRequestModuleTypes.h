@@ -1,14 +1,15 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Handle/Base/WebRequestHandleBase.h"
 #include "Interfaces/IHttpRequest.h"
 
 #include "WebRequestModuleTypes.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebRequestCompleteMulti, UWebRequestHandleBase*, InWebRequestHandle)
+class UWebRequestHandleBase;
 
-DECLARE_DYNAMIC_DELEGATE_OneParam(FOnWebRequestComplete, UWebRequestHandleBase*, InWebRequestHandle)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebRequestCompleteMulti, UWebRequestHandleBase*, InWebRequestHandle);
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnWebRequestComplete, UWebRequestHandleBase*, InWebRequestHandle);
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FWebRequestInfo
@@ -33,9 +34,7 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bSucceeded;
 
-	UPROPERTY(BlueprintReadOnly)
 	FHttpRequestPtr HttpRequestPtr;
 
-	UPROPERTY(BlueprintReadOnly)
 	FHttpResponsePtr HttpResponsePtr;
 };

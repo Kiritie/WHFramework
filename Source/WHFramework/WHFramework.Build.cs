@@ -47,6 +47,8 @@ public class WHFramework : ModuleRules
 				"Engine",
 				"UMG",
 				"Slate",
+				"HTTP",
+				"Json",
 				"SlateCore",
 				"InputCore",
 				"MediaAssets",

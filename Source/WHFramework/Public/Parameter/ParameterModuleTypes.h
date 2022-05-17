@@ -6,8 +6,6 @@
 
 #include "ParameterModuleTypes.generated.h"
 
-#define FParameterMap TMap<FString, FString>
-
 UENUM(BlueprintType)
 enum class EParameterMapType : uint8
 {

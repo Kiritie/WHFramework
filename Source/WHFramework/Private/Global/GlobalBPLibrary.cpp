@@ -49,7 +49,7 @@ void UGlobalBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint
 	}
 }
 
-void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const FParameterMap& InParam, bool bParamHavePropertyType)
+void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FString, FString>& InParam, bool bParamHavePropertyType)
 {
 	for(auto pair: InParam)
 	{
@@ -75,7 +75,7 @@ void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const FParameter
 	}
 }
 
-void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType)
+void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString>& OutParams, bool bDisplayPropertyType)
 {
 	if(InClass)
 	{

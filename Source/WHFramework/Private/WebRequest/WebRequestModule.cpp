@@ -149,12 +149,12 @@ void AWebRequestModule::ClearAllWebInterface()
 	WebInterfaces.Empty();
 }
 
-bool AWebRequestModule::SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap)
+bool AWebRequestModule::SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap)
 {
 	return SendWebRequestImpl(InWebInterfaceClass, InHeadMap);
 }
 
-bool AWebRequestModule::SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap, const FParameterMap& InParamMap, EParameterMapType InParamMapType)
+bool AWebRequestModule::SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap, const TMap<FString, FString>& InParamMap, EParameterMapType InParamMapType)
 {
 	FString ContentType;
 	switch(InParamMapType)
@@ -174,7 +174,7 @@ bool AWebRequestModule::SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebI
 	return SendWebRequestImpl(InWebInterfaceClass, InHeadMap, UParameterModuleBPLibrary::ParseParamMapToString(InParamMap, InParamMapType), true);
 }
 
-bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap, const FString& InContent, bool bPost)
+bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap, const FString& InContent, bool bPost)
 {
 	if(!InWebInterfaceClass) return false;
 
