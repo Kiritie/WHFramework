@@ -98,7 +98,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	ProcedureState = EProcedureState::Entered;
 	OnStateChanged(ProcedureState);
 
-	WH_LOG(WH_Procedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
+	WHLog(WH_Procedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()));
 
 	K2_OnEnter(InLastProcedure);
@@ -145,7 +145,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	ProcedureState = EProcedureState::Leaved;
 	OnStateChanged(ProcedureState);
 	
-	WH_LOG(WH_Procedure, Log, TEXT("离开流程: %s"), *ProcedureDisplayName.ToString());
+	WHLog(WH_Procedure, Log, TEXT("离开流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()));
 
 	K2_OnLeave(InNextProcedure);

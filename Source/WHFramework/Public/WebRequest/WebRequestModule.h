@@ -3,10 +3,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WebRequestModuleTypes.h"
+#include "Interfaces/IHttpRequest.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "WebRequestModule.generated.h"
 
+class UWebInterfaceBase;
 UCLASS()
 class WHFRAMEWORK_API AWebRequestModule : public AModuleBase
 {
@@ -34,4 +37,45 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+protected:
+	UPROPERTY()
+	TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*> WebInterfaces;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	bool HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+
+	UFUNCTION(BlueprintCallable)
+	UWebInterfaceBase* GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+
+	UFUNCTION(BlueprintCallable)
+	UWebInterfaceBase* CreateWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+
+	UFUNCTION(BlueprintCallable)
+	bool RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete);
+
+	UFUNCTION(BlueprintCallable)
+	bool UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete);
+
+	UFUNCTION(BlueprintCallable)
+	bool UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+
+	UFUNCTION(BlueprintCallable)
+	bool ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearAllWebInterface();
+
+public:
+	UFUNCTION(BlueprintCallable)
+	bool SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap);
+
+	UFUNCTION(BlueprintCallable)
+	bool SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap, const FParameterMap& InParamMap, EParameterMapType InParamMapType = EParameterMapType::Text);
+
+protected:
+	bool SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap& InHeadMap, const FString& InContent = TEXT(""), bool bPost = false);
+
+	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface);
 };

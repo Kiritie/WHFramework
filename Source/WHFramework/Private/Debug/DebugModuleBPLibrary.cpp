@@ -31,5 +31,5 @@ void UDebugModuleBPLibrary::DebugMessage(const FString& Message, FColor DisplayC
 	{
 		GEngine->AddOnScreenDebugMessage(-1, Duration, DisplayColor, Message, bNewerOnTop);
 	}
-	UE_LOG(WH_Debug, Log, TEXT("%s"), *Message);
+	WHLog(WH_Debug, Log, TEXT("%s"), *Message);
 }

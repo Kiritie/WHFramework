@@ -53,7 +53,7 @@ UPrimaryAssetBase* UPrimaryAssetManager::LoadAsset(const FPrimaryAssetId& InPrim
 
 	if (bLogWarning && !LoadedItem)
 	{
-		WH_LOG(WH_Asset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
+		WHLog(WH_Asset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString());
 	}
 	return LoadedItem;
 }

@@ -21,6 +21,12 @@ class WHFRAMEWORK_API UProcedureModuleBPLibrary : public UBlueprintFunctionLibra
 	GENERATED_BODY()
 
 public:
+	template<class T>
+	static T* GetCurrentProcedure()
+	{
+		return Cast<T>(GetCurrentProcedure());
+	}
+
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static UProcedureBase* GetCurrentProcedure();
 	

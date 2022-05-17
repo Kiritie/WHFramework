@@ -66,7 +66,7 @@ FReply FPlayerControllerDetailsPanel::OnClickCopyCameraParamsButton()
 
 			GCopiedCameraData = CameraParams;
 			
-			WH_LOG(WH_Controller, Log, TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance);
+			WHLog(WH_Controller, Log, TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance);
 		}
 	}
 	return FReply::Handled();

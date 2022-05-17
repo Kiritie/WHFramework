@@ -183,7 +183,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	StepExecuteResult = EStepExecuteResult::None;
 
-	WH_LOG(WH_Step, Log, TEXT("进入步骤: %s"), *StepDisplayName.ToString());
+	WHLog(WH_Step, Log, TEXT("进入步骤: %s"), *StepDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()));
 
 	K2_OnEnter(InLastStep);
@@ -407,7 +407,7 @@ void UStepBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WH_LOG(WH_Step, Log, TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString());
+	WHLog(WH_Step, Log, TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()));
 
 	K2_OnLeave();

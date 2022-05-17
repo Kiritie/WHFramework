@@ -6,6 +6,15 @@
 
 #include "ParameterModuleTypes.generated.h"
 
+#define FParameterMap TMap<FString, FString>
+
+UENUM(BlueprintType)
+enum class EParameterMapType : uint8
+{
+	Text,
+	Json
+};
+
 UENUM(BlueprintType)
 enum class EParameterType : uint8
 {

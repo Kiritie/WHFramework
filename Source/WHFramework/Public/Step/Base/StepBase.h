@@ -480,7 +480,7 @@ public:
 
 		OnExecuteDelegate.Broadcast();
 
-		WH_LOG(WH_Step, Log, TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString());
+		WHLog(WH_Step, Log, TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString());
 	}
 
 	void TryComplete(float DeltaSeconds)

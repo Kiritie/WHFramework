@@ -100,7 +100,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 #endif
 
 // 打印
-#define WH_LOG(CategoryName, Verbosity, Format, ...) \
+#define WHLog(CategoryName, Verbosity, Format, ...) \
 { \
 	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
 }
