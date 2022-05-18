@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Dom/JsonObject.h"
 #include "DataAssetBase.generated.h"
 
 /**
@@ -18,14 +19,9 @@ public:
 	UDataAssetBase();
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void InitData();
-
-	UFUNCTION(BlueprintNativeEvent)
-	void FillData(const FString& InJsonData);
-
-	UFUNCTION(BlueprintNativeEvent)
-	FString PackData();
+	virtual void FillData(TSharedPtr<FJsonObject> InJsonObject);
+	
+	virtual TSharedPtr<FJsonObject> PackData();
 
 protected:
 	UPROPERTY(EditDefaultsOnly)

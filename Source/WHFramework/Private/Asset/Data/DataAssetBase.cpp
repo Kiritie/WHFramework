@@ -8,17 +8,11 @@ UDataAssetBase::UDataAssetBase()
 	
 }
 
-void UDataAssetBase::InitData_Implementation()
+void UDataAssetBase::FillData(TSharedPtr<FJsonObject> InJsonObject)
 {
-	
 }
 
-void UDataAssetBase::FillData_Implementation(const FString& InJsonData)
+TSharedPtr<FJsonObject> UDataAssetBase::PackData()
 {
-	
-}
-
-FString UDataAssetBase::PackData_Implementation()
-{
-	return TEXT("");
+	return nullptr;
 }
