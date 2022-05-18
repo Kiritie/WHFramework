@@ -60,13 +60,17 @@ public:
 		HttpResponse = nullptr;
 	}
 	
-	FWebRequestResult(bool bInSucceeded, FHttpRequestPtr InHttpRequest, FHttpResponsePtr InHttpResponse)
+	FWebRequestResult(FString InContent, bool bInSucceeded, FHttpRequestPtr InHttpRequest, FHttpResponsePtr InHttpResponse)
 	{
+		Content = InContent;
 		bSucceeded = bInSucceeded;
 		HttpRequest = InHttpRequest;
 		HttpResponse = InHttpResponse;
 	}
-	
+		
+	UPROPERTY(BlueprintReadOnly)
+	FString Content;
+
 	UPROPERTY(BlueprintReadOnly)
 	bool bSucceeded;
 

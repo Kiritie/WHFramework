@@ -40,7 +40,14 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 protected:
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
+	FString ServerURL;
+public:
+	UFUNCTION(BlueprintPure)
+	FString GetServerURL() const { return ServerURL; }
+	
+protected:
+	UPROPERTY(VisibleAnywhere)
 	TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*> WebInterfaces;
 
 public:
@@ -78,5 +85,5 @@ public:
 protected:
 	bool SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap, const FString& InContent = TEXT(""), bool bPost = false);
 
-	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface);
+	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent);
 };

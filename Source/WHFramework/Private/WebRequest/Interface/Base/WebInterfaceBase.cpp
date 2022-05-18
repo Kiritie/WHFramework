@@ -10,26 +10,45 @@ UWebInterfaceBase::UWebInterfaceBase()
 {
 	Name = NAME_None;
 	Url = TEXT("");
-	Handle = UWebRequestHandleBase::StaticClass();
+	HandleClass = UWebRequestHandleBase::StaticClass();
+	HandleMap = TMap<FString, UWebRequestHandleBase*>();
 }
 
 void UWebInterfaceBase::OnDespawn_Implementation()
 {
-	Name = NAME_None;
-	Url = TEXT("");
-	Handle = nullptr;
 	OnWebRequestComplete.Clear();
+	for(auto Iter : HandleMap)
+	{
+		 UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
+	}
+	HandleMap.Empty();
 }
 
-void UWebInterfaceBase::OnRequestComplete_Implementation(FWebRequestResult InWebRequestResult)
+void UWebInterfaceBase::OnRequestComplete_Implementation(UWebRequestHandleBase* InWebRequestHandle)
 {
-	if(UWebRequestHandleBase* WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, Handle))
+	
+}
+
+void UWebInterfaceBase::RequestComplete(FWebRequestResult InWebRequestResult)
+{
+	UWebRequestHandleBase* WebRequestHandle = nullptr;
+	if(!HandleMap.Contains(InWebRequestResult.Content))
+	{
+		WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, HandleClass);
+		HandleMap.Add(InWebRequestResult.Content, WebRequestHandle);
+	}
+	else
+	{
+		WebRequestHandle = HandleMap[InWebRequestResult.Content];
+	}
+	if(WebRequestHandle)
 	{
 		if(InWebRequestResult.bSucceeded)
 		{
 			WebRequestHandle->Fill(InWebRequestResult);
 		}
+		OnRequestComplete(WebRequestHandle);
+		HandleMap.Emplace(InWebRequestResult.Content, WebRequestHandle);
 		OnWebRequestComplete.Broadcast(WebRequestHandle);
-		UObjectPoolModuleBPLibrary::DespawnObject(WebRequestHandle);
 	}
 }

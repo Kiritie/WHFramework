@@ -14,6 +14,7 @@ AWebRequestModule::AWebRequestModule()
 {
 	ModuleName = FName("WebRequestModule");
 
+	ServerURL = TEXT("http://127.0.0.1:8080/survival_world_war_exploded");
 	WebInterfaces = TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*>();
 }
 
@@ -187,7 +188,7 @@ bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebI
 	{
 		TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
-		HttpRequest->SetURL(WebInterface->GetUrl());
+		HttpRequest->SetURL(ServerURL + WebInterface->GetUrl());
 
 		InHeadMap.Add(TEXT("timestamp"), FString::FromInt(FDateTime::UtcNow().ToUnixTimestamp()));
 
@@ -200,14 +201,14 @@ bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebI
 
 		HttpRequest->SetVerb(!bPost ? TEXT("GET") : TEXT("POST"));
 
-		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface);
+		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent);
 
 		return HttpRequest->ProcessRequest();
 	}
 	return false;
 }
 
-void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface)
+void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent)
 {
 	if(!HttpResponse.IsValid())
 	{
@@ -245,6 +246,6 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 
 	if(InWebInterface)
 	{
-		InWebInterface->OnRequestComplete(FWebRequestResult(bSucceeded, HttpRequest, HttpResponse));
+		InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse));
 	}
 }

@@ -22,9 +22,12 @@ public:
 public:
 	virtual void OnDespawn_Implementation() override;
 
-public:
+protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnRequestComplete(FWebRequestResult InWebRequestResult);
+	void OnRequestComplete(UWebRequestHandleBase* InWebRequestHandle);
+
+public:
+	void RequestComplete(FWebRequestResult InWebRequestResult);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -34,15 +37,19 @@ protected:
 	FString Url;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSubclassOf<UWebRequestHandleBase> Handle;
+	TSubclassOf<UWebRequestHandleBase> HandleClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<FString, UWebRequestHandleBase*> HandleMap;
 
 	FOnWebRequestCompleteMulti OnWebRequestComplete;
+	
 public:
 	FName GetName() const { return Name; }
 	
 	FString GetUrl() const { return Url; }
 	
-	TSubclassOf<UWebRequestHandleBase> GetHandle() const { return Handle; }
+	TSubclassOf<UWebRequestHandleBase> GetHandle() const { return HandleClass; }
 
 	FOnWebRequestCompleteMulti& GetOnWebRequestComplete() { return OnWebRequestComplete; }
 };
