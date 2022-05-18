@@ -6,6 +6,7 @@
 #include "WebRequestModuleTypes.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Main/Base/ModuleBase.h"
+#include "Parameter/ParameterModuleTypes.h"
 
 #include "WebRequestModule.generated.h"
 
@@ -69,13 +70,13 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	bool SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap);
+	bool SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap);
 
 	UFUNCTION(BlueprintCallable)
-	bool SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap, const TMap<FString, FString>& InParamMap, EParameterMapType InParamMapType = EParameterMapType::Text);
+	bool SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap, FWebContent InWebContent);
 
 protected:
-	bool SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, TMap<FString, FString>& InHeadMap, const FString& InContent = TEXT(""), bool bPost = false);
+	bool SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap, const FString& InContent = TEXT(""), bool bPost = false);
 
 	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface);
 };

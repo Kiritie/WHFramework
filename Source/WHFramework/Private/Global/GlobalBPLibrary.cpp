@@ -49,9 +49,9 @@ void UGlobalBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint
 	}
 }
 
-void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FString, FString>& InParam, bool bParamHavePropertyType)
+void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, FParameterMap InParam, bool bParamHavePropertyType)
 {
-	for(auto pair: InParam)
+	for(auto pair: InParam.GetMap())
 	{
 		FString LeftS,PropName;
 		if(bParamHavePropertyType)
@@ -75,7 +75,7 @@ void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FStri
 	}
 }
 
-void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString>& OutParams, bool bDisplayPropertyType)
+void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType)
 {
 	if(InClass)
 	{
@@ -113,7 +113,7 @@ void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString
 				}
 			}
 		}
-		for(auto pair:OutParams)
+		for(auto pair:OutParams.GetMap())
 		{
 			if(!NewProps.Contains(pair.Key))
 				DiffProps.Add(pair.Key);

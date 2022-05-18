@@ -4,6 +4,7 @@
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "Parameter/ParameterModuleBPLibrary.h"
 
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {

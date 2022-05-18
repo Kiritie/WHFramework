@@ -6,11 +6,80 @@
 
 #include "ParameterModuleTypes.generated.h"
 
-UENUM(BlueprintType)
-enum class EParameterMapType : uint8
+USTRUCT(BlueprintType)
+struct FParameterMap
 {
-	Text,
-	Json
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FParameterMap()
+	{
+		Map = TMap<FString, FString>(); 
+	}
+
+	FParameterMap(const TMap<FString, FString>& InMap)
+	{
+		Map = InMap; 
+	}
+
+protected:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TMap<FString, FString> Map;
+
+public:
+	void Add(const FString& Key, const FString& Value)
+	{
+		if(!Map.Contains(Key))
+		{
+			Map.Add(Key, Value);
+		}
+	}
+
+	void Set(const FString& Key, const FString& Value)
+	{
+		if(Contains(Key))
+		{
+			Map[Key] = Value;
+		}
+	}
+
+	void Remove(const FString& Key)
+	{
+		if(Map.Contains(Key))
+		{
+			Map.Remove(Key);
+		}
+	}
+
+	void Clear()
+	{
+		Map.Empty();
+	}
+
+public:
+	bool Contains(const FString& Key) const
+	{
+		return Map.Contains(Key);
+	}
+
+	FString Get(const FString& Key) const
+	{
+		if(Contains(Key))
+		{
+			return Map[Key];
+		}
+		return TEXT("");
+	}
+
+	TMap<FString, FString>& GetMap()
+	{
+		return Map;
+	}
+
+	int32 GetNum() const
+	{
+		return Map.Num();
+	}
 };
 
 UENUM(BlueprintType)

@@ -177,19 +177,17 @@ void SProcedureEditorWidget::OnCreate()
 {
 	SEditorSlateWidgetBase::OnCreate();
 
-	if(OnOpenLevelHandle.IsValid())
+	if(OnOpenMapHandle.IsValid())
 	{
-		GEditor->OnPreviewFeatureLevelChanged().Remove(OnOpenLevelHandle);
+		FEditorDelegates::OnMapOpened.Remove(OnOpenMapHandle);
 	}
+	OnBlueprintCompiledHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SProcedureEditorWidget::OnMapOpened);
 
 	if(OnBlueprintCompiledHandle.IsValid())
 	{
 		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
 	}
-	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
-
-
-	//RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
+	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::OnBlueprintCompiled);
 }
 
 void SProcedureEditorWidget::OnReset()
@@ -238,6 +236,16 @@ void SProcedureEditorWidget::OnDestroy()
 	{
 		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
+}
+
+void SProcedureEditorWidget::OnMapOpened(const FString& Filename, bool bAsTemplate)
+{
+	Refresh();
+}
+
+void SProcedureEditorWidget::OnBlueprintCompiled()
+{
+	Refresh();
 }
 
 void SProcedureEditorWidget::TogglePreviewMode()

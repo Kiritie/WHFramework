@@ -8,38 +8,6 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Parameter/ParameterModule.h"
 
-FString UParameterModuleBPLibrary::ParseParamMapToString(const TMap<FString, FString>& InParamMap, EParameterMapType InParamMapType)
-{
-	if(InParamMap.Num() == 0) return TEXT("");
-	
-	FString ContentStr;
-	switch(InParamMapType)
-	{
-		case EParameterMapType::Text:
-		{
-			for(auto& Iter : InParamMap)
-			{
-				ContentStr.Append(FString::Printf(TEXT("%s=%s&"), *Iter.Key, *Iter.Value));
-			}
-			ContentStr.RemoveFromEnd(TEXT("&"));
-			break;
-		}
-		case EParameterMapType::Json:
-		{
-			TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&ContentStr);
-			JsonWriter->WriteObjectStart();
-			for (auto& It : InParamMap)
-			{
-				JsonWriter->WriteValue(It.Key, It.Value);
-			}
-			JsonWriter->WriteObjectEnd();
-			JsonWriter->Close();
-			break;
-		}
-	}
-	return ContentStr;
-}
-
 bool UParameterModuleBPLibrary::HasParameter(FName InName, bool bEnsured)
 {
 	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())

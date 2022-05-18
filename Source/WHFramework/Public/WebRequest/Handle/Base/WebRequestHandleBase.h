@@ -20,14 +20,12 @@ public:
 	UWebRequestHandleBase();
 
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
-
 	virtual void OnDespawn_Implementation() override;
 
 public:
-	void Fill(FWebRequestInfo InWebRequestInfo);
+	virtual void Fill(const FWebRequestResult& InWebRequestResult);
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bSucceeded;
 };

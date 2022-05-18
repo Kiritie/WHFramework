@@ -8,17 +8,12 @@ UWebRequestHandleBase::UWebRequestHandleBase()
 	bSucceeded = false;
 }
 
-void UWebRequestHandleBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
-{
-	
-}
-
 void UWebRequestHandleBase::OnDespawn_Implementation()
 {
 	bSucceeded = false;
 }
 
-void UWebRequestHandleBase::Fill(FWebRequestInfo InWebRequestInfo)
+void UWebRequestHandleBase::Fill(const FWebRequestResult& InWebRequestResult)
 {
-	bSucceeded = InWebRequestInfo.bSucceeded;
+	bSucceeded = InWebRequestResult.bSucceeded;
 }

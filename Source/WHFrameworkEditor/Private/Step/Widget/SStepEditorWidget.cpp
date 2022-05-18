@@ -204,6 +204,10 @@ void SStepEditorWidget::OnRefresh()
 		}
 		SEditorSlateWidgetBase::OnRefresh();
 	}
+	else
+	{
+		Destroy();
+	}
 }
 
 void SStepEditorWidget::OnDestroy()
@@ -253,17 +257,7 @@ void SStepEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 	{
 		if(AStepModule* _StepModule = AMainModule::GetModuleByClass<AStepModule>(!bIsPreviewMode))
 		{
-			bPreviewMode = bIsPreviewMode;
-			StepModule = _StepModule;
-			if(ListWidget)
-			{
-				DetailWidget->StepModule = StepModule;
-			}
-			if(ListWidget)
-			{
-				ListWidget->StepModule = StepModule;
-				ListWidget->Refresh();
-			}
+			Refresh();
 			SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
 		}
 	}

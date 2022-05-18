@@ -20,15 +20,13 @@ public:
 	UWebInterfaceBase();
 
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
-
 	virtual void OnDespawn_Implementation() override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnRequestComplete(FWebRequestInfo InWebRequestInfo);
+	void OnRequestComplete(FWebRequestResult InWebRequestResult);
 
-public:
+protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName Name;
 
@@ -38,6 +36,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UWebRequestHandleBase> Handle;
 
-public:
 	FOnWebRequestCompleteMulti OnWebRequestComplete;
+public:
+	FName GetName() const { return Name; }
+	
+	FString GetUrl() const { return Url; }
+	
+	TSubclassOf<UWebRequestHandleBase> GetHandle() const { return Handle; }
+
+	FOnWebRequestCompleteMulti& GetOnWebRequestComplete() { return OnWebRequestComplete; }
 };

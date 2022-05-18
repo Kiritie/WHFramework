@@ -8,6 +8,7 @@
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Parameter/ParameterModuleTypes.h"
 
 #include "GlobalBPLibrary.generated.h"
 
@@ -97,7 +98,7 @@ public:
 	* @param bParamHavePropertyType Param的key是否含有属性类的前缀表示：<int> <Array>...
 	*/
 	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void SerializeExposedParam(UObject* InObject, const TMap<FString,FString>& InParams, bool bParamHavePropertyType = true);
+	static void SerializeExposedParam(UObject* InObject, FParameterMap InParams, bool bParamHavePropertyType = true);
 	/*
 	* 导出目标类带有 ExposeOnSpawn 标签的参数
 	* @param InClass 目标类
@@ -105,7 +106,7 @@ public:
 	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
 	*/
 	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void ExportExposedParam(UClass* InClass, TMap<FString,FString>& OutParams, bool bDisplayPropertyType = true);
+	static void ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex

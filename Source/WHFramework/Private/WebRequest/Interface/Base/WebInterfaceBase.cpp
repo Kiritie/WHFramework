@@ -4,17 +4,13 @@
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "WebRequest/Handle/Base/WebRequestHandleBase.h"
 
 UWebInterfaceBase::UWebInterfaceBase()
 {
 	Name = NAME_None;
 	Url = TEXT("");
 	Handle = UWebRequestHandleBase::StaticClass();
-}
-
-void UWebInterfaceBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
-{
-	
 }
 
 void UWebInterfaceBase::OnDespawn_Implementation()
@@ -25,11 +21,14 @@ void UWebInterfaceBase::OnDespawn_Implementation()
 	OnWebRequestComplete.Clear();
 }
 
-void UWebInterfaceBase::OnRequestComplete_Implementation(FWebRequestInfo InWebRequestInfo)
+void UWebInterfaceBase::OnRequestComplete_Implementation(FWebRequestResult InWebRequestResult)
 {
 	if(UWebRequestHandleBase* WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, Handle))
 	{
-		WebRequestHandle->Fill(InWebRequestInfo);
+		if(InWebRequestResult.bSucceeded)
+		{
+			WebRequestHandle->Fill(InWebRequestResult);
+		}
 		OnWebRequestComplete.Broadcast(WebRequestHandle);
 		UObjectPoolModuleBPLibrary::DespawnObject(WebRequestHandle);
 	}

@@ -27,6 +27,11 @@ public:
 
 	virtual void OnDestroy() override;
 
+protected:
+	void OnMapOpened(const FString& Filename, bool bAsTemplate);
+
+	void OnBlueprintCompiled();
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
@@ -54,7 +59,7 @@ public:
 private:
 	FDelegateHandle OnBeginPIEHandle;
 	FDelegateHandle OnEndPIEHandle;
-	FDelegateHandle OnOpenLevelHandle;
+	FDelegateHandle OnOpenMapHandle;
 	FDelegateHandle OnBlueprintCompiledHandle;
 
 public:
