@@ -131,13 +131,13 @@ protected:
 	float CameraMoveRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
-	float CameraMoveSmooth;
+	float CameraMoveSpeed;
 
 	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	bool bCameraRotateAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Rotate")
 	bool bCameraRotateControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
@@ -150,7 +150,7 @@ protected:
 	float CameraLookUpRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
-	float CameraRotateSmooth;
+	float CameraRotateSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float MinCameraPinch;
@@ -165,7 +165,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bCameraZoomAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraZoomAble == true"), Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraZoomAble == true"), Category = "CameraControl|Zoom")
 	bool bCameraZoomControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -178,7 +178,7 @@ protected:
 	float CameraZoomRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
-	float CameraZoomSmooth;
+	float CameraZoomSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MinCameraDistance;
@@ -308,7 +308,7 @@ public:
 	virtual void SetCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f);
+	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
@@ -391,10 +391,10 @@ public:
 	void SetCameraMoveRate(float InCameraMoveRate) { this->CameraMoveRate = InCameraMoveRate; }
 
 	UFUNCTION(BlueprintPure)
-	float GetCameraMoveSmooth() const { return CameraMoveSmooth; }
+	float GetCameraMoveSpeed() const { return CameraMoveSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMoveSmooth(float InCameraMoveSmooth) { this->CameraMoveSmooth = InCameraMoveSmooth; }
+	void SetCameraMoveSpeed(float InCameraMoveSpeed) { this->CameraMoveSpeed = InCameraMoveSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraTurnRate() const { return CameraTurnRate; }
@@ -409,10 +409,10 @@ public:
 	void SetCameraLookUpRate(float InCameraLookUpRate) { this->CameraLookUpRate = InCameraLookUpRate; }
 
 	UFUNCTION(BlueprintPure)
-	float GetCameraRotateSmooth() const { return CameraRotateSmooth; }
+	float GetCameraRotateSpeed() const { return CameraRotateSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraRotateSmooth(float InCameraRotateSmooth) { this->CameraRotateSmooth = InCameraRotateSmooth; }
+	void SetCameraRotateSpeed(float InCameraRotateSpeed) { this->CameraRotateSpeed = InCameraRotateSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMinCameraPinch() const { return MinCameraPinch; }
@@ -439,10 +439,10 @@ public:
 	void SetCameraZoomRate(float InCameraZoomRate) { this->CameraZoomRate = InCameraZoomRate; }
 
 	UFUNCTION(BlueprintPure)
-	float GetCameraZoomSmooth() const { return CameraZoomSmooth; }
+	float GetCameraZoomSpeed() const { return CameraZoomSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraZoomSmooth(float InCameraZoomSmooth) { this->CameraZoomSmooth = InCameraZoomSmooth; }
+	void SetCameraZoomSpeed(float InCameraZoomSpeed) { this->CameraZoomSpeed = InCameraZoomSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMinCameraDistance() const { return MinCameraDistance; }

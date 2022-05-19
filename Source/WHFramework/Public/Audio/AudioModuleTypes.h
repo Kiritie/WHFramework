@@ -22,12 +22,12 @@ enum class EBGSoundState : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FBGSoundParams
+struct WHFRAMEWORK_API FBGSoundInfo
 {
 	GENERATED_USTRUCT_BODY()
 
 public:
-	FBGSoundParams()
+	FBGSoundInfo()
 	{
 		BGSound = nullptr;
 		BGVolume = 1.0f;
@@ -36,7 +36,7 @@ public:
 		BGSoundState = EBGSoundState::None;
 	}
 	
-	FBGSoundParams(USoundBase* InBGSound, EBGSoundState InInitSoundState = EBGSoundState::None, float InBGVolume = 1.0f, bool bInIsLoopSound = true, bool bInIsUISound = false)
+	FBGSoundInfo(USoundBase* InBGSound, EBGSoundState InInitSoundState = EBGSoundState::None, float InBGVolume = 1.0f, bool bInIsLoopSound = true, bool bInIsUISound = false)
 	{
 		BGSound = InBGSound;
 		BGVolume = InBGVolume;
@@ -68,12 +68,12 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSingleSoundParams
+struct WHFRAMEWORK_API FSingleSoundInfo
 {
 	GENERATED_USTRUCT_BODY()
 
 public:
-	FSingleSoundParams()
+	FSingleSoundInfo()
 	{
 		Sound = nullptr;
 		Volume = 1.0f;
@@ -81,7 +81,7 @@ public:
 		Location = FVector::ZeroVector;
 	}
 	
-	FSingleSoundParams(USoundBase* InSound, float InVolume = 1.0f, bool bInIsUISound = false, FVector InLocation = FVector::ZeroVector)
+	FSingleSoundInfo(USoundBase* InSound, float InVolume = 1.0f, bool bInIsUISound = false, FVector InLocation = FVector::ZeroVector)
 	{
 		Sound = InSound;
 		Volume = InVolume;

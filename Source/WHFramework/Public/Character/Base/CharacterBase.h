@@ -56,8 +56,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	UAudioComponent* SingleSound;
 	
-	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundParams, Category = "SoundActionInfos")
-	FSingleSoundParams SingleSoundParams;
+	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundInfo, Category = "SoundActionInfos")
+	FSingleSoundInfo SingleSoundInfo;
 
 private:
 	FTimerHandle SingleSoundStopTimerHandle;
@@ -69,7 +69,7 @@ public:
 	
 protected:
 	UFUNCTION()
-	virtual void OnRep_SingleSoundParams();
+	virtual void OnRep_SingleSoundInfo();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage

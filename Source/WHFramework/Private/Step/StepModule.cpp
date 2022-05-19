@@ -212,7 +212,7 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 
 void AStepModule::EndStep(bool bRestoreSteps)
 {
-	if(StepModuleState != EStepModuleState::Ended)
+	if(StepModuleState == EStepModuleState::Running)
 	{
 		StepModuleState = EStepModuleState::Ended;
 		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_EndStep>(EEventNetType::Single, this);

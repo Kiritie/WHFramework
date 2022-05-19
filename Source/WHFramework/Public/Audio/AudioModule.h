@@ -57,8 +57,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* SingleSoundComponent;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundParams, Category = "BGSound")
-	FSingleSoundParams SingleSoundParams;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundInfo, Category = "SingleSound")
+	FSingleSoundInfo SingleSoundInfo;
 
 private:
 	FTimerHandle SingleSoundStopTimerHandle;
@@ -80,7 +80,7 @@ public:
 
 protected:
 	UFUNCTION()
-	virtual void OnRep_SingleSoundParams();
+	virtual void OnRep_SingleSoundInfo();
 
 	UFUNCTION()
 	virtual void OnSingleSoundPlayFinished();
@@ -92,10 +92,10 @@ protected:
 	UAudioComponent* GlobalBGSoundComponent;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BGSound")
-	bool bAutoPlayGlobalBGSound;
+	bool bAutoPlayGlobal;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundParams, Category = "BGSound")
-	FBGSoundParams GlobalBGSoundParams;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundInfo, Category = "BGSound")
+	FBGSoundInfo GlobalBGSoundInfo;
 
 private:
 	FTimerHandle GlobalBGSoundLoopTimerHandle;
@@ -115,7 +115,7 @@ protected:
 	virtual void OnLoopGlobalBGSound();
 
 	UFUNCTION()
-	virtual void OnRep_GlobalBGSoundParams();
+	virtual void OnRep_GlobalBGSoundInfo();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Single BGSound
@@ -123,8 +123,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* SingleBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundParams, Category = "BGSound")
-	FBGSoundParams SingleBGSoundParams;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundInfo, Category = "BGSound")
+	FBGSoundInfo SingleBGSoundInfo;
 
 private:
 	FTimerHandle SingleBGSoundLoopTimerHandle;
@@ -147,7 +147,7 @@ protected:
 	virtual void OnLoopSingleBGSound();
 
 	UFUNCTION()
-	virtual void OnRep_SingleBGSoundParams();
+	virtual void OnRep_SingleBGSoundInfo();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network
