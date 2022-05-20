@@ -4,45 +4,101 @@
 #include "WebRequest/WebRequestModuleBPLibrary.h"
 
 #include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "WebRequest/WebRequestModule.h"
 
-FString UWebRequestModuleBPLibrary::ParseWebContentToString(FParameterMap InParamMap, EWebContentType InWebContentType)
+FString UWebRequestModuleBPLibrary::GetServerURL()
 {
-	if(InParamMap.GetNum() == 0) return TEXT("");
-	
-	FString ContentStr;
-	switch(InWebContentType)
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
 	{
-		case EWebContentType::Form:
-		{
-			for(auto& Iter : InParamMap.GetMap())
-			{
-				ContentStr.Append(FString::Printf(TEXT("%s=%s&"), *Iter.Key, *Iter.Value));
-			}
-			ContentStr.RemoveFromEnd(TEXT("&"));
-			break;
-		}
-		case EWebContentType::Text:
-		{
-			for(auto& Iter : InParamMap.GetMap())
-			{
-				ContentStr.Append(FString::Printf(TEXT("%s=%s,"), *Iter.Key, *Iter.Value));
-			}
-			ContentStr.RemoveFromEnd(TEXT(","));
-			break;
-		}
-		case EWebContentType::Json:
-		{
-			const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&ContentStr);
-			JsonWriter->WriteObjectStart();
-			for (auto& It : InParamMap.GetMap())
-			{
-				JsonWriter->WriteValue(It.Key, It.Value);
-			}
-			JsonWriter->WriteObjectEnd();
-			JsonWriter->Close();
-			break;
-		}
+		return WebRequestModule->GetServerURL();
 	}
-	return ContentStr;
+	return TEXT("");
+}
+
+void UWebRequestModuleBPLibrary::SetServerURL(const FString& InServerURL)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		WebRequestModule->SetServerURL(InServerURL);
+	}
+}
+
+bool UWebRequestModuleBPLibrary::HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->HasWebInterface(InWebInterfaceClass);
+	}
+	return false;
+}
+
+UWebInterfaceBase* UWebRequestModuleBPLibrary::GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->GetWebInterface(InWebInterfaceClass);
+	}
+	return nullptr;
+}
+
+UWebInterfaceBase* UWebRequestModuleBPLibrary::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->CreateWebInterface(InWebInterfaceClass);
+	}
+	return nullptr;
+}
+
+bool UWebRequestModuleBPLibrary::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->RegisterWebInterface(InWebInterfaceClass, InOnWebRequestComplete);
+	}
+	return false;
+}
+
+bool UWebRequestModuleBPLibrary::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->UnRegisterWebInterface(InWebInterfaceClass, InOnWebRequestComplete);
+	}
+	return false;
+}
+
+bool UWebRequestModuleBPLibrary::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->UnRegisterAllWebInterface(InWebInterfaceClass);
+	}
+	return false;
+}
+
+bool UWebRequestModuleBPLibrary::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->ClearWebInterface(InWebInterfaceClass);
+	}
+	return false;
+}
+
+void UWebRequestModuleBPLibrary::ClearAllWebInterface()
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		WebRequestModule->ClearAllWebInterface();
+	}
+}
+
+bool UWebRequestModuleBPLibrary::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->SendWebRequest(InWebInterfaceClass, InMethod, InHeadMap, InContent);
+	}
+	return false;
 }

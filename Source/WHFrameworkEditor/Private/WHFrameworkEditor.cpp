@@ -10,10 +10,10 @@
 #include "ToolMenus.h"
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Camera/CameraModuleDetailsPanel.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_BeginPlay.h"
 #include "Event/Handle/Global/EventHandle_EndPlay.h"
-#include "Gameplay/PlayerControllerDetailsPanel.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/AssetTypeActions_ProcedureBlueprint.h"
@@ -100,7 +100,7 @@ void FWHFrameworkEditorModule::StartupModule()
 	// Register the details customizer
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
 
-	PropertyModule.RegisterCustomClassLayout(TEXT("WHPlayerController"), FOnGetDetailCustomizationInstance::CreateStatic(&FPlayerControllerDetailsPanel::MakeInstance));
+	PropertyModule.RegisterCustomClassLayout(TEXT("CameraModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraModuleDetailsPanel::MakeInstance));
 
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailsPanel::MakeInstance));
 	PropertyModule.RegisterCustomClassLayout(TEXT("ProcedureModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureModuleDetailsPanel::MakeInstance));
@@ -157,7 +157,7 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	{
 		FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
 
-		PropertyModule.UnregisterCustomClassLayout(TEXT("WHPlayerController"));
+		PropertyModule.UnregisterCustomClassLayout(TEXT("CameraModule"));
 
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureBase"));
 		PropertyModule.UnregisterCustomClassLayout(TEXT("ProcedureModule"));

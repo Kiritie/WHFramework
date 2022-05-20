@@ -25,7 +25,14 @@ public:
 public:
 	virtual void Fill(const FWebRequestResult& InWebRequestResult);
 
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+protected:
+	UPROPERTY(VisibleAnywhere)
 	bool bSucceeded;
+	
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsSucceeded() const { return bSucceeded; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetSucceeded(bool bInSucceeded) { this->bSucceeded = bInSucceeded; }
 };

@@ -185,6 +185,12 @@ FText UGlobalBPLibrary::NumberToText(int32 InNumber, const TMap<int32, FString>&
 	return FText::FromString(TextStr);
 }
 
+bool UGlobalBPLibrary::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
+{
+	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
+    return FJsonSerializer::Deserialize(JsonReader, OutJsonObject);
+}
+
 FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputActionName)
 {
 	TArray<FInputActionKeyMapping> KeyMappings;

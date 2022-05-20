@@ -65,29 +65,29 @@ public:
 public:
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Close(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Toggle(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Reset() override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Refresh() override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Destroy(bool bRecovery = false) override;
 	
 protected:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void FinishOpen(bool bInstant) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void FinishClose(bool bInstant) override;
 
 public:

@@ -3,6 +3,7 @@
 
 #include "WebRequest/Handle/WebRequestHandle_GetJson.h"
 
+#include "Global/GlobalBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 
 UWebRequestHandle_GetJson::UWebRequestHandle_GetJson()
@@ -20,7 +21,6 @@ void UWebRequestHandle_GetJson::OnDespawn_Implementation()
 void UWebRequestHandle_GetJson::Fill(const FWebRequestResult& InWebRequestResult)
 {
 	Super::Fill(InWebRequestResult);
-	
-	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InWebRequestResult.HttpResponse->GetContentAsString());
-	FJsonSerializer::Deserialize(JsonReader, Json);
+
+	UGlobalBPLibrary::ParseJsonObjectFromString(InWebRequestResult.HttpResponse->GetContentAsString(), Json);
 }

@@ -23,8 +23,11 @@ public:
 	virtual void OnDespawn_Implementation() override;
 
 public:
-	TSharedPtr<FJsonObject> Json;
-
-public:
 	virtual void Fill(const FWebRequestResult& InWebRequestResult) override;
+
+protected:
+	TSharedPtr<FJsonObject> Json;
+	
+public:
+	TSharedPtr<FJsonObject> GetJson() const { return Json; }
 };

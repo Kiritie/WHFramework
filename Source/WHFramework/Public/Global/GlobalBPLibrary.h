@@ -9,6 +9,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Parameter/ParameterModuleTypes.h"
+#include "Dom/JsonObject.h"
 
 #include "GlobalBPLibrary.generated.h"
 
@@ -133,6 +134,11 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
+		
+	//////////////////////////////////////////////////////////////////////////
+	// Json
+public:
+	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input

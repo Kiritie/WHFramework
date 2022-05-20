@@ -3,10 +3,10 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
+#include "Camera/CameraModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
-#include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
@@ -166,25 +166,21 @@ void UProcedureBase::SwitchNextProcedure()
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	AWHPlayerController* PlayerController = UGlobalBPLibrary::GetObjectInExistedWorld<AWHPlayerController>([](const UWorld* World) {
-		return UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(World);
-	});
-
-	if(PlayerController)
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 		}
 		else
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch;
 		}
-		CameraViewDistance = PlayerController->GetCurrentCameraDistance();
+		CameraViewDistance = CameraModule->GetCurrentCameraDistance();
 
 		Modify();
 	}
@@ -212,7 +208,7 @@ void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		FVector CameraLocation;
 		float CameraYaw;
@@ -236,23 +232,23 @@ void UProcedureBase::ResetCameraView()
 		{
 			case EProcedureCameraViewMode::Instant:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, true);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-				PlayerController->SetCameraDistance(CameraViewDistance, true);
+				CameraModule->SetCameraLocation(CameraLocation, true);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+				CameraModule->SetCameraDistance(CameraViewDistance, true);
 				break;
 			}
 			case EProcedureCameraViewMode::Smooth:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, false);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-				PlayerController->SetCameraDistance(CameraViewDistance, false);
+				CameraModule->SetCameraLocation(CameraLocation, false);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+				CameraModule->SetCameraDistance(CameraViewDistance, false);
 				break;
 			}
 			case EProcedureCameraViewMode::Duration:
 			{
-				PlayerController->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
 				break;
 			}
 			default: break;

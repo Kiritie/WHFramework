@@ -31,7 +31,7 @@ void UWebInterfaceBase::OnRequestComplete_Implementation(UWebRequestHandleBase* 
 
 void UWebInterfaceBase::RequestComplete(FWebRequestResult InWebRequestResult)
 {
-	UWebRequestHandleBase* WebRequestHandle = nullptr;
+	UWebRequestHandleBase* WebRequestHandle;
 	if(!HandleMap.Contains(InWebRequestResult.Content))
 	{
 		WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, HandleClass);
@@ -48,7 +48,7 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InWebRequestResult)
 			WebRequestHandle->Fill(InWebRequestResult);
 		}
 		OnRequestComplete(WebRequestHandle);
-		HandleMap.Emplace(InWebRequestResult.Content, WebRequestHandle);
 		OnWebRequestComplete.Broadcast(WebRequestHandle);
+		HandleMap.Emplace(InWebRequestResult.Content, WebRequestHandle);
 	}
 }

@@ -14,8 +14,9 @@ AWebRequestModule::AWebRequestModule()
 {
 	ModuleName = FName("WebRequestModule");
 
-	ServerURL = TEXT("http://127.0.0.1:8080/survival_world_war_exploded");
-	WebInterfaces = TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*>();
+	ServerURL = TEXT("");
+	WebInterfaces = TArray<TSubclassOf<UWebInterfaceBase>>();
+	WebInterfaceMap = TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*>();
 }
 
 #if WITH_EDITOR
@@ -33,6 +34,11 @@ void AWebRequestModule::OnDestroy_Implementation()
 void AWebRequestModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : WebInterfaces)
+	{
+		CreateWebInterface(Iter);
+	}
 }
 
 void AWebRequestModule::OnPreparatory_Implementation()
@@ -55,11 +61,18 @@ void AWebRequestModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
+void AWebRequestModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+
+	ClearAllWebInterface();
+}
+
 bool AWebRequestModule::HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
 	if(!InWebInterfaceClass) return false;
 
-	return WebInterfaces.Contains(InWebInterfaceClass);
+	return WebInterfaceMap.Contains(InWebInterfaceClass);
 }
 
 UWebInterfaceBase* AWebRequestModule::GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
@@ -68,7 +81,7 @@ UWebInterfaceBase* AWebRequestModule::GetWebInterface(TSubclassOf<UWebInterfaceB
 
 	if(HasWebInterface(InWebInterfaceClass))
 	{
-		return WebInterfaces[InWebInterfaceClass];
+		return WebInterfaceMap[InWebInterfaceClass];
 	}
 	return nullptr;
 }
@@ -80,7 +93,10 @@ UWebInterfaceBase* AWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfa
 	if(!HasWebInterface(InWebInterfaceClass))
 	{
 		UWebInterfaceBase* WebInterface = UObjectPoolModuleBPLibrary::SpawnObject<UWebInterfaceBase>(nullptr, InWebInterfaceClass);
-		WebInterfaces.Add(InWebInterfaceClass, WebInterface);
+		WebInterfaceMap.Add(InWebInterfaceClass, WebInterface);
+		
+		WHLog(WH_WebRequest, Log, TEXT("Succeeded to creating the interface: %s"), *WebInterface->GetName().ToString());
+		
 		return WebInterface;
 	}
 	return nullptr;
@@ -95,6 +111,9 @@ bool AWebRequestModule::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWe
 		if(!WebInterface->GetOnWebRequestComplete().Contains(InOnWebRequestComplete))
 		{
 			WebInterface->GetOnWebRequestComplete().Add(InOnWebRequestComplete);
+			
+			WHLog(WH_WebRequest, Log, TEXT("Succeeded to register the interface: %s"), *WebInterface->GetName().ToString());
+			
 			return true;
 		}
 	}
@@ -110,6 +129,9 @@ bool AWebRequestModule::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> In
 		if(WebInterface->GetOnWebRequestComplete().Contains(InOnWebRequestComplete))
 		{
 			WebInterface->GetOnWebRequestComplete().Remove(InOnWebRequestComplete);
+
+			WHLog(WH_WebRequest, Log, TEXT("Succeeded to un register the interface: %s"), *WebInterface->GetName().ToString());
+
 			return true;
 		}
 	}
@@ -123,6 +145,9 @@ bool AWebRequestModule::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase>
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
 	{
 		WebInterface->GetOnWebRequestComplete().Clear();
+
+		WHLog(WH_WebRequest, Log, TEXT("Succeeded to un register all the interface: %s"), *WebInterface->GetName().ToString());
+		
 		return true;
 	}
 	return false;
@@ -134,8 +159,11 @@ bool AWebRequestModule::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebIn
 
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
 	{
-		WebInterfaces.Remove(InWebInterfaceClass);
+		WebInterfaceMap.Remove(InWebInterfaceClass);
 		UObjectPoolModuleBPLibrary::DespawnObject(WebInterface);
+
+		WHLog(WH_WebRequest, Log, TEXT("Succeeded to clear the interface: %s"), *WebInterface->GetName().ToString());
+		
 		return true;
 	}
 	return nullptr;
@@ -143,53 +171,43 @@ bool AWebRequestModule::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebIn
 
 void AWebRequestModule::ClearAllWebInterface()
 {
-	for(auto Iter : WebInterfaces)
+	for(auto Iter : WebInterfaceMap)
 	{
 		UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
 	}
-	WebInterfaces.Empty();
+	WebInterfaceMap.Empty();
 }
 
-bool AWebRequestModule::SendWebRequestGet(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap)
-{
-	return SendWebRequestImpl(InWebInterfaceClass, InHeadMap);
-}
-
-bool AWebRequestModule::SendWebRequestPost(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap, FWebContent InWebContent)
-{
-	FString ContentType;
-	switch(InWebContent.ContentType)
-	{
-		case EWebContentType::Form:
-		{
-			ContentType = TEXT("application/x-www-form-urlencoded");
-			break;
-		}
-		case EWebContentType::Text:
-		{
-			ContentType = TEXT("text/plain; charset=utf-8");
-			break;
-		}
-		case EWebContentType::Json:
-		{
-			ContentType = TEXT("application/json; charset=utf-8");
-			break;
-		}
-	}
-	InHeadMap.Add(TEXT("Content-Type"), ContentType);
-	return SendWebRequestImpl(InWebInterfaceClass, InHeadMap, InWebContent.ToString(), true);
-}
-
-bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, FParameterMap InHeadMap, const FString& InContent, bool bPost)
+bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
 {
 	if(!InWebInterfaceClass) return false;
 
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
 	{
-		TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+		const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
-		HttpRequest->SetURL(ServerURL + WebInterface->GetUrl());
+		HttpRequest->SetURL(WebInterface->GetFullUrl());
 
+		FString ContentType;
+		switch(InContent.ContentType)
+		{
+			case EWebContentType::Form:
+			{
+				ContentType = TEXT("application/x-www-form-urlencoded");
+				break;
+			}
+			case EWebContentType::Text:
+			{
+				ContentType = TEXT("text/plain; charset=utf-8");
+				break;
+			}
+			case EWebContentType::Json:
+			{
+				ContentType = TEXT("application/json; charset=utf-8");
+				break;
+			}
+		}
+		InHeadMap.Add(TEXT("Content-Type"), ContentType);
 		InHeadMap.Add(TEXT("timestamp"), FString::FromInt(FDateTime::UtcNow().ToUnixTimestamp()));
 
 		for(auto& Iter : InHeadMap.GetMap())
@@ -197,11 +215,16 @@ bool AWebRequestModule::SendWebRequestImpl(TSubclassOf<UWebInterfaceBase> InWebI
 			HttpRequest->SetHeader(Iter.Key, Iter.Value);
 		}
 
-		HttpRequest->SetContentAsString(InContent);
+		HttpRequest->SetContentAsString(InContent.ToString());
 
-		HttpRequest->SetVerb(!bPost ? TEXT("GET") : TEXT("POST"));
+		HttpRequest->SetVerb(UGlobalBPLibrary::GetEnumValueDisplayName(TEXT("EWebRequestMethod"), (int32)InMethod).ToString());
 
-		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent);
+		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString());
+
+		WHLog(WH_WebRequest, Log, TEXT("Start send web request: %s"), *WebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Log, TEXT("------> Method: %s"), *HttpRequest->GetVerb());
+		WHLog(WH_WebRequest, Log, TEXT("------> Head: %s"), *InHeadMap.ToString());
+		WHLog(WH_WebRequest, Log, TEXT("------> Content: %s"), *InContent.ToString());
 
 		return HttpRequest->ProcessRequest();
 	}
@@ -213,8 +236,7 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 	if(!HttpResponse.IsValid())
 	{
 		bSucceeded = false;
-		FString RequsetURL = HttpRequest.IsValid() ? HttpRequest->GetURL() : TEXT("");
-		WHLog(WH_WebRequest, Error, TEXT("Unable to process web request : %s"), *InWebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Error, TEXT("Unable to process web request: %s"), *InWebInterface->GetName().ToString());
 	}
 
 	if(HttpRequest.IsValid())
@@ -227,25 +249,22 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 			const int64 SpendTime = Now - RequestTime;
 			if(SpendTime > 8000)
 			{
-				WHLog(WH_WebRequest, Warning, TEXT("URL: %s, Spendtime to long : %d"), *HttpResponse->GetURL(), SpendTime);
+				WHLog(WH_WebRequest, Warning, TEXT("Web request: %s, Spendtime to long: %d"), *InWebInterface->GetName().ToString(), SpendTime);
 			}
 		}
 	}
 
 	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
 	{
-		WHLog(WH_WebRequest, Log, TEXT("Web request successed ------> URL: %s"), *HttpResponse->GetURL());
-		WHLog(WH_WebRequest, Log, TEXT("------> MessageBody %s"), *HttpResponse->GetURL(), *HttpResponse->GetContentAsString());
+		WHLog(WH_WebRequest, Log, TEXT("Web request successed: %s"), *InWebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Log, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
 	}
 	else
 	{
 		bSucceeded = false;
-		WHLog(WH_WebRequest, Error, TEXT("Web response returned error code: %d ------> URL: %s"), HttpResponse->GetResponseCode(), *HttpResponse->GetURL());
-		WHLog(WH_WebRequest, Error, TEXT("------> MessageBody %s"), *HttpResponse->GetURL(), *HttpResponse->GetContentAsString());
+		WHLog(WH_WebRequest, Error, TEXT("Web response returned error code: %d , Web request: %s"), HttpResponse->GetResponseCode(), *InWebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Error, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
 	}
 
-	if(InWebInterface)
-	{
-		InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse));
-	}
+	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse));
 }

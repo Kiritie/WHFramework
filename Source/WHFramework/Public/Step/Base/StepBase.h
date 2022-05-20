@@ -191,6 +191,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
+	/**
+	* 能否跳过
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool IsSkipAble() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target

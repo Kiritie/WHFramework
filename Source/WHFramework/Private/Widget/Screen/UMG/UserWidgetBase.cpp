@@ -226,19 +226,17 @@ void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
 }
 
-void UUserWidgetBase::Open_Implementation(const TArray<FParameter>& InParams, bool bInstant)
+void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(WidgetState == EScreenWidgetState::Opened) return;
-
 	UWidgetModuleBPLibrary::K2_OpenUserWidget(GetClass(), InParams, bInstant);
 }
 
-void UUserWidgetBase::Close_Implementation(bool bInstant)
+void UUserWidgetBase::Close(bool bInstant)
 {
 	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(bInstant, GetClass());
 }
 
-void UUserWidgetBase::Toggle_Implementation(bool bInstant)
+void UUserWidgetBase::Toggle(bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Closing) return;
 	
@@ -252,24 +250,24 @@ void UUserWidgetBase::Toggle_Implementation(bool bInstant)
 	}
 }
 
-void UUserWidgetBase::Reset_Implementation()
+void UUserWidgetBase::Reset()
 {
 	OnReset();
 }
 
-void UUserWidgetBase::Refresh_Implementation()
+void UUserWidgetBase::Refresh()
 {
 	if(WidgetRefreshType == EWidgetRefreshType::None) return;
 
 	OnRefresh();
 }
 
-void UUserWidgetBase::Destroy_Implementation(bool bRecovery)
+void UUserWidgetBase::Destroy(bool bRecovery)
 {
 	UWidgetModuleBPLibrary::DestroyUserWidget<UUserWidgetBase>(bRecovery, GetClass());
 }
 
-void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
+void UUserWidgetBase::FinishOpen(bool bInstant)
 {
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
@@ -285,7 +283,7 @@ void UUserWidgetBase::FinishOpen_Implementation(bool bInstant)
 	}
 }
 
-void UUserWidgetBase::FinishClose_Implementation(bool bInstant)
+void UUserWidgetBase::FinishClose(bool bInstant)
 {
 	WidgetState = EScreenWidgetState::Closed;
 	OnStateChanged(WidgetState);

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "UObject/Object.h"
+#include "WebRequest/WebRequestModuleBPLibrary.h"
 #include "WebRequest/WebRequestModuleTypes.h"
 #include "WebInterfaceBase.generated.h"
 
@@ -37,6 +38,9 @@ protected:
 	FString Url;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FString FullUrl;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UWebRequestHandleBase> HandleClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -48,8 +52,10 @@ public:
 	FName GetName() const { return Name; }
 	
 	FString GetUrl() const { return Url; }
-	
-	TSubclassOf<UWebRequestHandleBase> GetHandle() const { return HandleClass; }
+		
+	FString GetFullUrl() const { return FullUrl.IsEmpty() ? UWebRequestModuleBPLibrary::GetServerURL() + Url : FullUrl; }
+
+	TSubclassOf<UWebRequestHandleBase> GetHandleClass() const { return HandleClass; }
 
 	FOnWebRequestCompleteMulti& GetOnWebRequestComplete() { return OnWebRequestComplete; }
 };

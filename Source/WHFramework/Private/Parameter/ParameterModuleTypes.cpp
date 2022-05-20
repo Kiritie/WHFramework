@@ -6,6 +6,20 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Parameter/ParameterModuleBPLibrary.h"
 
+// FString FParameterMap::ToJsonString() const
+// {
+// 	FString JsonString;
+// 	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
+// 	JsonWriter->WriteObjectStart();
+// 	for (auto& It : Map)
+// 	{
+// 		JsonWriter->WriteValue(It.Key, It.Value);
+// 	}
+// 	JsonWriter->WriteObjectEnd();
+// 	JsonWriter->Close();
+// 	return JsonString;
+// }
+
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {
 	for (auto Iter : ParamSets)

@@ -8,9 +8,16 @@
 
 class UWebRequestHandleBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebRequestCompleteMulti, UWebRequestHandleBase*, InWebRequestHandle);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebRequestCompleteMulti, const UWebRequestHandleBase*, InWebRequestHandle);
 
-DECLARE_DYNAMIC_DELEGATE_OneParam(FOnWebRequestComplete, UWebRequestHandleBase*, InWebRequestHandle);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnWebRequestComplete, const UWebRequestHandleBase*, InWebRequestHandle);
+
+UENUM(BlueprintType)
+enum class EWebRequestMethod : uint8
+{
+	Get UMETA(DisplayName = "GET"),
+	Post UMETA(DisplayName = "POST")
+};
 
 UENUM(BlueprintType)
 enum class EWebContentType : uint8
@@ -28,20 +35,40 @@ struct FWebContent
 public:
 	FWebContent()
 	{
+		ContentType = EWebContentType::Form;
 		Content = TEXT("");
 		ContentMap = TMap<FString, FString>();
-		ContentType = EWebContentType::Form;
+	}
+
+	FWebContent(EWebContentType InContentType)
+	{
+		ContentType = InContentType;
+		Content = TEXT("");
+		ContentMap = TMap<FString, FString>();
+	}
+
+	FWebContent(EWebContentType InContentType, const FString& InContent)
+	{
+		ContentType = InContentType;
+		Content = InContent;
+		ContentMap = TMap<FString, FString>();
 	}
 
 public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	EWebContentType ContentType;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString Content;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FParameterMap ContentMap;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	EWebContentType ContentType;
+public:
+	FORCEINLINE FParameterMap& operator()()
+	{
+		return ContentMap;
+	}
 
 public:
 	FString ToString();

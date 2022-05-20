@@ -9,10 +9,10 @@
 enum class ECheckBoxState : uint8;
 class IDetailLayoutBuilder;
 
-class FPlayerControllerDetailsPanel : public IDetailCustomization
+class FCameraModuleDetailsPanel : public IDetailCustomization
 {
 public:
-	FPlayerControllerDetailsPanel();
+	FCameraModuleDetailsPanel();
 
 	// Makes a new instance of this detail layout class for a specific detail view requesting it
 	static TSharedRef<IDetailCustomization> MakeInstance();

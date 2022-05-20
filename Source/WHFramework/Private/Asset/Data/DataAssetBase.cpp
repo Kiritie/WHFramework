@@ -3,16 +3,26 @@
 
 #include "Asset/Data/DataAssetBase.h"
 
+#include "Global/GlobalBPLibrary.h"
+
 UDataAssetBase::UDataAssetBase()
 {
 	
 }
 
-void UDataAssetBase::FillData(TSharedPtr<FJsonObject> InJsonObject)
+void UDataAssetBase::FillData(const FString& InJsonString)
 {
+	TSharedPtr<FJsonObject> JsonObject;
+	UGlobalBPLibrary::ParseJsonObjectFromString(InJsonString, JsonObject);
+	FillData(InJsonString);
 }
 
-TSharedPtr<FJsonObject> UDataAssetBase::PackData()
+void UDataAssetBase::FillData(TSharedPtr<FJsonObject> InJsonObject)
 {
-	return nullptr;
+	
+}
+
+FString UDataAssetBase::PackData()
+{
+	return TEXT("");
 }

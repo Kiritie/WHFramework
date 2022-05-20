@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "json.h"
 
 #include "ParameterModuleTypes.generated.h"
 
@@ -79,6 +80,31 @@ public:
 	int32 GetNum() const
 	{
 		return Map.Num();
+	}
+
+	FString ToString() const
+	{
+		FString String;
+		for(auto& Iter : Map)
+		{
+			String.Append(FString::Printf(TEXT("%s=%s,"), *Iter.Key, *Iter.Value));
+		}
+		String.RemoveFromEnd(TEXT(","));
+		return String;
+	}
+
+	FString ToJsonString() const
+	{
+		FString JsonString;
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
+		JsonWriter->WriteObjectStart();
+		for (auto& It : Map)
+		{
+			JsonWriter->WriteValue(It.Key, It.Value);
+		}
+		JsonWriter->WriteObjectEnd();
+		JsonWriter->Close();
+		return JsonString;
 	}
 };
 

@@ -22,9 +22,13 @@ public:
 	virtual void OnDespawn_Implementation() override;
 
 public:
+	virtual void Fill(const FWebRequestResult& InWebRequestResult) override;
+
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FString Text;
-
+	
 public:
-	virtual void Fill(const FWebRequestResult& InWebRequestResult) override;
+	UFUNCTION(BlueprintPure)
+	FString GetText() const { return Text; }
 };

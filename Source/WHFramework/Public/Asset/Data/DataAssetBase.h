@@ -19,9 +19,11 @@ public:
 	UDataAssetBase();
 
 public:
+	virtual void FillData(const FString& InJsonString);
+
 	virtual void FillData(TSharedPtr<FJsonObject> InJsonObject);
 	
-	virtual TSharedPtr<FJsonObject> PackData();
+	virtual FString PackData();
 
 protected:
 	UPROPERTY(EditDefaultsOnly)

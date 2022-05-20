@@ -14,6 +14,33 @@ FString FWebContent::ToString()
 	}
 	else
 	{
-		return UWebRequestModuleBPLibrary::ParseWebContentToString(ContentMap, ContentType);
+		if(ContentMap.GetNum() > 0)
+		{
+			FString ContentStr;
+			switch(ContentType)
+			{
+				case EWebContentType::Form:
+				{
+					for(auto& Iter : ContentMap.GetMap())
+					{
+						ContentStr.Append(FString::Printf(TEXT("%s=%s&"), *Iter.Key, *Iter.Value));
+					}
+					ContentStr.RemoveFromEnd(TEXT("&"));
+					break;
+				}
+				case EWebContentType::Text:
+				{
+					ContentStr = ContentMap.ToString();
+					break;
+				}
+				case EWebContentType::Json:
+				{
+					ContentStr = ContentMap.ToJsonString();
+					break;
+				}
+			}
+			return ContentStr;
+		}
 	}
+	return TEXT("");
 }
