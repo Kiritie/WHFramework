@@ -64,10 +64,10 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
     void RefreshModules(float DeltaSeconds);
     
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MainModule")
     void PauseModules();
     
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MainModule")
     void UnPauseModules();
 
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")

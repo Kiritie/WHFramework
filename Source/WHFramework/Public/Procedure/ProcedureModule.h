@@ -11,7 +11,6 @@
 #include "ProcedureModule.generated.h"
 
 class UProcedureBase;
-class UProcedureBase;
 
 /**
  * 
@@ -48,6 +47,11 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
+protected:
+	/// 自动切换流程 
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
+	bool bAutoSwitchProcedure;
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchProcedure(UProcedureBase* InProcedure);

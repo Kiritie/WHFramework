@@ -25,7 +25,9 @@ AProcedureModule::AProcedureModule()
 	ModuleName = FName("ProcedureModule");
 
 	Procedures = TArray<UProcedureBase*>();
-	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>(); 
+	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();
+
+	bAutoSwitchProcedure = false;
 
 	FirstProcedure = nullptr;
 	CurrentProcedure = nullptr;
@@ -65,6 +67,11 @@ void AProcedureModule::OnInitialize_Implementation()
 void AProcedureModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	if(bAutoSwitchProcedure && FirstProcedure)
+	{
+		SwitchProcedure(FirstProcedure);
+	}
 }
 
 void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
