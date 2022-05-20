@@ -69,7 +69,6 @@ AMainModule::AMainModule()
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
 
 	bInEditor = false;
-	//Current = this;
 }
 
 // Called when the game starts or when spawned
@@ -83,10 +82,6 @@ void AMainModule::BeginPlay()
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-
-	TerminationModules();
-
-	Current = nullptr;
 }
 
 // Called every frame

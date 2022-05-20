@@ -21,6 +21,7 @@ enum class EStepModuleState : uint8
 {
 	None,
 	Running,
+	Paused,
 	Ended
 };
 
