@@ -133,7 +133,7 @@ void AWHPlayerController::LookUp(float InRate)
 	{
 		if(!CameraModule->GetCameraRotateKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraRotateKey()))
 		{
-			CameraModule->AddCameraRotationInput(0.f, -InRate);
+			CameraModule->AddCameraRotationInput(0.f, CameraModule->IsReverseCameraPitch() ? -InRate : InRate);
 		}
 	}
 }
@@ -147,7 +147,7 @@ void AWHPlayerController::PanH(float InRate)
 		if(!CameraModule->GetCameraPanMoveKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraPanMoveKey()))
 		{
 			const FRotator Rotation = GetControlRotation();
-			const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (CameraModule->IsReverseCameraMove() ? -1.f : 1.f);
+			const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (CameraModule->IsReverseCameraPanMove() ? -1.f : 1.f);
 			CameraModule->AddCameraMovementInput(Direction, InRate);
 		}
 	}
@@ -162,7 +162,7 @@ void AWHPlayerController::PanV(float InRate)
 		if(!CameraModule->GetCameraPanMoveKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraPanMoveKey()))
 		{
 			const FRotator Rotation = GetControlRotation();
-			const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (CameraModule->IsReverseCameraMove() ? -1.f : 1.f);
+			const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (CameraModule->IsReverseCameraPanMove() ? -1.f : 1.f);
 			CameraModule->AddCameraMovementInput(Direction, InRate);
 		}
 	}
@@ -176,7 +176,7 @@ void AWHPlayerController::ZoomCam(float InRate)
 	{
 		if(!CameraModule->GetCameraZoomKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraZoomKey()))
 		{
-			CameraModule->AddCameraDistanceInput(InRate);
+			CameraModule->AddCameraDistanceInput(-InRate);
 		}
 	}
 }
@@ -345,7 +345,7 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
 			if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 			{
-				CameraModule->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (CameraModule->IsReverseCameraMove() ? -1.f : 1.f));
+				CameraModule->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (CameraModule->IsReverseCameraPanMove() ? -1.f : 1.f));
 			}
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);

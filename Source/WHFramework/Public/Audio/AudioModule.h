@@ -91,10 +91,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* GlobalBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BGSound")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BG Sound")
 	bool bAutoPlayGlobal;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundInfo, Category = "BGSound")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundInfo, Category = "BG Sound")
 	FBGSoundInfo GlobalBGSoundInfo;
 
 private:
@@ -123,7 +123,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* SingleBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundInfo, Category = "BGSound")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundInfo, Category = "BG Sound")
 	FBGSoundInfo SingleBGSoundInfo;
 
 private:

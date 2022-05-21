@@ -50,7 +50,7 @@ public:
 protected:
 	/// 自动切换流程 
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
-	bool bAutoSwitchProcedure;
+	bool bAutoSwitch;
 
 public:
 	UFUNCTION(BlueprintCallable)

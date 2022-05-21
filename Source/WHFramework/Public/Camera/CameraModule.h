@@ -120,13 +120,13 @@ protected:
 	bool bCameraMoveControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
-	bool bReverseCameraMove;
+	bool bReverseCameraPanMove;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bClampCameraMove;
 
 	UPROPERTY(EditAnywhere, meta = (EditCondition = "bClampCameraMove == true"), Category = "CameraControl|Move")
-	FBox CameraMoveLimit;
+	FBox CameraMoveRange;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	FKey CameraPanMoveKey;
@@ -144,6 +144,9 @@ protected:
 	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Rotate")
 	bool bCameraRotateControlAble;
 
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Rotate")
+	bool bReverseCameraPitch;
+
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	FKey CameraRotateKey;
 
@@ -157,13 +160,13 @@ protected:
 	float CameraRotateSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
-	float MinCameraPinch;
+	float MinCameraPitch;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
-	float MaxCameraPinch;
+	float MaxCameraPitch;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
-	float InitCameraPinch;
+	float InitCameraPitch;
 
 	// Zoom
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -196,9 +199,6 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Stats
 protected:
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats")
-	AWHPlayerController* PlayerController;
-	
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
 	FVector CurrentCameraLocation;
 	
@@ -217,6 +217,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
 	float TargetCameraDistance;
 
+	UPROPERTY(Transient)
+	AWHPlayerController* PlayerController;
+	
 private:
 	float CameraDoMoveTime;
 	float CameraDoMoveDuration;
@@ -238,14 +241,6 @@ private:
 	float TrackDistance;
 	bool TrackAllowControl;
 	ETrackTargetMode TrackTargetMode;
-
-	int32 TouchPressedCount;
-	FVector2D TouchLocationPrevious;
-	float TouchPinchValuePrevious;
-
-	FTimerHandle TouchReleaseTimerHandle1;
-	FTimerHandle TouchReleaseTimerHandle2;
-	FTimerHandle TouchReleaseTimerHandle3;
 
 protected:
 	virtual void DoTrackTarget(bool bInstant = false);
@@ -341,7 +336,7 @@ public:
 	FKey GetCameraPanMoveKey() const { return CameraPanMoveKey; }
 
 	UFUNCTION(BlueprintPure)
-	bool IsReverseCameraMove() const { return bReverseCameraMove; }
+	bool IsReverseCameraPanMove() const { return bReverseCameraPanMove; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }
@@ -368,6 +363,9 @@ public:
 	void SetCameraRotateControlAble(bool bInCameraRotateControlAble) { this->bCameraRotateControlAble = bInCameraRotateControlAble; }
 
 	UFUNCTION(BlueprintPure)
+	bool IsReverseCameraPitch() const { return bReverseCameraPitch; }
+
+	UFUNCTION(BlueprintPure)
 	FKey GetCameraRotateKey() const { return CameraRotateKey; }
 
 	UFUNCTION(BlueprintPure)
@@ -389,22 +387,22 @@ public:
 	void SetCameraRotateSpeed(float InCameraRotateSpeed) { this->CameraRotateSpeed = InCameraRotateSpeed; }
 
 	UFUNCTION(BlueprintPure)
-	float GetMinCameraPinch() const { return MinCameraPinch; }
+	float GetMinCameraPitch() const { return MinCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMinCameraPinch(float InMinCameraPinch) { this->MinCameraPinch = InMinCameraPinch; }
+	void SetMinCameraPitch(float InMinCameraPitch) { this->MinCameraPitch = InMinCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
-	float GetMaxCameraPinch() const { return MaxCameraPinch; }
+	float GetMaxCameraPitch() const { return MaxCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMaxCameraPinch(float InMaxCameraPinch) { this->MaxCameraPinch = InMaxCameraPinch; }
+	void SetMaxCameraPitch(float InMaxCameraPitch) { this->MaxCameraPitch = InMaxCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
-	float GetInitCameraPinch() const { return InitCameraPinch; }
+	float GetInitCameraPitch() const { return InitCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetInitCameraPinch(float InInitCameraPinch) { this->InitCameraPinch = InInitCameraPinch; }
+	void SetInitCameraPitch(float InInitCameraPitch) { this->InitCameraPitch = InInitCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraZoomAble() const { return bCameraZoomAble; }
@@ -475,8 +473,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	FRotator GetRealCameraRotation();
 
-public:
-	UFUNCTION(BlueprintPure)
+protected:
 	AWHPlayerController* GetPlayerController();
 
 	//////////////////////////////////////////////////////////////////////////
