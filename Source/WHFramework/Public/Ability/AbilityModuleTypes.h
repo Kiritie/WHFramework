@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Abilities/GameplayAbilityTypes.h"
-#include "Asset/Primary/PrimaryAssetManager.h"
+#include "Asset/AssetManagerBase.h"
 
 #include "AbilityModuleTypes.generated.h"
 

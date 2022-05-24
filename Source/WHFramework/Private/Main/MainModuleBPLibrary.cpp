@@ -6,14 +6,30 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
+void UMainModuleBPLibrary::PauseAllModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->PauseModules();
+	}
+}
+
+void UMainModuleBPLibrary::UnPauseAllModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->UnPauseModules();
+	}
+}
+
 AMainModule* UMainModuleBPLibrary::GetMainModule(bool bInEditor)
 {
 	return AMainModule::Get(bInEditor);
 }
 
-TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModules(bool bInEditor)
+TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModule(bool bInEditor)
 {
-	return AMainModule::GetAllModules(bInEditor);
+	return AMainModule::GetAllModule(bInEditor);
 }
 
 AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor)

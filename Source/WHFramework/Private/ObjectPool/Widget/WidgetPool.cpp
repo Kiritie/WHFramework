@@ -5,6 +5,7 @@
 
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Blueprint/UserWidget.h"
+#include "Debug/DebugModuleTypes.h"
 
 UWidgetPool::UWidgetPool()
 {

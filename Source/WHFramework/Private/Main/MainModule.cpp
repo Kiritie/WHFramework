@@ -29,8 +29,10 @@
 #include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
-AMainModule* AMainModule::Current = nullptr;
-
+AMainModule* AMainModule::Instance = nullptr;
+#if WITH_EDITOR
+AMainModule* AMainModule::InstanceEditor = nullptr;
+#endif
 // ParamSets default values
 AMainModule::AMainModule()
 {
@@ -67,8 +69,18 @@ AMainModule::AMainModule()
 	ModuleRefs = TArray<TScriptInterface<IModule>>();
 
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
+}
 
-	bInEditor = false;
+AMainModule::~AMainModule()
+{
+	if(Instance == this)
+	{
+		Instance = nullptr;
+	}
+	if(InstanceEditor == this)
+	{
+		InstanceEditor = nullptr;
+	}
 }
 
 // Called when the game starts or when spawned
@@ -94,14 +106,30 @@ void AMainModule::Tick(float DeltaTime)
 
 AMainModule* AMainModule::Get(bool bInEditor)
 {
-	if(!Current || !Current->IsValidLowLevel() || Current->bInEditor != bInEditor)
+	#if WITH_EDITOR
+	if(!bInEditor)
 	{
-		Current = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
-			return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
-		}, bInEditor);
-		if(Current) Current->bInEditor = bInEditor;
+	#endif
+		if(!Instance || !Instance->IsValidLowLevel())
+		{
+			Instance = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
+				return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
+			}, false);
+		}
+		return Instance;
+	#if WITH_EDITOR
 	}
-	return Current;
+	else
+	{
+		if(!InstanceEditor || !InstanceEditor->IsValidLowLevel())
+		{
+			InstanceEditor = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
+				return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
+			}, true);
+		}
+		return InstanceEditor;
+	}
+	#endif
 }
 
 #if WITH_EDITOR

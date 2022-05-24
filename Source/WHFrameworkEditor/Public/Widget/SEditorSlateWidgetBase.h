@@ -88,7 +88,7 @@ public:
 
 	int32 GetChildNum() const { return ChildWidgets.Num(); }
 
-	TSharedPtr<SEditorSlateWidgetBase> GetParentWidget() const { return ParentWidget; }
+	TSharedPtr<SEditorSlateWidgetBase> GetParentWidgetN() const { return ParentWidget; }
 
 	TArray<TSharedPtr<SEditorSlateWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
 };

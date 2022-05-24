@@ -178,3 +178,74 @@ void UCameraModuleBPLibrary::StopDoCameraTransform()
 		CameraModule->StopDoCameraTransform();
 	}
 }
+
+FVector UCameraModuleBPLibrary::GetCurrentCameraLocation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetCurrentCameraLocation();
+	}
+	return FVector::ZeroVector;
+}
+
+FRotator UCameraModuleBPLibrary::GetCurrentCameraRotation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetCurrentCameraRotation();
+	}
+	return FRotator::ZeroRotator;
+}
+float UCameraModuleBPLibrary::GetCurrentCameraDistance()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetCurrentCameraDistance();
+	}
+	return 0.f;
+}
+
+FVector UCameraModuleBPLibrary::GetTargetCameraLocation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetTargetCameraLocation();
+	}
+	return FVector::ZeroVector;
+}
+
+FRotator UCameraModuleBPLibrary::GetTargetCameraRotation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetTargetCameraRotation();
+	}
+	return FRotator::ZeroRotator;
+}
+
+float UCameraModuleBPLibrary::GetTargetCameraDistance()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetTargetCameraDistance();
+	}
+	return 0.f;
+}
+
+FVector UCameraModuleBPLibrary::GetRealCameraLocation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetRealCameraLocation();
+	}
+	return FVector::ZeroVector;
+}
+
+FRotator UCameraModuleBPLibrary::GetRealCameraRotation()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetRealCameraRotation();
+	}
+	return FRotator::ZeroRotator;
+}

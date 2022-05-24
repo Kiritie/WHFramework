@@ -25,7 +25,7 @@ public:
 		return Cast<T>(K2_GetCurrentCamera(InClass));
 	}
 
-	UFUNCTION(BlueprintPure, DisplayName = "GetCamera", meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
 	static ACameraPawnBase* K2_GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass);
 	
 	template<class T>
@@ -34,7 +34,7 @@ public:
 		return Cast<T>(K2_GetCamera(InClass));
 	}
 
-	UFUNCTION(BlueprintPure, DisplayName = "GetCamera", meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
 	static ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
 
 	template<class T>
@@ -43,7 +43,7 @@ public:
 		return Cast<T>(K2_GetCameraByName(InCameraName));
 	}
 
-	UFUNCTION(BlueprintPure, DisplayName = "GetCamera", Category = "CameraModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera"), Category = "CameraModuleBPLibrary")
 	static ACameraPawnBase* K2_GetCameraByName(const FName InCameraName);
 
 	template<class T>
@@ -52,7 +52,7 @@ public:
 		K2_SwitchCamera(InClass);
 	}
 
-	UFUNCTION(BlueprintCallable, DisplayName = "SwitchCamera", Category = "CameraModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SwitchCamera"), Category = "CameraModuleBPLibrary")
 	static void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
@@ -106,4 +106,29 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void StopDoCameraTransform();
+
+public:
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FVector GetCurrentCameraLocation();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FRotator GetCurrentCameraRotation();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static float GetCurrentCameraDistance();
+	
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FVector GetTargetCameraLocation();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FRotator GetTargetCameraRotation();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static float GetTargetCameraDistance();
+	
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FVector GetRealCameraLocation();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FRotator GetRealCameraRotation();
 };

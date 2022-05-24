@@ -82,7 +82,7 @@ public:
 		return Cast<T>(K2_GetCamera(InClass));
 	}
 
-	UFUNCTION(BlueprintCallable, DisplayName = "GetCamera", meta = (DeterminesOutputType = "InClass"))
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"))
 	ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
 
 	template<class T>
@@ -91,7 +91,7 @@ public:
 		return Cast<T>(K2_GetCameraByName(InCameraName));
 	}
 
-	UFUNCTION(BlueprintPure, DisplayName = "GetCamera")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera"))
 	ACameraPawnBase* K2_GetCameraByName(const FName InCameraName) const;
 
 	template<class T>
@@ -100,7 +100,7 @@ public:
 		K2_SwitchCamera(InClass, bInstant);
 	}
 
-	UFUNCTION(BlueprintCallable, DisplayName = "SwitchCamera")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SwitchCamera"))
 	void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
@@ -318,19 +318,25 @@ public:
 	bool IsCameraControlAble() const { return bCameraControlAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraControlAble(bool bInCameraControlAble) { this->bCameraControlAble = bInCameraControlAble; }
+	void SetCameraControlAble(bool bInCameraControlAble) { bCameraControlAble = bInCameraControlAble; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraMovementAble(bool bInCameraMoveAble, bool bInCameraRotateAble, bool bInCameraZoomAble) { bCameraMoveAble = bInCameraMoveAble; bCameraRotateAble = bInCameraRotateAble; bCameraZoomAble = bInCameraZoomAble; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraMovementControlAble(bool bInCameraMoveControlAble, bool bInCameraRotateControlAble, bool bInCameraZoomControlAble) { bCameraMoveControlAble = bInCameraMoveControlAble; bCameraRotateControlAble = bInCameraRotateControlAble; bCameraZoomControlAble = bInCameraZoomControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraMoveAble() const { return bCameraMoveAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMoveAble(bool bInCameraMoveAble) { this->bCameraMoveAble = bInCameraMoveAble; }
+	void SetCameraMoveAble(bool bInCameraMoveAble) { bCameraMoveAble = bInCameraMoveAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraMoveControlAble() const { return bCameraMoveControlAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMoveControlAble(bool bInCameraMoveControlAble) { this->bCameraMoveControlAble = bInCameraMoveControlAble; }
+	void SetCameraMoveControlAble(bool bInCameraMoveControlAble) { bCameraMoveControlAble = bInCameraMoveControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	FKey GetCameraPanMoveKey() const { return CameraPanMoveKey; }
@@ -342,25 +348,25 @@ public:
 	float GetCameraMoveRate() const { return CameraMoveRate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMoveRate(float InCameraMoveRate) { this->CameraMoveRate = InCameraMoveRate; }
+	void SetCameraMoveRate(float InCameraMoveRate) { CameraMoveRate = InCameraMoveRate; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveSpeed() const { return CameraMoveSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMoveSpeed(float InCameraMoveSpeed) { this->CameraMoveSpeed = InCameraMoveSpeed; }
+	void SetCameraMoveSpeed(float InCameraMoveSpeed) { CameraMoveSpeed = InCameraMoveSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraRotateAble() const { return bCameraRotateAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraRotateAble(bool bInCameraRotateAble) { this->bCameraRotateAble = bInCameraRotateAble; }
+	void SetCameraRotateAble(bool bInCameraRotateAble) { bCameraRotateAble = bInCameraRotateAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraRotateControlAble() const { return bCameraRotateControlAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraRotateControlAble(bool bInCameraRotateControlAble) { this->bCameraRotateControlAble = bInCameraRotateControlAble; }
+	void SetCameraRotateControlAble(bool bInCameraRotateControlAble) { bCameraRotateControlAble = bInCameraRotateControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsReverseCameraPitch() const { return bReverseCameraPitch; }
@@ -372,49 +378,49 @@ public:
 	float GetCameraTurnRate() const { return CameraTurnRate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraTurnRate(float InCameraTurnRate) { this->CameraTurnRate = InCameraTurnRate; }
+	void SetCameraTurnRate(float InCameraTurnRate) { CameraTurnRate = InCameraTurnRate; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraLookUpRate() const { return CameraLookUpRate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraLookUpRate(float InCameraLookUpRate) { this->CameraLookUpRate = InCameraLookUpRate; }
+	void SetCameraLookUpRate(float InCameraLookUpRate) { CameraLookUpRate = InCameraLookUpRate; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraRotateSpeed() const { return CameraRotateSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraRotateSpeed(float InCameraRotateSpeed) { this->CameraRotateSpeed = InCameraRotateSpeed; }
+	void SetCameraRotateSpeed(float InCameraRotateSpeed) { CameraRotateSpeed = InCameraRotateSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMinCameraPitch() const { return MinCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMinCameraPitch(float InMinCameraPitch) { this->MinCameraPitch = InMinCameraPitch; }
+	void SetMinCameraPitch(float InMinCameraPitch) { MinCameraPitch = InMinCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMaxCameraPitch() const { return MaxCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMaxCameraPitch(float InMaxCameraPitch) { this->MaxCameraPitch = InMaxCameraPitch; }
+	void SetMaxCameraPitch(float InMaxCameraPitch) { MaxCameraPitch = InMaxCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
 	float GetInitCameraPitch() const { return InitCameraPitch; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetInitCameraPitch(float InInitCameraPitch) { this->InitCameraPitch = InInitCameraPitch; }
+	void SetInitCameraPitch(float InInitCameraPitch) { InitCameraPitch = InInitCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraZoomAble() const { return bCameraZoomAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraZoomAble(bool bInCameraZoomAble) { this->bCameraZoomAble = bInCameraZoomAble; }
+	void SetCameraZoomAble(bool bInCameraZoomAble) { bCameraZoomAble = bInCameraZoomAble; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsCameraZoomControlAble() const { return bCameraZoomControlAble; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraZoomControlAble(bool bInCameraZoomControlAble) { this->bCameraZoomControlAble = bInCameraZoomControlAble; }
+	void SetCameraZoomControlAble(bool bInCameraZoomControlAble) { bCameraZoomControlAble = bInCameraZoomControlAble; }
 
 	UFUNCTION(BlueprintPure)
 	FKey GetCameraZoomKey() const { return CameraZoomKey; }
@@ -423,31 +429,31 @@ public:
 	float GetCameraZoomRate() const { return CameraZoomRate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraZoomRate(float InCameraZoomRate) { this->CameraZoomRate = InCameraZoomRate; }
+	void SetCameraZoomRate(float InCameraZoomRate) { CameraZoomRate = InCameraZoomRate; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraZoomSpeed() const { return CameraZoomSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraZoomSpeed(float InCameraZoomSpeed) { this->CameraZoomSpeed = InCameraZoomSpeed; }
+	void SetCameraZoomSpeed(float InCameraZoomSpeed) { CameraZoomSpeed = InCameraZoomSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMinCameraDistance() const { return MinCameraDistance; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMinCameraDistance(float InMinCameraDistance) { this->MinCameraDistance = InMinCameraDistance; }
+	void SetMinCameraDistance(float InMinCameraDistance) { MinCameraDistance = InMinCameraDistance; }
 
 	UFUNCTION(BlueprintPure)
 	float GetMaxCameraDistance() const { return MaxCameraDistance; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMaxCameraDistance(float InMaxCameraDistance) { this->MaxCameraDistance = InMaxCameraDistance; }
+	void SetMaxCameraDistance(float InMaxCameraDistance) { MaxCameraDistance = InMaxCameraDistance; }
 
 	UFUNCTION(BlueprintPure)
 	float GetInitCameraDistance() const { return InitCameraDistance; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetInitCameraDistance(float InInitCameraDistance) { this->InitCameraDistance = InInitCameraDistance; }
+	void SetInitCameraDistance(float InInitCameraDistance) { InitCameraDistance = InInitCameraDistance; }
 	
 	UFUNCTION(BlueprintPure)
 	FVector GetCurrentCameraLocation() const { return CurrentCameraLocation; }

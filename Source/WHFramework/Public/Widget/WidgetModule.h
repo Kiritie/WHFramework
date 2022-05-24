@@ -230,7 +230,7 @@ public:
 				{
 					MainUserWidget = UserWidget;
 				}
-				if(!UserWidget->GetParentWidget() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+				if(!UserWidget->GetParentWidgetN() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 				{
 					if(TemporaryUserWidget)
 					{
@@ -271,7 +271,7 @@ public:
 				{
 					MainUserWidget = nullptr;
 				}
-				if(!UserWidget->GetParentWidget() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+				if(!UserWidget->GetParentWidgetN() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 				{
 					TemporaryUserWidget = nullptr;
 				}
@@ -397,7 +397,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(nullptr)))
 		{
-			if(!SlateWidget->GetParentWidget() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 			{
 				if(TemporarySlateWidget)
 				{
@@ -417,7 +417,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			if(!SlateWidget->GetParentWidget() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
 			{
 				TemporarySlateWidget = nullptr;
 			}
@@ -603,7 +603,7 @@ public:
 
 		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
 		
-		return DestroyWorldWidgetByName(WidgetName, InWidgetIndex);
+		return DestroyWorldWidgetByName(WidgetName, InWidgetIndex, bRecovery);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidget"))

@@ -26,6 +26,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AMainModule();
 
+	~AMainModule();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -39,7 +41,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Instance
 protected:
-	static AMainModule* Current;
+	static AMainModule* Instance;
+	#if WITH_EDITOR
+	static AMainModule* InstanceEditor;
+	#endif
 
 public:
 	static AMainModule* Get(bool bInEditor = false);
@@ -64,10 +69,10 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
     void RefreshModules(float DeltaSeconds);
     
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
     void PauseModules();
     
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
     void UnPauseModules();
 
 	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
@@ -85,14 +90,11 @@ private:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
 
-	UPROPERTY()
-	bool bInEditor;
-
 public:
 	/**
 	* 获取所有模块
 	*/
-	static TArray<TScriptInterface<IModule>> GetAllModules(bool bInEditor = false)
+	static TArray<TScriptInterface<IModule>> GetAllModule(bool bInEditor = false)
 	{
 		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 		{

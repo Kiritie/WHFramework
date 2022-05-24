@@ -325,7 +325,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		}
 	}
 
-	if(!GetParentWidget() && GetWidgetCategory() == EWidgetCategory::Temporary)
+	if(!GetParentWidgetN() && GetWidgetCategory() == EWidgetCategory::Temporary)
 	{
 		if(!bInstant && GetLastWidget())
 		{

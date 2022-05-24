@@ -61,7 +61,7 @@ void AInputModule::OnUnPause_Implementation()
 void AInputModule::UpdateInputMode()
 {
 	EInputMode TmpInputMode = EInputMode::None;
-	for (auto Iter : AMainModule::GetAllModules())
+	for (auto Iter : AMainModule::GetAllModule())
 	{
 		if(IInputManager* InputManager = Cast<IInputManager>(Iter.GetObject()))
 		{

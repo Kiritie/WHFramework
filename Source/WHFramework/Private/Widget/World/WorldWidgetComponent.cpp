@@ -217,7 +217,7 @@ void UWorldWidgetComponent::CreateWorldWidget()
 	}
 }
 
-void UWorldWidgetComponent::DestroyWorldWidget()
+void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery)
 {
 	if(WorldWidget)
 	{
@@ -230,7 +230,7 @@ void UWorldWidgetComponent::DestroyWorldWidget()
 			}
 			case EWidgetSpace::Screen:
 			{
-				WorldWidget->Destroy();
+				WorldWidget->Destroy(bRecovery);
 				WorldWidget = nullptr;
 				break;
 			}

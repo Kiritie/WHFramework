@@ -27,6 +27,15 @@ public:
 
 	virtual void OnDestroy() override;
 
+protected:
+	void OnBeginPIE(bool bIsSimulating);
+
+	void OnEndPIE(bool bIsSimulating);
+
+	void OnMapOpened(const FString& Filename, bool bAsTemplate);
+
+	void OnBlueprintCompiled();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
@@ -52,16 +61,13 @@ protected:
 	TSharedPtr<class SStepStatusWidget> StatusWidget;
 
 private:
-	FDelegateHandle RefreshDelegateHandle;
-	FDelegateHandle BeginPIEDelegateHandle;
-	FDelegateHandle EndPIEDelegateHandle;
+	FDelegateHandle OnBeginPIEHandle;
+	FDelegateHandle OnEndPIEHandle;
+	FDelegateHandle OnMapOpenedHandle;
+	FDelegateHandle OnBlueprintCompiledHandle;
 
 public:
 	void TogglePreviewMode();
-
-	void OnBeginPIE(bool bIsSimulating);
-
-	void OnEndPIE(bool bIsSimulating);
 
 	void SetIsPreviewMode(bool bIsPreviewMode);
 };

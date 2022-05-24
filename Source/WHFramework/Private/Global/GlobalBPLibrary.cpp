@@ -5,11 +5,87 @@
 
 #include "WHFramework.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Global/EventHandle_PauseGame.h"
+#include "Event/Handle/Global/EventHandle_UnPauseGame.h"
 #include "GameFramework/InputSettings.h"
 #include "Global/GlobalTypes.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
+#include "Main/MainModule.h"
+#include "Main/MainModuleBPLibrary.h"
+
+bool UGlobalBPLibrary::IsPaused()
+{
+	return UGameplayStatics::IsGamePaused(AMainModule::Get());
+}
+
+void UGlobalBPLibrary::SetPaused(bool bPaused)
+{
+	UGameplayStatics::SetGamePaused(AMainModule::Get(), bPaused);
+}
+
+float UGlobalBPLibrary::GetTimeScale()
+{
+	return UGameplayStatics::GetGlobalTimeDilation(AMainModule::Get());
+}
+
+void UGlobalBPLibrary::SetTimeScale(float TimeScale)
+{
+	return UGameplayStatics::SetGlobalTimeDilation(AMainModule::Get(), TimeScale);
+}
+
+void UGlobalBPLibrary::PauseGame(EPauseGameMode PauseGameMode)
+{
+	switch(PauseGameMode)
+	{
+		case EPauseGameMode::Default:
+		{
+			SetPaused(true);
+			break;
+		}
+		case EPauseGameMode::OnlyTime:
+		{
+			SetTimeScale(0.f);
+			break;
+		}
+		case EPauseGameMode::OnlyModules:
+		{
+			UMainModuleBPLibrary::PauseAllModule();
+			break;
+		}
+	}
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+}
+
+void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
+{
+	switch(PauseGameMode)
+	{
+		case EPauseGameMode::Default:
+		{
+			SetPaused(false);
+			break;
+		}
+		case EPauseGameMode::OnlyTime:
+		{
+			SetTimeScale(1.f);
+			break;
+		}
+		case EPauseGameMode::OnlyModules:
+		{
+			UMainModuleBPLibrary::UnPauseAllModule();
+			break;
+		}
+	}
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+}
+
+void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
+{
+	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(AMainModule::Get()), QuitPreference, bIgnorePlatformRestrictions);
+}
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {

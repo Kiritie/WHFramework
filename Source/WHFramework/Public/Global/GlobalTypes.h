@@ -35,6 +35,14 @@ public:
 
 extern WHFRAMEWORK_API FCameraParams GCopiedCameraData;
 
+UENUM(BlueprintType)
+enum class EPauseGameMode : uint8
+{
+	Default,
+	OnlyTime,
+	OnlyModules
+};
+
 /*
 * 数据保存档案
 */

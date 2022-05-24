@@ -66,7 +66,7 @@ public:
 	void CreateWorldWidget();
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidget();
+	void DestroyWorldWidget(bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
 	void SetWorldWidget(UUserWidget* InWidget);

@@ -44,7 +44,44 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static bool IsEditor() { return GIsEditor; }
+	/*
+	 * 当前是否为暂停状态
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsPaused();
+	/*
+	 * 设置暂停状态
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SetPaused(bool bPaused);
+	/*
+	 * 获取时间缩放
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static float GetTimeScale();
+	/*
+	 * 设置时间缩放
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SetTimeScale(float TimeScale);
 	
+public:
+	/*
+	 * 暂停游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void PauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	/*
+	 * 取消暂停游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void UnPauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	/*
+	 * 退出游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 public:

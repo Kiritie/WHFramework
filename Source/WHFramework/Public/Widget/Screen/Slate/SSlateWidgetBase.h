@@ -166,9 +166,9 @@ public:
 
 	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
 
-	virtual IScreenWidgetInterface* GetParentWidget() const override { return ParentWidget; }
+	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
-	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 

@@ -231,6 +231,11 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 	return false;
 }
 
+bool AWebRequestModule::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+{
+	return SendWebRequest(InWebInterfaceClass, InMethod, InHeadMap, InContent);
+}
+
 void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent)
 {
 	if(!HttpResponse.IsValid())

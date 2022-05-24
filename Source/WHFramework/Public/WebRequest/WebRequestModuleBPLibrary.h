@@ -91,6 +91,9 @@ public:
 	{
 		return SendWebRequest(T::StaticClass(), InMethod, InHeadMap, InContent);
 	}
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleBPLibrary")
+
 	static bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SendWebRequest"), Category = "WebRequestModuleBPLibrary")
+	static bool K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent);
 };

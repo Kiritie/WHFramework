@@ -62,7 +62,11 @@ void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 
 void UWorldWidgetBase::OnDespawn_Implementation()
 {
-	
+	OwnerActor = nullptr;
+	WidgetParams.Empty();
+	WidgetIndex = 0;
+	WidgetComponent = nullptr;
+	BindWidgetMap.Empty();
 }
 
 void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
@@ -132,12 +136,9 @@ void UWorldWidgetBase::OnRefresh_Implementation()
 
 void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 {
-	if(IsInViewport())
+	if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
 	{
-		if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
-		{
-			Container->RemoveWorldWidget(this);
-		}
+		Container->RemoveWorldWidget(this);
 	}
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)

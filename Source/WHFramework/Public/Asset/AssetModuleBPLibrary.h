@@ -95,6 +95,6 @@ public:
 	template<class T>
 	static T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{
-		return UPrimaryAssetManager::Get().LoadAssetRef<T>(InPrimaryAssetId, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryAssetId, bLogWarning);
 	}
 };

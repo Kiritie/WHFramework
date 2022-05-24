@@ -18,6 +18,16 @@ class WHFRAMEWORK_API UMathBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
+	// Lerp
+public:
+	template<class U>
+	FORCEINLINE static FRotator Lerp(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
+	{
+		const FRotator Delta = B - A;
+		return A + (bNormalized ? Delta.GetNormalized() : Delta) * Alpha;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
 	// Index
 public:
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
