@@ -191,7 +191,10 @@ void UWorldWidgetComponent::RefreshParams()
 		{
 			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
 			Pivot = DefaultObject->GetWidgetAlignment();
-			// WidgetParams = DefaultObject->GetWidgetParams();
+			if(WidgetParams.Num() != DefaultObject->GetWidgetParams().Num())
+			{
+				WidgetParams = DefaultObject->GetWidgetParams();
+			}
 		}
 	}
 }

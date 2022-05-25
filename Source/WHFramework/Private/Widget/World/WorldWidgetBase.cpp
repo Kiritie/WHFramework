@@ -207,6 +207,15 @@ void UWorldWidgetBase::UnBindWidgetPoint_Implementation(UWidget* InWidget)
 	}
 }
 
+USceneComponent* UWorldWidgetBase::GetWidgetBindPoint_Implementation(UWidget* InWidget)
+{
+	if(BindWidgetMap.Contains(InWidget))
+	{
+		return BindWidgetMap[InWidget];
+	}
+	return nullptr;
+}
+
 EWidgetSpace UWorldWidgetBase::GetWidgetSpace() const
 {
 	if(WidgetComponent)

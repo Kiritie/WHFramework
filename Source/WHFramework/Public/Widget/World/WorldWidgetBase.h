@@ -67,6 +67,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void UnBindWidgetPoint(UWidget* InWidget);
+	
+	UFUNCTION(BlueprintPure, BlueprintNativeEvent)
+	USceneComponent* GetWidgetBindPoint(UWidget* InWidget);
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
