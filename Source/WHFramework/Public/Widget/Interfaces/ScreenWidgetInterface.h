@@ -89,4 +89,6 @@ public:
 	virtual int32 GetChildNum() const = 0;
 
 	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() = 0;
+
+	virtual IScreenWidgetInterface* GetChild(int32 InIndex) const = 0;
 };

@@ -100,15 +100,20 @@ public:
 	template<class T>
 	T* GetChild(int32 InIndex) const
 	{
-		return Cast<T>(GetChild(T::StaticClass(), InIndex));
+		return Cast<T>(GetChild(InIndex));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
-	UUserWidgetBase* GetChild(TSubclassOf<UUserWidgetBase> InWidgetClass, int32 InIndex) const
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass", DisplayName = "Get Child"))
+	UUserWidgetBase* K2_GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+	{
+		return Cast<UUserWidgetBase>(GetChild(InIndex));
+	}
+
+	IScreenWidgetInterface* GetChild(int32 InIndex) const override
 	{
 		if(ChildWidgets.IsValidIndex(InIndex))
 		{
-			return Cast<UUserWidgetBase>(ChildWidgets[InIndex]);
+			return ChildWidgets[InIndex];
 		}
 		return nullptr;
 	}
