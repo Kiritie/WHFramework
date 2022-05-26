@@ -44,6 +44,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 	////////////////////////////////////////////////////
 	// UserWidget
 protected:
@@ -337,6 +339,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void CloseAllUserWidget(bool bInstant = false);
 
+	UFUNCTION(BlueprintCallable)
+	void ClearAllUserWidget();
+
 	////////////////////////////////////////////////////
 	// SlateWidget
 protected:
@@ -461,6 +466,8 @@ public:
 
 	void CloseAllSlateWidget(bool bInstant = false);
 	
+	void ClearAllSlateWidget();
+
 	////////////////////////////////////////////////////
 	// Widget
 protected:
@@ -610,31 +617,7 @@ public:
 	bool K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgetByName"))
-	bool DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery = false)
-	{
-		if(AllWorldWidgets.Contains(InWidgetName) && AllWorldWidgets[InWidgetName].WorldWidgets.IsValidIndex(InWidgetIndex))
-		{
-			if(UWorldWidgetBase* WorldWidget = AllWorldWidgets[InWidgetName].WorldWidgets[InWidgetIndex])
-			{
-				AllWorldWidgets[InWidgetName].WorldWidgets.RemoveAt(InWidgetIndex);
-
-				if(AllWorldWidgets[InWidgetName].WorldWidgets.Num() > 0)
-				{
-					for(int32 i = 0; i < AllWorldWidgets[InWidgetName].WorldWidgets.Num(); i++)
-					{
-						AllWorldWidgets[InWidgetName].WorldWidgets[i]->SetWidgetIndex(i);
-					}
-				}
-				else
-				{
-					AllWorldWidgets.Remove(InWidgetName);
-				}
-				WorldWidget->OnDestroy(bRecovery);
-			}
-			return true;
-		}
-		return false;
-	}
+	bool DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery = false);
 
 	template<class T>
 	void DestroyWorldWidgets(bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -650,20 +633,10 @@ public:
 	void K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgets"))
-	void DestroyWorldWidgetsByName(FName InWidgetName, bool bRecovery = false)
-	{
-		if(AllWorldWidgets.Contains(InWidgetName))
-		{
-			for(auto Iter : AllWorldWidgets[InWidgetName].WorldWidgets)
-			{
-				if(Iter)
-				{
-					Iter->OnDestroy(bRecovery);
-				}
-			}
-			AllWorldWidgets.Remove(InWidgetName);
-		}
-	}
+	void DestroyWorldWidgetsByName(FName InWidgetName, bool bRecovery = false);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearAllWorldWidget();
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode

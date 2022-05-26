@@ -20,7 +20,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 {
 	WidgetName = NAME_None;
 	bWidgetTickAble = true;
-	WidgetZOrder = -1;
+	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);

@@ -14,6 +14,7 @@ UWidgetPool::UWidgetPool()
 UObject* UWidgetPool::SpawnImpl()
 {
 	UObject* Object = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
+	Object->AddToRoot();
 	return Object;
 }
 

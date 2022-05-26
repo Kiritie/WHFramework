@@ -28,7 +28,7 @@ AStepModule::AStepModule()
 
 	bAutoStart = false;
 
-	CurrentRootStepIndex = 0;
+	CurrentRootStepIndex = -1;
 	RootSteps = TArray<URootStepBase*>();
 
 	FirstStep = nullptr;
@@ -147,65 +147,65 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 		if(RootSteps.IsValidIndex(InRootStepIndex))
 		{
 			if(StepModuleState != EStepModuleState::Running)
-            {
-            	StepModuleState = EStepModuleState::Running;
-            	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(CurrentRootStepIndex)});
-            }
-    
+			{
+				StepModuleState = EStepModuleState::Running;
+				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(InRootStepIndex)});
+			}
+
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
             {
-            	if(RootSteps.IsValidIndex(i))
+            	if(RootSteps.IsValidIndex(i) && RootSteps[i])
             	{
-            		if(RootSteps[i])
+            		if(i == InRootStepIndex)
             		{
-            			if(i == InRootStepIndex)
-            			{
-            				RootSteps[InRootStepIndex]->Enter();
-            			}
-            			else if(bSkipSteps)
-            			{
-            				RootSteps[i]->Complete(EStepExecuteResult::Skipped);
-            			}
+            			RootSteps[i]->Enter();
+            		}
+            		else if(bSkipSteps)
+            		{
+            			RootSteps[i]->Complete(EStepExecuteResult::Skipped);
             		}
             	}
             }
             CurrentRootStepIndex = InRootStepIndex;
 		}
 	}
-	else
+	else if(FirstStep)
 	{
-		if(FirstStep)
+		InRootStepIndex = FirstStep->RootStep->StepIndex;
+		
+		if(RootSteps.IsValidIndex(InRootStepIndex))
 		{
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(FirstStep->RootStep->StepIndex)});
+				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeInteger(InRootStepIndex)});
 			}
-
+		
 			if(bSkipSteps)
 			{
-				for(int32 i = CurrentRootStepIndex; i <= FirstStep->RootStep->StepIndex; i++)
+				for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
 				{
-					if(RootSteps.IsValidIndex(i))
+					if(RootSteps.IsValidIndex(i) && RootSteps[i])
 					{
-						if(RootSteps[i])
+						if(i == InRootStepIndex)
 						{
-							if(i == FirstStep->RootStep->StepIndex)
+							RootSteps[i]->Enter();
+							RootSteps[i]->Execute();
+							for(int32 j = 0; j < FirstStep->StepIndex; j++)
 							{
-								for(int32 j = 0; j < FirstStep->StepIndex; j++)
-								{
-									FirstStep->ParentStep->SubSteps[j]->Complete(EStepExecuteResult::Skipped);
-								}
+								FirstStep->ParentStep->SubSteps[j]->Complete(EStepExecuteResult::Skipped);
 							}
-							else
-							{
-								RootSteps[i]->Complete(EStepExecuteResult::Skipped);
-							}
+						}
+						else
+						{
+							RootSteps[i]->Complete(EStepExecuteResult::Skipped);
 						}
 					}
 				}
 			}
 			FirstStep->Enter();
+		
+			CurrentRootStepIndex = InRootStepIndex;
 		}
 	}
 }
@@ -220,24 +220,21 @@ void AStepModule::EndStep(bool bRestoreSteps)
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)
 	{
-		if(RootSteps.IsValidIndex(i))
+		if(RootSteps.IsValidIndex(i) && RootSteps[i])
 		{
-			if(RootSteps[i])
+			if(i == CurrentRootStepIndex)
 			{
-				if(i == CurrentRootStepIndex)
-				{
-					RootSteps[i]->Complete(EStepExecuteResult::Skipped);
-				}
-				if(bRestoreSteps)
-				{
-					RootSteps[i]->Restore();
-				}
+				RootSteps[i]->Complete(EStepExecuteResult::Skipped);
+			}
+			if(bRestoreSteps)
+			{
+				RootSteps[i]->Restore();
 			}
 		}
 	}
 	if(bRestoreSteps)
 	{
-		CurrentRootStepIndex = 0;
+		CurrentRootStepIndex = -1;
 		CurrentStep = nullptr;
 	}
 }
@@ -303,7 +300,7 @@ void AStepModule::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecu
 {
 	if(!InStep) return;
 	
-	if(/*InStep->IsEntered() && */!InStep->IsCompleted())
+	if(!InStep->IsCompleted())
 	{
 		InStep->OnComplete(InStepExecuteResult);
 	}

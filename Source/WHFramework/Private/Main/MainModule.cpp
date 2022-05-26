@@ -94,6 +94,8 @@ void AMainModule::BeginPlay()
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+
+	TerminationModules();
 }
 
 // Called every frame

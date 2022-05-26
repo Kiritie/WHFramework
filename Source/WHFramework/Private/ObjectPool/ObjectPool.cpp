@@ -56,7 +56,10 @@ void UObjectPool::Despawn(UObject* InObject)
 
 void UObjectPool::DespawnImpl(UObject* InObject)
 {
-	InObject->RemoveFromRoot();
+	if(InObject->IsRooted())
+	{
+		InObject->RemoveFromRoot();
+	}
 	InObject->ConditionalBeginDestroy();
 }
 
@@ -67,8 +70,7 @@ void UObjectPool::Clear()
 	{
 		if(Object)
 		{
-			Object->RemoveFromRoot();
-			Object->ConditionalBeginDestroy();
+			DespawnImpl(Object);
 		}
 	}
 	Queue.Empty();
