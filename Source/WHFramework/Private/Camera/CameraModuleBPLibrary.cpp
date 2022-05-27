@@ -8,46 +8,63 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-ACameraPawnBase* UCameraModuleBPLibrary::K2_GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera()
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		return CameraModule->K2_GetCurrentCamera(InClass);
+		return CameraModule->GetCurrentCamera();
 	}
 	return nullptr;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		return CameraModule->K2_GetCamera(InClass);
+		return CameraModule->GetCurrentCamera(InCameraClass);
 	}
 	return nullptr;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::K2_GetCameraByName(const FName InCameraName)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		return CameraModule->K2_GetCameraByName(InCameraName);
+		return CameraModule->GetCameraByClass(InCameraClass);
 	}
 	return nullptr;
 }
 
-void UCameraModuleBPLibrary::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InCameraName)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		CameraModule->K2_SwitchCamera(InClass);
+		return CameraModule->GetCameraByName(InCameraName);
+	}
+	return nullptr;
+}
+
+void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		CameraModule->SwitchCamera(InCamera, bInstant);
 	}
 }
 
-void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName)
+void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
-		CameraModule->SwitchCameraByName(InCameraName);
+		CameraModule->SwitchCameraByClass(InCameraClass, bInstant);
+	}
+}
+
+void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName, bool bInstant)
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		CameraModule->SwitchCameraByName(InCameraName, bInstant);
 	}
 }
 

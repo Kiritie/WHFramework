@@ -45,17 +45,17 @@ public:
 	/// CameraModule
 protected:
 	UPROPERTY(EditAnywhere, Category = "CameraModule")
-	TSubclassOf<ACameraPawnBase> DefaultCameraClass;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCameraClass != nullptr"), Category = "CameraModule")
-	bool DefaultInstantSwitch;
-
-	UPROPERTY(EditAnywhere, Category = "CameraModule")
 	TArray<TSubclassOf<ACameraPawnBase>> CameraClasses;
 	
 	UPROPERTY(EditAnywhere, Category = "CameraModule")
 	TArray<ACameraPawnBase*> Cameras;
-		
+	
+	UPROPERTY(EditAnywhere, Category = "CameraModule")
+	ACameraPawnBase* DefaultCamera;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCameraClass != nullptr"), Category = "CameraModule")
+	bool DefaultInstantSwitch;
+
 	UPROPERTY(VisibleAnywhere, Category = "CameraModule")
 	ACameraPawnBase* CurrentCamera;
 
@@ -65,43 +65,48 @@ private:
 
 public:
 	template<class T>
-	T* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	T* GetCurrentCamera()
 	{
-		return Cast<T>(K2_GetCurrentCamera(InClass));
+		return Cast<T>(CurrentCamera);
 	}
+	
+	ACameraPawnBase* GetCurrentCamera() const;
 
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* K2_GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass);
+	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const;
 
 	UFUNCTION(BlueprintPure)
-	USpringArmComponent* GetCurrentCameraBoom();
+	USpringArmComponent* GetCurrentCameraBoom() const;
 
 	template<class T>
-	T* GetCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
 	{
-		return Cast<T>(K2_GetCamera(InClass));
+		return Cast<T>(GetCameraByClass(InCameraClass));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"))
-	ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InCameraClass"))
+	ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass);
 
 	template<class T>
 	T* GetCameraByName(const FName InCameraName)
 	{
-		return Cast<T>(K2_GetCameraByName(InCameraName));
+		return Cast<T>(GetCameraByName(InCameraName));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera"))
-	ACameraPawnBase* K2_GetCameraByName(const FName InCameraName) const;
+	UFUNCTION(BlueprintPure)
+	ACameraPawnBase* GetCameraByName(const FName InCameraName) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
 
 	template<class T>
-	void SwitchCamera(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
 	{
-		K2_SwitchCamera(InClass, bInstant);
+		SwitchCameraByClass(InCameraClass, bInstant);
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SwitchCamera"))
-	void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
+	UFUNCTION(BlueprintCallable)
+	void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchCameraByName(const FName InCameraName, bool bInstant = false);

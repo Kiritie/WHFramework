@@ -28,11 +28,11 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 protected:
-	virtual void MoveForward(float InValue, bool b2DMode = false) override;
+	virtual void MoveForward_Implementation(float InValue) override;
 
-	virtual void MoveRight(float InValue, bool b2DMode = false) override;
+	virtual void MoveRight_Implementation(float InValue) override;
 
-	virtual void MoveUp(float InValue, bool b2DMode = false) override;
+	virtual void MoveUp_Implementation(float InValue) override;
 
 public:
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode) override;

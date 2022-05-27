@@ -20,43 +20,48 @@ class WHFRAMEWORK_API UCameraModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	template<class T>
-	static T* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	static T* GetCurrentCamera()
 	{
-		return Cast<T>(K2_GetCurrentCamera(InClass));
+		return Cast<T>(GetCurrentCamera());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* K2_GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass);
+	static ACameraPawnBase* GetCurrentCamera();
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCurrentCamera", DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass);
 	
 	template<class T>
-	static T* GetCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
 	{
-		return Cast<T>(K2_GetCamera(InClass));
+		return Cast<T>(GetCameraByClass(InCameraClass));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera", DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass);
 
 	template<class T>
 	static T* GetCameraByName(const FName InCameraName)
 	{
-		return Cast<T>(K2_GetCameraByName(InCameraName));
+		return Cast<T>(GetCameraByName(InCameraName));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCamera"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* K2_GetCameraByName(const FName InCameraName);
-
-	template<class T>
-	static void SwitchCamera(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
-	{
-		K2_SwitchCamera(InClass);
-	}
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SwitchCamera"), Category = "CameraModuleBPLibrary")
-	static void K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass);
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* GetCameraByName(const FName InCameraName);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void SwitchCameraByName(const FName InCameraName);
+	static void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
+
+	template<class T>
+	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
+	{
+		SwitchCameraByClass(InCameraClass);
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	static void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	static void SwitchCameraByName(const FName InCameraName, bool bInstant = false);
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")

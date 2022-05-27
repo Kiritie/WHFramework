@@ -50,7 +50,6 @@ AWHPlayerController::AWHPlayerController()
 	ProcedureModuleNetComp = CreateDefaultSubobject<UProcedureModuleNetworkComponent>(FName("ProcedureModuleNetComp"));
 	ModuleNetCompMap.Add(UProcedureModuleNetworkComponent::StaticClass(), ProcedureModuleNetComp);
 
-	bUse2DInputMode = false;
 	TouchInputRate = 1.f;
 
 	TouchPressedCount = 0;
@@ -366,9 +365,9 @@ void AWHPlayerController::MoveForward(float InValue)
 {
 	if(InValue == 0.f) return;
 
-	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		PlayerInterface->MoveForward(InValue, bUse2DInputMode);
+		IWHPlayerInterface::Execute_MoveForward(GetPawn(), InValue);
 	}
 }
 
@@ -376,9 +375,9 @@ void AWHPlayerController::MoveRight(float InValue)
 {
 	if(InValue == 0.f) return;
 
-	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		PlayerInterface->MoveRight(InValue, bUse2DInputMode);
+		IWHPlayerInterface::Execute_MoveRight(GetPawn(), InValue);
 	}
 }
 
@@ -386,8 +385,8 @@ void AWHPlayerController::MoveUp(float InValue)
 {
 	if(InValue == 0.f) return;
 
-	if(IWHPlayerInterface* PlayerInterface = GetPawn<IWHPlayerInterface>())
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		PlayerInterface->MoveUp(InValue, bUse2DInputMode);
+		IWHPlayerInterface::Execute_MoveUp(GetPawn(), InValue);
 	}
 }

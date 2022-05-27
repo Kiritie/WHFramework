@@ -8,6 +8,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "CharacterModuleBPLibrary.generated.h"
 
+class ACharacterBase;
 class UCharacterHandleBase;
 class ACharacterModule;
 /**
@@ -19,45 +20,60 @@ class WHFRAMEWORK_API UCharacterModuleBPLibrary : public UBlueprintFunctionLibra
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void AddCharacterToList(TScriptInterface<class ICharacterInterface> InCharacter);
+	template<class T>
+	static T* GetCurrentCharacter()
+	{
+		return Cast<T>(GetCurrentCharacter());
+	}
+
+	static ACharacterBase* GetCurrentCharacter();
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"), Category = "CharacterModuleBPLibrary")
+	static ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass);
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void RemoveCharacterFromList(TScriptInterface<ICharacterInterface> InCharacter);
+	static void SwitchCharacter(ACharacterBase* InCharacter);
+
+	template<class T>
+	static void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		SwitchCharacterByClass(InCharacterClass);
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void RemoveCharacterFromListByName(FName InCharacterName);
+	static void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+
+	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
+	static void SwitchCharacterByName(FName InCharacterName);
+
+	template<class T>
+	static bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		return HasCharacterByClass(InCharacterClass);
+	}
 
 	UFUNCTION(BlueprintPure, Category = "CharacterModuleBPLibrary")
-	static TScriptInterface<ICharacterInterface> GetCharacterByName(FName InCharacterName);
+	static bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+
+	UFUNCTION(BlueprintPure, Category = "CharacterModuleBPLibrary")
+	static bool HasCharacterByName(FName InCharacterName);
+
+	template<class T>
+	static T* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		return GetCharacterByClass(InCharacterClass);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"), Category = "CharacterModuleBPLibrary")
+	static ACharacterBase* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+
+	UFUNCTION(BlueprintPure)
+	static ACharacterBase* GetCharacterByName(FName InCharacterName);
+
+public:
+	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
+	static void AddCharacterToList(ACharacterBase* InCharacter);
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void PlayCharacterSound(FName InCharacterName, class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void StopCharacterSound(FName InCharacterName);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void PlayCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void StopCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void StopCharacterAIMove(FName InCharacterName, bool bMulticast = false);
-
-	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration = 1.f, bool bMulticast = false);
+	static void RemoveCharacterFromList(ACharacterBase* InCharacter);
 };

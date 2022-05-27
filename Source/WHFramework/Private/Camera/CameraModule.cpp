@@ -4,6 +4,7 @@
 #include "Camera/CameraModule.h"
 
 #include "Camera/Roam/RoamCameraPawn.h"
+#include "Character/CharacterModuleBPLibrary.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHPlayerController.h"
@@ -18,7 +19,7 @@ ACameraModule::ACameraModule()
 {
 	ModuleName = FName("CameraModule");
 
-	DefaultCameraClass = nullptr;
+	DefaultCamera = nullptr;
 	DefaultInstantSwitch = false;
 	CameraClasses = TArray<TSubclassOf<ACameraPawnBase>>();
 	CameraClasses.Add(ARoamCameraPawn::StaticClass());
@@ -152,9 +153,9 @@ void ACameraModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
 
-	if(DefaultCameraClass)
+	if(DefaultCamera)
 	{
-		SwitchCamera<ACameraPawnBase>(DefaultInstantSwitch, DefaultCameraClass);
+		SwitchCamera(DefaultCamera, DefaultInstantSwitch);
 	}
 }
 
@@ -240,12 +241,17 @@ void ACameraModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-ACameraPawnBase* ACameraModule::K2_GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraPawnBase* ACameraModule::GetCurrentCamera() const
 {
 	return CurrentCamera;
 }
 
-USpringArmComponent* ACameraModule::GetCurrentCameraBoom()
+ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const
+{
+	return CurrentCamera;
+}
+
+USpringArmComponent* ACameraModule::GetCurrentCameraBoom() const
 {
 	if(CurrentCamera)
 	{
@@ -254,15 +260,15 @@ USpringArmComponent* ACameraModule::GetCurrentCameraBoom()
 	return nullptr;
 }
 
-ACameraPawnBase* ACameraModule::K2_GetCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
-	if(!InClass) return nullptr;
+	if(!InCameraClass) return nullptr;
 	
-	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
-	return K2_GetCameraByName(CameraName);
+	const FName CameraName = InCameraClass.GetDefaultObject()->GetCameraName();
+	return GetCameraByName(CameraName);
 }
 
-ACameraPawnBase* ACameraModule::K2_GetCameraByName(const FName InCameraName) const
+ACameraPawnBase* ACameraModule::GetCameraByName(const FName InCameraName) const
 {
 	if(CameraMap.Contains(InCameraName))
 	{
@@ -271,31 +277,42 @@ ACameraPawnBase* ACameraModule::K2_GetCameraByName(const FName InCameraName) con
 	return nullptr;
 }
 
-void ACameraModule::K2_SwitchCamera(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
+void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 {
-	if(!InClass) return;
-	
-	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
+	if(!CurrentCamera || CurrentCamera != InCamera)
+	{
+		if(InCamera)
+		{
+			UCharacterModuleBPLibrary::SwitchCharacter(nullptr);
+			if(GetPlayerController())
+			{
+				GetPlayerController()->Possess(InCamera);
+			}
+			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
+			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
+			SetCameraDistance(InCamera->GetCameraBoom()->TargetArmLength, bInstant);
+			CurrentCamera = InCamera;
+		}
+		else if(CurrentCamera)
+		{
+			if(GetPlayerController())
+			{
+				GetPlayerController()->UnPossess();
+			}
+			CurrentCamera = nullptr;
+		}
+	}
+}
+
+void ACameraModule::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant)
+{
+	const FName CameraName = InCameraClass ? InCameraClass.GetDefaultObject()->GetCameraName() : NAME_None;
 	SwitchCameraByName(CameraName, bInstant);
 }
 
 void ACameraModule::SwitchCameraByName(const FName InCameraName, bool bInstant)
 {
-	if(!CurrentCamera || CurrentCamera->GetCameraName() != InCameraName)
-	{
-		if(ACameraPawnBase* Camera = GetCameraByName<ACameraPawnBase>(InCameraName))
-		{
-			if(GetPlayerController())
-			{
-				GetPlayerController()->Possess(Camera);
-			}
-			
-			SetCameraLocation(Camera->GetActorLocation(), bInstant);
-			SetCameraRotation(Camera->GetActorRotation().Yaw, Camera->GetActorRotation().Pitch, bInstant);
-			SetCameraDistance(Camera->GetCameraBoom()->TargetArmLength, bInstant);
-			CurrentCamera = Camera;
-		}
-	}
+	SwitchCamera(GetCameraByName(InCameraName), bInstant);
 }
 
 void ACameraModule::DoTrackTarget(bool bInstant)
@@ -362,7 +379,7 @@ void ACameraModule::DoTrackTarget(bool bInstant)
 
 void ACameraModule::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
-	if(!InTargetActor) return;
+	if(!InTargetActor || !CurrentCamera) return;
 
 	if(TrackTargetActor != InTargetActor)
 	{
@@ -379,6 +396,8 @@ void ACameraModule::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InT
 
 void ACameraModule::EndTrackTarget(AActor* InTargetActor)
 {
+	if(!CurrentCamera) return;
+
 	if(!InTargetActor || InTargetActor == TrackTargetActor)
 	{
 		TrackTargetActor = nullptr;
@@ -387,8 +406,10 @@ void ACameraModule::EndTrackTarget(AActor* InTargetActor)
 
 void ACameraModule::SetCameraLocation(FVector InLocation, bool bInstant)
 {
+	if(!CurrentCamera) return;
+
 	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
-	if(bInstant && CurrentCamera && CurrentCamera->IsA(ACameraPawnBase::StaticClass()))
+	if(bInstant)
 	{
 		CurrentCameraLocation = TargetCameraLocation;
 		CurrentCamera->SetActorLocation(TargetCameraLocation);
@@ -398,6 +419,8 @@ void ACameraModule::SetCameraLocation(FVector InLocation, bool bInstant)
 
 void ACameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEaseType InEaseType)
 {
+	if(!CurrentCamera) return;
+
 	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
 	if(InDuration > 0.f)
 	{
@@ -463,8 +486,10 @@ void ACameraModule::StopDoCameraRotation()
 
 void ACameraModule::SetCameraDistance(float InDistance, bool bInstant)
 {
+	if(!GetCurrentCameraBoom()) return;
+
 	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
-	if(bInstant && GetCurrentCameraBoom())
+	if(bInstant)
 	{
 		CurrentCameraDistance = TargetCameraDistance;
 		GetCurrentCameraBoom()->TargetArmLength = TargetCameraDistance;
@@ -474,6 +499,8 @@ void ACameraModule::SetCameraDistance(float InDistance, bool bInstant)
 
 void ACameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseType InEaseType)
 {
+	if(!GetCurrentCameraBoom()) return;
+
 	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
 	if(InDuration > 0.f)
 	{
@@ -482,7 +509,7 @@ void ACameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseTy
 		CameraDoZoomDistance = CurrentCameraDistance;
 		CameraDoZoomEaseType = InEaseType;
 	}
-	else if(GetCurrentCameraBoom())
+	else
 	{
 		CurrentCameraDistance = TargetCameraDistance;
 		GetCurrentCameraBoom()->TargetArmLength = TargetCameraDistance;

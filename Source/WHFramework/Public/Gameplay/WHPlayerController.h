@@ -115,9 +115,6 @@ protected:
 	/// PlayerController
 protected:
 	UPROPERTY(EditAnywhere, Category = "PlayerController")
-	bool bUse2DInputMode;
-
-	UPROPERTY(EditAnywhere, Category = "PlayerController")
 	float TouchInputRate;
 
 	UPROPERTY(VisibleAnywhere, Category = "PlayerController")

@@ -24,9 +24,12 @@ class WHFRAMEWORK_API IWHPlayerInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void MoveForward(float InValue, bool b2DMode = false) = 0;
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveForward(float InValue);
 
-	virtual void MoveRight(float InValue, bool b2DMode = false) = 0;
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveRight(float InValue);
 
-	virtual void MoveUp(float InValue, bool b2DMode = false) = 0;
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveUp(float InValue);
 };
