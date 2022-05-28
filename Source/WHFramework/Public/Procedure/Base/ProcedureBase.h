@@ -83,6 +83,11 @@ public:
 
 public:
 	/**
+	* 指引流程流程
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Guide();
+	/**
 	* 切换到上一个流程
 	*/
 	UFUNCTION(BlueprintCallable)

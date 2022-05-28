@@ -158,9 +158,9 @@ void AProcedureModule::SwitchNextProcedure()
 
 void AProcedureModule::GuideCurrentProcedure()
 {
-	if(CurrentProcedure && CurrentProcedure->GetProcedureState() == EProcedureState::Entered)
+	if(CurrentProcedure)
 	{
-		CurrentProcedure->OnGuide();
+		CurrentProcedure->Guide();
 	}
 }
 

@@ -153,6 +153,14 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
 }
 
+void UProcedureBase::Guide()
+{
+	if(ProcedureState == EProcedureState::Entered)
+	{
+		OnGuide();
+	}
+}
+
 void UProcedureBase::SwitchLastProcedure()
 {
 	UProcedureModuleBPLibrary::SwitchLastProcedure();
