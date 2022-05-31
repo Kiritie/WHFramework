@@ -77,10 +77,12 @@ AMainModule::~AMainModule()
 	{
 		Instance = nullptr;
 	}
+	#if WITH_EDITOR
 	if(InstanceEditor == this)
 	{
 		InstanceEditor = nullptr;
 	}
+	#endif
 }
 
 // Called when the game starts or when spawned
