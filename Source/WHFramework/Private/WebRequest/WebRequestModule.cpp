@@ -193,7 +193,7 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 		{
 			case EWebContentType::Form:
 			{
-				ContentType = TEXT("application/x-www-form-urlencoded");
+				ContentType = TEXT("application/x-www-form-urlencoded; charset=utf-8");
 				break;
 			}
 			case EWebContentType::Text:
@@ -227,6 +227,11 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 		WHLog(WH_WebRequest, Log, TEXT("------> Content: %s"), *InContent.ToString());
 
 		return HttpRequest->ProcessRequest();
+	}
+	else
+	{
+		ensureEditor(true);
+		WHLog(WH_WebRequest, Warning, TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetName().ToString());
 	}
 	return false;
 }

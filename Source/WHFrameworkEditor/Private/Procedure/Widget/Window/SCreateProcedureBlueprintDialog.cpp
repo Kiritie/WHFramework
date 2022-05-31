@@ -51,7 +51,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 			.Padding(2)
 			[
 				SNew(SBorder)
-				.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 				[
 					SNew(SVerticalBox)
 
@@ -77,7 +77,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			[
 				SNew(SBorder)
-				.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
@@ -109,14 +109,14 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 			.Padding(5)
 			[
 				SNew(SUniformGridPanel)
-				.SlotPadding(FEditorStyle::GetMargin("StandardDialog.SlotPadding"))
-				.MinDesiredSlotWidth(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
-				.MinDesiredSlotHeight(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
+				.SlotPadding(FAppStyle::GetMargin("StandardDialog.SlotPadding"))
+				.MinDesiredSlotWidth(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
+				.MinDesiredSlotHeight(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
 				+ SUniformGridPanel::Slot(0, 0)
 				[
 					SNew(SButton)
 					.HAlign(HAlign_Center)
-					.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("OK", "OK"))
 					.OnClicked(this, &SCreateProcedureBlueprintDialog::OnButtonClick, EAppReturnType::Ok)
 				]
@@ -124,7 +124,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.HAlign(HAlign_Center)
-					.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
 					.OnClicked(this, &SCreateProcedureBlueprintDialog::OnButtonClick, EAppReturnType::Cancel)
 				]

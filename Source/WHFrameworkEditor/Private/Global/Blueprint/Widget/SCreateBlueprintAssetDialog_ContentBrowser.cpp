@@ -5,6 +5,7 @@
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
+#include "EditorStyleSet.h"
 #include "IAssetTools.h"
 #include "IContentBrowserSingleton.h"
 #include "SlateOptMacros.h"
@@ -30,7 +31,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 	[
 		SNew(SBorder)
 		.Visibility(EVisibility::Visible)
-		.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
+		.BorderImage(FAppStyle::GetBrush("Menu.Background"))
 		[
 			SNew(SBox)
 			.Visibility(EVisibility::Visible)
@@ -41,7 +42,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 				.FillHeight(1)
 				[
 					SNew(SBorder)
-					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 					.Content()
 					[
 						SAssignNew(ParentClassContainer, SVerticalBox)
@@ -56,14 +57,14 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 				.Padding(8)
 				[
 					SNew(SUniformGridPanel)
-					.SlotPadding(FEditorStyle::GetMargin("StandardDialog.SlotPadding"))
-					.MinDesiredSlotWidth(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
-					.MinDesiredSlotHeight(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
+					.SlotPadding(FAppStyle::GetMargin("StandardDialog.SlotPadding"))
+					.MinDesiredSlotWidth(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
+					.MinDesiredSlotHeight(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
 					+ SUniformGridPanel::Slot(0, 0)
 					[
 						SNew(SButton)
 						.HAlign(HAlign_Center)
-						.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+						.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 						.OnClicked(this, &SCreateBlueprintAssetDialog_ContentBrowser::OkClicked)
 						.Text(LOCTEXT("CreateBlueprintOk", "OK"))
 					]
@@ -71,7 +72,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 					[
 						SNew(SButton)
 						.HAlign(HAlign_Center)
-						.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
+						.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 						.OnClicked(this, &SCreateBlueprintAssetDialog_ContentBrowser::CancelClicked)
 						.Text(LOCTEXT("CreateBlueprintCancel", "Cancel"))
 					]

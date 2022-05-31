@@ -20,7 +20,7 @@ void UDebugModuleBPLibrary::EnsureEditorCrash(const FString& Message, bool bNoCr
 #else
 	if(!bNoCrash)
 	{
-		WH_LOG(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
+		WHLog(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
 	}
 #endif
 }

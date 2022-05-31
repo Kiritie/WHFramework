@@ -167,7 +167,12 @@ public:
 	{
 		if(InWidgetName.IsNone()) return nullptr;
 		
-		if(!UserWidgetClassMap.Contains(InWidgetName)) return nullptr;
+		if(!UserWidgetClassMap.Contains(InWidgetName))
+		{
+			ensureEditor(true);
+			WHLog(WH_Widget, Warning, TEXT("Failed to create user widget. Module does not contain this type: %s"), *InWidgetName.ToString());
+			return nullptr;
+		}
 		
 		if(!AllUserWidgets.Contains(InWidgetName))
 		{
@@ -585,8 +590,13 @@ public:
 	template<class T>
 	T* CreateWorldWidgetByName(FName InWidgetName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
 	{
-		if(!WorldWidgetClassMap.Contains(InWidgetName)) return nullptr;
-
+		if(!WorldWidgetClassMap.Contains(InWidgetName))
+		{
+			ensureEditor(true);
+			WHLog(WH_Widget, Warning, TEXT("Failed to create world widget. Module does not contain this type: %s"), *InWidgetName.ToString());
+			return nullptr;
+		}
+		
 		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleBPLibrary::SpawnObject<UWorldWidgetBase>(nullptr, WorldWidgetClassMap[InWidgetName]))
 		{
 			if(!AllWorldWidgets.Contains(InWidgetName))

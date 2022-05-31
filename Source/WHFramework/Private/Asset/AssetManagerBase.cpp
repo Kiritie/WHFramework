@@ -22,7 +22,8 @@ UAssetManagerBase& UAssetManagerBase::Get()
 	}
 	else
 	{
-		ensureEditorMsgf(false, TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!"));
+		ensureEditor(true);
+		WHLog(WH_Asset, Warning, TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!"));
 		return UReferencePoolModuleBPLibrary::GetReference<UAssetManagerBase>();
 	}
 }

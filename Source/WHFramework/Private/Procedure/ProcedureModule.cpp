@@ -122,6 +122,11 @@ void AProcedureModule::SwitchProcedureByIndex(int32 InProcedureIndex)
 	{
 		SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InProcedureIndex));
 	}
+	else
+	{
+		WHLog(WH_Procedure, Warning, TEXT("切换流程失败，不存在指定索引的流程: %d"), InProcedureIndex);
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InProcedureIndex));
+	}
 }
 
 void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
@@ -129,6 +134,11 @@ void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProc
 	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
 	{
 		SwitchProcedure(GetProcedureByClass<UProcedureBase>(InProcedureClass));
+	}
+	else
+	{
+		WHLog(WH_Procedure, Warning, TEXT("切换流程失败，不存在指定类型的流程: %s"), InProcedureClass ? *InProcedureClass->GetName() : TEXT("None"));
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InProcedureClass ? *InProcedureClass->GetName() : TEXT("None")));
 	}
 }
 
