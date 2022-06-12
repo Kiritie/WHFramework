@@ -41,6 +41,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
 protected:
 	UPROPERTY(EditAnywhere, Category = "UserData")
 	int32 UserIndex;
@@ -102,6 +104,7 @@ public:
 		{
 			if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InSaveGameClass)))
 			{
+				SaveGame->AddToRoot();
 				AllSaveGames.Add(SaveName, SaveGame);
 				SaveGame->OnCreate(InSaveIndex);
 				if(bAutoLoad)
@@ -246,7 +249,8 @@ public:
 			{
 				SaveGame->OnUnload();
 				SaveGame->OnDestroy();
-				SaveGame->ConditionalBeginDestroy();
+				SaveGame->RemoveFromRoot();
+				//SaveGame->ConditionalBeginDestroy();
 			}
 		}
 		if (UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InSaveIndex), UserIndex))

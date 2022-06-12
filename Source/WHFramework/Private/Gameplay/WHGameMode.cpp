@@ -65,5 +65,5 @@ void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	OnPreparatory_Implementation();
+	OnPreparatory();
 }
