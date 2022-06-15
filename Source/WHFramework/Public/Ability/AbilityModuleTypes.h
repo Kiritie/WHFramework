@@ -9,8 +9,14 @@ class UItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
 
+#define	ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
+	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
+
 /**
- * ����Ŀ�����
+ * 目标类型
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin))
 class WHFRAMEWORK_API UTargetType : public UObject
@@ -20,13 +26,13 @@ class WHFRAMEWORK_API UTargetType : public UObject
 public:
 	UTargetType() {}
 
-	/** ��ȡĿ�� */
+	/** 获取目标 */
 	UFUNCTION(BlueprintNativeEvent)
 	void GetTargets(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const;
 };
 
 /**
- * ����Ŀ��_ʹ��ӵ����
+ * 目标类型_使用自身
  */
 UCLASS(NotBlueprintable)
 class WHFRAMEWORK_API UTargetType_UseOwner : public UTargetType
@@ -40,7 +46,7 @@ public:
 };
 
 /**
- * ����Ŀ��_ʹ���¼�����
+ * 目标类型_使用事件数据
  */
 UCLASS(NotBlueprintable)
 class WHFRAMEWORK_API UTargetType_UseEventData : public UTargetType
@@ -54,7 +60,7 @@ public:
 };
 
 /**
- * GameplayEffect????
+ * GameplayEffect容器
  */
 USTRUCT(BlueprintType)
 struct FGameplayEffectContainer
@@ -65,17 +71,17 @@ public:
     FGameplayEffectContainer() {}
 
 public:
-    /** ??????? */
+    /** 目标类型 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
     TSubclassOf<UTargetType> TargetType;
 
-    /** ??????????GameplayEffect?б? */
+    /** 目标GameplayEffect类型 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
     TArray<TSubclassOf<UGameplayEffect>> TargetGameplayEffectClasses;
 };
 
 /**
- * GameplayEffect?????淶
+ * GameplayEffect容器规格
  */
 USTRUCT(BlueprintType)
 struct FGameplayEffectContainerSpec
@@ -86,37 +92,37 @@ public:
     FGameplayEffectContainerSpec() {}
 
 public:
-    /** ??????? */
+    /** 目标数据 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
     FGameplayAbilityTargetDataHandle TargetData;
 
-    /** ?????????GameplayEffect?б? */
+    /** 目标GameplayEffect规格 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
     TArray<FGameplayEffectSpecHandle> TargetGameplayEffectSpecs;
     
-    /** ???????Ч?????*/
+    /** 是否有有效目标 */
     bool HasValidTargets() const;
 
-    /** ???????Ч??Effect*/
+    /** 是否有有效Effect */
     bool HasValidEffects() const;
 
-    /** ???????????????? */
+    /** 添加目标 */
     void AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors);
 };
 
 /**
- * ???????????
+ * 能力耗费类型
  */
 UENUM(BlueprintType)
 enum class EAbilityCostType : uint8
 {
-	// ??
+	// 无
 	None,
-	// ?????
+	// 生命值
 	Health,
-	// ????
+	// 魔法值
 	Mana,
-	// ?????
+	// 体力值
 	Stamina
 };
 
@@ -204,16 +210,14 @@ public:
 };
 
 /**
- * ???????
+ * 伤害类型
  */
 UENUM(BlueprintType)
 enum class EDamageType : uint8
 {
-	// ????
-	Any,
-	// ????
+	// 物理伤害
 	Physics,
-	// ???
+	// 魔法伤害
 	Magic
 };
 
@@ -227,7 +231,7 @@ enum class ESkillType : uint8
 	None,
 	// 近战
 	Melee,
-	// ???????
+	// 远程
 	Remote
 };
 
@@ -255,44 +259,58 @@ enum class EInteractAction : uint8
 	None UMETA(DisplayName="无"),
 	// 复活
 	Revive UMETA(DisplayName="复活"),
-	// 喂食
-	Feed UMETA(DisplayName="喂食"),
-	// 骑乘
-	Ride UMETA(DisplayName="骑乘"),
-	// 取消骑乘
-	UnRide UMETA(DisplayName="取消骑乘"),
 	// 战斗
 	Fight UMETA(DisplayName="战斗"),
 	// 对话
 	Dialogue UMETA(DisplayName="对话"),
 	// 交易
 	Transaction UMETA(DisplayName="交易"),
-	// 打开
-	Open UMETA(DisplayName="打开"),
-	// 关闭
-	Close UMETA(DisplayName="关闭")
+	
+	Custom1 UMETA(Hidden),
+	Custom2 UMETA(Hidden),
+	Custom3 UMETA(Hidden),
+	Custom4 UMETA(Hidden),
+	Custom5 UMETA(Hidden),
+	Custom6 UMETA(Hidden),
+	Custom7 UMETA(Hidden),
+	Custom8 UMETA(Hidden),
+	Custom9 UMETA(Hidden),
+	Custom10 UMETA(Hidden)
 };
 
-class UItemDataBase;
 /**
- * ???????
+ * 体术交互选项
+ */
+UENUM(BlueprintType)
+enum class EVoxelInteractAction : uint8
+{
+	// 无
+	None = EInteractAction::None UMETA(DisplayName="无"),
+	// 打开
+	Open = EInteractAction::Custom1 UMETA(DisplayName="打开"),
+	// 关闭
+	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
+};
+
+/**
+ * 能力项类型
  */
 UENUM(BlueprintType)
 enum class EAbilityItemType : uint8
 {
-	// ??
+	// 无
 	None,
-	// ????
+	// 体素
 	Voxel,
-	// ????
+	// 道具
 	Prop,
-	// ???
+	// 装备
 	Equip,
-	// ????
+	// 技能
 	Skill,
-	// ????
+	// 生命
 	Vitality,
-	// ????
+	// 角色
 	Character
 };
 
@@ -398,5 +416,66 @@ public:
 			A.Count -= B.Count;
 		}
 		return A;
+	}
+};
+
+/**
+ * 种族数据
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FRaceData : public FTableRowBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadWrite)
+	FName ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString Detail;
+				
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Proportion;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityItem> Items;
+
+	FORCEINLINE FRaceData()
+	{
+		ID = NAME_None;
+		Name = NAME_None;
+		Detail = TEXT("");
+		Proportion = 1;
+		Items = TArray<FAbilityItem>();
+	}
+
+	FORCEINLINE bool IsValid() const
+	{
+		return !ID.IsNone();
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVitalityRaceData : public FRaceData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVitalityRaceData()
+	{
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCharacterRaceData : public FRaceData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FCharacterRaceData()
+	{
 	}
 };

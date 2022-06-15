@@ -5,7 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
-#include "VitalityDataBase.h"
+#include "AbilityVitalityDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -20,10 +20,10 @@ class UBoxComponent;
 class UAttributeSetBase;
 
 /**
- * ������������
+ * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryAssetInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -37,7 +37,7 @@ protected:
 
 protected:
 	// stats
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
 	FPrimaryAssetId AssetID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
@@ -228,7 +228,7 @@ public:
 		return static_cast<T&>(GetVitalityData());
 	}
 	
-	UVitalityDataBase& GetVitalityData() const;
+	UAbilityVitalityDataBase& GetVitalityData() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

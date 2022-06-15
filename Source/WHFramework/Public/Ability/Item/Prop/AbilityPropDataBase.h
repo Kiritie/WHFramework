@@ -2,15 +2,15 @@
 
 #include "Ability/Item/ItemDataBase.h"
 
-#include "PropDataBase.generated.h"
+#include "AbilityPropDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UPropDataBase : public UItemDataBase
+class WHFRAMEWORK_API UAbilityPropDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	UPropDataBase();
+	UAbilityPropDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

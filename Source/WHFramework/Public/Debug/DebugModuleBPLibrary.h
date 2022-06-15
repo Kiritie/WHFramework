@@ -6,8 +6,6 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "DebugModuleBPLibrary.generated.h"
 
-class ADebugModule;
-
 UENUM(BlueprintType)
 enum class EDebugMode : uint8
 {
@@ -16,6 +14,7 @@ enum class EDebugMode : uint8
 	Console
 };
 
+class ADebugModule;
 /**
  * 
  */

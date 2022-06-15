@@ -8,6 +8,7 @@
 
 #include "WHPlayerController.generated.h"
 
+class IWHPlayerInterface;
 class UModuleNetworkComponent;
 /**
  * 
@@ -61,17 +62,23 @@ protected:
 private:
 	UPROPERTY(Transient)
 	TMap<TSubclassOf<UModuleNetworkComponent>, UModuleNetworkComponent*> ModuleNetCompMap;
+	
 public:
 	template<class T>
 	T* GetModuleNetCompByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass = T::StaticClass())
 	{
+		return Cast<T>(GetModuleNetCompByClass(InModuleClass));
+	}
+	
+	UModuleNetworkComponent* GetModuleNetCompByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass)
+	{
 		if(ModuleNetCompMap.Contains(InModuleClass))
 		{
-			return Cast<T>(ModuleNetCompMap[InModuleClass]);
+			return ModuleNetCompMap[InModuleClass];
 		}
 		return nullptr;
 	}
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Inherits
 protected:
@@ -112,12 +119,27 @@ protected:
 	virtual void EndInteract(FKey InKey);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// PlayerController
+	/// Player
 protected:
-	UPROPERTY(EditAnywhere, Category = "PlayerController")
+	UPROPERTY(BlueprintReadOnly)
+	APawn* PlayerPawn;
+
+public:
+	template<class T>
+	T* GetPlayerPawn()
+	{
+		return Cast<T>(PlayerPawn);
+	}
+	
+	APawn* GetPlayerPawn() const { return PlayerPawn; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Input
+protected:
+	UPROPERTY(EditAnywhere, Category = "Input")
 	float TouchInputRate;
 
-	UPROPERTY(VisibleAnywhere, Category = "PlayerController")
+	UPROPERTY(VisibleAnywhere, Category = "Input")
 	int32 TouchPressedCount;
 
 public:

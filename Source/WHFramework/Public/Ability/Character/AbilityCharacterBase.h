@@ -3,7 +3,7 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
-#include "CharacterDataBase.h"
+#include "AbilityCharacterDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
@@ -25,10 +25,10 @@ class AAbilitySkillBase;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
 
 /**
- * 角色
+ * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IPrimaryAssetInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -42,9 +42,6 @@ protected:
 
 protected:
 	// stats
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FPrimaryAssetId AssetID;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName RaceID;
 
@@ -200,6 +197,14 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	template<class T>
+	T& GetCharacterData() const
+	{
+		return static_cast<T&>(GetCharacterData());
+	}
+	
+	UAbilityCharacterDataBase& GetCharacterData() const;
+
+	template<class T>
 	T* GetAttributeSet() const
 	{
 		return Cast<T>(AttributeSet);
@@ -210,22 +215,11 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
-	template<class T>
-	T& GetCharacterData() const
-	{
-		return static_cast<T&>(GetCharacterData());
-	}
-	
-	UCharacterDataBase& GetCharacterData() const;
-
 public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead() const override { return bDead; }
 
 public:
-	UFUNCTION(BlueprintPure)
-	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
-
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameV() const override { return Name; }
 

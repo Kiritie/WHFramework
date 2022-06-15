@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-
 #include "CharacterInterface.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -15,7 +15,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneActorInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneActorInterface, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -108,6 +108,15 @@ public:
 	virtual void StopAIMove(bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiStopAIMove();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Primary Asset
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FPrimaryAssetId AssetID;
+
+public:
+	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

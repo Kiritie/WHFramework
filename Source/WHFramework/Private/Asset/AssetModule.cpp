@@ -33,6 +33,13 @@ void AAssetModule::OnInitialize_Implementation()
 			DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
 		}
 	}
+	for(auto Iter : DataTables)
+	{
+		if(Iter)
+		{
+			DataTableMap.Add(Iter->RowStruct, Iter);
+		}
+	}
 }
 
 void AAssetModule::OnPreparatory_Implementation()
@@ -95,4 +102,33 @@ void AAssetModule::RemoveAllDataAsset()
 		Iter.Value->ConditionalBeginDestroy();
 	}
 	DataAssetMap.Empty();
+}
+
+bool AAssetModule::AddDataTable(UDataTable* InDataTable)
+{
+	if(!InDataTable) return false;
+		
+	if(!DataTableMap.Contains(InDataTable->RowStruct))
+	{
+		DataTableMap.Add(InDataTable->RowStruct, InDataTable);
+		return true;
+	}
+	return false;
+}
+
+bool AAssetModule::RemoveDataTable(UDataTable* InDataTable)
+{
+	if(!InDataTable) return false;
+		
+	if(DataTableMap.Contains(InDataTable->RowStruct))
+	{
+		DataTableMap.Remove(InDataTable->RowStruct);
+		return true;
+	}
+	return false;
+}
+
+void AAssetModule::RemoveAllDataTable()
+{
+	DataTableMap.Empty();
 }

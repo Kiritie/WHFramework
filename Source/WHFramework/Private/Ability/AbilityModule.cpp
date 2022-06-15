@@ -3,10 +3,16 @@
 
 #include "Ability/AbilityModule.h"
 
+#include "Global/GlobalBPLibrary.h"
+
 // Sets default values
 AAbilityModule::AAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
+
+	InteractActionMap = TMap<EInteractAction, FString>();
+	InteractActionMap.Add(EInteractAction::Custom1, TEXT("EVoxelInteractAction"));
+	InteractActionMap.Add(EInteractAction::Custom2, TEXT("EVoxelInteractAction"));
 }
 
 #if WITH_EDITOR
@@ -44,4 +50,14 @@ void AAbilityModule::OnPause_Implementation()
 void AAbilityModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
+{
+	FString EnumName = TEXT("EInteractAction");
+	if(InteractActionMap.Contains((EInteractAction)InInteractAction))
+	{
+		EnumName = InteractActionMap[(EInteractAction)InInteractAction];
+	}
+	return UGlobalBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
 }

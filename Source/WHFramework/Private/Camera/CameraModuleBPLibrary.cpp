@@ -266,3 +266,11 @@ FRotator UCameraModuleBPLibrary::GetRealCameraRotation()
 	}
 	return FRotator::ZeroRotator;
 }
+
+void UCameraModuleBPLibrary::SetViewTargetWithBlend(AActor* NewViewTarget, float BlendTime, EViewTargetBlendFunction BlendFunc, float BlendExp, bool bLockOutgoing)
+{
+	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	{
+		PlayerController->SetViewTargetWithBlend(NewViewTarget, BlendTime, BlendFunc, BlendExp, bLockOutgoing);
+	}
+}

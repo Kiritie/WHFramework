@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 
 #include "UObject/Interface.h"
-#include "PrimaryAssetInterface.generated.h"
+#include "PrimaryEntityInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UPrimaryAssetInterface : public UInterface
+class UPrimaryEntityInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -17,7 +17,7 @@ class UPrimaryAssetInterface : public UInterface
 /**
 * 
 */
-class WHFRAMEWORK_API IPrimaryAssetInterface
+class WHFRAMEWORK_API IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 

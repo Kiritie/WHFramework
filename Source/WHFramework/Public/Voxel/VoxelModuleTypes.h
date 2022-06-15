@@ -371,6 +371,32 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float CharacterRaceDensity;
+
+public:
+	FORCEINLINE float GetChunkLength() const
+	{
+		return ChunkSize * BlockSize;
+	}
+
+	FORCEINLINE int32 GetWorldHeight() const
+	{
+		return ChunkSize * ChunkHeightRange;
+	}
+
+	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency Transparency) const
+	{
+		const int32 Index = FMath::Clamp((int32)Transparency, 0, ChunkMaterials.Num());
+		if(ChunkMaterials.IsValidIndex(Index))
+		{
+			return ChunkMaterials[Index];
+		}
+		return FVoxelChunkMaterial();
+	}
+
+	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const
+	{
+		return BlockSize * InNormal * InLength;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -420,29 +446,4 @@ public:
 
 public:
 	virtual void Initialize();
-
-	FORCEINLINE float GetChunkLength() const
-	{
-		return ChunkSize * BlockSize;
-	}
-
-	FORCEINLINE int32 GetWorldHeight() const
-	{
-		return ChunkSize * ChunkHeightRange;
-	}
-
-	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency Transparency) const
-	{
-		const int32 Index = FMath::Clamp((int32)Transparency, 0, ChunkMaterials.Num());
-		if(ChunkMaterials.IsValidIndex(Index))
-		{
-			return ChunkMaterials[Index];
-		}
-		return FVoxelChunkMaterial();
-	}
-
-	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const
-	{
-		return BlockSize * InNormal * InLength;
-	}
 };

@@ -1,11 +1,11 @@
-#include "Ability/Character/CharacterDataBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UCharacterDataBase::UCharacterDataBase()
+UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Character);
+	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Character);
 	MaxCount = 1;
 	Range = FVector(1.f, 1.f, 2.f);
 	EXP = 50;

@@ -1,12 +1,12 @@
-#include "Ability/Item/Equip/EquipDataBase.h"
+#include "Ability/Item/Equip/AbilityEquipDataBase.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UEquipDataBase::UEquipDataBase()
+UAbilityEquipDataBase::UAbilityEquipDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Equip);
+	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Equip);
 	MaxCount = 1;
 	EquipMesh = nullptr;
 	EquipClass = nullptr;

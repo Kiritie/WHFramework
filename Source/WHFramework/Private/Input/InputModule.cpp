@@ -76,7 +76,7 @@ void AInputModule::UpdateInputMode()
 
 void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		if(GlobalInputMode != InInputMode)
 		{

@@ -11,11 +11,11 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
 #include "Perception/AISense_Sight.h"
 #include "Scene/SceneModuleBPLibrary.h"
-#include "Scene/Components/WorldTextComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
@@ -99,38 +99,44 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(Ar.IsSaveGame())
+	if(!AttributeSet) return;
+
+	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
 	{
-		float CurrentValue;
-		if(Ar.IsLoading())
+		float BaseValue = 0.f;
+		float CurrentValue = 0.f;
+		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
 		{
-			Ar << CurrentValue;
-			if(CurrentValue > 0)
+			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
 			{
-				SetHealth(CurrentValue);
+				if(Ar.IsLoading())
+				{
+					Ar << BaseValue;
+					Ar << CurrentValue;
+					AttributeData->SetBaseValue(BaseValue);
+					AttributeData->SetCurrentValue(CurrentValue);
+				}
+				else if(Ar.IsSaving())
+				{
+					BaseValue = AttributeData->GetBaseValue();
+					CurrentValue = AttributeData->GetCurrentValue();
+					Ar << BaseValue;
+					Ar << CurrentValue;
+				}
 			}
-			else
-			{
-				Revive();
-				Ar << CurrentValue;
-				Ar << CurrentValue;
-			}
-		}
-		else if(Ar.IsSaveGame())
-		{
-			CurrentValue = GetHealth();
-			Ar << CurrentValue;
 		}
 	}
 }
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData)
 {
+	UGlobalBPLibrary::LoadObjectFromMemory(this, InSaveData->Datas);
 }
 
 FSaveData* AAbilityCharacterBase::ToData(bool bSaved)
 {
 	static FSaveData SaveData = FSaveData();
+	UGlobalBPLibrary::SaveObjectToMemory(this, SaveData.Datas);
 	return &SaveData;
 }
 
@@ -394,14 +400,14 @@ UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() cons
 	return AbilitySystem;
 }
 
+UAbilityCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(AssetID);
+}
+
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 {
 	return Interaction;
-}
-
-UCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UCharacterDataBase>(AssetID);
 }
 
 void AAbilityCharacterBase::SetNameV(FName InName)

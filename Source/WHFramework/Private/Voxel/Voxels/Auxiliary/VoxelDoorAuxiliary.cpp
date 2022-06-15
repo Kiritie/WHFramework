@@ -10,8 +10,8 @@
 // Sets default values
 AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 {
-	Interaction->AddInteractionAction(EInteractAction::Open);
-	Interaction->AddInteractionAction(EInteractAction::Close);
+	Interaction->AddInteractionAction((EInteractAction)EVoxelInteractAction::Open);
+	Interaction->AddInteractionAction((EInteractAction)EVoxelInteractAction::Close);
 }
 
 // Called when the game starts or when spawned
@@ -42,7 +42,7 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 	
 	switch (InInteractAction)
 	{
-		case EInteractAction::Open:
+		case EVoxelInteractAction::Open:
 		{
 			if(!GetVoxelItem().GetParam(FName("bOpened")).GetBooleanValue())
 			{
@@ -50,7 +50,7 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 			}
 			break;
 		}
-		case EInteractAction::Close:
+		case EVoxelInteractAction::Close:
 		{
 			if(GetVoxelItem().GetParam(FName("bOpened")).GetBooleanValue())
 			{
@@ -69,12 +69,12 @@ void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAg
 
 	switch (InInteractAction)
 	{
-		case EInteractAction::Open:
+		case EVoxelInteractAction::Open:
 		{
 			OpenDoor();
 			break;
 		}
-		case EInteractAction::Close:
+		case EVoxelInteractAction::Close:
 		{
 			CloseDoor();
 			break;

@@ -310,6 +310,18 @@ void AMainModule::TerminationModules_Implementation()
 	ModuleMap.Empty();
 }
 
+UModuleNetworkComponent* AMainModule::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor)
+{
+	if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
+	{
+		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+		{
+			return PlayerController->GetModuleNetCompByClass(InModuleNetworkComponentClass);
+		}
+	}
+	return nullptr;
+}
+
 void AMainModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

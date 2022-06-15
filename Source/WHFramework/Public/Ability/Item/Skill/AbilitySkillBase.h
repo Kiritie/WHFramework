@@ -6,7 +6,7 @@
 #include "AbilitySkillBase.generated.h"
 
 /**
- * 技能
+ * 技能基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilitySkillBase : public AAbilityItemBase

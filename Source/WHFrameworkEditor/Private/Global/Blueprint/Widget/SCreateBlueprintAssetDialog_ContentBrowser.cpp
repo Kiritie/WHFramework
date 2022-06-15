@@ -31,7 +31,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 	[
 		SNew(SBorder)
 		.Visibility(EVisibility::Visible)
-		.BorderImage(FAppStyle::GetBrush("Menu.Background"))
+		.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
 		[
 			SNew(SBox)
 			.Visibility(EVisibility::Visible)
@@ -42,7 +42,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 				.FillHeight(1)
 				[
 					SNew(SBorder)
-					.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
 					.Content()
 					[
 						SAssignNew(ParentClassContainer, SVerticalBox)
@@ -57,14 +57,14 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 				.Padding(8)
 				[
 					SNew(SUniformGridPanel)
-					.SlotPadding(FAppStyle::GetMargin("StandardDialog.SlotPadding"))
-					.MinDesiredSlotWidth(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
-					.MinDesiredSlotHeight(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
+					.SlotPadding(FEditorStyle::GetMargin("StandardDialog.SlotPadding"))
+					.MinDesiredSlotWidth(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
+					.MinDesiredSlotHeight(FEditorStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
 					+ SUniformGridPanel::Slot(0, 0)
 					[
 						SNew(SButton)
 						.HAlign(HAlign_Center)
-						.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
+						.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
 						.OnClicked(this, &SCreateBlueprintAssetDialog_ContentBrowser::OkClicked)
 						.Text(LOCTEXT("CreateBlueprintOk", "OK"))
 					]
@@ -72,7 +72,7 @@ void SCreateBlueprintAssetDialog_ContentBrowser::Construct(const FArguments& InA
 					[
 						SNew(SButton)
 						.HAlign(HAlign_Center)
-						.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
+						.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
 						.OnClicked(this, &SCreateBlueprintAssetDialog_ContentBrowser::CancelClicked)
 						.Text(LOCTEXT("CreateBlueprintCancel", "Cancel"))
 					]

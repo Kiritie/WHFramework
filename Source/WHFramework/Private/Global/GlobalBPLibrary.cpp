@@ -3,17 +3,18 @@
 
 #include "Global/GlobalBPLibrary.h"
 
-#include "WHFramework.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_PauseGame.h"
 #include "Event/Handle/Global/EventHandle_UnPauseGame.h"
 #include "GameFramework/InputSettings.h"
+#include "Gameplay/WHGameInstance.h"
+#include "Gameplay/WHGameMode.h"
+#include "Gameplay/WHGameState.h"
 #include "Global/GlobalTypes.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
-#include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
 bool UGlobalBPLibrary::IsPaused()
@@ -84,7 +85,7 @@ void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
 
 void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
 {
-	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(AMainModule::Get()), QuitPreference, bIgnorePlatformRestrictions);
+	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
@@ -292,39 +293,39 @@ bool UGlobalBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncN
 	return false;
 }
 
-UGameInstance* UGlobalBPLibrary::K2_GetGameInstance(const UObject* InWorldContext, TSubclassOf<UGameInstance> InClass)
+UWHGameInstance* UGlobalBPLibrary::K2_GetGameInstance(TSubclassOf<UWHGameInstance> InClass)
 {
-	return UGameplayStatics::GetGameInstance(InWorldContext);
+	return Cast<UWHGameInstance>(UGameplayStatics::GetGameInstance(AMainModule::Get()));
 }
 
-AGameModeBase* UGlobalBPLibrary::K2_GetGameMode(const UObject* InWorldContext, TSubclassOf<AGameModeBase> InClass)
+AWHGameMode* UGlobalBPLibrary::K2_GetGameMode(TSubclassOf<AWHGameMode> InClass)
 {
-	return UGameplayStatics::GetGameMode(InWorldContext);
+	return Cast<AWHGameMode>(UGameplayStatics::GetGameMode(AMainModule::Get()));
 }
 
-AGameStateBase* UGlobalBPLibrary::K2_GetGameState(const UObject* InWorldContext, TSubclassOf<AGameStateBase> InClass)
+AWHGameState* UGlobalBPLibrary::K2_GetGameState(TSubclassOf<AWHGameState> InClass)
 {
-	return UGameplayStatics::GetGameState(InWorldContext);
+	return Cast<AWHGameState>(UGameplayStatics::GetGameState(AMainModule::Get()));
 }
 
-APlayerController* UGlobalBPLibrary::K2_GetPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass, int32 InPlayerIndex)
+AWHPlayerController* UGlobalBPLibrary::K2_GetPlayerController(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerIndex)
 {
-	return UGameplayStatics::GetPlayerController(InWorldContext, InPlayerIndex);
+	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(AMainModule::Get(), InPlayerIndex));
 }
 
-APlayerController* UGlobalBPLibrary::K2_GetPlayerControllerByID(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass, int32 InPlayerID)
+AWHPlayerController* UGlobalBPLibrary::K2_GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerID)
 {
-	return UGameplayStatics::GetPlayerControllerFromID(InWorldContext, InPlayerID);
+	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
 }
 
-APlayerController* UGlobalBPLibrary::K2_GetLocalPlayerController(const UObject* InWorldContext, TSubclassOf<APlayerController> InClass)
+AWHPlayerController* UGlobalBPLibrary::K2_GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass)
 {
-	if(UWorld* World = GEngine->GetWorldFromContextObject(InWorldContext, EGetWorldErrorMode::LogAndReturnNull))
+	if(UWorld* World = GetWorldFromObjectExisted(AMainModule::Get()))
 	{
 		for(auto Iter = World->GetPlayerControllerIterator(); Iter; ++Iter)
 		{
-			APlayerController* PlayerController = Iter->Get();
-			if(PlayerController->IsLocalController())
+			AWHPlayerController* PlayerController = Cast<AWHPlayerController>(Iter->Get());
+			if(PlayerController && PlayerController->IsLocalController())
 			{
 				return PlayerController;
 			}
@@ -333,48 +334,56 @@ APlayerController* UGlobalBPLibrary::K2_GetLocalPlayerController(const UObject* 
 	return nullptr;
 }
 
-APawn* UGlobalBPLibrary::K2_GetPlayerPawn(const UObject* InWorldContext, TSubclassOf<APawn> InClass, int32 InPlayerIndex)
+APawn* UGlobalBPLibrary::K2_GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
 {
-	return UGameplayStatics::GetPlayerPawn(InWorldContext, InPlayerIndex);
-}
-
-APawn* UGlobalBPLibrary::K2_GetPlayerPawnByID(const UObject* InWorldContext, TSubclassOf<APawn> InClass, int32 InPlayerID)
-{
-	if(APlayerController* PlayerController = GetPlayerControllerByID<APlayerController>(InWorldContext, InPlayerID))
+	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
-		return PlayerController->GetPawn();
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }
 
-APawn* UGlobalBPLibrary::K2_GetLocalPlayerPawn(const UObject* InWorldContext, TSubclassOf<APawn> InClass)
+APawn* UGlobalBPLibrary::K2_GetPlayerPawnByID(TSubclassOf<APawn> InClass, int32 InPlayerID)
 {
-	if(APlayerController* PlayerController = GetLocalPlayerController<APlayerController>(InWorldContext))
+	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 	{
-		return PlayerController->GetPawn();
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }
 
-ACharacter* UGlobalBPLibrary::K2_GetPlayerCharacter(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass, int32 InPlayerIndex)
+APawn* UGlobalBPLibrary::K2_GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
 {
-	return UGameplayStatics::GetPlayerCharacter(InWorldContext, InPlayerIndex);
-}
-
-ACharacter* UGlobalBPLibrary::K2_GetPlayerCharacterByID(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass, int32 InPlayerID)
-{
-	if(APlayerController* PlayerController = GetPlayerControllerByID<APlayerController>(InWorldContext, InPlayerID))
+	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 	{
-		return PlayerController->GetCharacter();
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }
 
-ACharacter* UGlobalBPLibrary::K2_GetLocalPlayerCharacter(const UObject* InWorldContext, TSubclassOf<ACharacter> InClass)
+ACharacter* UGlobalBPLibrary::K2_GetPlayerCharacter(TSubclassOf<ACharacter> InClass, int32 InPlayerIndex)
 {
-	if(APlayerController* PlayerController = GetLocalPlayerController<APlayerController>(InWorldContext))
+	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
-		return PlayerController->GetCharacter();
+		return PlayerController->GetPlayerPawn<ACharacter>();
+	}
+	return nullptr;
+}
+
+ACharacter* UGlobalBPLibrary::K2_GetPlayerCharacterByID(TSubclassOf<ACharacter> InClass, int32 InPlayerID)
+{
+	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
+	{
+		return PlayerController->GetPlayerPawn<ACharacter>();
+	}
+	return nullptr;
+}
+
+ACharacter* UGlobalBPLibrary::K2_GetLocalPlayerCharacter(TSubclassOf<ACharacter> InClass)
+{
+	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
+	{
+		return PlayerController->GetPlayerPawn<ACharacter>();
 	}
 	return nullptr;
 }

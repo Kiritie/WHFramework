@@ -48,11 +48,11 @@ void UAudioModuleBPLibrary::PlaySingleSoundAtLocation(USoundBase* InSound, FVect
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSoundAtLocation2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlaySingleSoundAtLocation2DWithDelegate(InSound, InOnSoundPlayFinished, InLocation, InVolume, bMulticast);
+		AudioModule->PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinished, InLocation, InVolume, bMulticast);
 	}
 }
 

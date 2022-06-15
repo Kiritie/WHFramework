@@ -64,3 +64,38 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 	}
 	return LoadedItem;
 }
+
+TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
+{
+	return Super::LoadPrimaryAssets(AssetsToLoad, LoadBundles, DelegateToCall, Priority);
+}
+
+TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
+{
+	TArray<UPrimaryAssetBase*> LoadedItems;
+	
+	TArray<FSoftObjectPath> ItemPaths;
+	GetPrimaryAssetPathList(InPrimaryAssetType, ItemPaths);
+
+	if(!PrimaryAssetsMap.Contains(InPrimaryAssetType))
+	{
+		for(auto Iter : ItemPaths)
+		{
+			LoadedItems.Add(Cast<UPrimaryAssetBase>(Iter.TryLoad()));
+		}
+		if(LoadedItems.Num() > 0)
+		{
+			PrimaryAssetsMap.Add(InPrimaryAssetType, FPrimaryAssets(LoadedItems));
+		}
+	}
+	else
+	{
+		LoadedItems = PrimaryAssetsMap[InPrimaryAssetType].Assets;
+	}
+
+	if(bLogWarning && LoadedItems.Num() == 0)
+	{
+		WHLog(WH_Asset, Warning, TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetType.ToString());
+	}
+	return LoadedItems;
+}

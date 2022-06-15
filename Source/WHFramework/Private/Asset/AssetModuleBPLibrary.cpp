@@ -51,7 +51,38 @@ void UAssetModuleBPLibrary::RemoveAllDataAsset()
 	}
 }
 
+bool UAssetModuleBPLibrary::AddDataTable(UDataTable* InDataTable)
+{
+	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	{
+		return AssetModule->AddDataTable(InDataTable);
+	}
+	return false;
+}
+
+bool UAssetModuleBPLibrary::RemoveDataTable(UDataTable* InDataTable)
+{
+	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	{
+		return AssetModule->RemoveDataTable(InDataTable);
+	}
+	return false;
+}
+
+void UAssetModuleBPLibrary::RemoveAllDataTable()
+{
+	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	{
+		AssetModule->RemoveAllDataTable();
+	}
+}
+
 UPrimaryAssetBase* UAssetModuleBPLibrary::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass, bool bLogWarning)
 {
 	return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
+}
+
+TArray<UPrimaryAssetBase*> UAssetModuleBPLibrary::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
+{
+	return UAssetManagerBase::Get().LoadPrimaryAssets(InPrimaryAssetType, bLogWarning);
 }

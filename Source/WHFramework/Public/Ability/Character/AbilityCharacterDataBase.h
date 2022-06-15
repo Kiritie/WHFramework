@@ -2,16 +2,16 @@
 
 #include "Ability/Item/ItemDataBase.h"
 
-#include "VitalityDataBase.generated.h"
+#include "AbilityCharacterDataBase.generated.h"
 
-class AAbilityVitalityBase;
+class AAbilityCharacterBase;
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVitalityDataBase : public UItemDataBase
+class WHFRAMEWORK_API UAbilityCharacterDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	UVitalityDataBase();
+	UAbilityCharacterDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -25,7 +25,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 EXPFactor;
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityVitalityBase> Class;
+	TSubclassOf<AAbilityCharacterBase> Class;
 };

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilityModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "AbilityModule.generated.h"
@@ -34,4 +35,12 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<EInteractAction, FString> InteractActionMap;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FText GetInteractActionDisplayName(int32 InInteractAction);
 };

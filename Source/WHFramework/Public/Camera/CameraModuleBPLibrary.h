@@ -136,4 +136,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
 	static FRotator GetRealCameraRotation();
+
+public:
+	/**
+	 * Set the view target blending with variable control
+	 * @param NewViewTarget - new actor to set as view target
+	 * @param BlendTime - time taken to blend
+	 * @param BlendFunc - Cubic, Linear etc functions for blending
+	 * @param BlendExp -  Exponent, used by certain blend functions to control the shape of the curve. 
+	 * @param bLockOutgoing - If true, lock outgoing viewtarget to last frame's camera position for the remainder of the blend.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	virtual void SetViewTargetWithBlend(class AActor* NewViewTarget, float BlendTime = 0, enum EViewTargetBlendFunction BlendFunc = VTBlend_Linear, float BlendExp = 0, bool bLockOutgoing = false);
 };

@@ -626,7 +626,7 @@ AWHPlayerController* ACameraModule::GetPlayerController()
 {
 	if(!PlayerController)
 	{
-		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this);
+		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>();
 	}
 	return PlayerController;
 }

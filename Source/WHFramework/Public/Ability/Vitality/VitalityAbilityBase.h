@@ -5,7 +5,7 @@
 #include "VitalityAbilityBase.generated.h"
 
 /**
- * Vitality Ability基类
+ * 生命Ability基类
  */
 UCLASS()
 class WHFRAMEWORK_API UVitalityAbilityBase : public UAbilityBase

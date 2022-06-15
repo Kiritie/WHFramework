@@ -7,6 +7,7 @@
 #include "SlateOptMacros.h"
 #include "WHFrameworkEditor.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Procedure/ProcedureModule.h"

@@ -9,7 +9,6 @@ UCharacterAttributeSetBase::UCharacterAttributeSetBase()
 	RotationSpeed(360.f),
 	JumpForce(420.f)
 {
-	
 }
 
 void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)

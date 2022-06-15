@@ -6,7 +6,10 @@
 
 UItemDataBase::UItemDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::None);
+	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::None);
+
+	Name = FText::GetEmpty();
+	Detail = FText::GetEmpty();
 	Icon = nullptr;
 	Price = 0;
 	MaxCount = -1;
@@ -16,5 +19,5 @@ UItemDataBase::UItemDataBase()
 
 bool UItemDataBase::EqualType(EAbilityItemType InItemType) const
 {
-	return Type == UAbilityModuleBPLibrary::GetAssetIDByItemType(InItemType);
+	return Type == UAbilityModuleBPLibrary::GetAssetTypeByItemType(InItemType);
 }

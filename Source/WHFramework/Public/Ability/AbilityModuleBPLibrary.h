@@ -17,5 +17,18 @@ class WHFRAMEWORK_API UAbilityModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FPrimaryAssetType GetAssetIDByItemType(EAbilityItemType InItemType);
+	static FPrimaryAssetType GetAssetTypeByItemType(EAbilityItemType InItemType);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Interact
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static FText GetInteractActionDisplayName(int32 InInteractAction);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Race
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static FVitalityRaceData RandomVitalityRaceData();
+	
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static FCharacterRaceData RandomCharacterRaceData();
 };

@@ -100,7 +100,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 {
 	if(!CurrentCharacter || CurrentCharacter != InCharacter)
 	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
 			if(InCharacter)
 			{

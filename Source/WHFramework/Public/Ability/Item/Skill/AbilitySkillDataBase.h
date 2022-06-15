@@ -3,15 +3,15 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Item/ItemDataBase.h"
 
-#include "SkillDataBase.generated.h"
+#include "AbilitySkillDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API USkillDataBase : public UItemDataBase
+class WHFRAMEWORK_API UAbilitySkillDataBase : public UItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	USkillDataBase();
+	UAbilitySkillDataBase();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

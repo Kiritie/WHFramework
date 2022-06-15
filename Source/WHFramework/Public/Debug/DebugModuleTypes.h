@@ -112,7 +112,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  * @param Duration 持续时间
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, EDebugMode DebugMode = EDebugMode::All, int32 Key = -1, bool bNewerOnTop = true)
 {
-	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, EDebugMode::All, Key, bNewerOnTop);
+	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, DebugMode, Key, bNewerOnTop);
 }

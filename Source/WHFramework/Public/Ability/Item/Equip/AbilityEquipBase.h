@@ -9,7 +9,7 @@ class AAbilityCharacterBase;
 class UStaticMeshComponent;
 
 /**
- * װ��
+ * 装备基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilityEquipBase : public AAbilityItemBase

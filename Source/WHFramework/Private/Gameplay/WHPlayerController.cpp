@@ -99,6 +99,11 @@ void AWHPlayerController::SetupInputComponent()
 void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+
+	if(InPawn->Implements<UWHPlayerInterface>())
+	{
+		PlayerPawn = InPawn;
+	}
 }
 
 void AWHPlayerController::OnUnPossess()

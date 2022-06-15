@@ -120,4 +120,116 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void RemoveAllDataAsset();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// DataTable
+protected:
+	UPROPERTY(EditAnywhere, Category = "DataTable")
+	TArray<UDataTable*> DataTables;
+
+	UPROPERTY(VisibleAnywhere, Transient, Category = "DataTable")
+	TMap<UScriptStruct*, UDataTable*> DataTableMap;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	bool AddDataTable(UDataTable* InDataTable);
+
+	UFUNCTION(BlueprintCallable)
+	bool RemoveDataTable(UDataTable* InDataTable);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveAllDataTable();
+
+	template<class T>
+	bool GetDataTableRow(int32 InRowIndex, T& OutRow)
+	{
+		return GetDataTableRow(*FString::FromInt(InRowIndex), OutRow);
+	}
+
+	template<class T>
+	bool GetDataTableRow(FName InRowName, T& OutRow)
+	{
+		UDataTable* DataTable = nullptr;
+		if(DataTableMap.Contains(T::StaticStruct()))
+		{
+			DataTable = DataTableMap[T::StaticStruct()];
+		}
+		return GetDataTableRow(DataTable, InRowName, OutRow);
+	}
+
+	template<class T>
+	bool GetDataTableRow(UDataTable* InDataTable, int32 InRowIndex, T& OutRow)
+	{
+		return GetDataTableRow(InDataTable, *FString::FromInt(InRowIndex), OutRow);
+	}
+
+	template<class T>
+	bool GetDataTableRow(UDataTable* InDataTable, FName InRowName, T& OutRow)
+	{
+		if(!InDataTable) return false;
+
+		FString ContextStr;
+		if(T* Row = InDataTable->FindRow<T>(InRowName, ContextStr))
+		{
+			OutRow = *Row;
+			return true;
+		}
+		return false;
+	}
+
+	template<class T>
+	bool ReadDataTable(TArray<T>& OutRows)
+	{
+		UDataTable* DataTable = nullptr;
+		if(DataTableMap.Contains(T::StaticStruct()))
+		{
+			DataTable = DataTableMap[T::StaticStruct()];
+		}
+		return ReadDataTable(DataTable, OutRows);
+	}
+
+	template<class T>
+	bool ReadDataTable(UDataTable* InDataTable, TArray<T>& OutRows)
+	{
+		if(!InDataTable) return false;
+
+		TArray<T*> Rows;
+		FString ContextStr;
+
+		InDataTable->GetAllRows(ContextStr, Rows);
+		for(auto Iter : Rows)
+		{
+			OutRows.Add(*Iter);
+			return true;
+		}
+		return true;
+	}
+
+	template<class T>
+	bool ReadDataTable(TMap<FName, T>& OutRows)
+	{
+		UDataTable* DataTable = nullptr;
+		if(DataTableMap.Contains(T::StaticStruct()))
+		{
+			DataTable = DataTableMap[T::StaticStruct()];
+		}
+		return ReadDataTable(DataTable, OutRows);
+	}
+
+	template<class T>
+	bool ReadDataTable(UDataTable* InDataTable, TMap<FName, T>& OutRows)
+	{
+		if(!InDataTable) return false;
+
+		FString ContextStr;
+
+		for(auto Iter : InDataTable->GetRowNames())
+		{
+			if(T* Row = InDataTable->FindRow<T>(Iter, ContextStr))
+			{
+				OutRows.Add(Iter, *Row);
+			}
+		}
+		return true;
+	}
 };

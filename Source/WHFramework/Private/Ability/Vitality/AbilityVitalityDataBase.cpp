@@ -1,11 +1,11 @@
-#include "Ability/Vitality/VitalityDataBase.h"
+#include "Ability/Vitality/AbilityVitalityDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UVitalityDataBase::UVitalityDataBase()
+UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Vitality);
+	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Vitality);
 	MaxCount = 1;
 	Range = FVector::OneVector;
 	EXP = 50;

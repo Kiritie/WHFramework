@@ -11,7 +11,6 @@
 #include "Main/Base/ModuleNetworkComponent.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Kismet/GameplayStatics.h"
-#include "Global/GlobalBPLibrary.h"
 
 #include "MainModule.generated.h"
 
@@ -136,15 +135,10 @@ public:
 	template<class T>
 	static T* GetModuleNetworkComponentByClass(bool bInEditor = false, TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
 	{
-		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
-		{
-			if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(Get()))
-			{
-				return PlayerController->GetModuleNetCompByClass<T>(InModuleNetworkComponentClass);
-			}
-		}
-		return nullptr;
+		return Cast<T>(GetModuleNetworkComponentByClass(InModuleNetworkComponentClass, bInEditor));
 	}
+	
+	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor = false);
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

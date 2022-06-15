@@ -3,6 +3,7 @@
 
 #include "Voxel/Chunks/VoxelChunk.h"
 
+#include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/BoxComponent.h"
@@ -410,9 +411,19 @@ void AVoxelChunk::GenerateMap()
 	}
 }
 
-void AVoxelChunk::SpawnActors() {}
+void AVoxelChunk::SpawnActors()
+{
+	
+}
 
-void AVoxelChunk::DestroyActors() {}
+void AVoxelChunk::DestroyActors()
+{
+	for(int32 i = 0; i < PickUps.Num(); i++)
+	{
+		PickUps[i]->Destroy();
+	}
+	PickUps.Empty();
+}
 
 void AVoxelChunk::OnGenerated()
 {

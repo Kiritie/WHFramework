@@ -1,11 +1,11 @@
-#include "Ability/Item/Skill/SkillDataBase.h"
+#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-USkillDataBase::USkillDataBase()
+UAbilitySkillDataBase::UAbilitySkillDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetIDByItemType(EAbilityItemType::Skill);
+	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Skill);
 	MaxCount = 1;
 	SkillType = ESkillType::None;
 	SkillMode = ESkillMode::None;

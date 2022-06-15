@@ -9,6 +9,7 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Voxel/EventHandle_ChangeVoxelWorldState.h"
 #include "Gameplay/WHPlayerInterface.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
@@ -285,23 +286,23 @@ void AVoxelModule::GeneratePreviews()
 
 void AVoxelModule::GenerateTerrain()
 {
-	if(IWHPlayerInterface* Player = UGlobalBPLibrary::GetPlayerPawn<IWHPlayerInterface>(this))
+	if(const APawn* PlayerPawn = UGlobalBPLibrary::GetPlayerPawn<APawn>())
 	{
-		FIndex chunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(Cast<AActor>(Player)->GetActorLocation(), true);
+		const FIndex ChunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(PlayerPawn->GetActorLocation(), true);
 
-		if(LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(chunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
+		if(LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(ChunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
 		{
-			GenerateChunks(chunkIndex);
+			GenerateChunks(ChunkIndex);
 		}
 
-		if(chunkIndex != LastStayChunkIndex)
+		if(ChunkIndex != LastStayChunkIndex)
 		{
-			LastStayChunkIndex = chunkIndex;
+			LastStayChunkIndex = ChunkIndex;
 			for(auto iter = ChunkMap.CreateConstIterator(); iter; ++iter)
 			{
 				FIndex index = iter->Key;
 				AVoxelChunk* chunk = iter->Value;
-				if(FIndex::Distance(chunkIndex, index, true) >= ChunkSpawnRange + ChunkDestroyDistance)
+				if(FIndex::Distance(ChunkIndex, index, true) >= ChunkSpawnRange + ChunkDestroyDistance)
 				{
 					AddToDestroyQueue(chunk);
 				}

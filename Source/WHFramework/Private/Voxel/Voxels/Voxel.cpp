@@ -6,6 +6,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Asset/AssetManagerBase.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
@@ -169,7 +170,7 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 	{
 		case EMouseButton::Left:
 		{
-			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
+			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
 			{
 				return VoxelAgentPlayer->DestroyVoxel(InHitResult);
 			}
@@ -177,7 +178,7 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 		}
 		case EMouseButton::Right:
 		{
-			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>(this))
+			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
 			{
 				FAbilityItem tmpItem = FAbilityItem(VoxelAgentPlayer->GetGeneratingVoxelItem(), 1);
 				return VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem);

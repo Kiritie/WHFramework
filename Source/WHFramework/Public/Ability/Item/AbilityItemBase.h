@@ -10,7 +10,7 @@
 class AAbilityCharacterBase;
 
 /**
- * װ��
+ * 物品基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilityItemBase : public AActor

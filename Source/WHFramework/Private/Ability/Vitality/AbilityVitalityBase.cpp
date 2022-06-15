@@ -10,9 +10,9 @@
 #include "Ability/Vitality/VitalityAttributeSetBase.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
-#include "Kismet/GameplayStatics.h"
+	#include "Global/GlobalBPLibrary.h"
+	#include "Kismet/GameplayStatics.h"
 #include "Scene/SceneModuleBPLibrary.h"
-#include "Scene/Components/WorldTextComponent.h"
 
 	// Sets default values
 AAbilityVitalityBase::AAbilityVitalityBase()
@@ -68,45 +68,52 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(Ar.IsSaveGame())
+	if(!AttributeSet) return;
+
+	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
 	{
-		float CurrentValue;
-		if(Ar.IsLoading())
+		float BaseValue = 0.f;
+		float CurrentValue = 0.f;
+		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
 		{
-			Ar << CurrentValue;
-			if(CurrentValue > 0)
+			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
 			{
-				SetHealth(CurrentValue);
+				if(Ar.IsLoading())
+				{
+					Ar << BaseValue;
+					Ar << CurrentValue;
+					AttributeData->SetBaseValue(BaseValue);
+					AttributeData->SetCurrentValue(CurrentValue);
+				}
+				else if(Ar.IsSaving())
+				{
+					BaseValue = AttributeData->GetBaseValue();
+					CurrentValue = AttributeData->GetCurrentValue();
+					Ar << BaseValue;
+					Ar << CurrentValue;
+				}
 			}
-			else
-			{
-				Revive();
-				Ar << CurrentValue;
-				Ar << CurrentValue;
-			}
-		}
-		else if(Ar.IsSaveGame())
-		{
-			CurrentValue = GetHealth();
-			Ar << CurrentValue;
 		}
 	}
 }
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData)
 {
+	UGlobalBPLibrary::LoadObjectFromMemory(this, InSaveData->Datas);
 }
 
 FSaveData* AAbilityVitalityBase::ToData(bool bSaved)
 {
-	static FSaveData SaveData;
+	static FSaveData SaveData = FSaveData();
+	UGlobalBPLibrary::SaveObjectToMemory(this, SaveData.Datas);
 	return &SaveData;
 }
 
 void AAbilityVitalityBase::ResetData(bool bRefresh)
 {
 	bDead = false;
-	if(bRefresh) ResetData();
+	
+	if(bRefresh) RefreshData();
 }
 
 void AAbilityVitalityBase::RefreshData()
@@ -246,9 +253,9 @@ float AAbilityVitalityBase::GetMagicDamage() const
 	return AttributeSet->GetMagicDamage();
 }
 
-UVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
+UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVitalityDataBase>(AssetID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
 UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const

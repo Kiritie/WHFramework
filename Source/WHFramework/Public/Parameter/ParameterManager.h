@@ -81,7 +81,14 @@ public:
 	virtual FRotator GetRotatorParameter(FName InName, bool bEnsured = true) const = 0;
 
 	virtual TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true) const = 0;
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	virtual void SetColorParameter(FName InName, const FColor& InValue) = 0;
+
+	virtual FColor GetColorParameter(FName InName, bool bEnsured = true) const = 0;
+
+	virtual TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true) const = 0;
+
 	//////////////////////////////////////////////////////////////////////////
 	virtual void SetClassParameter(FName InName, UClass* InValue) = 0;
 

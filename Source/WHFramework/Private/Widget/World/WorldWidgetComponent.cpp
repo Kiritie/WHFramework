@@ -60,7 +60,7 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	
 	if(bOrientCamera)
 	{
-		if(const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		if(const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
 			const FRotator TargetRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
 			SetWorldRotation(TargetRotation);
