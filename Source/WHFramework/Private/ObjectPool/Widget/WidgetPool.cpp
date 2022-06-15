@@ -5,6 +5,7 @@
 
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Blueprint/UserWidget.h"
+#include "Debug/DebugModuleTypes.h"
 
 UWidgetPool::UWidgetPool()
 {
@@ -13,6 +14,7 @@ UWidgetPool::UWidgetPool()
 UObject* UWidgetPool::SpawnImpl()
 {
 	UObject* Object = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
+	Object->AddToRoot();
 	return Object;
 }
 

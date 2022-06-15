@@ -50,13 +50,13 @@ void UWidgetLoadingLevelPanel::OnRefresh_Implementation()
 	if(LoadProgress >= 0)
 	{
 		CurrentProgress = FMath::FInterpConstantTo(CurrentProgress, LoadProgress, GetWorld()->GetDeltaSeconds(), 1.f);
-		if(PBarProgress)
+		if(ProgressBar_Progress)
 		{
-			PBarProgress->SetPercent(CurrentProgress);
+			ProgressBar_Progress->SetPercent(CurrentProgress);
 		}
-		if(TxtProgress)
+		if(TextBlock_Progress)
 		{
-			TxtProgress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
+			TextBlock_Progress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
 		}
 		UE_LOG(LogTemp, Log, TEXT("Load level progress: %f"), CurrentProgress);
 	}

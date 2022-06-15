@@ -63,6 +63,19 @@ public:
 		return nullptr;
 	}
 
+	template<class T>
+	T& GetDataAssetRef(FName InDataAssetName = NAME_None) const
+	{
+		if(T* Asset = GetDataAsset<T>(InDataAssetName))
+		{
+			return *Asset;
+		}
+		else
+		{
+			return UReferencePoolModuleBPLibrary::GetReference<T>();
+		}
+	}
+
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetDataAsset", DeterminesOutputType = "InDataAssetClass"))
 	UDataAssetBase* K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None) const;
 

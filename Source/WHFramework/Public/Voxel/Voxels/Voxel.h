@@ -103,6 +103,12 @@ protected:
 	AVoxelAuxiliary* Auxiliary;
 
 public:
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+	
 	UVoxelData& GetData() const;
 
 	UFUNCTION(BlueprintPure)

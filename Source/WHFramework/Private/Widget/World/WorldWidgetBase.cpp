@@ -20,7 +20,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 {
 	WidgetName = NAME_None;
 	bWidgetTickAble = true;
-	WidgetZOrder = -1;
+	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
@@ -34,7 +34,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetIndex = 0;
 
 	WidgetComponent = nullptr;
-	BindWidgetMap = TMap<UWidget*, class USceneComponent*>();
+	BindWidgetMap = TMap<UWidget*, FWorldWidgetBindInfo>();
 }
 
 void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -46,13 +46,14 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Iter.Key->Slot))
 			{
 				FVector2D ScreenPos;
-				if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), Iter.Value->GetComponentLocation(), ScreenPos, false))
+				if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), Iter.Value.SceneComp ? Iter.Value.SceneComp->GetComponentLocation() + Iter.Value.Location : Iter.Value.Location, ScreenPos, false))
 				{
 					CanvasPanelSlot->SetPosition(ScreenPos);
 				}
 			}
 		}
 	}
+
 }
 
 void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -62,7 +63,11 @@ void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 
 void UWorldWidgetBase::OnDespawn_Implementation()
 {
-	
+	OwnerActor = nullptr;
+	WidgetParams.Empty();
+	WidgetIndex = 0;
+	WidgetComponent = nullptr;
+	BindWidgetMap.Empty();
 }
 
 void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
@@ -101,24 +106,13 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 				CanvasPanelSlot->SetAlignment(WidgetAlignment);
 				SetRenderTransformPivot(WidgetAlignment);
 
-				if(!InLocation.IsNearlyZero())
+				if(!WidgetComponent)
 				{
-					FVector2D ScreenPos;
-					if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), InLocation, ScreenPos, false))
-					{
-						CanvasPanelSlot->SetPosition(ScreenPos);
-					}
+					BindWidgetPoint(this, InLocation, InSceneComp);
 				}
-				else if(InSceneComp)
+				else if(WidgetComponent->IsBindToSelf())
 				{
-					if(!WidgetComponent)
-					{
-						BindWidgetPoint(this, InSceneComp);
-					}
-					else if(WidgetComponent->IsBindToSelf())
-					{
-						BindWidgetPoint(this, WidgetComponent);
-					}
+					BindWidgetPoint(this, InLocation, WidgetComponent);
 				}
 			}
 		}
@@ -132,12 +126,9 @@ void UWorldWidgetBase::OnRefresh_Implementation()
 
 void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 {
-	if(IsInViewport())
+	if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
 	{
-		if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
-		{
-			Container->RemoveWorldWidget(this);
-		}
+		Container->RemoveWorldWidget(this);
 	}
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
@@ -172,17 +163,17 @@ void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 	UWidgetModuleBPLibrary::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
 }
 
-void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, USceneComponent* InSceneComp)
+void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp)
 {
 	if(!InSceneComp) return;
 	
 	if(!BindWidgetMap.Contains(InWidget))
 	{
-		BindWidgetMap.Add(InWidget, InSceneComp);
+		BindWidgetMap.Add(InWidget, FWorldWidgetBindInfo(InLocation, InSceneComp));
 		if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
 		{
 			FVector2D ScreenPos;
-			if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), InSceneComp->GetComponentLocation(), ScreenPos, false))
+			if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this), InSceneComp ? InSceneComp->GetComponentLocation() + InLocation : InLocation, ScreenPos, false))
 			{
 				CanvasPanelSlot->SetPosition(ScreenPos);
 			}
@@ -190,11 +181,11 @@ void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, USceneC
 	}
 }
 
-void UWorldWidgetBase::BindWidgetPointByName_Implementation(UWidget* InWidget, FName InPointName)
+void UWorldWidgetBase::BindWidgetPointByName_Implementation(UWidget* InWidget, FVector InLocation, FName InPointName)
 {
 	if(WidgetComponent)
 	{
-		BindWidgetPoint(InWidget, WidgetComponent->GetWidgetPoint(InPointName));
+		BindWidgetPoint(InWidget, InLocation, WidgetComponent->GetWidgetPoint(InPointName));
 	}
 }
 
@@ -204,6 +195,15 @@ void UWorldWidgetBase::UnBindWidgetPoint_Implementation(UWidget* InWidget)
 	{
 		BindWidgetMap.Remove(InWidget);
 	}
+}
+
+FWorldWidgetBindInfo UWorldWidgetBase::GetWidgetBindInfo_Implementation(UWidget* InWidget)
+{
+	if(BindWidgetMap.Contains(InWidget))
+	{
+		return BindWidgetMap[InWidget];
+	}
+	return FWorldWidgetBindInfo();
 }
 
 EWidgetSpace UWorldWidgetBase::GetWidgetSpace() const

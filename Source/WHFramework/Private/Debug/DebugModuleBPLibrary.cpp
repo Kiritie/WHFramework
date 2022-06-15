@@ -20,16 +20,30 @@ void UDebugModuleBPLibrary::EnsureEditorCrash(const FString& Message, bool bNoCr
 #else
 	if(!bNoCrash)
 	{
-		WH_LOG(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
+		WHLog(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
 	}
 #endif
 }
 
-void UDebugModuleBPLibrary::DebugMessage(const FString& Message, FColor DisplayColor, float Duration, bool bNewerOnTop)
+void UDebugModuleBPLibrary::DebugMessage(const FString& Message, const FColor& DisplayColor, float Duration, EDebugMode DebugMode, int32 Key, bool bNewerOnTop)
 {
-	if(GEngine)
+	switch (DebugMode)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, Duration, DisplayColor, Message, bNewerOnTop);
+		case EDebugMode::All:
+		{
+			GEngine->AddOnScreenDebugMessage(Key, Duration, DisplayColor, Message, bNewerOnTop);
+			WHLog(WH_Debug, Log, TEXT("%s"), *Message);
+			break;
+		}
+		case EDebugMode::Screen:
+		{
+			GEngine->AddOnScreenDebugMessage(Key, Duration, DisplayColor, Message, bNewerOnTop);
+			break;
+		}
+		case EDebugMode::Console:
+		{
+			WHLog(WH_Debug, Log, TEXT("%s"), *Message);
+			break;
+		}
 	}
-	UE_LOG(WH_Debug, Log, TEXT("%s"), *Message);
 }

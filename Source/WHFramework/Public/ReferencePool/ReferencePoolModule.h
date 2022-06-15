@@ -84,7 +84,7 @@ public:
 			ReferencePool->Initialize(InType);
 			ReferencePools.Add(InType, ReferencePool);
 		}
-		return Cast<T>(ReferencePools[InType]->Set(InObject));
+		ReferencePools[InType]->Set(InObject);
 	}
 
 	template<class T>

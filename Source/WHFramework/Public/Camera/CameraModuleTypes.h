@@ -12,3 +12,19 @@ enum class ECameraCollisionMode : uint8
 	PhysicsOnly,
 	SightOnly
 };
+
+UENUM(BlueprintType)
+enum class ETrackTargetMode : uint8
+{
+	LocationOnly,
+	LocationAndRotation,
+	LocationAndRotationAndDistance,
+	LocationAndRotationAndDistanceOnce
+};
+
+UENUM(BlueprintType)
+enum class ETrackTargetSpace : uint8
+{
+	Local,
+	World
+};

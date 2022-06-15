@@ -82,11 +82,13 @@ public:
 
 	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) = 0;
 
-	virtual IScreenWidgetInterface* GetParentWidget() const = 0;
+	virtual IScreenWidgetInterface* GetParentWidgetN() const = 0;
 
-	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) = 0;
+	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) = 0;
 
 	virtual int32 GetChildNum() const = 0;
 
 	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() = 0;
+
+	virtual IScreenWidgetInterface* GetChild(int32 InIndex) const = 0;
 };

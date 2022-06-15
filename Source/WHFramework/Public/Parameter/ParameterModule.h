@@ -136,6 +136,17 @@ public:
 	virtual TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true) const override;
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Color
+	UFUNCTION(BlueprintCallable)
+	virtual void SetColorParameter(FName InName, const FColor& InValue) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	virtual FColor GetColorParameter(FName InName, bool bEnsured = true) const override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	virtual TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true) const override;
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Class
 	UFUNCTION(BlueprintCallable)
 	virtual void SetClassParameter(FName InName, UClass* InValue) override;

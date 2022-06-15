@@ -28,7 +28,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
  * 角色
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IPrimaryAssetInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -186,9 +186,6 @@ public:
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle) override;
-
 	UFUNCTION(BlueprintCallable)
 	float Distance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
 

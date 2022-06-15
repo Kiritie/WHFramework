@@ -191,6 +191,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
+	/**
+	* 能否跳过
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool IsSkipAble() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target
@@ -480,7 +485,7 @@ public:
 
 		OnExecuteDelegate.Broadcast();
 
-		WH_LOG(WH_Step, Log, TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString());
+		WHLog(WH_Step, Log, TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString());
 	}
 
 	void TryComplete(float DeltaSeconds)

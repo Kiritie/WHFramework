@@ -11,6 +11,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Scene/SceneModuleBPLibrary.h"
 #include "Scene/Components/WorldTextComponent.h"
 
 	// Sets default values
@@ -255,16 +256,6 @@ UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
 	return AbilitySystem;
 }
 
-void AAbilityVitalityBase::AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle)
-{
-	auto contextHUD = NewObject<UWorldTextComponent>(this);
-	contextHUD->RegisterComponent();
-	contextHUD->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-	contextHUD->SetRelativeLocation(FVector(0, 0, 50));
-	contextHUD->SetVisibility(false);
-	contextHUD->InitContent(InContent, InContentType, InContentStyle);
-}
-
 FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
 {
 	if (AbilitySystem && InAbility)
@@ -474,7 +465,7 @@ void AAbilityVitalityBase::HandleHealthChanged(float NewValue, float DeltaValue 
 {
 	if(DeltaValue > 0.f)
 	{
-		AddWorldText(FString::FromInt(FMath::Abs(DeltaValue)), EWorldTextType::HealthRecover, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress);
+		USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
 	}
 }
 

@@ -152,4 +152,30 @@ public:
 	TArray<class UWorldWidgetBase*> WorldWidgets;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWorldWidgetBindInfo
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FWorldWidgetBindInfo()
+	{
+		Location = FVector();
+		SceneComp = nullptr;
+	}
+	
+	FWorldWidgetBindInfo(FVector InLocation, USceneComponent* InSceneComp)
+	{
+		Location = InLocation;
+		SceneComp = InSceneComp;
+	}
+	
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FVector Location;
+
+	UPROPERTY(BlueprintReadOnly)
+	USceneComponent* SceneComp;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);

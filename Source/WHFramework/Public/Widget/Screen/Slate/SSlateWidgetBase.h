@@ -66,11 +66,11 @@ public:
 
 	virtual void RemoveAllChild() override;
 	
-	virtual SSlateWidgetBase* GetChild(int32 InIndex) const
+	virtual IScreenWidgetInterface* GetChild(int32 InIndex) const override
 	{
 		if(ChildWidgets.IsValidIndex(InIndex))
 		{
-			return Cast<SSlateWidgetBase>(ChildWidgets[InIndex]);
+			return ChildWidgets[InIndex];
 		}
 		return nullptr;
 	}
@@ -166,9 +166,9 @@ public:
 
 	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
 
-	virtual IScreenWidgetInterface* GetParentWidget() const override { return ParentWidget; }
+	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
-	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 

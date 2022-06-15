@@ -97,11 +97,11 @@ public:
 	/**
 	* 获取模块名称
 	*/
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	FName GetModuleName() const;
 	/**
 	* 获取模块状态
 	*/
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	EModuleState GetModuleState() const;
 };

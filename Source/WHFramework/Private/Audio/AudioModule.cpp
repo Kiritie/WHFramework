@@ -20,7 +20,7 @@ AAudioModule::AAudioModule()
 	SingleSoundComponent->SetupAttachment(RootComponent);
 	SingleSoundComponent->OnAudioFinished.AddDynamic(this, &AAudioModule::OnSingleSoundPlayFinished);
 
-	bAutoPlayGlobalBGSound = true;
+	bAutoPlayGlobal = true;
 
 	GlobalBGSoundComponent = CreateDefaultSubobject<UAudioComponent>(FName("GlobalBGSoundComponent"));
 	GlobalBGSoundComponent->SetupAttachment(RootComponent);
@@ -45,7 +45,7 @@ void AAudioModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 	
-	if(bAutoPlayGlobalBGSound)
+	if(bAutoPlayGlobal)
 	{
 		PlayGlobalBGSound();
 	}
@@ -85,7 +85,7 @@ void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMultic
 		}
 		return;
 	}
-	UGameplayStatics::PlaySound2D(this, InSound, InVolume);
+	UGameplayStatics::PlaySound2D(this, InSound, SingleSoundInfo.VolumeScale * InVolume);
 }
 
 void AAudioModule::MultiPlaySound2D_Implementation(USoundBase* InSound, float InVolume)
@@ -107,7 +107,7 @@ void AAudioModule::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, 
 		}
 		return;
 	}
-	UGameplayStatics::PlaySoundAtLocation(this, InSound, InLocation,InVolume);
+	UGameplayStatics::PlaySoundAtLocation(this, InSound, InLocation, SingleSoundInfo.VolumeScale * InVolume);
 }
 
 void AAudioModule::MultiPlaySoundAtLocation_Implementation(USoundBase* InSound, FVector InLocation, float InVolume)
@@ -123,8 +123,8 @@ void AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool b
 	
 	if(bMulticast)
 	{
-		SingleSoundParams = FSingleSoundParams(InSound, InVolume, true);
-		OnRep_SingleSoundParams();
+		SingleSoundInfo = FSingleSoundInfo(InSound, InVolume, true);
+		OnRep_SingleSoundInfo();
 	}
 	else
 	{
@@ -135,10 +135,10 @@ void AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool b
 	}
 }
 
-void AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume, bool bMulticast)
+void AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume, bool bMulticast)
 {
 	PlaySingleSound2D(InSound, InVolume, bMulticast);
-	OnSoundPlayFinishedDelegate = InOnSoundPlayFinishedDelegate;
+	OnSingleSoundPlayFinishedDelegate = InOnSoundPlayFinished;
 }
 
 void AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
@@ -149,8 +149,8 @@ void AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLoca
 
 	if(bMulticast)
 	{
-		SingleSoundParams = FSingleSoundParams(InSound, InVolume, false, InLocation);
-		OnRep_SingleSoundParams();
+		SingleSoundInfo = FSingleSoundInfo(InSound, InVolume, false, InLocation);
+		OnRep_SingleSoundInfo();
 	}
 	else
 	{
@@ -162,103 +162,131 @@ void AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLoca
 	}
 }
 
+void AAudioModule::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume, bool bMulticast)
+{
+	PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+	OnSingleSoundPlayFinishedDelegate = InOnSoundPlayFinished;
+}
+
 void AAudioModule::StopSingleSound()
 {
-	SingleSoundParams.Sound = nullptr;
-	OnRep_SingleSoundParams();
+	SingleSoundInfo.Sound = nullptr;
+	OnRep_SingleSoundInfo();
 	OnSingleSoundPlayFinished();
 	GetWorld()->GetTimerManager().ClearTimer(SingleSoundStopTimerHandle);
 }
 
-void AAudioModule::OnRep_SingleSoundParams()
+float AAudioModule::GetSingleSoundVolume()
 {
-	if(!SingleSoundParams.Sound)
+	return SingleSoundInfo.VolumeScale;
+}
+
+void AAudioModule::SetSingleSoundVolume(float InVolume)
+{
+	SingleSoundInfo.VolumeScale = InVolume;
+	SingleSoundComponent->VolumeMultiplier = SingleSoundInfo.Volume * InVolume;
+}
+
+void AAudioModule::OnRep_SingleSoundInfo()
+{
+	if(!SingleSoundInfo.Sound)
 	{
 		SingleSoundComponent->Stop();
 		return;
 	}
 	
-	if(SingleSoundComponent->Sound != SingleSoundParams.Sound)
+	if(SingleSoundComponent->Sound != SingleSoundInfo.Sound)
 	{
-		SingleSoundComponent->Sound = SingleSoundParams.Sound;
+		SingleSoundComponent->Sound = SingleSoundInfo.Sound;
 	}
-	SingleSoundComponent->VolumeMultiplier = SingleSoundParams.Volume;
-	SingleSoundComponent->bIsUISound = SingleSoundParams.bIsUISound;
-	if(!SingleSoundParams.bIsUISound)
+	SingleSoundComponent->VolumeMultiplier = SingleSoundInfo.Volume * SingleSoundInfo.VolumeScale;
+	SingleSoundComponent->bIsUISound = SingleSoundInfo.bUISound;
+	if(!SingleSoundInfo.bUISound)
 	{
-		SingleSoundComponent->SetWorldLocation(SingleSoundParams.Location);
+		SingleSoundComponent->SetWorldLocation(SingleSoundInfo.Location);
 	}
 	SingleSoundComponent->Play();
 
 	if(!HasAuthority())
 	{
-		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &AAudioModule::StopSingleSound, SingleSoundParams.Sound->GetDuration());
+		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &AAudioModule::StopSingleSound, SingleSoundInfo.Sound->GetDuration());
 	}
 }
 
 void AAudioModule::OnSingleSoundPlayFinished()
 {
-	if(OnSoundPlayFinishedDelegate.IsBound())
+	if(OnSingleSoundPlayFinishedDelegate.IsBound())
 	{
-		OnSoundPlayFinishedDelegate.Execute();
-		OnSoundPlayFinishedDelegate.Clear();
+		OnSingleSoundPlayFinishedDelegate.Execute();
+		OnSingleSoundPlayFinishedDelegate.Clear();
 	}
 }
 
 void AAudioModule::PlayGlobalBGSound()
 {
-	if(!GlobalBGSoundParams.BGSound) return;
+	if(!GlobalBGSoundInfo.Sound) return;
 	
-	if(GlobalBGSoundParams.bIsLoopSound && !GlobalBGSoundParams.BGSound->IsLooping())
+	if(GlobalBGSoundInfo.bLoopSound && !GlobalBGSoundInfo.Sound->IsLooping())
 	{
-		if(GlobalBGSoundParams.BGSoundState == EBGSoundState::Pausing)
+		if(GlobalBGSoundInfo.SoundState == ESoundState::Pausing)
 		{
 			GetWorld()->GetTimerManager().UnPauseTimer(GlobalBGSoundLoopTimerHandle);
 		}
 		else
 		{
-			GetWorld()->GetTimerManager().SetTimer(GlobalBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopGlobalBGSound, FMath::Max(GlobalBGSoundParams.BGSound->GetDuration() - 1.f, 0.f));
+			GetWorld()->GetTimerManager().SetTimer(GlobalBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopGlobalBGSound, FMath::Max(GlobalBGSoundInfo.Sound->GetDuration() - 1.f, 0.f));
 		}
 	}
-	GlobalBGSoundParams.BGSoundState = EBGSoundState::Playing;
-	OnRep_GlobalBGSoundParams();
+	GlobalBGSoundInfo.SoundState = ESoundState::Playing;
+	OnRep_GlobalBGSoundInfo();
 }
 
 void AAudioModule::PauseGlobalBGSound()
 {
 	GetWorld()->GetTimerManager().PauseTimer(SingleBGSoundLoopTimerHandle);
-	GlobalBGSoundParams.BGSoundState = EBGSoundState::Pausing;
-	OnRep_GlobalBGSoundParams();
+	GlobalBGSoundInfo.SoundState = ESoundState::Pausing;
+	OnRep_GlobalBGSoundInfo();
 	GetWorld()->GetTimerManager().PauseTimer(GlobalBGSoundLoopTimerHandle);
 }
 
 void AAudioModule::StopGlobalBGSound()
 {
-	GlobalBGSoundParams.BGSoundState = EBGSoundState::Stopped;
-	OnRep_GlobalBGSoundParams();
+	GlobalBGSoundInfo.SoundState = ESoundState::Stopped;
+	OnRep_GlobalBGSoundInfo();
 	GetWorld()->GetTimerManager().ClearTimer(GlobalBGSoundLoopTimerHandle);
+}
+
+float AAudioModule::GetGlobalBGSoundVolume()
+{
+	return GlobalBGSoundInfo.VolumeScale;
+}
+
+void AAudioModule::SetGlobalBGSoundVolume(float InVolume)
+{
+	GlobalBGSoundInfo.VolumeScale = InVolume;
+	GlobalBGSoundComponent->VolumeMultiplier = GlobalBGSoundInfo.Volume * InVolume;
 }
 
 void AAudioModule::OnLoopGlobalBGSound()
 {
-	GlobalBGSoundParams.BGSoundState = EBGSoundState::None;
+	GlobalBGSoundInfo.SoundState = ESoundState::None;
 	GetWorld()->GetTimerManager().SetTimer(GlobalBGSoundLoopTimerHandle, this, &AAudioModule::PlayGlobalBGSound, 1.f);
 }
 
-void AAudioModule::OnRep_GlobalBGSoundParams()
+void AAudioModule::OnRep_GlobalBGSoundInfo()
 {
-	if(!GlobalBGSoundParams.BGSound) return;
+	if(!GlobalBGSoundInfo.Sound) return;
 	
-	if(GlobalBGSoundComponent->Sound != GlobalBGSoundParams.BGSound)
+	if(GlobalBGSoundComponent->Sound != GlobalBGSoundInfo.Sound)
 	{
-		GlobalBGSoundComponent->Sound = GlobalBGSoundParams.BGSound;
+		GlobalBGSoundComponent->Sound = GlobalBGSoundInfo.Sound;
 	}
-	GlobalBGSoundComponent->VolumeMultiplier = GlobalBGSoundParams.BGVolume;
-	GlobalBGSoundComponent->bIsUISound = GlobalBGSoundParams.bIsUISound;
+	GlobalBGSoundComponent->VolumeMultiplier = GlobalBGSoundInfo.Volume * GlobalBGSoundInfo.VolumeScale;
+	GlobalBGSoundComponent->bIsUISound = GlobalBGSoundInfo.bUISound;
 
-	switch(GlobalBGSoundParams.BGSoundState)
+	switch(GlobalBGSoundInfo.SoundState)
 	{
-		case EBGSoundState::Playing:
+		case ESoundState::Playing:
 		{
 			if(GlobalBGSoundComponent->bIsPaused)
 			{
@@ -270,12 +298,12 @@ void AAudioModule::OnRep_GlobalBGSoundParams()
 			}
 			break;
 		}
-		case EBGSoundState::Pausing:
+		case ESoundState::Pausing:
 		{
 			GlobalBGSoundComponent->SetPaused(true);
 			break;
 		}
-		case EBGSoundState::Stopped:
+		case ESoundState::Stopped:
 		{
 			GlobalBGSoundComponent->Stop();
 			break;
@@ -286,8 +314,8 @@ void AAudioModule::OnRep_GlobalBGSoundParams()
 
 void AAudioModule::InitSingleBGSound(USoundBase* InBGSound, float InBGVolume, bool bIsLoopSound, bool bIsUISound, bool bIsAutoPlay)
 {
-	SingleBGSoundParams = FBGSoundParams(InBGSound, EBGSoundState::None, InBGVolume, bIsLoopSound, bIsUISound);
-	OnRep_SingleBGSoundParams();
+	SingleBGSoundInfo = FBGSoundInfo(InBGSound, ESoundState::None, InBGVolume, bIsLoopSound, bIsUISound);
+	OnRep_SingleBGSoundInfo();
 	if(bIsAutoPlay)
 	{
 		PlaySingleBGSound();
@@ -296,63 +324,74 @@ void AAudioModule::InitSingleBGSound(USoundBase* InBGSound, float InBGVolume, bo
 
 void AAudioModule::PlaySingleBGSound()
 {
-	if(!SingleBGSoundParams.BGSound) return;
+	if(!SingleBGSoundInfo.Sound) return;
 
 	PauseGlobalBGSound();
 	
-	if(SingleBGSoundParams.bIsLoopSound && !SingleBGSoundParams.BGSound->IsLooping())
+	if(SingleBGSoundInfo.bLoopSound && !SingleBGSoundInfo.Sound->IsLooping())
 	{
-		if(SingleBGSoundParams.BGSoundState == EBGSoundState::Pausing)
+		if(SingleBGSoundInfo.SoundState == ESoundState::Pausing)
 		{
 			GetWorld()->GetTimerManager().UnPauseTimer(SingleBGSoundLoopTimerHandle);
 		}
 		else
 		{
-			GetWorld()->GetTimerManager().SetTimer(SingleBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopSingleBGSound, FMath::Max(SingleBGSoundParams.BGSound->GetDuration() - 1.f, 0.f));
+			GetWorld()->GetTimerManager().SetTimer(SingleBGSoundLoopTimerHandle, this, &AAudioModule::OnLoopSingleBGSound, FMath::Max(SingleBGSoundInfo.Sound->GetDuration() - 1.f, 0.f));
 		}
 	}
-	SingleBGSoundParams.BGSoundState = EBGSoundState::Playing;
-	OnRep_SingleBGSoundParams();
+	SingleBGSoundInfo.SoundState = ESoundState::Playing;
+	OnRep_SingleBGSoundInfo();
 }
 
 void AAudioModule::PauseSingleBGSound()
 {
-	SingleBGSoundParams.BGSoundState = EBGSoundState::Pausing;
-	OnRep_SingleBGSoundParams();
+	SingleBGSoundInfo.SoundState = ESoundState::Pausing;
+	OnRep_SingleBGSoundInfo();
 	GetWorld()->GetTimerManager().PauseTimer(SingleBGSoundLoopTimerHandle);
 }
 
 void AAudioModule::StopSingleBGSound()
 {
-	if(bAutoPlayGlobalBGSound)
+	if(bAutoPlayGlobal)
 	{
 		PlayGlobalBGSound();
 	}
-	SingleBGSoundParams.BGSoundState = EBGSoundState::Stopped;
-	OnRep_SingleBGSoundParams();
+	SingleBGSoundInfo.SoundState = ESoundState::Stopped;
+	OnRep_SingleBGSoundInfo();
 	GetWorld()->GetTimerManager().ClearTimer(SingleBGSoundLoopTimerHandle);
+}
+
+float AAudioModule::GetSingleBGSoundVolume()
+{
+	return SingleBGSoundInfo.VolumeScale;
+}
+
+void AAudioModule::SetSingleBGSoundVolume(float InVolume)
+{
+	SingleBGSoundInfo.VolumeScale = InVolume;
+	SingleBGSoundComponent->VolumeMultiplier = SingleBGSoundInfo.Volume * InVolume;
 }
 
 void AAudioModule::OnLoopSingleBGSound()
 {
-	SingleBGSoundParams.BGSoundState = EBGSoundState::None;
+	SingleBGSoundInfo.SoundState = ESoundState::None;
 	GetWorld()->GetTimerManager().SetTimer(SingleBGSoundLoopTimerHandle, this, &AAudioModule::PlaySingleBGSound, 1.f);
 }
 
-void AAudioModule::OnRep_SingleBGSoundParams()
+void AAudioModule::OnRep_SingleBGSoundInfo()
 {
-	if(!SingleBGSoundParams.BGSound) return;
+	if(!SingleBGSoundInfo.Sound) return;
 	
-	if(SingleBGSoundComponent->Sound != SingleBGSoundParams.BGSound)
+	if(SingleBGSoundComponent->Sound != SingleBGSoundInfo.Sound)
 	{
-		SingleBGSoundComponent->Sound = SingleBGSoundParams.BGSound;
+		SingleBGSoundComponent->Sound = SingleBGSoundInfo.Sound;
 	}
-	SingleBGSoundComponent->VolumeMultiplier = SingleBGSoundParams.BGVolume;
-	SingleBGSoundComponent->bIsUISound = SingleBGSoundParams.bIsUISound;
+	SingleBGSoundComponent->VolumeMultiplier = SingleBGSoundInfo.Volume * SingleBGSoundInfo.VolumeScale;
+	SingleBGSoundComponent->bIsUISound = SingleBGSoundInfo.bUISound;
 
-	switch(SingleBGSoundParams.BGSoundState)
+	switch(SingleBGSoundInfo.SoundState)
 	{
-		case EBGSoundState::Playing:
+		case ESoundState::Playing:
 		{
 			if(SingleBGSoundComponent->bIsPaused)
 			{
@@ -364,12 +403,12 @@ void AAudioModule::OnRep_SingleBGSoundParams()
 			}
 			break;
 		}
-		case EBGSoundState::Pausing:
+		case ESoundState::Pausing:
 		{
 			SingleBGSoundComponent->SetPaused(true);
 			break;
 		}
-		case EBGSoundState::Stopped:
+		case ESoundState::Stopped:
 		{
 			SingleBGSoundComponent->Stop();
 			break;
@@ -382,6 +421,6 @@ void AAudioModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AAudioModule, GlobalBGSoundParams);
-	DOREPLIFETIME(AAudioModule, SingleBGSoundParams);
+	DOREPLIFETIME(AAudioModule, GlobalBGSoundInfo);
+	DOREPLIFETIME(AAudioModule, SingleBGSoundInfo);
 }

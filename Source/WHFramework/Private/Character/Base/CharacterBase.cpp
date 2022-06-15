@@ -42,29 +42,29 @@ void ACharacterBase::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 }
 
-void ACharacterBase::OnRep_SingleSoundParams()
+void ACharacterBase::OnRep_SingleSoundInfo()
 {
-	if(!SingleSoundParams.Sound)
+	if(!SingleSoundInfo.Sound)
 	{
 		SingleSound->Stop();
 		return;
 	}
 	
-	if(SingleSound->Sound != SingleSoundParams.Sound)
+	if(SingleSound->Sound != SingleSoundInfo.Sound)
 	{
-		SingleSound->Sound = SingleSoundParams.Sound;
+		SingleSound->Sound = SingleSoundInfo.Sound;
 	}
-	SingleSound->VolumeMultiplier = SingleSoundParams.Volume;
-	SingleSound->bIsUISound = SingleSoundParams.bIsUISound;
-	if(!SingleSoundParams.bIsUISound)
+	SingleSound->VolumeMultiplier = SingleSoundInfo.Volume;
+	SingleSound->bIsUISound = SingleSoundInfo.bUISound;
+	if(!SingleSoundInfo.bUISound)
 	{
-		SingleSound->SetWorldLocation(SingleSoundParams.Location);
+		SingleSound->SetWorldLocation(SingleSoundInfo.Location);
 	}
 	SingleSound->Play();
 
 	if(!HasAuthority())
 	{
-		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &ACharacterBase::StopSound, SingleSoundParams.Sound->GetDuration());
+		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &ACharacterBase::StopSound, SingleSoundInfo.Sound->GetDuration());
 	}
 }
 
@@ -76,8 +76,8 @@ void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMultic
 
 	if(bMulticast && !HasAuthority())
 	{
-		SingleSoundParams = FSingleSoundParams(InSound, InVolume, true);
-		OnRep_SingleSoundParams();
+		SingleSoundInfo = FSingleSoundInfo(InSound, InVolume, true);
+		OnRep_SingleSoundInfo();
 	}
 	else
 	{
@@ -90,8 +90,8 @@ void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMultic
 
 void ACharacterBase::StopSound()
 {
-	SingleSoundParams.Sound = nullptr;
-	OnRep_SingleSoundParams();
+	SingleSoundInfo.Sound = nullptr;
+	OnRep_SingleSoundInfo();
 	GetWorld()->GetTimerManager().ClearTimer(SingleSoundStopTimerHandle);
 }
 
@@ -245,5 +245,5 @@ void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ACharacterBase, SingleSoundParams);
+	DOREPLIFETIME(ACharacterBase, SingleSoundInfo);
 }

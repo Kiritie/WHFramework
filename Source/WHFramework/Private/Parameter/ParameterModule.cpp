@@ -1,3 +1,4 @@
+
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
@@ -171,6 +172,21 @@ FRotator AParameterModule::GetRotatorParameter(FName InName, bool bEnsured) cons
 TArray<FRotator> AParameterModule::GetRotatorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetRotatorParameters(InName, bEnsured);
+}
+
+void AParameterModule::SetColorParameter(FName InName, const FColor& InValue)
+{
+	Parameters.SetColorParameter(InName, InValue);
+}
+
+FColor AParameterModule::GetColorParameter(FName InName, bool bEnsured) const
+{
+	return Parameters.GetColorParameter(InName, bEnsured);
+}
+
+TArray<FColor> AParameterModule::GetColorParameters(FName InName, bool bEnsured) const
+{
+	return Parameters.GetColorParameters(InName, bEnsured);
 }
 
 void AParameterModule::SetClassParameter(FName InName, UClass* InValue)

@@ -1,5 +1,5 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/WidgetModule.h"
 
@@ -20,7 +20,7 @@ AWidgetModule::AWidgetModule()
 	TemporaryUserWidget = nullptr;
 	UserWidgetClassMap = TMap<FName, TSubclassOf<UUserWidgetBase>>();
 
-	AllSlateWidgets = TMap<FName, TSharedPtr<class SSlateWidgetBase>>();
+	AllSlateWidgets = TMap<FName, TSharedPtr<SSlateWidgetBase>>();
 	TemporarySlateWidget = nullptr;
 
 	WorldWidgetClasses = TArray<TSubclassOf<UWorldWidgetBase>>();
@@ -160,6 +160,15 @@ void AWidgetModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
+void AWidgetModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+
+	ClearAllUserWidget();
+	ClearAllSlateWidget();
+	ClearAllWorldWidget();
+}
+
 bool AWidgetModule::K2_HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	return HasUserWidgetClass<UUserWidgetBase>(InWidgetClass);
@@ -236,6 +245,22 @@ void AWidgetModule::CloseAllUserWidget(bool bInstant)
 	}
 }
 
+void AWidgetModule::ClearAllUserWidget()
+{
+	for (auto Iter : AllUserWidgets)
+	{
+		if(Iter.Value)
+		{
+			if(Iter.Value->IsRooted())
+			{
+				Iter.Value->RemoveFromRoot();
+			}
+			Iter.Value->ConditionalBeginDestroy();
+		}
+	}
+	AllUserWidgets.Empty();
+}
+
 void AWidgetModule::CloseAllSlateWidget(bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)
@@ -246,6 +271,11 @@ void AWidgetModule::CloseAllSlateWidget(bool bInstant)
 			Iter.Value->Close(bInstant);
 		}
 	}
+}
+
+void AWidgetModule::ClearAllSlateWidget()
+{
+	AllSlateWidgets.Empty();
 }
 
 bool AWidgetModule::K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
@@ -288,9 +318,70 @@ bool AWidgetModule::K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidget
 	return DestroyWorldWidget<UWorldWidgetBase>(InWidgetIndex, bRecovery, InWidgetClass);
 }
 
+bool AWidgetModule::DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery)
+{
+	if(AllWorldWidgets.Contains(InWidgetName) && AllWorldWidgets[InWidgetName].WorldWidgets.IsValidIndex(InWidgetIndex))
+	{
+		if(UWorldWidgetBase* WorldWidget = AllWorldWidgets[InWidgetName].WorldWidgets[InWidgetIndex])
+		{
+			AllWorldWidgets[InWidgetName].WorldWidgets.RemoveAt(InWidgetIndex);
+
+			if(AllWorldWidgets[InWidgetName].WorldWidgets.Num() > 0)
+			{
+				for(int32 i = 0; i < AllWorldWidgets[InWidgetName].WorldWidgets.Num(); i++)
+				{
+					AllWorldWidgets[InWidgetName].WorldWidgets[i]->SetWidgetIndex(i);
+				}
+			}
+			else
+			{
+				AllWorldWidgets.Remove(InWidgetName);
+			}
+			WorldWidget->OnDestroy(bRecovery);
+		}
+		return true;
+	}
+	return false;
+}
+
 void AWidgetModule::K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
 {
 	return DestroyWorldWidgets<UWorldWidgetBase>(bRecovery, InWidgetClass);
+}
+
+void AWidgetModule::DestroyWorldWidgetsByName(FName InWidgetName, bool bRecovery)
+{
+	if(AllWorldWidgets.Contains(InWidgetName))
+	{
+		for(auto Iter : AllWorldWidgets[InWidgetName].WorldWidgets)
+		{
+			if(Iter)
+			{
+				Iter->OnDestroy(bRecovery);
+			}
+		}
+		AllWorldWidgets.Remove(InWidgetName);
+	}
+}
+
+void AWidgetModule::ClearAllWorldWidget()
+{
+	for(auto Iter1 : AllWorldWidgets)
+	{
+		for(auto Iter2 : Iter1.Value.WorldWidgets)
+		{
+			if(Iter2)
+			{
+				if(Iter2->IsRooted())
+				{
+					Iter2->RemoveFromRoot();
+				}
+				Iter2->ConditionalBeginDestroy();
+			}
+		}
+		Iter1.Value.WorldWidgets.Empty();
+	}
+	AllWorldWidgets.Empty();
 }
 
 EInputMode AWidgetModule::GetNativeInputMode() const

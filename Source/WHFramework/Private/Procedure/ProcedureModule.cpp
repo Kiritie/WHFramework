@@ -25,7 +25,9 @@ AProcedureModule::AProcedureModule()
 	ModuleName = FName("ProcedureModule");
 
 	Procedures = TArray<UProcedureBase*>();
-	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>(); 
+	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();
+
+	bAutoSwitch = false;
 
 	FirstProcedure = nullptr;
 	CurrentProcedure = nullptr;
@@ -65,6 +67,11 @@ void AProcedureModule::OnInitialize_Implementation()
 void AProcedureModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	if(bAutoSwitch && FirstProcedure)
+	{
+		SwitchProcedure(FirstProcedure);
+	}
 }
 
 void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -115,6 +122,11 @@ void AProcedureModule::SwitchProcedureByIndex(int32 InProcedureIndex)
 	{
 		SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InProcedureIndex));
 	}
+	else
+	{
+		WHLog(WH_Procedure, Warning, TEXT("切换流程失败，不存在指定索引的流程: %d"), InProcedureIndex);
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InProcedureIndex));
+	}
 }
 
 void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
@@ -122,6 +134,11 @@ void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProc
 	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
 	{
 		SwitchProcedure(GetProcedureByClass<UProcedureBase>(InProcedureClass));
+	}
+	else
+	{
+		WHLog(WH_Procedure, Warning, TEXT("切换流程失败，不存在指定类型的流程: %s"), InProcedureClass ? *InProcedureClass->GetName() : TEXT("None"));
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InProcedureClass ? *InProcedureClass->GetName() : TEXT("None")));
 	}
 }
 
@@ -151,9 +168,9 @@ void AProcedureModule::SwitchNextProcedure()
 
 void AProcedureModule::GuideCurrentProcedure()
 {
-	if(CurrentProcedure && CurrentProcedure->GetProcedureState() == EProcedureState::Entered)
+	if(CurrentProcedure)
 	{
-		CurrentProcedure->OnGuide();
+		CurrentProcedure->Guide();
 	}
 }
 

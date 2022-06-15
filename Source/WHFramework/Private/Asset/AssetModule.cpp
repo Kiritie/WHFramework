@@ -30,7 +30,6 @@ void AAssetModule::OnInitialize_Implementation()
 	{
 		if(Iter)
 		{
-			Iter->InitData();
 			DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
 		}
 	}

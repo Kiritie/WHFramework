@@ -8,6 +8,8 @@
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Parameter/ParameterModuleTypes.h"
+#include "Dom/JsonObject.h"
 
 #include "GlobalBPLibrary.generated.h"
 
@@ -42,7 +44,44 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static bool IsEditor() { return GIsEditor; }
+	/*
+	 * 当前是否为暂停状态
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool IsPaused();
+	/*
+	 * 设置暂停状态
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SetPaused(bool bPaused);
+	/*
+	 * 获取时间缩放
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static float GetTimeScale();
+	/*
+	 * 设置时间缩放
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SetTimeScale(float TimeScale);
 	
+public:
+	/*
+	 * 暂停游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void PauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	/*
+	 * 取消暂停游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void UnPauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	/*
+	 * 退出游戏
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 public:
@@ -97,7 +136,7 @@ public:
 	* @param bParamHavePropertyType Param的key是否含有属性类的前缀表示：<int> <Array>...
 	*/
 	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void SerializeExposedParam(UObject* InObject, const TMap<FString,FString>& InParams, bool bParamHavePropertyType = true);
+	static void SerializeExposedParam(UObject* InObject, FParameterMap InParams, bool bParamHavePropertyType = true);
 	/*
 	* 导出目标类带有 ExposeOnSpawn 标签的参数
 	* @param InClass 目标类
@@ -105,7 +144,7 @@ public:
 	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
 	*/
 	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void ExportExposedParam(UClass* InClass, TMap<FString,FString>& OutParams, bool bDisplayPropertyType = true);
+	static void ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex
@@ -132,6 +171,11 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
+		
+	//////////////////////////////////////////////////////////////////////////
+	// Json
+public:
+	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input

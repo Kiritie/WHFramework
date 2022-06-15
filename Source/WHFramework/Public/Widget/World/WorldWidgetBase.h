@@ -58,15 +58,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Destroy(bool bRecovery = false);
-	
+
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void BindWidgetPoint(UWidget* InWidget, class USceneComponent* InSceneComp);
+	void BindWidgetPoint(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp = nullptr);
 		
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void BindWidgetPointByName(UWidget* InWidget, FName InPointName);
+	void BindWidgetPointByName(UWidget* InWidget, FVector InLocation, FName InPointName);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void UnBindWidgetPoint(UWidget* InWidget);
+	
+	UFUNCTION(BlueprintPure, BlueprintNativeEvent)
+	FWorldWidgetBindInfo GetWidgetBindInfo(UWidget* InWidget);
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -112,7 +115,7 @@ protected:
 	class UWorldWidgetComponent* WidgetComponent;
 
 	UPROPERTY(Transient)
-	TMap<UWidget*, class USceneComponent*> BindWidgetMap;
+	TMap<UWidget*, FWorldWidgetBindInfo> BindWidgetMap;
 
 private:
 	FTimerHandle RefreshTimerHandle;

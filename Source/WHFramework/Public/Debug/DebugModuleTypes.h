@@ -100,7 +100,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 #endif
 
 // 打印
-#define WH_LOG(CategoryName, Verbosity, Format, ...) \
+#define WHLog(CategoryName, Verbosity, Format, ...) \
 { \
 	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
 }
@@ -112,7 +112,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  * @param Duration 持续时间
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, FColor DisplayColor = FColor::Cyan, float Duration = 1.5f, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
 {
-	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, bNewerOnTop);
+	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, EDebugMode::All, Key, bNewerOnTop);
 }

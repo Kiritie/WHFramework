@@ -5,11 +5,87 @@
 
 #include "WHFramework.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Global/EventHandle_PauseGame.h"
+#include "Event/Handle/Global/EventHandle_UnPauseGame.h"
 #include "GameFramework/InputSettings.h"
 #include "Global/GlobalTypes.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
+#include "Main/MainModule.h"
+#include "Main/MainModuleBPLibrary.h"
+
+bool UGlobalBPLibrary::IsPaused()
+{
+	return UGameplayStatics::IsGamePaused(AMainModule::Get());
+}
+
+void UGlobalBPLibrary::SetPaused(bool bPaused)
+{
+	UGameplayStatics::SetGamePaused(AMainModule::Get(), bPaused);
+}
+
+float UGlobalBPLibrary::GetTimeScale()
+{
+	return UGameplayStatics::GetGlobalTimeDilation(AMainModule::Get());
+}
+
+void UGlobalBPLibrary::SetTimeScale(float TimeScale)
+{
+	return UGameplayStatics::SetGlobalTimeDilation(AMainModule::Get(), TimeScale);
+}
+
+void UGlobalBPLibrary::PauseGame(EPauseGameMode PauseGameMode)
+{
+	switch(PauseGameMode)
+	{
+		case EPauseGameMode::Default:
+		{
+			SetPaused(true);
+			break;
+		}
+		case EPauseGameMode::OnlyTime:
+		{
+			SetTimeScale(0.f);
+			break;
+		}
+		case EPauseGameMode::OnlyModules:
+		{
+			UMainModuleBPLibrary::PauseAllModule();
+			break;
+		}
+	}
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+}
+
+void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
+{
+	switch(PauseGameMode)
+	{
+		case EPauseGameMode::Default:
+		{
+			SetPaused(false);
+			break;
+		}
+		case EPauseGameMode::OnlyTime:
+		{
+			SetTimeScale(1.f);
+			break;
+		}
+		case EPauseGameMode::OnlyModules:
+		{
+			UMainModuleBPLibrary::UnPauseAllModule();
+			break;
+		}
+	}
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+}
+
+void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
+{
+	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(AMainModule::Get()), QuitPreference, bIgnorePlatformRestrictions);
+}
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
@@ -49,9 +125,9 @@ void UGlobalBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint
 	}
 }
 
-void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FString, FString>& InParam, bool bParamHavePropertyType)
+void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, FParameterMap InParam, bool bParamHavePropertyType)
 {
-	for(auto pair: InParam)
+	for(auto pair: InParam.GetMap())
 	{
 		FString LeftS,PropName;
 		if(bParamHavePropertyType)
@@ -70,12 +146,12 @@ void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, const TMap<FStri
 		}
 		else
 		{
-			WH_LOG(LogTemp,Error,TEXT("%s : Not Found Property : %s"),*InObject->GetName(),*PropName);
+			WHLog(LogTemp,Error,TEXT("%s : Not Found Property : %s"),*InObject->GetName(),*PropName);
 		}
 	}
 }
 
-void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString>& OutParams, bool bDisplayPropertyType)
+void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType)
 {
 	if(InClass)
 	{
@@ -113,7 +189,7 @@ void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, TMap<FString, FString
 				}
 			}
 		}
-		for(auto pair:OutParams)
+		for(auto pair:OutParams.GetMap())
 		{
 			if(!NewProps.Contains(pair.Key))
 				DiffProps.Add(pair.Key);
@@ -183,6 +259,12 @@ FText UGlobalBPLibrary::NumberToText(int32 InNumber, const TMap<int32, FString>&
 		}
 	}
 	return FText::FromString(TextStr);
+}
+
+bool UGlobalBPLibrary::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
+{
+	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
+    return FJsonSerializer::Deserialize(JsonReader, OutJsonObject);
 }
 
 FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputActionName)

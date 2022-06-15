@@ -37,18 +37,6 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 
 	StepModule = AMainModule::GetModuleByClass<AStepModule>(!UGlobalBPLibrary::IsPlaying());
 
-	if(BeginPIEDelegateHandle.IsValid())
-	{
-		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
-	}
-	BeginPIEDelegateHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SStepEditorWidget::OnBeginPIE);
-
-	if(EndPIEDelegateHandle.IsValid())
-	{
-		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
-	}
-	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &SStepEditorWidget::OnEndPIE);
-
 	if(StepModule)
 	{
 		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bShowListPanel"), bShowListPanel, GStepEditorIni);
@@ -177,12 +165,15 @@ void SStepEditorWidget::OnCreate()
 {
 	SEditorSlateWidgetBase::OnCreate();
 
-	if(RefreshDelegateHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
-	}
-	RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SStepEditorWidget::Refresh);
+	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SStepEditorWidget::OnBeginPIE);
+
+	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SStepEditorWidget::OnEndPIE);
+
+	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SStepEditorWidget::OnMapOpened);
+
+	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SStepEditorWidget::OnBlueprintCompiled);
 }
+
 
 void SStepEditorWidget::OnReset()
 {
@@ -194,15 +185,19 @@ void SStepEditorWidget::OnRefresh()
 	StepModule = AMainModule::GetModuleByClass<AStepModule>(!bPreviewMode);
 	if(StepModule)
 	{
-		if(DetailWidget)
-		{
-			DetailWidget->StepModule = StepModule;
-		}
 		if(ListWidget)
 		{
 			ListWidget->StepModule = StepModule;
 		}
+		if(DetailWidget)
+		{
+			DetailWidget->StepModule = StepModule;
+		}
 		SEditorSlateWidgetBase::OnRefresh();
+	}
+	else
+	{
+		Destroy();
 	}
 }
 
@@ -210,25 +205,25 @@ void SStepEditorWidget::OnDestroy()
 {
 	SEditorSlateWidgetBase::OnDestroy();
 
-	if(RefreshDelegateHandle.IsValid())
+	if(OnBeginPIEHandle.IsValid())
 	{
-		GEditor->OnBlueprintCompiled().Remove(RefreshDelegateHandle);
+		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
 	}
 
-	if(BeginPIEDelegateHandle.IsValid())
+	if(OnEndPIEHandle.IsValid())
 	{
-		FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
 
-	if(EndPIEDelegateHandle.IsValid())
+	if(OnMapOpenedHandle.IsValid())
 	{
-		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+		FEditorDelegates::OnMapOpened.Remove(OnMapOpenedHandle);
 	}
-}
 
-void SStepEditorWidget::TogglePreviewMode()
-{
-	SetIsPreviewMode(!bPreviewMode);
+	if(OnBlueprintCompiledHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
+	}
 }
 
 void SStepEditorWidget::OnBeginPIE(bool bIsSimulating)
@@ -247,25 +242,28 @@ void SStepEditorWidget::OnEndPIE(bool bIsSimulating)
 	}
 }
 
+void SStepEditorWidget::OnMapOpened(const FString& Filename, bool bAsTemplate)
+{
+	Refresh();
+}
+
+void SStepEditorWidget::OnBlueprintCompiled()
+{
+	Refresh();
+}
+
+void SStepEditorWidget::TogglePreviewMode()
+{
+	SetIsPreviewMode(!bPreviewMode);
+}
+
 void SStepEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 {
 	if(bPreviewMode != bIsPreviewMode)
 	{
-		if(AStepModule* _StepModule = AMainModule::GetModuleByClass<AStepModule>(!bIsPreviewMode))
-		{
-			bPreviewMode = bIsPreviewMode;
-			StepModule = _StepModule;
-			if(ListWidget)
-			{
-				DetailWidget->StepModule = StepModule;
-			}
-			if(ListWidget)
-			{
-				ListWidget->StepModule = StepModule;
-				ListWidget->Refresh();
-			}
-			SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
-		}
+		bPreviewMode = bIsPreviewMode;
+		Refresh();
+		SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
 	}
 }
 

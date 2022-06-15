@@ -10,6 +10,7 @@
 
 #include "CharacterModule.generated.h"
 
+class ACharacterBase;
 UCLASS()
 class WHFRAMEWORK_API ACharacterModule : public AModuleBase
 {
@@ -42,63 +43,75 @@ public:
 	/// Character
 protected:
 	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
-	TArray<TScriptInterface<ICharacterInterface>> Characters;
+	TArray<ACharacterBase*> Characters;
+
+	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
+	ACharacterBase* DefaultCharacter;
+
+	UPROPERTY(VisibleAnywhere, Replicated, Category = "Character")
+	ACharacterBase* CurrentCharacter;
+
+private:
+	UPROPERTY(Transient)
+	TMap<FName, ACharacterBase*> CharacterMap;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void AddCharacterToList(TScriptInterface<ICharacterInterface> InCharacter);
+	template<class T>
+	T* GetCurrentCharacter() const
+	{
+		return Cast<T>(CurrentCharacter);
+	}
+
+	ACharacterBase* GetCurrentCharacter() const;
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"))
+	ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass) const;
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveCharacterFromList(TScriptInterface<ICharacterInterface> InCharacter);
+	void SwitchCharacter(ACharacterBase* InCharacter);
+
+	template<class T>
+	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		SwitchCharacterByClass(InCharacterClass);
+	}
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveCharacterFromListByName(FName InCharacterName);
+	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+
+	UFUNCTION(BlueprintCallable)
+	void SwitchCharacterByName(FName InCharacterName);
+
+	template<class T>
+	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		return HasCharacterByClass(InCharacterClass);
+	}
 
 	UFUNCTION(BlueprintPure)
-	TScriptInterface<ICharacterInterface> GetCharacterByName(FName InCharacterName) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Sound
+	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const;
+
+	UFUNCTION(BlueprintPure)
+	bool HasCharacterByName(FName InCharacterName) const;
+
+	template<class T>
+	T* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	{
+		return GetCharacterByClass(InCharacterClass);
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"))
+	ACharacterBase* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const;
+
+	UFUNCTION(BlueprintPure)
+	ACharacterBase* GetCharacterByName(FName InCharacterName) const;
+
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayCharacterSound(FName InCharacterName, class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable)
-	void StopCharacterSound(FName InCharacterName);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Montage
-public:
-	UFUNCTION(BlueprintCallable)
-	void PlayCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
-	UFUNCTION(BlueprintCallable)
-	void PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable)
-	void StopCharacterMontage(FName InCharacterName, class UAnimMontage* InMontage, bool bMulticast = false);
-	UFUNCTION(BlueprintCallable)
-	void StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast = false);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Teleport
-public:
-	UFUNCTION(BlueprintCallable)
-	void TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast = false);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// AI Move
-public:
-	UFUNCTION(BlueprintCallable)
-	void AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance = 10.f, bool bMulticast = false);
+	void AddCharacterToList(ACharacterBase* InCharacter);
 
 	UFUNCTION(BlueprintCallable)
-	void StopCharacterAIMove(FName InCharacterName, bool bMulticast = false);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Rotation
-public:
-	UFUNCTION(BlueprintCallable)
-	void RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration = 1.f, bool bMulticast = false);
+	void RemoveCharacterFromList(ACharacterBase* InCharacter);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

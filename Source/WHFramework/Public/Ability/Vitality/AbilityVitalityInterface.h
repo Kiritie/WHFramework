@@ -32,14 +32,10 @@ public:
 	
 	virtual void ModifyEXP(float InDeltaValue) = 0;
 
-	virtual void AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle) = 0;
-
 public:
 	virtual bool IsDead() const = 0;
 	
 public:
-	virtual FPrimaryAssetId GetAssetID() const = 0;
-	
 	virtual FName GetNameV() const = 0;
 
 	virtual void SetNameV(FName InName) = 0;

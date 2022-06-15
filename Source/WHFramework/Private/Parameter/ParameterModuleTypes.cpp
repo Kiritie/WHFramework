@@ -4,6 +4,21 @@
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "Parameter/ParameterModuleBPLibrary.h"
+
+// FString FParameterMap::ToJsonString() const
+// {
+// 	FString JsonString;
+// 	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
+// 	JsonWriter->WriteObjectStart();
+// 	for (auto& It : Map)
+// 	{
+// 		JsonWriter->WriteValue(It.Key, It.Value);
+// 	}
+// 	JsonWriter->WriteObjectEnd();
+// 	JsonWriter->Close();
+// 	return JsonString;
+// }
 
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {
@@ -14,7 +29,8 @@ bool FParameters::HasParameter(FName InName, bool bEnsured) const
 			return true;
 		}
 	}
-	return bEnsured ? ensureEditor(false) : false;
+	ensureEditor(bEnsured);
+	return false;
 }
 
 void FParameters::SetParameter(FName InName, FParameter InParameter)
@@ -248,6 +264,33 @@ TArray<FRotator> FParameters::GetRotatorParameters(FName InName, bool bEnsured) 
 		for (auto Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetRotatorValue());
+		}
+	}
+	return TmpArr;
+}
+
+void FParameters::SetColorParameter(FName InName, const FColor& InValue)
+{
+	SetParameter(InName, FParameter::MakeColor(InValue));
+}
+
+FColor FParameters::GetColorParameter(FName InName, bool bEnsured) const
+{
+	if(HasParameter(InName, bEnsured))
+	{
+		return GetParameter(InName, bEnsured).GetColorValue();
+	}
+	return FColor();
+}
+
+TArray<FColor> FParameters::GetColorParameters(FName InName, bool bEnsured) const
+{
+	TArray<FColor> TmpArr = TArray<FColor>();
+	if(HasParameter(InName, bEnsured))
+	{
+		for (auto Iter : GetParameters(InName, bEnsured))
+		{
+			TmpArr.Add(Iter.GetColorValue());
 		}
 	}
 	return TmpArr;

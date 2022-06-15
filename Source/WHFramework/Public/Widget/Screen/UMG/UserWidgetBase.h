@@ -65,29 +65,29 @@ public:
 public:
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Close(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Toggle(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Reset() override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Refresh() override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Destroy(bool bRecovery = false) override;
 	
 protected:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void FinishOpen(bool bInstant) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void FinishClose(bool bInstant) override;
 
 public:
@@ -100,15 +100,20 @@ public:
 	template<class T>
 	T* GetChild(int32 InIndex) const
 	{
-		return Cast<T>(GetChild(T::StaticClass(), InIndex));
+		return Cast<T>(GetChild(InIndex));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
-	UUserWidgetBase* GetChild(TSubclassOf<UUserWidgetBase> InWidgetClass, int32 InIndex) const
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass", DisplayName = "Get Child"))
+	UUserWidgetBase* K2_GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+	{
+		return Cast<UUserWidgetBase>(GetChild(InIndex));
+	}
+
+	IScreenWidgetInterface* GetChild(int32 InIndex) const override
 	{
 		if(ChildWidgets.IsValidIndex(InIndex))
 		{
-			return Cast<UUserWidgetBase>(ChildWidgets[InIndex]);
+			return ChildWidgets[InIndex];
 		}
 		return nullptr;
 	}
@@ -273,9 +278,9 @@ public:
 
 	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
 
-	virtual IScreenWidgetInterface* GetParentWidget() const override { return ParentWidget; }
+	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
-	virtual void SetParentWidget(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
+	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }

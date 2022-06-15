@@ -12,7 +12,7 @@ void UAudioModuleBPLibrary::PlaySound2D(USoundBase* InSound, float InVolume, boo
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySound2D(InSound, InVolume, bMulticast);
+		AudioModule->PlaySound2D(InSound, InVolume, bMulticast);
 	}
 }
 
@@ -20,7 +20,7 @@ void UAudioModuleBPLibrary::PlaySoundAtLocation(USoundBase* InSound, FVector InL
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+		AudioModule->PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast);
 	}
 }
 
@@ -28,15 +28,15 @@ void UAudioModuleBPLibrary::PlaySingleSound2D(USoundBase* InSound, float InVolum
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySingleSound2D(InSound, InVolume, bMulticast);
+		AudioModule->PlaySingleSound2D(InSound, InVolume, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinishedDelegate, InVolume, bMulticast);
+		AudioModule->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinished, InVolume, bMulticast);
 	}
 }
 
@@ -44,7 +44,15 @@ void UAudioModuleBPLibrary::PlaySingleSoundAtLocation(USoundBase* InSound, FVect
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+		AudioModule->PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+	}
+}
+
+void UAudioModuleBPLibrary::PlaySingleSoundAtLocation2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume, bool bMulticast)
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		AudioModule->PlaySingleSoundAtLocation2DWithDelegate(InSound, InOnSoundPlayFinished, InLocation, InVolume, bMulticast);
 	}
 }
 
@@ -52,7 +60,24 @@ void UAudioModuleBPLibrary::StopSingleSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->StopSingleSound();
+		AudioModule->StopSingleSound();
+	}
+}
+
+float UAudioModuleBPLibrary::GetSingleSoundVolume()
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		return AudioModule->GetSingleSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetSingleSoundVolume(float InVolume)
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		AudioModule->SetSingleSoundVolume(InVolume);
 	}
 }
 
@@ -60,7 +85,7 @@ void UAudioModuleBPLibrary::PlayGlobalBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlayGlobalBGSound();
+		AudioModule->PlayGlobalBGSound();
 	}
 }
 
@@ -68,7 +93,7 @@ void UAudioModuleBPLibrary::PauseGlobalBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PauseGlobalBGSound();
+		AudioModule->PauseGlobalBGSound();
 	}
 }
 
@@ -76,7 +101,24 @@ void UAudioModuleBPLibrary::StopGlobalBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->StopGlobalBGSound();
+		AudioModule->StopGlobalBGSound();
+	}
+}
+
+float UAudioModuleBPLibrary::GetGlobalBGSoundVolume()
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		return AudioModule->GetGlobalBGSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetGlobalBGSoundVolume(float InVolume)
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		AudioModule->SetGlobalBGSoundVolume(InVolume);
 	}
 }
 
@@ -84,7 +126,7 @@ void UAudioModuleBPLibrary::InitSingleBGSound(USoundBase* InBGSound, float InBGV
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->InitSingleBGSound(InBGSound, InBGVolume, bIsLoopSound, bIsUISound, bIsAutoPlay);
+		AudioModule->InitSingleBGSound(InBGSound, InBGVolume, bIsLoopSound, bIsUISound, bIsAutoPlay);
 	}
 }
 
@@ -92,7 +134,7 @@ void UAudioModuleBPLibrary::PlaySingleBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PlaySingleBGSound();
+		AudioModule->PlaySingleBGSound();
 	}
 }
 
@@ -100,7 +142,7 @@ void UAudioModuleBPLibrary::PauseSingleBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->PauseSingleBGSound();
+		AudioModule->PauseSingleBGSound();
 	}
 }
 
@@ -108,6 +150,23 @@ void UAudioModuleBPLibrary::StopSingleBGSound()
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->StopSingleBGSound();
+		AudioModule->StopSingleBGSound();
+	}
+}
+
+float UAudioModuleBPLibrary::GetSingleBGSoundVolume()
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		return AudioModule->GetSingleBGSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetSingleBGSoundVolume(float InVolume)
+{
+	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
+	{
+		AudioModule->SetSingleBGSoundVolume(InVolume);
 	}
 }

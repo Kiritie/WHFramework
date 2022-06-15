@@ -3,10 +3,10 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
+#include "Camera/CameraModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
-#include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
@@ -98,7 +98,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	ProcedureState = EProcedureState::Entered;
 	OnStateChanged(ProcedureState);
 
-	WH_LOG(WH_Procedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
+	WHLog(WH_Procedure, Log, TEXT("进入流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()));
 
 	K2_OnEnter(InLastProcedure);
@@ -145,12 +145,20 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	ProcedureState = EProcedureState::Leaved;
 	OnStateChanged(ProcedureState);
 	
-	WH_LOG(WH_Procedure, Log, TEXT("离开流程: %s"), *ProcedureDisplayName.ToString());
+	WHLog(WH_Procedure, Log, TEXT("离开流程: %s"), *ProcedureDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()));
 
 	K2_OnLeave(InNextProcedure);
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+}
+
+void UProcedureBase::Guide()
+{
+	if(ProcedureState == EProcedureState::Entered)
+	{
+		OnGuide();
+	}
 }
 
 void UProcedureBase::SwitchLastProcedure()
@@ -166,25 +174,21 @@ void UProcedureBase::SwitchNextProcedure()
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	AWHPlayerController* PlayerController = UGlobalBPLibrary::GetObjectInExistedWorld<AWHPlayerController>([](const UWorld* World) {
-		return UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(World);
-	});
-
-	if(PlayerController)
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 		}
 		else
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch;
 		}
-		CameraViewDistance = PlayerController->GetCurrentCameraDistance();
+		CameraViewDistance = CameraModule->GetCurrentCameraDistance();
 
 		Modify();
 	}
@@ -212,7 +216,7 @@ void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		FVector CameraLocation;
 		float CameraYaw;
@@ -236,23 +240,23 @@ void UProcedureBase::ResetCameraView()
 		{
 			case EProcedureCameraViewMode::Instant:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, true);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-				PlayerController->SetCameraDistance(CameraViewDistance, true);
+				CameraModule->SetCameraLocation(CameraLocation, true);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+				CameraModule->SetCameraDistance(CameraViewDistance, true);
 				break;
 			}
 			case EProcedureCameraViewMode::Smooth:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, false);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-				PlayerController->SetCameraDistance(CameraViewDistance, false);
+				CameraModule->SetCameraLocation(CameraLocation, false);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+				CameraModule->SetCameraDistance(CameraViewDistance, false);
 				break;
 			}
 			case EProcedureCameraViewMode::Duration:
 			{
-				PlayerController->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
 				break;
 			}
 			default: break;

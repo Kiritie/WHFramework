@@ -11,7 +11,6 @@
 #include "ProcedureModule.generated.h"
 
 class UProcedureBase;
-class UProcedureBase;
 
 /**
  * 
@@ -48,6 +47,11 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
+protected:
+	/// 自动切换流程 
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
+	bool bAutoSwitch;
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchProcedure(UProcedureBase* InProcedure);
@@ -83,7 +87,7 @@ public:
 	/// Procedure Stats
 protected:
 	/// 初始流程 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Procedure Stats")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
 	UProcedureBase* FirstProcedure;
 	/// 当前流程 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Procedure Stats")

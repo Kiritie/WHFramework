@@ -19,7 +19,7 @@ SEditorSlateWidgetBase::SEditorSlateWidgetBase()
 
 void SEditorSlateWidgetBase::Construct(const FArguments& InArgs)
 {
-	OnCreate();
+	GWorld->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateRaw(this, &SEditorSlateWidgetBase::OnCreate));
 	/*
 	ChildSlot
 	[
@@ -38,20 +38,18 @@ void SEditorSlateWidgetBase::OnWindowDeactivated()
 
 void SEditorSlateWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 {
-	if(GetOwnerWindow())
+	OnDestroy();
+	if(OnWindowActivatedHandle.IsValid())
 	{
-		if(OnWindowActivatedHandle.IsValid())
-		{
-			GetOwnerWindow()->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
-		}
-		if(OnWindowDeactivatedHandle.IsValid())
-		{
-			GetOwnerWindow()->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
-		}
-		if(OnWindowClosedHandle.IsValid())
-		{
-			GetOwnerWindow()->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
-		}
+		InOwnerWindow->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
+	}
+	if(OnWindowDeactivatedHandle.IsValid())
+	{
+		InOwnerWindow->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
+	}
+	if(OnWindowClosedHandle.IsValid())
+	{
+		InOwnerWindow->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
 	}
 }
 
@@ -59,7 +57,7 @@ void SEditorSlateWidgetBase::OnCreate()
 {
 	if(WidgetType == EEditorWidgetType::Main)
 	{
-		if(GetOwnerWindow())
+		if(GetOwnerWindow().IsValid())
 		{
 			OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowActivated);
 			OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowDeactivated);
@@ -82,6 +80,11 @@ void SEditorSlateWidgetBase::OnRefresh()
 
 void SEditorSlateWidgetBase::OnDestroy()
 {
+	for(auto Iter : ChildWidgets)
+	{
+		Iter->OnDestroy();
+	}
+	ChildWidgets.Empty();
 }
 
 void SEditorSlateWidgetBase::Reset()
@@ -100,9 +103,9 @@ void SEditorSlateWidgetBase::Destroy()
 	{
 		case EEditorWidgetType::Main:
 		{
-			if(GetOwnerWindow())
+			if(GetOwnerWindow().IsValid())
 			{
-				FSlateApplicationBase::Get().RequestDestroyWindow(GetOwnerWindow().ToSharedRef());
+				GetOwnerWindow()->RequestDestroyWindow();
 			}
 			break;
 		}
@@ -145,7 +148,7 @@ void SEditorSlateWidgetBase::RemoveAllChild()
 
 TSharedPtr<SWindow> SEditorSlateWidgetBase::GetOwnerWindow()
 {
-	return FSlateApplicationBase::Get().FindWidgetWindow(this->AsShared());
+	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

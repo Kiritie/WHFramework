@@ -3,7 +3,6 @@
 #include "Step/StepGraphSchema.h"
 
 #include "EdGraphSchema_K2_Actions.h"
-#include "GameplayEffect.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 
 UStepGraphSchema::UStepGraphSchema(const FObjectInitializer& ObjectInitializer)

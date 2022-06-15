@@ -14,7 +14,7 @@ bool UParameterModuleBPLibrary::HasParameter(FName InName, bool bEnsured)
 	{
 		return ParameterModule->HasParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return false;
 }
 
@@ -32,7 +32,7 @@ FParameter UParameterModuleBPLibrary::GetParameter(FName InName, bool bEnsured)
 	{
 		return ParameterModule->GetParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return FParameter();
 }
 
@@ -42,7 +42,7 @@ TArray<FParameter> UParameterModuleBPLibrary::GetParameters(FName InName, bool b
 	{
 		return ParameterModule->GetParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<FParameter>();
 }
 
@@ -61,7 +61,7 @@ int32 UParameterModuleBPLibrary::GetIntegerParameter(FName InName, bool bEnsured
 	{
 		return ParameterModule->GetIntegerParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return 0;
 }
 
@@ -71,7 +71,7 @@ TArray<int32> UParameterModuleBPLibrary::GetIntegerParameters(FName InName, bool
 	{
 		return ParameterModule->GetIntegerParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<int32>();
 }
 
@@ -90,7 +90,7 @@ float UParameterModuleBPLibrary::GetFloatParameter(FName InName, bool bEnsured)
 	{
 		return ParameterModule->GetFloatParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return 0.f;
 }
 
@@ -100,7 +100,7 @@ TArray<float> UParameterModuleBPLibrary::GetFloatParameters(FName InName, bool b
 	{
 		return ParameterModule->GetFloatParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<float>();
 }
 
@@ -119,7 +119,7 @@ FString UParameterModuleBPLibrary::GetStringParameter(FName InName, bool bEnsure
 	{
 		return ParameterModule->GetStringParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TEXT("");
 }
 
@@ -129,7 +129,7 @@ TArray<FString> UParameterModuleBPLibrary::GetStringParameters(FName InName, boo
 	{
 		return ParameterModule->GetStringParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<FString>();
 }
 
@@ -148,7 +148,7 @@ FText UParameterModuleBPLibrary::GetTextParameter(FName InName, bool bEnsured)
 	{
 		return ParameterModule->GetTextParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return FText::GetEmpty();
 }
 
@@ -158,7 +158,7 @@ TArray<FText> UParameterModuleBPLibrary::GetTextParameters(FName InName, bool bE
 	{
 		return ParameterModule->GetTextParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<FText>();
 }
 
@@ -177,7 +177,7 @@ bool UParameterModuleBPLibrary::GetBooleanParameter(FName InName, bool bEnsured)
 	{
 		return ParameterModule->GetBooleanParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return false;
 }
 
@@ -187,7 +187,7 @@ TArray<bool> UParameterModuleBPLibrary::GetBooleanParameters(FName InName, bool 
 	{
 		return ParameterModule->GetBooleanParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<bool>();
 }
 
@@ -206,7 +206,7 @@ FVector UParameterModuleBPLibrary::GetVectorParameter(FName InName, bool bEnsure
 	{
 		return ParameterModule->GetVectorParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return FVector();
 }
 
@@ -216,7 +216,7 @@ TArray<FVector> UParameterModuleBPLibrary::GetVectorParameters(FName InName, boo
 	{
 		return ParameterModule->GetVectorParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<FVector>();
 }
 
@@ -235,7 +235,7 @@ FRotator UParameterModuleBPLibrary::GetRotatorParameter(FName InName, bool bEnsu
 	{
 		return ParameterModule->GetRotatorParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return FRotator();
 }
 
@@ -245,8 +245,37 @@ TArray<FRotator> UParameterModuleBPLibrary::GetRotatorParameters(FName InName, b
 	{
 		return ParameterModule->GetRotatorParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<FRotator>();
+}
+
+//////////////////////////////////////////////////////////////////////////
+void UParameterModuleBPLibrary::SetColorParameter(FName InName, const FColor& InValue)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		ParameterModule->SetColorParameter(InName, InValue);
+	}
+}
+
+FColor UParameterModuleBPLibrary::GetColorParameter(FName InName, bool bEnsured)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		return ParameterModule->GetColorParameter(InName, bEnsured);
+	}
+	ensureEditor(bEnsured);
+	return FColor();
+}
+
+TArray<FColor> UParameterModuleBPLibrary::GetColorParameters(FName InName, bool bEnsured)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		return ParameterModule->GetColorParameters(InName, bEnsured);
+	}
+	ensureEditor(bEnsured);
+	return TArray<FColor>();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -264,7 +293,7 @@ UClass* UParameterModuleBPLibrary::GetClassParameter(FName InName, bool bEnsured
 	{
 		return ParameterModule->GetClassParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return nullptr;
 }
 
@@ -274,7 +303,7 @@ TArray<UClass*> UParameterModuleBPLibrary::GetClassParameters(FName InName, bool
 	{
 		return ParameterModule->GetClassParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<UClass*>();
 }
 
@@ -293,7 +322,7 @@ UObject* UParameterModuleBPLibrary::GetObjectParameter(FName InName, bool bEnsur
 	{
 		return ParameterModule->GetObjectParameter(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return nullptr;
 }
 
@@ -303,7 +332,7 @@ TArray<UObject*> UParameterModuleBPLibrary::GetObjectParameters(FName InName, bo
 	{
 		return ParameterModule->GetObjectParameters(InName, bEnsured);
 	}
-	if(bEnsured) ensureEditor(false);
+	ensureEditor(bEnsured);
 	return TArray<UObject*>();
 }
 

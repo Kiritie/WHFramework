@@ -57,30 +57,39 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* SingleSoundComponent;
 	
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundParams, Category = "BGSound")
-	FSingleSoundParams SingleSoundParams;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_SingleSoundInfo, Category = "SingleSound")
+	FSingleSoundInfo SingleSoundInfo;
 
 private:
 	FTimerHandle SingleSoundStopTimerHandle;
 
-	FOnSoundPlayFinishedDelegate OnSoundPlayFinishedDelegate;
+	FOnSoundPlayFinishedDelegate OnSingleSoundPlayFinishedDelegate;
 
 public:
 	UFUNCTION(BlueprintCallable)
 	virtual void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"))
-	virtual void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinishedDelegate, float InVolume = 1.0f, bool bMulticast = false);
+	virtual void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
+	virtual void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable)
 	virtual void StopSingleSound();
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetSingleSoundVolume();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetSingleSoundVolume(float InVolume);
 
 protected:
 	UFUNCTION()
-	virtual void OnRep_SingleSoundParams();
+	virtual void OnRep_SingleSoundInfo();
 
 	UFUNCTION()
 	virtual void OnSingleSoundPlayFinished();
@@ -91,11 +100,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* GlobalBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BGSound")
-	bool bAutoPlayGlobalBGSound;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BG Sound")
+	bool bAutoPlayGlobal;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundParams, Category = "BGSound")
-	FBGSoundParams GlobalBGSoundParams;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundInfo, Category = "BG Sound")
+	FBGSoundInfo GlobalBGSoundInfo;
 
 private:
 	FTimerHandle GlobalBGSoundLoopTimerHandle;
@@ -110,12 +119,18 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void StopGlobalBGSound();
 
+	UFUNCTION(BlueprintPure)
+	virtual float GetGlobalBGSoundVolume();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetGlobalBGSoundVolume(float InVolume);
+
 protected:
 	UFUNCTION()
 	virtual void OnLoopGlobalBGSound();
 
 	UFUNCTION()
-	virtual void OnRep_GlobalBGSoundParams();
+	virtual void OnRep_GlobalBGSoundInfo();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Single BGSound
@@ -123,8 +138,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
 	UAudioComponent* SingleBGSoundComponent;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundParams, Category = "BGSound")
-	FBGSoundParams SingleBGSoundParams;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundInfo, Category = "BG Sound")
+	FBGSoundInfo SingleBGSoundInfo;
 
 private:
 	FTimerHandle SingleBGSoundLoopTimerHandle;
@@ -142,12 +157,18 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void StopSingleBGSound();
 
+	UFUNCTION(BlueprintPure)
+	virtual float GetSingleBGSoundVolume();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetSingleBGSoundVolume(float InVolume);
+
 protected:
 	UFUNCTION()
 	virtual void OnLoopSingleBGSound();
 
 	UFUNCTION()
-	virtual void OnRep_SingleBGSoundParams();
+	virtual void OnRep_SingleBGSoundInfo();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -13,7 +13,7 @@ DECLARE_DYNAMIC_DELEGATE(FOnSoundsPlayFinishedSingleDelegate);
 DECLARE_DYNAMIC_DELEGATE(FOnSoundPlayFinishedDelegate);
 
 UENUM(BlueprintType)
-enum class EBGSoundState : uint8
+enum class ESoundState : uint8
 {
 	None,
 	Playing,
@@ -22,71 +22,29 @@ enum class EBGSoundState : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FBGSoundParams
+struct WHFRAMEWORK_API FBGSoundInfo
 {
 	GENERATED_USTRUCT_BODY()
 
 public:
-	FBGSoundParams()
-	{
-		BGSound = nullptr;
-		BGVolume = 1.0f;
-		bIsUISound = false;
-		bIsLoopSound = true;
-		BGSoundState = EBGSoundState::None;
-	}
-	
-	FBGSoundParams(USoundBase* InBGSound, EBGSoundState InInitSoundState = EBGSoundState::None, float InBGVolume = 1.0f, bool bInIsLoopSound = true, bool bInIsUISound = false)
-	{
-		BGSound = InBGSound;
-		BGVolume = InBGVolume;
-		bIsLoopSound = bInIsLoopSound;
-		bIsUISound = bInIsUISound;
-		BGSoundState = InInitSoundState;
-	}
-	
-public:
-	// 背景音乐
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	USoundBase* BGSound;
-	
-	// 音量大小
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	float BGVolume;
-
-	// 是否是2D声音
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bIsUISound;
-		
-	// 是否是循环声音
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bIsLoopSound;
-	
-	// 背景声音播放状态
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	EBGSoundState BGSoundState;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSingleSoundParams
-{
-	GENERATED_USTRUCT_BODY()
-
-public:
-	FSingleSoundParams()
+	FBGSoundInfo()
 	{
 		Sound = nullptr;
 		Volume = 1.0f;
-		bIsUISound = false;
-		Location = FVector::ZeroVector;
+		VolumeScale = 1.0f;
+		bUISound = false;
+		bLoopSound = true;
+		SoundState = ESoundState::None;
 	}
 	
-	FSingleSoundParams(USoundBase* InSound, float InVolume = 1.0f, bool bInIsUISound = false, FVector InLocation = FVector::ZeroVector)
+	FBGSoundInfo(USoundBase* InSound, ESoundState InInitSoundState = ESoundState::None, float InVolume = 1.0f, bool bInLoopSound = true, bool bInUISound = false)
 	{
 		Sound = InSound;
 		Volume = InVolume;
-		bIsUISound = bInIsUISound;
-		Location = InLocation;
+		VolumeScale = 1.0f;
+		bLoopSound = bInLoopSound;
+		bUISound = bInUISound;
+		SoundState = InInitSoundState;
 	}
 	
 public:
@@ -97,12 +55,66 @@ public:
 	// 音量大小
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float Volume;
+	
+	// 音量缩放
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	float VolumeScale;
 
 	// 是否是2D声音
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bIsUISound;
+	bool bUISound;
+		
+	// 是否是循环声音
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bLoopSound;
+	
+	// 声音播放状态
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	ESoundState SoundState;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSingleSoundInfo
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FSingleSoundInfo()
+	{
+		Sound = nullptr;
+		Volume = 1.0f;
+		VolumeScale = 1.0f;
+		bUISound = false;
+		Location = FVector::ZeroVector;
+	}
+	
+	FSingleSoundInfo(USoundBase* InSound, float InVolume = 1.0f, bool bInUISound = false, FVector InLocation = FVector::ZeroVector)
+	{
+		Sound = InSound;
+		Volume = InVolume;
+		VolumeScale = 1.0f;
+		bUISound = bInUISound;
+		Location = InLocation;
+	}
+	
+public:
+	// 声音
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	USoundBase* Sound;
+	
+	// 音量大小
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	float Volume;
+	
+	// 音量缩放
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	float VolumeScale;
+
+	// 是否是2D声音
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	bool bUISound;
 
 	// 位置
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
 	FVector Location;
 };

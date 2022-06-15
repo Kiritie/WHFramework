@@ -50,16 +50,6 @@ void ASaveGameModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ASaveGameModule::OnTermination_Implementation()
-{
-	Super::OnTermination_Implementation();
-
-	for(auto Iter : AllSaveGames)
-	{
-		Iter.Value->RemoveFromRoot();
-	}
-}
-
 bool ASaveGameModule::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass,  int32 InSaveIndex) const
 {
 	return HasSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);

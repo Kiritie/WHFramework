@@ -21,6 +21,7 @@ enum class EStepModuleState : uint8
 {
 	None,
 	Running,
+	Paused,
 	Ended
 };
 
@@ -59,7 +60,7 @@ public:
 protected:
 	/// 自动开始步骤
 	UPROPERTY(EditAnywhere, Category = "StepModule")
-	bool bAutoStartStep;
+	bool bAutoStart;
 	
 	/// 步骤模块状态
 	UPROPERTY(VisibleAnywhere, Category = "StepModule")

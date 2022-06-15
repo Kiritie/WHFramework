@@ -110,7 +110,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true);
-	
+		
+	//////////////////////////////////////////////////////////////////////////
+	/// Color
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
+	static void SetColorParameter(FName InName, const FColor& InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static FColor GetColorParameter(FName InName, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Class
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")

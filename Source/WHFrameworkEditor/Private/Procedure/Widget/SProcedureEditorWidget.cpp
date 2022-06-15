@@ -37,18 +37,6 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 
 	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!UGlobalBPLibrary::IsPlaying());
 
-	if(OnBeginPIEHandle.IsValid())
-	{
-		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
-	}
-	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SProcedureEditorWidget::OnBeginPIE);
-
-	if(OnEndPIEHandle.IsValid())
-	{
-		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
-	}
-	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SProcedureEditorWidget::OnEndPIE);
-
 	if(ProcedureModule)
 	{
 		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowListPanel"), bShowListPanel, GProcedureEditorIni);
@@ -177,19 +165,13 @@ void SProcedureEditorWidget::OnCreate()
 {
 	SEditorSlateWidgetBase::OnCreate();
 
-	if(OnOpenLevelHandle.IsValid())
-	{
-		GEditor->OnPreviewFeatureLevelChanged().Remove(OnOpenLevelHandle);
-	}
+	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SProcedureEditorWidget::OnBeginPIE);
 
-	if(OnBlueprintCompiledHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
-	}
-	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
+	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SProcedureEditorWidget::OnEndPIE);
 
+	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SProcedureEditorWidget::OnMapOpened);
 
-	//RefreshDelegateHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::Refresh);
+	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::OnBlueprintCompiled);
 }
 
 void SProcedureEditorWidget::OnReset()
@@ -200,7 +182,6 @@ void SProcedureEditorWidget::OnReset()
 void SProcedureEditorWidget::OnRefresh()
 {
 	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!bPreviewMode);
-
 	if(ProcedureModule)
 	{
 		if(ListWidget)
@@ -211,7 +192,6 @@ void SProcedureEditorWidget::OnRefresh()
 		{
 			DetailWidget->ProcedureModule = ProcedureModule;
 		}
-
 		SEditorSlateWidgetBase::OnRefresh();
 	}
 	else
@@ -224,11 +204,6 @@ void SProcedureEditorWidget::OnDestroy()
 {
 	SEditorSlateWidgetBase::OnDestroy();
 
-	if(OnBlueprintCompiledHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
-	}
-
 	if(OnBeginPIEHandle.IsValid())
 	{
 		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
@@ -238,11 +213,16 @@ void SProcedureEditorWidget::OnDestroy()
 	{
 		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
-}
 
-void SProcedureEditorWidget::TogglePreviewMode()
-{
-	SetIsPreviewMode(!bPreviewMode);
+	if(OnMapOpenedHandle.IsValid())
+	{
+		FEditorDelegates::OnMapOpened.Remove(OnMapOpenedHandle);
+	}
+
+	if(OnBlueprintCompiledHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
+	}
 }
 
 void SProcedureEditorWidget::OnBeginPIE(bool bIsSimulating)
@@ -261,10 +241,26 @@ void SProcedureEditorWidget::OnEndPIE(bool bIsSimulating)
 	}
 }
 
+void SProcedureEditorWidget::OnMapOpened(const FString& Filename, bool bAsTemplate)
+{
+	Refresh();
+}
+
+void SProcedureEditorWidget::OnBlueprintCompiled()
+{
+	Refresh();
+}
+
+void SProcedureEditorWidget::TogglePreviewMode()
+{
+	SetIsPreviewMode(!bPreviewMode);
+}
+
 void SProcedureEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 {
 	if(bPreviewMode != bIsPreviewMode)
 	{
+		bPreviewMode = bIsPreviewMode;
 		Refresh();
 		SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
 	}

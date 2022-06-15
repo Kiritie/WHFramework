@@ -94,27 +94,32 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Physics Volume
-	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
 	static bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
 	
-	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
 	static bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true);
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
 	static APhysicsVolumeBase* GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
 	static APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true);
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 	
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void RemovePhysicsVolumeByName(FName InName);
+
+	//////////////////////////////////////////////////////////////////////////
+    /// World Text
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
+	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp = nullptr);
 };

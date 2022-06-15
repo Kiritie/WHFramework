@@ -539,16 +539,6 @@ float AAbilityCharacterBase::GetHalfHeight() const
 	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
-void AAbilityCharacterBase::AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle)
-{
-	auto contextHUD = NewObject<UWorldTextComponent>(this);
-	contextHUD->RegisterComponent();
-	contextHUD->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-	contextHUD->SetRelativeLocation(FVector(0, 0, 0));
-	contextHUD->SetVisibility(false);
-	contextHUD->InitContent(InContent, InContentType, InContentStyle);
-}
-
 float AAbilityCharacterBase::Distance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/)
 {
 	if(!InTargetCharacter || !InTargetCharacter->IsValidLowLevel()) return -1;
@@ -598,7 +588,7 @@ void AAbilityCharacterBase::HandleHealthChanged(float NewValue, float DeltaValue
 {
 	if(DeltaValue > 0.f)
 	{
-		AddWorldText(FString::FromInt(FMath::Abs(DeltaValue)), EWorldTextType::HealthRecover, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress);
+		USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
 	}
 }
 

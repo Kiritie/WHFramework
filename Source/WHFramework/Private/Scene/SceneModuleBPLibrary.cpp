@@ -260,3 +260,11 @@ void USceneModuleBPLibrary::RemovePhysicsVolumeByName(FName InName)
 		SceneModule->RemovePhysicsVolumeByName(InName);
 	}
 }
+
+void USceneModuleBPLibrary::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp)
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		SceneModule->SpawnWorldText(InText, InTextColor, InTextStyle, InLocation, InSceneComp);
+	}
+}

@@ -3,12 +3,12 @@
 
 #include "Step/Base/StepBase.h"
 
+#include "Camera/CameraModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Step/EventHandle_CompleteStep.h"
 #include "Event/Handle/Step/EventHandle_EnterStep.h"
 #include "Event/Handle/Step/EventHandle_ExecuteStep.h"
 #include "Event/Handle/Step/EventHandle_LeaveStep.h"
-#include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
@@ -183,7 +183,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	StepExecuteResult = EStepExecuteResult::None;
 
-	WH_LOG(WH_Step, Log, TEXT("进入步骤: %s"), *StepDisplayName.ToString());
+	WHLog(WH_Step, Log, TEXT("进入步骤: %s"), *StepDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()));
 
 	K2_OnEnter(InLastStep);
@@ -328,9 +328,9 @@ void UStepBase::OnExecute()
 
 	if(bTrackTarget && OperationTarget)
 	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 		{
-			PlayerController->StartTrackTarget(OperationTarget);
+			CameraModule->StartTrackTarget(OperationTarget);
 		}
 	}
 
@@ -377,9 +377,9 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 	if(bTrackTarget && OperationTarget)
 	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 		{
-			PlayerController->EndTrackTarget();
+			CameraModule->EndTrackTarget();
 		}
 	}
 	
@@ -407,7 +407,7 @@ void UStepBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WH_LOG(WH_Step, Log, TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString());
+	WHLog(WH_Step, Log, TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString());
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()));
 
 	K2_OnLeave();
@@ -436,28 +436,29 @@ bool UStepBase::IsCompleted(bool bCheckSubs) const
 	return (StepState == EStepState::Completed || StepState == EStepState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
 }
 
+bool UStepBase::IsSkipAble_Implementation() const
+{
+	return true;
+}
+
 #if WITH_EDITOR
 void UStepBase::GetCameraView()
 {
-	AWHPlayerController* PlayerController = UGlobalBPLibrary::GetObjectInExistedWorld<AWHPlayerController>([](const UWorld* World) {
-		return UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(World);
-	});
-
-	if(PlayerController)
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 		}
 		else
 		{
-			CameraViewOffset = PlayerController->GetCurrentCameraLocation();
-			CameraViewYaw = PlayerController->GetCurrentCameraRotation().Yaw;
-			CameraViewPitch = PlayerController->GetCurrentCameraRotation().Pitch;
+			CameraViewOffset = CameraModule->GetCurrentCameraLocation();
+			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw;
+			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch;
 		}
-		CameraViewDistance = PlayerController->GetCurrentCameraDistance();
+		CameraViewDistance = CameraModule->GetCurrentCameraDistance();
 
 		Modify();
 	}
@@ -485,7 +486,7 @@ void UStepBase::SetCameraView(FCameraParams InCameraParams)
 
 void UStepBase::ResetCameraView()
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
 	{
 		FVector CameraLocation;
 		float CameraYaw;
@@ -509,23 +510,23 @@ void UStepBase::ResetCameraView()
 		{
 			case EStepCameraViewMode::Instant:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, true);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-				PlayerController->SetCameraDistance(CameraViewDistance, true);
+				CameraModule->SetCameraLocation(CameraLocation, true);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+				CameraModule->SetCameraDistance(CameraViewDistance, true);
 				break;
 			}
 			case EStepCameraViewMode::Smooth:
 			{
-				PlayerController->SetCameraLocation(CameraLocation, false);
-				PlayerController->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-				PlayerController->SetCameraDistance(CameraViewDistance, false);
+				CameraModule->SetCameraLocation(CameraLocation, false);
+				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+				CameraModule->SetCameraDistance(CameraViewDistance, false);
 				break;
 			}
 			case EStepCameraViewMode::Duration:
 			{
-				PlayerController->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-				PlayerController->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+				CameraModule->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
 				break;
 			}
 			default: break;

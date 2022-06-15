@@ -3,12 +3,21 @@
 
 #include "Character/CharacterModule.h"
 
+#include "Camera/CameraModuleBPLibrary.h"
+#include "Character/Base/CharacterBase.h"
+#include "Gameplay/WHPlayerController.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 
 // Sets default values
 ACharacterModule::ACharacterModule()
 {
 	ModuleName = FName("CharacterModule");
+
+	Characters = TArray<ACharacterBase*>();
+	CharacterMap = TMap<FName, ACharacterBase*>();
+	DefaultCharacter = nullptr;
+	CurrentCharacter = nullptr;
 }
 
 #if WITH_EDITOR
@@ -28,11 +37,24 @@ void ACharacterModule::OnDestroy_Implementation()
 void ACharacterModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : Characters)
+	{
+		if(Iter && !CharacterMap.Contains(Iter->GetNameC()))
+		{
+			CharacterMap.Add(Iter->GetNameC(), Iter);
+		}
+	}
 }
 
 void ACharacterModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	if(DefaultCharacter)
+	{
+		SwitchCharacter(DefaultCharacter);
+	}
 }
 
 void ACharacterModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -50,28 +72,94 @@ void ACharacterModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ACharacterModule::AddCharacterToList(TScriptInterface<ICharacterInterface> InCharacter)
+void ACharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 {
 	if(!Characters.Contains(InCharacter))
 	{
 		Characters.Add(InCharacter);
+		if(!CharacterMap.Contains(InCharacter->GetNameC()))
+		{
+			CharacterMap.Add(InCharacter->GetNameC(), InCharacter);
+		}
 	}
 }
 
-void ACharacterModule::RemoveCharacterFromList(TScriptInterface<ICharacterInterface> InCharacter)
+void ACharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 {
 	if(Characters.Contains(InCharacter))
 	{
 		Characters.Remove(InCharacter);
+		if(CharacterMap.Contains(InCharacter->GetNameC()))
+		{
+			CharacterMap.Remove(InCharacter->GetNameC());
+		}
 	}
 }
 
-void ACharacterModule::RemoveCharacterFromListByName(FName InCharacterName)
+void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 {
-	RemoveCharacterFromList(GetCharacterByName(InCharacterName));
+	if(!CurrentCharacter || CurrentCharacter != InCharacter)
+	{
+		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(this))
+		{
+			if(InCharacter)
+			{
+				CurrentCharacter = InCharacter;
+				UCameraModuleBPLibrary::SwitchCamera(nullptr);
+				PlayerController->Possess(InCharacter);
+				UCameraModuleBPLibrary::SetCameraRotation(InCharacter->GetActorRotation().Yaw, -10);
+			}
+			else if(CurrentCharacter)
+			{
+				PlayerController->UnPossess();
+				CurrentCharacter = nullptr;
+			}
+		}
+	}
 }
 
-TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(FName InCharacterName) const
+void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
+{
+	SwitchCharacter(GetCharacterByClass(InCharacterClass));
+}
+
+void ACharacterModule::SwitchCharacterByName(FName InCharacterName)
+{
+	SwitchCharacter(GetCharacterByName(InCharacterName));
+}
+
+bool ACharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const
+{
+	if(!InCharacterClass) return nullptr;
+	
+	const FName CharacterName = InCharacterClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	return HasCharacterByName(CharacterName);
+}
+
+bool ACharacterModule::HasCharacterByName(FName InCharacterName) const
+{
+	return CharacterMap.Contains(InCharacterName);
+}
+
+ACharacterBase* ACharacterModule::GetCurrentCharacter() const
+{
+	return CurrentCharacter;
+}
+
+ACharacterBase* ACharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass) const
+{
+	return CurrentCharacter;
+}
+
+ACharacterBase* ACharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const
+{
+	if(!InCharacterClass) return nullptr;
+	
+	const FName CharacterName = InCharacterClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	return GetCharacterByName(CharacterName);
+}
+
+ACharacterBase* ACharacterModule::GetCharacterByName(FName InCharacterName) const
 {
 	for (auto Iter : Characters)
 	{
@@ -81,86 +169,6 @@ TScriptInterface<ICharacterInterface> ACharacterModule::GetCharacterByName(FName
 		}
 	}
 	return nullptr;
-}
-
-void ACharacterModule::PlayCharacterSound(FName InCharacterName, USoundBase* InSound, float InVolume, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->PlaySound(InSound, InVolume, bMulticast);
-	}
-}
-
-void ACharacterModule::StopCharacterSound(FName InCharacterName)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->StopSound();
-	}
-}
-
-void ACharacterModule::PlayCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->PlayMontage(InMontage, bMulticast);
-	}
-}
-
-void ACharacterModule::PlayCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->PlayMontageByName(InMontageName, bMulticast);
-	}
-}
-
-void ACharacterModule::StopCharacterMontage(FName InCharacterName, UAnimMontage* InMontage, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->StopMontage(InMontage, bMulticast);
-	}
-}
-
-void ACharacterModule::StopCharacterMontageByName(FName InCharacterName, const FName InMontageName, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->StopMontageByName(InMontageName, bMulticast);
-	}
-}
-
-void ACharacterModule::TeleportCharacterTo(FName InCharacterName, FTransform InTransform, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->TransformTowards(InTransform, bMulticast);
-	}
-}
-
-void ACharacterModule::AIMoveCharacterTo(FName InCharacterName, FVector InLocation, float InStopDistance, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->AIMoveTo(InLocation, InStopDistance, bMulticast);
-	}
-}
-
-void ACharacterModule::StopCharacterAIMove(FName InCharacterName, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->StopAIMove(bMulticast);
-	}
-}
-
-void ACharacterModule::RotationCharacterTowards(FName InCharacterName, FRotator InRotation, float InDuration, bool bMulticast)
-{
-	if(TScriptInterface<ICharacterInterface> Character = GetCharacterByName(InCharacterName))
-	{
-		Character->RotationTowards(InRotation, InDuration, bMulticast);
-	}
 }
 
 void ACharacterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

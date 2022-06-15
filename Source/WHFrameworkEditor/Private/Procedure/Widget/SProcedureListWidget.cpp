@@ -492,6 +492,7 @@ void SProcedureListWidget::UpdateListView(bool bRegenerate)
 		ProcedureModule->UpdateListItem(ProcedureListItems);
 	}
 
+	ListView->ClearSelection();
 	ListView->RequestListRefresh();
 }
 

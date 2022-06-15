@@ -18,8 +18,4 @@ class WHFRAMEWORK_API UWidgetWorldText : public UWorldWidgetBase
 
 public:
 	UWidgetWorldText(const FObjectInitializer& ObjectInitializer);
-
-public:
-	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
-	void InitContent(const FString& InContent, EWorldTextType InContentType);
 };

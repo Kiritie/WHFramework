@@ -34,6 +34,19 @@ public:
 		}
 		return nullptr;
 	}
+	
+	template<class T>
+	static T& GetDataAssetRef(FName InDataAssetName = NAME_None)
+	{
+		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		{
+			return AssetModule->GetDataAssetRef<T>(InDataAssetName);
+		}
+		else
+		{
+			return UReferencePoolModuleBPLibrary::GetReference<T>();
+		}
+	}
 
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetDataAsset", DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
 	static UDataAssetBase* K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
@@ -82,6 +95,6 @@ public:
 	template<class T>
 	static T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{
-		return UPrimaryAssetManager::Get().LoadAssetRef<T>(InPrimaryAssetId, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryAssetId, bLogWarning);
 	}
 };

@@ -16,6 +16,7 @@
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
+#include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
 ASceneModule::ASceneModule()
@@ -304,7 +305,8 @@ bool ASceneModule::HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsur
 bool ASceneModule::HasSceneActorByName(FName InName, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(InName)) return true;
-	return bEnsured ? ensureEditor(false) : false;
+	ensureEditor(bEnsured);
+	return false;
 }
 
 AActor* ASceneModule::GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured) const
@@ -392,7 +394,8 @@ void ASceneModule::DestroySceneActorByName(FName InName)
 bool ASceneModule::HasTargetPointByName(FName InName, bool bEnsured) const
 {
 	if(TargetPoints.Contains(InName)) return true;
-	return bEnsured ? ensureEditor(false) : false;
+	ensureEditor(bEnsured);
+	return false;
 }
 
 ATargetPoint* ASceneModule::GetTargetPointByName(FName InName, bool bEnsured) const
@@ -427,7 +430,8 @@ void ASceneModule::RemoveTargetPointByName(FName InName)
 bool ASceneModule::HasScenePointByName(FName InName, bool bEnsured) const
 {
 	if(ScenePoints.Contains(InName)) return true;
-	return bEnsured ? ensureEditor(false) : false;
+	ensureEditor(bEnsured);
+	return false;
 }
 
 USceneComponent* ASceneModule::GetScenePointByName(FName InName, bool bEnsured) const
@@ -469,7 +473,8 @@ bool ASceneModule::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InCla
 bool ASceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
 {
 	if(PhysicsVolumes.Contains(InName)) return true;
-	return bEnsured ? ensureEditor(false) : false;
+	ensureEditor(bEnsured);
+	return false;
 }
 
 APhysicsVolumeBase* ASceneModule::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
@@ -522,6 +527,12 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 	{
 		PhysicsVolumes.Remove(InName);
 	}
+}
+
+void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp)
+{
+	TArray<FParameter> Parameters = { FParameter::MakeString(InText), FParameter::MakeColor(InTextColor), FParameter::MakeInteger((int32)InTextStyle) };
+	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(this, InLocation, InSceneComp, &Parameters);
 }
 
 FLinearColor ASceneModule::GetOutlineColor() const

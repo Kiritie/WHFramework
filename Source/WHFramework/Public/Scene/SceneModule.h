@@ -65,16 +65,16 @@ protected:
 	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
 	
 public:
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	UFUNCTION(BlueprintPure)
 	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
 
-	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	UFUNCTION(BlueprintPure)
 	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
 
 protected:
@@ -94,34 +94,34 @@ protected:
 	TMap<FName, AActor*> SceneActorMap;
 
 public:
-	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	UFUNCTION(BlueprintPure)
 	virtual bool HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintPure, Category = "SceneActor")
+	UFUNCTION(BlueprintPure)
 	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	virtual AActor* GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneActor")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void AddSceneActor(AActor* InActor) override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void AddSceneActorByName(FName InName, AActor* InActor) override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void RemoveSceneActor(AActor* InActor) override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void RemoveSceneActorByName(FName InName) override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void DestroySceneActor(AActor* InActor) override;
 
-	UFUNCTION(BlueprintCallable, Category = "SceneActor")
+	UFUNCTION(BlueprintCallable)
 	virtual void DestroySceneActorByName(FName InName) override;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -131,16 +131,16 @@ protected:
 	TMap<FName, class ATargetPoint*> TargetPoints;
 
 public:
-	UFUNCTION(BlueprintPure, Category = "TargetPoint")
+	UFUNCTION(BlueprintPure)
 	bool HasTargetPointByName(FName InName, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintPure, Category = "TargetPoint")
+	UFUNCTION(BlueprintPure)
 	ATargetPoint* GetTargetPointByName(FName InName, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
+	UFUNCTION(BlueprintCallable)
 	void AddTargetPointByName(FName InName, ATargetPoint* InPoint);
 
-	UFUNCTION(BlueprintCallable, Category = "TargetPoint")
+	UFUNCTION(BlueprintCallable)
 	void RemoveTargetPointByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -150,16 +150,16 @@ protected:
 	TMap<FName, USceneComponent*> ScenePoints;
 
 public:
-	UFUNCTION(BlueprintPure, Category = "ScenePoint")
+	UFUNCTION(BlueprintPure)
 	bool HasScenePointByName(FName InName, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintPure, Category = "ScenePoint")
+	UFUNCTION(BlueprintPure)
 	USceneComponent* GetScenePointByName(FName InName, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
+	UFUNCTION(BlueprintCallable)
 	void AddScenePointByName(FName InName, USceneComponent* InSceneComp);
 
-	UFUNCTION(BlueprintCallable, Category = "ScenePoint")
+	UFUNCTION(BlueprintCallable)
 	void RemoveScenePointByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -172,29 +172,35 @@ protected:
 	TArray<FPhysicsVolumeData> DefaultPhysicsVolumes;
 
 public:
-	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure)
 	bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 	
-	UFUNCTION(BlueprintPure, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure)
 	bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true) const;
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	APhysicsVolumeBase* GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable)
 	void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 	
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable)
 	void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable)
 	void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 
-	UFUNCTION(BlueprintCallable, Category = "PhysicsVolumes")
+	UFUNCTION(BlueprintCallable)
 	void RemovePhysicsVolumeByName(FName InName);
+
+	//////////////////////////////////////////////////////////////////////////
+    /// World Text
+public:
+	UFUNCTION(BlueprintCallable)
+	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline

@@ -23,7 +23,7 @@ class UAttributeSetBase;
  * ������������
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryAssetInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -107,9 +107,6 @@ public:
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void AddWorldText(FString InContent, EWorldTextType InContentType, EWorldTextStyle InContentStyle) override;
 
 public:
 	UFUNCTION(BlueprintCallable)
