@@ -84,15 +84,4 @@ public:
 		}
 		return LoadedItems;
 	}
-
-	template<class T>
-	TArray<T>& LoadPrimaryAssetRefs(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)
-	{
-		static TArray<T> LoadedItems;
-		for(auto Iter : LoadPrimaryAssets(InPrimaryAssetType, bLogWarning))
-		{
-			LoadedItems.Add(static_cast<T&>(*Iter));
-		}
-		return LoadedItems;
-	}
 };

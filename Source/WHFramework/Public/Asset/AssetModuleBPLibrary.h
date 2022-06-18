@@ -210,10 +210,4 @@ public:
 	{
 		return UAssetManagerBase::Get().LoadPrimaryAssets<T>(InPrimaryAssetType, bLogWarning);
 	}
-
-	template<class T>
-	static TArray<T>& LoadPrimaryAssetRefs(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)
-	{
-		return UAssetManagerBase::Get().LoadPrimaryAssetRefs<T>(InPrimaryAssetType, bLogWarning);
-	}
 };
