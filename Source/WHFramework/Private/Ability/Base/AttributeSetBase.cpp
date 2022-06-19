@@ -39,7 +39,7 @@ TArray<FGameplayAttribute> UAttributeSetBase::GetPersistentAttributes()
 	TArray<FGameplayAttribute> PersistentAttributes;
 	for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
 	{
-		FStructProperty* Property = Cast<FStructProperty>(*PropertyIt);
+		FStructProperty* Property = CastField<FStructProperty>(*PropertyIt);
 		if(Property && Property->Struct == FGameplayAttributeData::StaticStruct() && Property->HasAnyPropertyFlags(CPF_SaveGame))
 		{
 			FGameplayAttribute* Value = Property->ContainerPtrToValuePtr<FGameplayAttribute>(this);

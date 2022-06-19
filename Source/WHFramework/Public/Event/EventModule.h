@@ -43,8 +43,20 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Event
 public:
+	template<class T>
+	void SubscribeEvent(UObject* InOwner, const FName InFuncName)
+	{
+		SubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+	}
+
 	UFUNCTION(BlueprintCallable)
 	void SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+
+	template<class T>
+	void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
+	{
+		UnsubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+	}
 
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);

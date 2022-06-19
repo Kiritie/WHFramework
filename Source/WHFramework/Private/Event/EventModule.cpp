@@ -10,6 +10,7 @@
 #include "Event/EventModuleNetworkComponent.h"
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
+#include "Global/GlobalBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Network/NetworkModuleBPLibrary.h"

@@ -19,8 +19,20 @@ class WHFRAMEWORK_API UEventModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	template<class T>
+	static void SubscribeEvent(UObject* InOwner, const FName InFuncName)
+	{
+		SubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+	}
+
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+
+	template<class T>
+	static void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
+	{
+		UnsubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);

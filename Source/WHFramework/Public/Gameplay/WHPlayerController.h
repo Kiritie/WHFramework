@@ -132,6 +132,8 @@ public:
 	}
 	
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
+	
+	void SetPlayerPawn(APawn* InPlayerPawn) { PlayerPawn =  InPlayerPawn; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Input
