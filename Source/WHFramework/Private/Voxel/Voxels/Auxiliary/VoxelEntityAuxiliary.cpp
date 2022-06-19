@@ -9,7 +9,7 @@
 AVoxelEntityAuxiliary::AVoxelEntityAuxiliary()
 {
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(TEXT("DW_EntityAuxiliary"));
+	BoxComponent->SetCollisionProfileName(TEXT("EntityAuxiliary"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
 	BoxComponent->OnComponentHit.AddDynamic(this, &AVoxelEntityAuxiliary::OnCollision);
 	SetRootComponent(BoxComponent);

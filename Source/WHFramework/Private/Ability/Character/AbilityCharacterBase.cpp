@@ -36,7 +36,7 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
-	GetCapsuleComponent()->SetCollisionProfileName(TEXT("DW_Character"));
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
 	GetCapsuleComponent()->CanCharacterStepUpOn = ECanBeCharacterBase::ECB_No;
 
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -90), FRotator(0, -90, 0));

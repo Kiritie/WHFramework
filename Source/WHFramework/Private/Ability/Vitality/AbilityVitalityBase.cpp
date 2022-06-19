@@ -21,7 +21,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	PrimaryActorTick.bCanEverTick = false;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(FName("DW_Vitality"));
+	BoxComponent->SetCollisionProfileName(FName("Vitality"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
 	SetRootComponent(BoxComponent);
 

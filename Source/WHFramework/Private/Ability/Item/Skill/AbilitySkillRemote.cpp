@@ -15,7 +15,7 @@ AAbilitySkillRemote::AAbilitySkillRemote()
 
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
 	SphereComponent->SetupAttachment(RootComponent);
-	SphereComponent->SetCollisionProfileName(TEXT("DW_Weapon"));
+	SphereComponent->SetCollisionProfileName(TEXT("Weapon"));
 	SphereComponent->SetSphereRadius(50);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilitySkillRemote::OnBeginOverlap);
 	SetRootComponent(SphereComponent);

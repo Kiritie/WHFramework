@@ -8,7 +8,7 @@
 class UAbilitySystemComponentBase;
 
 /** Delegate type used, EventTag and Payload may be empty if it came from the montage callbacks */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FDWWaitForEventDelegate, FGameplayTag, EventTag, FGameplayEventData, EventData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWaitForEventDelegate, FGameplayTag, EventTag, FGameplayEventData, EventData);
 
 /**
  * This task combines Wait and WaitForEvent into one task, so you can wait for multiple types of activations such as from a melee combo
@@ -30,7 +30,7 @@ public:
 
 	/** One of the triggering gameplay events happened */
 	UPROPERTY(BlueprintAssignable)
-	FDWWaitForEventDelegate EventReceived;
+	FWaitForEventDelegate EventReceived;
 
 	/**
 	 * Play a montage and wait for it end. If a gameplay event happens that matches EventTags (or EventTags is empty), the EventReceived delegate will fire with a tag and event data.

@@ -3,6 +3,7 @@
 
 #include "Voxel/VoxelModule.h"
 
+#include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -16,6 +17,7 @@
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
+#include "Scene/Actor/PickUp/PickUpVoxel.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
@@ -253,35 +255,34 @@ void AVoxelModule::UnloadData()
 
 void AVoxelModule::GeneratePreviews()
 {
-	// auto voxelDatas = UDWHelper::LoadVoxelDatas();
-	// if(voxelDatas.Num() == 0) return;
-	//
-	// int32 tmpNum = 8;
-	// int32 tmpIndex = 0;
-	// VoxelsCapture->OrthoWidth = tmpNum * GetWorldData()->BlockSize * 0.5f;
-	// for (float x = -(tmpNum - 1) * 0.5f; x <= (tmpNum - 1) * 0.5f; x++)
-	// {
-	// 	for (float y = -(tmpNum - 1) * 0.5f; y <= (tmpNum - 1) * 0.5f; y++)
-	// 	{
-	// 		if (tmpIndex >= voxelDatas.Num()) break;
-	//
-	// 		//voxelDatas[tmpIndex].TexUV = FVector2D((tmpIndex - 1) % tmpNum, (tmpIndex - 1) / tmpNum);
-	// 		FActorSpawnParameters spawnParams = FActorSpawnParameters();
-	// 		spawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	// 		auto pickUpItem = GetWorld()->SpawnActor<APickUpVoxel>(spawnParams);
-	// 		if (pickUpItem != nullptr)
-	// 		{
-	// 			pickUpItem->Initialize(FAbilityItem(voxelDatas[tmpIndex].ID, 1), true);
-	// 			pickUpItem->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-	// 			pickUpItem->SetActorLocation(FVector(x * GetWorldData()->BlockSize * 0.5f, y * GetWorldData()->BlockSize * 0.5f, 0));
-	// 			pickUpItem->SetActorRotation(FRotator(-70, 0, -180));
-	// 			pickUpItem->GetMeshComponent()->SetRelativeRotation(FRotator(0, 45, 0));
-	// 			VoxelsCapture->ShowOnlyActors.Add(pickUpItem);
-	// 		}
-	//
-	// 		tmpIndex++;
-	// 	}
-	// }
+	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Voxel));
+	if(VoxelDatas.Num() == 0) return;
+	
+	int32 tmpNum = 8;
+	int32 tmpIndex = 0;
+	VoxelsCapture->OrthoWidth = tmpNum * GetWorldData()->BlockSize * 0.5f;
+	for (float x = -(tmpNum - 1) * 0.5f; x <= (tmpNum - 1) * 0.5f; x++)
+	{
+		for (float y = -(tmpNum - 1) * 0.5f; y <= (tmpNum - 1) * 0.5f; y++)
+		{
+			if (tmpIndex >= VoxelDatas.Num()) break;
+	
+			FActorSpawnParameters SpawnParams = FActorSpawnParameters();
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			auto PickUpItem = GetWorld()->SpawnActor<APickUpVoxel>(SpawnParams);
+			if (PickUpItem != nullptr)
+			{
+				PickUpItem->Initialize(FAbilityItem(VoxelDatas[tmpIndex]->GetPrimaryAssetId(), 1), true);
+				PickUpItem->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+				PickUpItem->SetActorLocation(FVector(x * GetWorldData()->BlockSize * 0.5f, y * GetWorldData()->BlockSize * 0.5f, 0));
+				PickUpItem->SetActorRotation(FRotator(-70, 0, -180));
+				PickUpItem->GetMeshComponent()->SetRelativeRotation(FRotator(0, 45, 0));
+				VoxelsCapture->ShowOnlyActors.Add(PickUpItem);
+			}
+	
+			tmpIndex++;
+		}
+	}
 }
 
 void AVoxelModule::GenerateTerrain()
@@ -333,33 +334,6 @@ void AVoxelModule::GenerateTerrain()
 		}
 		else if(ChunkMapBuildQueue.Num() > 0)
 		{
-			// TArray<AVoxelChunk*> tmpArr;
-			// for(int32 i = 0; i < ChunkMapBuildQueue.Num(); i++)
-			// {
-			// 	tmpArr.Add(ChunkMapBuildQueue[i]);
-			// 	if(tmpArr.Num() >= FMath::Min(ChunkMapBuildQueue.Num(), ChunkMapBuildSpeed))
-			// 	{
-			// 		FAsyncTask<ChunkMapBuildTask>* tmpTask = new FAsyncTask<ChunkMapBuildTask>(this, tmpArr);
-			// 		tmpTask->StartBackgroundTask();
-			// 		ChunkMapBuildTasks.Add(tmpTask);
-			// 		tmpArr.Empty();
-			// 	}
-			// }
-			// for(int32 i = 0; i < ChunkMapBuildTasks.Num(); i++)
-			// {
-			// 	FAsyncTask<ChunkMapBuildTask>* tmpTask = ChunkMapBuildTasks[i];
-			// 	if(tmpTask && tmpTask->IsDone())
-			// 	{
-			// 		for(auto iter : tmpTask->GetTask().GetQueue())
-			// 		{
-			// 			if(ChunkMapBuildQueue.Contains(iter))
-			// 			{
-			// 				ChunkMapBuildQueue.Remove(iter);
-			// 			}
-			// 		}
-			// 		delete tmpTask;
-			// 	}
-			// }
 			const int32 tmpNum = FMath::Min(ChunkMapBuildQueue.Num(), ChunkMapBuildSpeed);
 			for(int32 i = 0; i < tmpNum; i++)
 			{
@@ -369,10 +343,6 @@ void AVoxelModule::GenerateTerrain()
 		}
 		else if(ChunkMapGenerateQueue.Num() > 0)
 		{
-			// if(ChunkMapBuildTasks.Num() > 0)
-			// {
-			// 	ChunkMapBuildTasks.Empty();
-			// }
 			const int32 tmpNum = FMath::Min(ChunkMapGenerateQueue.Num(), ChunkMapGenerateSpeed);
 			for(int32 i = 0; i < tmpNum; i++)
 			{

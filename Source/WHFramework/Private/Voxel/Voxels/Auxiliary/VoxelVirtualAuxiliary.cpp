@@ -9,7 +9,7 @@
 AVoxelVirtualAuxiliary::AVoxelVirtualAuxiliary()
 {
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(TEXT("DW_VirtualAuxiliary"));
+	BoxComponent->SetCollisionProfileName(TEXT("VirtualAuxiliary"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
 	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AVoxelVirtualAuxiliary::OnBeginOverlap);
 	BoxComponent->OnComponentEndOverlap.AddDynamic(this, &AVoxelVirtualAuxiliary::OnEndOverlap);

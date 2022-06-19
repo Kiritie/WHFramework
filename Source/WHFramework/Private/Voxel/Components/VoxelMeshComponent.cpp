@@ -40,12 +40,12 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparen
 				case EVoxelTransparency::Solid:
 				case EVoxelTransparency::SemiTransparent:
 				{
-					SetCollisionProfileName(TEXT("DW_SolidVoxel"));
+					SetCollisionProfileName(TEXT("SolidVoxel"));
 					break;
 				}
 				case EVoxelTransparency::Transparent:
 				{
-					SetCollisionProfileName(TEXT("DW_TransVoxel"));
+					SetCollisionProfileName(TEXT("TransVoxel"));
 					break;
 				}
 			}

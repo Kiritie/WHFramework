@@ -16,7 +16,7 @@ APickUp::APickUp()
 	PrimaryActorTick.bCanEverTick = false;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(TEXT("DW_PickUp"));
+	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
 	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &APickUp::OnOverlap);
 	SetRootComponent(BoxComponent);
