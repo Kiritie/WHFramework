@@ -3,15 +3,15 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 
-#include "ItemDataBase.generated.h"
+#include "AbilityItemDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UItemDataBase : public UPrimaryAssetBase
+class WHFRAMEWORK_API UAbilityItemDataBase : public UPrimaryAssetBase
 {
 	GENERATED_BODY()
 
 public:
-	UItemDataBase();
+	UAbilityItemDataBase();
 	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

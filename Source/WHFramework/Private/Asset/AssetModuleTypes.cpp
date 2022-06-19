@@ -4,7 +4,7 @@
 
 FAbilityItem FAbilityItem::Empty = FAbilityItem();
 
-UItemDataBase& FAbilityItem::GetData() const
+UAbilityItemDataBase& FAbilityItem::GetData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UItemDataBase>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
 }

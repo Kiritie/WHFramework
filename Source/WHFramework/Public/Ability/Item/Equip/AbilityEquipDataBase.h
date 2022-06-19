@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Ability/Item/ItemDataBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 
 #include "AbilityEquipDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityEquipDataBase : public UItemDataBase
+class WHFRAMEWORK_API UAbilityEquipDataBase : public UAbilityItemDataBase
 {
 	GENERATED_BODY()
 

@@ -3,7 +3,7 @@
 #include "Asset/AssetManagerBase.h"
 
 #include "AbilitySystemGlobals.h"
-#include "Ability/Item/ItemDataBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 #include "Debug/DebugModuleTypes.h"
 
 UAssetManagerBase::UAssetManagerBase()

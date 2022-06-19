@@ -37,3 +37,9 @@ void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
 {
 	OwnerCharacter = InOwnerCharacter;
 }
+
+void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+{
+	Initialize(InOwnerCharacter);
+	Item = InItem;
+}

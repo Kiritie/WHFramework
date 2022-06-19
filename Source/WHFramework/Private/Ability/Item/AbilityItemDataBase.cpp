@@ -1,10 +1,10 @@
-#include "Ability/Item/ItemDataBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 
-UItemDataBase::UItemDataBase()
+UAbilityItemDataBase::UAbilityItemDataBase()
 {
 	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::None);
 
@@ -17,7 +17,7 @@ UItemDataBase::UItemDataBase()
 	AbilityClass = nullptr;
 }
 
-bool UItemDataBase::EqualType(EAbilityItemType InItemType) const
+bool UAbilityItemDataBase::EqualType(EAbilityItemType InItemType) const
 {
 	return Type == UAbilityModuleBPLibrary::GetAssetTypeByItemType(InItemType);
 }

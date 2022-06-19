@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Ability/Item/ItemDataBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelData.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelData : public UItemDataBase
+class WHFRAMEWORK_API UVoxelData : public UAbilityItemDataBase
 {
 	GENERATED_BODY()
 

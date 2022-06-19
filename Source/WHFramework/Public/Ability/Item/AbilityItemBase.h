@@ -37,6 +37,8 @@ public:
 	virtual void Tick(float DeltaTime) override;
 		
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter);
+		
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem);
 
 public:
 	template<class T >
@@ -45,7 +47,7 @@ public:
 		return Item.GetData<T>();
 	}
 
-	UItemDataBase& GetItemData() const
+	UAbilityItemDataBase& GetItemData() const
 	{
 		return Item.GetData();
 	}

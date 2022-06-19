@@ -36,21 +36,23 @@ void AAbilitySkillBase::Tick(float DeltaTime)
 void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
 {
 	Super::Initialize(InOwnerCharacter);
+
+	SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
+	SetActorRotation(OwnerCharacter->GetActorRotation());
 }
 
-void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID)
+void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	if (InOwnerCharacter)
-	{
-		OwnerCharacter = InOwnerCharacter;
-		SkillAbilityID = InSkillID;
-		SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
-		SetActorRotation(OwnerCharacter->GetActorRotation());
-	}
+	Super::Initialize(InOwnerCharacter, InItem);
 }
 
 void AAbilitySkillBase::Destroyed()
 {
 	Super::Destroyed();
 	GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
+}
+
+FPrimaryAssetId AAbilitySkillBase::GetSkillID() const
+{
+	return GetItemData().GetPrimaryAssetId();
 }

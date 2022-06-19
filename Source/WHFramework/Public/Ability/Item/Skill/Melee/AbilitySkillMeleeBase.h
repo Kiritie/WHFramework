@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "AbilitySkillBase.h"
-#include "AbilitySkillMelee.generated.h"
+#include "Ability/Item/Skill/AbilitySkillBase.h"
+#include "AbilitySkillMeleeBase.generated.h"
 
 class USphereComponent;
 class UStaticMeshComponent;
@@ -13,13 +13,13 @@ class UProjectileMovementComponent;
  * ��ս����
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilitySkillMelee : public AAbilitySkillBase
+class WHFRAMEWORK_API AAbilitySkillMeleeBase : public AAbilitySkillBase
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AAbilitySkillMelee();
+	AAbilitySkillMeleeBase();
 
 
 protected:

@@ -5,7 +5,7 @@
 #include "SkillAbilityBase.generated.h"
 
 /**
- * 道具Ability基类
+ * 技能Ability基类
  */
 UCLASS()
 class WHFRAMEWORK_API USkillAbilityBase : public UItemAbilityBase

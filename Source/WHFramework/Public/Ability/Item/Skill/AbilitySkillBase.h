@@ -24,9 +24,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
 	float DurationTime;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
-	FPrimaryAssetId SkillAbilityID;
-
 private:
 	FTimerHandle DestroyTimer;
 
@@ -40,11 +37,11 @@ public:
 
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
 
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID);
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem) override;
 
 	virtual void Destroyed() override;
 
 public:
 	UFUNCTION(BlueprintPure)
-	FPrimaryAssetId GetSkillID() const { return SkillAbilityID; }
+	FPrimaryAssetId GetSkillID() const;
 };

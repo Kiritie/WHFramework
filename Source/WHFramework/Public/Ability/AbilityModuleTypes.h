@@ -5,7 +5,7 @@
 
 #include "AbilityModuleTypes.generated.h"
 
-class UItemDataBase;
+class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
 
@@ -206,7 +206,7 @@ public:
 		return static_cast<T&>(GetItemData());
 	}
 
-	UItemDataBase& GetItemData() const;
+	UAbilityItemDataBase& GetItemData() const;
 };
 
 /**
@@ -337,8 +337,8 @@ public:
 		Count = 0;
 		Level = 0;
 	}
-		
-	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount, int32 InLevel = 0)
+				
+	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
 	{
 		ID = InID;
 		Count = InCount;
@@ -360,7 +360,7 @@ public:
 		return static_cast<T&>(GetData());
 	}
 
-	UItemDataBase& GetData() const;
+	UAbilityItemDataBase& GetData() const;
 
 	FORCEINLINE virtual bool IsValid() const
 	{

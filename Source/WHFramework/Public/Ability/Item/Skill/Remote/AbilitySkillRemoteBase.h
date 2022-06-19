@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "AbilitySkillBase.h"
-#include "AbilitySkillRemote.generated.h"
+#include "Ability/Item/Skill/AbilitySkillBase.h"
+#include "AbilitySkillRemoteBase.generated.h"
 
 class AAbilityCharacterBase;
 class USphereComponent;
@@ -14,13 +14,13 @@ class UProjectileMovementComponent;
  * Զ�̼���
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilitySkillRemote : public AAbilitySkillBase
+class WHFRAMEWORK_API AAbilitySkillRemoteBase : public AAbilitySkillBase
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AAbilitySkillRemote();
+	AAbilitySkillRemoteBase();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -39,7 +39,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FPrimaryAssetId& InSkillID) override;
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
 
 	UFUNCTION()
 	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
