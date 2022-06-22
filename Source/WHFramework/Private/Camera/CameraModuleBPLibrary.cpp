@@ -5,6 +5,7 @@
 
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraModule.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 

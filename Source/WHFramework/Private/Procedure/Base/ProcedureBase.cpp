@@ -3,7 +3,7 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
-#include "Camera/CameraModule.h"
+#include "Camera/CameraModuleBPLibrary.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
@@ -27,6 +27,7 @@ UProcedureBase::UProcedureBase()
 	OperationTarget = nullptr;
 	bTrackTarget = false;
 
+	CameraViewPawn = nullptr;
 	CameraViewMode = EProcedureCameraViewMode::None;
 	CameraViewSpace = EProcedureCameraViewSpace::Local;
 	CameraViewEaseType = EEaseType::Linear;
@@ -68,6 +69,7 @@ void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
 	InNewProcedure->ProcedureIndex = ProcedureIndex;
 	InNewProcedure->OperationTarget = OperationTarget;
 	InNewProcedure->bTrackTarget = bTrackTarget;
+	InNewProcedure->CameraViewPawn = CameraViewPawn;
 	InNewProcedure->CameraViewMode = CameraViewMode;
 	InNewProcedure->CameraViewSpace = CameraViewSpace;
 	InNewProcedure->CameraViewEaseType = CameraViewEaseType;
@@ -103,6 +105,8 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	K2_OnEnter(InLastProcedure);
 
+	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
+	
 	ResetCameraView();
 
 	switch(ProcedureGuideType)
@@ -174,24 +178,21 @@ void UProcedureBase::SwitchNextProcedure()
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 	{
-		if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
-		{
-			CameraViewOffset = CameraModule->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
-		}
-		else
-		{
-			CameraViewOffset = CameraModule->GetCurrentCameraLocation();
-			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw;
-			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch;
-		}
-		CameraViewDistance = CameraModule->GetCurrentCameraDistance();
-
-		Modify();
+		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
+	else
+	{
+		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch;
+	}
+	CameraViewDistance = UCameraModuleBPLibrary::GetCurrentCameraDistance();
+
+	Modify();
 }
 
 void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
@@ -216,51 +217,48 @@ void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	FVector CameraLocation;
+	float CameraYaw;
+	float CameraPitch;
+	float CameraDistance;
+	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 	{
-		FVector CameraLocation;
-		float CameraYaw;
-		float CameraPitch;
-		float CameraDistance;
-		if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
+		CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
+		CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
+		CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
+		CameraDistance = CameraViewDistance;
+	}
+	else
+	{
+		CameraLocation = CameraViewOffset;
+		CameraYaw = CameraViewYaw;
+		CameraPitch = CameraViewPitch;
+		CameraDistance = CameraViewDistance;
+	}
+	switch(CameraViewMode)
+	{
+		case EProcedureCameraViewMode::Instant:
 		{
-			CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
-			CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
-			CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
-			CameraDistance = CameraViewDistance;
+			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, true);
+			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, true);
+			break;
 		}
-		else
+		case EProcedureCameraViewMode::Smooth:
 		{
-			CameraLocation = CameraViewOffset;
-			CameraYaw = CameraViewYaw;
-			CameraPitch = CameraViewPitch;
-			CameraDistance = CameraViewDistance;
+			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, false);
+			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, false);
+			break;
 		}
-		switch(CameraViewMode)
+		case EProcedureCameraViewMode::Duration:
 		{
-			case EProcedureCameraViewMode::Instant:
-			{
-				CameraModule->SetCameraLocation(CameraLocation, true);
-				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-				CameraModule->SetCameraDistance(CameraViewDistance, true);
-				break;
-			}
-			case EProcedureCameraViewMode::Smooth:
-			{
-				CameraModule->SetCameraLocation(CameraLocation, false);
-				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-				CameraModule->SetCameraDistance(CameraViewDistance, false);
-				break;
-			}
-			case EProcedureCameraViewMode::Duration:
-			{
-				CameraModule->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-				CameraModule->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-				CameraModule->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
-				break;
-			}
-			default: break;
+			UCameraModuleBPLibrary::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleBPLibrary::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleBPLibrary::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+			break;
 		}
+		default: break;
 	}
 }
 

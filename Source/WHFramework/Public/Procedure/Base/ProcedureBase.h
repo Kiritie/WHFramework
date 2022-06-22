@@ -12,6 +12,7 @@
 
 #include "ProcedureBase.generated.h"
 
+class ACameraPawnBase;
 /**
  * 流程基类
  */
@@ -151,6 +152,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
 	bool bTrackTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	ACameraPawnBase* CameraViewPawn;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	EProcedureCameraViewMode CameraViewMode;

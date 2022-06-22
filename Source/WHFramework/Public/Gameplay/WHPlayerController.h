@@ -130,7 +130,8 @@ public:
 	{
 		return Cast<T>(PlayerPawn);
 	}
-	
+
+	UFUNCTION(BlueprintPure)
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
 	
 	void SetPlayerPawn(APawn* InPlayerPawn) { PlayerPawn =  InPlayerPawn; }

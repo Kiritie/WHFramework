@@ -15,6 +15,7 @@
 
 #include "GlobalBPLibrary.generated.h"
 
+class ACharacterBase;
 class AWHPlayerController;
 class AWHGameState;
 class AWHGameMode;
@@ -145,7 +146,7 @@ public:
 	static void SerializeExposedParam(UObject* InObject, FParameterMap InParams, bool bParamHavePropertyType = true);
 	/*
 	* 导出目标类带有 ExposeOnSpawn 标签的参数
-	* @param InClass 目标类
+	* @param InClass = nullptr 目标类
 	* @param OutParams 导出参数的存放键值对
 	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
 	*/
@@ -236,7 +237,7 @@ public:
 		return Cast<T>(UGameplayStatics::GetGameInstance(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameInstance", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static UWHGameInstance* K2_GetGameInstance(TSubclassOf<UWHGameInstance> InClass);
+	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
 
 	template<class T>
 	static T* GetGameMode()
@@ -244,7 +245,7 @@ public:
 		return Cast<T>(UGameplayStatics::GetGameMode(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameMode", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static AWHGameMode* K2_GetGameMode(TSubclassOf<AWHGameMode> InClass);
+	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
 
 	template<class T>
 	static T* GetGameState()
@@ -252,7 +253,7 @@ public:
 		return Cast<T>(UGameplayStatics::GetGameState(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameState", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static AWHGameState* K2_GetGameState(TSubclassOf<AWHGameState> InClass);
+	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerController(int32 InPlayerIndex = 0)
@@ -261,7 +262,7 @@ public:
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerController", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static AWHPlayerController* K2_GetPlayerController(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerIndex = 0);
+	static AWHPlayerController* GetPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
 	static T* GetPlayerControllerByID(int32 InPlayerID = 0)
@@ -269,15 +270,15 @@ public:
 		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerControllerByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static AWHPlayerController* K2_GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerID = 0);
+	static AWHPlayerController* GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
 	static T* GetLocalPlayerController()
 	{
-		return Cast<T>(K2_GetLocalPlayerController(T::StaticClass()));
+		return Cast<T>(GetLocalPlayerController(T::StaticClass()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerController", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static AWHPlayerController* K2_GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass);
+	static AWHPlayerController* GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerPawn(int32 InPlayerIndex = 0)
@@ -289,7 +290,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawn", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static APawn* K2_GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex = 0);
+	static APawn* GetPlayerPawn(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
 	static T* GetPlayerPawnByID(int32 InPlayerID = 0)
@@ -301,7 +302,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawnByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static APawn* K2_GetPlayerPawnByID(TSubclassOf<APawn> InClass, int32 InPlayerID = 0);
+	static APawn* GetPlayerPawnByID(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
 	static T* GetLocalPlayerPawn()
@@ -313,7 +314,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerPawn", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static APawn* K2_GetLocalPlayerPawn(TSubclassOf<APawn> InClass);
+	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerCharacter(int32 InPlayerIndex = 0)
@@ -325,7 +326,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacter", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacter* K2_GetPlayerCharacter(TSubclassOf<ACharacter> InClass, int32 InPlayerIndex = 0);
+	static ACharacterBase* GetPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
 	static T* GetPlayerCharacterByID(int32 InPlayerID = 0)
@@ -337,7 +338,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacterByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacter* K2_GetPlayerCharacterByID(TSubclassOf<ACharacter> InClass, int32 InPlayerID = 0);
+	static ACharacterBase* GetPlayerCharacterByID(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
 	static T* GetLocalPlayerCharacter()
@@ -349,5 +350,5 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerCharacter", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacter* K2_GetLocalPlayerCharacter(TSubclassOf<ACharacter> InClass);
+	static ACharacterBase* GetLocalPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr);
 };

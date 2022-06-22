@@ -107,7 +107,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 				CurrentCharacter = InCharacter;
 				UCameraModuleBPLibrary::SwitchCamera(nullptr);
 				PlayerController->Possess(InCharacter);
-				UCameraModuleBPLibrary::SetCameraRotation(InCharacter->GetActorRotation().Yaw, -10);
+				UCameraModuleBPLibrary::SetCameraRotationAndDistance(InCharacter->GetActorRotation().Yaw, -1, -1);
 			}
 			else if(CurrentCharacter)
 			{

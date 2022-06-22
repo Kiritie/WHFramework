@@ -3,7 +3,7 @@
 
 #include "Step/Base/StepBase.h"
 
-#include "Camera/CameraModule.h"
+#include "Camera/CameraModuleBPLibrary.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Step/EventHandle_CompleteStep.h"
 #include "Event/Handle/Step/EventHandle_EnterStep.h"
@@ -31,6 +31,7 @@ UStepBase::UStepBase()
 	OperationTarget = nullptr;
 	bTrackTarget = false;
 
+	CameraViewPawn = nullptr;
 	CameraViewMode = EStepCameraViewMode::None;
 	CameraViewSpace = EStepCameraViewSpace::Local;
 	CameraViewEaseType = EEaseType::Linear;
@@ -99,6 +100,7 @@ void UStepBase::OnDuplicate(UStepBase* InNewStep)
 	InNewStep->StepHierarchy = StepHierarchy;
 	InNewStep->OperationTarget = OperationTarget;
 	InNewStep->bTrackTarget = bTrackTarget;
+	InNewStep->CameraViewPawn = CameraViewPawn;
 	InNewStep->CameraViewMode = CameraViewMode;
 	InNewStep->CameraViewSpace = CameraViewSpace;
 	InNewStep->CameraViewEaseType = CameraViewEaseType;
@@ -187,6 +189,8 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()));
 
 	K2_OnEnter(InLastStep);
+
+	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
 
 	ResetCameraView();
 
@@ -328,10 +332,7 @@ void UStepBase::OnExecute()
 
 	if(bTrackTarget && OperationTarget)
 	{
-		if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
-		{
-			CameraModule->StartTrackTarget(OperationTarget);
-		}
+		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget);
 	}
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
@@ -377,10 +378,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 	if(bTrackTarget && OperationTarget)
 	{
-		if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
-		{
-			CameraModule->EndTrackTarget();
-		}
+		UCameraModuleBPLibrary::EndTrackTarget();
 	}
 	
 	K2_OnComplete(InStepExecuteResult);
@@ -444,24 +442,21 @@ bool UStepBase::IsSkipAble_Implementation() const
 #if WITH_EDITOR
 void UStepBase::GetCameraView()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 	{
-		if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
-		{
-			CameraViewOffset = CameraModule->GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
-		}
-		else
-		{
-			CameraViewOffset = CameraModule->GetCurrentCameraLocation();
-			CameraViewYaw = CameraModule->GetCurrentCameraRotation().Yaw;
-			CameraViewPitch = CameraModule->GetCurrentCameraRotation().Pitch;
-		}
-		CameraViewDistance = CameraModule->GetCurrentCameraDistance();
-
-		Modify();
+		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
+	else
+	{
+		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch;
+	}
+	CameraViewDistance = UCameraModuleBPLibrary::GetCurrentCameraDistance();
+
+	Modify();
 }
 
 void UStepBase::SetCameraView(FCameraParams InCameraParams)
@@ -486,51 +481,48 @@ void UStepBase::SetCameraView(FCameraParams InCameraParams)
 
 void UStepBase::ResetCameraView()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	FVector CameraLocation;
+	float CameraYaw;
+	float CameraPitch;
+	float CameraDistance;
+	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 	{
-		FVector CameraLocation;
-		float CameraYaw;
-		float CameraPitch;
-		float CameraDistance;
-		if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
+		CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
+		CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
+		CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
+		CameraDistance = CameraViewDistance;
+	}
+	else
+	{
+		CameraLocation = CameraViewOffset;
+		CameraYaw = CameraViewYaw;
+		CameraPitch = CameraViewPitch;
+		CameraDistance = CameraViewDistance;
+	}
+	switch(CameraViewMode)
+	{
+		case EStepCameraViewMode::Instant:
 		{
-			CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
-			CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
-			CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
-			CameraDistance = CameraViewDistance;
+			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, true);
+			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, true);
+			break;
 		}
-		else
+		case EStepCameraViewMode::Smooth:
 		{
-			CameraLocation = CameraViewOffset;
-			CameraYaw = CameraViewYaw;
-			CameraPitch = CameraViewPitch;
-			CameraDistance = CameraViewDistance;
+			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, false);
+			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, false);
+			break;
 		}
-		switch(CameraViewMode)
+		case EStepCameraViewMode::Duration:
 		{
-			case EStepCameraViewMode::Instant:
-			{
-				CameraModule->SetCameraLocation(CameraLocation, true);
-				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-				CameraModule->SetCameraDistance(CameraViewDistance, true);
-				break;
-			}
-			case EStepCameraViewMode::Smooth:
-			{
-				CameraModule->SetCameraLocation(CameraLocation, false);
-				CameraModule->SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-				CameraModule->SetCameraDistance(CameraViewDistance, false);
-				break;
-			}
-			case EStepCameraViewMode::Duration:
-			{
-				CameraModule->DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-				CameraModule->DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-				CameraModule->DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
-				break;
-			}
-			default: break;
+			UCameraModuleBPLibrary::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleBPLibrary::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleBPLibrary::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+			break;
 		}
+		default: break;
 	}
 }
 

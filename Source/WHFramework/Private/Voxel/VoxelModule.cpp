@@ -136,7 +136,6 @@ FVoxelWorldSaveData* AVoxelModule::GetWorldData()
 void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
 {
 	WorldMode = InWorldMode;
-	OnWorldStateChanged();
 }
 
 float AVoxelModule::GetWorldLength() const

@@ -182,12 +182,12 @@ public:
 		const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
 		if(AllSaveGames.Contains(SaveName))
 		{
-			AllSaveGames.Remove(SaveName);
 			if(USaveGameBase* SaveGame = AllSaveGames[SaveName])
 			{
 				SaveGame->OnUnload();
 				SaveGame->ConditionalBeginDestroy();
 			}
+			AllSaveGames.Remove(SaveName);
 		}
 		return false;
 	}

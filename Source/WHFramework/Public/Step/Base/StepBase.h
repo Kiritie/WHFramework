@@ -11,6 +11,7 @@
 
 #include "StepBase.generated.h"
 
+class ACameraPawnBase;
 class URootStepBase;
 /**
  * 步骤基类
@@ -205,6 +206,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
 	bool bTrackTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
+	ACameraPawnBase* CameraViewPawn;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	EStepCameraViewMode CameraViewMode;

@@ -6,7 +6,7 @@
 #include "WHGameState.generated.h"
 
 /**
- * ��Ϸ״̬����
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API AWHGameState : public AGameStateBase
