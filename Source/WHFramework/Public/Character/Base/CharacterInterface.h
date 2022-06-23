@@ -50,4 +50,6 @@ public:
 	virtual void SetNameC(FName InName) = 0;
 
 	virtual class UCharacterAnim* GetAnim() const = 0;
+
+	virtual class AController* GetDefaultController() const = 0;
 };

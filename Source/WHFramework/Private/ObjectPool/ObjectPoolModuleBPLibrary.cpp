@@ -6,11 +6,11 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-UObject* UObjectPoolModuleBPLibrary::K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
+UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 	{
-		return ObjectPoolModule->K2_SpawnObject(InType, InParams);
+		return ObjectPoolModule->SpawnObject(InType, InParams);
 	}
 	return nullptr;
 }
@@ -23,11 +23,11 @@ void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
 	}
 }
 
-void UObjectPoolModuleBPLibrary::K2_ClearObject(TSubclassOf<UObject> InType)
+void UObjectPoolModuleBPLibrary::ClearObject(TSubclassOf<UObject> InType)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
 	{
-		ObjectPoolModule->K2_ClearObject(InType);
+		ObjectPoolModule->ClearObject(InType);
 	}
 }
 

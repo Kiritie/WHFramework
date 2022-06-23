@@ -9,6 +9,8 @@
 #include "Math/MathTypes.h"
 #include "CameraModuleBPLibrary.generated.h"
 
+class USpringArmComponent;
+class UCameraComponent;
 class ACameraPawnBase;
 /**
  * 
@@ -27,9 +29,15 @@ public:
 
 	static ACameraPawnBase* GetCurrentCamera();
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetCurrentCamera", DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
 	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass);
 	
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static UCameraComponent* GetCurrentCameraComp();
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static USpringArmComponent* GetCurrentCameraBoom();
+
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
 	{

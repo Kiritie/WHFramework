@@ -28,6 +28,8 @@ protected:
 public:
 	virtual void Tick(float DeltaSeconds) override;
 
+	virtual void SpawnDefaultController() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
@@ -49,6 +51,14 @@ protected:
 	UCharacterAnim* Anim;
 public:
 	virtual UCharacterAnim* GetAnim() const override { return Anim; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// DefaultController
+protected:
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
+	AController* DefaultController;
+public:
+	virtual AController* GetDefaultController() const override { return DefaultController; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound

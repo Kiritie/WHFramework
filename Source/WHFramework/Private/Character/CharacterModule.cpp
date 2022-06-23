@@ -104,14 +104,22 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 		{
 			if(InCharacter)
 			{
-				CurrentCharacter = InCharacter;
 				UCameraModuleBPLibrary::SwitchCamera(nullptr);
 				PlayerController->Possess(InCharacter);
 				UCameraModuleBPLibrary::SetCameraRotationAndDistance(InCharacter->GetActorRotation().Yaw, -1, -1);
+				if(CurrentCharacter && CurrentCharacter->GetDefaultController())
+				{
+					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
+				}
+				CurrentCharacter = InCharacter;
 			}
 			else if(CurrentCharacter)
 			{
 				PlayerController->UnPossess();
+				if(CurrentCharacter->GetDefaultController())
+				{
+					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
+				}
 				CurrentCharacter = nullptr;
 			}
 		}

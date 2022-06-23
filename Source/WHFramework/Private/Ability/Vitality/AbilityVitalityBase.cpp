@@ -6,8 +6,8 @@
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/VitalityInteractionComponent.h"
-#include "Ability/Vitality/VitalityAbilityBase.h"
-#include "Ability/Vitality/VitalityAttributeSetBase.h"
+#include "Ability/Abilities/VitalityAbilityBase.h"
+#include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
 	#include "Global/GlobalBPLibrary.h"
@@ -26,16 +26,19 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	SetRootComponent(BoxComponent);
 
 	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	//
+	// AbilitySystem->SetIsReplicated(true);
+	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
 	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
 	
 	Interaction = CreateDefaultSubobject<UVitalityInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
-	// states
-	bDead = true;
-	
+	// tags
+	// DeadTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dead");
+	// DyingTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dying");
+
 	// stats
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
@@ -50,8 +53,12 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 void AAbilityVitalityBase::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	AbilitySystem->InitAbilityActorInfo(this, this);
+	for(auto Iter : AttributeSet->GetAllAttributes())
+	{
+		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityVitalityBase::OnAttributeChange);
+	}
 
 	Spawn();
 }
@@ -61,7 +68,7 @@ void AAbilityVitalityBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if(bDead) return;
+	if(IsDead()) return;
 }
 
 void AAbilityVitalityBase::Serialize(FArchive& Ar)
@@ -109,25 +116,17 @@ FSaveData* AAbilityVitalityBase::ToData(bool bSaved)
 	return &SaveData;
 }
 
-void AAbilityVitalityBase::ResetData(bool bRefresh)
+void AAbilityVitalityBase::ResetData()
 {
-	bDead = false;
-	
-	if(bRefresh) RefreshData();
-}
-
-void AAbilityVitalityBase::RefreshData()
-{
-	HandleHealthChanged(GetHealth());
-	HandleNameChanged(GetNameV());
-	HandleRaceIDChanged(GetRaceID());
+	AbilitySystem->RemoveLooseGameplayTag(DeadTag);
+	AbilitySystem->RemoveLooseGameplayTag(DyingTag);
 }
 
 void AAbilityVitalityBase::Death(AActor* InKiller /*= nullptr*/)
 {
-	if (!bDead)
+	if (!IsDead())
 	{
-		bDead = true;
+		AbilitySystem->AddLooseGameplayTag(DeadTag);
 		if(IAbilityVitalityInterface* InVitality = Cast<IAbilityVitalityInterface>(InKiller))
 		{
 			InVitality->ModifyEXP(GetTotalEXP());
@@ -145,8 +144,9 @@ void AAbilityVitalityBase::Spawn()
 
 void AAbilityVitalityBase::Revive()
 {
-	if (bDead)
+	if (IsDead())
 	{
+		AbilitySystem->RemoveLooseGameplayTag(DeadTag);
 		ResetData();
 		SetHealth(GetMaxHealth());
 	}
@@ -169,33 +169,34 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 {
 }
 
-bool AAbilityVitalityBase::IsDead() const
+bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
-	return bDead;
+	return AbilitySystem->HasMatchingGameplayTag(DeadTag) || bCheckDying && IsDying();
+}
+
+bool AAbilityVitalityBase::IsDying() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(DyingTag);
 }
 
 void AAbilityVitalityBase::SetNameV(FName InName)
 {
 	Name = InName;
-	HandleNameChanged(InName);
 }
 
 void AAbilityVitalityBase::SetRaceID(FName InRaceID)
 {
 	RaceID = InRaceID;
-	HandleRaceIDChanged(InRaceID);
 }
 
 void AAbilityVitalityBase::SetLevelV(int32 InLevel)
 {
 	Level = InLevel;
-	HandleLevelChanged(InLevel);
 }
 
 void AAbilityVitalityBase::SetEXP(int32 InEXP)
 {
 	EXP = InEXP;
-	HandleEXPChanged(InEXP);
 }
 
 int32 AAbilityVitalityBase::GetMaxEXP() const
@@ -416,28 +417,42 @@ void AAbilityVitalityBase::ModifyHealth(float InDeltaValue)
 void AAbilityVitalityBase::ModifyEXP(float InDeltaValue)
 {
 	const int32 MaxEXP = GetMaxEXP();
-	EXP += InDeltaValue;
+	int32 TempEXP = GetEXP();
+	TempEXP += InDeltaValue;
 	if (InDeltaValue > 0.f)
 	{
-		if (EXP >= MaxEXP)
+		if (TempEXP >= MaxEXP)
 		{
-			Level++;
-			EXP -= MaxEXP;
+			SetLevelV(Level + 1);
+			TempEXP -= MaxEXP;
 		}
 	}
 	else
 	{
-		if (EXP < 0.f)
+		if (TempEXP < 0.f)
 		{
-			EXP = 0.f;
+			TempEXP = 0.f;
 		}
 	}
-	HandleEXPChanged(EXP);
+	SetEXP(TempEXP);
 }
 
 UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
 {
 	return Interaction;
+}
+
+void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
+{
+	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	{
+		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
+		if(DeltaValue != 0.f)
+		{
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
+		}
+	}
+
 }
 
 void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -446,37 +461,4 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 	{
 		Death(SourceActor);
 	}
-}
-
-void AAbilityVitalityBase::HandleNameChanged(FName NewValue)
-{
-	
-}
-
-void AAbilityVitalityBase::HandleRaceIDChanged(FName NewValue)
-{
-	
-}
-
-void AAbilityVitalityBase::HandleLevelChanged(int32 NewValue, int32 DeltaValue /*= 0*/)
-{
-	
-}
-
-void AAbilityVitalityBase::HandleEXPChanged(int32 NewValue, int32 DeltaValue /*= 0*/)
-{
-	
-}
-
-void AAbilityVitalityBase::HandleHealthChanged(float NewValue, float DeltaValue /*= 0.f*/)
-{
-	if(DeltaValue > 0.f)
-	{
-		USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
-	}
-}
-
-void AAbilityVitalityBase::HandleMaxHealthChanged(float NewValue, float DeltaValue /*= 0.f*/)
-{
-	
 }

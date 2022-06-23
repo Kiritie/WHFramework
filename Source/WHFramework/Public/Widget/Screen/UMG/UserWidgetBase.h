@@ -63,6 +63,11 @@ public:
 	void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
+	bool Initialize() override;
+
+	UFUNCTION(BlueprintCallable)
+	void Initialize(AActor* InOwner) override;
+	
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
@@ -103,8 +108,8 @@ public:
 		return Cast<T>(GetChild(InIndex));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass", DisplayName = "Get Child"))
-	UUserWidgetBase* K2_GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
+	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InWidgetClass) const
 	{
 		return Cast<UUserWidgetBase>(GetChild(InIndex));
 	}

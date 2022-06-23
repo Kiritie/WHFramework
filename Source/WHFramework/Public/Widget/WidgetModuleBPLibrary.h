@@ -30,8 +30,8 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetMainUserWidget"), Category = "WidgetModuleBPLibrary")
-	static UUserWidgetBase* K2_GetMainUserWidget();
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static UUserWidgetBase* GetMainUserWidget();
 
 	template<class T>
 	static T* GetTemporaryUserWidget()
@@ -43,8 +43,8 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetTemporaryUserWidget"), Category = "WidgetModuleBPLibrary")
-	static UUserWidgetBase* K2_GetTemporaryUserWidget();
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static UUserWidgetBase* GetTemporaryUserWidget();
 
 	template<class T>
 	static bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
@@ -56,10 +56,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static bool K2_HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass);
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidgetClassByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
 	static bool HasUserWidgetClassByName(FName InWidgetName)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -69,7 +69,7 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidgetClassByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
 	static TSubclassOf<UUserWidgetBase> GetUserWidgetClassByName(FName InWidgetName)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -89,10 +89,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static bool HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasUserWidgetByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
 	static bool HasUserWidgetByName(FName InWidgetName)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -103,7 +103,7 @@ public:
 	}
 
 	template<class T>
-	static T* GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static T* GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -112,8 +112,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static class UUserWidgetBase* K2_GetUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
+	static UUserWidgetBase* GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	template<class T>
 	static T* GetUserWidgetByName(FName InWidgetName)
@@ -125,11 +125,11 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetUserWidgetByName", DeterminesOutputType = "InWidgetClass"))
-	static UUserWidgetBase* K2_GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
+	static UUserWidgetBase* GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass);
 
 	template<class T>
-	static T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -138,8 +138,8 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static class UUserWidgetBase* K2_CreateUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, AActor* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
+	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner = nullptr);
 
 	template<class T>
 	static T* CreateUserWidgetByName(FName InWidgetName, AActor* InOwner = nullptr)
@@ -151,11 +151,11 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateUserWidgetByName"), Category = "WidgetModuleBPLibrary")
-	static class UUserWidgetBase* K2_CreateUserWidgetByName(FName InWidgetName, AActor* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static UUserWidgetBase* CreateUserWidgetByName(FName InWidgetName, AActor* InOwner = nullptr);
 
 	template<class T>
-	static bool InitializeUserWidget(AActor* InOwner, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -164,10 +164,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "InitializeUserWidgetByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static bool InitializeUserWidgetByName(FName InWidgetName, AActor* InOwner)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -178,7 +178,7 @@ public:
 	}
 
 	template<class T>
-	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -187,8 +187,8 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidget", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static bool K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
 
 	static bool OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
 	{
@@ -199,11 +199,11 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "OpenUserWidgetByName", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static bool K2_OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	static bool OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant = false);
 
 	template<class T>
-	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -212,10 +212,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CloseUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_CloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CloseUserWidgetByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static bool CloseUserWidgetByName(FName InWidgetName, bool bInstant = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -226,7 +226,7 @@ public:
 	}
 
 	template<class T>
-	static bool ToggleUserWidget(bool bInstant = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool ToggleUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -235,10 +235,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "ToggleUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_ToggleUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "ToggleUserWidgetByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static bool ToggleUserWidgetByName(FName InWidgetName, bool bInstant = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -249,7 +249,7 @@ public:
 	}
 
 	template<class T>
-	static bool DestroyUserWidget(bool bRecovery = false, TSubclassOf<class UUserWidgetBase> InWidgetClass = T::StaticClass())
+	static bool DestroyUserWidget(bool bRecovery = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 		{
@@ -258,10 +258,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyUserWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_DestroyUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, bool bRecovery = false);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bRecovery = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyUserWidgetByName"), Category = "WidgetModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static bool DestroyUserWidgetByName(FName InWidgetName, bool bRecovery = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -365,10 +365,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasWorldWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasWorldWidgetByName"))
+	UFUNCTION(BlueprintPure)
 	bool HasWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex) const
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -388,8 +388,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidget", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
+	static UWorldWidgetBase* GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
 	template<class T>
 	static T* GetWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex)
@@ -401,8 +401,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgetByName", DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* K2_GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"), Category = "WidgetModuleBPLibrary")
+	static UWorldWidgetBase* GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex);
 
 	template<class T>
 	static TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -414,8 +414,8 @@ public:
 		return TArray<T*>();
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgets"), Category = "WidgetModuleBPLibrary")
-	static TArray<UWorldWidgetBase*> K2_GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass);
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass);
 
 	template<class T>
 	static TArray<T*> GetWorldWidgetsByName(FName InWidgetName)
@@ -427,8 +427,8 @@ public:
 		return TArray<T*>();
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetWorldWidgetsByName"), Category = "WidgetModuleBPLibrary")
-	static TArray<UWorldWidgetBase*> K2_GetWorldWidgetsByName(FName InWidgetName);
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
+	static TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InWidgetName);
 
 	template<class T>
 	static T* CreateWorldWidget(AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -440,8 +440,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWorldWidget", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
 	T* CreateWorldWidgetByName(FName InWidgetName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -453,8 +453,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateWorldWidgetByName", DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* K2_CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
+	UWorldWidgetBase* CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
 	static bool DestroyWorldWidget(int32 InWidgetIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -466,10 +466,10 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidget"), Category = "WidgetModuleBPLibrary")
-	static bool K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery = false);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgetByName"))
+	UFUNCTION(BlueprintCallable)
 	bool DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
@@ -488,10 +488,10 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgets"), Category = "WidgetModuleBPLibrary")
-	static void K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery = false);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery = false);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "DestroyWorldWidgets"))
+	UFUNCTION(BlueprintCallable)
 	void DestroyWorldWidgetsByName(FName InWidgetName, bool bRecovery = false)
 	{
 		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())

@@ -28,8 +28,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams", DisplayName = "Spawn Object"), Category = "ObjectPoolModuleBPLibrary")
-	static UObject* K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleBPLibrary")
+	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
 	static void DespawnObject(UObject* InObject);
@@ -43,8 +43,8 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Clear Object"), Category = "ObjectPoolModuleBPLibrary")
-	static void K2_ClearObject(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
+	static void ClearObject(TSubclassOf<UObject> InType);
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
 	static void ClearAllObject();

@@ -94,6 +94,6 @@ public:
 
 	static bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "SendWebRequest"), Category = "WebRequestModuleBPLibrary")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request"), Category = "WebRequestModuleBPLibrary")
 	static bool K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent);
 };

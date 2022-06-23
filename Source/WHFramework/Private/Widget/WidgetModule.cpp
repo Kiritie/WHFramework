@@ -169,22 +169,22 @@ void AWidgetModule::OnTermination_Implementation()
 	ClearAllWorldWidget();
 }
 
-bool AWidgetModule::K2_HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+bool AWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	return HasUserWidgetClass<UUserWidgetBase>(InWidgetClass);
 }
 
-bool AWidgetModule::K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+bool AWidgetModule::HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	return HasUserWidget<UUserWidgetBase>(InWidgetClass);
 }
 
-UUserWidgetBase* AWidgetModule::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
+UUserWidgetBase* AWidgetModule::GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	return GetUserWidget<UUserWidgetBase>(InWidgetClass);
 }
 
-UUserWidgetBase* AWidgetModule::K2_GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+UUserWidgetBase* AWidgetModule::GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass) const
 {
 	if(AllUserWidgets.Contains(InWidgetName))
 	{
@@ -193,42 +193,42 @@ UUserWidgetBase* AWidgetModule::K2_GetUserWidgetByName(FName InWidgetName, TSubc
 	return nullptr;
 }
 
-UUserWidgetBase* AWidgetModule::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
+UUserWidgetBase* AWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	return CreateUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
 }
 
-UUserWidgetBase* AWidgetModule::K2_CreateUserWidgetByName(FName InWidgetName, AActor* InOwner)
+UUserWidgetBase* AWidgetModule::CreateUserWidgetByName(FName InWidgetName, AActor* InOwner)
 {
 	return CreateUserWidgetByName<UUserWidgetBase>(InWidgetName, InOwner);
 }
 
-bool AWidgetModule::K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
+bool AWidgetModule::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	return InitializeUserWidget<UUserWidgetBase>(InOwner, InWidgetClass);
 }
 
-bool AWidgetModule::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams,  bool bInstant)
+bool AWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams,  bool bInstant)
 {
 	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, InWidgetClass);
 }
 
-bool AWidgetModule::K2_OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
+bool AWidgetModule::OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
 {
 	return OpenUserWidgetByName(InWidgetName, &InParams, bInstant);
 }
 
-bool AWidgetModule::K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool AWidgetModule::CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
 	return CloseUserWidget<UUserWidgetBase>(bInstant, InWidgetClass);
 }
 
-bool AWidgetModule::K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool AWidgetModule::ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
 	return ToggleUserWidget<UUserWidgetBase>(bInstant, InWidgetClass);
 }
 
-bool AWidgetModule::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass,  bool bRecovery)
+bool AWidgetModule::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass,  bool bRecovery)
 {
 	return DestroyUserWidget<UUserWidgetBase>(bRecovery, InWidgetClass);
 }
@@ -278,42 +278,42 @@ void AWidgetModule::ClearAllSlateWidget()
 	AllSlateWidgets.Empty();
 }
 
-bool AWidgetModule::K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
+bool AWidgetModule::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
 {
 	return HasWorldWidget<UWorldWidgetBase>(InWidgetIndex, InWidgetClass);
 }
 
-UWorldWidgetBase* AWidgetModule::K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
+UWorldWidgetBase* AWidgetModule::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
 {
 	return GetWorldWidget<UWorldWidgetBase>(InWidgetIndex, InWidgetClass);
 }
 
-UWorldWidgetBase* AWidgetModule::K2_GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
+UWorldWidgetBase* AWidgetModule::GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex) const
 {
 	return GetWorldWidgetByName<UWorldWidgetBase>(InWidgetName, InWidgetIndex);
 }
 
-TArray<UWorldWidgetBase*> AWidgetModule::K2_GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass) const
+TArray<UWorldWidgetBase*> AWidgetModule::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass) const
 {
 	return GetWorldWidgets<UWorldWidgetBase>(InWidgetClass);
 }
 
-TArray<UWorldWidgetBase*> AWidgetModule::K2_GetWorldWidgetsByName(FName InWidgetName) const
+TArray<UWorldWidgetBase*> AWidgetModule::GetWorldWidgetsByName(FName InWidgetName) const
 {
 	return GetWorldWidgetsByName<UWorldWidgetBase>(InWidgetName);
 }
 
-UWorldWidgetBase* AWidgetModule::K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InLocation, InSceneComp, &InParams, InWidgetClass);
 }
 
-UWorldWidgetBase* AWidgetModule::K2_CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	return CreateWorldWidgetByName<UWorldWidgetBase>(InWidgetName, InOwner, InLocation, InSceneComp, &InParams, InWidgetClass);
 }
 
-bool AWidgetModule::K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
+bool AWidgetModule::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
 {
 	return DestroyWorldWidget<UWorldWidgetBase>(InWidgetIndex, bRecovery, InWidgetClass);
 }
@@ -344,7 +344,7 @@ bool AWidgetModule::DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetI
 	return false;
 }
 
-void AWidgetModule::K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
+void AWidgetModule::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
 {
 	return DestroyWorldWidgets<UWorldWidgetBase>(bRecovery, InWidgetClass);
 }

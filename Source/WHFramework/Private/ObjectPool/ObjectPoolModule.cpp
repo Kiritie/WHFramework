@@ -57,12 +57,12 @@ void AObjectPoolModule::OnTermination_Implementation()
 	ClearAllObject();
 }
 
-bool AObjectPoolModule::K2_HasObject(TSubclassOf<UObject> InType)
+bool AObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 {
 	return HasObject<UObject>(InType);
 }
 
-UObject* AObjectPoolModule::K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
+UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
 	return SpawnObject<UObject>(&InParams, InType);
 }
@@ -85,7 +85,7 @@ void AObjectPoolModule::DespawnObject(UObject* InObject)
 	}
 }
 
-void AObjectPoolModule::K2_ClearObject(TSubclassOf<UObject> InType)
+void AObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
 {
 	ClearObject<UObject>(InType);
 }

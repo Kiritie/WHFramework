@@ -32,4 +32,11 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void MoveUp(float InValue);
+
+public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	class UCameraComponent* GetCameraComp();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	class USpringArmComponent* GetCameraBoom();
 };

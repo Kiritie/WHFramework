@@ -32,10 +32,6 @@ public:
 	AAbilityVitalityBase();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStates")
-	bool bDead;
-
-protected:
 	// stats
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
 	FPrimaryAssetId AssetID;
@@ -72,6 +68,11 @@ protected:
 	UVitalityInteractionComponent* Interaction;
 
 protected:
+	FGameplayTag DeadTag;
+
+	FGameplayTag DyingTag;
+
+protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
@@ -84,21 +85,17 @@ public:
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData(bool bSaved = true) override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void ResetData(bool bRefresh = false) override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void RefreshData() override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void Death(AActor* InKiller = nullptr) override;
-
+	virtual void ResetData() override;
+	
 	UFUNCTION(BlueprintCallable)
 	virtual void Spawn() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Revive() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Death(AActor* InKiller = nullptr) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -159,7 +156,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool IsDead() const override;
+	virtual bool IsDead(bool bCheckDying = false) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsDying() const override;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -245,17 +245,7 @@ public:
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
 public:
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-		
-	virtual void HandleNameChanged(FName NewValue) override;
-
-	virtual void HandleRaceIDChanged(FName NewValue) override;
-
-	virtual void HandleLevelChanged(int32 NewValue, int32 DeltaValue = 0) override;
-
-	virtual void HandleEXPChanged(int32 NewValue, int32 DeltaValue = 0) override;
-
-	virtual void HandleHealthChanged(float NewValue, float DeltaValue = 0.f) override;
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleMaxHealthChanged(float NewValue, float DeltaValue = 0.f) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

@@ -15,6 +15,115 @@ class AAbilityEquipBase;
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
+USTRUCT()
+struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContext
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+
+	virtual FGameplayAbilityTargetDataHandle GetTargetData()
+	{
+		return TargetData;
+	}
+
+	virtual void AddTargetData(const FGameplayAbilityTargetDataHandle& TargetDataHandle)
+	{
+		TargetData.Append(TargetDataHandle);
+	}
+
+	/**
+	* Functions that subclasses of FGameplayEffectContext need to override
+	*/
+
+	virtual UScriptStruct* GetScriptStruct() const override
+	{
+		return FGameplayEffectContextBase::StaticStruct();
+	}
+
+	virtual FGameplayEffectContextBase* Duplicate() const override
+	{
+		FGameplayEffectContextBase* NewContext = new FGameplayEffectContextBase();
+		*NewContext = *this;
+		NewContext->AddActors(Actors);
+		if (GetHitResult())
+		{
+			// Does a deep copy of the hit result
+			NewContext->AddHitResult(*GetHitResult(), true);
+		}
+		// Shallow copy of TargetData, is this okay?
+		NewContext->TargetData.Append(TargetData);
+		return NewContext;
+	}
+
+	virtual bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess) override;
+
+protected:
+	FGameplayAbilityTargetDataHandle TargetData;
+};
+
+template<>
+struct TStructOpsTypeTraits<FGameplayEffectContextBase> : public TStructOpsTypeTraitsBase2<FGameplayEffectContextBase>
+{
+	enum
+	{
+		WithNetSerializer = true,
+		WithCopy = true		// Necessary so that TSharedPtr<FHitResult> Data is copied around
+	};
+};
+
+
+USTRUCT()
+struct WHFRAMEWORK_API FAbilityMeshMontage
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	class USkeletalMeshComponent* Mesh;
+
+	UPROPERTY()
+	class UAnimMontage* Montage;
+
+	FAbilityMeshMontage() : Mesh(nullptr), Montage(nullptr)
+	{
+	}
+
+	FAbilityMeshMontage(class USkeletalMeshComponent* InMesh, class UAnimMontage* InMontage) 
+		: Mesh(InMesh), Montage(InMontage)
+	{
+	}
+};
+
+UENUM(BlueprintType)
+enum class EAbilityInputID : uint8
+{
+	// 0 None
+	None				UMETA(DisplayName = "None"),
+	// 1 Confirm
+	Confirm				UMETA(DisplayName = "Confirm"),
+	// 2 Cancel
+	Cancel				UMETA(DisplayName = "Cancel"),
+	// 3 Sprint
+	Sprint				UMETA(DisplayName = "Sprint"),
+	// 4 Jump
+	Jump				UMETA(DisplayName = "Jump"),
+	// 5 PrimaryFire
+	PrimaryFire			UMETA(DisplayName = "Primary Fire"),
+	// 6 SecondaryFire
+	SecondaryFire		UMETA(DisplayName = "Secondary Fire"),
+	// 7 Alternate Fire
+	AlternateFire		UMETA(DisplayName = "Alternate Fire"),
+	// 8 Reload
+	Reload				UMETA(DisplayName = "Reload"),
+	// 9 NextWeapon
+	NextWeapon			UMETA(DisplayName = "Next Weapon"), 
+	// 10 PrevWeapon
+	PrevWeapon			UMETA(DisplayName = "Previous Weapon"),
+	// 11 Interact
+	Interact			UMETA(DisplayName = "Interact")
+};
+
 /**
  * 目标类型
  */

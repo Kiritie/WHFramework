@@ -53,8 +53,8 @@ void ACameraPawnBase::Tick(float DeltaTime)
 void ACameraPawnBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
 {
 	CameraCollisionMode = InCameraCollisionMode;
-	if(GetCameraBoom())
+	if(Execute_GetCameraBoom(this))
 	{
-		GetCameraBoom()->bDoCollisionTest = CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::SightOnly;
+		Execute_GetCameraBoom(this)->bDoCollisionTest = CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::SightOnly;
 	}
 }

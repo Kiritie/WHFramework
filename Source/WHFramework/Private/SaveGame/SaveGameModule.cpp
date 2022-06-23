@@ -50,22 +50,22 @@ void ASaveGameModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-bool ASaveGameModule::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass,  int32 InSaveIndex) const
+bool ASaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass,  int32 InSaveIndex) const
 {
 	return HasSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const
+USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass) const
 {
 	return GetSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-USaveGameBase* ASaveGameModule::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
+USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
 {
 	return CreateSaveGame<USaveGameBase>(InSaveIndex, bAutoLoad, InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
+bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
 {
 	return SaveSaveGame<USaveGameBase>(bRefresh, InSaveGameClass);
 }
@@ -95,27 +95,27 @@ bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
 	return bIsAllSaved;
 }
 
-USaveGameBase* ASaveGameModule::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	return LoadSaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	return UnloadSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool ASaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	return ResetSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool ASaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	return RefreshSaveGame<USaveGameBase>(InSaveGameClass);
 }
 
-bool ASaveGameModule::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool ASaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	return DestroySaveGame<USaveGameBase>(InSaveIndex, InSaveGameClass);
 }

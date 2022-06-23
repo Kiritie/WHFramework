@@ -6,128 +6,128 @@
 #include "Main/MainModule.h"
 #include "Kismet/GameplayStatics.h"
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetMainUserWidget()
+UUserWidgetBase* UWidgetModuleBPLibrary::GetMainUserWidget()
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetMainUserWidget();
+		return WidgetModule->GetMainUserWidget();
 	}
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetTemporaryUserWidget()
+UUserWidgetBase* UWidgetModuleBPLibrary::GetTemporaryUserWidget()
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetTemporaryUserWidget();
+		return WidgetModule->GetTemporaryUserWidget();
 	}
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool UWidgetModuleBPLibrary::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_HasUserWidgetClass(InWidgetClass);
+		return WidgetModule->HasUserWidgetClass(InWidgetClass);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
+bool UWidgetModuleBPLibrary::HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_HasUserWidget(InWidgetClass);
+		return WidgetModule->HasUserWidget(InWidgetClass);
 	}
 	return false;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
+UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetUserWidget(InWidgetClass);
+		return WidgetModule->GetUserWidget(InWidgetClass);
 	}
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass)
+UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetUserWidgetByName(InWidgetName, InWidgetClass);
+		return WidgetModule->GetUserWidgetByName(InWidgetName, InWidgetClass);
 	}
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
+UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CreateUserWidget(InWidgetClass, InOwner);
+		return WidgetModule->CreateUserWidget(InWidgetClass, InOwner);
 	}
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::K2_CreateUserWidgetByName(FName InWidgetName, AActor* InOwner)
+UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InWidgetName, AActor* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CreateUserWidgetByName(InWidgetName, InOwner);
+		return WidgetModule->CreateUserWidgetByName(InWidgetName, InOwner);
 	}
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
+bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_InitializeUserWidget(InWidgetClass, InOwner);
+		return WidgetModule->InitializeUserWidget(InWidgetClass, InOwner);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant)
+bool UWidgetModuleBPLibrary::OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_OpenUserWidget(InWidgetClass, InParams, bInstant);
+		return WidgetModule->OpenUserWidget(InWidgetClass, InParams, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
+bool UWidgetModuleBPLibrary::OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_OpenUserWidgetByName(InWidgetName, InParams, bInstant);
+		return WidgetModule->OpenUserWidgetByName(InWidgetName, InParams, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CloseUserWidget(InWidgetClass, bInstant);
+		return WidgetModule->CloseUserWidget(InWidgetClass, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
+bool UWidgetModuleBPLibrary::ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_ToggleUserWidget(InWidgetClass, bInstant);
+		return WidgetModule->ToggleUserWidget(InWidgetClass, bInstant);
 	}
 	return false;
 }
 
-bool UWidgetModuleBPLibrary::K2_DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bRecovery)
+bool UWidgetModuleBPLibrary::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bRecovery)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_DestroyUserWidget(InWidgetClass, bRecovery);
+		return WidgetModule->DestroyUserWidget(InWidgetClass, bRecovery);
 	}
 	return false;
 }
@@ -157,82 +157,82 @@ UWorldWidgetContainer* UWidgetModuleBPLibrary::GetWorldWidgetContainer()
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
+bool UWidgetModuleBPLibrary::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_HasWorldWidget(InWidgetClass, InWidgetIndex);
+		return WidgetModule->HasWorldWidget(InWidgetClass, InWidgetIndex);
 	}
 	return false;
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::K2_GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
+UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetWorldWidget(InWidgetClass, InWidgetIndex);
+		return WidgetModule->GetWorldWidget(InWidgetClass, InWidgetIndex);
 	}
 	return nullptr;
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::K2_GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
+UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetWorldWidgetByName(InWidgetName, InWidgetClass, InWidgetIndex);
+		return WidgetModule->GetWorldWidgetByName(InWidgetName, InWidgetClass, InWidgetIndex);
 	}
 	return nullptr;
 }
 
-TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::K2_GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass)
+TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetWorldWidgets(InWidgetClass);
+		return WidgetModule->GetWorldWidgets(InWidgetClass);
 	}
 	return TArray<UWorldWidgetBase*>();
 }
 
-TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::K2_GetWorldWidgetsByName(FName InWidgetName)
+TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgetsByName(FName InWidgetName)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_GetWorldWidgetsByName(InWidgetName);
+		return WidgetModule->GetWorldWidgetsByName(InWidgetName);
 	}
 	return TArray<UWorldWidgetBase*>();
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::K2_CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CreateWorldWidget(InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
+		return WidgetModule->CreateWorldWidget(InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
 	}
 	return nullptr;
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::K2_CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_CreateWorldWidgetByName(InWidgetName, InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
+		return WidgetModule->CreateWorldWidgetByName(InWidgetName, InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
 	}
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::K2_DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
+bool UWidgetModuleBPLibrary::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		return WidgetModule->K2_DestroyWorldWidget(InWidgetClass, InWidgetIndex, bRecovery);
+		return WidgetModule->DestroyWorldWidget(InWidgetClass, InWidgetIndex, bRecovery);
 	}
 	return false;
 }
 
-void UWidgetModuleBPLibrary::K2_DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
+void UWidgetModuleBPLibrary::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
 {
 	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
 	{
-		WidgetModule->K2_DestroyWorldWidgets(InWidgetClass, bRecovery);
+		WidgetModule->DestroyWorldWidgets(InWidgetClass, bRecovery);
 	}
 }

@@ -22,6 +22,7 @@ ACharacterBase::ACharacterBase()
 
 	Name = NAME_None;
 	Anim = nullptr;
+	DefaultController = nullptr;
 
 	SingleSound = CreateDefaultSubobject<UAudioComponent>(FName("SingleSound"));
 	SingleSound->SetupAttachment(RootComponent);
@@ -39,6 +40,13 @@ void ACharacterBase::BeginPlay()
 void ACharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+}
+
+void ACharacterBase::SpawnDefaultController()
+{
+	Super::SpawnDefaultController();
+
+	DefaultController = Controller;
 }
 
 void ACharacterBase::OnRep_SingleSoundInfo()

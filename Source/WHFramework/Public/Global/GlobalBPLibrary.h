@@ -244,7 +244,7 @@ public:
 	{
 		return Cast<T>(UGameplayStatics::GetGameMode(AMainModule::Get()));
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameMode", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
 
 	template<class T>
@@ -252,7 +252,7 @@ public:
 	{
 		return Cast<T>(UGameplayStatics::GetGameState(AMainModule::Get()));
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameState", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
 
 	template<class T>
@@ -261,7 +261,7 @@ public:
 		return Cast<T>(UGameplayStatics::GetPlayerController(AMainModule::Get(), InPlayerIndex));
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerController", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHPlayerController* GetPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
@@ -269,7 +269,7 @@ public:
 	{
 		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerControllerByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHPlayerController* GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
@@ -277,7 +277,7 @@ public:
 	{
 		return Cast<T>(GetLocalPlayerController(T::StaticClass()));
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerController", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHPlayerController* GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
@@ -289,7 +289,7 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawn", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APawn* GetPlayerPawn(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
@@ -301,7 +301,7 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerPawnByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APawn* GetPlayerPawnByID(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
@@ -313,7 +313,7 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerPawn", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
@@ -325,7 +325,7 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacter", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static ACharacterBase* GetPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerIndex = 0);
 
 	template<class T>
@@ -337,7 +337,7 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetPlayerCharacterByID", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static ACharacterBase* GetPlayerCharacterByID(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerID = 0);
 
 	template<class T>
@@ -349,6 +349,6 @@ public:
 		}
 		return nullptr;
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetLocalPlayerCharacter", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static ACharacterBase* GetLocalPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr);
 };

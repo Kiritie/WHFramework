@@ -36,11 +36,6 @@ public:
 	AAbilityCharacterBase();
 	
 protected:
-	// states
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStates")
-	bool bDead;
-
-protected:
 	// stats
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName RaceID;
@@ -68,6 +63,11 @@ protected:
 	AController* OwnerController;
 
 protected:
+	FGameplayTag DeadTag;
+	
+	FGameplayTag DyingTag;
+
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 
@@ -82,6 +82,8 @@ public:
 	FOnCharacterDead OnCharacterDead;
 
 protected:
+	bool bASCInputBound;
+
 	float DefaultGravityScale;
 
 	float DefaultAirControl;
@@ -93,6 +95,10 @@ protected:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	virtual void BindASCInput();
+
 public:
 	virtual void Tick(float DeltaTime) override;
 
@@ -103,10 +109,7 @@ public:
 	virtual FSaveData* ToData(bool bSaved = true) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetData(bool bRefresh = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void RefreshData() override;
+	virtual void ResetData() override;
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -217,7 +220,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool IsDead() const override { return bDead; }
+	virtual bool IsDead(bool bCheckDying = false) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsDying() const override;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -306,31 +312,14 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	float GetHalfHeight() const;
-	
-	UFUNCTION(BlueprintPure)
-	AController* GetOwnerController() const { return OwnerController; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetOwnerController(AController* InOwnerController) { this->OwnerController = InOwnerController; }
 
 public:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-	
-	virtual void HandleNameChanged(FName NewValue) override;
 
-	virtual void HandleRaceIDChanged(FName NewValue) override;
+public:
+	virtual void OnRep_Controller() override;
 
-	virtual void HandleLevelChanged(int32 NewValue, int32 DeltaValue = 0) override;
-
-	virtual void HandleEXPChanged(int32 NewValue, int32 DeltaValue = 0) override;
-
-	virtual void HandleHealthChanged(float NewValue, float DeltaValue = 0.f) override;
-	
-	virtual void HandleMaxHealthChanged(float NewValue, float DeltaValue = 0.f) override;
-
-	virtual void HandleMoveSpeedChanged(float NewValue, float DeltaValue = 0.f);
-
-	virtual void HandleRotationSpeedChanged(float NewValue, float DeltaValue = 0.f);
-	
-	virtual void HandleJumpForceChanged(float NewValue, float DeltaValue = 0.f);
+	virtual void OnRep_PlayerState() override;
 };

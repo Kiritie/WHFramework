@@ -48,8 +48,8 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetDataAsset", DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
-	static UDataAssetBase* K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
+	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
 
 	template<class T>
 	static T* CreateDataAsset(FName InDataAssetName = NAME_None)
@@ -61,8 +61,8 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "CreateDataAsset", DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
-	static UDataAssetBase* K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
+	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
 
 	template<class T>
 	static bool RemoveDataAsset(FName InDataAssetName = NAME_None)
@@ -74,8 +74,8 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "RemoveDataAsset"), Category = "AssetModuleBPLibrary")
-	static bool K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
+	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
 	static void RemoveAllDataAsset();

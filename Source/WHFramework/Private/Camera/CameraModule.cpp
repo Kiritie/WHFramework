@@ -251,11 +251,32 @@ ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> In
 	return CurrentCamera;
 }
 
-USpringArmComponent* ACameraModule::GetCurrentCameraBoom() const
+UCameraComponent* ACameraModule::GetCurrentCameraComp()
 {
-	if(CurrentCamera)
+	if(GetPlayerController())
 	{
-		return CurrentCamera->GetCameraBoom();
+		if(APawn* Pawn = GetPlayerController()->GetPawn())
+		{
+			if(Pawn->Implements<UWHPlayerInterface>())
+			{
+				return IWHPlayerInterface::Execute_GetCameraComp(Pawn);
+			}
+		}
+	}
+	return nullptr;
+}
+
+USpringArmComponent* ACameraModule::GetCurrentCameraBoom()
+{
+	if(GetPlayerController())
+	{
+		if(APawn* Pawn = GetPlayerController()->GetPawn())
+		{
+			if(Pawn->Implements<UWHPlayerInterface>())
+			{
+				return IWHPlayerInterface::Execute_GetCameraBoom(Pawn);
+			}
+		}
 	}
 	return nullptr;
 }
@@ -290,7 +311,7 @@ void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 			}
 			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
-			SetCameraDistance(InCamera->GetCameraBoom()->TargetArmLength, bInstant);
+			SetCameraDistance(InCamera->Execute_GetCameraBoom(InCamera)->TargetArmLength, bInstant);
 			CurrentCamera = InCamera;
 		}
 		else if(CurrentCamera)

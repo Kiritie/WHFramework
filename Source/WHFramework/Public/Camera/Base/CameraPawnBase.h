@@ -5,10 +5,11 @@
 #include "CoreMinimal.h"
 #include "Camera/CameraModuleTypes.h"
 #include "GameFramework/Pawn.h"
+#include "Gameplay/WHPlayerInterface.h"
 #include "CameraPawnBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API ACameraPawnBase : public APawn
+class WHFRAMEWORK_API ACameraPawnBase : public APawn, public IWHPlayerInterface
 {
 	GENERATED_BODY()
 
@@ -45,11 +46,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	FName GetCameraName() const { return CameraName; }
 
-	UFUNCTION(BlueprintPure)
-	UCameraComponent* GetCamera() const { return Camera; }
+	UCameraComponent* GetCameraComp_Implementation() override { return Camera; }
 
-	UFUNCTION(BlueprintPure)
-	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	USpringArmComponent* GetCameraBoom_Implementation() override { return CameraBoom; }
 
 	UFUNCTION(BlueprintPure)
 	ECameraCollisionMode GetCameraCollisionMode() const { return CameraCollisionMode; }

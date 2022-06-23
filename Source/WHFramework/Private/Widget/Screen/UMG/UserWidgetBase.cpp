@@ -221,6 +221,16 @@ void UUserWidgetBase::OnStateChanged_Implementation(EScreenWidgetState InWidgetS
 	OnWidgetStateChanged.Broadcast(InWidgetState);
 }
 
+bool UUserWidgetBase::Initialize()
+{
+	return Super::Initialize();
+}
+
+void UUserWidgetBase::Initialize(AActor* InOwner)
+{
+	UWidgetModuleBPLibrary::InitializeUserWidget<UUserWidgetBase>(InOwner, GetClass());
+}
+
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
@@ -228,7 +238,7 @@ void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 
 void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
 {
-	UWidgetModuleBPLibrary::K2_OpenUserWidget(GetClass(), InParams, bInstant);
+	UWidgetModuleBPLibrary::OpenUserWidget(GetClass(), InParams, bInstant);
 }
 
 void UUserWidgetBase::Close(bool bInstant)

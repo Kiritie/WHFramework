@@ -16,29 +16,29 @@ bool UAssetModuleBPLibrary::HasDataAsset(FName InDataAssetName)
 	return false;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+UDataAssetBase* UAssetModuleBPLibrary::GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_GetDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->GetDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return nullptr;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+UDataAssetBase* UAssetModuleBPLibrary::CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_CreateDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->CreateDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return nullptr;
 }
 
-bool UAssetModuleBPLibrary::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+bool UAssetModuleBPLibrary::RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
 	{
-		return AssetModule->K2_RemoveDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->RemoveDataAsset(InDataAssetClass, InDataAssetName);
 	}
 	return false;
 }

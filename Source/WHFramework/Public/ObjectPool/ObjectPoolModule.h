@@ -66,8 +66,8 @@ public:
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Has Object"))
-	bool K2_HasObject(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable)
+	bool HasObject(TSubclassOf<UObject> InType);
 
 	template<class T>
 	T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
@@ -96,8 +96,8 @@ public:
 		return Cast<T>(ObjectPools[InType]->Spawn(InParams ? *InParams : TArray<FParameter>()));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams", DisplayName = "Spawn Object"))
-	UObject* K2_SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
+	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject);
@@ -113,8 +113,8 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Clear Object"))
-	void K2_ClearObject(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable)
+	void ClearObject(TSubclassOf<UObject> InType);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllObject();

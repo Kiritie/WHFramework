@@ -10,6 +10,7 @@
 
 #include "CameraModule.generated.h"
 
+class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
 class ACameraPawnBase;
@@ -76,7 +77,10 @@ public:
 	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const;
 
 	UFUNCTION(BlueprintPure)
-	USpringArmComponent* GetCurrentCameraBoom() const;
+	UCameraComponent* GetCurrentCameraComp();
+
+	UFUNCTION(BlueprintPure)
+	USpringArmComponent* GetCurrentCameraBoom();
 
 	template<class T>
 	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())

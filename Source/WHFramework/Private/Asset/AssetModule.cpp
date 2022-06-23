@@ -67,7 +67,7 @@ bool AAssetModule::HasDataAsset(FName InDataAssetName) const
 	return DataAssetMap.Contains(InDataAssetName);
 }
 
-UDataAssetBase* AAssetModule::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName) const
+UDataAssetBase* AAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName) const
 {
 	if(!InDataAssetClass) return nullptr;
 	
@@ -76,7 +76,7 @@ UDataAssetBase* AAssetModule::K2_GetDataAsset(TSubclassOf<UDataAssetBase> InData
 	return GetDataAsset<UDataAssetBase>(InDataAssetName);
 }
 
-UDataAssetBase* AAssetModule::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+UDataAssetBase* AAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(!InDataAssetClass) return nullptr;
 
@@ -85,7 +85,7 @@ UDataAssetBase* AAssetModule::K2_CreateDataAsset(TSubclassOf<UDataAssetBase> InD
 	return CreateDataAsset<UDataAssetBase>(InDataAssetName);
 }
 
-bool AAssetModule::K2_RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+bool AAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
 	if(!InDataAssetClass) return false;
 

@@ -8,7 +8,7 @@
 #include "RoamCameraPawn.generated.h"
 
 UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API ARoamCameraPawn : public ACameraPawnBase, public IWHPlayerInterface
+class WHFRAMEWORK_API ARoamCameraPawn : public ACameraPawnBase
 {
 	GENERATED_BODY()
 

@@ -27,6 +27,24 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPaw
 	return nullptr;
 }
 
+UCameraComponent* UCameraModuleBPLibrary::GetCurrentCameraComp()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetCurrentCameraComp();
+	}
+	return nullptr;
+}
+
+USpringArmComponent* UCameraModuleBPLibrary::GetCurrentCameraBoom()
+{
+	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	{
+		return CameraModule->GetCurrentCameraBoom();
+	}
+	return nullptr;
+}
+
 ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
 	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())

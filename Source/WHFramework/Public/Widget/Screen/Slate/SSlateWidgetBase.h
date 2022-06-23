@@ -40,6 +40,8 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
+	virtual void Initialize(AActor* InOwner) override;
+
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;

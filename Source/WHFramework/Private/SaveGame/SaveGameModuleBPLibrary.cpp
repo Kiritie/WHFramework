@@ -29,38 +29,38 @@ FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InSave
 	return TEXT("");
 }
 
-bool USaveGameModuleBPLibrary::K2_HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool USaveGameModuleBPLibrary::HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_HasSaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->HasSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+USaveGameBase* USaveGameModuleBPLibrary::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_GetSaveGame(InSaveGameClass);
+		return SaveGameModule->GetSaveGame(InSaveGameClass);
 	}
 	return nullptr;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
+USaveGameBase* USaveGameModuleBPLibrary::CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_CreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad);
+		return SaveGameModule->CreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad);
 	}
 	return nullptr;
 }
 
-bool USaveGameModuleBPLibrary::K2_SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
+bool USaveGameModuleBPLibrary::SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_SaveSaveGame(InSaveGameClass, bRefresh);
+		return SaveGameModule->SaveSaveGame(InSaveGameClass, bRefresh);
 	}
 	return false;
 }
@@ -83,47 +83,47 @@ bool USaveGameModuleBPLibrary::SaveAllSaveGame(bool bRefresh)
 	return false;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::K2_LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_LoadSaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->LoadSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return nullptr;
 }
 
-bool USaveGameModuleBPLibrary::K2_UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool USaveGameModuleBPLibrary::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_UnloadSaveGame(InSaveGameClass);
+		return SaveGameModule->UnloadSaveGame(InSaveGameClass);
 	}
 	return false;
 }
 
-bool USaveGameModuleBPLibrary::K2_ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool USaveGameModuleBPLibrary::ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_ResetSaveGame(InSaveGameClass);
+		return SaveGameModule->ResetSaveGame(InSaveGameClass);
 	}
 	return false;
 }
 
-bool USaveGameModuleBPLibrary::K2_RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
+bool USaveGameModuleBPLibrary::RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_RefreshSaveGame(InSaveGameClass);
+		return SaveGameModule->RefreshSaveGame(InSaveGameClass);
 	}
 	return false;
 }
 
-bool USaveGameModuleBPLibrary::K2_DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool USaveGameModuleBPLibrary::DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->K2_DestroySaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->DestroySaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
 }

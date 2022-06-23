@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/Actor/AbilityActorInterface.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
 
@@ -8,12 +9,12 @@
 
 class UAbilityBase;
 UINTERFACE()
-class WHFRAMEWORK_API UAbilityVitalityInterface : public UInterface
+class WHFRAMEWORK_API UAbilityVitalityInterface : public UAbilityActorInterface
 {
 	GENERATED_BODY()
 };
 
-class WHFRAMEWORK_API IAbilityVitalityInterface
+class WHFRAMEWORK_API IAbilityVitalityInterface : public IAbilityActorInterface
 {
 	GENERATED_BODY()
 
@@ -24,16 +25,16 @@ public:
 
 	virtual void Death(AActor* InKiller = nullptr) = 0;
 		
-	virtual void ResetData(bool bRefresh = false) = 0;
-
-	virtual void RefreshData() = 0;
+	virtual void ResetData() = 0;
 	
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 	
 	virtual void ModifyEXP(float InDeltaValue) = 0;
 
 public:
-	virtual bool IsDead() const = 0;
+	virtual bool IsDead(bool bCheckDying = false) const = 0;
+	
+	virtual bool IsDying() const = 0;
 	
 public:
 	virtual FName GetNameV() const = 0;
@@ -75,46 +76,5 @@ public:
 	virtual float GetMagicDamage() const = 0;
 
 public:
-	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) = 0;
-
-	virtual bool ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation = false) = 0;
-
-	virtual bool ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation = false) = 0;
-
-	virtual bool ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation = false) = 0;
-
-	virtual void CancelAbility(UAbilityBase* Ability) = 0;
-
-	virtual void CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle) = 0;
-
-	virtual void CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore = nullptr) = 0;
-	
-	virtual void CancelAllAbilities(UAbilityBase* Ignore = nullptr) = 0;
-	
-	virtual FActiveGameplayEffectHandle ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass) = 0;
-	
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle) = 0;
-		
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpec(const FGameplayEffectSpec& Spec) = 0;
-
-	virtual bool RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove=-1) = 0;
-
-	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) = 0;
-
-	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) = 0;
-
-public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
-		
-	virtual void HandleNameChanged(FName NewValue) = 0;
-
-	virtual void HandleRaceIDChanged(FName NewValue) = 0;
-	
-	virtual void HandleLevelChanged(int32 NewValue, int32 DeltaValue = 0) = 0;
-
-	virtual void HandleEXPChanged(int32 NewValue, int32 DeltaValue = 0) = 0;
-
-	virtual void HandleHealthChanged(float NewValue, float DeltaValue = 0.f) = 0;
-
-	virtual void HandleMaxHealthChanged(float NewValue, float DeltaValue = 0.f) = 0;
 };

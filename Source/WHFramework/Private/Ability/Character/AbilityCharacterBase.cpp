@@ -6,8 +6,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "TimerManager.h"
-#include "Ability/Base/AbilityBase.h"
-#include "Ability/Character/CharacterAttributeSetBase.h"
+#include "Ability/Abilities/AbilityBase.h"
+#include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
@@ -26,7 +26,9 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	//
+	// AbilitySystem->SetIsReplicated(true);
+	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
 	// AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 	
 	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
@@ -49,8 +51,9 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
 
-	// states
-	bDead = true;
+	// tags
+	// DeadTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dead");
+	// DyingTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dying");
 
 	// stats
 	Name = NAME_None;
@@ -83,8 +86,30 @@ void AAbilityCharacterBase::BeginPlay()
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 
 	AbilitySystem->InitAbilityActorInfo(this, this);
-	
+	for(auto Iter : AttributeSet->GetAllAttributes())
+	{
+		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityCharacterBase::OnAttributeChange);
+	}
+
 	Spawn();
+}
+
+void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	BindASCInput();
+}
+
+void AAbilityCharacterBase::BindASCInput()
+{
+	if (!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	{
+		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+			FString("CancelTarget"), FString("EAbilityInputID"), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+
+		bASCInputBound = true;
+	}
 }
 
 // Called every frame
@@ -92,7 +117,7 @@ void AAbilityCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (bDead) return;
+	if (!IsDead()) return;
 }
 
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
@@ -140,23 +165,13 @@ FSaveData* AAbilityCharacterBase::ToData(bool bSaved)
 	return &SaveData;
 }
 
-void AAbilityCharacterBase::ResetData(bool bRefresh)
+void AAbilityCharacterBase::ResetData()
 {
-	// states
-	bDead = false;
+	AbilitySystem->RemoveLooseGameplayTag(DeadTag);
+	AbilitySystem->RemoveLooseGameplayTag(DyingTag);
 
 	// stats
 	SetMotionRate(1, 1);
-			
-	if(bRefresh) RefreshData();
-}
-
-void AAbilityCharacterBase::RefreshData()
-{
-	HandleEXPChanged(GetEXP());
-	HandleLevelChanged(GetLevelV());
-	HandleHealthChanged(GetHealth());
-	HandleMoveSpeedChanged(GetMoveSpeed());
 }
 
 void AAbilityCharacterBase::Spawn()
@@ -167,7 +182,7 @@ void AAbilityCharacterBase::Spawn()
 
 void AAbilityCharacterBase::Revive()
 {
-	if (bDead)
+	if (IsDead())
 	{
 		SetVisible(true);
 		SetHealth(GetMaxHealth());
@@ -363,23 +378,24 @@ bool AAbilityCharacterBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClas
 void AAbilityCharacterBase::ModifyEXP(float InDeltaValue)
 {
 	const int32 MaxEXP = GetMaxEXP();
-	EXP += InDeltaValue;
+	int32 TempEXP = GetEXP();
+	TempEXP += InDeltaValue;
 	if (InDeltaValue > 0.f)
 	{
-		if (EXP >= MaxEXP)
+		if (TempEXP >= MaxEXP)
 		{
-			Level++;
-			EXP -= MaxEXP;
+			SetLevelV(Level + 1);
+			TempEXP -= MaxEXP;
 		}
 	}
 	else
 	{
-		if (EXP < 0.f)
+		if (TempEXP < 0.f)
 		{
-			EXP = 0.f;
+			TempEXP = 0.f;
 		}
 	}
-	HandleEXPChanged(EXP);
+	SetEXP(TempEXP);
 }
 
 void AAbilityCharacterBase::ModifyHealth(float InDeltaValue)
@@ -410,28 +426,35 @@ UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 	return Interaction;
 }
 
+bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(DeadTag) || bCheckDying && IsDying();
+}
+
+bool AAbilityCharacterBase::IsDying() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(DyingTag);
+}
+
 void AAbilityCharacterBase::SetNameV(FName InName)
 {
 	Name = InName;
-	HandleNameChanged(InName);
 }
 
 void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 {
 	RaceID = InRaceID;
-	HandleRaceIDChanged(InRaceID);
 }
 
 void AAbilityCharacterBase::SetLevelV(int32 InLevel)
 {
 	Level = InLevel;
-	HandleLevelChanged(InLevel);
+	DefaultAbility.AbilityLevel = InLevel;
 }
 
 void AAbilityCharacterBase::SetEXP(int32 InEXP)
 {
 	EXP = InEXP;
-	HandleEXPChanged(InEXP);
 }
 
 int32 AAbilityCharacterBase::GetMaxEXP() const
@@ -560,8 +583,32 @@ void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, f
 {
 	MovementRate = InMovementRate;
 	RotationRate = InRotationRate;
-	HandleMoveSpeedChanged(GetMoveSpeed());
-	HandleRotationSpeedChanged(GetRotationSpeed());
+	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
+	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed(), 0) * RotationRate;
+}
+
+void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
+{
+	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
+	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	{
+		if(DeltaValue != 0.f)
+		{
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
+		}
+	}
+	else if(InAttributeChangeData.Attribute == AttributeSet->GetMoveSpeedAttribute())
+	{
+		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
+	}
+	else if(InAttributeChangeData.Attribute == AttributeSet->GetRotationSpeedAttribute())
+	{
+		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue, 0) * RotationRate;
+	}
+	else if(InAttributeChangeData.Attribute == AttributeSet->GetJumpForceAttribute())
+	{
+		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
+	}
 }
 
 void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -572,48 +619,17 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 	}
 }
 
-void AAbilityCharacterBase::HandleNameChanged(FName NewValue)
+void AAbilityCharacterBase::OnRep_Controller()
 {
+	Super::OnRep_Controller();
 }
 
-void AAbilityCharacterBase::HandleRaceIDChanged(FName NewValue)
+void AAbilityCharacterBase::OnRep_PlayerState()
 {
-}
+	Super::OnRep_PlayerState();
 
-void AAbilityCharacterBase::HandleLevelChanged(int32 NewValue, int32 DeltaValue /*= 0*/)
-{
-	DefaultAbility.AbilityLevel = NewValue;
-}
-
-void AAbilityCharacterBase::HandleEXPChanged(int32 NewValue, int32 DeltaValue /*= 0*/)
-{
-
-}
-
-void AAbilityCharacterBase::HandleHealthChanged(float NewValue, float DeltaValue /*= 0.f*/)
-{
-	if(DeltaValue > 0.f)
+	if(GetPlayerState())
 	{
-		USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
+		BindASCInput();
 	}
-}
-
-void AAbilityCharacterBase::HandleMaxHealthChanged(float NewValue, float DeltaValue /*= 0.f*/)
-{
-	
-}
-
-void AAbilityCharacterBase::HandleMoveSpeedChanged(float NewValue, float DeltaValue /*= 0.f*/)
-{
-	GetCharacterMovement()->MaxWalkSpeed = NewValue * MovementRate;
-}
-
-void AAbilityCharacterBase::HandleRotationSpeedChanged(float NewValue, float DeltaValue)
-{
-	GetCharacterMovement()->RotationRate = FRotator(0, NewValue, 0) * RotationRate;
-}
-
-void AAbilityCharacterBase::HandleJumpForceChanged(float NewValue, float DeltaValue)
-{
-	GetCharacterMovement()->JumpZVelocity = NewValue;
 }
