@@ -43,13 +43,31 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere)
+	bool bLocalMode;
+
+	UPROPERTY(EditAnywhere)
 	FString ServerURL;
+
+	UPROPERTY(EditAnywhere)
+	int32 ServerPort;
 public:
 	UFUNCTION(BlueprintPure)
-	FString GetServerURL() const { return ServerURL; }
-	
+	bool IsLocalMode() const { return bLocalMode; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLocalMode(bool bInLocalMode) { this->bLocalMode = bInLocalMode; }
+
+	UFUNCTION(BlueprintPure)
+	FString GetServerURL() const;
+
 	UFUNCTION(BlueprintCallable)
 	void SetServerURL(const FString& InServerURL) { this->ServerURL = InServerURL; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetServerPort() const { return ServerPort; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetServerPort(int32 InServerPort) { this->ServerPort = InServerPort; }
 
 protected:
 	UPROPERTY(EditAnywhere)

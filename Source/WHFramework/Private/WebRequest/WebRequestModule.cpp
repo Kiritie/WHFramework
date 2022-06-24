@@ -4,6 +4,7 @@
 #include "WebRequest/WebRequestModule.h"
 
 #include "HttpModule.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Parameter/ParameterModuleBPLibrary.h"
@@ -14,7 +15,10 @@ AWebRequestModule::AWebRequestModule()
 {
 	ModuleName = FName("WebRequestModule");
 
+	bLocalMode = false;
 	ServerURL = TEXT("");
+	ServerPort = 8080;
+	
 	WebInterfaces = TArray<TSubclassOf<UWebInterfaceBase>>();
 	WebInterfaceMap = TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*>();
 }
@@ -66,6 +70,14 @@ void AWebRequestModule::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 
 	ClearAllWebInterface();
+}
+
+FString AWebRequestModule::GetServerURL() const
+{
+	const int32 MidIndex = ServerURL.Find(TEXT("/"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+	const FString BeginURL = !bLocalMode ? ServerURL.Mid(0, MidIndex) : TEXT("http://127.0.0.1");
+	const FString EndURL = ServerURL.Mid(MidIndex, ServerURL.Len() - MidIndex);
+	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
 }
 
 bool AWebRequestModule::HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
@@ -222,6 +234,7 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString());
 
 		WHLog(WH_WebRequest, Log, TEXT("Start send web request: %s"), *WebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Log, TEXT("------> URL: %s"), *HttpRequest->GetURL());
 		WHLog(WH_WebRequest, Log, TEXT("------> Method: %s"), *HttpRequest->GetVerb());
 		WHLog(WH_WebRequest, Log, TEXT("------> Head: %s"), *InHeadMap.ToString());
 		WHLog(WH_WebRequest, Log, TEXT("------> Content: %s"), *InContent.ToString());
@@ -260,6 +273,7 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 			if(SpendTime > 8000)
 			{
 				WHLog(WH_WebRequest, Warning, TEXT("Web request: %s, Spendtime to long: %d"), *InWebInterface->GetName().ToString(), SpendTime);
+				WHLog(WH_WebRequest, Warning, TEXT("------> URL: %s"), *HttpRequest->GetURL());
 			}
 		}
 	}
@@ -267,12 +281,14 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
 	{
 		WHLog(WH_WebRequest, Log, TEXT("Web request successed: %s"), *InWebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Log, TEXT("------> URL: %s"), *HttpRequest->GetURL());
 		WHLog(WH_WebRequest, Log, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
 	}
 	else
 	{
 		bSucceeded = false;
 		WHLog(WH_WebRequest, Error, TEXT("Web response returned error code: %d , Web request: %s"), HttpResponse->GetResponseCode(), *InWebInterface->GetName().ToString());
+		WHLog(WH_WebRequest, Error, TEXT("------> URL: %s"), *HttpRequest->GetURL());
 		WHLog(WH_WebRequest, Error, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
 	}
 

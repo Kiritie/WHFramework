@@ -100,12 +100,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool HasProcedureByIndex(int32 InProcedureIndex) const
-	{
-		if(!InProcedureIndex) return false;
-
-		return Procedures.IsValidIndex(InProcedureIndex);
-	}
+	bool HasProcedureByIndex(int32 InProcedureIndex) const;
 
 	template<class T>
 	T* GetProcedureByIndex(int32 InProcedureIndex) const
@@ -119,8 +114,8 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByIndex", DeterminesOutputType = "InProcedureIndex"))
-	UProcedureBase* K2_GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureIndex"))
+	UProcedureBase* GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const;
 	
 	template<class T>
 	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
@@ -130,8 +125,8 @@ public:
 		return ProcedureMap.Contains(InProcedureClass);
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasProcedureByClass"))
-	bool K2_HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
+	UFUNCTION(BlueprintPure)
+	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
 
 	template<class T>
 	T* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
@@ -145,8 +140,8 @@ public:
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InProcedureClass"))
-	UProcedureBase* K2_GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
+	UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
 
 public:
 	/**
@@ -164,6 +159,23 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UProcedureBase* GetCurrentProcedure() const { return CurrentProcedure; }
+	
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentProcedureByIndex(int32 InProcedureIndex) const;
+
+	template<class T>
+	bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	{
+		return IsCurrentProcedureByClass(InProcedureClass);
+	}
+
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+	{
+		if(!InProcedureClass) return false;
+
+		return CurrentProcedure && CurrentProcedure->GetClass() == InProcedureClass;
+	}
 	/**
 	* 获取流程列表
 	*/

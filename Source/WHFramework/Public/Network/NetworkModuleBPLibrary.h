@@ -17,6 +17,41 @@ class WHFRAMEWORK_API UNetworkModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
+public:
+public:
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static bool IsNetworkLocalMode();
+
+	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleBPLibrary")
+	static void SetNetworkLocalMode(bool bInLocalMode);
+
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static FString GetNetworkServerURL();
+	
+	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleBPLibrary")
+	static void SetNetworkServerURL(const FString& InServerURL);
+
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static int32 GetNetworkServerPort();
+
+	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleBPLibrary")
+	static void SetNetworkServerPort(int32 InServerPort);
+
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static FString GetServerLocalURL();
+
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static FString GetServerLocalIP();
+
+	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
+	static int32 GetServerLocalPort();
+
+	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleBPLibrary")
+	static bool ConnectNetworkServer(const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
+
+	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleBPLibrary")
+	static bool DisconnectNetworkServer(const FString& InLevelName);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute Actor Func
 public:

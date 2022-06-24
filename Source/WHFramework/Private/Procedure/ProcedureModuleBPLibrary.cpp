@@ -18,6 +18,15 @@ UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure()
 	return nullptr;
 }
 
+bool UProcedureModuleBPLibrary::IsCurrentProcedureByIndex(int32 InProcedureIndex)
+{
+	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	{
+		return ProcedureModule->IsCurrentProcedureByIndex(InProcedureIndex);
+	}
+	return false;
+}
+
 bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
@@ -27,29 +36,29 @@ bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
 	return false;
 }
 
-UProcedureBase* UProcedureModuleBPLibrary::K2_GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		return ProcedureModule->K2_GetProcedureByIndex(InProcedureIndex, InProcedureClass);
+		return ProcedureModule->GetProcedureByIndex(InProcedureIndex, InProcedureClass);
 	}
 	return nullptr;
 }
 
-bool UProcedureModuleBPLibrary::K2_HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+bool UProcedureModuleBPLibrary::HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		return ProcedureModule->K2_HasProcedureByClass(InProcedureClass);
+		return ProcedureModule->HasProcedureByClass(InProcedureClass);
 	}
 	return false;
 }
 
-UProcedureBase* UProcedureModuleBPLibrary::K2_GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
-		return ProcedureModule->K2_GetProcedureByClass(InProcedureClass);
+		return ProcedureModule->GetProcedureByClass(InProcedureClass);
 	}
 	return nullptr;
 }

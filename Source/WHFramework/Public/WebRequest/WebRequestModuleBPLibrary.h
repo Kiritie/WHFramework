@@ -20,10 +20,22 @@ class WHFRAMEWORK_API UWebRequestModuleBPLibrary : public UBlueprintFunctionLibr
 
 public:
 	UFUNCTION(BlueprintPure, Category = "WebRequestModuleBPLibrary")
-	static FString GetServerURL();
+	static bool IsWebLocalMode();
+
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleBPLibrary")
+	static void SetWebLocalMode(bool bInLocalMode);
+
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleBPLibrary")
+	static FString GetWebServerURL();
 	
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleBPLibrary")
-	static void SetServerURL(const FString& InServerURL);
+	static void SetWebServerURL(const FString& InServerURL);
+
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleBPLibrary")
+	static int32 GetWebServerPort();
+
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleBPLibrary")
+	static void SetWebServerPort(int32 InServerPort);
 
 public:
 	template<class T>

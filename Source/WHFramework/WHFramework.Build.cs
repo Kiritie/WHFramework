@@ -30,6 +30,7 @@ public class WHFramework : ModuleRules
 				"Slate",
 				"HTTP",
 				"Json",
+				"Sockets",
 				"SlateCore",
 				"InputCore",
 				"MediaAssets",

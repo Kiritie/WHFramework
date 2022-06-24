@@ -53,7 +53,7 @@ public:
 	
 	FString GetUrl() const { return Url; }
 		
-	FString GetFullUrl() const { return FullUrl.IsEmpty() ? UWebRequestModuleBPLibrary::GetServerURL() + Url : FullUrl; }
+	FString GetFullUrl() const;
 
 	TSubclassOf<UWebRequestHandleBase> GetHandleClass() const { return HandleClass; }
 

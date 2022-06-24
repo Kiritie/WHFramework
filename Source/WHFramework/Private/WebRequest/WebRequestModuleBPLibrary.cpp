@@ -6,7 +6,24 @@
 #include "Main/MainModule.h"
 #include "WebRequest/WebRequestModule.h"
 
-FString UWebRequestModuleBPLibrary::GetServerURL()
+bool UWebRequestModuleBPLibrary::IsWebLocalMode()
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->IsLocalMode();
+	}
+	return false;
+}
+
+void UWebRequestModuleBPLibrary::SetWebLocalMode(bool bInLocalMode)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		WebRequestModule->SetLocalMode(bInLocalMode);
+	}
+}
+
+FString UWebRequestModuleBPLibrary::GetWebServerURL()
 {
 	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
 	{
@@ -15,11 +32,28 @@ FString UWebRequestModuleBPLibrary::GetServerURL()
 	return TEXT("");
 }
 
-void UWebRequestModuleBPLibrary::SetServerURL(const FString& InServerURL)
+void UWebRequestModuleBPLibrary::SetWebServerURL(const FString& InServerURL)
 {
 	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
 	{
 		WebRequestModule->SetServerURL(InServerURL);
+	}
+}
+
+int32 UWebRequestModuleBPLibrary::GetWebServerPort()
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		return WebRequestModule->GetServerPort();
+	}
+	return 0;
+}
+
+void UWebRequestModuleBPLibrary::SetWebServerPort(int32 InServerPort)
+{
+	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	{
+		WebRequestModule->SetServerPort(InServerPort);
 	}
 }
 

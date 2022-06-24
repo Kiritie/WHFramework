@@ -35,4 +35,48 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+protected:
+	UPROPERTY(EditAnywhere)
+	bool bLocalMode;
+
+	UPROPERTY(EditAnywhere)
+	FString ServerURL;
+
+	UPROPERTY(EditAnywhere)
+	int32 ServerPort;
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsLocalMode() const { return bLocalMode; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLocalMode(bool bInLocalMode) { this->bLocalMode = bInLocalMode; }
+
+	UFUNCTION(BlueprintPure)
+	FString GetServerURL() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetServerURL(const FString& InServerURL) { this->ServerURL = InServerURL; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetServerPort() const { return ServerPort; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetServerPort(int32 InServerPort) { this->ServerPort = InServerPort; }
+
+	UFUNCTION(BlueprintPure)
+	FString GetServerLocalURL() const;
+
+	UFUNCTION(BlueprintPure)
+	FString GetServerLocalIP() const;
+
+	UFUNCTION(BlueprintPure)
+	int32 GetServerLocalPort() const;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	bool ConnectServer(const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
+
+	UFUNCTION(BlueprintCallable)
+	bool DisconnectServer(const FString& InLevelName);
 };

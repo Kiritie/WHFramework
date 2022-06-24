@@ -30,6 +30,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static UProcedureBase* GetCurrentProcedure();
 	
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
+	static bool IsCurrentProcedureByIndex(int32 InProcedureIndex);
+
+	template<class T>
+	static bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
+	{
+		return IsCurrentProcedureByClass(InProcedureClass);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
+	static bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+	{
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		{
+			return ProcedureModule->IsCurrentProcedureByClass(InProcedureClass);
+		}
+		return false;
+	}
+
 public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static bool HasProcedureByIndex(int32 InProcedureIndex);
@@ -44,7 +63,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByIndex", DeterminesOutputType = "InProcedureIndex"))
-	static UProcedureBase* K2_GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass);
+	static UProcedureBase* GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass);
 	
 	template<class T>
 	static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
@@ -56,7 +75,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasProcedureByClass"))
-	static bool K2_HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
+	static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
 
 	template<class T>
 	static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
@@ -68,7 +87,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InProcedureClass"))
-	static UProcedureBase* K2_GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
+	static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")

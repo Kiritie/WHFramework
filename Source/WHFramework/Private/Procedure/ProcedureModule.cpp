@@ -192,19 +192,29 @@ void AProcedureModule::ClearAllProcedure()
 	Modify();
 }
 
-UProcedureBase* AProcedureModule::K2_GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const
+bool AProcedureModule::HasProcedureByIndex(int32 InProcedureIndex) const
+{
+	return Procedures.IsValidIndex(InProcedureIndex);
+}
+
+UProcedureBase* AProcedureModule::GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const
 {
 	return GetProcedureByIndex<UProcedureBase>(InProcedureIndex);
 }
 
-bool AProcedureModule::K2_HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+bool AProcedureModule::HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
 {
 	return HasProcedureByClass<UProcedureBase>(InProcedureClass);
 }
 
-UProcedureBase* AProcedureModule::K2_GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+UProcedureBase* AProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
 {
 	return GetProcedureByClass<UProcedureBase>(InProcedureClass);
+}
+
+bool AProcedureModule::IsCurrentProcedureByIndex(int32 InProcedureIndex) const
+{
+	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InProcedureIndex;
 }
 
 #if WITH_EDITOR

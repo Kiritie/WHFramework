@@ -3,11 +3,108 @@
 
 #include "Network/NetworkModuleBPLibrary.h"
 
+#include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Network/NetworkModule.h"
 #include "Network/NetworkModuleNetworkComponent.h"
+
+bool UNetworkModuleBPLibrary::IsNetworkLocalMode()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->IsLocalMode();
+	}
+	return false;
+}
+
+void UNetworkModuleBPLibrary::SetNetworkLocalMode(bool bInLocalMode)
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		NetworkModule->SetLocalMode(bInLocalMode);
+	}
+}
+
+FString UNetworkModuleBPLibrary::GetNetworkServerURL()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->GetServerURL();
+	}
+	return TEXT("");
+}
+
+void UNetworkModuleBPLibrary::SetNetworkServerURL(const FString& InServerURL)
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		NetworkModule->SetServerURL(InServerURL);
+	}
+}
+
+int32 UNetworkModuleBPLibrary::GetNetworkServerPort()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->GetServerPort();
+	}
+	return 0;
+}
+
+void UNetworkModuleBPLibrary::SetNetworkServerPort(int32 InServerPort)
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		NetworkModule->SetServerPort(InServerPort);
+	}
+}
+
+FString UNetworkModuleBPLibrary::GetServerLocalURL()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->GetServerLocalURL();
+	}
+	return TEXT("");
+}
+
+FString UNetworkModuleBPLibrary::GetServerLocalIP()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->GetServerLocalIP();
+	}
+	return TEXT("");
+}
+
+int32 UNetworkModuleBPLibrary::GetServerLocalPort()
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->GetServerLocalPort();
+	}
+	return 0;
+}
+
+bool UNetworkModuleBPLibrary::ConnectNetworkServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->ConnectServer(InServerURL, InServerPort, InOptions);
+	}
+	return false;
+}
+
+bool UNetworkModuleBPLibrary::DisconnectNetworkServer(const FString& InLevelName)
+{
+	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	{
+		return NetworkModule->DisconnectServer(InLevelName);
+	}
+	return false;
+}
 
 void UNetworkModuleBPLibrary::ServerExecuteActorFunc(AActor* InActor, FName InFuncName)
 {

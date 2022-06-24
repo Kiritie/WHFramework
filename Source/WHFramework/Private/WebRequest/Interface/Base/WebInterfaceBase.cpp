@@ -52,3 +52,8 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InWebRequestResult)
 		HandleMap.Emplace(InWebRequestResult.Content, WebRequestHandle);
 	}
 }
+
+FString UWebInterfaceBase::GetFullUrl() const
+{
+	return FullUrl.IsEmpty() ? UWebRequestModuleBPLibrary::GetWebServerURL() + Url : FullUrl;
+}
