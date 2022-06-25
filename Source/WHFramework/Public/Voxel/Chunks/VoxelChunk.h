@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -110,7 +110,7 @@ public:
 
 	virtual void LoadData(FSaveData* InSaveData) override;
 
-	virtual FSaveData* ToData(bool bSaved = true) override;
+	virtual FSaveData* ToData() override;
 
 	virtual void Generate();
 

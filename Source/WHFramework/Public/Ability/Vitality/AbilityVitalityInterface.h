@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorInterface.h"
@@ -19,12 +19,10 @@ class WHFRAMEWORK_API IAbilityVitalityInterface : public IAbilityActorInterface
 	GENERATED_BODY()
 
 public:
-	virtual void Spawn() = 0;
+	virtual void Death(AActor* InKiller = nullptr) = 0;
 	
 	virtual void Revive() = 0;
 
-	virtual void Death(AActor* InKiller = nullptr) = 0;
-		
 	virtual void ResetData() = 0;
 	
 	virtual void ModifyHealth(float InDeltaValue) = 0;

@@ -1,4 +1,4 @@
-	// Fill out your copyright notice in the Description page of Project Settings.
+﻿	// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
@@ -59,8 +59,16 @@ void AAbilityVitalityBase::BeginPlay()
 	{
 		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityVitalityBase::OnAttributeChange);
 	}
+}
 
-	Spawn();
+void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	ResetData();
+}
+
+void AAbilityVitalityBase::OnDespawn_Implementation()
+{
+
 }
 
 // Called every frame
@@ -106,14 +114,12 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData)
 {
-	UGlobalBPLibrary::LoadObjectFromMemory(this, InSaveData->Datas);
+
 }
 
-FSaveData* AAbilityVitalityBase::ToData(bool bSaved)
+FSaveData* AAbilityVitalityBase::ToData()
 {
-	static FSaveData SaveData = FSaveData();
-	UGlobalBPLibrary::SaveObjectToMemory(this, SaveData.Datas);
-	return &SaveData;
+	return nullptr;
 }
 
 void AAbilityVitalityBase::ResetData()
@@ -134,12 +140,6 @@ void AAbilityVitalityBase::Death(AActor* InKiller /*= nullptr*/)
 		SetEXP(0);
 		SetHealth(0.f);
 	}
-}
-
-void AAbilityVitalityBase::Spawn()
-{
-	ResetData();
-	SetHealth(GetMaxHealth());
 }
 
 void AAbilityVitalityBase::Revive()

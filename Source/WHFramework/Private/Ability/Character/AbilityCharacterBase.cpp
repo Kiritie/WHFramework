@@ -1,4 +1,4 @@
-// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
+﻿// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Components/CapsuleComponent.h"
@@ -90,8 +90,18 @@ void AAbilityCharacterBase::BeginPlay()
 	{
 		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityCharacterBase::OnAttributeChange);
 	}
+}
 
-	Spawn();
+void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InParams);
+
+	ResetData();
+}
+
+void AAbilityCharacterBase::OnDespawn_Implementation()
+{
+	Super::OnDespawn_Implementation();
 }
 
 void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -155,14 +165,12 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData)
 {
-	UGlobalBPLibrary::LoadObjectFromMemory(this, InSaveData->Datas);
+	
 }
 
-FSaveData* AAbilityCharacterBase::ToData(bool bSaved)
+FSaveData* AAbilityCharacterBase::ToData()
 {
-	static FSaveData SaveData = FSaveData();
-	UGlobalBPLibrary::SaveObjectToMemory(this, SaveData.Datas);
-	return &SaveData;
+	return nullptr;
 }
 
 void AAbilityCharacterBase::ResetData()
@@ -172,21 +180,6 @@ void AAbilityCharacterBase::ResetData()
 
 	// stats
 	SetMotionRate(1, 1);
-}
-
-void AAbilityCharacterBase::Spawn()
-{
-	SetVisible(true);
-	SetHealth(GetMaxHealth());
-}
-
-void AAbilityCharacterBase::Revive()
-{
-	if (IsDead())
-	{
-		SetVisible(true);
-		SetHealth(GetMaxHealth());
-	}
 }
 
 void AAbilityCharacterBase::Death(AActor* InKiller /*= nullptr*/)
@@ -200,6 +193,15 @@ void AAbilityCharacterBase::Death(AActor* InKiller /*= nullptr*/)
 		SetEXP(0);
 		SetHealth(0.f);
 		OnCharacterDead.Broadcast();
+	}
+}
+
+void AAbilityCharacterBase::Revive()
+{
+	if (IsDead())
+	{
+		SetVisible(true);
+		SetHealth(GetMaxHealth());
 	}
 }
 

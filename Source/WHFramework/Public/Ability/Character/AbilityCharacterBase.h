@@ -1,4 +1,4 @@
-// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
+﻿// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -95,6 +95,10 @@ protected:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
+
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	virtual void BindASCInput();
@@ -106,20 +110,16 @@ public:
 
 	virtual void LoadData(FSaveData* InSaveData) override;
 
-	virtual FSaveData* ToData(bool bSaved = true) override;
+	virtual FSaveData* ToData() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void ResetData() override;
-
-public:
-	UFUNCTION(BlueprintCallable)
-	virtual void Spawn() override;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void Revive() override;
 			
 	UFUNCTION(BlueprintCallable)
 	virtual void Death(AActor* InKiller = nullptr) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Revive() override;
 
 	virtual void Jump() override;
 

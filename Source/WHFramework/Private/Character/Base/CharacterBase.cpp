@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/Base/CharacterBase.h"
@@ -32,14 +32,17 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	USceneModuleBPLibrary::AddSceneActor(this);
-
 	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
 }
 
-void ACharacterBase::Tick(float DeltaSeconds)
+void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::Tick(DeltaSeconds);
+	USceneModuleBPLibrary::AddSceneActor(this);
+}
+
+void ACharacterBase::OnDespawn_Implementation()
+{
+	USceneModuleBPLibrary::RemoveSceneActor(this);
 }
 
 void ACharacterBase::SpawnDefaultController()

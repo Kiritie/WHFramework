@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -154,4 +154,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModuleBPLibrary")
 	static bool DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = 0);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// SaveData
+	static void ObjectLoadData(UObject* InObject, FSaveData* InSaveData, bool bLoadMemoryData = false);
+
+	template<class T>
+	static T* ObjectToData(UObject* InObject, bool bMakeSaved = true, bool bSaveMemoryData = false)
+	{
+		return static_cast<T*>(ObjectToData(InObject, bMakeSaved, bSaveMemoryData));
+	}
+
+	static FSaveData* ObjectToData(UObject* InObject, bool bMakeSaved = true, bool bSaveMemoryData = false);
+
+	static void ObjectUnloadData(UObject* InObject);
 };

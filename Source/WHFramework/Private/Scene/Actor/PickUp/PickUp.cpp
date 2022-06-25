@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Scene/Actor/PickUp/PickUp.h"
@@ -83,16 +83,24 @@ void APickUp::LoadData(FSaveData* InSaveData)
 	Item = SaveData.Item;
 }
 
-FSaveData* APickUp::ToData(bool bSaved)
+FSaveData* APickUp::ToData()
 {
-	static auto data = FPickUpSaveData();
+	static auto saveData = FPickUpSaveData();
 
-	data.bSaved = bSaved;
+	saveData.Item = Item;
+	saveData.Location = GetActorLocation();
 
-	data.Item = Item;
-	data.Location = GetActorLocation();
+	return &saveData;
+}
 
-	return &data;
+void APickUp::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+
+}
+
+void APickUp::OnDespawn_Implementation()
+{
+
 }
 
 // Called every frame

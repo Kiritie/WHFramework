@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
 #include "Scene/Actor/SceneActorInterface.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "CharacterBase.generated.h"
 
@@ -15,7 +16,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public ISceneActorInterface, public IPrimaryEntityInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -26,7 +27,9 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
-	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
 
 	virtual void SpawnDefaultController() override;
 

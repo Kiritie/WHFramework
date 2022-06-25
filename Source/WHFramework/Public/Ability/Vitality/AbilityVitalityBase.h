@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -9,6 +9,7 @@
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
@@ -23,7 +24,7 @@ class UAttributeSetBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AActor, public IAbilityVitalityInterface, public IObjectPoolInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -77,19 +78,19 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	// Called every frame
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
+
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void Serialize(FArchive& Ar) override;
 
 	virtual void LoadData(FSaveData* InSaveData) override;
 
-	virtual FSaveData* ToData(bool bSaved = true) override;
+	virtual FSaveData* ToData() override;
 
 	virtual void ResetData() override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void Spawn() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Revive() override;

@@ -1,7 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "Global/GlobalBPLibrary.h"
 
 int32 USaveGameModuleBPLibrary::GetUserIndex()
 {
@@ -126,4 +127,42 @@ bool USaveGameModuleBPLibrary::DestroySaveGame(TSubclassOf<USaveGameBase> InSave
 		return SaveGameModule->DestroySaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
+}
+
+void USaveGameModuleBPLibrary::ObjectLoadData(UObject* InObject, FSaveData* InSaveData, bool bLoadMemoryData /*= false*/)
+{
+	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
+	{
+		SaveDataInterface->LoadData(InSaveData);
+		if (bLoadMemoryData)
+		{
+			UGlobalBPLibrary::LoadObjectFromMemory(InObject, InSaveData->Datas);
+		}
+	}
+}
+
+FSaveData* USaveGameModuleBPLibrary::ObjectToData(UObject* InObject, bool bMakeSaved /*= true*/, bool bSaveMemoryData /*= false*/)
+{
+	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
+	{
+		FSaveData* SaveData = SaveDataInterface->ToData();
+		if (bMakeSaved)
+		{
+			SaveData->bSaved = true;
+		}
+		if (bSaveMemoryData)
+		{
+			UGlobalBPLibrary::SaveObjectToMemory(InObject, SaveData->Datas);
+		}
+		return SaveData;
+	}
+	return nullptr;
+}
+
+void USaveGameModuleBPLibrary::ObjectUnloadData(UObject* InObject)
+{
+	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
+	{
+		SaveDataInterface->UnloadData();
+	}
 }

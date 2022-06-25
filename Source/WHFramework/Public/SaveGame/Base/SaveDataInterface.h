@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Ability/AbilityModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -20,5 +20,7 @@ class WHFRAMEWORK_API ISaveDataInterface
 public:
 	virtual void LoadData(FSaveData* InSaveData) = 0;
 
-	virtual FSaveData* ToData(bool bSaved = true) = 0;
+	virtual FSaveData* ToData() = 0;
+
+	virtual void UnloadData() { }
 };

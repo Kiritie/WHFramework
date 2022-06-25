@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.PickUp/
+﻿// Fill out your copyright notice in the Description page of Project Settings.PickUp/
 
 
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -20,6 +20,7 @@
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 
 // Sets default values
 AVoxelChunk::AVoxelChunk()
@@ -246,7 +247,7 @@ void AVoxelChunk::Initialize(FIndex InIndex, int32 InBatch)
 
 void AVoxelChunk::LoadData(FSaveData* InVoxelChunkData) {}
 
-FSaveData* AVoxelChunk::ToData(bool bSaved)
+FSaveData* AVoxelChunk::ToData()
 {
 	return nullptr;
 }
@@ -981,14 +982,13 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 	UVoxelData& VoxelData = InVoxelItem.GetData<UVoxelData>();
 	if(VoxelMap.Contains(InVoxelItem.Index) && VoxelData.AuxiliaryClass)
 	{
-		FActorSpawnParameters spawnParams = FActorSpawnParameters();
-		spawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		const FVector Location = IndexToLocation(InVoxelItem.Index, true) + VoxelData.GetCeilRange() * AVoxelModule::GetWorldData()->BlockSize * 0.5f;
-		if(AVoxelAuxiliary* Auxiliary = GetWorld()->SpawnActor<AVoxelAuxiliary>(VoxelData.AuxiliaryClass, Location, InVoxelItem.Rotation, spawnParams))
+		if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
 		{
 			InVoxelItem.Auxiliary = Auxiliary;
 			Auxiliary->Initialize(this, InVoxelItem.Index);
 			Auxiliary->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+			Auxiliary->SetActorLocationAndRotation(Location, InVoxelItem.Rotation);
 			//SetVoxelSample(InVoxelItem.Index, InVoxelItem, false, false);
 			return Auxiliary;
 		}
@@ -1038,26 +1038,24 @@ APickUp* AVoxelChunk::SpawnPickUp(FAbilityItem InItem, FVector InLocation)
 
 	APickUp* pickUpItem = nullptr;
 
-	FActorSpawnParameters spawnParams = FActorSpawnParameters();
-	spawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
 	if(InItem.GetData().EqualType(EAbilityItemType::Voxel))
 	{
-		pickUpItem = GetWorld()->SpawnActor<APickUpVoxel>(InLocation, FRotator::ZeroRotator, spawnParams);
+		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpVoxel>();
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
 	{
-		pickUpItem = GetWorld()->SpawnActor<APickUpEquip>(InLocation, FRotator::ZeroRotator, spawnParams);
+		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpEquip>();
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
 	{
-		pickUpItem = GetWorld()->SpawnActor<APickUpProp>(InLocation, FRotator::ZeroRotator, spawnParams);
+		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpProp>();
 	}
 
-	if(pickUpItem != nullptr)
+	if(pickUpItem)
 	{
 		AttachPickUp(pickUpItem);
 		pickUpItem->Initialize(InItem);
+		pickUpItem->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
 	}
 	return pickUpItem;
 }

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Voxel/VoxelModule.h"
@@ -165,14 +165,14 @@ void AVoxelModule::InitRandomStream(int32 InDeltaSeed)
 	RandomStream.Initialize(GetWorldData()->WorldSeed + InDeltaSeed);
 }
 
-void AVoxelModule::LoadData(FSaveData* InWorldData)
+void AVoxelModule::LoadData(FSaveData* InSaveData)
 {
 	if(WorldState != EVoxelWorldState::None) return;
 
 	WorldState = EVoxelWorldState::Generating;
 	OnWorldStateChanged();
 
-	WorldData = static_cast<FVoxelWorldSaveData*>(InWorldData);
+	WorldData = static_cast<FVoxelWorldSaveData*>(InSaveData);
 	RandomStream = FRandomStream(GetWorldData()->WorldSeed);
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
@@ -199,10 +199,9 @@ void AVoxelModule::LoadData(FSaveData* InWorldData)
 	}
 }
 
-FSaveData* AVoxelModule::ToData(bool bSaved)
+FSaveData* AVoxelModule::ToData()
 {
-	WorldData->bSaved = bSaved;
-	return WorldData;
+	return nullptr;
 }
 
 void AVoxelModule::UnloadData()

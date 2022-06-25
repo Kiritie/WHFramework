@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "PickUp.generated.h"
 
@@ -19,7 +20,7 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class WHFRAMEWORK_API APickUp : public AActor, public ISceneActorInterface, public ISaveDataInterface
+class WHFRAMEWORK_API APickUp : public AActor, public IObjectPoolInterface, public ISceneActorInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -54,12 +55,15 @@ protected:
 	virtual void OnPickUp(IPickerInterface* InPicker);
 
 public:
-	// Called every frame
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams);
+
+	virtual void OnDespawn_Implementation();
+
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void LoadData(FSaveData* InSaveData) override;
 
-	virtual FSaveData* ToData(bool bSaved = true) override;
+	virtual FSaveData* ToData() override;
 
 	virtual void Initialize(FAbilityItem InItem, bool bPreview = false);
 
