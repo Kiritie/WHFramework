@@ -52,8 +52,8 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
 
 	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dead");
-	// DyingTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dying");
+	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
+	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
 
 	// stats
 	Name = NAME_None;

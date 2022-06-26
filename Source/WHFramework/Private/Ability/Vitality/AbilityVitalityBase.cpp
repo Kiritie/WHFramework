@@ -36,8 +36,8 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
 	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dead");
-	// DyingTag = FGameplayTag::RequestGameplayTag("Vitality.State.Dying");
+	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
+	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
 
 	// stats
 	AssetID = FPrimaryAssetId();

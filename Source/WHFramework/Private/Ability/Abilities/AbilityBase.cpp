@@ -1,4 +1,4 @@
-#include "Ability/Abilities/AbilityBase.h"
+﻿#include "Ability/Abilities/AbilityBase.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
@@ -14,7 +14,7 @@ UAbilityBase::UAbilityBase()
 	bCannotActivateWhileInteracting = true;
 
 	// UAbilitySystemGlobals hasn't initialized tags yet to set ActivationBlockedTags
-	//ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag("Vitality.State.Dead"));
+	//ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag("State.Vitality.Dead"));
 
 	EffectContainerMap = TMap<FGameplayTag, FGameplayEffectContainer>();
 }
