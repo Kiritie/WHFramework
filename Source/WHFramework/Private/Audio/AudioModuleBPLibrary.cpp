@@ -24,149 +24,82 @@ void UAudioModuleBPLibrary::PlaySoundAtLocation(USoundBase* InSound, FVector InL
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlaySingleSound2D(InSound, InVolume, bMulticast);
+		AudioModule->PlaySingleSound2D(InSound, InFlag, InVolume, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinished, InVolume, bMulticast);
+		AudioModule->PlaySingleSoundAtLocation(InSound, InFlag, InLocation, InVolume, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSound2DWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+		AudioModule->PlaySingleSound2DWithDelegate(InSound, InFlag, InOnSoundPlayFinish, InVolume);
 	}
 }
 
-void UAudioModuleBPLibrary::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume, bool bMulticast)
+void UAudioModuleBPLibrary::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinished, InLocation, InVolume, bMulticast);
+		AudioModule->PlaySingleSoundAtLocationWithDelegate(InSound, InFlag, InOnSoundPlayFinish, InLocation, InVolume);
 	}
 }
 
-void UAudioModuleBPLibrary::StopSingleSound()
+void UAudioModuleBPLibrary::StopSingleSound(FName InFlag, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->StopSingleSound();
+		AudioModule->StopSingleSound(InFlag, bMulticast);
 	}
 }
 
-float UAudioModuleBPLibrary::GetSingleSoundVolume()
+void UAudioModuleBPLibrary::SetSingleSoundPaused(FName InFlag, bool bPaused, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->GetSingleSoundVolume();
-	}
-	return 0.f;
-}
-
-void UAudioModuleBPLibrary::SetSingleSoundVolume(float InVolume)
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->SetSingleSoundVolume(InVolume);
+		AudioModule->SetSingleSoundPaused(InFlag, bPaused, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::PlayGlobalBGSound()
+void UAudioModuleBPLibrary::SetGlobalSoundVolume(float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PlayGlobalBGSound();
+		AudioModule->SetGlobalSoundVolume(InVolume, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::PauseGlobalBGSound()
+void UAudioModuleBPLibrary::SetBGMSoundVolume(float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->PauseGlobalBGSound();
+		AudioModule->SetBGMSoundVolume(InVolume, bMulticast);
 	}
 }
 
-void UAudioModuleBPLibrary::StopGlobalBGSound()
+void UAudioModuleBPLibrary::SetEnvironmentSoundVolume(float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		AudioModule->StopGlobalBGSound();
+		AudioModule->SetEnvironmentSoundVolume(InVolume, bMulticast);
 	}
 }
 
-float UAudioModuleBPLibrary::GetGlobalBGSoundVolume()
+void UAudioModuleBPLibrary::SetEffectSoundVolume(float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
 	{
-		return AudioModule->GetGlobalBGSoundVolume();
-	}
-	return 0.f;
-}
-
-void UAudioModuleBPLibrary::SetGlobalBGSoundVolume(float InVolume)
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->SetGlobalBGSoundVolume(InVolume);
-	}
-}
-
-void UAudioModuleBPLibrary::InitSingleBGSound(USoundBase* InBGSound, float InBGVolume, bool bIsLoopSound, bool bIsUISound, bool bIsAutoPlay)
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->InitSingleBGSound(InBGSound, InBGVolume, bIsLoopSound, bIsUISound, bIsAutoPlay);
-	}
-}
-
-void UAudioModuleBPLibrary::PlaySingleBGSound()
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->PlaySingleBGSound();
-	}
-}
-
-void UAudioModuleBPLibrary::PauseSingleBGSound()
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->PauseSingleBGSound();
-	}
-}
-
-void UAudioModuleBPLibrary::StopSingleBGSound()
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->StopSingleBGSound();
-	}
-}
-
-float UAudioModuleBPLibrary::GetSingleBGSoundVolume()
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		return AudioModule->GetSingleBGSoundVolume();
-	}
-	return 0.f;
-}
-
-void UAudioModuleBPLibrary::SetSingleBGSoundVolume(float InVolume)
-{
-	if(AAudioModule* AudioModule = AMainModule::GetModuleByClass<AAudioModule>())
-	{
-		AudioModule->SetSingleBGSoundVolume(InVolume);
+		AudioModule->SetEffectSoundVolume(InVolume, bMulticast);
 	}
 }

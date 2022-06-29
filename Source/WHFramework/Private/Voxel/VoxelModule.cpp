@@ -172,7 +172,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData)
 	WorldState = EVoxelWorldState::Generating;
 	OnWorldStateChanged();
 
-	WorldData = static_cast<FVoxelWorldSaveData*>(InSaveData);
+	WorldData = InSaveData->To<FVoxelWorldSaveData>();
 	RandomStream = FRandomStream(GetWorldData()->WorldSeed);
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{

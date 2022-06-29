@@ -52,123 +52,106 @@ public:
 	virtual void MultiPlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Single Sound
+	/// SingleSound
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
-	UAudioComponent* SingleSoundComponent;
+	UPROPERTY()
+	TMap<FName, UAudioComponent*> AudioComponents;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_SingleSoundInfo, Category = "SingleSound")
-	FSingleSoundInfo SingleSoundInfo;
-
-private:
-	FTimerHandle SingleSoundStopTimerHandle;
-
-	FOnSoundPlayFinishedDelegate OnSingleSoundPlayFinishedDelegate;
-
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"))
-	virtual void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume = 1.0f, bool bMulticast = false);
+	virtual void PlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiPlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	virtual void PlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiPlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	virtual void PlaySingleSound2DWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f);
+	UFUNCTION(BlueprintCallable)
+	virtual void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void StopSingleSound();
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetSingleSoundVolume();
+	virtual void StopSingleSound(FName InFlag, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiStopSingleSound(FName InFlag);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetSingleSoundVolume(float InVolume);
+	virtual void SetSingleSoundPaused(FName InFlag, bool bPaused, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiSetSingleSoundPaused(FName InFlag, bool bPaused);
 
 protected:
-	UFUNCTION()
-	virtual void OnRep_SingleSoundInfo();
+	virtual void NativePlaySingleSound(FName InFlag, UAudioComponent* InAudioComponent);
 
-	UFUNCTION()
-	virtual void OnSingleSoundPlayFinished();
+	virtual void NativeStopSingleSound(FName InFlag);
+
+	virtual void NativeSetSingleSoundPaused(FName InFlag, bool bPaused);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Global BGSound
+	/// GlobalSound
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
-	UAudioComponent* GlobalBGSoundComponent;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BG Sound")
-	bool bAutoPlayGlobal;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_GlobalBGSoundInfo, Category = "BG Sound")
-	FBGSoundInfo GlobalBGSoundInfo;
-
-private:
-	FTimerHandle GlobalBGSoundLoopTimerHandle;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GlobalSound")
+	USoundMix* GlobalSoundMix;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GlobalSound")
+	USoundClass* GlobalSoundClass;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void PlayGlobalBGSound();
-
-	UFUNCTION(BlueprintCallable)
-	virtual void PauseGlobalBGSound();
-
-	UFUNCTION(BlueprintCallable)
-	virtual void StopGlobalBGSound();
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetGlobalBGSoundVolume();
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetGlobalBGSoundVolume(float InVolume);
-
-protected:
-	UFUNCTION()
-	virtual void OnLoopGlobalBGSound();
-
-	UFUNCTION()
-	virtual void OnRep_GlobalBGSoundInfo();
+	virtual void SetGlobalSoundVolume(float InVolume, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiSetGlobalSoundVolume(float InVolume);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Single BGSound
+	/// BGMSound
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Components")
-	UAudioComponent* SingleBGSoundComponent;
-
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = OnRep_SingleBGSoundInfo, Category = "BG Sound")
-	FBGSoundInfo SingleBGSoundInfo;
-
-private:
-	FTimerHandle SingleBGSoundLoopTimerHandle;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BGMSound")
+	USoundMix* BGMSoundMix;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BGMSound")
+	USoundClass* BGMSoundClass;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void InitSingleBGSound(USoundBase* InBGSound, float InBGVolume = 1.0f, bool bIsLoopSound = true, bool bIsUISound = false, bool bIsAutoPlay = true);
+	virtual void SetBGMSoundVolume(float InVolume, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiSetBGMSoundVolume(float InVolume);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// EnvironmentSound
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EnvironmentSound")
+	USoundMix* EnvironmentSoundMix;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EnvironmentSound")
+	USoundClass* EnvironmentSoundClass;
+
+public:
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySingleBGSound();
+	virtual void SetEnvironmentSoundVolume(float InVolume, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiSetEnvironmentSoundVolume(float InVolume);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// EffectSound
+protected:
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EffectSound")
+	USoundMix* EffectSoundMix;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EffectSound")
+	USoundClass* EffectSoundClass;
+
+public:
 	UFUNCTION(BlueprintCallable)
-	virtual void PauseSingleBGSound();
-
-	UFUNCTION(BlueprintCallable)
-	virtual void StopSingleBGSound();
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetSingleBGSoundVolume();
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetSingleBGSoundVolume(float InVolume);
+	virtual void SetEffectSoundVolume(float InVolume, bool bMulticast = false);
+	UFUNCTION(NetMulticast, Reliable)
+	virtual void MultiSetEffectSoundVolume(float InVolume);
 
 protected:
-	UFUNCTION()
-	virtual void OnLoopSingleBGSound();
-
-	UFUNCTION()
-	virtual void OnRep_SingleBGSoundInfo();
+	virtual void NativeSetSoundVolume(USoundMix* InSoundMix, USoundClass* InSoundClass, float InVolume);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -26,62 +26,42 @@ public:
 	static void PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Single Sound
+	/// SingleSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"), Category = "AudioModuleBPLibrary")
-	static void PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, float InVolume = 1.0f, bool bMulticast = false);
+	static void PlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnSoundPlayFinishedDelegate"), Category = "AudioModuleBPLibrary")
-	static void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishedDelegate& InOnSoundPlayFinished, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	static void PlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void StopSingleSound();
-
-	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
-	static float GetSingleSoundVolume();
+	static void PlaySingleSound2DWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetSingleSoundVolume(float InVolume);
+	static void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void StopSingleSound(FName InFlag, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void SetSingleSoundPaused(FName InFlag, bool bPaused, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Global BGSound
+	/// GlobalSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlayGlobalBGSound();
-
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PauseGlobalBGSound();
-
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void StopGlobalBGSound();
-	
-	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
-	static float GetGlobalBGSoundVolume();
-
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetGlobalBGSoundVolume(float InVolume);
+	static void SetGlobalSoundVolume(float InVolume, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Single BGSound
+	/// BGMSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void InitSingleBGSound(USoundBase* InBGSound, float InBGVolume = 1.0f, bool bIsLoopSound = true, bool bIsUISound = false, bool bIsAutoPlay = true);
+	static void SetBGMSoundVolume(float InVolume, bool bMulticast = false);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// EnvironmentSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleBGSound();
+	static void SetEnvironmentSoundVolume(float InVolume, bool bMulticast = false);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// EffectSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PauseSingleBGSound();
-
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void StopSingleBGSound();
-
-	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
-	static float GetSingleBGSoundVolume();
-
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetSingleBGSoundVolume(float InVolume);
+	static void SetEffectSoundVolume(float InVolume, bool bMulticast = false);
 };

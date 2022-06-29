@@ -7,22 +7,19 @@
 #include "ParameterManager.h"
 #include "ParameterModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 #include "ParameterModule.generated.h"
 
 class ATargetPoint;
 
 UCLASS()
-class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterManager
+class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterManager, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	// ParamSets default values for this actor's properties
 	AParameterModule();
-
-protected:
-	UPROPERTY(EditAnywhere, Replicated)
-	FParameters Parameters;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -43,8 +40,19 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	virtual void OnTermination_Implementation() override;
+
+public:
+	virtual void LoadData(FSaveData* InSaveData) override;
+
+	virtual FSaveData* ToData() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameter
+protected:
+	UPROPERTY(EditAnywhere, Replicated)
+	FParameters Parameters;
+
 public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const override;

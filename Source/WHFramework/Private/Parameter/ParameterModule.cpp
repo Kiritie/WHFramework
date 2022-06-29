@@ -5,6 +5,8 @@
 #include "Parameter/ParameterModule.h"
 
 #include "Net/UnrealNetwork.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/Parameter/ParameterSaveGame.h"
 
 // ParamSets default values
 AParameterModule::AParameterModule()
@@ -32,6 +34,8 @@ void AParameterModule::OnInitialize_Implementation()
 void AParameterModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	USaveGameModuleBPLibrary::LoadObjectData(this, USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
 }
 
 void AParameterModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -47,6 +51,26 @@ void AParameterModule::OnPause_Implementation()
 void AParameterModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AParameterModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+
+	USaveGameModuleBPLibrary::GetSaveGame<UParameterSaveGame>(0)->SetSaveData(USaveGameModuleBPLibrary::ObjectToData(this));
+	USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
+}
+
+void AParameterModule::LoadData(FSaveData* InSaveData)
+{
+	Parameters = InSaveData->ToRef<FParameterSaveData>().Parameters;
+}
+
+FSaveData* AParameterModule::ToData()
+{
+	static FParameterSaveData SaveData;
+	SaveData.Parameters = Parameters;
+	return &SaveData;
 }
 
 bool AParameterModule::HasParameter(FName InName, bool bEnsured) const

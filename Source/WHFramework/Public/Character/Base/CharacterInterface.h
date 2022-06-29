@@ -26,7 +26,7 @@ class WHFRAMEWORK_API ICharacterInterface
 public:
 	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) = 0;
 	
-	virtual void StopSound() = 0;
+	virtual void StopSound(bool bMulticast = false) = 0;
 
 	virtual void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false) = 0;
 	

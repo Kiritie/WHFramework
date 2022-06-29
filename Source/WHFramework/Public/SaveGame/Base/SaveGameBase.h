@@ -3,6 +3,7 @@
 #pragma once
 
 #include "GameFramework/SaveGame.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGameBase.generated.h"
 
 /**
@@ -60,31 +61,46 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	FName SaveName;
+
+	UPROPERTY()
+	int32 SaveIndex;
+
+	UPROPERTY()
+	bool bSaved;
+
+	UPROPERTY()
+	bool bLoaded;
+	
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetSaveName() const { return SaveName; }
 
-protected:
-	UPROPERTY()
-	int32 SaveIndex;
-public:
 	UFUNCTION(BlueprintPure)
 	int32 GetSaveIndex() const { return SaveIndex; }
 	
 	UFUNCTION(BlueprintCallable)
 	void SetSaveIndex(int32 InSaveIndex) { this->SaveIndex = InSaveIndex; }
 
-protected:
-	UPROPERTY()
-	bool bSaved;
-public:
 	UFUNCTION(BlueprintPure)
 	bool IsSaved() const { return bSaved; }
 
-protected:
-	UPROPERTY()
-	bool bLoaded;
-public:
 	UFUNCTION(BlueprintPure)
 	bool IsLoaded() const { return bLoaded; }
+
+public:
+	template<typename T>
+	T* GetSaveData()
+	{
+		return static_cast<T*>(GetSaveData());
+	}
+	
+	template<typename T>
+	T& GetSaveDataRef()
+	{
+		return *GetSaveData<T>();
+	}
+
+	virtual FSaveData* GetSaveData() { return nullptr; }
+
+	virtual void SetSaveData(FSaveData* InSaveData) { }
 };

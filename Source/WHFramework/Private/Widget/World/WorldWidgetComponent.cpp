@@ -3,6 +3,7 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
+#include "Global/GlobalBPLibrary.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 

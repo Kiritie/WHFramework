@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AudioModuleTypes.h"
 
 #include "Main/Base/ModuleNetworkComponent.h"
 
@@ -24,4 +25,28 @@ public:
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerPlaySoundAtLocationMulticast(USoundBase* InSound, FVector InLocation, float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerPlaySingleSound2DMulticast(USoundBase* InSound, FName InFlag, float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerPlaySingleSoundAtLocationMulticast(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerStopSingleSoundMulticast(FName InFlag);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerSetSingleSoundPausedMulticast(FName InFlag, bool bPaused);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerSetGlobalSoundVolumeMulticast(float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerSetBGMSoundVolumeMulticast(float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerSetEnvironmentSoundVolumeMulticast(float InVolume);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+	void ServerSetEffectSoundVolumeMulticast(float InVolume);
 };

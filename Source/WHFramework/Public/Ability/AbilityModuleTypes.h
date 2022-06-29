@@ -528,6 +528,21 @@ public:
 	}
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItems
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityItems()
+	{
+		Items = TArray<FAbilityItem>();
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityItem> Items;
+};
+
 /**
  * 种族数据
  */

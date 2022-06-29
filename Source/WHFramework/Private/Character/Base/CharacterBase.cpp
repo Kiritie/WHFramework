@@ -23,9 +23,6 @@ ACharacterBase::ACharacterBase()
 	Name = NAME_None;
 	Anim = nullptr;
 	DefaultController = nullptr;
-
-	SingleSound = CreateDefaultSubobject<UAudioComponent>(FName("SingleSound"));
-	SingleSound->SetupAttachment(RootComponent);
 }
 
 void ACharacterBase::BeginPlay()
@@ -52,57 +49,14 @@ void ACharacterBase::SpawnDefaultController()
 	DefaultController = Controller;
 }
 
-void ACharacterBase::OnRep_SingleSoundInfo()
-{
-	if(!SingleSoundInfo.Sound)
-	{
-		SingleSound->Stop();
-		return;
-	}
-	
-	if(SingleSound->Sound != SingleSoundInfo.Sound)
-	{
-		SingleSound->Sound = SingleSoundInfo.Sound;
-	}
-	SingleSound->VolumeMultiplier = SingleSoundInfo.Volume;
-	SingleSound->bIsUISound = SingleSoundInfo.bUISound;
-	if(!SingleSoundInfo.bUISound)
-	{
-		SingleSound->SetWorldLocation(SingleSoundInfo.Location);
-	}
-	SingleSound->Play();
-
-	if(!HasAuthority())
-	{
-		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &ACharacterBase::StopSound, SingleSoundInfo.Sound->GetDuration());
-	}
-}
-
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	if(!InSound) return;
-
-	StopSound();
-
-	if(bMulticast && !HasAuthority())
-	{
-		SingleSoundInfo = FSingleSoundInfo(InSound, InVolume, true);
-		OnRep_SingleSoundInfo();
-	}
-	else
-	{
-		SingleSound->SetSound(InSound);
-		SingleSound->SetVolumeMultiplier(InVolume);
-		SingleSound->Play();
-		GetWorld()->GetTimerManager().SetTimer(SingleSoundStopTimerHandle, this, &ACharacterBase::StopSound, InSound->GetDuration());
-	}
+	UAudioModuleBPLibrary::PlaySingleSoundAtLocation(InSound, Name, GetActorLocation(), InVolume, bMulticast);
 }
 
-void ACharacterBase::StopSound()
+void ACharacterBase::StopSound(bool bMulticast)
 {
-	SingleSoundInfo.Sound = nullptr;
-	OnRep_SingleSoundInfo();
-	GetWorld()->GetTimerManager().ClearTimer(SingleSoundStopTimerHandle);
+	UAudioModuleBPLibrary::StopSingleSound(Name, bMulticast);
 }
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
@@ -270,6 +224,4 @@ void ACharacterBase::MultiStopAIMove_Implementation()
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(ACharacterBase, SingleSoundInfo);
 }

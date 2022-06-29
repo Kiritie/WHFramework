@@ -49,7 +49,7 @@ void USaveGameBase::OnDestroy_Implementation()
 
 bool USaveGameBase::Save(bool bRefresh)
 {
-	return USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(bRefresh, GetClass());
+	return USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(SaveIndex, bRefresh, GetClass());
 }
 
 bool USaveGameBase::Load()
@@ -59,17 +59,17 @@ bool USaveGameBase::Load()
 
 bool USaveGameBase::Unload()
 {
-	return USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(SaveIndex, GetClass());
 }
 
 bool USaveGameBase::Reset()
 {
-	return USaveGameModuleBPLibrary::ResetSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::ResetSaveGame<USaveGameBase>(SaveIndex, GetClass());
 }
 
 bool USaveGameBase::Refresh()
 {
-	return USaveGameModuleBPLibrary::RefreshSaveGame<USaveGameBase>(GetClass());
+	return USaveGameModuleBPLibrary::RefreshSaveGame<USaveGameBase>(SaveIndex, GetClass());
 }
 
 bool USaveGameBase::Destroy()

@@ -76,7 +76,7 @@ void APickUp::OnPickUp(IPickerInterface* InPicker)
 
 void APickUp::LoadData(FSaveData* InSaveData)
 {
-	FPickUpSaveData SaveData = *static_cast<FPickUpSaveData*>(InSaveData);
+	FPickUpSaveData SaveData = InSaveData->ToRef<FPickUpSaveData>();
 	if (!SaveData.bSaved) return;
 
 	SetActorLocation(SaveData.Location);

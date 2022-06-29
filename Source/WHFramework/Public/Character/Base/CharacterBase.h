@@ -65,24 +65,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
-protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
-	UAudioComponent* SingleSound;
-	
-	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_SingleSoundInfo, Category = "SoundActionInfos")
-	FSingleSoundInfo SingleSoundInfo;
-
-private:
-	FTimerHandle SingleSoundStopTimerHandle;
-
 public:
 	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	
-	virtual void StopSound() override;
-	
-protected:
-	UFUNCTION()
-	virtual void OnRep_SingleSoundInfo();
+	virtual void StopSound(bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
