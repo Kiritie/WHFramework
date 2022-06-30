@@ -9,22 +9,13 @@
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Procedure/Base/ProcedureBase.h"
 
-UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure()
+UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 	{
 		return ProcedureModule->GetCurrentProcedure();
 	}
 	return nullptr;
-}
-
-bool UProcedureModuleBPLibrary::IsCurrentProcedureByIndex(int32 InProcedureIndex)
-{
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-	{
-		return ProcedureModule->IsCurrentProcedureByIndex(InProcedureIndex);
-	}
-	return false;
 }
 
 bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
@@ -61,6 +52,15 @@ UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProc
 		return ProcedureModule->GetProcedureByClass(InProcedureClass);
 	}
 	return nullptr;
+}
+
+bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InProcedureIndex)
+{
+	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	{
+		return ProcedureModule->IsCurrentProcedureIndex(InProcedureIndex);
+	}
+	return false;
 }
 
 void UProcedureModuleBPLibrary::SwitchProcedure(UProcedureBase* InProcedure)

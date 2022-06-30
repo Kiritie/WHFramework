@@ -142,6 +142,23 @@ public:
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
 	UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
+	
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentProcedureIndex(int32 InProcedureIndex) const;
+
+	template<class T>
+	bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	{
+		return IsCurrentProcedureClass(InProcedureClass);
+	}
+
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+	{
+		if(!InProcedureClass) return false;
+
+		return CurrentProcedure && CurrentProcedure->GetClass() == InProcedureClass;
+	}
 
 public:
 	/**
@@ -157,31 +174,20 @@ public:
 	/**
 	* 获取当前流程
 	*/
-	UFUNCTION(BlueprintPure)
-	UProcedureBase* GetCurrentProcedure() const { return CurrentProcedure; }
-	
-	UFUNCTION(BlueprintPure)
-	bool IsCurrentProcedureByIndex(int32 InProcedureIndex) const;
-
 	template<class T>
-	bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	T* GetCurrentProcedure() const
 	{
-		return IsCurrentProcedureByClass(InProcedureClass);
+		return Cast<T>(CurrentProcedure);
 	}
-
-	UFUNCTION(BlueprintPure)
-	bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
-	{
-		if(!InProcedureClass) return false;
-
-		return CurrentProcedure && CurrentProcedure->GetClass() == InProcedureClass;
-	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
+	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass = nullptr) const { return CurrentProcedure; }
 	/**
 	* 获取流程列表
 	*/
 	UFUNCTION(BlueprintPure)
 	TArray<UProcedureBase*>& GetProcedures() { return Procedures; }
 	
+	UFUNCTION(BlueprintPure)
 	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>& GetProcedureMap() { return ProcedureMap; }
 
 	//////////////////////////////////////////////////////////////////////////

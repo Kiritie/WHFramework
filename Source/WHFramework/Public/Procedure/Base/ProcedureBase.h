@@ -84,7 +84,7 @@ public:
 
 public:
 	/**
-	* 指引流程流程
+	* 指引流程
 	*/
 	UFUNCTION(BlueprintCallable)
 	void Guide();

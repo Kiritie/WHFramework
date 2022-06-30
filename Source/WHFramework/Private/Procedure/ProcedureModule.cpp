@@ -212,7 +212,7 @@ UProcedureBase* AProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase
 	return GetProcedureByClass<UProcedureBase>(InProcedureClass);
 }
 
-bool AProcedureModule::IsCurrentProcedureByIndex(int32 InProcedureIndex) const
+bool AProcedureModule::IsCurrentProcedureIndex(int32 InProcedureIndex) const
 {
 	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InProcedureIndex;
 }

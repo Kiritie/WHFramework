@@ -143,7 +143,21 @@ public:
 	template<class T>
 	bool GetDataTableRow(int32 InRowIndex, T& OutRow)
 	{
-		return GetDataTableRow(*FString::FromInt(InRowIndex), OutRow);
+		UDataTable* DataTable = nullptr;
+		FName RowName = NAME_None;
+		if(DataTableMap.Contains(T::StaticStruct()))
+		{
+			DataTable = DataTableMap[T::StaticStruct()];
+			if(DataTable)
+			{
+				TArray<FName> RowNames = DataTable->GetRowNames();
+				if(RowNames.IsValidIndex(InRowIndex))
+				{
+					RowName = RowNames[InRowIndex];
+				}
+			}
+		}
+		return GetDataTableRow(DataTable, RowName, OutRow);
 	}
 
 	template<class T>

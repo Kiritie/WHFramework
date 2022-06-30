@@ -26,28 +26,9 @@ public:
 	{
 		return Cast<T>(GetCurrentProcedure());
 	}
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static UProcedureBase* GetCurrentProcedure();
 	
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static bool IsCurrentProcedureByIndex(int32 InProcedureIndex);
-
-	template<class T>
-	static bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
-	{
-		return IsCurrentProcedureByClass(InProcedureClass);
-	}
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
-	static bool IsCurrentProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
-	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
-		{
-			return ProcedureModule->IsCurrentProcedureByClass(InProcedureClass);
-		}
-		return false;
-	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"), Category = "ProcedureModuleBPLibrary")
+	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass = nullptr);
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
@@ -88,6 +69,25 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InProcedureClass"))
 	static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
+	
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
+	static bool IsCurrentProcedureIndex(int32 InProcedureIndex);
+
+	template<class T>
+	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
+	{
+		return IsCurrentProcedureClass(InProcedureClass);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
+	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass)
+	{
+		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		{
+			return ProcedureModule->IsCurrentProcedureClass(InProcedureClass);
+		}
+		return false;
+	}
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleBPLibrary")
