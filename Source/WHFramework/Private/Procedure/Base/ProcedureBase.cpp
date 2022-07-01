@@ -165,14 +165,19 @@ void UProcedureBase::Guide()
 	}
 }
 
-void UProcedureBase::SwitchLastProcedure()
+void UProcedureBase::SwitchLast()
 {
 	UProcedureModuleBPLibrary::SwitchLastProcedure();
 }
 
-void UProcedureBase::SwitchNextProcedure()
+void UProcedureBase::SwitchNext()
 {
 	UProcedureModuleBPLibrary::SwitchNextProcedure();
+}
+
+bool UProcedureBase::IsCurrent()
+{
+	return UProcedureModuleBPLibrary::IsCurrentProcedure(this);
 }
 
 #if WITH_EDITOR

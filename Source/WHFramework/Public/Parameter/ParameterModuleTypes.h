@@ -236,6 +236,9 @@ public:
 	template<class T>
 	T* GetPointerValue() const { return static_cast<T*>(PointerValue); }
 
+	template<class T>
+	T& GetPointerValueRef() const { return *GetPointerValue<T>(); }
+
 	void SetPointerValue(void* InPointerValue) { this->PointerValue = InPointerValue; }
 
 public:

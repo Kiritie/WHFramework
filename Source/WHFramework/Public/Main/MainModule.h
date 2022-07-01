@@ -16,8 +16,8 @@
 
 class AModuleBase;
 
-UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API AMainModule : public AActor
+UCLASS()
+class WHFRAMEWORK_API AMainModule : public AWHActor
 {
 	GENERATED_BODY()
 	

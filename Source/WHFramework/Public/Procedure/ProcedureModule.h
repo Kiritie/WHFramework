@@ -60,10 +60,7 @@ public:
 	void SwitchProcedureByIndex(int32 InProcedureIndex);
 
 	template<class T>
-	void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
-	{
-		SwitchProcedureByClass(InProcedureClass);
-	}
+	void SwitchProcedureByClass() { SwitchProcedureByClass(T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
@@ -105,8 +102,6 @@ public:
 	template<class T>
 	T* GetProcedureByIndex(int32 InProcedureIndex) const
 	{
-		if(!InProcedureIndex) return nullptr;
-
 		if(HasProcedureByIndex(InProcedureIndex))
 		{
 			return Cast<T>(Procedures[InProcedureIndex]);
@@ -142,14 +137,17 @@ public:
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
 	UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
-	
+		
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentProcedure(UProcedureBase* InProcedure) const;
+
 	UFUNCTION(BlueprintPure)
 	bool IsCurrentProcedureIndex(int32 InProcedureIndex) const;
 
 	template<class T>
-	bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	bool IsCurrentProcedureClass() const
 	{
-		return IsCurrentProcedureClass(InProcedureClass);
+		return IsCurrentProcedureClass(T::StaticClass());
 	}
 
 	UFUNCTION(BlueprintPure)

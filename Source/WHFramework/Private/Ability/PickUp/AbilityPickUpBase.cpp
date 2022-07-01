@@ -1,16 +1,16 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Actor/PickUp/PickUp.h"
+#include "Ability/PickUp/AbilityPickUpBase.h"
 
+#include "Ability/PickUp/AbilityPickerInterface.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
-#include "Scene/Actor/PickUp/PickerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
 // Sets default values
-APickUp::APickUp()
+AAbilityPickUpBase::AAbilityPickUpBase()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
@@ -18,7 +18,7 @@ APickUp::APickUp()
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
-	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &APickUp::OnOverlap);
+	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
 	SetRootComponent(BoxComponent);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
@@ -31,20 +31,18 @@ APickUp::APickUp()
 }
 
 // Called when the game starts or when spawned
-void APickUp::BeginPlay()
+void AAbilityPickUpBase::BeginPlay()
 {
 	Super::BeginPlay();
 
 }
 
-void APickUp::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
+void AAbilityPickUpBase::Initialize(FAbilityItem InItem)
 {
 	Item = InItem;
-	RotatingComponent->SetActive(!bPreview);
-	BoxComponent->SetCollisionEnabled(!bPreview ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
-void APickUp::RemoveFromContainer_Implementation()
+void AAbilityPickUpBase::RemoveFromContainer_Implementation()
 {
 	if(Container)
 	{
@@ -53,11 +51,11 @@ void APickUp::RemoveFromContainer_Implementation()
 	}
 }
 
-void APickUp::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (OtherActor)
 	{
-		auto Picker = Cast<IPickerInterface>(OtherActor);
+		auto Picker = Cast<IAbilityPickerInterface>(OtherActor);
 		if (Picker)
 		{
 			OnPickUp(Picker);
@@ -65,7 +63,7 @@ void APickUp::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherA
 	}
 }
 
-void APickUp::OnPickUp(IPickerInterface* InPicker)
+void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 {
 	if(InPicker)
 	{
@@ -74,7 +72,18 @@ void APickUp::OnPickUp(IPickerInterface* InPicker)
 	Execute_RemoveFromContainer(this);
 }
 
-void APickUp::LoadData(FSaveData* InSaveData)
+void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+
+}
+
+void AAbilityPickUpBase::OnDespawn_Implementation()
+{
+	Item = FAbilityItem::Empty;
+	Container = nullptr;
+}
+
+void AAbilityPickUpBase::LoadData(FSaveData* InSaveData)
 {
 	FPickUpSaveData SaveData = InSaveData->ToRef<FPickUpSaveData>();
 	if (!SaveData.bSaved) return;
@@ -83,7 +92,7 @@ void APickUp::LoadData(FSaveData* InSaveData)
 	Item = SaveData.Item;
 }
 
-FSaveData* APickUp::ToData()
+FSaveData* AAbilityPickUpBase::ToData()
 {
 	static auto saveData = FPickUpSaveData();
 
@@ -91,21 +100,4 @@ FSaveData* APickUp::ToData()
 	saveData.Location = GetActorLocation();
 
 	return &saveData;
-}
-
-void APickUp::OnSpawn_Implementation(const TArray<FParameter>& InParams)
-{
-
-}
-
-void APickUp::OnDespawn_Implementation()
-{
-
-}
-
-// Called every frame
-void APickUp::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
 }

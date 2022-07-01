@@ -4,13 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Global/Base/WHActor.h"
 
 #include "EventManagerBase.generated.h"
 
 class UEventHandle_EndPlay;
 class UEventHandle_BeginPlay;
+
 UCLASS()
-class WHFRAMEWORK_API AEventManagerBase : public AActor
+class WHFRAMEWORK_API AEventManagerBase : public AWHActor
 {
 	GENERATED_BODY()
 	

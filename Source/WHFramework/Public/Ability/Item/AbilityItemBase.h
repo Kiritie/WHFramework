@@ -13,7 +13,7 @@ class AAbilityCharacterBase;
  * 物品基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityItemBase : public AActor
+class WHFRAMEWORK_API AAbilityItemBase : public AWHActor
 {
 	GENERATED_BODY()
 	

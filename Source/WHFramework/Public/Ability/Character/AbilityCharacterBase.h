@@ -5,6 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilityCharacterDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
+#include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -28,7 +29,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -125,6 +126,8 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnJump();
+
+	virtual void PickUp(AAbilityPickUpBase* InPickUp) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 

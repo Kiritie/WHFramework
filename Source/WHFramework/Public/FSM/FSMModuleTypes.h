@@ -5,3 +5,22 @@
 #include "CoreMinimal.h"
 
 #include "UObject/NoExportTypes.h"
+
+#include "FSMModuleTypes.generated.h"
+
+class UFSMComponent;
+
+USTRUCT(BlueprintType)
+struct FFSMGroupInfo
+{
+	GENERATED_BODY()
+
+public:
+	FFSMGroupInfo()
+	{
+		FSMArray = TArray<UFSMComponent*>();
+	}
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TArray<UFSMComponent*> FSMArray;
+};

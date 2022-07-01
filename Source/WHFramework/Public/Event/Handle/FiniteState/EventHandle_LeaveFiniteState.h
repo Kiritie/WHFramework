@@ -19,9 +19,9 @@ public:
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	class UFiniteStateBase* FiniteState;
+	class UFiniteStateBase* State;
 	UPROPERTY(BlueprintReadOnly)
-	class UFSMComponent* FSMComponent;
+	class UFSMComponent* FSM;
 
 public:
 	virtual void OnDespawn_Implementation() override;

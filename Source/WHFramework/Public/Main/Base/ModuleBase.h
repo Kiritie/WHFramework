@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 
 #include "Main/Base/Module.h"
-#include "GameFramework/Actor.h"
+#include "Global/Base/WHActor.h"
 #include "ModuleBase.generated.h"
 
-UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API AModuleBase : public AActor, public IModule
+UCLASS()
+class WHFRAMEWORK_API AModuleBase : public AWHActor, public IModule
 {
 	GENERATED_BODY()
 	

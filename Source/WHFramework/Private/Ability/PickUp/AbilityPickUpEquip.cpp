@@ -1,14 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Scene/Actor/PickUp/PickUpEquip.h"
+#include "Ability/PickUp/AbilityPickUpEquip.h"
 
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
 // Sets default values
-APickUpEquip::APickUpEquip()
+AAbilityPickUpEquip::AAbilityPickUpEquip()
 {
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
@@ -16,19 +16,19 @@ APickUpEquip::APickUpEquip()
 }
 
 // Called when the game starts or when spawned
-void APickUpEquip::BeginPlay()
+void AAbilityPickUpEquip::BeginPlay()
 {
 	Super::BeginPlay();
 
 }
 
-void APickUpEquip::Initialize(FAbilityItem InItem, bool bPreview /*= false*/)
+void AAbilityPickUpEquip::Initialize(FAbilityItem InItem)
 {
-	Super::Initialize(InItem, bPreview);
+	Super::Initialize(InItem);
 	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UAbilityEquipDataBase>().EquipMesh);
 }
 
-void APickUpEquip::OnPickUp(IPickerInterface* InPicker)
+void AAbilityPickUpEquip::OnPickUp(IAbilityPickerInterface* InPicker)
 {
 	Super::OnPickUp(InPicker);
 

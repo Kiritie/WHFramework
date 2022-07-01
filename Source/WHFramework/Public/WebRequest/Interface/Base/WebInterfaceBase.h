@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Global/Base/WHObject.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "UObject/Object.h"
 #include "WebRequest/WebRequestModuleBPLibrary.h"
@@ -13,7 +14,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWebInterfaceBase : public UObject, public IObjectPoolInterface
+class WHFRAMEWORK_API UWebInterfaceBase : public UWHObject, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 

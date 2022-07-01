@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Global/Base/WHActor.h"
 
 #include "Media/MediaModuleTypes.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -13,7 +14,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API AMediaPlayerBase : public AActor, public ISceneActorInterface
+class WHFRAMEWORK_API AMediaPlayerBase : public AWHActor, public ISceneActorInterface
 {
 	GENERATED_BODY()
 	

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Global/Base/WHObject.h"
 #include "UObject/NoExportTypes.h"
 #include "ReferencePool.generated.h"
 
@@ -10,7 +11,7 @@
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UReferencePool : public UObject
+class WHFRAMEWORK_API UReferencePool : public UWHObject
 {
 	GENERATED_BODY()
 

@@ -15,7 +15,7 @@ class UVoxel;
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AActor, public IInteractionAgentInterface
+class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public IInteractionAgentInterface
 {
 	GENERATED_BODY()
 	

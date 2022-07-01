@@ -11,7 +11,7 @@
 
 class ACharacterBase;
 class UVoxel;
-class APickUp;
+class AAbilityPickUpBase;
 class AAbilityVitalityBase;
 class UVoxelMeshComponent;
 
@@ -19,7 +19,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AActor, public IObjectPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public IObjectPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -81,7 +81,7 @@ protected:
 	TArray<AVoxelChunk*> Neighbors;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<APickUp*> PickUps;
+	TArray<AAbilityPickUpBase*> PickUps;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	FIndex Index;
@@ -201,14 +201,14 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	APickUp* SpawnPickUp(FAbilityItem InItem, FVector InLocation);
+	AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation);
 
-	APickUp* SpawnPickUp(FPickUpSaveData InPickUpData);
+	AAbilityPickUpBase* SpawnPickUp(FPickUpSaveData InPickUpData);
 
-	void AttachPickUp(APickUp* InPickUp);
+	void AttachPickUp(AAbilityPickUpBase* InPickUp);
 
-	void DetachPickUp(APickUp* InPickUp);
+	void DetachPickUp(AAbilityPickUpBase* InPickUp);
 
-	void DestroyPickUp(APickUp* InPickUp);
+	void DestroyPickUp(AAbilityPickUpBase* InPickUp);
 };
 

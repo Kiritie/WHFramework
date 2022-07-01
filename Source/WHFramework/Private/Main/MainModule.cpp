@@ -13,6 +13,7 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Input/InputModule.h"
 #include "LatentAction/LatentActionModule.h"
 #include "Media/MediaModule.h"

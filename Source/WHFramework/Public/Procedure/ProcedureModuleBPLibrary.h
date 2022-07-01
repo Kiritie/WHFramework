@@ -47,11 +47,11 @@ public:
 	static UProcedureBase* GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass);
 	
 	template<class T>
-	static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
+	static bool HasProcedureByClass()
 	{
 		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
 		{
-			return ProcedureModule->HasProcedureByClass<T>(InProcedureClass);
+			return ProcedureModule->HasProcedureByClass<T>(T::StaticClass());
 		}
 		return nullptr;
 	}
@@ -69,14 +69,17 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InProcedureClass"))
 	static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
-	
+			
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
+	static bool IsCurrentProcedure(UProcedureBase* InProcedure);
+
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static bool IsCurrentProcedureIndex(int32 InProcedureIndex);
 
 	template<class T>
-	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
+	static bool IsCurrentProcedureClass()
 	{
-		return IsCurrentProcedureClass(InProcedureClass);
+		return IsCurrentProcedureClass(T::StaticClass());
 	}
 
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")

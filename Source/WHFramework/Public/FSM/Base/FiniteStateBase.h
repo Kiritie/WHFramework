@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Global/Base/WHObject.h"
 
 #include "FiniteStateBase.generated.h"
 
@@ -12,7 +13,7 @@ class UFSMComponent;
  * 状态基类
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API UFiniteStateBase : public UObject
+class WHFRAMEWORK_API UFiniteStateBase : public UWHObject
 {
 	GENERATED_BODY()
 
@@ -20,23 +21,12 @@ public:
 	UFiniteStateBase();
 
 public:
-	/// 状态名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FName StateName;
-	/// 状态索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	int32 StateIndex;
-	/// 状态机组件
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UFSMComponent* FSMComponent;
-
-public:
 	/**
 	 * 状态初始化
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	void K2_OnInitialize(UFSMComponent* InFSMComponent);
-	virtual void OnInitialize(UFSMComponent* InFSMComponent);
+	void K2_OnInitialize();
+	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex);
 	/**
 	 * 状态进入
 	 * @param InLastFiniteState 上一个状态
@@ -60,19 +50,48 @@ public:
 	/**
 	 * 状态终止
 	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTerminate")
-	void K2_OnTerminate();
-	virtual void OnTerminate();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
+	void K2_OnTermination();
+	virtual void OnTermination();
 
 public:
+	/**
+	* 终止状态
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Terminate();
 	/**
 	* 切换到上一个状态
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SwitchLastState();
+	void SwitchLast();
 	/**
 	* 切换到下一个状态
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SwitchNextState();
+	void SwitchNext();
+	/**
+	* 是否是当前状态
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentState();
+
+protected:
+	/// 状态名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName StateName;
+	/// 状态索引
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 StateIndex;
+	/// 状态机组件
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UFSMComponent* FSM;
+public:
+	FName GetStateName() const { return StateName; }
+	
+	int32 GetStateIndex() const { return StateIndex; }
+	
+	void SetStateIndex(int32 InStateIndex) { this->StateIndex = InStateIndex; }
+	
+	UFSMComponent* GetFSM() const { return FSM; }
 };

@@ -54,6 +54,15 @@ UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProc
 	return nullptr;
 }
 
+bool UProcedureModuleBPLibrary::IsCurrentProcedure(UProcedureBase* InProcedure)
+{
+	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	{
+		return ProcedureModule->IsCurrentProcedure(InProcedure);
+	}
+	return false;
+}
+
 bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InProcedureIndex)
 {
 	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())

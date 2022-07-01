@@ -7,6 +7,7 @@
 #include "Procedure/ProcedureModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalTypes.h"
+#include "Global/Base/WHObject.h"
 #include "Math/MathTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 
@@ -17,7 +18,7 @@ class ACameraPawnBase;
  * 流程基类
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API UProcedureBase : public UObject
+class WHFRAMEWORK_API UProcedureBase : public UWHObject
 {
 	GENERATED_BODY()
 
@@ -92,12 +93,17 @@ public:
 	* 切换到上一个流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SwitchLastProcedure();
+	void SwitchLast();
 	/**
 	* 切换到下一个流程
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SwitchNextProcedure();
+	void SwitchNext();
+	/**
+	* 是否是当前流程
+	*/
+	UFUNCTION(BlueprintCallable)
+	bool IsCurrent();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description

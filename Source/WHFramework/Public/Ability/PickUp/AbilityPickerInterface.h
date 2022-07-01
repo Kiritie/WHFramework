@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "PickerInterface.generated.h"
+#include "AbilityPickerInterface.generated.h"
 
-class APickUp;
+class AAbilityPickUpBase;
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UPickerInterface : public UInterface
+class UAbilityPickerInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -17,10 +17,10 @@ class UPickerInterface : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IPickerInterface
+class WHFRAMEWORK_API IAbilityPickerInterface
 {
 	GENERATED_BODY()
 
 public:
-	virtual void PickUp(APickUp* InPickUp) = 0;
+	virtual void PickUp(AAbilityPickUpBase* InPickUp) = 0;
 };

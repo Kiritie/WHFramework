@@ -4,6 +4,7 @@
 #include "Voxel/VoxelModule.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -17,7 +18,6 @@
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
-#include "Scene/Actor/PickUp/PickUpVoxel.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
@@ -265,12 +265,10 @@ void AVoxelModule::GeneratePreviews()
 		{
 			if (tmpIndex >= VoxelDatas.Num()) break;
 	
-			FActorSpawnParameters SpawnParams = FActorSpawnParameters();
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			auto PickUpItem = GetWorld()->SpawnActor<APickUpVoxel>(SpawnParams);
+			auto PickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
 			if (PickUpItem != nullptr)
 			{
-				PickUpItem->Initialize(FAbilityItem(VoxelDatas[tmpIndex]->GetPrimaryAssetId(), 1), true);
+				PickUpItem->Initialize(FAbilityItem(VoxelDatas[tmpIndex]->GetPrimaryAssetId()));
 				PickUpItem->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 				PickUpItem->SetActorLocation(FVector(x * GetWorldData()->BlockSize * 0.5f, y * GetWorldData()->BlockSize * 0.5f, 0));
 				PickUpItem->SetActorRotation(FRotator(-70, 0, -180));

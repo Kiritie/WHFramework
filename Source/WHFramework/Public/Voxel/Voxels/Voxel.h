@@ -5,6 +5,7 @@
 #include "Input/InputModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
+#include "Global/Base/WHObject.h"
 
 #include "Voxel.generated.h"
 
@@ -17,7 +18,7 @@ class UVoxelData;
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UObject, public IObjectPoolInterface
+class WHFRAMEWORK_API UVoxel : public UWHObject, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 

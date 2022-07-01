@@ -8,9 +8,9 @@
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 
-#include "PickUp.generated.h"
+#include "AbilityPickUpBase.generated.h"
 
-class IPickerInterface;
+class IAbilityPickerInterface;
 class AVoxelChunk;
 class UBoxComponent;
 class UMeshComponent;
@@ -20,13 +20,13 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class WHFRAMEWORK_API APickUp : public AActor, public IObjectPoolInterface, public ISceneActorInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public IObjectPoolInterface, public ISceneActorInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	APickUp();
+	AAbilityPickUpBase();
 
 protected:
 	UPROPERTY(BlueprintReadWrite)
@@ -52,20 +52,18 @@ protected:
 	UFUNCTION()
 	virtual void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	virtual void OnPickUp(IPickerInterface* InPicker);
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
 
 public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams);
 
 	virtual void OnDespawn_Implementation();
 
-	virtual void Tick(float DeltaTime) override;
-
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData() override;
 
-	virtual void Initialize(FAbilityItem InItem, bool bPreview = false);
+	virtual void Initialize(FAbilityItem InItem);
 
 	virtual void RemoveFromContainer_Implementation() override;
 

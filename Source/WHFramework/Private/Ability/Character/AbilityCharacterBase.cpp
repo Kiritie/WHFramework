@@ -215,6 +215,10 @@ void AAbilityCharacterBase::UnJump()
 	Super::StopJumping();
 }
 
+void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)
+{
+}
+
 void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }

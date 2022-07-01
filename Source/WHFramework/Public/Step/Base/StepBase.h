@@ -7,6 +7,7 @@
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalTypes.h"
+#include "Global/Base/WHObject.h"
 #include "Math/MathTypes.h"
 
 #include "StepBase.generated.h"
@@ -17,7 +18,7 @@ class URootStepBase;
  * 步骤基类
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API UStepBase : public UObject
+class WHFRAMEWORK_API UStepBase : public UWHObject
 {
 	GENERATED_BODY()
 

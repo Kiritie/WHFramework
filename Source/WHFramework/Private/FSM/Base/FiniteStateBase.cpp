@@ -12,23 +12,23 @@ UFiniteStateBase::UFiniteStateBase()
 {
 	StateName = FName("FiniteStateBase");
 	StateIndex = 0;
-	FSMComponent = nullptr;
+	FSM = nullptr;
 }
 
-void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent)
+void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
-	FSMComponent = InFSMComponent;
-	K2_OnInitialize(InFSMComponent);
+	FSM = InFSMComponent;
+	StateIndex = InStateIndex;
+	K2_OnInitialize();
 }
 
 void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("进入状态: %s"), *StateName.ToString());
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("进入状态: %s"), *StateName.ToString()));
+	WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *FSM->GetAgent()->GetActorLabel(), *StateName.ToString());
 
 	K2_OnEnter(InLastFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this), FParameter::MakeObject(FSMComponent)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this), FParameter::MakeObject(FSM)});
 }
 
 void UFiniteStateBase::OnRefresh()
@@ -38,31 +38,34 @@ void UFiniteStateBase::OnRefresh()
 
 void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("离开状态: %s"), *StateName.ToString());
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("离开状态: %s"), *StateName.ToString()));
+	WHLog(WH_FSM, Log, TEXT("%s=>离开状态: %s"), *FSM->GetAgent()->GetActorLabel(), *StateName.ToString());
 
 	K2_OnLeave(InNextFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this), FParameter::MakeObject(FSMComponent)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this), FParameter::MakeObject(FSM)});
 }
 
-void UFiniteStateBase::OnTerminate()
+void UFiniteStateBase::OnTermination()
 {
-	K2_OnTerminate();
+	K2_OnTermination();
 }
 
-void UFiniteStateBase::SwitchLastState()
+void UFiniteStateBase::Terminate()
 {
-	if(FSMComponent)
-	{
-		FSMComponent->SwitchLastState();
-	}
+	FSM->TerminateState(this);
 }
 
-void UFiniteStateBase::SwitchNextState()
+void UFiniteStateBase::SwitchLast()
 {
-	if(FSMComponent)
-	{
-		FSMComponent->SwitchNextState();
-	}
+	FSM->SwitchLastState();
+}
+
+void UFiniteStateBase::SwitchNext()
+{
+	FSM->SwitchNextState();
+}
+
+bool UFiniteStateBase::IsCurrentState()
+{
+	return FSM->IsCurrentState(this);
 }

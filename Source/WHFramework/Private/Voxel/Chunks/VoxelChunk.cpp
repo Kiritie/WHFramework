@@ -4,15 +4,13 @@
 #include "Voxel/Chunks/VoxelChunk.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/PickUp/AbilityPickUpBase.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Math/MathBPLibrary.h"
-#include "Scene/Actor/PickUp/PickUp.h"
-#include "Scene/Actor/PickUp/PickUpEquip.h"
-#include "Scene/Actor/PickUp/PickUpProp.h"
-#include "Scene/Actor/PickUp/PickUpVoxel.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -39,7 +37,7 @@ AVoxelChunk::AVoxelChunk()
 	VoxelMap = TMap<FIndex, FVoxelItem>();
 	Neighbors = TArray<AVoxelChunk*>();
 	Neighbors.SetNumZeroed(6);
-	PickUps = TArray<APickUp*>();
+	PickUps = TArray<AAbilityPickUpBase*>();
 }
 
 // Called when the game starts or when spawned
@@ -1010,7 +1008,7 @@ void AVoxelChunk::DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary)
 
 void AVoxelChunk::AddSceneActor(AActor* InActor)
 {
-	if(APickUp* PickUp = Cast<APickUp>(InActor))
+	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
 		AttachPickUp(PickUp);
 	}
@@ -1018,7 +1016,7 @@ void AVoxelChunk::AddSceneActor(AActor* InActor)
 
 void AVoxelChunk::RemoveSceneActor(AActor* InActor)
 {
-	if(APickUp* PickUp = Cast<APickUp>(InActor))
+	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
 		DetachPickUp(PickUp);
 	}
@@ -1026,46 +1024,46 @@ void AVoxelChunk::RemoveSceneActor(AActor* InActor)
 
 void AVoxelChunk::DestroySceneActor(AActor* InActor)
 {
-	if(APickUp* PickUp = Cast<APickUp>(InActor))
+	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
 		DestroyPickUp(PickUp);
 	}
 }
 
-APickUp* AVoxelChunk::SpawnPickUp(FAbilityItem InItem, FVector InLocation)
+AAbilityPickUpBase* AVoxelChunk::SpawnPickUp(FAbilityItem InItem, FVector InLocation)
 {
 	if(InItem == FAbilityItem::Empty) return nullptr;
 
-	APickUp* pickUpItem = nullptr;
+	AAbilityPickUpBase* PickUp = nullptr;
 
 	if(InItem.GetData().EqualType(EAbilityItemType::Voxel))
 	{
-		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpVoxel>();
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
 	{
-		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpEquip>();
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
 	{
-		pickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<APickUpProp>();
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
 	}
 
-	if(pickUpItem)
+	if(PickUp)
 	{
-		AttachPickUp(pickUpItem);
-		pickUpItem->Initialize(InItem);
-		pickUpItem->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
+		AttachPickUp(PickUp);
+		PickUp->Initialize(InItem);
+		PickUp->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
 	}
-	return pickUpItem;
+	return PickUp;
 }
 
-APickUp* AVoxelChunk::SpawnPickUp(FPickUpSaveData InPickUpData)
+AAbilityPickUpBase* AVoxelChunk::SpawnPickUp(FPickUpSaveData InPickUpData)
 {
 	return SpawnPickUp(InPickUpData.Item, InPickUpData.Location);
 }
 
-void AVoxelChunk::AttachPickUp(APickUp* InPickUp)
+void AVoxelChunk::AttachPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(!InPickUp || !InPickUp->IsValidLowLevel() || PickUps.Contains(InPickUp)) return;
 
@@ -1074,7 +1072,7 @@ void AVoxelChunk::AttachPickUp(APickUp* InPickUp)
 	PickUps.Add(InPickUp);
 }
 
-void AVoxelChunk::DetachPickUp(APickUp* InPickUp)
+void AVoxelChunk::DetachPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(!InPickUp || !InPickUp->IsValidLowLevel() || !PickUps.Contains(InPickUp)) return;
 
@@ -1083,7 +1081,7 @@ void AVoxelChunk::DetachPickUp(APickUp* InPickUp)
 	PickUps.Remove(InPickUp);
 }
 
-void AVoxelChunk::DestroyPickUp(APickUp* InPickUp)
+void AVoxelChunk::DestroyPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(!InPickUp || !InPickUp->IsValidLowLevel()) return;
 

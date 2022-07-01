@@ -4,15 +4,20 @@
 #include "FSM/Components/FSMComponent.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "FSM/FSMModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 
 // ParamSets default values
 UFSMComponent::UFSMComponent()
 {
+	PrimaryComponentTick.bCanEverTick = false;
+	
 	States = TArray<TSubclassOf<UFiniteStateBase>>();
 
 	DefaultState = nullptr;
 	FinalState = nullptr;
 	CurrentState = nullptr;
+	GroupName = NAME_None;
 
 	StateMap = TMap<FName, UFiniteStateBase*>();
 }
@@ -21,33 +26,62 @@ void UFSMComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	OnInitialize();
+}
+
+void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	OnTermination();
+}
+
+void UFSMComponent::OnInitialize()
+{
+	UFSMModuleBPLibrary::RegisterFSM(this);
+	
 	for(auto Iter : States)
 	{
 		if(Iter)
 		{
-			const FName StateName = Iter->GetDefaultObject<UFiniteStateBase>()->StateName;
+			const FName StateName = Iter->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 			if(!StateMap.Contains(StateName))
 			{
-				if(UFiniteStateBase* FiniteState = NewObject<UFiniteStateBase>(this, Iter))
+				if(UFiniteStateBase* FiniteState = UObjectPoolModuleBPLibrary::SpawnObject<UFiniteStateBase>(nullptr, Iter))
 				{
-					FiniteState->OnInitialize(this);
+					FiniteState->OnInitialize(this, StateMap.Num());
 					StateMap.Add(StateName, FiniteState);
 				}
 			}
 		}
 	}
-
 	SwitchDefaultState();
 }
 
-void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UFSMComponent::OnRefresh()
 {
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
 	if(CurrentState)
 	{
 		CurrentState->OnRefresh();
 	}
+}
+
+void UFSMComponent::OnTermination()
+{
+	UFSMModuleBPLibrary::UnregisterFSM(this);
+	
+	for(auto Iter : StateMap)
+	{
+		if(Iter.Value)
+		{
+			Iter.Value->OnTermination();
+			UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
+		}
+	}
+	
+	StateMap.Empty();
+
+	CurrentState = nullptr;
 }
 
 void UFSMComponent::SwitchState(UFiniteStateBase* InState)
@@ -72,8 +106,7 @@ void UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	}
 	else
 	{
-		WHLog(WH_FSM, Warning, TEXT("切换状态失败，不存在指定索引的状态: %d"), InStateIndex);
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换状态失败，不存在指定索引的状态: %d"), InStateIndex));
+		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex);
 	}
 }
 
@@ -85,8 +118,7 @@ void UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	}
 	else
 	{
-		WHLog(WH_FSM, Warning, TEXT("切换状态失败，不存在指定类型的状态: %s"), InStateClass ? *InStateClass->GetName() : TEXT("None"));
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("切换状态失败，不存在指定类型的状态: %s"), InStateClass ? *InStateClass->GetName() : TEXT("None")));
+		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None"));
 	}
 }
 
@@ -108,35 +140,35 @@ void UFSMComponent::SwitchFinalState()
 
 void UFSMComponent::SwitchLastState()
 {
-	if(CurrentState && CurrentState->StateIndex > 0)
+	if(CurrentState && CurrentState->GetStateIndex() > 0)
 	{
-		SwitchStateByIndex(CurrentState->StateIndex - 1);
+		SwitchStateByIndex(CurrentState->GetStateIndex() - 1);
 	}
 }
 
 void UFSMComponent::SwitchNextState()
 {
-	if(CurrentState && CurrentState->StateIndex < States.Num() - 1)
+	if(CurrentState && CurrentState->GetStateIndex() < StateMap.Num() - 1)
 	{
-		SwitchStateByIndex(CurrentState->StateIndex + 1);
+		SwitchStateByIndex(CurrentState->GetStateIndex() + 1);
 	}
 }
 
-void UFSMComponent::ClearAllState()
+void UFSMComponent::TerminateState(UFiniteStateBase* InState)
 {
-	for(auto Iter : States)
-	{
-		if(Iter)
-		{
-			Iter->ConditionalBeginDestroy();
-		}
-	}
+	if(InState == CurrentState) CurrentState = nullptr;
 	
-	States.Empty();
-
-	CurrentState = nullptr;
-
-	Modify();
+	if(StateMap.Contains(InState->GetStateName()))
+	{
+		StateMap.Remove(InState->GetStateName());
+		InState->OnTermination();
+		UObjectPoolModuleBPLibrary::DespawnObject(InState);
+	}
+	const auto TempStates = GetStates();
+	for(int32 i = 0; i < TempStates.Num(); i++)
+	{
+		TempStates[i]->SetStateIndex(i);
+	}
 }
 
 bool UFSMComponent::HasStateByIndex(int32 InStateIndex) const
@@ -159,7 +191,12 @@ UFiniteStateBase* UFSMComponent::GetStateByClass(TSubclassOf<UFiniteStateBase> I
 	return GetStateByClass<UFiniteStateBase>(InStateClass);
 }
 
+bool UFSMComponent::IsCurrentState(UFiniteStateBase* InState) const
+{
+	return InState == CurrentState;
+}
+
 bool UFSMComponent::IsCurrentStateIndex(int32 InStateIndex) const
 {
-	return CurrentState && CurrentState->StateIndex == InStateIndex;
+	return CurrentState && CurrentState->GetStateIndex() == InStateIndex;
 }

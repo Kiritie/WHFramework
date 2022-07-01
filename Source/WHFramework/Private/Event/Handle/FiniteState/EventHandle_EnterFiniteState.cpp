@@ -6,23 +6,23 @@
 UEventHandle_EnterFiniteState::UEventHandle_EnterFiniteState()
 {
 	EventType = EEventType::Multicast;
-	FiniteState = nullptr;
+	State = nullptr;
 }
 
 void UEventHandle_EnterFiniteState::OnDespawn_Implementation()
 {
-	FiniteState = nullptr;
-	FSMComponent = nullptr;
+	State = nullptr;
+	FSM = nullptr;
 }
 
 void UEventHandle_EnterFiniteState::Fill_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		FiniteState = InParams[0].GetObjectValue<UFiniteStateBase>();
+		State = InParams[0].GetObjectValue<UFiniteStateBase>();
 	}
 	if(InParams.IsValidIndex(0))
 	{
-		FSMComponent = InParams[0].GetObjectValue<UFSMComponent>();
+		FSM = InParams[0].GetObjectValue<UFSMComponent>();
 	}
 }

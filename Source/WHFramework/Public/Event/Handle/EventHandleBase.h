@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Event/EventModuleTypes.h"
+#include "Global/Base/WHObject.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Parameter/ParameterModuleTypes.h"
 
@@ -14,7 +15,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API UEventHandleBase : public UObject, public IObjectPoolInterface
+class WHFRAMEWORK_API UEventHandleBase : public UWHObject, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	

@@ -14,6 +14,7 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_BeginPlay.h"
 #include "Event/Handle/Global/EventHandle_EndPlay.h"
+#include "FSM/AssetTypeActions_FiniteStateBlueprint.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Procedure/AssetTypeActions_ProcedureBlueprint.h"
@@ -97,6 +98,9 @@ void FWHFrameworkEditorModule::StartupModule()
 	TSharedRef<IAssetTypeActions> SBAction = MakeShareable(new FAssetTypeActions_StepBlueprint(AssetCategory));
 	RegisterAssetTypeAction(AssetTools, SBAction);
 
+	TSharedRef<IAssetTypeActions> FSAction = MakeShareable(new FAssetTypeActions_FiniteStateBlueprint(AssetCategory));
+	RegisterAssetTypeAction(AssetTools, FSAction);
+
 	// Register the details customizer
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
 
@@ -164,7 +168,7 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	
 		PropertyModule.UnregisterCustomClassLayout(TEXT("StepBase"));
 		PropertyModule.UnregisterCustomClassLayout(TEXT("StepModule"));
-	
+
 		PropertyModule.NotifyCustomizationModuleChanged();
 	}
 

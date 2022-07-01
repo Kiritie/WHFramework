@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "FSM/Base/FiniteStateBase.h"
+#include "FSM/Base/FSMAgentInterface.h"
 
 #include "FSMComponent.generated.h"
 
@@ -24,8 +25,19 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// FSM
 public:
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	UFUNCTION(BlueprintCallable)
+	void OnInitialize();
+
+	UFUNCTION(BlueprintCallable)
+	void OnRefresh();
+
+	UFUNCTION(BlueprintCallable)
+	void OnTermination();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// State
@@ -37,10 +49,7 @@ public:
 	void SwitchStateByIndex(int32 InStateIndex);
 
 	template<class T>
-	void SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass())
-	{
-		SwitchStateByClass(InStateClass);
-	}
+	void SwitchStateByClass() { SwitchStateByClass(T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass);
@@ -58,22 +67,26 @@ public:
 	void SwitchNextState();
 
 	UFUNCTION(BlueprintCallable)
-	void ClearAllState();
+	void TerminateState(UFiniteStateBase* InState);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// State Stats
-protected:
+	/// Stats
+public:
 	/// 状态列表
-	UPROPERTY(VisibleAnywhere, Category = "State Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TArray<TSubclassOf<UFiniteStateBase>> States;
 	/// 初始状态
-	UPROPERTY(VisibleAnywhere, Category = "State Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TSubclassOf<UFiniteStateBase> DefaultState;
 	/// 最终状态
-	UPROPERTY(VisibleAnywhere, Category = "State Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TSubclassOf<UFiniteStateBase> FinalState;
+	/// 状态组
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	FName GroupName;
+protected:
 	/// 当前状态
-	UPROPERTY(VisibleAnywhere, Transient, Category = "State Stats")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Stats")
 	UFiniteStateBase* CurrentState;
 	UPROPERTY()
 	TMap<FName, UFiniteStateBase*> StateMap;
@@ -85,8 +98,6 @@ public:
 	template<class T>
 	T* GetStateByIndex(int32 InStateIndex) const
 	{
-		if(!InStateIndex) return nullptr;
-
 		if(HasStateByIndex(InStateIndex))
 		{
 			return Cast<T>(GetStates()[InStateIndex]);
@@ -102,7 +113,7 @@ public:
 	{
 		if(!InStateClass) return false;
 
-		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->StateName;
+		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 		return StateMap.Contains(StateName);
 	}
 	
@@ -116,7 +127,7 @@ public:
 
 		if(HasStateByClass<T>(InStateClass))
 		{
-			const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->StateName;
+			const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 			return Cast<T>(StateMap[StateName]);
 		}
 		return nullptr;
@@ -124,7 +135,10 @@ public:
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateClass"))
 	UFiniteStateBase* GetStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const;
-	
+		
+	UFUNCTION(BlueprintPure)
+	bool IsCurrentState(UFiniteStateBase* InState) const;
+
 	UFUNCTION(BlueprintPure)
 	bool IsCurrentStateIndex(int32 InStateIndex) const;
 
@@ -139,10 +153,9 @@ public:
 	{
 		if(!InStateClass) return false;
 
-		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->StateName;
-		return CurrentState && CurrentState->StateName == StateName;
+		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
+		return CurrentState && CurrentState->GetStateName() == StateName;
 	}
-
 	/**
 	* 获取当前状态
 	*/
@@ -159,11 +172,20 @@ public:
 	UFUNCTION(BlueprintPure)
 	TArray<UFiniteStateBase*>& GetStates() const
 	{
-		TArray<UFiniteStateBase*> TempStates;
+		static TArray<UFiniteStateBase*> TempStates;
 		StateMap.GenerateValueArray(TempStates);
 		return TempStates;
 	}
 	
 	UFUNCTION(BlueprintPure)
 	TMap<FName, UFiniteStateBase*>& GetStateMap() { return StateMap; }
+
+	template<class T>
+	T* GetAgent() const
+	{
+		return Cast<T>(GetOwner());
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
+	AActor* GetAgent(TSubclassOf<AActor> InAgentClass = nullptr) const { return GetOwner(); }
 };
