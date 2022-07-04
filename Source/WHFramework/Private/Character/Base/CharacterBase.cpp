@@ -15,6 +15,9 @@
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Tasks/AITask_MoveTo.h"
+#include "Voxel/VoxelModule.h"
+#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Datas/VoxelData.h"
 
 ACharacterBase::ACharacterBase()
 {
@@ -23,6 +26,8 @@ ACharacterBase::ACharacterBase()
 	Name = NAME_None;
 	Anim = nullptr;
 	DefaultController = nullptr;
+
+	OwnerChunk = nullptr;
 }
 
 void ACharacterBase::BeginPlay()
@@ -47,6 +52,77 @@ void ACharacterBase::SpawnDefaultController()
 	Super::SpawnDefaultController();
 
 	DefaultController = Controller;
+}
+
+bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem)
+{
+	bool bSuccess = false;
+	AVoxelChunk* chunk = InVoxelItem.Owner;
+	const FIndex index = InVoxelItem.Index;
+	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
+
+	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelItem)
+	{
+		FHitResult HitResult;
+		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		{
+			if(voxelItem.IsValid())
+			{
+				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
+			}
+			else
+			{
+				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
+			}
+		}
+	}
+	return bSuccess;
+}
+
+bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult)
+{
+	bool bSuccess = false;
+	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
+	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::GetWorldData()->GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
+
+	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)
+	{
+		FHitResult HitResult;
+		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		{
+			if(voxelItem.IsValid())
+			{
+				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
+			}
+			else
+			{
+				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
+			}
+		}
+	}
+	return bSuccess;
+}
+
+bool ACharacterBase::DestroyVoxel(FVoxelItem& InVoxelItem)
+{
+	if (InVoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
+	{
+		return InVoxelItem.Owner->DestroyVoxel(InVoxelItem);
+	}
+	return false;
+}
+
+bool ACharacterBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	AVoxelChunk* Chunk = InVoxelHitResult.GetOwner();
+	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
+
+	if (VoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
+	{
+		return Chunk->DestroyVoxel(VoxelItem);
+	}
+	return false;
 }
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)

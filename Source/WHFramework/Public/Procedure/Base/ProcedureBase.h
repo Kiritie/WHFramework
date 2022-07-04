@@ -119,7 +119,7 @@ public:
 	FText ProcedureDescription;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Index/State/Guide
+	/// Index/Type/Guide
 public:
 	/// 是否为开始流程
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")

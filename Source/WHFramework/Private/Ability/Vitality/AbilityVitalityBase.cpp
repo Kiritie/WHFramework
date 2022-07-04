@@ -1,5 +1,4 @@
-﻿	// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
 
@@ -8,13 +7,19 @@
 #include "Ability/Components/VitalityInteractionComponent.h"
 #include "Ability/Abilities/VitalityAbilityBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Death.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
-	#include "Global/GlobalBPLibrary.h"
-	#include "Kismet/GameplayStatics.h"
+#include "FSM/Components/FSMComponent.h"
+#include "Global/GlobalBPLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Scene/SceneModuleBPLibrary.h"
+#include "Voxel/VoxelModule.h"
+#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Datas/VoxelData.h"
 
-	// Sets default values
+// Sets default values
 AAbilityVitalityBase::AAbilityVitalityBase()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -35,10 +40,12 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
-	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
-	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
-
+	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
+	FSM->GroupName = FName("Vitality");
+	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
+	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
+	
 	// stats
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
@@ -47,6 +54,8 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	EXP = 50;
 	BaseEXP = 100;
 	EXPFactor = 2.f;
+
+	OwnerChunk = nullptr;
 }
 
 // Called when the game starts or when spawned
@@ -124,21 +133,20 @@ FSaveData* AAbilityVitalityBase::ToData()
 
 void AAbilityVitalityBase::ResetData()
 {
-	AbilitySystem->RemoveLooseGameplayTag(DeadTag);
-	AbilitySystem->RemoveLooseGameplayTag(DyingTag);
+	
 }
 
 void AAbilityVitalityBase::Death(AActor* InKiller /*= nullptr*/)
 {
 	if (!IsDead())
 	{
-		AbilitySystem->AddLooseGameplayTag(DeadTag);
 		if(IAbilityVitalityInterface* InVitality = Cast<IAbilityVitalityInterface>(InKiller))
 		{
 			InVitality->ModifyEXP(GetTotalEXP());
 		}
 		SetEXP(0);
 		SetHealth(0.f);
+		FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
 	}
 }
 
@@ -146,9 +154,9 @@ void AAbilityVitalityBase::Revive()
 {
 	if (IsDead())
 	{
-		AbilitySystem->RemoveLooseGameplayTag(DeadTag);
 		ResetData();
 		SetHealth(GetMaxHealth());
+		FSM->SwitchDefaultState();
 	}
 }
 
@@ -171,12 +179,12 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DeadTag) || bCheckDying && IsDying();
 }
 
 bool AAbilityVitalityBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(DyingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DyingTag);
 }
 
 void AAbilityVitalityBase::SetNameV(FName InName)
@@ -435,6 +443,77 @@ void AAbilityVitalityBase::ModifyEXP(float InDeltaValue)
 		}
 	}
 	SetEXP(TempEXP);
+}
+
+bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem)
+{
+	bool bSuccess = false;
+	AVoxelChunk* chunk = InVoxelItem.Owner;
+	const FIndex index = InVoxelItem.Index;
+	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
+
+	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelItem)
+	{
+		FHitResult HitResult;
+		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		{
+			if(voxelItem.IsValid())
+			{
+				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
+			}
+			else
+			{
+				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
+			}
+		}
+	}
+	return bSuccess;
+}
+
+bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult)
+{
+	bool bSuccess = false;
+	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
+	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::GetWorldData()->GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
+
+	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)
+	{
+		FHitResult HitResult;
+		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		{
+			if(voxelItem.IsValid())
+			{
+				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
+			}
+			else
+			{
+				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
+			}
+		}
+	}
+	return bSuccess;
+}
+
+bool AAbilityVitalityBase::DestroyVoxel(FVoxelItem& InVoxelItem)
+{
+	if (InVoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
+	{
+		return InVoxelItem.Owner->DestroyVoxel(InVoxelItem);
+	}
+	return false;
+}
+
+bool AAbilityVitalityBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	AVoxelChunk* Chunk = InVoxelHitResult.GetOwner();
+	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
+
+	if (VoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
+	{
+		return Chunk->DestroyVoxel(VoxelItem);
+	}
+	return false;
 }
 
 UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const

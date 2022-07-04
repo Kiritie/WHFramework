@@ -7,12 +7,16 @@
 #include "AbilityVitalityInterface.h"
 #include "AbilityVitalityDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
+#include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Voxel/VoxelModuleTypes.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
+class UFSMComponent;
 class UVitalityInteractionComponent;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
@@ -24,13 +28,29 @@ class UAttributeSetBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IObjectPoolInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
 	AAbilityVitalityBase();
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilitySystemComponentBase* AbilitySystem;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityAttributeSetBase* AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityInteractionComponent* Interaction;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UFSMComponent* FSM;
 
 protected:
 	// stats
@@ -54,24 +74,15 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 EXPFactor;
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UBoxComponent* BoxComponent;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilitySystemComponentBase* AbilitySystem;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityAttributeSetBase* AttributeSet;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	AVoxelChunk* OwnerChunk;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityInteractionComponent* Interaction;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	FVoxelItem GeneratingVoxelItem;
 
-protected:
-	FGameplayTag DeadTag;
-
-	FGameplayTag DyingTag;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	FVoxelItem SelectedVoxelItem;
 
 protected:
 	// Called when the game starts or when spawned
@@ -155,6 +166,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void ModifyEXP(float InDeltaValue) override;
 
+	UFUNCTION(BlueprintCallable)
+	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
+
+	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) override;
+
+	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+
 public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = false) const override;
@@ -223,6 +244,22 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual float GetMagicDamage() const override;
 
+	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+
+	UFUNCTION(BlueprintPure)
+	virtual AVoxelChunk* GetOwnerChunk() const override { return OwnerChunk; }
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) override { OwnerChunk = InOwnerChunk; }
+
+	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
+
+	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) override { GeneratingVoxelItem = InGeneratingVoxelItem; }
+
+	virtual FVoxelItem& GetSelectedVoxelItem() override { return SelectedVoxelItem; }
+
+	virtual void SetSelectedVoxelItem(FVoxelItem InSelectedVoxelItem) override { SelectedVoxelItem = InSelectedVoxelItem; }
+
 	template<class T>
 	T& GetVitalityData() const
 	{
@@ -244,6 +281,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

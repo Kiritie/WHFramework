@@ -8,11 +8,13 @@
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
+#include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "AbilityCharacterBase.generated.h"
 
+class UFSMComponent;
 class UCharacterInteractionComponent;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
@@ -29,7 +31,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -77,6 +79,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCharacterInteractionComponent* Interaction;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UFSMComponent* FSM;
 
 public:
 	UPROPERTY(BlueprintAssignable)
@@ -220,6 +225,8 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
+
+	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:
 	UFUNCTION(BlueprintPure)

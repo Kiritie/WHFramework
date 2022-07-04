@@ -180,8 +180,7 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 		{
 			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
 			{
-				FAbilityItem tmpItem = FAbilityItem(VoxelAgentPlayer->GetGeneratingVoxelItem(), 1);
-				return VoxelAgentPlayer->GenerateVoxel(InHitResult, tmpItem);
+				return VoxelAgentPlayer->GenerateVoxel(VoxelAgentPlayer->GetGeneratingVoxelItem(), InHitResult);
 			}
 			break;
 		}

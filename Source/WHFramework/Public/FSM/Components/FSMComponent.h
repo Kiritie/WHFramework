@@ -183,7 +183,7 @@ public:
 	template<class T>
 	T* GetAgent() const
 	{
-		return Cast<T>(GetOwner());
+		return Cast<T>(GetAgent());
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))

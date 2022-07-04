@@ -94,4 +94,13 @@ public:
 	void SetStateIndex(int32 InStateIndex) { this->StateIndex = InStateIndex; }
 	
 	UFSMComponent* GetFSM() const { return FSM; }
+
+	template<class T>
+	T* GetAgent() const
+	{
+		return Cast<T>(GetAgent());
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
+	AActor* GetAgent(TSubclassOf<AActor> InAgentClass = nullptr) const;
 };

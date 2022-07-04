@@ -19,6 +19,7 @@
 #include "Scene/Components/WorldTimerComponent.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -283,9 +284,9 @@ void AVoxelModule::GeneratePreviews()
 
 void AVoxelModule::GenerateTerrain()
 {
-	if(const APawn* PlayerPawn = UGlobalBPLibrary::GetPlayerPawn<APawn>())
+	if(IVoxelAgentInterface* VoxelAgent = UGlobalBPLibrary::GetPlayerPawn<IVoxelAgentInterface>())
 	{
-		const FIndex ChunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(PlayerPawn->GetActorLocation(), true);
+		const FIndex ChunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(VoxelAgent->GetWorldLocation(), true);
 
 		if(LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(ChunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
 		{

@@ -8,9 +8,12 @@
 #include "TimerManager.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
+#include "Ability/Character/States/AbilityCharacterState_Death.h"
+#include "Ability/Character/States/AbilityCharacterState_Default.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
+#include "FSM/Components/FSMComponent.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
@@ -36,6 +39,12 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 	Interaction->AddInteractionAction(EInteractAction::Revive);
 
+	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
+	FSM->GroupName = FName("Character");
+	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
+	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
 	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
@@ -50,10 +59,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	GetCharacterMovement()->JumpZVelocity = 420;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
-
-	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
-	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
 
 	// stats
 	Name = NAME_None;
@@ -193,6 +198,7 @@ void AAbilityCharacterBase::Death(AActor* InKiller /*= nullptr*/)
 		SetEXP(0);
 		SetHealth(0.f);
 		OnCharacterDead.Broadcast();
+		FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
 	}
 }
 
@@ -202,6 +208,7 @@ void AAbilityCharacterBase::Revive()
 	{
 		SetVisible(true);
 		SetHealth(GetMaxHealth());
+		FSM->SwitchDefaultState();
 	}
 }
 

@@ -9,6 +9,7 @@
 #include "Audio/AudioModuleTypes.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "CharacterBase.generated.h"
 
@@ -16,7 +17,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -36,7 +37,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "CharacterStats")
 	FName Name;
 public:
 	virtual FName GetNameC() const override { return Name; }
@@ -56,12 +57,51 @@ public:
 	virtual UCharacterAnim* GetAnim() const override { return Anim; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// DefaultController
+	/// Controller
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
 	AController* DefaultController;
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Chunk
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	AVoxelChunk* OwnerChunk;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FVoxelItem GeneratingVoxelItem;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FVoxelItem SelectedVoxelItem;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
+
+	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) override;
+
+	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	
+	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+	
+	UFUNCTION(BlueprintPure)
+	virtual AVoxelChunk* GetOwnerChunk() const override { return OwnerChunk; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) override { OwnerChunk = InOwnerChunk; }
+
+	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
+
+	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) override { GeneratingVoxelItem = InGeneratingVoxelItem; }
+
+	virtual FVoxelItem& GetSelectedVoxelItem() override { return SelectedVoxelItem; }
+
+	virtual void SetSelectedVoxelItem(FVoxelItem InSelectedVoxelItem) override { SelectedVoxelItem = InSelectedVoxelItem; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound

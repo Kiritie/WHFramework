@@ -164,10 +164,10 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TMap<FName, FParameter> Params;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Owner;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
 	static FVoxelItem EmptyVoxel;

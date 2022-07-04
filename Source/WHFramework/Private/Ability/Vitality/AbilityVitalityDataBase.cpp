@@ -12,4 +12,8 @@ UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 	BaseEXP = 100;
 	EXPFactor = 2.f;
 	Class = nullptr;
+
+	// tags
+	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
+	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
 }

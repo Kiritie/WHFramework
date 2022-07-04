@@ -24,7 +24,7 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InState
 
 void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *FSM->GetAgent()->GetActorLabel(), *StateName.ToString());
+	WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
 
 	K2_OnEnter(InLastFiniteState);
 
@@ -38,7 +38,7 @@ void UFiniteStateBase::OnRefresh()
 
 void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("%s=>离开状态: %s"), *FSM->GetAgent()->GetActorLabel(), *StateName.ToString());
+	WHLog(WH_FSM, Log, TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
 
 	K2_OnLeave(InNextFiniteState);
 
@@ -68,4 +68,9 @@ void UFiniteStateBase::SwitchNext()
 bool UFiniteStateBase::IsCurrentState()
 {
 	return FSM->IsCurrentState(this);
+}
+
+AActor* UFiniteStateBase::GetAgent(TSubclassOf<AActor> InAgentClass) const
+{
+	return FSM->GetAgent(InAgentClass);
 }
