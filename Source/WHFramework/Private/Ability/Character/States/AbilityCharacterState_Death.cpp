@@ -4,6 +4,8 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -13,16 +15,24 @@ UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
 	Super::OnInitialize(InFSMComponent, InStateIndex);
+
+}
+
+bool UAbilityCharacterState_Death::OnValidate()
+{
+	return Super::OnValidate();
 }
 
 void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
 
-	GetAgent<AAbilityCharacterBase>()->GetAbilitySystemComponent()
-	->AddLooseGameplayTag(GetAgent<AAbilityCharacterBase>()->GetCharacterData().DyingTag);
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	DeathStart();
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DyingTag);
+
+	Character->SetEXP(0);
+	Character->SetHealth(0.f);
 }
 
 void UAbilityCharacterState_Death::OnRefresh()
@@ -34,11 +44,10 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
 
-	GetAgent<AAbilityCharacterBase>()->GetAbilitySystemComponent()
-	->RemoveLooseGameplayTag(GetAgent<AAbilityCharacterBase>()->GetCharacterData().DyingTag);
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	GetAgent<AAbilityCharacterBase>()->GetAbilitySystemComponent()
-	->RemoveLooseGameplayTag(GetAgent<AAbilityCharacterBase>()->GetCharacterData().DeadTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DeadTag);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -53,9 +62,13 @@ void UAbilityCharacterState_Death::DeathStart()
 
 void UAbilityCharacterState_Death::DeathEnd()
 {
-	GetAgent<AAbilityCharacterBase>()->GetAbilitySystemComponent()
-	->RemoveLooseGameplayTag(GetAgent<AAbilityCharacterBase>()->GetCharacterData().DyingTag);
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	GetAgent<AAbilityCharacterBase>()->GetAbilitySystemComponent()
-	->AddLooseGameplayTag(GetAgent<AAbilityCharacterBase>()->GetCharacterData().DeadTag);
+	Character->SetVisible(false);
+	Character->GetCharacterMovement()->SetActive(false);
+	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
+	
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DeadTag);
 }

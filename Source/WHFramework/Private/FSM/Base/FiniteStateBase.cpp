@@ -22,6 +22,11 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InState
 	K2_OnInitialize();
 }
 
+bool UFiniteStateBase::OnValidate()
+{
+	return true;
+}
+
 void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
@@ -53,6 +58,11 @@ void UFiniteStateBase::OnTermination()
 void UFiniteStateBase::Terminate()
 {
 	FSM->TerminateState(this);
+}
+
+void UFiniteStateBase::Switch(UFiniteStateBase* InFiniteState)
+{
+	FSM->SwitchState(InFiniteState);
 }
 
 void UFiniteStateBase::SwitchLast()

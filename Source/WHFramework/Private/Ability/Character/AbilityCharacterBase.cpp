@@ -10,6 +10,9 @@
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
+#include "Ability/Character/States/AbilityCharacterState_Fall.h"
+#include "Ability/Character/States/AbilityCharacterState_Jump.h"
+#include "Ability/Character/States/AbilityCharacterState_Walk.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
@@ -127,6 +130,26 @@ void AAbilityCharacterBase::BindASCInput()
 	}
 }
 
+void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+{
+	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
+
+	switch (GetCharacterMovement()->MovementMode)
+	{
+		case EMovementMode::MOVE_Walking:
+		{
+			FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+			break;
+		}
+		case EMovementMode::MOVE_Falling:
+		{
+			FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
+			break;
+		}
+		default: break;
+	}
+}
+
 // Called every frame
 void AAbilityCharacterBase::Tick(float DeltaTime)
 {
@@ -180,9 +203,6 @@ FSaveData* AAbilityCharacterBase::ToData()
 
 void AAbilityCharacterBase::ResetData()
 {
-	AbilitySystem->RemoveLooseGameplayTag(DeadTag);
-	AbilitySystem->RemoveLooseGameplayTag(DyingTag);
-
 	// stats
 	SetMotionRate(1, 1);
 }
@@ -195,9 +215,6 @@ void AAbilityCharacterBase::Death(AActor* InKiller /*= nullptr*/)
 		{
 			InVitality->ModifyEXP(GetTotalEXP());
 		}
-		SetEXP(0);
-		SetHealth(0.f);
-		OnCharacterDead.Broadcast();
 		FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
 	}
 }
@@ -206,20 +223,13 @@ void AAbilityCharacterBase::Revive()
 {
 	if (IsDead())
 	{
-		SetVisible(true);
-		SetHealth(GetMaxHealth());
 		FSM->SwitchDefaultState();
 	}
 }
 
-void AAbilityCharacterBase::Jump()
+void AAbilityCharacterBase::StartJump()
 {
-	Super::Jump();
-}
-
-void AAbilityCharacterBase::UnJump()
-{
-	Super::StopJumping();
+	FSM->SwitchStateByClass<UAbilityCharacterState_Jump>();
 }
 
 void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)

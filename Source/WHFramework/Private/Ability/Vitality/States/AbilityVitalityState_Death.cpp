@@ -15,12 +15,21 @@ void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSMComponent, in
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
+bool UAbilityVitalityState_Death::OnValidate()
+{
+	return Super::OnValidate();
+}
+
 void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
 
-	GetAgent<AAbilityVitalityBase>()->GetAbilitySystemComponent()
-	->AddLooseGameplayTag(GetAgent<AAbilityVitalityBase>()->GetVitalityData().DeadTag);
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
+
+	Vitality->SetEXP(0);
+	Vitality->SetHealth(0.f);
 }
 
 void UAbilityVitalityState_Death::OnRefresh()
@@ -32,11 +41,27 @@ void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
 
-	GetAgent<AAbilityVitalityBase>()->GetAbilitySystemComponent()
-	->RemoveLooseGameplayTag(GetAgent<AAbilityVitalityBase>()->GetVitalityData().DeadTag);
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DeadTag);
 }
 
 void UAbilityVitalityState_Death::OnTermination()
 {
 	Super::OnTermination();
+}
+
+void UAbilityVitalityState_Death::DeathStart()
+{
+	DeathEnd();
+}
+
+void UAbilityVitalityState_Death::DeathEnd()
+{
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+	
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
+	
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(Vitality->GetVitalityData().DeadTag);
 }

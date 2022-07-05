@@ -3,20 +3,20 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FSM/Base/FiniteStateBase.h"
 #include "UObject/Object.h"
-#include "AbilityVitalityStateBase.generated.h"
+#include "Ability/Character/States/AbilityCharacterStateBase.h"
+#include "AbilityCharacterState_Jump.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAbilityVitalityStateBase : public UFiniteStateBase
+class WHFRAMEWORK_API UAbilityCharacterState_Jump : public UAbilityCharacterStateBase
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityVitalityStateBase();
+	UAbilityCharacterState_Jump();
 
 public:
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex) override;
@@ -30,4 +30,10 @@ public:
 	virtual void OnLeave(UFiniteStateBase* InNextFiniteState) override;
 
 	virtual void OnTermination() override;
+
+protected:
+	UPROPERTY()
+	UFiniteStateBase* LastFiniteState;
+
+	float WaitTime;
 };

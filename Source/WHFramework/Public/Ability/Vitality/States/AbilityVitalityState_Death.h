@@ -21,6 +21,8 @@ public:
 public:
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex) override;
 
+	virtual bool OnValidate() override;
+
 	virtual void OnEnter(UFiniteStateBase* InLastFiniteState) override;
 	
 	virtual void OnRefresh() override;
@@ -31,8 +33,8 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void DeathStart() override;
+	virtual void DeathStart();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DeathEnd() override;
+	virtual void DeathEnd();
 };

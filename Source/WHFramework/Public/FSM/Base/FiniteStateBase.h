@@ -28,6 +28,12 @@ public:
 	void K2_OnInitialize();
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex);
 	/**
+	 * 状态验证
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	bool K2_OnValidate();
+	virtual bool OnValidate();
+	/**
 	 * 状态进入
 	 * @param InLastFiniteState 上一个状态
 	 */
@@ -60,6 +66,11 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable)
 	void Terminate();
+	/**
+	* 切换到指定状态
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Switch(UFiniteStateBase* InFiniteState);
 	/**
 	* 切换到上一个状态
 	*/

@@ -12,6 +12,11 @@ void UAbilityVitalityStateBase::OnInitialize(UFSMComponent* InFSMComponent, int3
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
+bool UAbilityVitalityStateBase::OnValidate()
+{
+	return Super::OnValidate();
+}
+
 void UAbilityVitalityStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);

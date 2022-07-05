@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "AbilityCharacterState_Death.generated.h"
 
+class AAbilityCharacterBase;
 /**
  * 
  */
@@ -20,6 +21,8 @@ public:
 
 public:
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex) override;
+
+	virtual bool OnValidate() override;
 
 	virtual void OnEnter(UFiniteStateBase* InLastFiniteState) override;
 	

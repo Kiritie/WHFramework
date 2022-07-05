@@ -1,33 +1,38 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Ability/Vitality/States/AbilityVitalityState_Death.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 
-UAbilityVitalityState_Death::UAbilityVitalityState_Death()
+UAbilityVitalityState_Default::UAbilityVitalityState_Default()
 {
-	StateName = FName("Death");
+	StateName = FName("Default");
 }
 
-void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityVitalityState_Default::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+bool UAbilityVitalityState_Default::OnValidate()
+{
+	return Super::OnValidate();
+}
+
+void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
 }
 
-void UAbilityVitalityState_Death::OnRefresh()
+void UAbilityVitalityState_Default::OnRefresh()
 {
 	Super::OnRefresh();
 }
 
-void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityVitalityState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
 }
 
-void UAbilityVitalityState_Death::OnTermination()
+void UAbilityVitalityState_Default::OnTermination()
 {
 	Super::OnTermination();
 }

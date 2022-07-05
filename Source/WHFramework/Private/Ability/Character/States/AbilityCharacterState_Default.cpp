@@ -1,33 +1,47 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Ability/Character/States/AbilityCharacterState_Death.h"
+#include "Ability/Character/States/AbilityCharacterState_Default.h"
 
-UAbilityCharacterState_Death::UAbilityCharacterState_Death()
+#include "Ability/Character/AbilityCharacterBase.h"
+
+class AAbilityCharacterBase;
+
+UAbilityCharacterState_Default::UAbilityCharacterState_Default()
 {
-	StateName = FName("Death");
+	StateName = FName("Default");
 }
 
-void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterState_Default::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterState_Default::OnValidate()
 {
-	Super::OnEnter(InLastFiniteState);
+	return Super::OnValidate();
 }
 
-void UAbilityCharacterState_Death::OnRefresh()
+void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
+{
+	Super::OnEnter(InLastFiniteState);
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->SetVisible(true);
+	Character->SetHealth(-1.f);
+}
+
+void UAbilityCharacterState_Default::OnRefresh()
 {
 	Super::OnRefresh();
 }
 
-void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
 }
 
-void UAbilityCharacterState_Death::OnTermination()
+void UAbilityCharacterState_Default::OnTermination()
 {
 	Super::OnTermination();
 }

@@ -12,6 +12,11 @@ void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSMComponent, int
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
+bool UAbilityCharacterStateBase::OnValidate()
+{
+	return Super::OnValidate();
+}
+
 void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);

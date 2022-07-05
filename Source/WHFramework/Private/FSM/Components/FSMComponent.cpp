@@ -88,13 +88,15 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
 	if(InState && InState != CurrentState)
 	{
-		if(CurrentState)
+		if(InState->OnValidate())
 		{
-			CurrentState->OnLeave(InState);
+			if(CurrentState)
+			{
+				CurrentState->OnLeave(InState);
+			}
+			InState->OnEnter(CurrentState);
+			CurrentState = InState;
 		}
-		InState->OnEnter(CurrentState);
-
-		CurrentState = InState;
 	}
 }
 

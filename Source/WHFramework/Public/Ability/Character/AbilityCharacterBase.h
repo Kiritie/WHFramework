@@ -25,8 +25,6 @@ class UAbilityBase;
 class UAbilitySystemComponentBase;
 class AAbilitySkillBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDead);
-
 /**
  * Ability Character基类
  */
@@ -83,10 +81,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
-public:
-	UPROPERTY(BlueprintAssignable)
-	FOnCharacterDead OnCharacterDead;
-
 protected:
 	bool bASCInputBound;
 
@@ -109,6 +103,8 @@ protected:
 
 	virtual void BindASCInput();
 
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
+
 public:
 	virtual void Tick(float DeltaTime) override;
 
@@ -127,10 +123,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void Revive() override;
 
-	virtual void Jump() override;
-
 	UFUNCTION(BlueprintCallable)
-	virtual void UnJump();
+	virtual void StartJump();
 
 	virtual void PickUp(AAbilityPickUpBase* InPickUp) override;
 
