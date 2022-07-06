@@ -15,6 +15,8 @@ class WHFRAMEWORK_API UAbilityCharacterState_Jump : public UAbilityCharacterStat
 {
 	GENERATED_BODY()
 
+	friend class AAbilityCharacterBase;
+
 public:
 	UAbilityCharacterState_Jump();
 
@@ -30,10 +32,4 @@ public:
 	virtual void OnLeave(UFiniteStateBase* InNextFiniteState) override;
 
 	virtual void OnTermination() override;
-
-protected:
-	UPROPERTY()
-	UFiniteStateBase* LastFiniteState;
-
-	float WaitTime;
 };

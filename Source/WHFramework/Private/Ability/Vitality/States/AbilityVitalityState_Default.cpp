@@ -2,6 +2,8 @@
 
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 
+#include "Ability/Vitality/AbilityVitalityBase.h"
+
 UAbilityVitalityState_Default::UAbilityVitalityState_Default()
 {
 	StateName = FName("Default");
@@ -20,6 +22,10 @@ bool UAbilityVitalityState_Default::OnValidate()
 void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
+
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+
+	Vitality->SetHealth(-1.f);
 }
 
 void UAbilityVitalityState_Default::OnRefresh()

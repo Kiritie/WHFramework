@@ -29,6 +29,7 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 
 	Character->SetVisible(true);
 	Character->SetHealth(-1.f);
+	Character->SetMotionRate(1, 1);
 }
 
 void UAbilityCharacterState_Default::OnRefresh()

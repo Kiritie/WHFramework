@@ -17,6 +17,7 @@
 #include "ScopedTransaction.h"
 #include "WHFrameworkEditor.h"
 #include "Procedure/Base/ProcedureBase.h"
+#include "Windows/WindowsPlatformApplicationMisc.h"
 
 FProcedureDetailsPanel::FProcedureDetailsPanel() {}
 
@@ -78,7 +79,9 @@ FReply FProcedureDetailsPanel::OnClickPasteCameraViewButton()
 	{
 		if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get()))
 		{
-			Procedure->SetCameraView(GCopiedCameraData);
+			FString CameraParams;
+			FPlatformApplicationMisc::ClipboardPaste(CameraParams);
+			Procedure->SetCameraView(FCameraParams(CameraParams));
 		}
 	}
 

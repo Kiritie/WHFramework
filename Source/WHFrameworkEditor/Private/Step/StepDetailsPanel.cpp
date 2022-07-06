@@ -17,6 +17,7 @@
 #include "ScopedTransaction.h"
 #include "WHFrameworkEditor.h"
 #include "Step/Base/StepBase.h"
+#include "Windows/WindowsPlatformApplicationMisc.h"
 
 FStepDetailsPanel::FStepDetailsPanel() {}
 
@@ -78,7 +79,9 @@ FReply FStepDetailsPanel::OnClickPasteCameraViewButton()
 	{
 		if(UStepBase* Step = Cast<UStepBase>(SelectedObject.Get()))
 		{
-			Step->SetCameraView(GCopiedCameraData);
+			FString CameraParams;
+			FPlatformApplicationMisc::ClipboardPaste(CameraParams);
+			Step->SetCameraView(FCameraParams(CameraParams));
 		}
 	}
 

@@ -15,6 +15,8 @@ class WHFRAMEWORK_API UAbilityCharacterState_Static : public UAbilityCharacterSt
 {
 	GENERATED_BODY()
 
+	friend class AAbilityCharacterBase;
+
 public:
 	UAbilityCharacterState_Static();
 

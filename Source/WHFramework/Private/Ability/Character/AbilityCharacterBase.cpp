@@ -103,8 +103,6 @@ void AAbilityCharacterBase::BeginPlay()
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
-
-	ResetData();
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation()
@@ -134,19 +132,22 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	switch (GetCharacterMovement()->MovementMode)
+	if(!FSM->GetCurrentState() || FSM->IsCurrentStateClass<UAbilityCharacterState_Default>())
 	{
-		case EMovementMode::MOVE_Walking:
+		switch (GetCharacterMovement()->MovementMode)
 		{
-			FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
-			break;
+			case EMovementMode::MOVE_Walking:
+			{
+				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+				break;
+			}
+			case EMovementMode::MOVE_Falling:
+			{
+				FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
+				break;
+			}
+			default: break;
 		}
-		case EMovementMode::MOVE_Falling:
-		{
-			FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
-			break;
-		}
-		default: break;
 	}
 }
 
@@ -201,35 +202,28 @@ FSaveData* AAbilityCharacterBase::ToData()
 	return nullptr;
 }
 
-void AAbilityCharacterBase::ResetData()
+void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	// stats
-	SetMotionRate(1, 1);
+	FSM->GetStateByClass<UAbilityCharacterState_Death>()->Killer = InKiller;
+	FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
 }
 
-void AAbilityCharacterBase::Death(AActor* InKiller /*= nullptr*/)
+void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	if (!IsDead())
-	{
-		if(IAbilityVitalityInterface* InVitality = Cast<IAbilityVitalityInterface>(InKiller))
-		{
-			InVitality->ModifyEXP(GetTotalEXP());
-		}
-		FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
-	}
+	FSM->SwitchDefaultState();
 }
 
-void AAbilityCharacterBase::Revive()
-{
-	if (IsDead())
-	{
-		FSM->SwitchDefaultState();
-	}
-}
-
-void AAbilityCharacterBase::StartJump()
+void AAbilityCharacterBase::Jump()
 {
 	FSM->SwitchStateByClass<UAbilityCharacterState_Jump>();
+}
+
+void AAbilityCharacterBase::UnJump()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
+	{
+		FSM->SwitchState(nullptr);
+	}
 }
 
 void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)
@@ -634,7 +628,7 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	}
 }
 
-void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality)
 {
 	if (GetHealth() <= 0.f)
 	{

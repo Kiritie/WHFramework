@@ -15,7 +15,6 @@ UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
 	Super::OnInitialize(InFSMComponent, InStateIndex);
-
 }
 
 bool UAbilityCharacterState_Death::OnValidate()
@@ -31,6 +30,11 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DyingTag);
 
+	if(Killer)
+	{
+		Killer->ModifyEXP(Character->GetTotalEXP());
+	}
+
 	Character->SetEXP(0);
 	Character->SetHealth(0.f);
 }
@@ -43,6 +47,8 @@ void UAbilityCharacterState_Death::OnRefresh()
 void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
+
+	Killer = nullptr;
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

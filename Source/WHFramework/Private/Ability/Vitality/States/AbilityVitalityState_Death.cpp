@@ -28,6 +28,11 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
 
+	if(Killer)
+	{
+		Killer->ModifyEXP(Vitality->GetTotalEXP());
+	}
+
 	Vitality->SetEXP(0);
 	Vitality->SetHealth(0.f);
 }
@@ -40,6 +45,8 @@ void UAbilityVitalityState_Death::OnRefresh()
 void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
+
+	Killer = nullptr;
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 

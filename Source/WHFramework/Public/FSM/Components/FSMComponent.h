@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
 
@@ -24,6 +25,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void PostLoad() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -84,6 +87,10 @@ public:
 	/// 状态组
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	FName GroupName;
+	/// 当状态改变
+	UPROPERTY(BlueprintAssignable)
+	FOnFiniteStateChanged OnStateChanged;
+
 protected:
 	/// 当前状态
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Stats")

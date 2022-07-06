@@ -72,7 +72,7 @@ void AAbilityVitalityBase::BeginPlay()
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	ResetData();
+	
 }
 
 void AAbilityVitalityBase::OnDespawn_Implementation()
@@ -131,33 +131,15 @@ FSaveData* AAbilityVitalityBase::ToData()
 	return nullptr;
 }
 
-void AAbilityVitalityBase::ResetData()
+void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	
+	FSM->GetStateByClass<UAbilityVitalityState_Death>()->Killer = InKiller;
+	FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
 }
 
-void AAbilityVitalityBase::Death(AActor* InKiller /*= nullptr*/)
+void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	if (!IsDead())
-	{
-		if(IAbilityVitalityInterface* InVitality = Cast<IAbilityVitalityInterface>(InKiller))
-		{
-			InVitality->ModifyEXP(GetTotalEXP());
-		}
-		SetEXP(0);
-		SetHealth(0.f);
-		FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
-	}
-}
-
-void AAbilityVitalityBase::Revive()
-{
-	if (IsDead())
-	{
-		ResetData();
-		SetHealth(GetMaxHealth());
-		FSM->SwitchDefaultState();
-	}
+	FSM->SwitchDefaultState();
 }
 
 void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
@@ -534,10 +516,10 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 
 }
 
-void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality)
 {
 	if (GetHealth() <= 0.f)
 	{
-		Death(SourceActor);
+		Death(SourceVitality);
 	}
 }

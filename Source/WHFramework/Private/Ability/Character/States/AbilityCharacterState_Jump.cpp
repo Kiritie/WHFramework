@@ -8,7 +8,6 @@ UAbilityCharacterState_Jump::UAbilityCharacterState_Jump()
 {
 	StateName = FName("Jump");
 	
-	LastFiniteState = nullptr;
 }
 
 void UAbilityCharacterState_Jump::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
@@ -24,11 +23,7 @@ bool UAbilityCharacterState_Jump::OnValidate()
 void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
-
-	WaitTime = 0.f;
 	
-	LastFiniteState = InLastFiniteState;
-
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->Jump();
@@ -37,14 +32,6 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastFiniteState)
 void UAbilityCharacterState_Jump::OnRefresh()
 {
 	Super::OnRefresh();
-
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	WaitTime += GetWorld()->GetDeltaSeconds();
-	if(WaitTime >= 0.1f)
-	{
-		Switch(LastFiniteState);
-	}
 }
 
 void UAbilityCharacterState_Jump::OnLeave(UFiniteStateBase* InNextFiniteState)

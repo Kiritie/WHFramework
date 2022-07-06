@@ -33,6 +33,13 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 {
 	GENERATED_BODY()
 
+	friend class UAbilityCharacterState_Death;
+	friend class UAbilityCharacterState_Default;
+	friend class UAbilityCharacterState_Fall;
+	friend class UAbilityCharacterState_Jump;
+	friend class UAbilityCharacterState_Static;
+	friend class UAbilityCharacterState_Walk;
+
 public:
 	AAbilityCharacterBase();
 	
@@ -113,18 +120,15 @@ public:
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData() override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void ResetData() override;
 			
-	UFUNCTION(BlueprintCallable)
-	virtual void Death(AActor* InKiller = nullptr) override;
+	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
+
+	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
+
+	virtual void Jump() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Revive() override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void StartJump();
+	virtual void UnJump();
 
 	virtual void PickUp(AAbilityPickUpBase* InPickUp) override;
 
@@ -320,7 +324,7 @@ public:
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality) override;
 
 public:
 	virtual void OnRep_Controller() override;

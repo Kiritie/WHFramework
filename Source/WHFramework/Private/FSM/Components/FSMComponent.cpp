@@ -26,6 +26,12 @@ void UFSMComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+}
+
+void UFSMComponent::PostLoad()
+{
+	Super::PostLoad();
+
 	OnInitialize();
 }
 
@@ -86,18 +92,24 @@ void UFSMComponent::OnTermination()
 
 void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(InState && InState != CurrentState)
+	if(InState == CurrentState) return;
+	
+	UFiniteStateBase* LastState = CurrentState;
+
+	CurrentState = InState;
+
+	if(!InState || InState->OnValidate())
 	{
-		if(InState->OnValidate())
+		if(LastState)
 		{
-			if(CurrentState)
-			{
-				CurrentState->OnLeave(InState);
-			}
-			InState->OnEnter(CurrentState);
-			CurrentState = InState;
+			LastState->OnLeave(InState);
+		}
+		if(InState)
+		{
+			InState->OnEnter(LastState);
 		}
 	}
+	OnStateChanged.Broadcast(CurrentState);
 }
 
 void UFSMComponent::SwitchStateByIndex(int32 InStateIndex)

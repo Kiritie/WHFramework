@@ -32,6 +32,9 @@ class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVit
 {
 	GENERATED_BODY()
 
+	friend class UAbilityVitalityState_Death;
+	friend class UAbilityVitalityState_Default;
+
 public:
 	// Sets default values for this actor's properties
 	AAbilityVitalityBase();
@@ -101,13 +104,9 @@ public:
 
 	virtual FSaveData* ToData() override;
 
-	virtual void ResetData() override;
+	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void Revive() override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void Death(AActor* InKiller = nullptr) override;
+	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -288,5 +287,5 @@ public:
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality) override;
 };

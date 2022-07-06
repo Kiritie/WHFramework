@@ -23,6 +23,15 @@ public:
 		CameraDistance = 0.f;
 	}
 
+	FCameraParams(const FString& InParams)
+	{
+		TArray<FString> ParamsArr;
+		InParams.ParseIntoArray(ParamsArr, TEXT("|"));
+		CameraLocation.InitFromString(ParamsArr[0]);
+		CameraRotation.InitFromString(ParamsArr[1]);
+		CameraDistance = FCString::Atof(*ParamsArr[2]);
+	}
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FVector CameraLocation;
 
@@ -31,9 +40,13 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	float CameraDistance;
-};
 
-extern WHFRAMEWORK_API FCameraParams GCopiedCameraData;
+public:
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("%s|%s|%f"), *CameraLocation.ToString(), *CameraRotation.ToString(), CameraDistance);
+	}
+};
 
 UENUM(BlueprintType)
 enum class EPauseGameMode : uint8

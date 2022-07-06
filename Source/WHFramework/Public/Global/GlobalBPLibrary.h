@@ -90,15 +90,6 @@ public:
 	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Data
-public:
-	/*
-	 * 获取已复制的摄像机参数
-	 */
-	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static FCameraParams GetCopiedCameraParams() { return GCopiedCameraData; }
-
-	//////////////////////////////////////////////////////////////////////////
 	// Enum
 public:
 	/*

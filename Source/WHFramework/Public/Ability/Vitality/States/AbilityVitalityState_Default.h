@@ -15,6 +15,8 @@ class WHFRAMEWORK_API UAbilityVitalityState_Default : public UAbilityVitalitySta
 {
 	GENERATED_BODY()
 
+	friend class AAbilityVitalityBase;
+
 public:
 	UAbilityVitalityState_Default();
 

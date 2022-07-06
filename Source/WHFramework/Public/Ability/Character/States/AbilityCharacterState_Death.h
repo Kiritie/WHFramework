@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "AbilityCharacterState_Death.generated.h"
 
+class IAbilityVitalityInterface;
 class AAbilityCharacterBase;
 /**
  * 
@@ -15,6 +16,8 @@ UCLASS()
 class WHFRAMEWORK_API UAbilityCharacterState_Death : public UAbilityCharacterStateBase
 {
 	GENERATED_BODY()
+
+	friend class AAbilityCharacterBase;
 
 public:
 	UAbilityCharacterState_Death();
@@ -38,4 +41,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void DeathEnd();
+
+protected:
+	IAbilityVitalityInterface* Killer;
 };
