@@ -39,6 +39,7 @@ public class WHFrameworkEditor : ModuleRules
 				"SlateCore",
 				"EditorStyle",
 				"WHFramework",
+				"ApplicationCore",
 				"PropertyEditor",
 				"ClassViewer",
 				"UnrealEd",

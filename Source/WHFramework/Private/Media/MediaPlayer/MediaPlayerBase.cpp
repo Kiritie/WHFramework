@@ -14,8 +14,6 @@ AMediaPlayerBase::AMediaPlayerBase()
 	bReplicates = true;
 
 	PlayerName = NAME_None;
-
-	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
 
 void AMediaPlayerBase::BeginPlay()

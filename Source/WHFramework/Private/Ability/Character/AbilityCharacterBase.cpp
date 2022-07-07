@@ -11,7 +11,9 @@
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
+#include "Ability/Character/States/AbilityCharacterState_Idle.h"
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
+#include "Ability/Character/States/AbilityCharacterState_Static.h"
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
@@ -44,8 +46,13 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Character");
-	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Idle::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
 	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
 
 	// Set size for collision capsule
@@ -128,17 +135,34 @@ void AAbilityCharacterBase::BindASCInput()
 	}
 }
 
+void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+{
+	RefreshFiniteState();
+}
+
 void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	if(!FSM->GetCurrentState() || FSM->IsCurrentStateClass<UAbilityCharacterState_Default>())
+	RefreshFiniteState();
+}
+
+void AAbilityCharacterBase::RefreshFiniteState()
+{
+	if(!FSM->GetCurrentState())
 	{
 		switch (GetCharacterMovement()->MovementMode)
 		{
 			case EMovementMode::MOVE_Walking:
 			{
-				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+				if(GetVelocity().Size() > 0.2f)
+				{
+					FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+				}
+				else
+				{
+					FSM->SwitchStateByClass<UAbilityCharacterState_Idle>();
+				}
 				break;
 			}
 			case EMovementMode::MOVE_Falling:
@@ -215,7 +239,14 @@ void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 
 void AAbilityCharacterBase::Jump()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Jump>();
+	if(!FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
+	{
+		FSM->SwitchStateByClass<UAbilityCharacterState_Jump>();
+	}
+	else
+	{
+		Super::Jump();
+	}
 }
 
 void AAbilityCharacterBase::UnJump()
@@ -223,6 +254,10 @@ void AAbilityCharacterBase::UnJump()
 	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
 	{
 		FSM->SwitchState(nullptr);
+	}
+	else
+	{
+		Super::StopJumping();
 	}
 }
 
@@ -628,11 +663,11 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	}
 }
 
-void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality)
+void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	if (GetHealth() <= 0.f)
 	{
-		Death(SourceActor);
+		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
 }
 

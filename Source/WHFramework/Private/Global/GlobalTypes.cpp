@@ -8,4 +8,5 @@ bool GIsPlaying = false;
 #else
 bool GIsPlaying = true;
 #endif
+
 bool GIsSimulating = false;

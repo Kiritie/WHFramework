@@ -6,6 +6,7 @@
 #include "UObject/Interface.h"
 #include "FSMAgentInterface.generated.h"
 
+class UFiniteStateBase;
 class UFSMComponent;
 
 // This class does not need to be modified.
@@ -24,5 +25,7 @@ class WHFRAMEWORK_API IFSMAgentInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) = 0;
+
 	virtual UFSMComponent* GetFSMComponent() const = 0;
 };

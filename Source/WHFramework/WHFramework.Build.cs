@@ -33,6 +33,7 @@ public class WHFramework : ModuleRules
 				"Sockets",
 				"SlateCore",
 				"InputCore",
+				"ApplicationCore",
 				"MediaAssets",
 				"AIModule",
 				"GameplayTags",

@@ -98,7 +98,7 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 
 	CurrentState = InState;
 
-	if(!InState || InState->OnValidate())
+	if(!InState || GetStates().Contains(InState) && InState->OnValidate())
 	{
 		if(LastState)
 		{
@@ -109,6 +109,7 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 			InState->OnEnter(LastState);
 		}
 	}
+	GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
 	OnStateChanged.Broadcast(CurrentState);
 }
 

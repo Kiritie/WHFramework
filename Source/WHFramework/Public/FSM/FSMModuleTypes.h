@@ -9,6 +9,7 @@
 #include "FSMModuleTypes.generated.h"
 
 class UFSMComponent;
+class UFiniteStateBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFiniteStateChanged, UFiniteStateBase*, InFiniteState);
 

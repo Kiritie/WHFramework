@@ -70,6 +70,10 @@ void AAbilityVitalityBase::BeginPlay()
 	}
 }
 
+void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+{
+}
+
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	
@@ -516,10 +520,10 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 
 }
 
-void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality)
+void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	if (GetHealth() <= 0.f)
 	{
-		Death(SourceVitality);
+		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
 }

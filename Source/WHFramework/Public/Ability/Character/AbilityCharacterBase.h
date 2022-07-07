@@ -36,6 +36,7 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 	friend class UAbilityCharacterState_Death;
 	friend class UAbilityCharacterState_Default;
 	friend class UAbilityCharacterState_Fall;
+	friend class UAbilityCharacterState_Idle;
 	friend class UAbilityCharacterState_Jump;
 	friend class UAbilityCharacterState_Static;
 	friend class UAbilityCharacterState_Walk;
@@ -110,7 +111,11 @@ protected:
 
 	virtual void BindASCInput();
 
+	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
+
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
+
+	virtual void RefreshFiniteState();
 
 public:
 	virtual void Tick(float DeltaTime) override;
@@ -224,6 +229,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
+	UFUNCTION(BlueprintPure)
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:
@@ -324,7 +330,7 @@ public:
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, IAbilityVitalityInterface* SourceVitality) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
 	virtual void OnRep_Controller() override;

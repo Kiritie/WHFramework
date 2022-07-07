@@ -42,8 +42,6 @@ AMainModule::AMainModule()
 
 	bReplicates = true;
 
-	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
-
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAbilityModule::StaticClass());
 	ModuleClasses.Add(AAssetModule::StaticClass());

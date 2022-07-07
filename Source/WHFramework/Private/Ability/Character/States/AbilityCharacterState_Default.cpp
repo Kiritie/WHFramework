@@ -4,8 +4,6 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 
-class AAbilityCharacterBase;
-
 UAbilityCharacterState_Default::UAbilityCharacterState_Default()
 {
 	StateName = FName("Default");

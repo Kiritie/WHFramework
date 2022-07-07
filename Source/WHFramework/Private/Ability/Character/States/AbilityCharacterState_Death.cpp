@@ -75,6 +75,5 @@ void UAbilityCharacterState_Death::DeathEnd()
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
-	
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DeadTag);
 }

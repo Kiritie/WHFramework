@@ -15,8 +15,6 @@ AEventManagerBase::AEventManagerBase()
 	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
-
-	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
 
 void AEventManagerBase::OnInitialize_Implementation()

@@ -14,8 +14,6 @@ AModuleBase::AModuleBase()
 	bReplicates = true;
 
 	ModuleState = EModuleState::None;
-
-	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
 
 #if WITH_EDITOR
