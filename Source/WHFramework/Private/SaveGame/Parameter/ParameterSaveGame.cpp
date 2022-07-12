@@ -5,6 +5,8 @@
 #include "Camera/CameraModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Parameter/ParameterModule.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
 
 UParameterSaveGame::UParameterSaveGame()
 {
@@ -30,4 +32,5 @@ void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
+	SetSaveData(USaveGameModuleBPLibrary::ObjectToData(AMainModule::GetModuleByClass<AParameterModule>()));
 }

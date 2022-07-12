@@ -5,6 +5,7 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 #include "AbilityItemBase.generated.h"
 
 class AAbilityCharacterBase;
@@ -13,7 +14,7 @@ class AAbilityCharacterBase;
  * 物品基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityItemBase : public AWHActor
+class WHFRAMEWORK_API AAbilityItemBase : public AWHActor, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
@@ -29,13 +30,11 @@ protected:
 	AAbilityCharacterBase* OwnerCharacter;
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-		
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter);
 		
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem);

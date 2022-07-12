@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Global/Base/WHObject.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "FiniteStateBase.generated.h"
 
@@ -13,12 +14,17 @@ class UFSMComponent;
  * 状态基类
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API UFiniteStateBase : public UWHObject
+class WHFRAMEWORK_API UFiniteStateBase : public UWHObject, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 
 public:
 	UFiniteStateBase();
+
+public:
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
 
 public:
 	/**

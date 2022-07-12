@@ -15,6 +15,17 @@ UFiniteStateBase::UFiniteStateBase()
 	FSM = nullptr;
 }
 
+void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	
+}
+
+void UFiniteStateBase::OnDespawn_Implementation()
+{
+	StateIndex = 0;
+	FSM = nullptr;
+}
+
 void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
 {
 	FSM = InFSMComponent;

@@ -19,7 +19,6 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 	SphereComponent->SetCollisionProfileName(TEXT("Weapon"));
 	SphereComponent->SetSphereRadius(50);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilitySkillRemoteBase::OnBeginOverlap);
-	SetRootComponent(SphereComponent);
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
@@ -35,13 +34,6 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 	InitialVelocity = FVector(3000, 0, 0);
 }
 
-// Called when the game starts or when spawned
-void AAbilitySkillRemoteBase::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
 void AAbilitySkillRemoteBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
 {
 	Super::Initialize(InOwnerCharacter);
@@ -54,9 +46,6 @@ void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComp
 	OnHitTarget(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
 }
 
-// Called every frame
-void AAbilitySkillRemoteBase::Tick(float DeltaTime)
+void AAbilitySkillRemoteBase::OnHitTarget_Implementation(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	Super::Tick(DeltaTime);
-
 }

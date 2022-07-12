@@ -13,6 +13,7 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
+#include "FSM/FSMModule.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Input/InputModule.h"
 #include "LatentAction/LatentActionModule.h"
@@ -50,6 +51,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(ACameraModule::StaticClass());
 	ModuleClasses.Add(ADebugModule::StaticClass());
 	ModuleClasses.Add(AEventModule::StaticClass());
+	ModuleClasses.Add(AFSMModule::StaticClass());
 	ModuleClasses.Add(AInputModule::StaticClass());
 	ModuleClasses.Add(ALatentActionModule::StaticClass());
 	ModuleClasses.Add(AMediaModule::StaticClass());

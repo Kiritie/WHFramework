@@ -14,16 +14,12 @@ class WHFRAMEWORK_API AAbilityPropBase : public AAbilityItemBase
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AAbilityPropBase();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* MeshComponent;
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
 };

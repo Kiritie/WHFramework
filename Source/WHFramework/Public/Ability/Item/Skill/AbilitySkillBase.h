@@ -14,7 +14,6 @@ class WHFRAMEWORK_API AAbilitySkillBase : public AAbilityItemBase
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AAbilitySkillBase();
 
 protected:
@@ -27,14 +26,7 @@ protected:
 private:
 	FTimerHandle DestroyTimer;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
 
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem) override;

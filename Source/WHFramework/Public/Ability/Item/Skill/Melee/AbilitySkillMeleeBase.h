@@ -10,7 +10,7 @@ class UStaticMeshComponent;
 class UProjectileMovementComponent;
 
 /**
- * ��ս����
+ * 近战技能基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilitySkillMeleeBase : public AAbilitySkillBase
@@ -18,15 +18,5 @@ class WHFRAMEWORK_API AAbilitySkillMeleeBase : public AAbilitySkillBase
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AAbilitySkillMeleeBase();
-
-
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 };

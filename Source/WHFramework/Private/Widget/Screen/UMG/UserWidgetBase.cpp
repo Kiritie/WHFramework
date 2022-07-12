@@ -27,10 +27,10 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetAlignment = FVector2D(0.f);
 	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
-	WidgetOpenFinishType = EWidgetOpenFinishType::Procedure;
+	WidgetOpenFinishType = EWidgetOpenFinishType::Instant;
 	WidgetOpenFinishTime = 0.f;
 	WidgetCloseType = EWidgetCloseType::Hidden;
-	WidgetCloseFinishType = EWidgetCloseFinishType::Procedure;
+	WidgetCloseFinishType = EWidgetCloseFinishType::Instant;
 	WidgetCloseFinishTime = 0.f;
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
@@ -279,6 +279,8 @@ void UUserWidgetBase::Destroy(bool bRecovery)
 
 void UUserWidgetBase::FinishOpen(bool bInstant)
 {
+	if(WidgetState == EScreenWidgetState::Opened) return;
+
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
 
@@ -295,6 +297,8 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 
 void UUserWidgetBase::FinishClose(bool bInstant)
 {
+	if(WidgetState == EScreenWidgetState::Closed) return;
+
 	WidgetState = EScreenWidgetState::Closed;
 	OnStateChanged(WidgetState);
 

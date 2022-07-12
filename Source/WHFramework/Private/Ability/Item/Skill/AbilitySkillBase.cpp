@@ -8,29 +8,10 @@
 #include "TimerManager.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 
-// Sets default values
 AAbilitySkillBase::AAbilitySkillBase()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
-
 	DurationTime = 0;
 	SocketName = NAME_None;
-}
-
-// Called when the game starts or when spawned
-void AAbilitySkillBase::BeginPlay()
-{
-	Super::BeginPlay();
-
-	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this]() { Destroy(); }, DurationTime, false);
-}
-
-// Called every frame
-void AAbilitySkillBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
 }
 
 void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)

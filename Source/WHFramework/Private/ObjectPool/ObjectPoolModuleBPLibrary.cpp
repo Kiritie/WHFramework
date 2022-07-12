@@ -6,6 +6,15 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
+UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams)
+{
+	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	{
+		return ObjectPoolModule->SpawnObject(InType, InParams);
+	}
+	return nullptr;
+}
+
 UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())

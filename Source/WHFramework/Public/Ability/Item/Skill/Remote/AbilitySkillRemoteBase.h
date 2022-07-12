@@ -11,7 +11,7 @@ class UStaticMeshComponent;
 class UProjectileMovementComponent;
 
 /**
- * Զ�̼���
+ * 远程技能基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilitySkillRemoteBase : public AAbilitySkillBase
@@ -19,7 +19,6 @@ class WHFRAMEWORK_API AAbilitySkillRemoteBase : public AAbilitySkillBase
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AAbilitySkillRemoteBase();
 
 protected:
@@ -35,22 +34,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
 	FVector InitialVelocity;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
+public:
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
 
+protected:
 	UFUNCTION()
-	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	UFUNCTION(BlueprintImplementableEvent)
+	UFUNCTION(BlueprintNativeEvent)
 	void OnHitTarget(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-		
 	UFUNCTION(BlueprintPure)
 	USphereComponent* GetSphereComponent() const { return SphereComponent; }
 

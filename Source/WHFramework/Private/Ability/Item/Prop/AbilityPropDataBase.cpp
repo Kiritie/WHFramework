@@ -8,5 +8,6 @@ UAbilityPropDataBase::UAbilityPropDataBase()
 {
 	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Prop);
 	MaxCount = 10;
-	PropMesh = nullptr;
+	PropClass = nullptr;
+	PropPickUpClass = nullptr;
 }

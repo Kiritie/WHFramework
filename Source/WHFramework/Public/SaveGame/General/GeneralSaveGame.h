@@ -5,18 +5,18 @@
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/Base/SaveGameBase.h"
 
-#include "ParameterSaveGame.generated.h"
+#include "GeneralSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UParameterSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UGeneralSaveGame : public USaveGameBase
 {
 	GENERATED_BODY()
 
 public:
-	UParameterSaveGame();
+	UGeneralSaveGame();
 	
 public:
 	virtual void OnCreate_Implementation(int32 InSaveIndex) override;
@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FParameterSaveData ParameterSaveData;
+	FGeneralSaveData GeneralSaveData;
 
 public:
-	virtual FSaveData* GetSaveData() override { return &ParameterSaveData; }
+	virtual FSaveData* GetSaveData() override { return &GeneralSaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { ParameterSaveData = InSaveData->ToRef<FParameterSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { GeneralSaveData = InSaveData->ToRef<FGeneralSaveData>(); }
 };

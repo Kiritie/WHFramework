@@ -5,6 +5,7 @@
 
 #include "AbilityPickUpVoxel.generated.h"
 
+class UVoxelMeshComponent;
 /**
  * 可拾取体素
  */
@@ -14,15 +15,18 @@ class WHFRAMEWORK_API AAbilityPickUpVoxel : public AAbilityPickUpBase
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
 	AAbilityPickUpVoxel();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* MeshComponent;
 
+protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
 
 public:
 	virtual void Initialize(FAbilityItem InItem) override;
+
+public:
+	virtual UMeshComponent* GetMeshComponent() const override;
 };

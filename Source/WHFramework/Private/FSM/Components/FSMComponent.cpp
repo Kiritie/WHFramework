@@ -26,12 +26,6 @@ void UFSMComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-}
-
-void UFSMComponent::PostLoad()
-{
-	Super::PostLoad();
-
 	OnInitialize();
 }
 

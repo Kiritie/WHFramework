@@ -3,27 +3,28 @@
 #pragma once
 #include "AbilityPickUpBase.h"
 
-#include "AbilityPickUpProp.generated.h"
+#include "AbilityPickUpSkill.generated.h"
 
+class UPaperSpriteComponent;
 /**
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPickUpProp : public AAbilityPickUpBase
+class WHFRAMEWORK_API AAbilityPickUpSkill : public AAbilityPickUpBase
 {
 	GENERATED_BODY()
 
 public:
-	AAbilityPickUpProp();
+	AAbilityPickUpSkill();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* MeshComponent;
-
-public:
-	virtual void Initialize(FAbilityItem InItem) override;
+	UPaperSpriteComponent* MeshComponent;
 
 protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
+
+public:
+	virtual void Initialize(FAbilityItem InItem) override;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

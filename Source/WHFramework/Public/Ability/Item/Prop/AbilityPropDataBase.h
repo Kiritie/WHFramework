@@ -4,6 +4,8 @@
 
 #include "AbilityPropDataBase.generated.h"
 
+class AAbilityPickUpProp;
+class AAbilityPropBase;
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityPropDataBase : public UAbilityItemDataBase
 {
@@ -14,5 +16,8 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UStaticMesh* PropMesh;
+	TSubclassOf<AAbilityPropBase> PropClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AAbilityPickUpProp> PropPickUpClass;
 };

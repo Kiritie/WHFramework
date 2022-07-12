@@ -6,3 +6,8 @@ AWHActor::AWHActor()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
+
+void AWHActor::SetVisible_Implementation(bool bVisible)
+{
+	GetRootComponent()->SetVisibility(bVisible, true);
+}

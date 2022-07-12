@@ -7,7 +7,6 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
-// Sets default values
 AAbilityPickUpEquip::AAbilityPickUpEquip()
 {
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
@@ -15,21 +14,18 @@ AAbilityPickUpEquip::AAbilityPickUpEquip()
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-// Called when the game starts or when spawned
-void AAbilityPickUpEquip::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
 void AAbilityPickUpEquip::Initialize(FAbilityItem InItem)
 {
 	Super::Initialize(InItem);
-	Cast<UStaticMeshComponent>(MeshComponent)->SetStaticMesh(Item.GetData<UAbilityEquipDataBase>().EquipMesh);
 }
 
 void AAbilityPickUpEquip::OnPickUp(IAbilityPickerInterface* InPicker)
 {
 	Super::OnPickUp(InPicker);
 
+}
+
+UMeshComponent* AAbilityPickUpEquip::GetMeshComponent() const
+{
+	return MeshComponent;
 }

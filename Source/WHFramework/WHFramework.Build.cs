@@ -31,6 +31,7 @@ public class WHFramework : ModuleRules
 				"HTTP",
 				"Json",
 				"Sockets",
+				"Paper2D",
 				"SlateCore",
 				"InputCore",
 				"ApplicationCore",

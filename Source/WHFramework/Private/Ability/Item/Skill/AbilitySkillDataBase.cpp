@@ -10,4 +10,5 @@ UAbilitySkillDataBase::UAbilitySkillDataBase()
 	SkillType = ESkillType::None;
 	SkillMode = ESkillMode::None;
 	SkillClass = nullptr;
+	SkillPickUpClass = nullptr;
 }

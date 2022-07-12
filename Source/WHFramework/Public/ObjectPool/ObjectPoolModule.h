@@ -96,6 +96,8 @@ public:
 		return Cast<T>(ObjectPools[InType]->Spawn(InParams ? *InParams : TArray<FParameter>()));
 	}
 
+	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams = nullptr);
+
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
 	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 

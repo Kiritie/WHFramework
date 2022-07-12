@@ -28,6 +28,8 @@ public:
 		return nullptr;
 	}
 
+	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams = nullptr);
+
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleBPLibrary")
 	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 

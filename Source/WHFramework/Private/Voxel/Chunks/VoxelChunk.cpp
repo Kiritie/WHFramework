@@ -4,8 +4,14 @@
 #include "Voxel/Chunks/VoxelChunk.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/Item/Equip/AbilityEquipDataBase.h"
+#include "Ability/Item/Prop/AbilityPropDataBase.h"
+#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
+#include "Ability/PickUp/AbilityPickUpEquip.h"
+#include "Ability/PickUp/AbilityPickUpProp.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Ability/PickUp/AbilityPickUpSkill.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/BoxComponent.h"
@@ -1040,11 +1046,15 @@ AAbilityPickUpBase* AVoxelChunk::SpawnPickUp(FAbilityItem InItem, FVector InLoca
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
 	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
 	}
 	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
 	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
+	}
+	else if(InItem.GetData().EqualType(EAbilityItemType::Skill))
+	{
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
 	}
 
 	if(PickUp)

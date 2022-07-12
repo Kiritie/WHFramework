@@ -17,4 +17,8 @@ class WHFRAMEWORK_API AWHActor : public AActor
 	
 public:	
 	AWHActor();
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void SetVisible(bool bVisible);
 };

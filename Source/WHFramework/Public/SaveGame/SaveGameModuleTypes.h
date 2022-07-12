@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Parameter/ParameterModuleTypes.h"
 
 #include "SaveGameModuleTypes.generated.h"
 
@@ -42,16 +43,56 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSaveGames
+struct WHFRAMEWORK_API FSaveGameInfo
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FSaveGames()
+	FORCEINLINE FSaveGameInfo()
 	{
-		Array = TArray<USaveGameBase*>();
+		Index = -1;
+		Class = nullptr;
+		Array = TMap<int32, USaveGameBase*>();
 	}
 
-	UPROPERTY()
-	TArray<USaveGameBase*> Array;
+	UPROPERTY(BlueprintReadOnly)
+	int32 Index;
+
+	UPROPERTY(BlueprintReadOnly)
+	TSubclassOf<USaveGameBase> Class;
+
+	UPROPERTY(BlueprintReadOnly)
+	TMap<int32, USaveGameBase*> Array;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FParameterSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FParameterSaveData()
+	{
+		Parameters = FParameters();
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FParameters Parameters;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FGeneralSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FGeneralSaveData()
+	{
+		AllSaveGameInfo = TMap<FName, FSaveGameInfo>();
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	TMap<FName, FSaveGameInfo> AllSaveGameInfo;
 };

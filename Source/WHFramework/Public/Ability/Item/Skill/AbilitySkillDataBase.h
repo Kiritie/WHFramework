@@ -5,6 +5,8 @@
 
 #include "AbilitySkillDataBase.generated.h"
 
+class AAbilityPickUpSkill;
+class UPaperSprite;
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilitySkillDataBase : public UAbilityItemDataBase
 {
@@ -22,4 +24,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilitySkillBase> SkillClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AAbilityPickUpSkill> SkillPickUpClass;
 };

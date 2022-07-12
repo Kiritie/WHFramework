@@ -32,13 +32,39 @@ FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InSave
 	return TEXT("");
 }
 
-bool USaveGameModuleBPLibrary::HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bFindOnDisk)
+bool USaveGameModuleBPLibrary::HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bFindOnDisk, bool bNeedLoaded)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->HasSaveGame(InSaveGameClass, InSaveIndex, bFindOnDisk);
+		return SaveGameModule->HasSaveGame(InSaveGameClass, InSaveIndex, bFindOnDisk, bNeedLoaded);
 	}
 	return false;
+}
+
+int32 USaveGameModuleBPLibrary::GetValidSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->GetValidSaveIndex(InSaveGameClass);
+	}
+	return -1;
+}
+
+int32 USaveGameModuleBPLibrary::GetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->GetActiveSaveIndex(InSaveGameClass);
+	}
+	return -1;
+}
+
+void USaveGameModuleBPLibrary::SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		SaveGameModule->SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
+	}
 }
 
 USaveGameBase* USaveGameModuleBPLibrary::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
@@ -73,6 +99,15 @@ USaveGameBase* USaveGameModuleBPLibrary::GetOrCreateSaveGame(TSubclassOf<USaveGa
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
 		return SaveGameModule->GetOrCreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad);
+	}
+	return nullptr;
+}
+
+USaveGameBase* USaveGameModuleBPLibrary::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->LoadOrCreateSaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return nullptr;
 }

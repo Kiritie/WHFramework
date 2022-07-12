@@ -17,18 +17,14 @@ AAbilityItemBase::AAbilityItemBase()
 	OwnerCharacter = nullptr;
 }
 
-// Called when the game starts or when spawned
-void AAbilityItemBase::BeginPlay()
+void AAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::BeginPlay();
-
+	
 }
 
-// Called every frame
-void AAbilityItemBase::Tick(float DeltaTime)
+void AAbilityItemBase::OnDespawn_Implementation()
 {
-	Super::Tick(DeltaTime);
-
+	SetVisible(false);
 }
 
 void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)

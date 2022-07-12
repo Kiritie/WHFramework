@@ -6,7 +6,6 @@
 #include "AbilityPickUpEquip.generated.h"
 
 /**
- * ��ʰȡװ��
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilityPickUpEquip : public AAbilityPickUpBase
@@ -14,15 +13,18 @@ class WHFRAMEWORK_API AAbilityPickUpEquip : public AAbilityPickUpBase
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
 	AAbilityPickUpEquip();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* MeshComponent;
 
 public:
 	virtual void Initialize(FAbilityItem InItem) override;
+
+protected:
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
+
+public:
+	virtual UMeshComponent* GetMeshComponent() const override;
 };

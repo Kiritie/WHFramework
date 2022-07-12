@@ -57,7 +57,6 @@ void AParameterModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
 
-	USaveGameModuleBPLibrary::GetSaveGame<UParameterSaveGame>(0)->SetSaveData(USaveGameModuleBPLibrary::ObjectToData(this));
 	USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
 }
 

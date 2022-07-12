@@ -21,17 +21,14 @@ void USaveGameBase::OnCreate_Implementation(int32 InSaveIndex)
 
 void USaveGameBase::OnSave_Implementation()
 {
-	bSaved = true;
 }
 
 void USaveGameBase::OnLoad_Implementation()
 {
-	bLoaded = true;
 }
 
 void USaveGameBase::OnUnload_Implementation()
 {
-	bLoaded = false;
 }
 
 void USaveGameBase::OnReset_Implementation()
@@ -44,7 +41,6 @@ void USaveGameBase::OnRefresh_Implementation()
 
 void USaveGameBase::OnDestroy_Implementation()
 {
-	
 }
 
 bool USaveGameBase::Save(bool bRefresh)

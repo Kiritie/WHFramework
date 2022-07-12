@@ -25,7 +25,6 @@ class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public IObjectPoolIn
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AAbilityPickUpBase();
 
 protected:
@@ -38,17 +37,16 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UMeshComponent* MeshComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	URotatingMovementComponent* RotatingComponent;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+public:
+	virtual void Initialize(FAbilityItem InItem);
 
+	virtual void RemoveFromContainer_Implementation() override;
+
+protected:
 	UFUNCTION()
 	virtual void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
@@ -63,10 +61,6 @@ public:
 
 	virtual FSaveData* ToData() override;
 
-	virtual void Initialize(FAbilityItem InItem);
-
-	virtual void RemoveFromContainer_Implementation() override;
-
 public:
 	FAbilityItem& GetItem() { return Item; }
 	
@@ -76,7 +70,7 @@ public:
 	
 	UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 
-	UMeshComponent* GetMeshComponent() const { return MeshComponent; }
+	virtual UMeshComponent* GetMeshComponent() const { return nullptr; }
 
 	URotatingMovementComponent* GetRotatingComponent() const { return RotatingComponent; }
 };
