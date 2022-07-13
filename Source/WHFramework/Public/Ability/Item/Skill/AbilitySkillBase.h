@@ -17,10 +17,10 @@ public:
 	AAbilitySkillBase();
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
 	FName SocketName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
 	float DurationTime;
 
 private:

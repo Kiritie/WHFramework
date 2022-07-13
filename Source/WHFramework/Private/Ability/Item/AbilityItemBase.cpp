@@ -34,6 +34,6 @@ void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
 
 void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	Initialize(InOwnerCharacter);
 	Item = InItem;
+	Initialize(InOwnerCharacter);
 }

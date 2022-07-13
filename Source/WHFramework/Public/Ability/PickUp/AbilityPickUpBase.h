@@ -28,10 +28,10 @@ public:
 	AAbilityPickUpBase();
 
 protected:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere, Category = "Default")
 	FAbilityItem Item;
 
-	UPROPERTY(Transient)
+	UPROPERTY(VisibleAnywhere, Category = "Default")
 	AActor* Container;
 
 protected:

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "CharacterInterface.h"
+#include "AI/Base/AIAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
@@ -17,7 +18,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -26,14 +27,14 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	
+
 public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation() override;
 
 	virtual void SpawnDefaultController() override;
-
+		
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
@@ -156,6 +157,11 @@ protected:
 
 public:
 	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// AI
+public:
+	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

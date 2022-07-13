@@ -4,6 +4,7 @@
 #include "Main/MainModule.h"
 
 #include "Ability/AbilityModule.h"
+#include "AI/AIModule.h"
 #include "Audio/AudioModule.h"
 #include "Asset/AssetModule.h"
 #include "Main/Base/ModuleBase.h"
@@ -35,6 +36,7 @@ AMainModule* AMainModule::Instance = nullptr;
 #if WITH_EDITOR
 AMainModule* AMainModule::InstanceEditor = nullptr;
 #endif
+
 // ParamSets default values
 AMainModule::AMainModule()
 {
@@ -45,6 +47,7 @@ AMainModule::AMainModule()
 
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAbilityModule::StaticClass());
+	ModuleClasses.Add(AAIModule::StaticClass());
 	ModuleClasses.Add(AAssetModule::StaticClass());
 	ModuleClasses.Add(AAudioModule::StaticClass());
 	ModuleClasses.Add(ACharacterModule::StaticClass());

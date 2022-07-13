@@ -20,6 +20,11 @@ void AAbilityEquipBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
 	Super::Initialize(InOwnerCharacter);
 }
 
+void AAbilityEquipBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+{
+	Super::Initialize(InOwnerCharacter, InItem);
+}
+
 void AAbilityEquipBase::OnAssemble_Implementation()
 {
 	

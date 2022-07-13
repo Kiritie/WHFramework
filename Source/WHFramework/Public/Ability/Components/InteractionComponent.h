@@ -61,6 +61,6 @@ public:
 	IInteractionAgentInterface* GetInteractionOwner() const;
 
 	IInteractionAgentInterface* GetInteractionAgent() const { return InteractionAgent; }
-	
+
 	void SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent);
 };

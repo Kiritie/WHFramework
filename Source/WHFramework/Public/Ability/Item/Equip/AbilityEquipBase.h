@@ -24,8 +24,9 @@ protected:
 	UStaticMeshComponent* MeshComponent;
 
 public:
-	UFUNCTION(BlueprintCallable)
 	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
+
+	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem) override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent)

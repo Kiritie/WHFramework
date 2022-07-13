@@ -31,7 +31,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UProjectileMovementComponent* MovementComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
 	FVector InitialVelocity;
 
 public:

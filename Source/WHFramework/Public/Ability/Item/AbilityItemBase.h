@@ -23,7 +23,7 @@ public:
 	AAbilityItemBase();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category = "Setup")
+	UPROPERTY(EditDefaultsOnly, Category = "Default")
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")

@@ -297,6 +297,11 @@ void ACharacterBase::MultiStopAIMove_Implementation()
 	StopAIMove(false);
 }
 
+UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const
+{
+	return nullptr;
+}
+
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
