@@ -3,7 +3,6 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
-#include "AbilityCharacterDataBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "SaveGame/SaveGameModuleTypes.h"
-#include "Scene/SceneModuleTypes.h"
 
 #include "AbilityActorInterface.generated.h"
 
@@ -16,6 +14,11 @@ class WHFRAMEWORK_API UAbilityActorInterface : public UInterface
 class WHFRAMEWORK_API IAbilityActorInterface
 {
 	GENERATED_BODY()
+
+public:
+	virtual int32 GetLevelV() const = 0;
+
+	virtual void SetLevelV(int32 InLevel) = 0;
 
 public:
 	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) = 0;

@@ -13,7 +13,10 @@ AMediaPlayerBase::AMediaPlayerBase()
 {
 	bReplicates = true;
 
-	PlayerName = NAME_None;
+	Name = NAME_None;
+
+	ActorID = FGuid::NewGuid();
+	Container = nullptr;
 }
 
 void AMediaPlayerBase::BeginPlay()

@@ -28,18 +28,31 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Actor
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	FGuid ActorID;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
+	TScriptInterface<ISceneContainerInterface> Container;
+	
+public:
+	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
+
+	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
+
+	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
+
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
 	UPROPERTY(EditAnywhere, Category = "Default")
-	FName PlayerName;
+	FName Name;
 	
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetPlayerName() const { return PlayerName; }
-
-	virtual FName GetObjectName_Implementation() const override { return PlayerName; }
-
-	virtual void SetObjectName_Implementation(FName InName) override { PlayerName = InName; }
+	virtual FName GetPlayerName() const { return Name; }
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Movie

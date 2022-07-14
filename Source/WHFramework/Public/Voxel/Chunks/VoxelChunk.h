@@ -68,11 +68,11 @@ public:
 	UVoxelMeshComponent* GetTransMesh();
 	
 public:
-	void DestroySolidMesh();
+	virtual void DestroySolidMesh();
 
-	void DestroySemiMesh();
+	virtual void DestroySemiMesh();
 
-	void DestroyTransMesh();
+	virtual void DestroyTransMesh();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats
@@ -125,69 +125,62 @@ public:
 protected:
 	virtual void OnGenerated();
 
-	void GenerateNeighbors(FIndex InIndex);
+	virtual void GenerateNeighbors(FIndex InIndex);
 
-	void GenerateNeighbors(int32 InX, int32 InY, int32 InZ);
+	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ);
 
-	void UpdateNeighbors();
+	virtual void UpdateNeighbors();
 
-	void BreakNeighbors();
+	virtual void BreakNeighbors();
 
 public:
-	bool IsOnTheChunk(FIndex InIndex) const;
+	virtual bool IsOnTheChunk(FIndex InIndex) const;
 
-	bool IsOnTheChunk(FVector InLocation) const;
+	virtual bool IsOnTheChunk(FVector InLocation) const;
 
-	FIndex LocationToIndex(FVector InLocation, bool bWorldSpace = true) const;
+	virtual FIndex LocationToIndex(FVector InLocation, bool bWorldSpace = true) const;
 
-	FVector IndexToLocation(FIndex InIndex, bool bWorldSpace = true) const;
+	virtual FVector IndexToLocation(FIndex InIndex, bool bWorldSpace = true) const;
 
-	FIndex LocalIndexToWorld(FIndex InIndex) const;
+	virtual FIndex LocalIndexToWorld(FIndex InIndex) const;
 
-	FIndex WorldIndexToLocal(FIndex InIndex) const;
+	virtual FIndex WorldIndexToLocal(FIndex InIndex) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
-	UVoxel* GetVoxel(FIndex InIndex);
+	virtual UVoxel* GetVoxel(FIndex InIndex);
 
-	UVoxel* GetVoxel(int32 InX, int32 InY, int32 InZ);
+	virtual UVoxel* GetVoxel(int32 InX, int32 InY, int32 InZ);
 
-	FVoxelItem& GetVoxelItem(FIndex InIndex);
+	virtual FVoxelItem& GetVoxelItem(FIndex InIndex);
 
-	FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ);
+	virtual FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ);
 
 public:
-	bool CheckVoxel(FIndex InIndex, FVector InRange = FVector::OneVector, bool bIgnoreTransparent = true);
+	virtual bool CheckVoxel(FIndex InIndex, FVector InRange = FVector::OneVector, bool bIgnoreTransparent = true);
 
-	bool CheckVoxel(int32 InX, int32 InY, int32 InZ, FVector InRange = FVector::OneVector, bool bIgnoreTransparent = true);
+	virtual bool CheckVoxel(int32 InX, int32 InY, int32 InZ, FVector InRange = FVector::OneVector, bool bIgnoreTransparent = true);
 
-	bool CheckAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection);
+	virtual bool CheckAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection);
 
-	bool CheckNeighbors(const FVoxelItem& InVoxelItem, EVoxelType InVoxelType, bool bIgnoreBottom = false, int32 InDistance = 1);
+	virtual bool CheckNeighbors(const FVoxelItem& InVoxelItem, EVoxelType InVoxelType, bool bIgnoreBottom = false, int32 InDistance = 1);
 
-	bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
+	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
 
-	bool SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
+	virtual bool SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
 
-	bool SetVoxelComplex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
+	virtual bool SetVoxelComplex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
 
-	bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
+	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
 
-	bool GenerateVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem);
+	virtual bool GenerateVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem);
 
-	bool DestroyVoxel(FIndex InIndex);
+	virtual bool DestroyVoxel(FIndex InIndex);
 
-	bool DestroyVoxel(const FVoxelItem& InVoxelItem);
+	virtual bool DestroyVoxel(const FVoxelItem& InVoxelItem);
 
-	bool ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelItem& InNewVoxelItem);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Auxiliary
-public:
-	AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
-
-	void DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary);
+	virtual bool ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelItem& InNewVoxelItem);
 
 	//////////////////////////////////////////////////////////////////////////
 	// SceneContainer
@@ -196,19 +189,11 @@ public:
 
 	virtual void RemoveSceneActor(AActor* InActor) override;
 
-	virtual void DestroySceneActor(AActor* InActor) override;
-
 	//////////////////////////////////////////////////////////////////////////
-	// PickUp
+	// Auxiliary
 public:
-	AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation);
+	virtual AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
 
-	AAbilityPickUpBase* SpawnPickUp(FPickUpSaveData InPickUpData);
-
-	void AttachPickUp(AAbilityPickUpBase* InPickUp);
-
-	void DetachPickUp(AAbilityPickUpBase* InPickUp);
-
-	void DestroyPickUp(AAbilityPickUpBase* InPickUp);
+	virtual void DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary);
 };
 

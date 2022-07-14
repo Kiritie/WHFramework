@@ -3,7 +3,23 @@
 
 #include "Ability/AbilityModule.h"
 
+#include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/Item/Equip/AbilityEquipDataBase.h"
+#include "Ability/Item/Prop/AbilityPropDataBase.h"
+#include "Ability/Item/Skill/AbilitySkillDataBase.h"
+#include "Ability/PickUp/AbilityPickUpBase.h"
+#include "Ability/PickUp/AbilityPickUpEquip.h"
+#include "Ability/PickUp/AbilityPickUpProp.h"
+#include "Ability/PickUp/AbilityPickUpSkill.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Ability/Vitality/AbilityVitalityBase.h"
+#include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Global/GlobalBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "Scene/Container/SceneContainerInterface.h"
 
 // Sets default values
 AAbilityModule::AAbilityModule()
@@ -60,4 +76,109 @@ FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 		EnumName = InteractActionMap[(EInteractAction)InInteractAction];
 	}
 	return UGlobalBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
+}
+
+AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
+{
+	if(InItem == FAbilityItem::Empty) return nullptr;
+
+	AAbilityPickUpBase* PickUp = nullptr;
+
+	if(InItem.GetData().EqualType(EAbilityItemType::Voxel))
+	{
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
+	}
+	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
+	{
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
+	}
+	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
+	{
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
+	}
+	else if(InItem.GetData().EqualType(EAbilityItemType::Skill))
+	{
+		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+	}
+
+	if(PickUp)
+	{
+		PickUp->Initialize(InItem);
+		PickUp->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(PickUp);
+		}
+	}
+	return PickUp;
+}
+
+AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	const auto SaveData = InSaveData->ToRef<FPickUpSaveData>();
+	return SpawnPickUp(SaveData.Item, SaveData.Location);
+}
+
+void AAbilityModule::DestroyPickUp(AAbilityPickUpBase* InPickUp)
+{
+	if(!InPickUp || !InPickUp->IsValidLowLevel()) return;
+
+	if(InPickUp->Execute_GetContainer(InPickUp))
+	{
+		InPickUp->Execute_GetContainer(InPickUp)->RemoveSceneActor(InPickUp);
+	}
+	UObjectPoolModuleBPLibrary::DespawnObject(InPickUp);
+}
+
+AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	const auto SaveData = InSaveData->ToRef<FCharacterSaveData>();
+	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>(nullptr, SaveData.GetCharacterData().Class))
+	{
+		USaveGameModuleBPLibrary::LoadObjectData(Character, InSaveData, true);
+		Character->SpawnDefaultController();
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Character);
+		}
+		return Character;
+	}
+	return nullptr;
+}
+
+void AAbilityModule::DestroyCharacter(AAbilityCharacterBase* InCharacter)
+{
+	if(!InCharacter || !InCharacter->IsValidLowLevel()) return;
+
+	if(InCharacter->Execute_GetContainer(InCharacter))
+	{
+		InCharacter->Execute_GetContainer(InCharacter)->RemoveSceneActor(InCharacter);
+	}
+	UObjectPoolModuleBPLibrary::DespawnObject(InCharacter);
+}
+
+AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	const auto SaveData = InSaveData->ToRef<FVitalitySaveData>();
+	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>(nullptr, SaveData.GetVitalityData().Class))
+	{
+		USaveGameModuleBPLibrary::LoadObjectData(Vitality, InSaveData, true);
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Vitality);
+		}
+		return Vitality;
+	}
+	return nullptr;
+}
+
+void AAbilityModule::DestroyVitality(AAbilityVitalityBase* InVitality)
+{
+	if(!InVitality || !InVitality->IsValidLowLevel()) return;
+
+	if(InVitality->Execute_GetContainer(InVitality))
+	{
+		InVitality->Execute_GetContainer(InVitality)->RemoveSceneActor(InVitality);
+	}
+	UObjectPoolModuleBPLibrary::DespawnObject(InVitality);
 }

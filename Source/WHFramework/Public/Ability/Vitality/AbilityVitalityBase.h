@@ -2,15 +2,11 @@
 
 #pragma once
 
-#include "GameFramework/Actor.h"
-#include "AbilitySystemInterface.h"
 #include "AbilityVitalityInterface.h"
-#include "AbilityVitalityDataBase.h"
+#include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Scene/Actor/SceneActorInterface.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
@@ -28,7 +24,7 @@ class UAttributeSetBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IAbilitySystemInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AAbilityActorBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -43,12 +39,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilitySystemComponentBase* AbilitySystem;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityAttributeSetBase* AttributeSet;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVitalityInteractionComponent* Interaction;
 
@@ -65,9 +55,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FName RaceID;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 EXP;
@@ -77,9 +64,6 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 EXPFactor;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	AVoxelChunk* OwnerChunk;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FVoxelItem GeneratingVoxelItem;
@@ -119,46 +103,32 @@ public:
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 public:
-	UFUNCTION(BlueprintCallable)
 	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual bool ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation = false) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual bool ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation = false) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual bool ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation = false) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual void CancelAbility(UAbilityBase* Ability) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual void CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual void CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore=nullptr) override;
 	
-	UFUNCTION(BlueprintCallable)
 	virtual void CancelAllAbilities(UAbilityBase* Ignore=nullptr) override;
 	
-	UFUNCTION(BlueprintCallable)
 	virtual FActiveGameplayEffectHandle ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass) override;
 	
-	UFUNCTION(BlueprintCallable)
 	virtual FActiveGameplayEffectHandle ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle) override;
 		
-	UFUNCTION(BlueprintCallable)
 	virtual FActiveGameplayEffectHandle ApplyEffectBySpec(const FGameplayEffectSpec& Spec) override;
 
-	UFUNCTION(BlueprintCallable)
 	virtual bool RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove=-1) override;
 
-	UFUNCTION(BlueprintPure)
 	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) override;
-
-	UFUNCTION(BlueprintPure)
+	
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
 
 	UFUNCTION(BlueprintCallable)
@@ -192,25 +162,23 @@ public:
 	virtual FName GetNameV() const override { return Name; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNameV(FName InName) override;
+	virtual void SetNameV(FName InName) override { Name = InName; }
 	
 	UFUNCTION(BlueprintPure)
 	virtual FName GetRaceID() const override { return RaceID; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetRaceID(FName InRaceID) override;
+	virtual void SetRaceID(FName InRaceID) override { RaceID = InRaceID; }
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetLevelV(int32 InLevel) override;
+	virtual int32 GetLevelV() const override { return Super::GetLevelV(); }
 
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual void SetLevelV(int32 InLevel) override { Super::SetLevelV(InLevel); }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetEXP() const override { return EXP; }
 		
 	UFUNCTION(BlueprintCallable)
-	virtual void SetEXP(int32 InEXP) override;
+	virtual void SetEXP(int32 InEXP) override { EXP = InEXP; }
 		
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetBaseEXP() const override { return BaseEXP; }
@@ -247,12 +215,6 @@ public:
 
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
 
-	UFUNCTION(BlueprintPure)
-	virtual AVoxelChunk* GetOwnerChunk() const override { return OwnerChunk; }
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) override { OwnerChunk = InOwnerChunk; }
-
 	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
 
 	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) override { GeneratingVoxelItem = InGeneratingVoxelItem; }
@@ -268,17 +230,6 @@ public:
 	}
 	
 	UAbilityVitalityDataBase& GetVitalityData() const;
-
-	UFUNCTION(BlueprintPure)
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-
-	template<class T>
-	T* GetAttributeSet() const
-	{
-		return Cast<T>(AttributeSet);
-	}
-	UFUNCTION(BlueprintPure)
-	UVitalityAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
 
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;

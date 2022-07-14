@@ -5,9 +5,13 @@
 #include "CoreMinimal.h"
 #include "AbilityModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
+#include "Scene/Container/SceneContainerInterface.h"
 
 #include "AbilityModule.generated.h"
 
+class AAbilityVitalityBase;
+class AAbilityCharacterBase;
+class AAbilityPickUpBase;
 UCLASS()
 class WHFRAMEWORK_API AAbilityModule : public AModuleBase
 {
@@ -40,7 +44,32 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EInteractAction, FString> InteractActionMap;
 
+	//////////////////////////////////////////////////////////////////////////
+	// Interact
 public:
 	UFUNCTION(BlueprintPure)
 	FText GetInteractActionDisplayName(int32 InInteractAction);
+
+	//////////////////////////////////////////////////////////////////////////
+	// PickUp
+public:
+	virtual AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual void DestroyPickUp(AAbilityPickUpBase* InPickUp);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Character
+public:
+	virtual AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual void DestroyCharacter(AAbilityCharacterBase* InCharacter);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Vitality
+public:
+	virtual AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual void DestroyVitality(AAbilityVitalityBase* InVitality);
 };

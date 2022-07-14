@@ -2,9 +2,13 @@
 
 #include "Abilities/GameplayAbilityTypes.h"
 #include "Asset/AssetManagerBase.h"
+#include "SaveGame/SaveGameModuleTypes.h"
+#include "Abilities/GameplayAbility.h"
 
 #include "AbilityModuleTypes.generated.h"
 
+class UAbilityCharacterDataBase;
+class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
@@ -602,4 +606,93 @@ public:
 	FORCEINLINE FCharacterRaceData()
 	{
 	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Location;
+	
+	FORCEINLINE FPickUpSaveData()
+	{
+		Item = FAbilityItem::Empty;
+		Location = FVector::ZeroVector;
+	}
+};
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVitalitySaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVitalitySaveData()
+	{
+		Name = NAME_None;
+		RaceID = NAME_None;
+		Level = 0;
+		EXP = 0;
+		SpawnLocation = FVector::ZeroVector;
+		SpawnRotation = FRotator::ZeroRotator;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(BlueprintReadWrite)
+	FName Name;
+		
+	UPROPERTY(BlueprintReadOnly)
+	FName RaceID;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 Level;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 EXP;
+	
+	UPROPERTY()
+	FVector SpawnLocation;
+	
+	UPROPERTY()
+	FRotator SpawnRotation;
+
+	UPROPERTY()
+	FAbilityData DefaultAbility;
+
+public:
+	template<class T>
+	T& GetVitalityData() const
+	{
+		return static_cast<T&>(GetVitalityData());
+	}
+
+	UAbilityVitalityDataBase& GetVitalityData() const;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCharacterSaveData : public FVitalitySaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FCharacterSaveData()
+	{
+	}
+
+public:
+	template<class T>
+	T& GetCharacterData() const
+	{
+		return static_cast<T&>(GetCharacterData());
+	}
+
+	UAbilityCharacterDataBase& GetCharacterData() const;
 };

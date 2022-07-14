@@ -51,11 +51,21 @@ void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent,
 
 FVoxelItem& AVoxelAuxiliary::GetVoxelItem() const
 {
-	if(OwnerChunk)
+	if(Container)
 	{
-		return OwnerChunk->GetVoxelItem(VoxelIndex);
+		return Container->GetVoxelItem(VoxelIndex);
 	}
 	return FVoxelItem::EmptyVoxel;
+}
+
+TScriptInterface<ISceneContainerInterface> AVoxelAuxiliary::GetContainer_Implementation() const
+{
+	return Container;
+}
+
+void AVoxelAuxiliary::SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer)
+{
+	Container = Cast<AVoxelChunk>(InContainer.GetObject());
 }
 
 UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const

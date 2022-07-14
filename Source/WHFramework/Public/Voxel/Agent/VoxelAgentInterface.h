@@ -29,10 +29,6 @@ public:
 public:
 	virtual FVector GetWorldLocation() const = 0;
 
-	virtual AVoxelChunk* GetOwnerChunk() const = 0;
-
-	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) = 0;
-
 	virtual FVoxelItem& GetGeneratingVoxelItem() = 0;
 
 	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) = 0;

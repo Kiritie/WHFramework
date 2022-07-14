@@ -6,7 +6,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "TimerManager.h"
-#include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"

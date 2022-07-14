@@ -36,6 +36,16 @@ UAbilityItemDataBase& FAbilityData::GetItemData() const
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
 }
 
+UAbilityVitalityDataBase& FVitalitySaveData::GetVitalityData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(ID);
+}
+
+UAbilityCharacterDataBase& FCharacterSaveData::GetCharacterData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(ID);
+}
+
 bool FGameplayEffectContainerSpec::HasValidTargets() const
 {
 	return TargetGameplayEffectSpecs.Num() > 0;

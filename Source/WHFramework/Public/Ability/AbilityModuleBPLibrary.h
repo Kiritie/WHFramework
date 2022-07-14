@@ -7,6 +7,10 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
+class ISceneContainerInterface;
+class AAbilityVitalityBase;
+class AAbilityCharacterBase;
+class AAbilityPickUpBase;
 /**
  * 
  */
@@ -31,4 +35,24 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
 	static FCharacterRaceData RandomCharacterRaceData();
+
+	//////////////////////////////////////////////////////////////////////////
+	// PickUp
+	static AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+
+	static AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	static void DestroyPickUp(AAbilityPickUpBase* InPickUp);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Character
+	static AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	static void DestroyCharacter(AAbilityCharacterBase* InCharacter);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Vitality
+	static AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	static void DestroyVitality(AAbilityVitalityBase* InVitality);
 };

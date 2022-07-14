@@ -32,7 +32,7 @@ protected:
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
-	AActor* Container;
+	TScriptInterface<ISceneContainerInterface> Container;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -43,8 +43,6 @@ protected:
 
 public:
 	virtual void Initialize(FAbilityItem InItem);
-
-	virtual void RemoveFromContainer_Implementation() override;
 
 protected:
 	UFUNCTION()
@@ -64,9 +62,9 @@ public:
 public:
 	FAbilityItem& GetItem() { return Item; }
 	
-	virtual AActor* GetContainer_Implementation() const override { return Container; }
+	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
 
-	virtual void SetContainer_Implementation(AActor* InContainer) override { Container = InContainer; }
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 	
 	UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 

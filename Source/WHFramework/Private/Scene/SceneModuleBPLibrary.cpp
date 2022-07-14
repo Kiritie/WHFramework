@@ -41,38 +41,20 @@ float USceneModuleBPLibrary::GetAsyncUnloadLevelProgress(FName InLevelPath)
 	return 0.f;
 }
 
-bool USceneModuleBPLibrary::HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured)
+bool USceneModuleBPLibrary::HasSceneActor(FGuid InID, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasSceneActorByClass(InClass, bEnsured);
+		return SceneModule->HasSceneActor(InID, bEnsured);
 	}
 	return false;
 }
 
-bool USceneModuleBPLibrary::HasSceneActorByName(FName InName, bool bEnsured)
+AActor* USceneModuleBPLibrary::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
-		return SceneModule->HasSceneActorByName(InName, bEnsured);
-	}
-	return false;
-}
-
-AActor* USceneModuleBPLibrary::GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		return SceneModule->GetSceneActorByClass(InClass, bEnsured);
-	}
-	return nullptr;
-}
-
-AActor* USceneModuleBPLibrary::GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass, bool bEnsured)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		return SceneModule->GetSceneActorByName(InName, InClass, bEnsured);
+		return SceneModule->GetSceneActor(InID, InClass, bEnsured);
 	}
 	return nullptr;
 }
@@ -85,43 +67,11 @@ void USceneModuleBPLibrary::AddSceneActor(AActor* InActor)
 	}
 }
 
-void USceneModuleBPLibrary::AddSceneActorByName(FName InName, AActor* InActor)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		SceneModule->AddSceneActor(InActor);
-	}
-}
-
 void USceneModuleBPLibrary::RemoveSceneActor(AActor* InActor)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
 	{
 		SceneModule->AddSceneActor(InActor);
-	}
-}
-
-void USceneModuleBPLibrary::RemoveSceneActorByName(FName InName)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		SceneModule->RemoveSceneActorByName(InName);
-	}
-}
-
-void USceneModuleBPLibrary::DestroySceneActor(AActor* InActor)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		SceneModule->DestroySceneActor(InActor);
-	}
-}
-
-void USceneModuleBPLibrary::DestroySceneActorByName(FName InName)
-{
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		SceneModule->DestroySceneActorByName(InName);
 	}
 }
 

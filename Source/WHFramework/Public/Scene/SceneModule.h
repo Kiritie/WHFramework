@@ -90,39 +90,21 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "SceneActor")
 	TArray<AActor*> SceneActors;
 
-	UPROPERTY(EditAnywhere, Category = "SceneActor")
-	TMap<FName, AActor*> SceneActorMap;
+	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
+	TMap<FGuid, AActor*> SceneActorMap;
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual bool HasSceneActorByName(FName InName, bool bEnsured = true) const override;
+	virtual bool HasSceneActor(FGuid InID, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
-	virtual AActor* GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true) const override;
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
-	virtual AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
+	virtual AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void AddSceneActor(AActor* InActor) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddSceneActorByName(FName InName, AActor* InActor) override;
-
-	UFUNCTION(BlueprintCallable)
 	virtual void RemoveSceneActor(AActor* InActor) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void RemoveSceneActorByName(FName InName) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void DestroySceneActor(AActor* InActor) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void DestroySceneActorByName(FName InName) override;
 
 	//////////////////////////////////////////////////////////////////////////
     /// Target Point
@@ -205,10 +187,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline
 protected:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Outline")
 	class UMaterialInterface* OutlineMat;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Outline")
 	FLinearColor OutlineColor;
 
 	UPROPERTY(Transient)

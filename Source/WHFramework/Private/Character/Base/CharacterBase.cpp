@@ -27,7 +27,8 @@ ACharacterBase::ACharacterBase()
 	Anim = nullptr;
 	DefaultController = nullptr;
 
-	OwnerChunk = nullptr;
+	ActorID = FGuid::NewGuid();
+	Container = nullptr;
 }
 
 void ACharacterBase::BeginPlay()

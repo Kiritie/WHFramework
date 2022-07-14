@@ -68,3 +68,63 @@ FCharacterRaceData UAbilityModuleBPLibrary::RandomCharacterRaceData()
 	}
 	return FCharacterRaceData();
 }
+
+AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		return AbilityModule->SpawnPickUp(InItem, InLocation, InContainer);
+	}
+	return nullptr;
+}
+
+AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		return AbilityModule->SpawnPickUp(InSaveData, InContainer);
+	}
+	return nullptr;
+}
+
+void UAbilityModuleBPLibrary::DestroyPickUp(AAbilityPickUpBase* InPickUp)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		AbilityModule->DestroyPickUp(InPickUp);
+	}
+}
+
+AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		return AbilityModule->SpawnCharacter(InSaveData, InContainer);
+	}
+	return nullptr;
+}
+
+void UAbilityModuleBPLibrary::DestroyCharacter(AAbilityCharacterBase* InCharacter)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		AbilityModule->DestroyCharacter(InCharacter);
+	}
+}
+
+AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		return AbilityModule->SpawnVitality(InSaveData, InContainer);
+	}
+	return nullptr;
+}
+
+void UAbilityModuleBPLibrary::DestroyVitality(AAbilityVitalityBase* InVitality)
+{
+	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	{
+		AbilityModule->DestroyVitality(InVitality);
+	}
+}

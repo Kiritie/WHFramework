@@ -34,7 +34,7 @@ public:
 	virtual void OnDespawn_Implementation() override;
 
 	virtual void SpawnDefaultController() override;
-		
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
@@ -45,9 +45,22 @@ public:
 
 	virtual void SetNameC(FName InName) override { Name = InName; }
 
-	virtual FName GetObjectName_Implementation() const override { return Name; }
+	//////////////////////////////////////////////////////////////////////////
+	/// Actor
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	FGuid ActorID;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
+	TScriptInterface<ISceneContainerInterface> Container;
+	
+public:
+	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
 
-	virtual void SetObjectName_Implementation(FName InName) override { Name = InName; }
+	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
+
+	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
+
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim
@@ -69,9 +82,6 @@ public:
 	/// Chunk
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	AVoxelChunk* OwnerChunk;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FVoxelItem GeneratingVoxelItem;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
@@ -89,12 +99,6 @@ public:
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 	
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
-	
-	UFUNCTION(BlueprintPure)
-	virtual AVoxelChunk* GetOwnerChunk() const override { return OwnerChunk; }
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetOwnerChunk(AVoxelChunk* InOwnerChunk) override { OwnerChunk = InOwnerChunk; }
 
 	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
 

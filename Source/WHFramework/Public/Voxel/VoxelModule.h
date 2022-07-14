@@ -88,16 +88,6 @@ public:
 protected:
 	virtual void OnWorldStateChanged();
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
-	FRandomStream RandomStream;
-public:
-	FRandomStream GetRandomStream() const { return RandomStream; }
-
-protected:
-	UFUNCTION(BlueprintCallable)
-	void InitRandomStream(int32 InDeltaSeed);
-
 public:
 	virtual void LoadData(FSaveData* InSaveData) override;
 

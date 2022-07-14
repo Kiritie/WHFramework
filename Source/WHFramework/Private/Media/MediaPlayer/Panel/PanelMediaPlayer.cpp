@@ -10,7 +10,7 @@ APanelMediaPlayer::APanelMediaPlayer()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("DefaultScene"));
 
-	PlayerName = "TV";
+	Name = "TV";
 	
 	PanelMediaMesh = CreateDefaultSubobject<UStaticMeshComponent>(FName("PanelMediaMesh"));
 	if (PanelMediaMesh)

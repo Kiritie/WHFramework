@@ -1,9 +1,6 @@
 ﻿#pragma once
 
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorInterface.h"
-#include "SaveGame/SaveGameModuleTypes.h"
-#include "Scene/SceneModuleTypes.h"
 
 #include "AbilityVitalityInterface.generated.h"
 
@@ -40,10 +37,6 @@ public:
 	virtual FName GetRaceID() const = 0;
 
 	virtual void SetRaceID(FName InRaceID) = 0;
-	
-	virtual int32 GetLevelV() const = 0;
-
-	virtual void SetLevelV(int32 InLevel) = 0;
 
 	virtual int32 GetEXP() const = 0;
 				

@@ -22,22 +22,3 @@ enum class EWorldTextStyle : uint8
 	// 强调
 	Stress
 };
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Location;
-	
-	FORCEINLINE FPickUpSaveData()
-	{
-		Item = FAbilityItem::Empty;
-		Location = FVector::ZeroVector;
-	}
-};

@@ -108,11 +108,3 @@ AVoxelChunk* FVoxelHitResult::GetOwner() const
 {
 	return VoxelItem.Owner;
 }
-
-void FVoxelWorldSaveData::Initialize()
-{
-	if(WorldSeed == 0)
-	{
-		WorldSeed = FMath::Rand();
-	}
-}

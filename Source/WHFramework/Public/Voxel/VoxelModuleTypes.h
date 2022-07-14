@@ -443,7 +443,6 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int32 TimeSeconds;
-
-public:
-	virtual void Initialize();
+	
+	FRandomStream RandomStream;
 };

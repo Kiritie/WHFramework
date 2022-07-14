@@ -6,6 +6,8 @@
 #include "UObject/Interface.h"
 #include "SceneActorInterface.generated.h"
 
+class ISceneContainerInterface;
+
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class USceneActorInterface : public UInterface
@@ -22,18 +24,14 @@ class WHFRAMEWORK_API ISceneActorInterface
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void RemoveFromContainer();
-
-public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	FName GetObjectName() const;
+	FGuid GetActorID() const;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void SetObjectName(FName InName);
+	void SetActorID(FGuid InID);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	AActor* GetContainer() const;
+	TScriptInterface<ISceneContainerInterface> GetContainer() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void SetContainer(AActor* InContainer);
+	void SetContainer(const TScriptInterface<ISceneContainerInterface>& InContainer);
 };

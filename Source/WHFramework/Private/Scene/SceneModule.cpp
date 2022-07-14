@@ -37,7 +37,7 @@ ASceneModule::ASceneModule()
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
 	SceneActors = TArray<AActor*>();
-	SceneActorMap = TMap<FName, AActor*>();
+	SceneActorMap = TMap<FGuid, AActor*>();
 
 	TargetPoints = TMap<FName, ATargetPoint*>();
 	
@@ -291,104 +291,41 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakeString(InLevelPath.ToString()) });
 }
 
-bool ASceneModule::HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured) const
+bool ASceneModule::HasSceneActor(FGuid InID, bool bEnsured) const
 {
-	if(!InClass) return false;
-	
-	if(InClass->ImplementsInterface(USceneActorInterface::StaticClass()))
-	{
-		return HasSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InClass->GetDefaultObject()), bEnsured);
-	}
-	return false;
-}
-
-bool ASceneModule::HasSceneActorByName(FName InName, bool bEnsured) const
-{
-	if(SceneActorMap.Contains(InName)) return true;
+	if(SceneActorMap.Contains(InID)) return true;
 	ensureEditor(bEnsured);
 	return false;
 }
 
-AActor* ASceneModule::GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured) const
+AActor* ASceneModule::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
-	if(!InClass) return nullptr;
-	
-	if(InClass->ImplementsInterface(USceneActorInterface::StaticClass()))
+	if(HasSceneActor(InID, bEnsured))
 	{
-		return GetSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InClass->GetDefaultObject()), InClass, bEnsured);
-	}
-	return nullptr;
-}
-
-AActor* ASceneModule::GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass, bool bEnsured) const
-{
-	if(HasSceneActorByName(InName, bEnsured))
-	{
-		return SceneActorMap[InName];
+		return SceneActorMap[InID];
 	}
 	return nullptr;
 }
 
 void ASceneModule::AddSceneActor(AActor* InActor)
 {
-	if(!InActor) return;
+	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) == this) return;
 
-	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
+	if(ISceneActorInterface::Execute_GetContainer(InActor))
 	{
-		AddSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor), InActor);
+		ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
 	}
-}
 
-void ASceneModule::AddSceneActorByName(FName InName, AActor* InActor)
-{
-	if(!InActor) return;
-
-	if(!SceneActorMap.Contains(InName))
-	{
-		SceneActorMap.Add(InName, InActor);
-		AddScenePointByName(InName, InActor->GetRootComponent());
-	}
+	SceneActorMap.Add(ISceneActorInterface::Execute_GetActorID(InActor), InActor);
+	ISceneActorInterface::Execute_SetContainer(InActor, this);
 }
 
 void ASceneModule::RemoveSceneActor(AActor* InActor)
 {
-	if(!InActor) return;
+	if(!InActor || !InActor->Implements<USceneActorInterface>() || !SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor))) return;
 
-	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
-	{
-		RemoveSceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor));
-	}
-}
-
-void ASceneModule::RemoveSceneActorByName(FName InName)
-{
-	if(SceneActorMap.Contains(InName))
-	{
-		SceneActorMap.Remove(InName);
-		RemoveScenePointByName(InName);
-	}
-}
-
-void ASceneModule::DestroySceneActor(AActor* InActor)
-{
-	if(!InActor) return;
-
-	if(InActor->GetClass()->ImplementsInterface(USceneActorInterface::StaticClass()))
-	{
-		DestroySceneActorByName(ISceneActorInterface::Execute_GetObjectName(InActor));
-	}
-}
-
-void ASceneModule::DestroySceneActorByName(FName InName)
-{
-	if(SceneActorMap.Contains(InName))
-	{
-		if(SceneActorMap[InName])
-		{
-			SceneActorMap[InName]->Destroy();
-		}
-		SceneActorMap.Remove(InName);
-	}
+	SceneActorMap.Remove(ISceneActorInterface::Execute_GetActorID(InActor));
+	ISceneActorInterface::Execute_SetContainer(SceneActorMap[ISceneActorInterface::Execute_GetActorID(InActor)], nullptr);
 }
 
 bool ASceneModule::HasTargetPointByName(FName InName, bool bEnsured) const

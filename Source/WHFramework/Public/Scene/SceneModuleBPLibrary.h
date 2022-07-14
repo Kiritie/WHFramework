@@ -35,34 +35,16 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Actor
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static bool HasSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
-	static bool HasSceneActorByName(FName InName, bool bEnsured = true);
+	static bool HasSceneActor(FGuid InID, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
-	static AActor* GetSceneActorByClass(TSubclassOf<AActor> InClass, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
-	static AActor* GetSceneActorByName(FName InName, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
+	static AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void AddSceneActor(AActor* InActor);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void AddSceneActorByName(FName InName, AActor* InActor);
-
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
 	static void RemoveSceneActor(AActor* InActor);
-
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void RemoveSceneActorByName(FName InName);
-
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void DestroySceneActor(AActor* InActor);
-
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void DestroySceneActorByName(FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Target Point

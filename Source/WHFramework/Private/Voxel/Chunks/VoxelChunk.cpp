@@ -928,7 +928,7 @@ bool AVoxelChunk::DestroyVoxel(const FVoxelItem& InVoxelItem)
 		DestroyAuxiliary(InVoxelItem.Auxiliary);
 
 		FVector range = voxelData.GetCeilRange(InVoxelItem.Rotation, InVoxelItem.Scale);
-		SpawnPickUp(FAbilityItem(InVoxelItem.ID, 1), IndexToLocation(InVoxelItem.Index) + range * AVoxelModule::GetWorldData()->BlockSize * 0.5f);
+		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(InVoxelItem.ID, 1), IndexToLocation(InVoxelItem.Index) + range * AVoxelModule::GetWorldData()->BlockSize * 0.5f, this);
 
 		for(int32 x = 0; x < range.X; x++)
 		{
@@ -979,123 +979,61 @@ bool AVoxelChunk::ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelIte
 	return false;
 }
 
+void AVoxelChunk::AddSceneActor(AActor* InActor)
+{
+	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) == this) return;
+
+	if(ISceneActorInterface::Execute_GetContainer(InActor))
+	{
+		ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
+	}
+
+	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
+	{
+		if(!PickUps.Contains(PickUp))
+		{
+			PickUp->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+			PickUp->Execute_SetContainer(PickUp, this);
+			PickUps.Add(PickUp);
+		}
+	}
+}
+
+void AVoxelChunk::RemoveSceneActor(AActor* InActor)
+{
+	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) != this) return;
+
+	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
+	{
+		PickUp->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		PickUp->Execute_SetContainer(PickUp, nullptr);
+		PickUps.Remove(PickUp);
+	}
+}
+
 AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 {
-	UVoxelData& VoxelData = InVoxelItem.GetData<UVoxelData>();
-	if(VoxelMap.Contains(InVoxelItem.Index) && VoxelData.AuxiliaryClass)
+	const UVoxelData& VoxelData = InVoxelItem.GetData<UVoxelData>();
+	if(!VoxelMap.Contains(InVoxelItem.Index) || !VoxelData.AuxiliaryClass) return	nullptr;
+	
+	const FVector Location = IndexToLocation(InVoxelItem.Index, true) + VoxelData.GetCeilRange() * AVoxelModule::GetWorldData()->BlockSize * 0.5f;
+	if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
 	{
-		const FVector Location = IndexToLocation(InVoxelItem.Index, true) + VoxelData.GetCeilRange() * AVoxelModule::GetWorldData()->BlockSize * 0.5f;
-		if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
-		{
-			InVoxelItem.Auxiliary = Auxiliary;
-			Auxiliary->Initialize(this, InVoxelItem.Index);
-			Auxiliary->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-			Auxiliary->SetActorLocationAndRotation(Location, InVoxelItem.Rotation);
-			//SetVoxelSample(InVoxelItem.Index, InVoxelItem, false, false);
-			return Auxiliary;
-		}
+		InVoxelItem.Auxiliary = Auxiliary;
+		Auxiliary->Initialize(this, InVoxelItem.Index);
+		Auxiliary->SetActorLocationAndRotation(Location, InVoxelItem.Rotation);
+		//SetVoxelSample(InVoxelItem.Index, InVoxelItem, false, false);
+		AddSceneActor(Auxiliary);
+		return Auxiliary;
 	}
 	return nullptr;
 }
 
 void AVoxelChunk::DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary)
 {
-	if(!InAuxiliary || !InAuxiliary->IsValidLowLevel()) return;
+	if(!InAuxiliary || !InAuxiliary->IsValidLowLevel() || !VoxelMap.Contains(InAuxiliary->GetVoxelItem().Index)) return;
 
-	if(VoxelMap.Contains(InAuxiliary->GetVoxelItem().Index))
-	{
-		InAuxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		InAuxiliary->Destroy();
-		InAuxiliary->GetVoxelItem().Auxiliary = nullptr;
-	}
-}
-
-void AVoxelChunk::AddSceneActor(AActor* InActor)
-{
-	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
-	{
-		AttachPickUp(PickUp);
-	}
-}
-
-void AVoxelChunk::RemoveSceneActor(AActor* InActor)
-{
-	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
-	{
-		DetachPickUp(PickUp);
-	}
-}
-
-void AVoxelChunk::DestroySceneActor(AActor* InActor)
-{
-	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
-	{
-		DestroyPickUp(PickUp);
-	}
-}
-
-AAbilityPickUpBase* AVoxelChunk::SpawnPickUp(FAbilityItem InItem, FVector InLocation)
-{
-	if(InItem == FAbilityItem::Empty) return nullptr;
-
-	AAbilityPickUpBase* PickUp = nullptr;
-
-	if(InItem.GetData().EqualType(EAbilityItemType::Voxel))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Skill))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpBase>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
-	}
-
-	if(PickUp)
-	{
-		AttachPickUp(PickUp);
-		PickUp->Initialize(InItem);
-		PickUp->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
-	}
-	return PickUp;
-}
-
-AAbilityPickUpBase* AVoxelChunk::SpawnPickUp(FPickUpSaveData InPickUpData)
-{
-	return SpawnPickUp(InPickUpData.Item, InPickUpData.Location);
-}
-
-void AVoxelChunk::AttachPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if(!InPickUp || !InPickUp->IsValidLowLevel() || PickUps.Contains(InPickUp)) return;
-
-	InPickUp->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-	InPickUp->SetContainer(this);
-	PickUps.Add(InPickUp);
-}
-
-void AVoxelChunk::DetachPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if(!InPickUp || !InPickUp->IsValidLowLevel() || !PickUps.Contains(InPickUp)) return;
-
-	InPickUp->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	InPickUp->SetContainer(nullptr);
-	PickUps.Remove(InPickUp);
-}
-
-void AVoxelChunk::DestroyPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if(!InPickUp || !InPickUp->IsValidLowLevel()) return;
-
-	if(PickUps.Contains(InPickUp))
-	{
-		PickUps.Remove(InPickUp);
-		InPickUp->Destroy();
-	}
+	InAuxiliary->Destroy();
+	InAuxiliary->GetVoxelItem().Auxiliary = nullptr;
+	RemoveSceneActor(InAuxiliary);
 }

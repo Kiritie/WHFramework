@@ -7,6 +7,7 @@
 #include "Ability/Components/VitalityInteractionComponent.h"
 #include "Ability/Abilities/VitalityAbilityBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
+#include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleBPLibrary.h"
@@ -54,20 +55,11 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	EXP = 50;
 	BaseEXP = 100;
 	EXPFactor = 2.f;
-
-	OwnerChunk = nullptr;
 }
 
-// Called when the game starts or when spawned
 void AAbilityVitalityBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	AbilitySystem->InitAbilityActorInfo(this, this);
-	for(auto Iter : AttributeSet->GetAllAttributes())
-	{
-		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityVitalityBase::OnAttributeChange);
-	}
 }
 
 void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
@@ -96,15 +88,15 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(!AttributeSet) return;
+	if(!GetAttributeSet<UVitalityAttributeSetBase>()) return;
 
-	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
+	if(Ar.ArIsSaveGame && GetAttributeSet<UVitalityAttributeSetBase>()->GetPersistentAttributes().Num() > 0)
 	{
 		float BaseValue = 0.f;
 		float CurrentValue = 0.f;
-		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
+		for(FGameplayAttribute& Attribute : GetAttributeSet<UVitalityAttributeSetBase>()->GetPersistentAttributes())
 		{
-			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
+			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(GetAttributeSet<UVitalityAttributeSetBase>()))
 			{
 				if(Ar.IsLoading())
 				{
@@ -163,6 +155,95 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 {
 }
 
+FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel)
+{
+	return Super::AcquireAbility(InAbility, InLevel);
+}
+
+bool AAbilityVitalityBase::ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation)
+{
+	return Super::ActiveAbility(AbilityHandle, bAllowRemoteActivation);
+}
+
+bool AAbilityVitalityBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation)
+{
+	return Super::ActiveAbilityByClass(AbilityClass, bAllowRemoteActivation);
+}
+
+bool AAbilityVitalityBase::ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation)
+{
+	return Super::ActiveAbilityByTag(GameplayTagContainer, bAllowRemoteActivation);
+}
+
+void AAbilityVitalityBase::CancelAbility(UAbilityBase* Ability)
+{
+	Super::CancelAbility(Ability);
+}
+
+void AAbilityVitalityBase::CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle)
+{
+	Super::CancelAbilityByHandle(AbilityHandle);
+}
+
+void AAbilityVitalityBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore)
+{
+	Super::CancelAbilities(WithTags, WithoutTags, Ignore);
+}
+
+void AAbilityVitalityBase::CancelAllAbilities(UAbilityBase* Ignore)
+{
+	Super::CancelAllAbilities(Ignore);
+}
+
+FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass)
+{
+	return Super::ApplyEffectByClass(EffectClass);
+}
+
+FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle)
+{
+	return Super::ApplyEffectBySpecHandle(SpecHandle);
+}
+
+FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpec(const FGameplayEffectSpec& Spec)
+{
+	return Super::ApplyEffectBySpec(Spec);
+}
+
+bool AAbilityVitalityBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove)
+{
+	return Super::RemoveEffect(Handle, StacksToRemove);
+}
+
+void AAbilityVitalityBase::GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities)
+{
+	Super::GetActiveAbilities(AbilityTags, ActiveAbilities);
+}
+
+bool AAbilityVitalityBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
+{
+	if (AbilitySystem && AbilityClass != nullptr)
+	{
+		float Cost = 0;
+		float Cooldown = 0;
+		EAbilityCostType CostType = EAbilityCostType::None;
+		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
+		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+		{
+			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
+			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, Cost);
+			if (ModifierInfo.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
+			{
+				CostType = EAbilityCostType::Health;
+			}
+		}
+		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, Cooldown);
+		OutAbilityInfo = FAbilityInfo(CostType, Cost, Cooldown);
+		return true;
+	}
+	return false;
+}
+
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DeadTag) || bCheckDying && IsDying();
@@ -171,26 +252,6 @@ bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 bool AAbilityVitalityBase::IsDying() const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DyingTag);
-}
-
-void AAbilityVitalityBase::SetNameV(FName InName)
-{
-	Name = InName;
-}
-
-void AAbilityVitalityBase::SetRaceID(FName InRaceID)
-{
-	RaceID = InRaceID;
-}
-
-void AAbilityVitalityBase::SetLevelV(int32 InLevel)
-{
-	Level = InLevel;
-}
-
-void AAbilityVitalityBase::SetEXP(int32 InEXP)
-{
-	EXP = InEXP;
 }
 
 int32 AAbilityVitalityBase::GetMaxEXP() const
@@ -220,32 +281,32 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 
 float AAbilityVitalityBase::GetHealth() const
 {
-	return AttributeSet->GetHealth();
+	return GetAttributeSet<UVitalityAttributeSetBase>()->GetHealth();
 }
 
 void AAbilityVitalityBase::SetHealth(float InValue)
 {
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetHealthAttribute(), EGameplayModOp::Override, InValue);
+	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute(), EGameplayModOp::Override, InValue);
 }
 
 float AAbilityVitalityBase::GetMaxHealth() const
 {
-	return AttributeSet->GetMaxHealth();
+	return GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxHealth();
 }
 
 void AAbilityVitalityBase::SetMaxHealth(float InValue)
 {
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetMaxHealthAttribute(), EGameplayModOp::Override, InValue);
+	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxHealthAttribute(), EGameplayModOp::Override, InValue);
 }
 
 float AAbilityVitalityBase::GetPhysicsDamage() const
 {
-	return AttributeSet->GetPhysicsDamage();
+	return GetAttributeSet<UVitalityAttributeSetBase>()->GetPhysicsDamage();
 }
 
 float AAbilityVitalityBase::GetMagicDamage() const
 {
-	return AttributeSet->GetMagicDamage();
+	return GetAttributeSet<UVitalityAttributeSetBase>()->GetMagicDamage();
 }
 
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
@@ -253,159 +314,9 @@ UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
-UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
-{
-	return AbilitySystem;
-}
-
-FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
-{
-	if (AbilitySystem && InAbility)
-	{
-		FGameplayAbilitySpecDef SpecDef = FGameplayAbilitySpecDef();
-		SpecDef.Ability = InAbility;
-		FGameplayAbilitySpec AbilitySpec = FGameplayAbilitySpec(SpecDef, InLevel);
-		return AbilitySystem->GiveAbility(AbilitySpec);
-	}
-	return FGameplayAbilitySpecHandle();
-}
-
-bool AAbilityVitalityBase::ActiveAbility(FGameplayAbilitySpecHandle SpecHandle, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbility(SpecHandle, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityVitalityBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilityByClass(AbilityClass, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityVitalityBase::ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilitiesByTag(GameplayTagContainer, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-void AAbilityVitalityBase::CancelAbility(UAbilityBase* Ability)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbility(Ability);
-	}
-}
-
-void AAbilityVitalityBase::CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilityHandle(AbilityHandle);
-	}
-}
-
-void AAbilityVitalityBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilities(&WithTags, &WithoutTags, Ignore);
-	}
-}
-
-void AAbilityVitalityBase::CancelAllAbilities(UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAllAbilities(Ignore);
-	}
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass)
-{
-	if (AbilitySystem)
-	{
-		auto effectContext = AbilitySystem->MakeEffectContext();
-		effectContext.AddSourceObject(this);
-		auto specHandle = AbilitySystem->MakeOutgoingSpec(EffectClass, GetLevelV(), effectContext);
-		if (specHandle.IsValid())
-		{
-			return AbilitySystem->ApplyGameplayEffectSpecToSelf(*specHandle.Data.Get());
-		}
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpec(const FGameplayEffectSpec& Spec)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(Spec);
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-bool AAbilityVitalityBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove/*=-1*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->RemoveActiveGameplayEffect(Handle, StacksToRemove);
-	}
-	return false;
-}
-
-void AAbilityVitalityBase::GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->GetActiveAbilitiesWithTags(AbilityTags, ActiveAbilities);
-	}
-}
-
-bool AAbilityVitalityBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
-{
-	if (AbilitySystem && AbilityClass != nullptr)
-	{
-		float Cost = 0;
-		float Cooldown = 0;
-		EAbilityCostType CostType = EAbilityCostType::None;
-		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
-		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
-		{
-			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
-			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, Cost);
-			if (ModifierInfo.Attribute == AttributeSet->GetHealthAttribute())
-			{
-				CostType = EAbilityCostType::Health;
-			}
-		}
-		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, Cooldown);
-		OutAbilityInfo = FAbilityInfo(CostType, Cost, Cooldown);
-		return true;
-	}
-	return false;
-}
-
 void AAbilityVitalityBase::ModifyHealth(float InDeltaValue)
 {
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetHealthAttribute(), EGameplayModOp::Additive, InDeltaValue);
+	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute(), EGameplayModOp::Additive, InDeltaValue);
 }
 
 void AAbilityVitalityBase::ModifyEXP(float InDeltaValue)
@@ -509,7 +420,7 @@ UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue != 0.f)
@@ -517,7 +428,6 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
 		}
 	}
-
 }
 
 void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
