@@ -89,7 +89,7 @@ void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(CurrentStep)
 		{
-			if(!CurrentStep->IsA(URootStepBase::StaticClass()))
+			if(!CurrentStep->IsA<URootStepBase>())
 			{
 				if(CurrentStep->GetStepState() != EStepState::Leaved)
 				{
@@ -101,7 +101,7 @@ void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
 					{
 						CurrentStep->ParentStep->Refresh();
 					}
-					else if(CurrentStep->ParentStep->IsA(URootStepBase::StaticClass()))
+					else if(CurrentStep->ParentStep->IsA<URootStepBase>())
 					{
 						StartStep(CurrentStep->ParentStep->StepIndex + 1, false);
 					}
@@ -141,7 +141,7 @@ void AStepModule::OnTermination_Implementation()
 
 void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
-	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA(URootStepBase::StaticClass()) ? FirstStep->StepIndex : -1;
+	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA<URootStepBase>() ? FirstStep->StepIndex : -1;
 	if(InRootStepIndex != -1)
 	{
 		if(RootSteps.IsValidIndex(InRootStepIndex))
@@ -263,7 +263,7 @@ void AStepModule::EnterStep(UStepBase* InStep)
 		}
 		InStep->OnEnter(CurrentStep);
 
-		if(InStep->IsA(URootStepBase::StaticClass()))
+		if(InStep->IsA<URootStepBase>())
 		{
 			CurrentRootStepIndex = InStep->StepIndex;
 		}
@@ -321,7 +321,7 @@ void AStepModule::LeaveStep(UStepBase* InStep)
 	if(InStep->GetStepState() != EStepState::Leaved)
 	{
 		InStep->OnLeave();
-		if(InStep->IsA(URootStepBase::StaticClass()))
+		if(InStep->IsA<URootStepBase>())
 		{
 			if(InStep->StepIndex == RootSteps.Num() - 1)
 			{

@@ -23,14 +23,14 @@ void UParameterSaveGame::OnLoad_Implementation()
 	Super::OnLoad_Implementation();
 }
 
-void UParameterSaveGame::OnUnload_Implementation()
+void UParameterSaveGame::OnUnload_Implementation(bool bForceMode)
 {
-	Super::OnLoad_Implementation();
+	Super::OnUnload_Implementation(bForceMode);
 }
 
 void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(USaveGameModuleBPLibrary::ObjectToData(AMainModule::GetModuleByClass<AParameterModule>()));
+	SetSaveData(AMainModule::GetModuleByClass<AParameterModule>()->ToSaveData());
 }

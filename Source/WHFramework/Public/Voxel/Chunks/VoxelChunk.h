@@ -31,6 +31,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void LoadData(FSaveData* InSaveData) override;
+
+	virtual FSaveData* ToData() override;
+
 	UFUNCTION()
 	virtual void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 	
@@ -107,10 +111,6 @@ public:
 	// Chunk
 public:
 	virtual void Initialize(FIndex InIndex, int32 InBatch);
-
-	virtual void LoadData(FSaveData* InSaveData) override;
-
-	virtual FSaveData* ToData() override;
 
 	virtual void Generate();
 

@@ -514,7 +514,7 @@ void SStepListWidget::SetIsEditMode(bool bInIsEditMode)
 		if(SelectedStepListItems.Num() > 0)
 		{
 			SelectedStepClass = SelectedStepListItems[0]->Step->GetClass();
-			if(SelectedStepClass->IsChildOf(URootStepBase::StaticClass()))
+			if(SelectedStepClass->IsChildOf<URootStepBase>())
 			{
 				StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
 				StepClassFilter->UnIncludeParentClass = nullptr;
@@ -609,7 +609,7 @@ void SStepListWidget::UpdateSelection()
 	{
 		SelectedStepListItems = SelectedItems;
 		SelectedStepClass = !bEditMode ? UStepBase::StaticClass() : SelectedStepListItems[0]->Step->GetClass();
-		if(SelectedStepClass->IsChildOf(URootStepBase::StaticClass()))
+		if(SelectedStepClass->IsChildOf<URootStepBase>())
 		{
 			StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
 			StepClassFilter->UnIncludeParentClass = nullptr;

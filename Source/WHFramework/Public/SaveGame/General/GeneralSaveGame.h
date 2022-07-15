@@ -23,7 +23,7 @@ public:
 	
 	virtual void OnLoad_Implementation() override;
 	
-	virtual void OnUnload_Implementation() override;
+	virtual void OnUnload_Implementation(bool bForceMode) override;
 
 	virtual void OnRefresh_Implementation() override;
 	
@@ -34,5 +34,5 @@ protected:
 public:
 	virtual FSaveData* GetSaveData() override { return &GeneralSaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { GeneralSaveData = InSaveData->ToRef<FGeneralSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { GeneralSaveData = InSaveData->CastRef<FGeneralSaveData>(); }
 };

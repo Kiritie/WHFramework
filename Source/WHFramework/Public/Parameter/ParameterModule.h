@@ -42,7 +42,7 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
-public:
+protected:
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData() override;

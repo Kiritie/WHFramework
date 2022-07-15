@@ -146,13 +146,13 @@ public:
 	static USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
 
 	template<class T>
-	static bool UnloadSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return UnloadSaveGame(InSaveGameClass, InSaveIndex);
+		return UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModuleBPLibrary")
-	static bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	static bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
 
 	template<class T>
 	static bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
@@ -180,24 +180,4 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModuleBPLibrary")
 	static bool DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// SaveData
-	static void LoadObjectData(UObject* InObject, FSaveData* InSaveData, bool bLoadMemoryData = false);
-
-	template<class T>
-	static T* ObjectToData(UObject* InObject, bool bMakeSaved = true, bool bSaveMemoryData = false)
-	{
-		return static_cast<T*>(ObjectToData(InObject, bMakeSaved, bSaveMemoryData));
-	}
-
-	template<class T>
-	static T& ObjectToDataRef(UObject* InObject, bool bMakeSaved = true, bool bSaveMemoryData = false)
-	{
-		return *ObjectToData<T>(InObject, bMakeSaved, bSaveMemoryData);
-	}
-
-	static FSaveData* ObjectToData(UObject* InObject, bool bMakeSaved = true, bool bSaveMemoryData = false);
-
-	static void UnloadDataObject(UObject* InObject);
 };

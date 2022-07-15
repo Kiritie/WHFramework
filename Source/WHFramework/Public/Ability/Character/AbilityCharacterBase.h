@@ -106,6 +106,10 @@ protected:
 
 	virtual void OnDespawn_Implementation() override;
 
+	virtual void LoadData(FSaveData* InSaveData) override;
+
+	virtual FSaveData* ToData() override;
+
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	virtual void BindASCInput();
@@ -120,10 +124,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void Serialize(FArchive& Ar) override;
-
-	virtual void LoadData(FSaveData* InSaveData) override;
-
-	virtual FSaveData* ToData() override;
 			
 	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
 

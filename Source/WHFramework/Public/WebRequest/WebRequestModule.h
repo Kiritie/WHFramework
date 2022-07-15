@@ -89,7 +89,7 @@ public:
 	template<class T>
 	T* GetWebInterface()
 	{
-		return Cast<T>(etWebInterface(T::StaticClass()));
+		return Cast<T>(GetWebInterface(T::StaticClass()));
 	}
 	UFUNCTION(BlueprintCallable)
 	UWebInterfaceBase* GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);

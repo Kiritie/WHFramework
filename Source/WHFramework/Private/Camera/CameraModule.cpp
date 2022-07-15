@@ -450,7 +450,7 @@ void ACameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEase
 		CameraDoMoveLocation = CurrentCameraLocation;
 		CameraDoMoveEaseType = InEaseType;
 	}
-	else if(CurrentCamera && CurrentCamera->IsA(ACameraPawnBase::StaticClass()))
+	else if(CurrentCamera && CurrentCamera->IsA<ACameraPawnBase>())
 	{
 		CurrentCameraLocation = TargetCameraLocation;
 		CurrentCamera->SetActorLocation(TargetCameraLocation);

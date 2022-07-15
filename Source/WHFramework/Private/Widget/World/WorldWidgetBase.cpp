@@ -85,7 +85,7 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 		InputModule->UpdateInputMode();
 	}
 
-	if(InSceneComp && InSceneComp->IsA(UWorldWidgetComponent::StaticClass()))
+	if(InSceneComp && InSceneComp->IsA<UWorldWidgetComponent>())
 	{
 		WidgetComponent = Cast<UWorldWidgetComponent>(InSceneComp);
 	}

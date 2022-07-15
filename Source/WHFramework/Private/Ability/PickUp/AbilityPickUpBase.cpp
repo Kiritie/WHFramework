@@ -65,7 +65,7 @@ void AAbilityPickUpBase::OnDespawn_Implementation()
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData)
 {
-	const auto SaveData = InSaveData->ToRef<FPickUpSaveData>();
+	const auto SaveData = InSaveData->CastRef<FPickUpSaveData>();
 	Item = SaveData.Item;
 	SetActorLocation(SaveData.Location);
 }

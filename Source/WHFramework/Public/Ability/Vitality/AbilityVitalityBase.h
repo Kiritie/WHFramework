@@ -75,6 +75,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void LoadData(FSaveData* InSaveData) override;
+
+	virtual FSaveData* ToData() override;
+
 	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
 
 public:
@@ -85,10 +89,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void Serialize(FArchive& Ar) override;
-
-	virtual void LoadData(FSaveData* InSaveData) override;
-
-	virtual FSaveData* ToData() override;
 
 	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
 

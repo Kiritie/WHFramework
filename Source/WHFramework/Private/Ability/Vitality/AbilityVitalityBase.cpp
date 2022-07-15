@@ -17,6 +17,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
 
@@ -60,6 +61,16 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 void AAbilityVitalityBase::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void AAbilityVitalityBase::LoadData(FSaveData* InSaveData)
+{
+
+}
+
+FSaveData* AAbilityVitalityBase::ToData()
+{
+	return nullptr;
 }
 
 void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
@@ -115,16 +126,6 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 			}
 		}
 	}
-}
-
-void AAbilityVitalityBase::LoadData(FSaveData* InSaveData)
-{
-
-}
-
-FSaveData* AAbilityVitalityBase::ToData()
-{
-	return nullptr;
 }
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
@@ -371,7 +372,7 @@ bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHi
 {
 	bool bSuccess = false;
 	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
-	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::GetWorldData()->GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
 	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
 
 	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)

@@ -24,6 +24,16 @@ public:
 	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Data
+public:
+	template<class T>
+	static T& GetWorldData()
+	{
+		return static_cast<T&>(GetWorldData());
+	}
+	static FVoxelWorldSaveData& GetWorldData();
+
+	//////////////////////////////////////////////////////////////////////////
 	// Index
 public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")

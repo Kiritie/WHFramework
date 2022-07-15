@@ -43,7 +43,7 @@ void FFiniteStateEditor::EnsureFiniteStateBlueprintIsUpToDate(UBlueprint* Bluepr
 		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
 		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
 		{
-			check(!Graph->Schema->GetClass()->IsChildOf(UFiniteStateGraphSchema::StaticClass()));
+			check(!Graph->Schema->GetClass()->IsChildOf<UFiniteStateGraphSchema>());
 			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
 			break;
 		}

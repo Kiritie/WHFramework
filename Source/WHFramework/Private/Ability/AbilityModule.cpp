@@ -115,7 +115,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 
 AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	const auto SaveData = InSaveData->ToRef<FPickUpSaveData>();
+	const auto SaveData = InSaveData->CastRef<FPickUpSaveData>();
 	return SpawnPickUp(SaveData.Item, SaveData.Location);
 }
 
@@ -132,10 +132,10 @@ void AAbilityModule::DestroyPickUp(AAbilityPickUpBase* InPickUp)
 
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	const auto SaveData = InSaveData->ToRef<FCharacterSaveData>();
+	const auto SaveData = InSaveData->CastRef<FCharacterSaveData>();
 	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>(nullptr, SaveData.GetCharacterData().Class))
 	{
-		USaveGameModuleBPLibrary::LoadObjectData(Character, InSaveData, true);
+		Character->LoadSaveData(InSaveData, true);
 		Character->SpawnDefaultController();
 		if(InContainer)
 		{
@@ -159,10 +159,10 @@ void AAbilityModule::DestroyCharacter(AAbilityCharacterBase* InCharacter)
 
 AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	const auto SaveData = InSaveData->ToRef<FVitalitySaveData>();
+	const auto SaveData = InSaveData->CastRef<FVitalitySaveData>();
 	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>(nullptr, SaveData.GetVitalityData().Class))
 	{
-		USaveGameModuleBPLibrary::LoadObjectData(Vitality, InSaveData, true);
+		Vitality->LoadSaveData(InSaveData, true);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Vitality);

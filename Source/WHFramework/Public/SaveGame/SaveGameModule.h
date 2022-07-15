@@ -45,7 +45,7 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
-public:
+protected:
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData() override;
@@ -189,13 +189,13 @@ public:
 	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
 
 	template<class T>
-	bool UnloadSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return UnloadSaveGame(InSaveGameClass, InSaveIndex);
+		return UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
 
 	template<class T>
 	bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

@@ -43,7 +43,7 @@ void FProcedureEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
 		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
 		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
 		{
-			check(!Graph->Schema->GetClass()->IsChildOf(UProcedureGraphSchema::StaticClass()));
+			check(!Graph->Schema->GetClass()->IsChildOf<UProcedureGraphSchema>());
 			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
 			break;
 		}

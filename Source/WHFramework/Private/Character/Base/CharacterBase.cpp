@@ -16,6 +16,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Tasks/AITask_MoveTo.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
 
@@ -84,7 +85,7 @@ bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResul
 {
 	bool bSuccess = false;
 	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
-	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::GetWorldData()->GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
 	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
 
 	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)

@@ -12,15 +12,24 @@ FPrimaryAssetId UVoxelModuleBPLibrary::GetAssetIDByVoxelType(EVoxelType InVoxelT
 	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
 }
 
+FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->GetWorldData();
+	}
+	return FVoxelWorldSaveData::Empty;
+}
+
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
-	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / AVoxelModule::GetWorldData()->GetChunkLength()),
-		FMath::FloorToInt(InLocation.Y / AVoxelModule::GetWorldData()->GetChunkLength()),
-		bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z / AVoxelModule::GetWorldData()->GetChunkLength()));
+	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / UVoxelModuleBPLibrary::GetWorldData().GetChunkLength()),
+		FMath::FloorToInt(InLocation.Y / UVoxelModuleBPLibrary::GetWorldData().GetChunkLength()),
+		bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z / UVoxelModuleBPLibrary::GetWorldData().GetChunkLength()));
 	return chunkIndex;
 }
 
 FVector UVoxelModuleBPLibrary::ChunkIndexToLocation(FIndex InIndex)
 {
-	return InIndex.ToVector() * AVoxelModule::GetWorldData()->GetChunkLength();
+	return InIndex.ToVector() * UVoxelModuleBPLibrary::GetWorldData().GetChunkLength();
 }

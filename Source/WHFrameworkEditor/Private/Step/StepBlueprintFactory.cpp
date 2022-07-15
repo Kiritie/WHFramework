@@ -34,12 +34,12 @@ bool UStepBlueprintFactory::ConfigureProperties()
 UObject* UStepBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn, FName CallingContext)
 {
 	// Make sure we are trying to factory a Step blueprint, then create and init one
-	check(Class->IsChildOf(UStepBlueprint::StaticClass()));
+	check(Class->IsChildOf<UStepBlueprint>());
 
 	// If they selected an interface, force the parent class to be UInterface
 	if(BlueprintType == BPTYPE_Interface) { ParentClass = UInterface::StaticClass(); }
 
-	if((ParentClass == NULL) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf(UStepBase::StaticClass()))
+	if((ParentClass == NULL) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf<UStepBase>())
 	{
 		FFormatNamedArguments Args;
 		Args.Add(TEXT("ClassName"), (ParentClass != NULL) ? FText::FromString(ParentClass->GetName()) : LOCTEXT("Null", "(null)"));

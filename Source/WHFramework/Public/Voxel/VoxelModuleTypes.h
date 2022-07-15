@@ -164,10 +164,10 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TMap<FName, FParameter> Params;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Transient)
 	AVoxelChunk* Owner;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Transient)
 	AVoxelAuxiliary* Auxiliary;
 
 	static FVoxelItem EmptyVoxel;
@@ -287,6 +287,16 @@ public:
 		Index = FIndex::ZeroIndex;
 		VoxelItems = TArray<FVoxelItem>();
 		PickUpDatas = TArray<FPickUpSaveData>();
+	}
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+		for(auto Iter : PickUpDatas)
+		{
+			Iter.MakeSaved();
+		}
 	}
 };
 

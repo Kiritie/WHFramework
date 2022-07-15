@@ -34,12 +34,12 @@ bool UProcedureBlueprintFactory::ConfigureProperties()
 UObject* UProcedureBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn, FName CallingContext)
 {
 	// Make sure we are trying to factory a Procedure blueprint, then create and init one
-	check(Class->IsChildOf(UProcedureBlueprint::StaticClass()));
+	check(Class->IsChildOf<UProcedureBlueprint>());
 
 	// If they selected an interface, force the parent class to be UInterface
 	if(BlueprintType == BPTYPE_Interface) { ParentClass = UInterface::StaticClass(); }
 
-	if((ParentClass == NULL) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf(UProcedureBase::StaticClass()))
+	if((ParentClass == NULL) || !FKismetEditorUtilities::CanCreateBlueprintOfClass(ParentClass) || !ParentClass->IsChildOf<UProcedureBase>())
 	{
 		FFormatNamedArguments Args;
 		Args.Add(TEXT("ClassName"), (ParentClass != NULL) ? FText::FromString(ParentClass->GetName()) : LOCTEXT("Null", "(null)"));

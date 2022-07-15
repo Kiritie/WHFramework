@@ -5,6 +5,7 @@
 
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Datas/VoxelData.h"
 
@@ -19,7 +20,7 @@ void AAbilityPickUpVoxel::Initialize(FAbilityItem InItem)
 {
 	Super::Initialize(InItem);
 
-	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>().Range * AVoxelModule::GetWorldData()->BlockSize * (1 / Item.GetData<UVoxelData>().Range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>().Range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * (1 / Item.GetData<UVoxelData>().Range.Z) * 0.2f);
 
 	MeshComponent->Initialize(EVoxelMeshType::PickUp);
 	MeshComponent->BuildVoxel(FVoxelItem(Item.ID));

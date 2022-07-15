@@ -24,8 +24,6 @@
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Datas/VoxelData.h"
 
-FVoxelWorldSaveData* AVoxelModule::WorldData = nullptr;
-
 // Sets default values
 AVoxelModule::AVoxelModule()
 {
@@ -122,18 +120,6 @@ void AVoxelModule::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-FVoxelWorldSaveData* AVoxelModule::GetWorldData()
-{
-	if(WorldData)
-	{
-		return WorldData;
-	}
-	else
-	{
-		return &FVoxelWorldSaveData::Empty;
-	}
-}
-
 void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
 {
 	WorldMode = InWorldMode;
@@ -161,14 +147,20 @@ void AVoxelModule::OnWorldStateChanged()
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakePointer(&WorldState)});
 }
 
+FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
+{
+	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
+}
+
 void AVoxelModule::LoadData(FSaveData* InSaveData)
 {
-	if(WorldState != EVoxelWorldState::None) return;
+	if(WorldState != EVoxelWorldState::Generating)
+	{
+		WorldState = EVoxelWorldState::Generating;
+		OnWorldStateChanged();
+	}
 
-	WorldState = EVoxelWorldState::Generating;
-	OnWorldStateChanged();
-
-	WorldData = InSaveData->To<FVoxelWorldSaveData>();
+	WorldData = InSaveData->Cast<FVoxelWorldSaveData>();
 	if(WorldData->WorldSeed == 0)
 	{
 		WorldData->WorldSeed = FMath::Rand();
@@ -204,49 +196,45 @@ FSaveData* AVoxelModule::ToData()
 	return nullptr;
 }
 
-void AVoxelModule::UnloadData()
+void AVoxelModule::UnloadData(bool bForceMode)
 {
-	if(WorldState == EVoxelWorldState::None) return;
-
-	switch(WorldMode)
+	if(WorldState != EVoxelWorldState::None)
 	{
-		case EVoxelWorldMode::Normal:
+		WorldState = EVoxelWorldState::None;
+		OnWorldStateChanged();
+	}
+
+	if(bForceMode)
+	{
+		for(auto iter : ChunkMap)
 		{
-			WorldState = EVoxelWorldState::None;
-			OnWorldStateChanged();
-
-			for(auto iter : ChunkMap)
+			if(iter.Value)
 			{
-				if(iter.Value)
-				{
-					UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
-				}
+				UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
 			}
-			ChunkMap.Empty();
-
-			ChunkSpawnBatch = 0;
-			LastGenerateIndex = FIndex(-1, -1, -1);
-			LastStayChunkIndex = FIndex::ZeroIndex;
-
-			ChunkSpawnQueue.Empty();
-			ChunkMapBuildQueue.Empty();
-			ChunkMapGenerateQueue.Empty();
-			ChunkGenerateQueue.Empty();
-			ChunkDestroyQueue.Empty();
-
-			WorldData = nullptr;
-			break;
 		}
-		case EVoxelWorldMode::Preview:
+		ChunkMap.Empty();
+
+		ChunkSpawnBatch = 0;
+		LastGenerateIndex = FIndex(-1, -1, -1);
+		LastStayChunkIndex = FIndex::ZeroIndex;
+
+		ChunkSpawnQueue.Empty();
+		ChunkMapBuildQueue.Empty();
+		ChunkMapGenerateQueue.Empty();
+		ChunkGenerateQueue.Empty();
+		ChunkDestroyQueue.Empty();
+
+		WorldData = nullptr;
+	}
+	else
+	{
+		for(auto Iter : ChunkMap)
 		{
-			for(auto Iter : ChunkMap)
+			if(Iter.Value && Iter.Value->IsGenerated())
 			{
-				if(Iter.Value && Iter.Value->IsGenerated())
-				{
-					Iter.Value->DestroyActors();
-				}
+				Iter.Value->DestroyActors();
 			}
-			break;
 		}
 	}
 }

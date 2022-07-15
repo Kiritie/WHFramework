@@ -22,6 +22,7 @@ public:
 
 	virtual ~FSaveData() { }
 
+protected:
 	UPROPERTY()
 	bool bSaved;
 
@@ -29,16 +30,25 @@ public:
 	TArray<uint8> Datas;
 
 public:
+	virtual bool IsSaved() const { return bSaved; }
+
+	virtual void MakeSaved() { this->bSaved = true; }
+
+	virtual TArray<uint8>& GetDatas() { return Datas; }
+
+	virtual void SetDatas(const TArray<uint8>& InDatas) { this->Datas = InDatas; }
+
+public:
 	template<class T>
-	T* To()
+	T* Cast()
 	{
 		return static_cast<T*>(this);
 	}
 
 	template<class T>
-	T& ToRef()
+	T& CastRef()
 	{
-		return *To<T>();
+		return *Cast<T>();
 	}
 };
 

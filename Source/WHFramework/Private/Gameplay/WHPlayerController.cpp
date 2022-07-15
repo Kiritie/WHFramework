@@ -100,7 +100,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	if(InPawn->Implements<UWHPlayerInterface>() && !InPawn->IsA(ACameraPawnBase::StaticClass()))
+	if(InPawn->Implements<UWHPlayerInterface>() && !InPawn->IsA<ACameraPawnBase>())
 	{
 		PlayerPawn = InPawn;
 	}

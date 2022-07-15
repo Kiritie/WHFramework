@@ -3,6 +3,7 @@
 
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -125,12 +126,12 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 			case EVoxelMeshType::PickUp:
 			case EVoxelMeshType::Vitality:
 			{
-				material = AVoxelModule::GetWorldData()->GetChunkMaterial(Transparency).Material;
+				material = UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material;
 				break;
 			}
 			case EVoxelMeshType::Entity:
 			{
-				material = UMaterialInstanceDynamic::Create(AVoxelModule::GetWorldData()->GetChunkMaterial(Transparency).Material, this);
+				material = UMaterialInstanceDynamic::Create(UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material, this);
 				Cast<UMaterialInstanceDynamic>(material)->SetScalarParameterValue(TEXT("Emissive"), 1);
 				break;
 			}
@@ -234,14 +235,14 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 {
 	int32 verNum = Vertices.Num();
 	UVoxelData& voxelData = InVoxelItem.GetData<UVoxelData>();
-	FVector2D uvCorner = voxelData.GetUVCorner(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData.Transparency).BlockUVSize);
-	FVector2D uvSpan = voxelData.GetUVSpan(InFaceIndex, AVoxelModule::GetWorldData()->GetChunkMaterial(voxelData.Transparency).BlockUVSize);
+	FVector2D uvCorner = voxelData.GetUVCorner(InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize);
+	FVector2D uvSpan = voxelData.GetUVSpan(InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize);
 	InNormal = InVoxelItem.Rotation.RotateVector(InNormal);
 
 	FVector center = voxelData.GetCeilRange(InVoxelItem.Rotation, InVoxelItem.Scale) * (CenterOffset + InVoxelItem.Rotation.RotateVector(voxelData.Offset) * OffsetScale);
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + center + InVoxelItem.Rotation.RotateVector(InVertices[i] * InVoxelItem.Scale)) * AVoxelModule::GetWorldData()->BlockSize * BlockScale);
+		Vertices.Add((InVoxelItem.Index.ToVector() + center + InVoxelItem.Rotation.RotateVector(InVertices[i] * InVoxelItem.Scale)) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
 	}
 
 	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));

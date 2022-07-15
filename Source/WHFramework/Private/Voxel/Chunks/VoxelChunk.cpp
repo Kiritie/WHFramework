@@ -44,19 +44,28 @@ AVoxelChunk::AVoxelChunk()
 	PickUps = TArray<AAbilityPickUpBase*>();
 }
 
-// Called when the game starts or when spawned
 void AVoxelChunk::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
+void AVoxelChunk::LoadData(FSaveData* InVoxelChunkData)
+{
+	
+}
+
+FSaveData* AVoxelChunk::ToData()
+{
+	return nullptr;
+}
+
 void AVoxelChunk::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if(OtherActor && OtherActor->IsA(ACharacterBase::StaticClass()))
+	if(OtherActor && OtherActor->IsA<ACharacterBase>())
 	{
 		if(IVoxelAgentInterface* voxelAgent = Cast<IVoxelAgentInterface>(OtherActor))
 		{
-			const FVoxelItem& voxelItem = GetVoxelItem(LocationToIndex(Hit.ImpactPoint - AVoxelModule::GetWorldData()->GetBlockSizedNormal(Hit.ImpactNormal)));
+			const FVoxelItem& voxelItem = GetVoxelItem(LocationToIndex(Hit.ImpactPoint - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)));
 			if(voxelItem.IsValid())
 			{
 				if(UVoxel* voxel = voxelItem.GetVoxel())
@@ -71,7 +80,7 @@ void AVoxelChunk::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherAc
 
 void AVoxelChunk::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// if(OtherComp && OtherComp->IsA(UAbilityCharacterPart::StaticClass()))
+	// if(OtherComp && OtherComp->IsA<UAbilityCharacterPart>())
 	// {
 	// 	if(UAbilityCharacterPart* characterPart = Cast<UAbilityCharacterPart>(OtherComp))
 	// 	{
@@ -80,7 +89,7 @@ void AVoxelChunk::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 	// 			Debug(FString::Printf(TEXT("%s"), *SweepResult.ImpactPoint.ToString()));
 	// 			Debug(FString::Printf(TEXT("%s"), *SweepResult.ImpactNormal.ToString()));
 	// 			const FVector normal = FVector(FMath::Min((character->GetMoveDirection(false) * 2.5f).X, 1.f), FMath::Min((character->GetMoveDirection(false) * 2.5f).Y, 1.f), FMath::Min((character->GetMoveDirection(false) * 2.5f).Z, 1.f));
-	// 			const FVector point = characterPart->GetComponentLocation() + characterPart->GetScaledCapsuleRadius() * normal + AVoxelModule::GetWorldData()->GetBlockSizedNormal(normal);
+	// 			const FVector point = characterPart->GetComponentLocation() + characterPart->GetScaledCapsuleRadius() * normal + UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(normal);
 	// 			if(FVector::Distance(character->GetActorLocation(), point) > 100)
 	// 			{
 	// 				Debug(FString::Printf(TEXT("%f"), FVector::Distance(character->GetActorLocation(), point)));
@@ -105,14 +114,14 @@ void AVoxelChunk::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 
 void AVoxelChunk::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	// if(OtherComp && OtherComp->IsA(UAbilityCharacterPart::StaticClass()))
+	// if(OtherComp && OtherComp->IsA<UAbilityCharacterPart>())
 	// {
 	// 	if(UAbilityCharacterPart* characterPart = Cast<UAbilityCharacterPart>(OtherComp))
 	// 	{
 	// 		if(ACharacterBase* character = characterPart->GetOwnerCharacter())
 	// 		{
 	// 			const FVector normal = FVector(FMath::Min((character->GetMoveDirection(false) * 2.5f).X, 1.f), FMath::Min((character->GetMoveDirection(false) * 2.5f).Y, 1.f), FMath::Min((character->GetMoveDirection(false) * 2.5f).Z, 1.f));
-	// 			const FVector point = characterPart->GetComponentLocation() - characterPart->GetScaledCapsuleRadius() * normal - AVoxelModule::GetWorldData()->GetBlockSizedNormal(normal);
+	// 			const FVector point = characterPart->GetComponentLocation() - characterPart->GetScaledCapsuleRadius() * normal - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(normal);
 	// 			UKismetSystemLibrary::DrawDebugBox(this, point, FVector(5), FColor::Red, FRotator::ZeroRotator, 100);
 	// 			const FVoxelItem& voxelItem = GetVoxelItem(LocationToIndex(point));
 	// 			const UVoxelAsset voxelData = voxelItem.GetData<UVoxelAsset>();
@@ -247,13 +256,6 @@ void AVoxelChunk::Initialize(FIndex InIndex, int32 InBatch)
 	UpdateNeighbors();
 }
 
-void AVoxelChunk::LoadData(FSaveData* InVoxelChunkData) {}
-
-FSaveData* AVoxelChunk::ToData()
-{
-	return nullptr;
-}
-
 void AVoxelChunk::Generate()
 {
 	if(VoxelMap.Num() > 0)
@@ -311,11 +313,11 @@ void AVoxelChunk::Generate()
 
 void AVoxelChunk::BuildMap()
 {
-	for(int32 x = 0; x < AVoxelModule::GetWorldData()->ChunkSize; x++)
+	for(int32 x = 0; x < UVoxelModuleBPLibrary::GetWorldData().ChunkSize; x++)
 	{
-		for(int32 y = 0; y < AVoxelModule::GetWorldData()->ChunkSize; y++)
+		for(int32 y = 0; y < UVoxelModuleBPLibrary::GetWorldData().ChunkSize; y++)
 		{
-			for(int32 z = 0; z < AVoxelModule::GetWorldData()->ChunkSize; z++)
+			for(int32 z = 0; z < UVoxelModuleBPLibrary::GetWorldData().ChunkSize; z++)
 			{
 				FIndex voxelIndex = FIndex(x, y, z);
 
@@ -339,7 +341,7 @@ void AVoxelChunk::BuildMap()
 							// tree
 							else if(tmpNum < 0.21f)
 							{
-								if((x > 2 && x <= AVoxelModule::GetWorldData()->ChunkSize - 2) && (y > 2 && y <= AVoxelModule::GetWorldData()->ChunkSize - 2))
+								if((x > 2 && x <= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 2) && (y > 2 && y <= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 2))
 								{
 									const int32 treeHeight = FMath::RandRange(4.f, 5.f);
 									const int32 leavesHeight = 2/*FMath::RandRange(2, 2)*/;
@@ -459,7 +461,7 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ)
 	{
 		Neighbors[(int32)EDirection::Back]->Generate();
 	}
-	else if(InX >= AVoxelModule::GetWorldData()->ChunkSize - 1 && Neighbors[(int32)EDirection::Forward] != nullptr)
+	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[(int32)EDirection::Forward] != nullptr)
 	{
 		Neighbors[(int32)EDirection::Forward]->Generate();
 	}
@@ -467,7 +469,7 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ)
 	{
 		Neighbors[(int32)EDirection::Left]->Generate();
 	}
-	else if(InY >= AVoxelModule::GetWorldData()->ChunkSize - 1 && Neighbors[(int32)EDirection::Right] != nullptr)
+	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[(int32)EDirection::Right] != nullptr)
 	{
 		Neighbors[(int32)EDirection::Right]->Generate();
 	}
@@ -475,7 +477,7 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ)
 	{
 		Neighbors[(int32)EDirection::Down]->Generate();
 	}
-	else if(InZ >= AVoxelModule::GetWorldData()->ChunkSize - 1 && Neighbors[(int32)EDirection::Up] != nullptr)
+	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[(int32)EDirection::Up] != nullptr)
 	{
 		Neighbors[(int32)EDirection::Up]->Generate();
 	}
@@ -507,21 +509,21 @@ void AVoxelChunk::BreakNeighbors()
 
 bool AVoxelChunk::IsOnTheChunk(FIndex InIndex) const
 {
-	return InIndex.X >= 0 && InIndex.X < AVoxelModule::GetWorldData()->ChunkSize &&
-		InIndex.Y >= 0 && InIndex.Y < AVoxelModule::GetWorldData()->ChunkSize &&
-		InIndex.Z >= 0 && InIndex.Z < AVoxelModule::GetWorldData()->ChunkSize;
+	return InIndex.X >= 0 && InIndex.X < UVoxelModuleBPLibrary::GetWorldData().ChunkSize &&
+		InIndex.Y >= 0 && InIndex.Y < UVoxelModuleBPLibrary::GetWorldData().ChunkSize &&
+		InIndex.Z >= 0 && InIndex.Z < UVoxelModuleBPLibrary::GetWorldData().ChunkSize;
 }
 
 bool AVoxelChunk::IsOnTheChunk(FVector InLocation) const
 {
-	return InLocation.X >= GetActorLocation().X && InLocation.X < GetActorLocation().X + AVoxelModule::GetWorldData()->GetChunkLength() &&
-		InLocation.Y >= GetActorLocation().Y && InLocation.Y < GetActorLocation().Y + AVoxelModule::GetWorldData()->GetChunkLength() &&
-		InLocation.Z >= GetActorLocation().Z && InLocation.Z < GetActorLocation().Z + AVoxelModule::GetWorldData()->GetChunkLength();
+	return InLocation.X >= GetActorLocation().X && InLocation.X < GetActorLocation().X + UVoxelModuleBPLibrary::GetWorldData().GetChunkLength() &&
+		InLocation.Y >= GetActorLocation().Y && InLocation.Y < GetActorLocation().Y + UVoxelModuleBPLibrary::GetWorldData().GetChunkLength() &&
+		InLocation.Z >= GetActorLocation().Z && InLocation.Z < GetActorLocation().Z + UVoxelModuleBPLibrary::GetWorldData().GetChunkLength();
 }
 
 FIndex AVoxelChunk::LocationToIndex(FVector InLocation, bool bWorldSpace /*= true*/) const
 {
-	const FVector point = (!bWorldSpace ? InLocation : GetActorTransform().InverseTransformPosition(InLocation)) / AVoxelModule::GetWorldData()->BlockSize;
+	const FVector point = (!bWorldSpace ? InLocation : GetActorTransform().InverseTransformPosition(InLocation)) / UVoxelModuleBPLibrary::GetWorldData().BlockSize;
 
 	FIndex index;
 	index.X = FMath::FloorToInt(point.X);
@@ -533,19 +535,19 @@ FIndex AVoxelChunk::LocationToIndex(FVector InLocation, bool bWorldSpace /*= tru
 
 FVector AVoxelChunk::IndexToLocation(FIndex InIndex, bool bWorldSpace /*= true*/) const
 {
-	const FVector localPoint = InIndex.ToVector() * AVoxelModule::GetWorldData()->BlockSize;
+	const FVector localPoint = InIndex.ToVector() * UVoxelModuleBPLibrary::GetWorldData().BlockSize;
 	if(!bWorldSpace) return localPoint;
 	return GetActorTransform().TransformPosition(localPoint);
 }
 
 FIndex AVoxelChunk::LocalIndexToWorld(FIndex InIndex) const
 {
-	return InIndex + Index * AVoxelModule::GetWorldData()->ChunkSize;
+	return InIndex + Index * UVoxelModuleBPLibrary::GetWorldData().ChunkSize;
 }
 
 FIndex AVoxelChunk::WorldIndexToLocal(FIndex InIndex) const
 {
-	return InIndex - Index * AVoxelModule::GetWorldData()->ChunkSize;
+	return InIndex - Index * UVoxelModuleBPLibrary::GetWorldData().ChunkSize;
 }
 
 UVoxel* AVoxelChunk::GetVoxel(FIndex InIndex)
@@ -568,39 +570,39 @@ FVoxelItem& AVoxelChunk::GetVoxelItem(int32 InX, int32 InY, int32 InZ)
 	if(InX < 0)
 	{
 		if(Neighbors[(int32)EDirection::Back] != nullptr)
-			return Neighbors[(int32)EDirection::Back]->GetVoxelItem(InX + AVoxelModule::GetWorldData()->ChunkSize, InY, InZ);
+			return Neighbors[(int32)EDirection::Back]->GetVoxelItem(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ);
 		return FVoxelItem::UnknownVoxel;
 	}
-	else if(InX >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Forward] != nullptr)
-			return Neighbors[(int32)EDirection::Forward]->GetVoxelItem(InX - AVoxelModule::GetWorldData()->ChunkSize, InY, InZ);
+			return Neighbors[(int32)EDirection::Forward]->GetVoxelItem(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ);
 		return FVoxelItem::UnknownVoxel;
 	}
 	else if(InY < 0)
 	{
 		if(Neighbors[(int32)EDirection::Left] != nullptr)
-			return Neighbors[(int32)EDirection::Left]->GetVoxelItem(InX, InY + AVoxelModule::GetWorldData()->ChunkSize, InZ);
+			return Neighbors[(int32)EDirection::Left]->GetVoxelItem(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ);
 		return FVoxelItem::UnknownVoxel;
 	}
-	else if(InY >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Right] != nullptr)
-			return Neighbors[(int32)EDirection::Right]->GetVoxelItem(InX, InY - AVoxelModule::GetWorldData()->ChunkSize, InZ);
+			return Neighbors[(int32)EDirection::Right]->GetVoxelItem(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ);
 		return FVoxelItem::UnknownVoxel;
 	}
 	else if(InZ < 0)
 	{
 		if(Neighbors[(int32)EDirection::Down] != nullptr)
-			return Neighbors[(int32)EDirection::Down]->GetVoxelItem(InX, InY, InZ + AVoxelModule::GetWorldData()->ChunkSize);
+			return Neighbors[(int32)EDirection::Down]->GetVoxelItem(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize);
 		else if(Index.Z > 0)
 			return FVoxelItem::UnknownVoxel;
 	}
-	else if(InZ >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Up] != nullptr)
-			return Neighbors[(int32)EDirection::Up]->GetVoxelItem(InX, InY, InZ - AVoxelModule::GetWorldData()->ChunkSize);
-		else if(Index.Z < AVoxelModule::GetWorldData()->ChunkHeightRange)
+			return Neighbors[(int32)EDirection::Up]->GetVoxelItem(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize);
+		else if(Index.Z < UVoxelModuleBPLibrary::GetWorldData().ChunkHeightRange)
 			return FVoxelItem::UnknownVoxel;
 	}
 	else if(VoxelMap.Contains(FIndex(InX, InY, InZ)))
@@ -812,34 +814,34 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	if(InX < 0)
 	{
 		if(Neighbors[(int32)EDirection::Back] != nullptr)
-			return Neighbors[(int32)EDirection::Back]->SetVoxelComplex(InX + AVoxelModule::GetWorldData()->ChunkSize, InY, InZ, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Back]->SetVoxelComplex(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerateMesh);
 	}
-	else if(InX >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Forward] != nullptr)
-			return Neighbors[(int32)EDirection::Forward]->SetVoxelComplex(InX - AVoxelModule::GetWorldData()->ChunkSize, InY, InZ, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Forward]->SetVoxelComplex(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerateMesh);
 	}
 	else if(InY < 0)
 	{
 		if(Neighbors[(int32)EDirection::Left] != nullptr)
-			return Neighbors[(int32)EDirection::Left]->SetVoxelComplex(InX, InY + AVoxelModule::GetWorldData()->ChunkSize, InZ, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Left]->SetVoxelComplex(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerateMesh);
 	}
-	else if(InY >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Right] != nullptr)
-			return Neighbors[(int32)EDirection::Right]->SetVoxelComplex(InX, InY - AVoxelModule::GetWorldData()->ChunkSize, InZ, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Right]->SetVoxelComplex(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerateMesh);
 	}
 	else if(InZ < 0)
 	{
 		if(Neighbors[(int32)EDirection::Down] != nullptr)
-			return Neighbors[(int32)EDirection::Down]->SetVoxelComplex(InX, InY, InZ + AVoxelModule::GetWorldData()->ChunkSize, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Down]->SetVoxelComplex(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerateMesh);
 	}
-	else if(InZ >= AVoxelModule::GetWorldData()->ChunkSize)
+	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
 		if(Neighbors[(int32)EDirection::Up] == nullptr)
 			AMainModule::GetModuleByClass<AVoxelModule>()->SpawnChunk(Index + UMathBPLibrary::DirectionToIndex(EDirection::Up), !bGenerateMesh);
 		if(Neighbors[(int32)EDirection::Up] != nullptr)
-			return Neighbors[(int32)EDirection::Up]->SetVoxelComplex(InX, InY, InZ - AVoxelModule::GetWorldData()->ChunkSize, InVoxelItem, bGenerateMesh);
+			return Neighbors[(int32)EDirection::Up]->SetVoxelComplex(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerateMesh);
 	}
 	else
 	{
@@ -928,7 +930,7 @@ bool AVoxelChunk::DestroyVoxel(const FVoxelItem& InVoxelItem)
 		DestroyAuxiliary(InVoxelItem.Auxiliary);
 
 		FVector range = voxelData.GetCeilRange(InVoxelItem.Rotation, InVoxelItem.Scale);
-		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(InVoxelItem.ID, 1), IndexToLocation(InVoxelItem.Index) + range * AVoxelModule::GetWorldData()->BlockSize * 0.5f, this);
+		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(InVoxelItem.ID, 1), IndexToLocation(InVoxelItem.Index) + range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, this);
 
 		for(int32 x = 0; x < range.X; x++)
 		{
@@ -1016,7 +1018,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 	const UVoxelData& VoxelData = InVoxelItem.GetData<UVoxelData>();
 	if(!VoxelMap.Contains(InVoxelItem.Index) || !VoxelData.AuxiliaryClass) return	nullptr;
 	
-	const FVector Location = IndexToLocation(InVoxelItem.Index, true) + VoxelData.GetCeilRange() * AVoxelModule::GetWorldData()->BlockSize * 0.5f;
+	const FVector Location = IndexToLocation(InVoxelItem.Index, true) + VoxelData.GetCeilRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f;
 	if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
 	{
 		InVoxelItem.Auxiliary = Auxiliary;

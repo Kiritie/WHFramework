@@ -23,7 +23,7 @@ public:
 	
 	virtual void OnLoad_Implementation() override;
 	
-	virtual void OnUnload_Implementation() override;
+	virtual void OnUnload_Implementation(bool bForceMode) override;
 
 	virtual void OnRefresh_Implementation() override;
 	
@@ -34,5 +34,5 @@ protected:
 public:
 	virtual FSaveData* GetSaveData() override { return &ParameterSaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { ParameterSaveData = InSaveData->ToRef<FParameterSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { ParameterSaveData = InSaveData->CastRef<FParameterSaveData>(); }
 };

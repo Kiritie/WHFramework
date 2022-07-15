@@ -35,7 +35,7 @@ void AParameterModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
 
-	USaveGameModuleBPLibrary::LoadObjectData(this, USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
+	LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
 }
 
 void AParameterModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -62,7 +62,7 @@ void AParameterModule::OnTermination_Implementation()
 
 void AParameterModule::LoadData(FSaveData* InSaveData)
 {
-	Parameters = InSaveData->ToRef<FParameterSaveData>().Parameters;
+	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
 }
 
 FSaveData* AParameterModule::ToData()

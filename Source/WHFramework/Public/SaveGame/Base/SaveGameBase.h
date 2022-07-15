@@ -30,7 +30,7 @@ public:
 	void OnLoad();
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnUnload();
+	void OnUnload(bool bForceMode);
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnReset();
@@ -49,7 +49,7 @@ public:
 	bool Load();
 
 	UFUNCTION(BlueprintCallable)
-	bool Unload();
+	bool Unload(bool bForceMode = false);
 
 	UFUNCTION(BlueprintCallable)
 	bool Reset();

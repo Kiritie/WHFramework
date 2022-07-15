@@ -107,7 +107,7 @@ FText UGlobalBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 	return FText::GetEmpty();
 }
 
-void UGlobalBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
+void UGlobalBPLibrary::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
 	if(InObject)
 	{
@@ -117,7 +117,7 @@ void UGlobalBPLibrary::SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutO
 	}
 }
 
-void UGlobalBPLibrary::LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
+void UGlobalBPLibrary::LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
 {
 	if(InObject && InObjectData.Num() > 0)
 	{
@@ -163,7 +163,7 @@ void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutPar
 		for (TFieldIterator<FProperty> PropertyIt(InClass, EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
 		{
 			FProperty* Property = *PropertyIt;
-			const bool bIsDelegate = Property->IsA(FMulticastDelegateProperty::StaticClass());
+			const bool bIsDelegate = Property->IsA<FMulticastDelegateProperty>();
 			const bool bFlag = Property->HasAllPropertyFlags(CPF_ExposeOnSpawn);
 			const bool bIsExposedToSpawn = bFlag;
 			const bool bIsSettableExternally = !Property->HasAnyPropertyFlags(CPF_DisableEditOnInstance);

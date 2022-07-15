@@ -6,6 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "TimerManager.h"
+#include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
@@ -116,6 +117,16 @@ void AAbilityCharacterBase::OnDespawn_Implementation()
 	Super::OnDespawn_Implementation();
 }
 
+void AAbilityCharacterBase::LoadData(FSaveData* InSaveData)
+{
+	
+}
+
+FSaveData* AAbilityCharacterBase::ToData()
+{
+	return nullptr;
+}
+
 void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -213,16 +224,6 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 			}
 		}
 	}
-}
-
-void AAbilityCharacterBase::LoadData(FSaveData* InSaveData)
-{
-	
-}
-
-FSaveData* AAbilityCharacterBase::ToData()
-{
-	return nullptr;
 }
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)

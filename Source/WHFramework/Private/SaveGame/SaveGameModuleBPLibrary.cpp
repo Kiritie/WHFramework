@@ -148,11 +148,11 @@ USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase>
 	return nullptr;
 }
 
-bool USaveGameModuleBPLibrary::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool USaveGameModuleBPLibrary::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bForceMode)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->UnloadSaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
 	}
 	return false;
 }
@@ -182,42 +182,4 @@ bool USaveGameModuleBPLibrary::DestroySaveGame(TSubclassOf<USaveGameBase> InSave
 		return SaveGameModule->DestroySaveGame(InSaveGameClass, InSaveIndex);
 	}
 	return false;
-}
-
-void USaveGameModuleBPLibrary::LoadObjectData(UObject* InObject, FSaveData* InSaveData, bool bLoadMemoryData /*= false*/)
-{
-	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
-	{
-		SaveDataInterface->LoadData(InSaveData);
-		if (bLoadMemoryData)
-		{
-			UGlobalBPLibrary::LoadObjectFromMemory(InObject, InSaveData->Datas);
-		}
-	}
-}
-
-FSaveData* USaveGameModuleBPLibrary::ObjectToData(UObject* InObject, bool bMakeSaved /*= true*/, bool bSaveMemoryData /*= false*/)
-{
-	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
-	{
-		FSaveData* SaveData = SaveDataInterface->ToData();
-		if (bMakeSaved)
-		{
-			SaveData->bSaved = true;
-		}
-		if (bSaveMemoryData)
-		{
-			UGlobalBPLibrary::SaveObjectToMemory(InObject, SaveData->Datas);
-		}
-		return SaveData;
-	}
-	return nullptr;
-}
-
-void USaveGameModuleBPLibrary::UnloadDataObject(UObject* InObject)
-{
-	if (ISaveDataInterface* SaveDataInterface = Cast<ISaveDataInterface>(InObject))
-	{
-		SaveDataInterface->UnloadData();
-	}
 }

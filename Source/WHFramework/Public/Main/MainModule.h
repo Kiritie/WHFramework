@@ -25,7 +25,7 @@ public:
 	// ParamSets default values for this actor's properties
 	AMainModule();
 
-	~AMainModule();
+	virtual ~AMainModule() override;
 
 protected:
 	// Called when the game starts or when spawned

@@ -77,11 +77,11 @@ public:
 		if(!ObjectPools.Contains(InType))
 		{
 			UObjectPool* ObjectPool;
-			if(InType->IsChildOf(AActor::StaticClass()))
+			if(InType->IsChildOf<AActor>())
 			{
 				ObjectPool = NewObject<UActorPool>(this);
 			}
-			else if(InType->IsChildOf(UUserWidget::StaticClass()))
+			else if(InType->IsChildOf<UUserWidget>())
 			{
 				ObjectPool = NewObject<UWidgetPool>(this);
 			}

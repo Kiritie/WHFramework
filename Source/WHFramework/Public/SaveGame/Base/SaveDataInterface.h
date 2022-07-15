@@ -6,7 +6,6 @@
 
 #include "SaveDataInterface.generated.h"
 
-class UAbilityBase;
 UINTERFACE()
 class WHFRAMEWORK_API USaveDataInterface : public UInterface
 {
@@ -18,9 +17,28 @@ class WHFRAMEWORK_API ISaveDataInterface
 	GENERATED_BODY()
 
 public:
+	void LoadSaveData(FSaveData* InSaveData, bool bLoadMemoryData = false);
+
+	FSaveData* ToSaveData(bool bSaveMemoryData = false);
+
+	template<class T>
+	T* ToSaveData(bool bSaveMemoryData = false)
+	{
+		return static_cast<T*>(ToSaveData(bSaveMemoryData));
+	}
+
+	template<class T>
+	T& ToSaveDataRef(bool bSaveMemoryData = false)
+	{
+		return *ToSaveData<T>(bSaveMemoryData);
+	}
+
+	void UnloadSaveData(bool bForceMode = false, bool bUnLoadMemoryData = false);
+
+protected:
 	virtual void LoadData(FSaveData* InSaveData) = 0;
 
 	virtual FSaveData* ToData() = 0;
 
-	virtual void UnloadData() { }
+	virtual void UnloadData(bool bForceMode) { }
 };

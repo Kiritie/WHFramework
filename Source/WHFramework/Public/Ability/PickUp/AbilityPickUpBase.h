@@ -50,7 +50,6 @@ protected:
 
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
 
-public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams);
 
 	virtual void OnDespawn_Implementation();

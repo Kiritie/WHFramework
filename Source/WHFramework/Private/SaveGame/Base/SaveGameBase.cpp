@@ -27,7 +27,7 @@ void USaveGameBase::OnLoad_Implementation()
 {
 }
 
-void USaveGameBase::OnUnload_Implementation()
+void USaveGameBase::OnUnload_Implementation(bool bForceMode)
 {
 }
 
@@ -53,9 +53,9 @@ bool USaveGameBase::Load()
 	return USaveGameModuleBPLibrary::LoadSaveGame<USaveGameBase>(SaveIndex, GetClass()) != nullptr;
 }
 
-bool USaveGameBase::Unload()
+bool USaveGameBase::Unload(bool bForceMode)
 {
-	return USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(SaveIndex, GetClass());
+	return USaveGameModuleBPLibrary::UnloadSaveGame<USaveGameBase>(SaveIndex, bForceMode, GetClass());
 }
 
 bool USaveGameBase::Reset()

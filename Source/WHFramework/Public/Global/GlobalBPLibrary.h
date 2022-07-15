@@ -117,7 +117,7 @@ public:
 	* @param OutObjectData 保存到的字节数组
 	*/
 	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
-	static void SaveObjectToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
+	static void SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
 
 	/*
 	* 从内存加载目标对象数据
@@ -125,7 +125,7 @@ public:
 	* @param InObjectData 目标对象字节数组
 	*/
 	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
-	static void LoadObjectFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
+	static void LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
 
 	/*
 	* 解析目标对象带有 ExposeOnSpawn 标签的参数

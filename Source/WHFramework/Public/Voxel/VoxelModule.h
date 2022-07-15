@@ -51,18 +51,6 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Data
-protected:
-	static FVoxelWorldSaveData* WorldData;
-public:
-	template<class T>
-	static T* GetWorldData()
-	{
-		return static_cast<T*>(WorldData);
-	}
-	static FVoxelWorldSaveData* GetWorldData();
-
-	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -88,12 +76,24 @@ public:
 protected:
 	virtual void OnWorldStateChanged();
 
+	//////////////////////////////////////////////////////////////////////////
+	// Data
+protected:
+	FVoxelWorldSaveData* WorldData;
 public:
+	template<class T>
+	T& GetWorldData()
+	{
+		return static_cast<T&>(GetWorldData());
+	}
+	FVoxelWorldSaveData& GetWorldData() const;
+
+protected:
 	virtual void LoadData(FSaveData* InSaveData) override;
 
 	virtual FSaveData* ToData() override;
 
-	virtual void UnloadData() override;
+	virtual void UnloadData(bool bForceMode) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
