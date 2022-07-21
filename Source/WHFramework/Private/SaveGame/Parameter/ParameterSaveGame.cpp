@@ -18,9 +18,9 @@ void UParameterSaveGame::OnCreate_Implementation(int32 InSaveIndex)
 	Super::OnCreate_Implementation(InSaveIndex);
 }
 
-void UParameterSaveGame::OnLoad_Implementation()
+void UParameterSaveGame::OnLoad_Implementation(bool bForceMode)
 {
-	Super::OnLoad_Implementation();
+	Super::OnLoad_Implementation(bForceMode);
 }
 
 void UParameterSaveGame::OnUnload_Implementation(bool bForceMode)

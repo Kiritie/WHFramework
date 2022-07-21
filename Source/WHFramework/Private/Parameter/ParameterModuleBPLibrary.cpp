@@ -46,6 +46,22 @@ TArray<FParameter> UParameterModuleBPLibrary::GetParameters(FName InName, bool b
 	return TArray<FParameter>();
 }
 
+void UParameterModuleBPLibrary::RemoveParameter(FName InName)
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		ParameterModule->RemoveParameter(InName);
+	}
+}
+
+void UParameterModuleBPLibrary::ClearAllParameter()
+{
+	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	{
+		ParameterModule->ClearAllParameter();
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::SetIntegerParameter(FName InName, int32 InValue)
 {

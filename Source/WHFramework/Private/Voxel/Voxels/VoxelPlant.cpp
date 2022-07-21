@@ -8,12 +8,12 @@ UVoxelPlant::UVoxelPlant()
 	
 }
 
-void UVoxelPlant::LoadData(const FString& InValue)
+void UVoxelPlant::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	Super::LoadData(InValue);
+	Super::LoadData(InSaveData, bForceMode);
 }
 
-FString UVoxelPlant::ToData()
+FSaveData* UVoxelPlant::ToData()
 {
 	return Super::ToData();
 }

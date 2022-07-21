@@ -24,7 +24,10 @@ UCLASS()
 class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
-	
+
+	friend class ChunkMapBuildTask;
+	friend class ChunkMapGenerateTask;
+
 public:	
 	// Sets default values for this actor's properties
 	AVoxelModule();
@@ -59,17 +62,20 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World")
 	EVoxelWorldMode WorldMode;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
 	EVoxelWorldState WorldState;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World")
+	FVoxelWorldBasicSaveData WorldBasicData;
 public:
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
 
-	virtual void SetWorldMode(EVoxelWorldMode InWorldMode);
-
 	EVoxelWorldState GetWorldState() const { return WorldState; }
+
+	FVoxelWorldBasicSaveData GetWorldBasicData() const { return WorldBasicData; }
 
 	virtual float GetWorldLength() const;
 
@@ -89,7 +95,7 @@ public:
 	FVoxelWorldSaveData& GetWorldData() const;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -139,6 +145,9 @@ protected:
 	TArray<AVoxelChunk*> ChunkMapBuildQueue;
 
 	UPROPERTY(Transient)
+	TArray<AVoxelChunk*> ChunkMapBuildQueue1;
+
+	UPROPERTY(Transient)
 	TArray<AVoxelChunk*> ChunkMapGenerateQueue;
 
 	UPROPERTY(Transient)
@@ -166,7 +175,9 @@ protected:
 	virtual void GenerateChunks(FIndex InIndex);
 
 public:
-	virtual void BuildChunkMap(AVoxelChunk* InChunk);
+	virtual void LoadChunkMap(AVoxelChunk* InChunk);
+
+	virtual void BuildChunkMap(AVoxelChunk* InChunk, int32 InStage);
 
 	virtual void GenerateChunkMap(AVoxelChunk* InChunk);
 

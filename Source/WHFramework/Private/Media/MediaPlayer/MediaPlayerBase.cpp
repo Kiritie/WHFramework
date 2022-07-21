@@ -22,8 +22,6 @@ AMediaPlayerBase::AMediaPlayerBase()
 void AMediaPlayerBase::BeginPlay()
 {
 	Super::BeginPlay();
-
-	USceneModuleBPLibrary::AddSceneActor(this);
 }
 
 void AMediaPlayerBase::Tick(float DeltaSeconds)

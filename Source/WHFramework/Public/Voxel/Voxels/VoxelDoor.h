@@ -17,13 +17,17 @@ class WHFRAMEWORK_API UVoxelDoor : public UVoxel
 
 public:
 	UVoxelDoor();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
 public:
-	virtual void LoadData(const FString& InValue) override;
+	virtual void OnDespawn_Implementation() override;
 
-	virtual FString ToData() override;
+	virtual void Serialize(FArchive& Ar) override;
+	
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+
+	virtual FSaveData* ToData() override;
 
 	virtual void OpenOrClose();
 
@@ -31,15 +35,9 @@ public:
 
 	virtual void CloseTheDoor();
 
-	virtual bool IsOpened() const;
-
-	virtual void SetOpened(bool InValue);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Events
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
-	
 	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
 
 	virtual void OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult) override;
@@ -55,4 +53,14 @@ public:
 	virtual bool OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult) override;
 
 	virtual void OnMouseHover(const FVoxelHitResult& InHitResult) override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Stats
+protected:
+	UPROPERTY(VisibleAnywhere)
+	bool bOpened;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsOpened() const { return bOpened; }
 };

@@ -62,21 +62,22 @@ void ASaveGameModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
 
-	USaveGameModuleBPLibrary::SaveSaveGame<UGeneralSaveGame>(0, true);
+	SaveSaveGame<UGeneralSaveGame>(0, true);
 }
 
-void ASaveGameModule::LoadData(FSaveData* InSaveData)
+void ASaveGameModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
 	const auto SaveData = InSaveData->CastRef<FGeneralSaveData>();
-	if(SaveData.AllSaveGameInfo.Num() > 0)
+	for(auto Iter1 : SaveData.AllSaveGameInfo)
 	{
-		AllSaveGameInfo = SaveData.AllSaveGameInfo;
-		for(auto Iter1 : SaveData.AllSaveGameInfo)
+		for(auto Iter2 : Iter1.Value.Array)
 		{
-			for(auto Iter2 : Iter1.Value.Array)
-			{
-				LoadSaveGame(Iter1.Value.Class, Iter2.Key);
-			}
+			LoadSaveGame(Iter1.Value.Class, Iter2.Key);
+		}
+		if(AllSaveGameInfo.Contains(Iter1.Key))
+		{
+			AllSaveGameInfo[Iter1.Key].Class = Iter1.Value.Class;
+			AllSaveGameInfo[Iter1.Key].Index = Iter1.Value.Index;
 		}
 	}
 }
@@ -84,11 +85,10 @@ void ASaveGameModule::LoadData(FSaveData* InSaveData)
 FSaveData* ASaveGameModule::ToData()
 {
 	static FGeneralSaveData SaveData;
+	SaveData.Reset();
 	for(auto Iter1 : AllSaveGameInfo)
 	{
 		FSaveGameInfo SaveGameInfo;
-		SaveGameInfo.Index = Iter1.Value.Index;
-		SaveGameInfo.Class = Iter1.Value.Class;
 		for(auto Iter2 : Iter1.Value.Array)
 		{
 			if(Iter2.Value && Iter2.Value->IsSaved())
@@ -96,7 +96,12 @@ FSaveData* ASaveGameModule::ToData()
 				SaveGameInfo.Array.Add(Iter2.Key, Iter2.Value);
 			}
 		}
-		SaveData.AllSaveGameInfo.Add(Iter1.Key, SaveGameInfo);
+		if(!SaveGameInfo.Array.IsEmpty())
+		{
+			SaveGameInfo.Class = Iter1.Value.Class;
+			SaveGameInfo.Index = SaveGameInfo.Array.Contains(Iter1.Value.Index) ? Iter1.Value.Index : GetSaveGameInfo(Iter1.Value.Class, true).Index;
+			SaveData.AllSaveGameInfo.Add(Iter1.Key, SaveGameInfo);
+		}
 	}
 	return &SaveData;
 }
@@ -159,8 +164,41 @@ void ASaveGameModule::SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameCl
 	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
 	if(AllSaveGameInfo.Contains(SaveName))
 	{
+		if(HasSaveGame(InSaveGameClass))
+		{
+			GetSaveGame(InSaveGameClass)->OnActiveChange(false);
+		}
 		AllSaveGameInfo[SaveName].Index = InSaveIndex;
+		if(HasSaveGame(InSaveGameClass))
+		{
+			GetSaveGame(InSaveGameClass)->OnActiveChange(true);
+		}
 	}
+}
+
+FSaveGameInfo ASaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData) const
+{
+	if(!InSaveGameClass) FSaveGameInfo();
+
+	FSaveGameInfo SaveGameInfo;
+	
+	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
+	if(!bFromGeneralData)
+	{
+		if(AllSaveGameInfo.Contains(SaveName))
+		{
+			SaveGameInfo = AllSaveGameInfo[SaveName];
+		}
+	}
+	else
+	{
+		const auto& GeneralSaveData = GetSaveGame<UGeneralSaveGame>()->GetSaveData()->CastRef<FGeneralSaveData>();
+		if(GeneralSaveData.AllSaveGameInfo.Contains(SaveName))
+		{
+			SaveGameInfo = GeneralSaveData.AllSaveGameInfo[SaveName];
+		}
+	}
+	return SaveGameInfo;
 }
 
 USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex) const
@@ -202,13 +240,13 @@ USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InSave
 		if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InSaveGameClass)))
 		{
 			if(!AllSaveGameInfo.Contains(SaveName)) AllSaveGameInfo.Add(SaveName);
-			AllSaveGameInfo[SaveName].Index = InSaveIndex;
 			AllSaveGameInfo[SaveName].Class = InSaveGameClass;
 			AllSaveGameInfo[SaveName].Array.Emplace(InSaveIndex, SaveGame);
 			SaveGame->OnCreate(InSaveIndex);
+			SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
 			if(bAutoLoad)
 			{
-				SaveGame->Load();
+				SaveGame->Load(true);
 			}
 			return SaveGame;
 		}
@@ -223,7 +261,7 @@ USaveGameBase* ASaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> I
 
 USaveGameBase* ASaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
-	return USaveGameModuleBPLibrary::HasSaveGame(InSaveGameClass, InSaveIndex, true) ? USaveGameModuleBPLibrary::LoadSaveGame(InSaveGameClass, InSaveIndex) : USaveGameModuleBPLibrary::CreateSaveGame(InSaveGameClass, InSaveIndex, true);
+	return USaveGameModuleBPLibrary::HasSaveGame(InSaveGameClass, InSaveIndex, true) ? USaveGameModuleBPLibrary::LoadSaveGame(InSaveGameClass, InSaveIndex, true) : USaveGameModuleBPLibrary::CreateSaveGame(InSaveGameClass, InSaveIndex, true);
 }
 
 bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bRefresh)
@@ -287,7 +325,7 @@ bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
 	return bIsAllSaved;
 }
 
-USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bForceMode)
 {
 	if(!InSaveGameClass) return nullptr;
 
@@ -301,7 +339,7 @@ USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGa
 			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
 			{
 				SaveGame->bLoaded = true;
-				SaveGame->OnLoad();
+				SaveGame->OnLoad(bForceMode);
 			}
 			return SaveGame;
 		}
@@ -315,7 +353,7 @@ USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGa
 			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
 			{
 				SaveGame->bLoaded = true;
-				SaveGame->OnLoad();
+				SaveGame->OnLoad(bForceMode);
 			}
 			return SaveGame;
 		}

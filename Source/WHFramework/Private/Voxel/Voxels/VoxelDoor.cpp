@@ -13,19 +13,38 @@ UVoxelDoor::UVoxelDoor()
 	
 }
 
-void UVoxelDoor::LoadData(const FString& InValue)
+void UVoxelDoor::OnDespawn_Implementation()
 {
-	Super::LoadData(InValue);
-	
-	TArray<FString> data;
-	InValue.ParseIntoArray(data, TEXT(";"));
-	
-	SetOpened((bool)FCString::Atoi(*data[3]));
+	Super::OnDespawn_Implementation();
+
+	bOpened = false;
 }
 
-FString UVoxelDoor::ToData()
+void UVoxelDoor::Serialize(FArchive& Ar)
 {
-	return Super::ToData() + FString::Printf(TEXT(";%d"), (int32)IsOpened());
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << bOpened;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << bOpened;
+		}
+	}
+}
+
+void UVoxelDoor::LoadData(FSaveData* InSaveData, bool bForceMode)
+{
+	Super::LoadData(InSaveData, bForceMode);
+}
+
+FSaveData* UVoxelDoor::ToData()
+{
+	return Super::ToData();
 }
 
 void UVoxelDoor::OpenOrClose()
@@ -36,7 +55,7 @@ void UVoxelDoor::OpenOrClose()
 
 void UVoxelDoor::OpenTheDoor()
 {
-	SetOpened(false);
+	bOpened = true;
 	Rotation += FRotator(0, -90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
@@ -44,11 +63,12 @@ void UVoxelDoor::OpenTheDoor()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[0], Owner->IndexToLocation(Index));
 	}
+	RefreshData();
 }
 
 void UVoxelDoor::CloseTheDoor()
 {
-	SetOpened(true);
+	bOpened = false;
 	Rotation += FRotator(0, 90, 0);
 	Scale = FVector(1, 1, 1);
 	Owner->Generate();
@@ -56,21 +76,7 @@ void UVoxelDoor::CloseTheDoor()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[1], Owner->IndexToLocation(Index));
 	}
-}
-
-bool UVoxelDoor::IsOpened() const
-{
-	return Params[FName("bOpened")].GetBooleanValue();
-}
-
-void UVoxelDoor::SetOpened(bool InValue)
-{
-	Params[FName("bOpened")].SetBooleanValue(InValue);
-}
-
-void UVoxelDoor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
-{
-	Params.Add(FName("bOpened"), FParameter::MakeBoolean(false));
+	RefreshData();
 }
 
 void UVoxelDoor::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)

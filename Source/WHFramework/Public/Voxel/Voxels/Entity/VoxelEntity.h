@@ -14,7 +14,7 @@ class UVoxelMeshComponent;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelEntity : public AWHActor, public IObjectPoolInterface
+class WHFRAMEWORK_API AVoxelEntity : public AWHActor
 {
 	GENERATED_BODY()
 
@@ -34,8 +34,10 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+		
 	virtual void OnDespawn_Implementation() override;
 
 	UVoxelData& GetVoxelData() const;

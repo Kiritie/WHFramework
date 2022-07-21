@@ -8,8 +8,6 @@
 UEventHandleBase::UEventHandleBase()
 {
 	EventType = EEventType::Multicast;
-	
-	Execute_OnDespawn(this);
 }
 
 bool UEventHandleBase::Filter_Implementation(UObject* InOwner, const FName InFuncName)
@@ -28,5 +26,5 @@ void UEventHandleBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 
 void UEventHandleBase::OnDespawn_Implementation()
 {
-	
+	EventType = EEventType::Multicast;
 }

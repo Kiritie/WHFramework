@@ -33,6 +33,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static TArray<FParameter> GetParameters(FName InName, bool bEnsured = true);
+	
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
+	virtual void RemoveParameter(FName InName);
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
+	virtual void ClearAllParameter();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Integer

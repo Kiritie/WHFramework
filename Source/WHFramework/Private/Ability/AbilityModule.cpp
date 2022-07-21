@@ -123,10 +123,6 @@ void AAbilityModule::DestroyPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(!InPickUp || !InPickUp->IsValidLowLevel()) return;
 
-	if(InPickUp->Execute_GetContainer(InPickUp))
-	{
-		InPickUp->Execute_GetContainer(InPickUp)->RemoveSceneActor(InPickUp);
-	}
 	UObjectPoolModuleBPLibrary::DespawnObject(InPickUp);
 }
 
@@ -150,10 +146,6 @@ void AAbilityModule::DestroyCharacter(AAbilityCharacterBase* InCharacter)
 {
 	if(!InCharacter || !InCharacter->IsValidLowLevel()) return;
 
-	if(InCharacter->Execute_GetContainer(InCharacter))
-	{
-		InCharacter->Execute_GetContainer(InCharacter)->RemoveSceneActor(InCharacter);
-	}
 	UObjectPoolModuleBPLibrary::DespawnObject(InCharacter);
 }
 
@@ -176,9 +168,5 @@ void AAbilityModule::DestroyVitality(AAbilityVitalityBase* InVitality)
 {
 	if(!InVitality || !InVitality->IsValidLowLevel()) return;
 
-	if(InVitality->Execute_GetContainer(InVitality))
-	{
-		InVitality->Execute_GetContainer(InVitality)->RemoveSceneActor(InVitality);
-	}
 	UObjectPoolModuleBPLibrary::DespawnObject(InVitality);
 }

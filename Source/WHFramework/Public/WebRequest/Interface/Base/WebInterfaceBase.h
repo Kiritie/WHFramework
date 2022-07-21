@@ -14,7 +14,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWebInterfaceBase : public UWHObject, public IObjectPoolInterface
+class WHFRAMEWORK_API UWebInterfaceBase : public UWHObject
 {
 	GENERATED_BODY()
 

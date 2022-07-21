@@ -23,7 +23,7 @@ void USaveGameBase::OnSave_Implementation()
 {
 }
 
-void USaveGameBase::OnLoad_Implementation()
+void USaveGameBase::OnLoad_Implementation(bool bForceMode)
 {
 }
 
@@ -43,14 +43,18 @@ void USaveGameBase::OnDestroy_Implementation()
 {
 }
 
+void USaveGameBase::OnActiveChange_Implementation(bool bActive)
+{
+}
+
 bool USaveGameBase::Save(bool bRefresh)
 {
 	return USaveGameModuleBPLibrary::SaveSaveGame<USaveGameBase>(SaveIndex, bRefresh, GetClass());
 }
 
-bool USaveGameBase::Load()
+bool USaveGameBase::Load(bool bForceMode)
 {
-	return USaveGameModuleBPLibrary::LoadSaveGame<USaveGameBase>(SaveIndex, GetClass()) != nullptr;
+	return USaveGameModuleBPLibrary::LoadSaveGame<USaveGameBase>(SaveIndex, bForceMode, GetClass()) != nullptr;
 }
 
 bool USaveGameBase::Unload(bool bForceMode)
@@ -71,4 +75,9 @@ bool USaveGameBase::Refresh()
 bool USaveGameBase::Destroy()
 {
 	return USaveGameModuleBPLibrary::DestroySaveGame<USaveGameBase>(SaveIndex, GetClass());
+}
+
+bool USaveGameBase::IsActived() const
+{
+	return USaveGameModuleBPLibrary::GetActiveSaveIndex(GetClass()) == SaveIndex;
 }

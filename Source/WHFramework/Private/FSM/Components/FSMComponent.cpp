@@ -10,16 +10,19 @@
 // ParamSets default values
 UFSMComponent::UFSMComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
-	
-	States = TArray<TSubclassOf<UFiniteStateBase>>();
+	PrimaryComponentTick.bCanEverTick = true;
 
+	bAutoSwitchDefault = false;
+	GroupName = NAME_None;
 	DefaultState = nullptr;
 	FinalState = nullptr;
 	CurrentState = nullptr;
-	GroupName = NAME_None;
+
+	States = TArray<TSubclassOf<UFiniteStateBase>>();
 
 	StateMap = TMap<FName, UFiniteStateBase*>();
+
+	bInitialized = false;
 }
 
 void UFSMComponent::BeginPlay()
@@ -34,6 +37,13 @@ void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 
 	OnTermination();
+}
+
+void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	OnRefresh();
 }
 
 void UFSMComponent::OnInitialize()
@@ -55,6 +65,9 @@ void UFSMComponent::OnInitialize()
 			}
 		}
 	}
+
+	bInitialized = true;
+	
 	SwitchDefaultState();
 }
 
@@ -86,11 +99,9 @@ void UFSMComponent::OnTermination()
 
 void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(InState == CurrentState) return;
+	if(!bInitialized || InState == CurrentState) return;
 	
 	UFiniteStateBase* LastState = CurrentState;
-
-	CurrentState = InState;
 
 	if(!InState || GetStates().Contains(InState) && InState->OnValidate())
 	{
@@ -100,11 +111,19 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 		}
 		if(InState)
 		{
+			CurrentState = InState;
 			InState->OnEnter(LastState);
 		}
+		else
+		{
+			CurrentState = nullptr;
+		}
 	}
-	GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
-	OnStateChanged.Broadcast(CurrentState);
+	if(InState == CurrentState)
+	{
+		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
+		OnStateChanged.Broadcast(CurrentState);
+	}
 }
 
 void UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
@@ -113,7 +132,7 @@ void UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	{
 		SwitchState(GetStateByIndex<UFiniteStateBase>(InStateIndex));
 	}
-	else
+	else if(bInitialized)
 	{
 		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex);
 	}
@@ -125,7 +144,7 @@ void UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	{
 		SwitchState(GetStateByClass<UFiniteStateBase>(InStateClass));
 	}
-	else
+	else if(bInitialized)
 	{
 		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None"));
 	}

@@ -6,6 +6,7 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Global/Base/WHObject.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "Voxel.generated.h"
 
@@ -18,51 +19,41 @@ class UVoxelData;
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UWHObject, public IObjectPoolInterface
+class WHFRAMEWORK_API UVoxel : public UWHObject, public ISaveDataInterface
 {
+private:
 	GENERATED_BODY()
 
 public:
 	UVoxel();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	// Statics
 public:
-	static UVoxel* EmptyVoxel;
+	static UVoxel& GetEmpty();
 
-	static UVoxel* UnknownVoxel;
-
-public:
-	static UVoxel* SpawnVoxel(EVoxelType InVoxelType);
-
-	static UVoxel* SpawnVoxel(const FPrimaryAssetId& InVoxelID);
-
-	static UVoxel* LoadVoxel(AVoxelChunk* InOwner, const FVoxelItem& InVoxelItem);
-
-	static UVoxel* LoadVoxel(AVoxelChunk* InOwner, const FString& InVoxelData);
+	static UVoxel& GetUnknown();
 	
-	static void DespawnVoxel(UVoxel* InVoxel);
-
-	static bool IsValid(UVoxel* InVoxel);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
 public:
-	virtual void LoadData(const FString& InValue);
+	virtual int32 GetLimit_Implementation() const override { return 10000; }
 
-	virtual void LoadItem(const FVoxelItem& InVoxelItem);
-
-	virtual FString ToData();
-
-	virtual FVoxelItem ToItem();
-
-	//////////////////////////////////////////////////////////////////////////
-	// Events
-public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation() override;
 
+	virtual void Serialize(FArchive& Ar) override;
+
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+
+	virtual FSaveData* ToData() override;
+
+	virtual  void RefreshData();
+
+	//////////////////////////////////////////////////////////////////////////
+	// Events
+public:
 	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
 
 	virtual void OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
@@ -81,29 +72,30 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats
-protected:
-	UPROPERTY(BlueprintReadOnly)
+public:
+	UPROPERTY(VisibleAnywhere)
 	FPrimaryAssetId ID;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere)
 	FIndex Index;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere)
 	FRotator Rotation;
 	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere)
 	FVector Scale;
-	
-	UPROPERTY(BlueprintReadWrite)
-	TMap<FName, FParameter> Params;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere)
 	AVoxelChunk* Owner;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere)
 	AVoxelAuxiliary* Auxiliary;
 
 public:
+	bool IsEmpty() const;
+
+	bool IsUnknown() const;
+
 	template<class T>
 	T& GetData() const
 	{
@@ -112,39 +104,30 @@ public:
 	
 	UVoxelData& GetData() const;
 
-	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId GetID() const { return ID; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetID(const FPrimaryAssetId& val) { ID = val; }
+	void SetID(FPrimaryAssetId InID) { ID = InID; }
 
 	UFUNCTION(BlueprintPure)
 	FIndex GetIndex() const { return Index; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetIndex(FIndex val) { Index = val; }
-
-	UFUNCTION(BlueprintPure)
 	FRotator GetRotation() const { return Rotation; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetRotation(FRotator val) { Rotation = val; }
-
-	UFUNCTION(BlueprintPure)
 	FVector GetScale() const { return Scale; }
-	
-	UFUNCTION(BlueprintCallable)
-	void SetScale(FVector val) { Scale = val; }
 
-	UFUNCTION(BlueprintPure)
 	AVoxelChunk* GetOwner() const { return Owner; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetOwner(AVoxelChunk* val) { Owner = val; }
-
-	UFUNCTION(BlueprintPure)
 	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
+};
 
-	UFUNCTION(BlueprintCallable)
-	void SetAuxiliary(AVoxelAuxiliary* val) { Auxiliary = val; }
+UCLASS()
+class WHFRAMEWORK_API UVoxelEmpty : public UVoxel
+{
+	GENERATED_BODY()
+};
+
+UCLASS()
+class WHFRAMEWORK_API UVoxelUnknown : public UVoxel
+{
+	GENERATED_BODY()
 };

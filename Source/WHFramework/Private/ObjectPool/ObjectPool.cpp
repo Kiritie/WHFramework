@@ -8,6 +8,7 @@
 UObjectPool::UObjectPool()
 {
 	Limit = 100;
+	Count = 0;
 	Type = nullptr;
 }
 
@@ -42,6 +43,7 @@ UObject* UObjectPool::SpawnImpl()
 
 void UObjectPool::Despawn(UObject* InObject)
 {
+	IObjectPoolInterface::Execute_OnDespawn(InObject);
 	if(Count >= Limit)
 	{
 		DespawnImpl(InObject);
@@ -51,7 +53,6 @@ void UObjectPool::Despawn(UObject* InObject)
 		Queue.Enqueue(InObject);
 		Count++;
 	}
-	IObjectPoolInterface::Execute_OnDespawn(InObject);
 }
 
 void UObjectPool::DespawnImpl(UObject* InObject)
@@ -74,14 +75,4 @@ void UObjectPool::Clear()
 		}
 	}
 	Queue.Empty();
-}
-
-int32 UObjectPool::GetLimit() const
-{
-	return Limit;
-}
-
-int32 UObjectPool::GetCount() const
-{
-	return Count;
 }

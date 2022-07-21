@@ -58,9 +58,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// StepModule
 protected:
-	/// 自动开始步骤
+	/// 自动开始初始步骤
 	UPROPERTY(EditAnywhere, Category = "StepModule")
-	bool bAutoStart;
+	bool bAutoStartFirst;
 	
 	/// 步骤模块状态
 	UPROPERTY(VisibleAnywhere, Category = "StepModule")

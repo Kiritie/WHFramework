@@ -102,11 +102,13 @@ protected:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation() override;
 
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -198,9 +200,6 @@ public:
 public:
 	UFUNCTION(BlueprintCallable)
 	float Distance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetVisible(bool bVisible);
 									
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetMotionRate(float InMovementRate, float InRotationRate);
@@ -291,22 +290,22 @@ public:
 	virtual void SetMaxHealth(float InValue) override;
 			
 	UFUNCTION(BlueprintPure)
-	float GetMoveSpeed() const;
+	virtual float GetMoveSpeed() const;
 		
 	UFUNCTION(BlueprintCallable)
-	void SetMoveSpeed(float InValue);
+	virtual void SetMoveSpeed(float InValue);
 			
 	UFUNCTION(BlueprintPure)
-	float GetRotationSpeed() const;
+	virtual float GetRotationSpeed() const;
 		
 	UFUNCTION(BlueprintCallable)
-	void SetRotationSpeed(float InValue);
+	virtual void SetRotationSpeed(float InValue);
 			
 	UFUNCTION(BlueprintPure)
-	float GetJumpForce() const;
+	virtual float GetJumpForce() const;
 		
 	UFUNCTION(BlueprintCallable)
-	void SetJumpForce(float InValue);
+	virtual void SetJumpForce(float InValue);
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetPhysicsDamage() const override;
@@ -315,16 +314,16 @@ public:
 	virtual float GetMagicDamage() const override;
 
 	UFUNCTION(BlueprintPure)
-	FVector GetMoveVelocity(bool bIgnoreZ = true) const;
+	virtual FVector GetMoveVelocity(bool bIgnoreZ = true) const;
 
 	UFUNCTION(BlueprintPure)
-	FVector GetMoveDirection(bool bIgnoreZ = true) const;
+	virtual FVector GetMoveDirection(bool bIgnoreZ = true) const;
 		
 	UFUNCTION(BlueprintPure)
-	float GetRadius() const;
+	virtual float GetRadius() const;
 
 	UFUNCTION(BlueprintPure)
-	float GetHalfHeight() const;
+	virtual float GetHalfHeight() const;
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

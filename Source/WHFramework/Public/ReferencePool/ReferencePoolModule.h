@@ -44,7 +44,7 @@ public:
 	/// ReferencePool
 protected:
 	UPROPERTY(VisibleAnywhere, Transient)
-	TMap<UClass*, UReferencePool*> ReferencePools;
+	TMap<TSubclassOf<UObject>, UReferencePool*> ReferencePools;
 
 public:
 	template<class T>
@@ -60,31 +60,19 @@ public:
 	}
 
 	template<class T>
+	void CreateReference(UObject* InObject = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
+
+		GetOrCreatePool<T>(InType)->Create(InObject);
+	}
+
+	template<class T>
 	T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return *NewObject<T>();
 
-		if(!ReferencePools.Contains(InType))
-		{
-			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
-			ReferencePool->Initialize(InType);
-			ReferencePools.Add(InType, ReferencePool);
-		}
-		return static_cast<T&>(ReferencePools[InType]->Get());
-	}
-
-	template<class T>
-	void SetReference(UObject* InObject, TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
-
-		if(!ReferencePools.Contains(InType))
-		{
-			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
-			ReferencePool->Initialize(InType);
-			ReferencePools.Add(InType, ReferencePool);
-		}
-		ReferencePools[InType]->Set(InObject);
+		return static_cast<T&>(GetOrCreatePool<T>(InType)->Get());
 	}
 
 	template<class T>
@@ -110,4 +98,19 @@ public:
 	}
 
 	void ClearAllReference();
+
+protected:
+	template<class T>
+	UReferencePool* GetOrCreatePool(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return nullptr;
+
+		if(!ReferencePools.Contains(InType))
+		{
+			UReferencePool* ReferencePool = NewObject<UReferencePool>(this);
+			ReferencePool->Initialize(InType);
+			ReferencePools.Add(InType, ReferencePool);
+		}
+		return ReferencePools[InType];
+	}
 };

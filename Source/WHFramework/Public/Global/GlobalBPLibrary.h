@@ -108,6 +108,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
 
+	/*
+	 * 获取枚举值变量名称
+	 * @param InEnumName 枚举名称
+	 * @param InEnumValue 枚举值
+	 */
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static int32 GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize
 public:

@@ -24,6 +24,9 @@ class WHFRAMEWORK_API ISceneActorInterface
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
+	bool IsAddToList() const;
+	
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
 	FGuid GetActorID() const;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
@@ -34,4 +37,10 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
 	void SetContainer(const TScriptInterface<ISceneContainerInterface>& InContainer);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
+	bool IsVisible() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
+	void SetActorVisible(bool bVisible);
 };

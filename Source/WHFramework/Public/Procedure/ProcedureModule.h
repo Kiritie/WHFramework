@@ -48,9 +48,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
 protected:
-	/// 自动切换流程 
+	/// 自动切换初始流程 
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
-	bool bAutoSwitch;
+	bool bAutoSwitchFirst;
 
 public:
 	UFUNCTION(BlueprintCallable)

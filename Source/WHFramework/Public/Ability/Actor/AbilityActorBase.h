@@ -5,8 +5,6 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityActorInterface.h"
-#include "Scene/Actor/SceneActorInterface.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "AbilityActorBase.generated.h"
 
@@ -16,7 +14,7 @@ class UAbilitySystemComponentBase;
  * Ability Actor基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IObjectPoolInterface, public ISceneActorInterface, public IAbilitySystemInterface
+class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -41,23 +39,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void Serialize(FArchive& Ar) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Actor
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
-	FGuid ActorID;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
-	TScriptInterface<ISceneContainerInterface> Container;
-	
-public:
-	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
-
-	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
-
-	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
-
-	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Ability

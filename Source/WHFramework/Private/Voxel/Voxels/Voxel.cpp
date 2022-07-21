@@ -15,115 +15,23 @@
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
-UVoxel* UVoxel::EmptyVoxel = nullptr;
-UVoxel* UVoxel::UnknownVoxel = nullptr;
-
 UVoxel::UVoxel()
 {
 	Index = FIndex::ZeroIndex;
 	Rotation = FRotator::ZeroRotator;
 	Scale = FVector::OneVector;
-	Params = TMap<FName, FParameter>();
 	Owner = nullptr;
 	Auxiliary = nullptr;
 }
 
-UVoxel* UVoxel::SpawnVoxel(EVoxelType InVoxelType)
+UVoxel& UVoxel::GetEmpty()
 {
-	return SpawnVoxel(UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType));
+	return UReferencePoolModuleBPLibrary::GetReference<UVoxelEmpty>();
 }
 
-UVoxel* UVoxel::SpawnVoxel(const FPrimaryAssetId& InVoxelID)
+UVoxel& UVoxel::GetUnknown()
 {
-	UVoxel* voxel = nullptr;
-	const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
-	if(voxelData.IsValid())
-	{
-		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : TSubclassOf<UVoxel>(StaticClass());
-		voxel = UObjectPoolModuleBPLibrary::SpawnObject<UVoxel>(nullptr, tmpClass);
-		if(voxel) voxel->ID = InVoxelID;
-	}
-	return voxel;
-}
-
-UVoxel* UVoxel::LoadVoxel(AVoxelChunk* InOwner, const FVoxelItem& InVoxelItem)
-{
-	UVoxel* voxel = SpawnVoxel(InVoxelItem.ID);
-	if(voxel)
-	{
-		voxel->LoadItem(InVoxelItem);
-		voxel->SetOwner(InOwner);
-		voxel->SetAuxiliary(InVoxelItem.Auxiliary);
-	}
-	return voxel;
-}
-
-UVoxel* UVoxel::LoadVoxel(AVoxelChunk* InOwner, const FString& InVoxelData)
-{
-	FString str1, str2;
-	InVoxelData.Split(TEXT(";"), &str1, &str2);
-	UVoxel* voxel = SpawnVoxel(FPrimaryAssetId::FromString(str1));
-	if(voxel)
-	{
-		voxel->LoadData(str2);
-		voxel->SetOwner(InOwner);
-	}
-	return voxel;
-}
-
-void UVoxel::DespawnVoxel(UVoxel* InVoxel)
-{
-	if(IsValid(InVoxel)) UObjectPoolModuleBPLibrary::DespawnObject(InVoxel);
-}
-
-bool UVoxel::IsValid(UVoxel* InVoxel)
-{
-	return InVoxel && InVoxel->IsValidLowLevel() && InVoxel != EmptyVoxel && InVoxel != UnknownVoxel;
-}
-
-void UVoxel::LoadData(const FString& InValue)
-{
-	TArray<FString> data;
-	InValue.ParseIntoArray(data, TEXT(";"));
-
-	Index = FIndex(data[0]);
-	
-	TArray<FString> rotData;
-	data[1].ParseIntoArray(rotData, TEXT(","));
-	Rotation = FRotator(FCString::Atof(*rotData[0]), FCString::Atof(*rotData[1]), FCString::Atof(*rotData[2]));
-	
-	TArray<FString> scaleData;
-	data[2].ParseIntoArray(scaleData, TEXT(","));
-	Scale = FVector(FCString::Atof(*scaleData[0]), FCString::Atof(*scaleData[1]), FCString::Atof(*scaleData[2]));
-}
-
-void UVoxel::LoadItem(const FVoxelItem& InVoxelItem)
-{
-	ID = InVoxelItem.ID;
-	Index = InVoxelItem.Index;
-	Rotation = InVoxelItem.Rotation;
-	Scale = InVoxelItem.Scale;
-	Params = InVoxelItem.Params;
-	Owner = InVoxelItem.Owner;
-	Auxiliary = InVoxelItem.Auxiliary;
-}
-
-FString UVoxel::ToData()
-{
-	return FString::Printf(TEXT("%s;%s;%s;%s"), *ID.ToString(), *Index.ToString(), *FString::Printf(TEXT("%f,%f,%f"), Rotation.Pitch, Rotation.Yaw, Rotation.Roll), *FString::Printf(TEXT("%f,%f,%f"), Scale.X, Scale.Y, Scale.Z));
-}
-
-FVoxelItem UVoxel::ToItem()
-{
-	FVoxelItem voxelItem;
-	voxelItem.ID = ID;
-	voxelItem.Index = Index;
-	voxelItem.Rotation = Rotation;
-	voxelItem.Scale = Scale;
-	voxelItem.Owner = Owner;
-	voxelItem.Auxiliary = Auxiliary;
-	voxelItem.Params = Params;
-	return voxelItem;
+	return UReferencePoolModuleBPLibrary::GetReference<UVoxelUnknown>();
 }
 
 void UVoxel::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -137,9 +45,63 @@ void UVoxel::OnDespawn_Implementation()
 	Index = FIndex::ZeroIndex;
 	Rotation = FRotator::ZeroRotator;
 	Scale = FVector::OneVector;
-	Params.Empty();
 	Owner = nullptr;
 	Auxiliary = nullptr;
+}
+
+void UVoxel::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << Index;
+			Ar << Rotation;
+			Ar << Scale;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << Index;
+			Ar << Rotation;
+			Ar << Scale;
+		}
+	}
+}
+
+void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
+{
+	const auto SaveData = InSaveData->CastRef<FVoxelItem>();
+
+	ID = SaveData.ID;
+	Index = SaveData.Index;
+	Rotation = SaveData.Rotation;
+	Scale = SaveData.Scale;
+}
+
+FSaveData* UVoxel::ToData()
+{
+	static FVoxelItem SaveData;
+	SaveData.Reset();
+
+	SaveData.VoxelType = UVoxelModuleBPLibrary::GetVoxelTypeByAssetID(ID);
+	SaveData.ID = ID;
+	SaveData.Index = Index;
+	SaveData.Rotation = Rotation;
+	SaveData.Scale = Scale;
+	SaveData.Owner = Owner;
+	SaveData.Auxiliary = Auxiliary;
+
+	return &SaveData;
+}
+
+void UVoxel::RefreshData()
+{
+	if(Owner)
+	{
+		Owner->GetVoxelItem(Index).RefreshSaveData();
+	}
 }
 
 void UVoxel::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
@@ -202,6 +164,16 @@ bool UVoxel::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
 {
 	
+}
+
+bool UVoxel::IsEmpty() const
+{
+	return &UVoxel::GetEmpty() == this;
+}
+
+bool UVoxel::IsUnknown() const
+{
+	return &UVoxel::GetUnknown() == this;
 }
 
 UVoxelData& UVoxel::GetData() const

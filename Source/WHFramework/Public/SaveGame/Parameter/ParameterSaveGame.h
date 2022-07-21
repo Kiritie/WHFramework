@@ -21,7 +21,7 @@ public:
 public:
 	virtual void OnCreate_Implementation(int32 InSaveIndex) override;
 	
-	virtual void OnLoad_Implementation() override;
+	virtual void OnLoad_Implementation(bool bForceMode) override;
 	
 	virtual void OnUnload_Implementation(bool bForceMode) override;
 

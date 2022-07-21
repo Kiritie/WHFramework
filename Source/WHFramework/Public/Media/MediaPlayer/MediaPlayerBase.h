@@ -6,7 +6,6 @@
 #include "Global/Base/WHActor.h"
 
 #include "Media/MediaModuleTypes.h"
-#include "Scene/Actor/SceneActorInterface.h"
 
 #include "MediaPlayerBase.generated.h"
 
@@ -14,7 +13,7 @@
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API AMediaPlayerBase : public AWHActor, public ISceneActorInterface
+class WHFRAMEWORK_API AMediaPlayerBase : public AWHActor
 {
 	GENERATED_BODY()
 	
@@ -26,23 +25,6 @@ protected:
 	
 public:
 	virtual void Tick(float DeltaSeconds) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Actor
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
-	FGuid ActorID;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
-	TScriptInterface<ISceneContainerInterface> Container;
-	
-public:
-	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
-
-	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
-
-	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
-
-	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name

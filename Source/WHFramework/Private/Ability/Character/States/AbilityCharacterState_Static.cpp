@@ -4,6 +4,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 

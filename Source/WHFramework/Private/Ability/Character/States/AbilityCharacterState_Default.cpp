@@ -25,7 +25,7 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->SetVisible(true);
+	Character->Execute_SetActorVisible(Character, true);
 	Character->SetHealth(-1.f);
 	Character->SetMotionRate(1, 1);
 }

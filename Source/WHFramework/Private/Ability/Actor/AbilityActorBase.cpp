@@ -34,12 +34,12 @@ void AAbilityActorBase::BeginPlay()
 
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	
+	Super::OnSpawn_Implementation(InParams);
 }
 
 void AAbilityActorBase::OnDespawn_Implementation()
 {
-
+	Super::OnDespawn_Implementation();
 }
 
 void AAbilityActorBase::Tick(float DeltaTime)

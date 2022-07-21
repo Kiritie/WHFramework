@@ -107,6 +107,15 @@ FText UGlobalBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 	return FText::GetEmpty();
 }
 
+int32 UGlobalBPLibrary::GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName)
+{
+	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
+	{
+		return EnumPtr->GetValueByNameString(InValueName);
+	}
+	return -1;
+}
+
 void UGlobalBPLibrary::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
 	if(InObject)

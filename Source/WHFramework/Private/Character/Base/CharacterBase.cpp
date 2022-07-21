@@ -41,12 +41,29 @@ void ACharacterBase::BeginPlay()
 
 void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	USceneModuleBPLibrary::AddSceneActor(this);
+	Execute_SetActorVisible(this, true);
+
+	if(Execute_IsAddToList(this))
+	{
+		USceneModuleBPLibrary::AddSceneActor(this);
+	}
 }
 
 void ACharacterBase::OnDespawn_Implementation()
 {
-	USceneModuleBPLibrary::RemoveSceneActor(this);
+	Execute_SetActorVisible(this, false);
+
+	if(Execute_IsAddToList(this))
+	{
+		USceneModuleBPLibrary::RemoveSceneActor(this);
+	}
+	else if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
+	Container = nullptr;
+	DefaultController = nullptr;
 }
 
 void ACharacterBase::SpawnDefaultController()
@@ -54,6 +71,16 @@ void ACharacterBase::SpawnDefaultController()
 	Super::SpawnDefaultController();
 
 	DefaultController = Controller;
+}
+
+bool ACharacterBase::IsVisible_Implementation() const
+{
+	return GetRootComponent()->IsVisible();
+}
+
+void ACharacterBase::SetActorVisible_Implementation(bool bVisible)
+{
+	GetRootComponent()->SetVisibility(bVisible, true);
 }
 
 bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem)

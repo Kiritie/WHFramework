@@ -43,7 +43,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -66,6 +66,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	virtual TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const override;
 	
+	UFUNCTION(BlueprintCallable)
+	virtual void RemoveParameter(FName InName) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void ClearAllParameter() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Integer
 	UFUNCTION(BlueprintCallable)

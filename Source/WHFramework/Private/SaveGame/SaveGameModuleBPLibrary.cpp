@@ -67,6 +67,15 @@ void USaveGameModuleBPLibrary::SetActiveSaveIndex(TSubclassOf<USaveGameBase> InS
 	}
 }
 
+FSaveGameInfo USaveGameModuleBPLibrary::GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData)
+{
+	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
+	{
+		return SaveGameModule->GetSaveGameInfo(InSaveGameClass, bFromGeneralData);
+	}
+	return FSaveGameInfo();
+}
+
 USaveGameBase* USaveGameModuleBPLibrary::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
@@ -139,11 +148,11 @@ bool USaveGameModuleBPLibrary::SaveAllSaveGame(bool bRefresh)
 	return false;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bForceMode)
 {
 	if(ASaveGameModule* SaveGameModule = AMainModule::GetModuleByClass<ASaveGameModule>())
 	{
-		return SaveGameModule->LoadSaveGame(InSaveGameClass, InSaveIndex);
+		return SaveGameModule->LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
 	}
 	return nullptr;
 }

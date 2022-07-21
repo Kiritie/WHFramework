@@ -4,4 +4,15 @@
 
 UWHObject::UWHObject()
 {
+	
+}
+
+void UWHObject::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	
+}
+
+void UWHObject::OnDespawn_Implementation()
+{
+	
 }

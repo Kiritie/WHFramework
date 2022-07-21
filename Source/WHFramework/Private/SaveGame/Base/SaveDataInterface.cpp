@@ -4,9 +4,9 @@
 
 #include "Global/GlobalBPLibrary.h"
 
-void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, bool bLoadMemoryData)
+void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, bool bForceMode, bool bLoadMemoryData)
 {
-	LoadData(InSaveData);
+	LoadData(InSaveData, bForceMode);
 	if (bLoadMemoryData)
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), InSaveData->GetDatas());

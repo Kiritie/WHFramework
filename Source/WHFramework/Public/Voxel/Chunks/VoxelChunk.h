@@ -9,6 +9,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
+class AVoxelModule;
 class ACharacterBase;
 class UVoxel;
 class AAbilityPickUpBase;
@@ -19,7 +20,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public IObjectPoolInterface, public ISceneContainerInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -31,7 +32,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -48,73 +49,20 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Components
-protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SolidMesh;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SemiMesh;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* TransMesh;
-
-public:
-	UVoxelMeshComponent* GetSolidMesh();
-
-	UVoxelMeshComponent* GetSemiMesh();
-
-	UVoxelMeshComponent* GetTransMesh();
-	
-public:
-	virtual void DestroySolidMesh();
-
-	virtual void DestroySemiMesh();
-
-	virtual void DestroyTransMesh();
-
-	//////////////////////////////////////////////////////////////////////////
-	// Stats
-protected:
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<AVoxelChunk*> Neighbors;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<AAbilityPickUpBase*> PickUps;
-
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	FIndex Index;
-
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	int32 Batch;
-
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	bool bGenerated;
-
-	TMap<FIndex, FVoxelItem> VoxelMap;
-	
-public:
-	FIndex GetIndex() const { return Index; }
-
-	int32 GetBatch() const { return Batch; }
-	
-	bool IsGenerated() const { return bGenerated; }
-
-	TArray<AVoxelChunk*> GetNeighbors() const { return Neighbors; }
-
-	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
-	virtual void Initialize(FIndex InIndex, int32 InBatch);
+	virtual void Initialize(AVoxelModule* InModule,  FIndex InIndex, int32 InBatch);
 
-	virtual void Generate();
+	virtual void Generate(bool bForceMode = false);
 
-	virtual void BuildMap();
+	virtual void BuildMap(int32 InStage);
 
 	virtual void GenerateMap();
 
@@ -123,11 +71,9 @@ public:
 	virtual void DestroyActors();
 
 protected:
-	virtual void OnGenerated();
+	virtual void GenerateNeighbors(FIndex InIndex, bool bForceMode = false);
 
-	virtual void GenerateNeighbors(FIndex InIndex);
-
-	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ);
+	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForceMode = false);
 
 	virtual void UpdateNeighbors();
 
@@ -149,9 +95,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
-	virtual UVoxel* GetVoxel(FIndex InIndex);
+	virtual UVoxel& GetVoxel(FIndex InIndex);
 
-	virtual UVoxel* GetVoxel(int32 InX, int32 InY, int32 InZ);
+	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ);
 
 	virtual FVoxelItem& GetVoxelItem(FIndex InIndex);
 
@@ -195,5 +141,53 @@ public:
 	virtual AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
 
 	virtual void DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Components
+protected:
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* SolidMesh;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* SemiMesh;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* TransMesh;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Stats
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	TArray<AVoxelChunk*> Neighbors;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	TArray<AAbilityPickUpBase*> PickUps;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	AVoxelModule* Module;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	FIndex Index;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	int32 Batch;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bGenerated;
+
+	TMap<FIndex, FVoxelItem> VoxelMap;
+	
+public:
+	virtual bool IsEntity() const;
+
+	AVoxelModule* GetModule() const { return Module; }
+
+	FIndex GetIndex() const { return Index; }
+
+	int32 GetBatch() const { return Batch; }
+
+	bool IsGenerated() const { return bGenerated; }
+
+	TArray<AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 };
 

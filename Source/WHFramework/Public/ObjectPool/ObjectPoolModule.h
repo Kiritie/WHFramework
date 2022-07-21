@@ -46,24 +46,50 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 protected:
-	/// 单个引用池上限
+	/// 默认引用池上限
 	UPROPERTY(EditAnywhere)
-	int32 Limit;
+	int32 DefaultLimit;
 
 	UPROPERTY(VisibleAnywhere, Transient)
-	TMap<UClass*, UObjectPool*> ObjectPools;
+	TMap<TSubclassOf<UObject>, UObjectPool*> ObjectPools;
 
 public:
 	template<class T>
+	bool HasPool(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		return HasPool(InType);
+	}
+	UFUNCTION(BlueprintPure)
+	bool HasPool(TSubclassOf<UObject> InType) const;
+	
+	template<class T>
+	UObjectPool* GetPool(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		return GetPool(InType);
+	}
+	UFUNCTION(BlueprintPure)
+	UObjectPool* GetPool(TSubclassOf<UObject> InType) const;
+	
+	template<class T>
+	UObjectPool* CreatePool(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		return CreatePool(InType);
+	}
+	UFUNCTION(BlueprintCallable)
+	UObjectPool* CreatePool(TSubclassOf<UObject> InType);
+
+	template<class T>
+	void DestroyPool(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		DestroyPool(InType);
+	}
+	UFUNCTION(BlueprintCallable)
+	void DestroyPool(TSubclassOf<UObject> InType);
+
+	template<class T>
 	bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return false;
-
-		if(ObjectPools.Contains(InType))
-		{
-			return ObjectPools[InType]->GetCount() > 0;
-		}
-		return false;
+		return HasObject(InType);
 	}
 
 	UFUNCTION(BlueprintCallable)
@@ -72,49 +98,20 @@ public:
 	template<class T>
 	T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
-
-		if(!ObjectPools.Contains(InType))
-		{
-			UObjectPool* ObjectPool;
-			if(InType->IsChildOf<AActor>())
-			{
-				ObjectPool = NewObject<UActorPool>(this);
-			}
-			else if(InType->IsChildOf<UUserWidget>())
-			{
-				ObjectPool = NewObject<UWidgetPool>(this);
-			}
-			else
-			{
-				ObjectPool = NewObject<UObjectPool>(this);
-			}
-			const int32 TempLimit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-			ObjectPool->Initialize(TempLimit != 0 ? TempLimit : Limit, InType);
-			ObjectPools.Add(InType, ObjectPool);
-		}
-		return Cast<T>(ObjectPools[InType]->Spawn(InParams ? *InParams : TArray<FParameter>()));
+		return Cast<T>(SpawnObject(InType, InParams));
 	}
-
 	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams = nullptr);
-
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
 	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject);
-
+	
 	template<class T>
 	void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
-
-		if(ObjectPools.Contains(InType))
-		{
-			ObjectPools[InType]->Clear();
-		}
+		ClearObject(InType);
 	}
-
 	UFUNCTION(BlueprintCallable)
 	void ClearObject(TSubclassOf<UObject> InType);
 

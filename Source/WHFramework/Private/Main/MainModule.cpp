@@ -143,28 +143,43 @@ AMainModule* AMainModule::Get(bool bInEditor)
 #if WITH_EDITOR
 void AMainModule::GenerateModules_Implementation()
 {
+	// 获取场景模块
 	TArray<AActor*> ChildActors;
 	GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
 		if(const IModule* Module = Cast<IModule>(Iter))
 		{
-			if(!ModuleRefs.Contains(Iter))
-			{
-				ModuleRefs.Add(Iter);
-			}
 			const FName ModuleName = Module->Execute_GetModuleName(Iter);
-			if(!ModuleMap.Contains(ModuleName))
-			{
-				ModuleMap.Add(ModuleName, Iter);
-			}
-			else if(!ModuleMap[ModuleName])
-			{
-				ModuleMap[ModuleName] = Iter;
-			}
+			Iter->SetActorLabel(ModuleName.ToString());
+			ModuleRefs.AddUnique(Iter);
+			ModuleMap.Emplace(ModuleName, Iter);
 		}
 	}
 
+	// 移除废弃模块
+	TArray<TScriptInterface<IModule>> RemoveList;
+	for(auto Iter : ModuleRefs)
+	{
+		if(!Iter.GetObject() || !ModuleClasses.Contains(Iter.GetObject()->GetClass()))
+		{
+			RemoveList.AddUnique(Iter);
+			if(AActor* Actor = Cast<AActor>(Iter.GetObject()))
+			{
+				Actor->Destroy();
+			}
+		}
+	}
+	for(auto Iter : RemoveList)
+	{
+		ModuleRefs.Remove(Iter);
+		if(ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
+		{
+			ModuleMap.Remove(Iter->Execute_GetModuleName(Iter.GetObject()));
+		}
+	}
+
+	// 生成新的模块
 	for(int32 i = 0; i < ModuleClasses.Num(); i++)
 	{
 		if(!ModuleClasses[i]) continue;
@@ -174,11 +189,8 @@ void AMainModule::GenerateModules_Implementation()
 		{
 			if(Iter.GetObject() && Iter.GetObject()->IsA(ModuleClasses[i]))
 			{
-				if(!ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
-				{
-					ModuleMap.Add(Iter->Execute_GetModuleName(Iter.GetObject()), Iter.GetObject());
-				}
 				Iter->Execute_OnGenerate(Iter.GetObject());
+				ModuleMap.Emplace(Iter->Execute_GetModuleName(Iter.GetObject()), Iter.GetObject());
 				IsNeedSpawn = false;
 				break;
 			}
@@ -191,37 +203,12 @@ void AMainModule::GenerateModules_Implementation()
 
 		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(ModuleClasses[i], ActorSpawnParameters))
 		{
-			ModuleRefs.Add(Module);
-			if(!ModuleMap.Contains(Module->Execute_GetModuleName(Module)))
-			{
-				ModuleMap.Add(Module->Execute_GetModuleName(Module), Module);
-			}
-			Module->SetActorLabel(Module->Execute_GetModuleName(Module).ToString());
+			const FName ModuleName = Module->Execute_GetModuleName(Module);
+			Module->SetActorLabel(ModuleName.ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			Module->Execute_OnGenerate(Module);
-		}
-	}
-
-	TArray<TScriptInterface<IModule>> RemoveList;
-
-	for(auto Iter : ModuleRefs)
-	{
-		if(!Iter.GetObject() || !ModuleClasses.Contains(Iter.GetObject()->GetClass()))
-		{
-			RemoveList.Add(Iter);
-			if(AActor* Actor = Cast<AActor>(Iter.GetObject()))
-			{
-				Actor->Destroy();
-			}
-		}
-	}
-
-	for(auto Iter : RemoveList)
-	{
-		ModuleRefs.Remove(Iter);
-		if(ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
-		{
-			ModuleMap.Remove(Iter->Execute_GetModuleName(Iter.GetObject()));
+			ModuleRefs.AddUnique(Module);
+			ModuleMap.Emplace(ModuleName, Module);
 		}
 	}
 

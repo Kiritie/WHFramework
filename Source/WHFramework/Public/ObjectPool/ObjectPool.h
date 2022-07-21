@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Global/Base/WHObject.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "UObject/NoExportTypes.h"
@@ -13,7 +12,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UObjectPool : public UWHObject
+class WHFRAMEWORK_API UObjectPool : public UObject
 {
 	GENERATED_BODY()
 
@@ -24,12 +23,12 @@ protected:
 	/// 限制大小
 	UPROPERTY(VisibleAnywhere)
 	int32 Limit;
-	/// 对象类型
-	UPROPERTY(VisibleAnywhere)
-	TSubclassOf<UObject> Type;
 	/// 对象数量
 	UPROPERTY(VisibleAnywhere)
 	int32 Count;
+	/// 对象类型
+	UPROPERTY(VisibleAnywhere)
+	TSubclassOf<UObject> Type;
 	/// 对象列表
 	TQueue<UObject*> Queue;
 
@@ -39,25 +38,32 @@ public:
 	* @param InLimit 限制大小
 	* @param InType 类型
 	*/
-	virtual void Initialize(int32 InLimit, TSubclassOf<UObject> InType);
+	void Initialize(int32 InLimit, TSubclassOf<UObject> InType);
 	/**
 	* 生成对象
 	*/
-	virtual UObject* Spawn(const TArray<FParameter>& InParams);
+	UObject* Spawn(const TArray<FParameter>& InParams);
 	virtual UObject* SpawnImpl();
 	/**
 	* 回收对象
 	* @param InObject 对象
 	*/
-	virtual void Despawn(UObject* InObject);
+	void Despawn(UObject* InObject);
 	virtual void DespawnImpl(UObject* InObject);
 	/**
 	* 清理对象
 	*/
-	virtual void Clear();
+	void Clear();
 
 public:
-	int32 GetLimit() const;
+	UFUNCTION(BlueprintPure)
+	int32 GetLimit() const { return Limit; }
 
-	int32 GetCount() const;
+	UFUNCTION(BlueprintPure)
+	int32 GetCount() const { return Count; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UObject> GetType() const { return Type; }
+
+	TQueue<UObject*>& GetQueue() { return Queue; }
 };

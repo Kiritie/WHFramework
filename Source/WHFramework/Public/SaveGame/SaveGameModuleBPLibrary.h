@@ -66,6 +66,15 @@ public:
 	static void SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
 
 	template<class T>
+	static FSaveGameInfo GetSaveGameInfo(bool bFromGeneralData = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	{
+		return GetSaveGameInfo(InSaveGameClass);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "SaveGameModuleBPLibrary")
+	static FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData = false);
+
+	template<class T>
 	static T* GetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		return Cast<T>(GetSaveGame(InSaveGameClass, InSaveIndex));
@@ -137,13 +146,13 @@ public:
 	static bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	static T* LoadSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static T* LoadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex));
+		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"), Category = "SaveGameModuleBPLibrary")
-	static USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	static USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
 
 	template<class T>
 	static bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

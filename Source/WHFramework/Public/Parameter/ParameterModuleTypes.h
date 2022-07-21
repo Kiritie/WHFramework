@@ -376,6 +376,11 @@ public:
 	TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const;
 
 	//////////////////////////////////////////////////////////////////////////
+	void RemoveParameter(FName InName);
+
+	void ClearAllParameter();
+
+	//////////////////////////////////////////////////////////////////////////
 	void SetIntegerParameter(FName InName, int32 InValue);
 
 	int32 GetIntegerParameter(FName InName, bool bEnsured = true) const;

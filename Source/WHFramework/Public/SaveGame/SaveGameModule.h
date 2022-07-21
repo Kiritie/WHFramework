@@ -46,7 +46,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -107,6 +107,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
+
+	template<class T>
+	FSaveGameInfo GetSaveGameInfo(bool bFromGeneralData = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	{
+		return GetSaveGameInfo(InSaveGameClass);
+	}
+
+	UFUNCTION(BlueprintPure)
+	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData = false) const;
 
 	template<class T>
 	T* GetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
@@ -180,13 +189,13 @@ public:
 	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	T* LoadSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* LoadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex));
+		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
 
 	template<class T>
 	bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

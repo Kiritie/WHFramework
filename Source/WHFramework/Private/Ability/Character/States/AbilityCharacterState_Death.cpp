@@ -4,8 +4,10 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -70,10 +72,12 @@ void UAbilityCharacterState_Death::DeathEnd()
 {
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	Character->SetVisible(false);
+	Character->Execute_SetActorVisible(Character, false);
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DeadTag);
+
+	UObjectPoolModuleBPLibrary::DespawnObject(Character);
 }

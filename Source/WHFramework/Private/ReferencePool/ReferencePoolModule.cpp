@@ -10,7 +10,7 @@ AReferencePoolModule::AReferencePoolModule()
 {
 	ModuleName = FName("ReferencePoolModule");
 
-	ReferencePools = TMap<UClass*, UReferencePool*>();
+	ReferencePools = TMap<TSubclassOf<UObject>, UReferencePool*>();
 }
 
 #if WITH_EDITOR

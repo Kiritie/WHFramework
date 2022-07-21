@@ -44,7 +44,7 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 	{
 		case EVoxelInteractAction::Open:
 		{
-			if(!GetVoxelItem().GetParam(FName("bOpened")).GetBooleanValue())
+			if(!GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened())
 			{
 				return true;
 			}
@@ -52,7 +52,7 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 		}
 		case EVoxelInteractAction::Close:
 		{
-			if(GetVoxelItem().GetParam(FName("bOpened")).GetBooleanValue())
+			if(GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened())
 			{
 				return true;
 			}
@@ -85,24 +85,10 @@ void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAg
 
 void AVoxelDoorAuxiliary::OpenDoor()
 {
-	if(UVoxel* Voxel = GetVoxelItem().GetVoxel())
-	{
-		if(UVoxelDoor* VoxelDoor = Cast<UVoxelDoor>(Voxel))
-		{
-			VoxelDoor->OpenTheDoor();
-		}
-		UVoxel::DespawnVoxel(Voxel);
-	}
+	GetVoxelItem().GetVoxel<UVoxelDoor>().OpenTheDoor();
 }
 
 void AVoxelDoorAuxiliary::CloseDoor()
 {
-	if(UVoxel* Voxel = GetVoxelItem().GetVoxel())
-	{
-		if(UVoxelDoor* VoxelDoor = Cast<UVoxelDoor>(Voxel))
-		{
-			VoxelDoor->CloseTheDoor();
-		}
-		UVoxel::DespawnVoxel(Voxel);
-	}
+	GetVoxelItem().GetVoxel<UVoxelDoor>().CloseTheDoor();
 }

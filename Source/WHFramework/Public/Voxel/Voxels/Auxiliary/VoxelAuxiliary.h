@@ -16,7 +16,7 @@ class UVoxel;
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public IInteractionAgentInterface, public ISceneActorInterface
+class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public IInteractionAgentInterface
 {
 	GENERATED_BODY()
 	
@@ -30,6 +30,12 @@ protected:
 
 public:	
 	virtual void Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex);
+
+	virtual int32 GetLimit_Implementation() const override { return 10000; }
+
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation() override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -46,17 +52,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FIndex VoxelIndex;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	AVoxelChunk* Container;
-
 public:
 	FIndex GetVoxelIndex() const { return VoxelIndex; }
 
 	FVoxelItem& GetVoxelItem() const;
-
-	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override;
-
-	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override;
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

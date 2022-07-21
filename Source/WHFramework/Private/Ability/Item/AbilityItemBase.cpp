@@ -19,12 +19,12 @@ AAbilityItemBase::AAbilityItemBase()
 
 void AAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	
+	Super::OnSpawn_Implementation(InParams);
 }
 
 void AAbilityItemBase::OnDespawn_Implementation()
 {
-	SetVisible(false);
+	Super::OnDespawn_Implementation();
 }
 
 void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)

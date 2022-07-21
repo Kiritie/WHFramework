@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static EVoxelType GetVoxelTypeByAssetID(FPrimaryAssetId InAssetID);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 public:
@@ -41,4 +44,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVector ChunkIndexToLocation(FIndex InIndex);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Voxel
+public:
+	static UVoxel& GetVoxel(EVoxelType InVoxelType);
+
+	static UVoxel& GetVoxel(const FPrimaryAssetId& InVoxelID);
+
+	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
+
+	static bool IsValid(UVoxel& InVoxel);
 };

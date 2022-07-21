@@ -11,12 +11,12 @@ UVoxelWater::UVoxelWater()
 	
 }
 
-void UVoxelWater::LoadData(const FString& InValue)
+void UVoxelWater::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	Super::LoadData(InValue);
+	Super::LoadData(InSaveData, bForceMode);
 }
 
-FString UVoxelWater::ToData()
+FSaveData* UVoxelWater::ToData()
 {
 	return Super::ToData();
 }

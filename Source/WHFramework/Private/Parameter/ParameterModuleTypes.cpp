@@ -80,6 +80,23 @@ TArray<FParameter> FParameters::GetParameters(FName InName, bool bEnsured) const
 	return TmpArr;
 }
 
+void FParameters::RemoveParameter(FName InName)
+{
+	for (int32 i = 0; i < ParamSets.Num(); i++)
+	{
+		if(ParamSets[i].Name == InName)
+		{
+			ParamSets.RemoveAt(i);
+			break;
+		}
+	}
+}
+
+void FParameters::ClearAllParameter()
+{
+	ParamSets.Empty();
+}
+
 void FParameters::SetIntegerParameter(FName InName, int32 InValue)
 {
 	SetParameter(InName, FParameter::MakeInteger(InValue));

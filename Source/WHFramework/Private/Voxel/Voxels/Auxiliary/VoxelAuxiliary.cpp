@@ -31,6 +31,18 @@ void AVoxelAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex)
 	VoxelIndex = InVoxelIndex;
 }
 
+void AVoxelAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InParams);
+}
+
+void AVoxelAuxiliary::OnDespawn_Implementation()
+{
+	Super::OnDespawn_Implementation();
+
+	VoxelIndex = FIndex::ZeroIndex;
+}
+
 void AVoxelAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
@@ -53,19 +65,9 @@ FVoxelItem& AVoxelAuxiliary::GetVoxelItem() const
 {
 	if(Container)
 	{
-		return Container->GetVoxelItem(VoxelIndex);
+		return Cast<AVoxelChunk>(Container.GetObject())->GetVoxelItem(VoxelIndex);
 	}
 	return FVoxelItem::EmptyVoxel;
-}
-
-TScriptInterface<ISceneContainerInterface> AVoxelAuxiliary::GetContainer_Implementation() const
-{
-	return Container;
-}
-
-void AVoxelAuxiliary::SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer)
-{
-	Container = Cast<AVoxelChunk>(InContainer.GetObject());
 }
 
 UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const

@@ -16,12 +16,17 @@ void UReferencePool::Initialize(TSubclassOf<UObject> InType)
 	Type = InType;
 }
 
-UObject& UReferencePool::Get()
+void UReferencePool::Create(UObject* InObject)
 {
 	if(!Object)
 	{
-		Object = NewObject<UObject>(this, Type);
+		Object = InObject ? InObject : NewObject<UObject>(this, Type);
 	}
+}
+
+UObject& UReferencePool::Get()
+{
+	if(!Object) Create();
 	return *Object;
 }
 

@@ -74,18 +74,20 @@ protected:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void OnDespawn_Implementation() override;
+
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 
 	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
 
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation() override;
-
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void Serialize(FArchive& Ar) override;

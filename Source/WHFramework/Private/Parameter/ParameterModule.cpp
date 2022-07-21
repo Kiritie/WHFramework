@@ -60,7 +60,7 @@ void AParameterModule::OnTermination_Implementation()
 	USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
 }
 
-void AParameterModule::LoadData(FSaveData* InSaveData)
+void AParameterModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
 	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
 }
@@ -68,6 +68,7 @@ void AParameterModule::LoadData(FSaveData* InSaveData)
 FSaveData* AParameterModule::ToData()
 {
 	static FParameterSaveData SaveData;
+	SaveData.Reset();
 	SaveData.Parameters = Parameters;
 	return &SaveData;
 }
@@ -90,6 +91,16 @@ FParameter AParameterModule::GetParameter(FName InName, bool bEnsured) const
 TArray<FParameter> AParameterModule::GetParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetParameters(InName, bEnsured);
+}
+
+void AParameterModule::RemoveParameter(FName InName)
+{
+	Parameters.RemoveParameter(InName);
+}
+
+void AParameterModule::ClearAllParameter()
+{
+	Parameters.ClearAllParameter();
 }
 
 void AParameterModule::SetIntegerParameter(FName InName, int32 InValue)

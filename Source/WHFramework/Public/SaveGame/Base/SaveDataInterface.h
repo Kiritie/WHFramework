@@ -17,7 +17,7 @@ class WHFRAMEWORK_API ISaveDataInterface
 	GENERATED_BODY()
 
 public:
-	void LoadSaveData(FSaveData* InSaveData, bool bLoadMemoryData = false);
+	void LoadSaveData(FSaveData* InSaveData, bool bForceMode = false, bool bLoadMemoryData = false);
 
 	FSaveData* ToSaveData(bool bSaveMemoryData = false);
 
@@ -36,7 +36,7 @@ public:
 	void UnloadSaveData(bool bForceMode = false, bool bUnLoadMemoryData = false);
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData) = 0;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) = 0;
 
 	virtual FSaveData* ToData() = 0;
 

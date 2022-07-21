@@ -8,12 +8,12 @@ UVoxelTorch::UVoxelTorch()
 	
 }
 
-void UVoxelTorch::LoadData(const FString& InValue)
+void UVoxelTorch::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	Super::LoadData(InValue);
+	Super::LoadData(InSaveData, bForceMode);
 }
 
-FString UVoxelTorch::ToData()
+FSaveData* UVoxelTorch::ToData()
 {
 	return Super::ToData();
 }

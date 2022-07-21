@@ -4,25 +4,31 @@
 
 #include "CoreMinimal.h"
 
+class AVoxelChunk;
+class AVoxelModule;
 /**
  * 
  */
 class ChunkMapBuildTask : public FNonAbandonableTask
 {
 	friend class FAsyncTask<ChunkMapBuildTask>;
-	
-	class AVoxelModule* VoxelModule;
-	TArray<class AVoxelChunk*> ChunkMapBuildQueue;
 
-	ChunkMapBuildTask(class AVoxelModule* InVoxelModule, TArray<class AVoxelChunk*> InChunkMapBuildQueue);
+public:
+	ChunkMapBuildTask(int32 InTaskIndex, class AVoxelModule* InVoxelModule, TArray<class AVoxelChunk*> InChunkMapBuildQueue);
 
+protected:
+	int32 TaskIndex;
+	AVoxelModule* VoxelModule;
+	TArray<AVoxelChunk*> ChunkMapBuildQueue;
+
+public:
 	void DoWork();
 
+	bool CanWork() const;
+
+public:
 	FORCEINLINE TStatId GetStatId() const
 	{
 		RETURN_QUICK_DECLARE_CYCLE_STAT(ChunkMapBuildTask, STATGROUP_ThreadPoolAsyncTasks);
 	}
-
-public:
-	TArray<class AVoxelChunk*> GetQueue() const { return ChunkMapBuildQueue; }
 };

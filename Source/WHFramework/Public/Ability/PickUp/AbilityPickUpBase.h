@@ -20,7 +20,7 @@ class URotatingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public IObjectPoolInterface, public ISceneActorInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -30,9 +30,6 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, Category = "Default")
-	TScriptInterface<ISceneContainerInterface> Container;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -50,11 +47,13 @@ protected:
 
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
 
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams);
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual void OnDespawn_Implementation();
+	virtual void OnDespawn_Implementation() override;
 
-	virtual void LoadData(FSaveData* InSaveData) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
 

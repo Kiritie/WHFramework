@@ -21,9 +21,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
 public:
-	virtual void LoadData(const FString& InValue) override;
+	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
-	virtual FString ToData() override;
+	virtual FSaveData* ToData() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Events

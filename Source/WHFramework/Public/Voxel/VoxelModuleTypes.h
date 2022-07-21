@@ -20,6 +20,7 @@ class UVoxel;
 UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
+	None,
 	Normal,
 	Preview,
 };
@@ -147,7 +148,23 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
+struct WHFRAMEWORK_API FVoxelSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	EVoxelType VoxelType;
+
+public:
+	FVoxelSaveData()
+	{
+		VoxelType = EVoxelType::Empty;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem, public FVoxelSaveData
 {
 	GENERATED_BODY()
 
@@ -160,16 +177,14 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	FVector Scale;
-	
-	UPROPERTY(BlueprintReadWrite)
-	TMap<FName, FParameter> Params;
 
-	UPROPERTY(BlueprintReadOnly, Transient)
+	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Owner;
 
-	UPROPERTY(BlueprintReadOnly, Transient)
+	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
+public:
 	static FVoxelItem EmptyVoxel;
 
 	static FVoxelItem UnknownVoxel;
@@ -180,23 +195,24 @@ public:
 		Index = FIndex::ZeroIndex;
 		Rotation = FRotator::ZeroRotator;
 		Scale = FVector::OneVector;
-		Params = TMap<FName, FParameter>();
 		Owner = nullptr;
 		Auxiliary = nullptr;
 	}
 		
-	FVoxelItem(EVoxelType InVoxelType);
-
-	FVoxelItem(const FPrimaryAssetId& InID)
+	FVoxelItem(const FAbilityItem& InAbilityItem) : FAbilityItem(InAbilityItem)
 	{
-		ID = InID;
 		Index = FIndex::ZeroIndex;
 		Rotation = FRotator::ZeroRotator;
 		Scale = FVector::OneVector;
-		Params = TMap<FName, FParameter>();
 		Owner = nullptr;
 		Auxiliary = nullptr;
 	}
+		
+	FVoxelItem(EVoxelType InVoxelType, bool bInitSaveData = false);
+
+	FVoxelItem(const FPrimaryAssetId& InID, bool bInitSaveData = false);
+
+	FVoxelItem(FVoxelSaveData& InSaveData);
 
 public:
 	virtual bool IsValid() const override;
@@ -205,15 +221,15 @@ public:
 
 	bool IsUnknown() const;
 
-	UVoxel* GetVoxel() const;
+	void RefreshSaveData();
 
-	FString GetStringData() const;
+	template<class T>
+	T& GetVoxel() const
+	{
+		return static_cast<T&>(GetVoxel());
+	}
 
-	bool HasParam(FName InName) const;
-
-	FParameter GetParam(FName InName);
-
-	void SetParam(FName InName, FParameter InParam);
+	UVoxel& GetVoxel() const;
 };
 
 USTRUCT(BlueprintType)
@@ -237,7 +253,7 @@ public:
 	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal);
 
 public:
-	UVoxel* GetVoxel() const;
+	UVoxel& GetVoxel() const;
 
 	AVoxelChunk* GetOwner() const;
 };
@@ -277,7 +293,7 @@ public:
 	FIndex Index;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TArray<FVoxelItem> VoxelItems;
+	TArray<FVoxelSaveData> VoxelDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
@@ -285,15 +301,27 @@ public:
 	FORCEINLINE FVoxelChunkSaveData()
 	{
 		Index = FIndex::ZeroIndex;
-		VoxelItems = TArray<FVoxelItem>();
+		VoxelDatas = TArray<FVoxelSaveData>();
 		PickUpDatas = TArray<FPickUpSaveData>();
 	}
 
 public:
+	virtual void Reset() override
+	{
+		FSaveData::Reset();
+		Index = FIndex::ZeroIndex;
+		VoxelDatas.Empty();
+		PickUpDatas.Empty();
+	}
+
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
-		for(auto Iter : PickUpDatas)
+		for(auto& Iter : VoxelDatas)
+		{
+			Iter.MakeSaved();
+		}
+		for(auto& Iter : PickUpDatas)
 		{
 			Iter.MakeSaved();
 		}
@@ -322,21 +350,6 @@ public:
 		TerrainBedrockVoxelHeight = 0.02f;
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
-		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid"));
-		// if(SolidMatFinder.Succeeded())
-		// {
-		// 	ChunkMaterials.Add(FVoxelChunkMaterial(SolidMatFinder.Object, FVector2D(0.0625f, 0.5f)));
-		// }
-		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent"));
-		// if(SemiTransparentMatFinder.Succeeded())
-		// {
-		// 	ChunkMaterials.Add(FVoxelChunkMaterial(SemiTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
-		// }
-		// static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent"));
-		// if(TransparentMatFinder.Succeeded())
-		// {
-		// 	ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
-		// }
 
 		VitalityRaceDensity = 50.f;
 		CharacterRaceDensity = 50.f;
@@ -419,30 +432,18 @@ public:
 	{
 		WorldSeed = 0;
 		TimeSeconds = 0.f;
+		RandomStream = FRandomStream();
+		LastCharacterRaceIndex = FIndex::ZeroIndex;
+		LastVitalityRaceIndex = FIndex::ZeroIndex;
 	}
 	
-	FORCEINLINE FVoxelWorldSaveData(FVoxelWorldBasicSaveData InBasicSaveData)
+	FORCEINLINE FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldBasicSaveData(InBasicSaveData)
 	{
 		WorldSeed = 0;
-		TimeSeconds = 0;
-
-		BlockSize = InBasicSaveData.BlockSize;
-		ChunkSize = InBasicSaveData.ChunkSize;
-		
-		ChunkHeightRange = InBasicSaveData.ChunkHeightRange;
-
-		TerrainBaseHeight = InBasicSaveData.TerrainBaseHeight;
-		TerrainPlainScale = InBasicSaveData.TerrainPlainScale;
-		TerrainMountainScale = InBasicSaveData.TerrainMountainScale;
-		TerrainStoneVoxelScale = InBasicSaveData.TerrainStoneVoxelScale;
-		TerrainSandVoxelScale = InBasicSaveData.TerrainSandVoxelScale;
-		TerrainWaterVoxelHeight = InBasicSaveData.TerrainWaterVoxelHeight;
-		TerrainBedrockVoxelHeight = InBasicSaveData.TerrainBedrockVoxelHeight;
-
-		ChunkMaterials = InBasicSaveData.ChunkMaterials;
-
-		VitalityRaceDensity = InBasicSaveData.VitalityRaceDensity;
-		CharacterRaceDensity = InBasicSaveData.CharacterRaceDensity;
+		TimeSeconds = 0.f;
+		RandomStream = FRandomStream();
+		LastCharacterRaceIndex = FIndex::ZeroIndex;
+		LastVitalityRaceIndex = FIndex::ZeroIndex;
 	}
 
 public:
@@ -454,5 +455,39 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int32 TimeSeconds;
 	
+	UPROPERTY(Transient)
 	FRandomStream RandomStream;
+
+	UPROPERTY(Transient)
+	FIndex LastVitalityRaceIndex;
+
+	UPROPERTY(Transient)
+	FIndex LastCharacterRaceIndex;
+	
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+	}
+
+	virtual bool IsExistChunkData(FIndex InChunkIndex) const
+	{
+		return false;
+	}
+
+	template<class T>
+	T* GetChunkData(FIndex InChunkIndex)
+	{
+		return static_cast<T*>(GetChunkData(InChunkIndex));
+	}
+
+	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex)
+	{
+		return nullptr;
+	}
+
+	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData)
+	{
+		
+	}
 };

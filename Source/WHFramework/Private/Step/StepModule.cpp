@@ -26,7 +26,7 @@ AStepModule::AStepModule()
 {
 	ModuleName = FName("StepModule");
 
-	bAutoStart = false;
+	bAutoStartFirst = false;
 
 	CurrentRootStepIndex = -1;
 	RootSteps = TArray<URootStepBase*>();
@@ -75,7 +75,7 @@ void AStepModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
 
-	if(bAutoStart)
+	if(bAutoStartFirst)
 	{
 		StartStep(-1, true);
 	}

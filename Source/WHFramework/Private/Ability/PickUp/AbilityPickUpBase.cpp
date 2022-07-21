@@ -3,9 +3,11 @@
 
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
+#include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -49,21 +51,21 @@ void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 	{
 		InPicker->PickUp(this);
 	}
-	Container->RemoveSceneActor(this);	
+	UObjectPoolModuleBPLibrary::DespawnObject(this);
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-
+	Super::OnSpawn_Implementation(InParams);
 }
 
 void AAbilityPickUpBase::OnDespawn_Implementation()
 {
+	Super::OnDespawn_Implementation();
 	Item = FAbilityItem::Empty;
-	Container = nullptr;
 }
 
-void AAbilityPickUpBase::LoadData(FSaveData* InSaveData)
+void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
 	const auto SaveData = InSaveData->CastRef<FPickUpSaveData>();
 	Item = SaveData.Item;

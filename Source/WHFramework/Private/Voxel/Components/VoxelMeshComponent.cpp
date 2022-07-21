@@ -36,20 +36,6 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparen
 			BlockScale = 1.f;
 			OffsetScale = 1.f;
 			CenterOffset = FVector(0.5f);
-			switch (Transparency)
-			{
-				case EVoxelTransparency::Solid:
-				case EVoxelTransparency::SemiTransparent:
-				{
-					SetCollisionProfileName(TEXT("SolidVoxel"));
-					break;
-				}
-				case EVoxelTransparency::Transparent:
-				{
-					SetCollisionProfileName(TEXT("TransVoxel"));
-					break;
-				}
-			}
 			break;
 		}
 		case EVoxelMeshType::PickUp:

@@ -43,10 +43,11 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
+	FSM->bAutoSwitchDefault = true;
 	FSM->GroupName = FName("Vitality");
+	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
 	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
-	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
 	
 	// stats
 	AssetID = FPrimaryAssetId();
@@ -63,28 +64,60 @@ void AAbilityVitalityBase::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AAbilityVitalityBase::LoadData(FSaveData* InSaveData)
-{
-
-}
-
-FSaveData* AAbilityVitalityBase::ToData()
-{
-	return nullptr;
-}
-
-void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
-{
-}
-
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	
+	Super::OnSpawn_Implementation(InParams);
+
+	FSM->SwitchDefaultState();
 }
 
 void AAbilityVitalityBase::OnDespawn_Implementation()
 {
+	Super::OnDespawn_Implementation();
 
+	FSM->SwitchState(nullptr);
+
+	RaceID = NAME_None;
+	Level = 0;
+	EXP = 50;
+}
+
+void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
+{
+	auto SaveData = InSaveData->CastRef<FVitalitySaveData>();
+	
+	if(bForceMode)
+	{
+		AssetID = SaveData.ID;
+		SetRaceID(SaveData.RaceID);
+		SetLevelV(SaveData.Level);
+		SetEXP(SaveData.EXP);
+		SetActorLocation(SaveData.SpawnLocation);
+		SetActorRotation(SaveData.SpawnRotation);
+	}
+
+	SetNameV(SaveData.Name);
+}
+
+FSaveData* AAbilityVitalityBase::ToData()
+{
+	static FVitalitySaveData SaveData;
+	SaveData.Reset();
+
+	SaveData.ID = AssetID;
+	SaveData.Name = Name;
+	SaveData.RaceID = RaceID;
+	SaveData.Level = Level;
+	SaveData.EXP = EXP;
+
+	SaveData.SpawnLocation = GetActorLocation();
+	SaveData.SpawnRotation = GetActorRotation();
+
+	return &SaveData;
+}
+
+void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+{
 }
 
 // Called every frame

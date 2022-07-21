@@ -27,7 +27,7 @@ public:
 	void OnSave();
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnLoad();
+	void OnLoad(bool bForceMode);
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnUnload(bool bForceMode);
@@ -41,12 +41,15 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy();
 
+	UFUNCTION(BlueprintNativeEvent)
+	void OnActiveChange(bool bActive);
+
 public:
 	UFUNCTION(BlueprintCallable)
 	bool Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
-	bool Load();
+	bool Load(bool bForceMode = false);
 
 	UFUNCTION(BlueprintCallable)
 	bool Unload(bool bForceMode = false);
@@ -88,6 +91,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsLoaded() const { return bLoaded; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsActived() const;
 
 public:
 	template<typename T>

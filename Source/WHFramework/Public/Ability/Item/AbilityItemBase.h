@@ -5,7 +5,6 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "AbilityItemBase.generated.h"
 
 class AAbilityCharacterBase;
@@ -14,7 +13,7 @@ class AAbilityCharacterBase;
  * 物品基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityItemBase : public AWHActor, public IObjectPoolInterface
+class WHFRAMEWORK_API AAbilityItemBase : public AWHActor
 {
 	GENERATED_BODY()
 	

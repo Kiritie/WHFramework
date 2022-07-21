@@ -13,15 +13,29 @@ FVoxelItem FVoxelItem::EmptyVoxel = FVoxelItem(FPrimaryAssetId(FName("Voxel"), F
 
 FVoxelItem FVoxelItem::UnknownVoxel = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
 
-FVoxelItem::FVoxelItem(EVoxelType InVoxelType)
+FVoxelItem::FVoxelItem(EVoxelType InVoxelType, bool bInitSaveData) : FVoxelItem()
 {
+	VoxelType = InVoxelType;
 	ID = UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType);
-	Index = FIndex::ZeroIndex;
-	Rotation = FRotator::ZeroRotator;
-	Scale = FVector::OneVector;
-	Params = TMap<FName, FParameter>();
-	Owner = nullptr;
-	Auxiliary = nullptr;
+	if(bInitSaveData)
+	{
+		RefreshSaveData();
+	}
+}
+
+FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bInitSaveData) : FVoxelItem()
+{
+	ID = InID;
+	if(bInitSaveData)
+	{
+		RefreshSaveData();
+	}
+}
+
+FVoxelItem::FVoxelItem(FVoxelSaveData& InSaveData) : FVoxelSaveData(InSaveData)
+{
+	ID = UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InSaveData.VoxelType);
+	RefreshSaveData();
 }
 
 bool FVoxelItem::IsValid() const
@@ -39,48 +53,16 @@ bool FVoxelItem::IsUnknown() const
 	return *this == UnknownVoxel;
 }
 
-UVoxel* FVoxelItem::GetVoxel() const
+void FVoxelItem::RefreshSaveData()
 {
-	if(IsEmpty()) return UVoxel::EmptyVoxel;
-	if(IsUnknown()) return UVoxel::UnknownVoxel;
-	return UVoxel::LoadVoxel(Owner, *this);
+	*this = GetVoxel().ToSaveDataRef<FVoxelItem>(true);
 }
 
-FString FVoxelItem::GetStringData() const
+UVoxel& FVoxelItem::GetVoxel() const
 {
-	FString tmpData;
-	if(UVoxel* tmpVoxel = GetVoxel())
-	{
-		tmpData = tmpVoxel->ToData();
-		UVoxel::DespawnVoxel(tmpVoxel);
-	}
-	return tmpData;
-}
-
-bool FVoxelItem::HasParam(FName InName) const
-{
-	return Params.Contains(InName);
-}
-
-FParameter FVoxelItem::GetParam(FName InName)
-{
-	if(HasParam(InName))
-	{
-		return Params[InName];
-	}
-	return FParameter();
-}
-
-void FVoxelItem::SetParam(FName InName, FParameter InParam)
-{
-	if(HasParam(InName))
-	{
-		Params[InName] = InParam;
-	}
-	else
-	{
-		Params.Add(InName, InParam);
-	}
+	if(IsEmpty()) return UVoxel::GetEmpty();;
+	if(IsUnknown()) return UVoxel::GetUnknown();;
+	return UVoxelModuleBPLibrary::GetVoxel(*this);
 }
 
 FVoxelHitResult::FVoxelHitResult()
@@ -99,7 +81,7 @@ FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint,
 	Normal = InNormal;
 }
 
-UVoxel* FVoxelHitResult::GetVoxel() const
+UVoxel& FVoxelHitResult::GetVoxel() const
 {
 	return VoxelItem.GetVoxel();
 }

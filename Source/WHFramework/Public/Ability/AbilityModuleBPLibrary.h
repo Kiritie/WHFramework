@@ -42,17 +42,11 @@ public:
 
 	static AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
-	static void DestroyPickUp(AAbilityPickUpBase* InPickUp);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Character
 	static AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
-	static void DestroyCharacter(AAbilityCharacterBase* InCharacter);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Vitality
 	static AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	static void DestroyVitality(AAbilityVitalityBase* InVitality);
 };

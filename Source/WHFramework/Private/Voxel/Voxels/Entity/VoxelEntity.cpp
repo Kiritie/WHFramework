@@ -31,6 +31,8 @@ void AVoxelEntity::BeginPlay()
 
 void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
+	Super::OnSpawn_Implementation(InParams);
+	
 	VoxelID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
 	if(GetVoxelData().IsValid())
 	{
@@ -42,6 +44,8 @@ void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 
 void AVoxelEntity::OnDespawn_Implementation()
 {
+	Super::OnDespawn_Implementation();
+	
 	VoxelID = FPrimaryAssetId();
 	VoxelMesh->ClearMesh();
 }

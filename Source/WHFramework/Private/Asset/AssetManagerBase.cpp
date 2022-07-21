@@ -17,7 +17,7 @@ UAssetManagerBase& UAssetManagerBase::Get()
 
 	if(This)
 	{
-		UReferencePoolModuleBPLibrary::SetReference<UAssetManagerBase>(This);
+		UReferencePoolModuleBPLibrary::CreateReference<UAssetManagerBase>(This);
 		return *This;
 	}
 	else
@@ -81,7 +81,12 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 	{
 		for(auto Iter : ItemPaths)
 		{
-			LoadedItems.Add(Cast<UPrimaryAssetBase>(Iter.TryLoad()));
+			UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(Iter.TryLoad());
+			if(LoadedItem)
+			{
+				LoadedItems.Add(LoadedItem);
+				PrimaryAssetMap.Emplace(LoadedItem->GetPrimaryAssetId(), LoadedItem);
+			}
 		}
 		if(LoadedItems.Num() > 0)
 		{

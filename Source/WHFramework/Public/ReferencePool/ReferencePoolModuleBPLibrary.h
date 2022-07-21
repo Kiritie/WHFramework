@@ -29,6 +29,15 @@ public:
 	}
 
 	template<class T>
+	static void CreateReference(UObject* InObject = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		{
+			ReferencePoolModule->CreateReference<T>(InObject, InType);
+		}
+	}
+
+	template<class T>
 	static T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
@@ -36,15 +45,6 @@ public:
 			return ReferencePoolModule->GetReference<T>(InType);
 		}
 		return *NewObject<T>();
-	}
-
-	template<class T>
-	static void SetReference(UObject* InObject, TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
-		{
-			ReferencePoolModule->SetReference<T>(InObject, InType);
-		}
 	}
 
 	template<class T>

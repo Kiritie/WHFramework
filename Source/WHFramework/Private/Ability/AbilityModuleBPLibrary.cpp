@@ -87,14 +87,6 @@ AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, 
 	return nullptr;
 }
 
-void UAbilityModuleBPLibrary::DestroyPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
-	{
-		AbilityModule->DestroyPickUp(InPickUp);
-	}
-}
-
 AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
@@ -104,14 +96,6 @@ AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSave
 	return nullptr;
 }
 
-void UAbilityModuleBPLibrary::DestroyCharacter(AAbilityCharacterBase* InCharacter)
-{
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
-	{
-		AbilityModule->DestroyCharacter(InCharacter);
-	}
-}
-
 AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
@@ -119,12 +103,4 @@ AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnVitality(FSaveData* InSaveDa
 		return AbilityModule->SpawnVitality(InSaveData, InContainer);
 	}
 	return nullptr;
-}
-
-void UAbilityModuleBPLibrary::DestroyVitality(AAbilityVitalityBase* InVitality)
-{
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
-	{
-		AbilityModule->DestroyVitality(InVitality);
-	}
 }

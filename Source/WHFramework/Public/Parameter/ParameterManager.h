@@ -33,6 +33,10 @@ public:
 
 	virtual TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const = 0;
 
+	virtual void RemoveParameter(FName InName) = 0;
+
+	virtual void ClearAllParameter() = 0;
+
 	//////////////////////////////////////////////////////////////////////////
 	virtual void SetIntegerParameter(FName InName, int32 InValue) = 0;
 

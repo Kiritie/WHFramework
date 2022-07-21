@@ -28,6 +28,9 @@ protected:
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+public:
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// FSM
 public:
@@ -73,18 +76,21 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	/// 状态列表
+	/// 自动切换默认状态
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	TArray<TSubclassOf<UFiniteStateBase>> States;
-	/// 初始状态
+	bool bAutoSwitchDefault;
+	/// 状态组
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	FName GroupName;
+	/// 默认状态
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TSubclassOf<UFiniteStateBase> DefaultState;
 	/// 最终状态
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TSubclassOf<UFiniteStateBase> FinalState;
-	/// 状态组
+	/// 状态列表
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-	FName GroupName;
+	TArray<TSubclassOf<UFiniteStateBase>> States;
 	/// 当状态改变
 	UPROPERTY(BlueprintAssignable)
 	FOnFiniteStateChanged OnStateChanged;
@@ -95,6 +101,8 @@ protected:
 	UFiniteStateBase* CurrentState;
 	UPROPERTY()
 	TMap<FName, UFiniteStateBase*> StateMap;
+	UPROPERTY()
+	bool bInitialized;
 
 public:
 	UFUNCTION(BlueprintPure)

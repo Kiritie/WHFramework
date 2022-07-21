@@ -45,7 +45,9 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Interaction->AddInteractionAction(EInteractAction::Revive);
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
+	FSM->bAutoSwitchDefault = true;
 	FSM->GroupName = FName("Character");
+	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
@@ -53,7 +55,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
-	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
@@ -110,21 +111,56 @@ void AAbilityCharacterBase::BeginPlay()
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
+
+	FSM->SwitchDefaultState();
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation()
 {
 	Super::OnDespawn_Implementation();
+
+	FSM->SwitchState(nullptr);
+
+	SetMotionRate(1, 1);
+	
+	RaceID = NAME_None;
+	Level = 0;
+	EXP = 0;
+	DefaultAbility = FAbilityData();
 }
 
-void AAbilityCharacterBase::LoadData(FSaveData* InSaveData)
+void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
+	auto SaveData = InSaveData->CastRef<FCharacterSaveData>();
 	
+	if(bForceMode)
+	{
+		AssetID = SaveData.ID;
+		SetRaceID(SaveData.RaceID);
+		SetLevelV(SaveData.Level);
+		SetEXP(SaveData.EXP);
+		SetActorLocation(SaveData.SpawnLocation);
+		SetActorRotation(SaveData.SpawnRotation);
+	}
+
+	SetNameV(SaveData.Name);
 }
 
 FSaveData* AAbilityCharacterBase::ToData()
 {
-	return nullptr;
+	static FCharacterSaveData SaveData;
+	SaveData.Reset();
+
+	SaveData.ID = AssetID;
+	SaveData.Name = Name;
+	SaveData.RaceID = RaceID;
+	SaveData.Level = Level;
+	SaveData.EXP = EXP;
+
+	SaveData.SpawnLocation = GetActorLocation();
+	SaveData.SpawnRotation = GetActorRotation();
+
+	return &SaveData;
 }
 
 void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -624,11 +660,6 @@ float AAbilityCharacterBase::Distance(AAbilityCharacterBase* InTargetCharacter, 
 {
 	if(!InTargetCharacter || !InTargetCharacter->IsValidLowLevel()) return -1;
 	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetCharacter->GetActorLocation().X, InTargetCharacter->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetCharacter->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : InTargetCharacter->GetRadius());
-}
-
-void AAbilityCharacterBase::SetVisible_Implementation(bool bVisible)
-{
-	GetRootComponent()->SetVisibility(bVisible, true);
 }
 
 void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, float InRotationRate)

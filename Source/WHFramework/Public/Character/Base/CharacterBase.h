@@ -62,6 +62,10 @@ public:
 
 	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 
+	virtual bool IsVisible_Implementation() const override;
+
+	virtual void SetActorVisible_Implementation(bool bVisible) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim
 protected:
