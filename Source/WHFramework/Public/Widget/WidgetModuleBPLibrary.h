@@ -187,6 +187,16 @@ public:
 		return false;
 	}
 
+	template<class T>
+	static bool OpenUserWidget(const TArray<FParameter>& InParams, bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+		{
+			return WidgetModule->OpenUserWidget<T>(InParams, bInstant, InWidgetClass);
+		}
+		return false;
+	}
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
 	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
 

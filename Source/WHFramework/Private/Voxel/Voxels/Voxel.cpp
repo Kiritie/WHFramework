@@ -142,7 +142,7 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 		{
 			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
 			{
-				return VoxelAgentPlayer->GenerateVoxel(VoxelAgentPlayer->GetGeneratingVoxelItem(), InHitResult);
+				return VoxelAgentPlayer->GenerateVoxel(VoxelAgentPlayer->GetGenerateVoxelItem(), InHitResult);
 			}
 			break;
 		}

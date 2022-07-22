@@ -27,11 +27,14 @@ protected:
 	FPrimaryAssetId VoxelID;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* VoxelMesh;
+	UVoxelMeshComponent* MeshComponent;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+public:
+	virtual void Initialize(FPrimaryAssetId InVoxelID);
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -41,4 +44,8 @@ public:
 	virtual void OnDespawn_Implementation() override;
 
 	UVoxelData& GetVoxelData() const;
+
+	FPrimaryAssetId GetVoxelID() const { return VoxelID; }
+
+	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
 };

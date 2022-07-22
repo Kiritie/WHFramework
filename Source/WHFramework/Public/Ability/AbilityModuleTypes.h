@@ -299,9 +299,6 @@ struct WHFRAMEWORK_API FAbilityData : public FTableRowBase
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FPrimaryAssetId AbilityID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 AbilityLevel;
 
 	FGameplayAbilitySpecHandle AbilityHandle;
@@ -310,6 +307,21 @@ public:
 	{
 		AbilityLevel = 1;
 		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemData : public FAbilityData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId AbilityID;
+
+	FORCEINLINE FAbilityItemData()
+	{
+		AbilityID = FPrimaryAssetId();
 	}
 
 public:
@@ -433,6 +445,9 @@ struct WHFRAMEWORK_API FAbilityItem
 	GENERATED_BODY()
 
 public:
+	static FAbilityItem Empty;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FPrimaryAssetId ID;
 
@@ -442,13 +457,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
 
-	static FAbilityItem Empty;
+	FGameplayAbilitySpecHandle AbilityHandle;
 
 public:
 	FORCEINLINE FAbilityItem()
 	{
+		ID = FPrimaryAssetId();
 		Count = 0;
 		Level = 0;
+		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 				
 	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
@@ -456,6 +473,7 @@ public:
 		ID = InID;
 		Count = InCount;
 		Level = InLevel;
+		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
 	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int InCount = -1)
@@ -463,6 +481,7 @@ public:
 		ID = InItem.ID;
 		Count = InCount == -1 ? InItem.Count : InCount;
 		Level = InItem.Level;
+		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 
 	virtual ~FAbilityItem() = default;

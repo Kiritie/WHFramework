@@ -29,11 +29,7 @@ public:
 public:
 	virtual FVector GetWorldLocation() const = 0;
 
-	virtual FVoxelItem& GetGeneratingVoxelItem() = 0;
+	virtual FVoxelItem& GetGenerateVoxelItem() = 0;
 
-	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) = 0;
-
-	virtual FVoxelItem& GetSelectedVoxelItem() = 0;
-
-	virtual void SetSelectedVoxelItem(FVoxelItem InSelectedVoxelItem) = 0;
+	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) = 0;
 };

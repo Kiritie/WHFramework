@@ -119,13 +119,6 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneCon
 	return SpawnPickUp(SaveData.Item, SaveData.Location);
 }
 
-void AAbilityModule::DestroyPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if(!InPickUp || !InPickUp->IsValidLowLevel()) return;
-
-	UObjectPoolModuleBPLibrary::DespawnObject(InPickUp);
-}
-
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto SaveData = InSaveData->CastRef<FCharacterSaveData>();
@@ -142,13 +135,6 @@ AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISc
 	return nullptr;
 }
 
-void AAbilityModule::DestroyCharacter(AAbilityCharacterBase* InCharacter)
-{
-	if(!InCharacter || !InCharacter->IsValidLowLevel()) return;
-
-	UObjectPoolModuleBPLibrary::DespawnObject(InCharacter);
-}
-
 AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto SaveData = InSaveData->CastRef<FVitalitySaveData>();
@@ -162,11 +148,4 @@ AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, IScen
 		return Vitality;
 	}
 	return nullptr;
-}
-
-void AAbilityModule::DestroyVitality(AAbilityVitalityBase* InVitality)
-{
-	if(!InVitality || !InVitality->IsValidLowLevel()) return;
-
-	UObjectPoolModuleBPLibrary::DespawnObject(InVitality);
 }

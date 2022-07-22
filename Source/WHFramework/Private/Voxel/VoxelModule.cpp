@@ -21,12 +21,14 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelDoor.h"
 #include "Voxel/Voxels/VoxelPlant.h"
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/VoxelWater.h"
+#include "Voxel/Voxels/Entity/VoxelEntity.h"
 
 // Sets default values
 AVoxelModule::AVoxelModule()
@@ -153,6 +155,22 @@ void AVoxelModule::OnUnPause_Implementation()
 void AVoxelModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
+
+	for(int32 i = 0; i < ChunkMapBuildTasks.Num(); i++)
+	{
+		if(ChunkMapBuildTasks[i])
+		{
+			ChunkMapBuildTasks[i]->Cancel();
+		}
+	}
+	
+	for(int32 i = 0; i < ChunkMapGenerateTasks.Num(); i++)
+	{
+		if(ChunkMapGenerateTasks[i])
+		{
+			ChunkMapGenerateTasks[i]->Cancel();
+		}
+	}
 }
 
 float AVoxelModule::GetWorldLength() const
@@ -299,15 +317,15 @@ void AVoxelModule::GeneratePreviews()
 		{
 			if (tmpIndex >= VoxelDatas.Num()) break;
 	
-			auto PickUpItem = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
-			if (PickUpItem != nullptr)
+			auto voxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntity>();
+			if (voxelEntity != nullptr)
 			{
-				PickUpItem->Initialize(FAbilityItem(VoxelDatas[tmpIndex]->GetPrimaryAssetId()));
-				PickUpItem->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-				PickUpItem->SetActorLocation(FVector(x * WorldData->BlockSize * 0.5f, y * WorldData->BlockSize * 0.5f, 0));
-				PickUpItem->SetActorRotation(FRotator(-70, 0, -180));
-				PickUpItem->GetMeshComponent()->SetRelativeRotation(FRotator(0, 45, 0));
-				VoxelsCapture->ShowOnlyActors.Add(PickUpItem);
+				voxelEntity->Initialize(VoxelDatas[tmpIndex]->GetPrimaryAssetId());
+				voxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+				voxelEntity->SetActorLocation(FVector(x * WorldData->BlockSize * 0.5f, y * WorldData->BlockSize * 0.5f, 0));
+				voxelEntity->SetActorRotation(FRotator(-70, 0, -180));
+				voxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0, 45, 0));
+				VoxelsCapture->ShowOnlyActors.Add(voxelEntity);
 			}
 	
 			tmpIndex++;

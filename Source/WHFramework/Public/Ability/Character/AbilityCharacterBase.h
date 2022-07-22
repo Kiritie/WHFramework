@@ -320,6 +320,12 @@ public:
 	virtual FVector GetMoveDirection(bool bIgnoreZ = true) const;
 		
 	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultGravityScale() const { return DefaultGravityScale; }
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
+
+	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const;
 
 	UFUNCTION(BlueprintPure)

@@ -86,10 +86,7 @@ public:
 	/// Chunk
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FVoxelItem GeneratingVoxelItem;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FVoxelItem SelectedVoxelItem;
+	FVoxelItem GenerateVoxelItem;
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -104,13 +101,9 @@ public:
 	
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
 
-	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
+	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
 
-	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) override { GeneratingVoxelItem = InGeneratingVoxelItem; }
-
-	virtual FVoxelItem& GetSelectedVoxelItem() override { return SelectedVoxelItem; }
-
-	virtual void SetSelectedVoxelItem(FVoxelItem InSelectedVoxelItem) override { SelectedVoxelItem = InSelectedVoxelItem; }
+	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound

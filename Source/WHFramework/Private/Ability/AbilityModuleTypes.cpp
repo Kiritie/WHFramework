@@ -31,7 +31,7 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-UAbilityItemDataBase& FAbilityData::GetItemData() const
+UAbilityItemDataBase& FAbilityItemData::GetItemData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
 }

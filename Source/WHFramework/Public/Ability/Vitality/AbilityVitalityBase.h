@@ -66,10 +66,7 @@ protected:
 	int32 EXPFactor;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FVoxelItem GeneratingVoxelItem;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FVoxelItem SelectedVoxelItem;
+	FVoxelItem GenerateVoxelItem;
 
 protected:
 	// Called when the game starts or when spawned
@@ -217,13 +214,9 @@ public:
 
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
 
-	virtual FVoxelItem& GetGeneratingVoxelItem() override { return GeneratingVoxelItem; }
+	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
 
-	virtual void SetGeneratingVoxelItem(FVoxelItem InGeneratingVoxelItem) override { GeneratingVoxelItem = InGeneratingVoxelItem; }
-
-	virtual FVoxelItem& GetSelectedVoxelItem() override { return SelectedVoxelItem; }
-
-	virtual void SetSelectedVoxelItem(FVoxelItem InSelectedVoxelItem) override { SelectedVoxelItem = InSelectedVoxelItem; }
+	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
 
 	template<class T>
 	T& GetVitalityData() const

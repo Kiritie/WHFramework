@@ -57,19 +57,13 @@ public:
 
 	virtual AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
-	virtual void DestroyPickUp(AAbilityPickUpBase* InPickUp);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Character
 public:
 	virtual AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
-	virtual void DestroyCharacter(AAbilityCharacterBase* InCharacter);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Vitality
 public:
 	virtual AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	virtual void DestroyVitality(AAbilityVitalityBase* InVitality);
 };

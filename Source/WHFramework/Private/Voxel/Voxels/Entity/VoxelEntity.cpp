@@ -14,10 +14,10 @@ AVoxelEntity::AVoxelEntity()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	
-	VoxelMesh = CreateDefaultSubobject<UVoxelMeshComponent>(FName("VoxelMesh"));
-	VoxelMesh->SetupAttachment(RootComponent, FName("VoxelMesh"));
-	VoxelMesh->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
-	VoxelMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
+	MeshComponent->SetupAttachment(RootComponent);
+	MeshComponent->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	VoxelID = FPrimaryAssetId();
 }
@@ -29,17 +29,20 @@ void AVoxelEntity::BeginPlay()
 
 }
 
+void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
+{
+	VoxelID = InVoxelID;
+	if(GetVoxelData().IsValid())
+	{
+		MeshComponent->Initialize(EVoxelMeshType::Entity);
+		MeshComponent->BuildVoxel(FVoxelItem(VoxelID));
+		MeshComponent->CreateMesh(0, false);
+	}
+}
+
 void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
-	
-	VoxelID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
-	if(GetVoxelData().IsValid())
-	{
-		VoxelMesh->Initialize(EVoxelMeshType::Entity);
-		VoxelMesh->BuildVoxel(FVoxelItem(VoxelID));
-		VoxelMesh->CreateMesh(0, false);
-	}
 }
 
 void AVoxelEntity::OnDespawn_Implementation()
@@ -47,7 +50,7 @@ void AVoxelEntity::OnDespawn_Implementation()
 	Super::OnDespawn_Implementation();
 	
 	VoxelID = FPrimaryAssetId();
-	VoxelMesh->ClearMesh();
+	MeshComponent->ClearMesh();
 }
 
 UVoxelData& AVoxelEntity::GetVoxelData() const

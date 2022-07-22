@@ -224,6 +224,14 @@ public:
 		return OpenUserWidgetByName(WidgetName, InParams, bInstant);
 	}
 
+	template<class T>
+	bool OpenUserWidget(const TArray<FParameter>& InParams, bool bInstant = false, TSubclassOf<UUserWidgetBase> InWidgetClass = T::StaticClass())
+	{
+		const FName WidgetName = InWidgetClass.GetDefaultObject()->GetWidgetName();
+
+		return OpenUserWidgetByName(WidgetName, InParams, bInstant);
+	}
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant = false);
 

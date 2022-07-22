@@ -63,13 +63,11 @@ void AAbilityPickUpBase::OnDespawn_Implementation()
 {
 	Super::OnDespawn_Implementation();
 	Item = FAbilityItem::Empty;
+	Container = nullptr;
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	const auto SaveData = InSaveData->CastRef<FPickUpSaveData>();
-	Item = SaveData.Item;
-	SetActorLocation(SaveData.Location);
 }
 
 FSaveData* AAbilityPickUpBase::ToData()
