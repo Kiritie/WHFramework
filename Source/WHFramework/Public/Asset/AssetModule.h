@@ -214,9 +214,8 @@ public:
 		for(auto Iter : Rows)
 		{
 			OutRows.Add(*Iter);
-			return true;
 		}
-		return true;
+		return Rows.Num() > 0;
 	}
 
 	template<class T>
@@ -244,6 +243,6 @@ public:
 				OutRows.Add(Iter, *Row);
 			}
 		}
-		return true;
+		return OutRows.Num() > 0;
 	}
 };

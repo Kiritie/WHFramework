@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
@@ -14,9 +14,13 @@ void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSMComponent, in
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-bool UAbilityCharacterState_Walk::OnValidate()
+bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	return Super::OnValidate();
+	if(!Super::OnEnterValidate(InLastFiniteState)) return false;
+	
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	return Character->GetCharacterMovement()->IsWalking();
 }
 
 void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastFiniteState)
@@ -27,6 +31,15 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastFiniteState)
 void UAbilityCharacterState_Walk::OnRefresh()
 {
 	Super::OnRefresh();
+}
+
+bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
+{
+	if(!Super::OnLeaveValidate(InNextFiniteState)) return false;
+	
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	return !Character->GetCharacterMovement()->IsFalling() || InNextFiniteState && InNextFiniteState->IsA<UAbilityCharacterState_Jump>();
 }
 
 void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextFiniteState)

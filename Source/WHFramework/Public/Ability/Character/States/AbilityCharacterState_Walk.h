@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -23,11 +23,13 @@ public:
 public:
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex) override;
 
-	virtual bool OnValidate() override;
+	virtual bool OnEnterValidate(UFiniteStateBase* InLastFiniteState) override;
 
 	virtual void OnEnter(UFiniteStateBase* InLastFiniteState) override;
 	
 	virtual void OnRefresh() override;
+
+	virtual bool OnLeaveValidate(UFiniteStateBase* InNextFiniteState) override;
 
 	virtual void OnLeave(UFiniteStateBase* InNextFiniteState) override;
 

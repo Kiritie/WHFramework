@@ -33,11 +33,12 @@ public:
 	void K2_OnInitialize();
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex);
 	/**
-	 * 状态验证
+	 * 状态进入验证
+	 * @param InLastFiniteState 上一个状态
 	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	bool K2_OnValidate();
-	virtual bool OnValidate();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnterValidate")
+	bool K2_OnEnterValidate(UFiniteStateBase* InLastFiniteState);
+	virtual bool OnEnterValidate(UFiniteStateBase* InLastFiniteState);
 	/**
 	 * 状态进入
 	 * @param InLastFiniteState 上一个状态
@@ -51,6 +52,13 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
 	virtual void OnRefresh();
+	/**
+	 * 状态离开验证
+	 * @param InNextFiniteState 下一个状态
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeaveValidate")
+	bool K2_OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
+	virtual bool OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
 	/**
 	 * 状态离开
 	 * @param InNextFiniteState 下一个状态

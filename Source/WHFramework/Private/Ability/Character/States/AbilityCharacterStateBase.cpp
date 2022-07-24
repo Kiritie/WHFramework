@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Character/States/AbilityCharacterStateBase.h"
 
@@ -12,9 +12,9 @@ void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSMComponent, int
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-bool UAbilityCharacterStateBase::OnValidate()
+bool UAbilityCharacterStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	return Super::OnValidate();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)

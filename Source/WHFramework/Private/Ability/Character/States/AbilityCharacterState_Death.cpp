@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 
@@ -19,9 +19,9 @@ void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, i
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-bool UAbilityCharacterState_Death::OnValidate()
+bool UAbilityCharacterState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	return Super::OnValidate();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)

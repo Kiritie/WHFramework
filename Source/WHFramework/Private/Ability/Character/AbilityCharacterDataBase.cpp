@@ -14,7 +14,8 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 	Class = nullptr;
 
 	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Static");
 	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
 	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
+	// StaticTag = FGameplayTag::RequestGameplayTag("State.Vitality.Static");
+	// FallingTag = FGameplayTag::RequestGameplayTag("State.Character.Falling");
 }

@@ -30,11 +30,14 @@ public:
 	TSubclassOf<AAbilityCharacterBase> Class;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag StaticTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
 	FGameplayTag DeadTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
 	FGameplayTag DyingTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
+	FGameplayTag StaticTag;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
+	FGameplayTag 	FallingTag;
 };

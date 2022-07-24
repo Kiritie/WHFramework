@@ -1,4 +1,4 @@
-﻿// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Components/CapsuleComponent.h"
@@ -190,34 +190,31 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	RefreshFiniteState();
+	//RefreshFiniteState();
 }
 
 void AAbilityCharacterBase::RefreshFiniteState()
 {
-	if(!FSM->GetCurrentState())
+	switch (GetCharacterMovement()->MovementMode)
 	{
-		switch (GetCharacterMovement()->MovementMode)
+		case EMovementMode::MOVE_Walking:
 		{
-			case EMovementMode::MOVE_Walking:
+			if(GetVelocity().Size() > 0.2f)
 			{
-				if(GetVelocity().Size() > 0.2f)
-				{
-					FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
-				}
-				else
-				{
-					FSM->SwitchStateByClass<UAbilityCharacterState_Idle>();
-				}
-				break;
+				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
 			}
-			case EMovementMode::MOVE_Falling:
+			else
 			{
-				FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
-				break;
+				FSM->SwitchStateByClass<UAbilityCharacterState_Idle>();
 			}
-			default: break;
+			break;
 		}
+		case EMovementMode::MOVE_Falling:
+		{
+			FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
+			break;
+		}
+		default: break;
 	}
 }
 
@@ -227,6 +224,8 @@ void AAbilityCharacterBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	if (!IsDead()) return;
+
+	RefreshFiniteState();
 }
 
 void AAbilityCharacterBase::Serialize(FArchive& Ar)

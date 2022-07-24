@@ -17,9 +17,9 @@ void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSMComponent, in
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-bool UAbilityVitalityState_Death::OnValidate()
+bool UAbilityVitalityState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	return Super::OnValidate();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)

@@ -33,7 +33,7 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InState
 	K2_OnInitialize();
 }
 
-bool UFiniteStateBase::OnValidate()
+bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
 	return true;
 }
@@ -50,6 +50,11 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 void UFiniteStateBase::OnRefresh()
 {
 	K2_OnRefresh();
+}
+
+bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
+{
+	return true;
 }
 
 void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)

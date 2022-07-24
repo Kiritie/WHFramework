@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 
@@ -14,9 +14,9 @@ void UAbilityVitalityState_Default::OnInitialize(UFSMComponent* InFSMComponent, 
 	Super::OnInitialize(InFSMComponent, InStateIndex);
 }
 
-bool UAbilityVitalityState_Default::OnValidate()
+bool UAbilityVitalityState_Default::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	return Super::OnValidate();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)

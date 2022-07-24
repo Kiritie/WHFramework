@@ -99,24 +99,28 @@ void UFSMComponent::OnTermination()
 
 void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(!bInitialized || InState == CurrentState) return;
+	if(!bInitialized || InState == CurrentState || !GetStates().Contains(InState)) return;
 	
 	UFiniteStateBase* LastState = CurrentState;
 
-	if(!InState || GetStates().Contains(InState) && InState->OnValidate())
+	if(!LastState || LastState->OnLeaveValidate(InState))
 	{
 		if(LastState)
 		{
 			LastState->OnLeave(InState);
-		}
-		if(InState)
-		{
-			CurrentState = InState;
-			InState->OnEnter(LastState);
-		}
-		else
-		{
 			CurrentState = nullptr;
+		}
+		if(!InState || InState->OnEnterValidate(LastState))
+		{
+			if(InState)
+			{
+				CurrentState = InState;
+				InState->OnEnter(LastState);
+			}
+			else
+			{
+				CurrentState = nullptr;
+			}
 		}
 	}
 	if(InState == CurrentState)
