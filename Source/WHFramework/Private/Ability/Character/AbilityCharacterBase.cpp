@@ -11,7 +11,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
-#include "Ability/Character/States/AbilityCharacterState_Idle.h"
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
 #include "Ability/Character/States/AbilityCharacterState_Static.h"
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
@@ -51,7 +50,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Idle::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
@@ -101,7 +99,8 @@ void AAbilityCharacterBase::BeginPlay()
 	DefaultGravityScale = GetCharacterMovement()->GravityScale;
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 
-	AbilitySystem->InitAbilityActorInfo(this, this);
+	InitializeAbilitySystem();
+
 	for(auto Iter : AttributeSet->GetAllAttributes())
 	{
 		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityCharacterBase::OnAttributeChange);
@@ -183,30 +182,26 @@ void AAbilityCharacterBase::BindASCInput()
 
 void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
 {
-	RefreshFiniteState();
+	if(!InFiniteState)
+	{
+		RefreshState();
+	}
 }
 
 void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	//RefreshFiniteState();
+	RefreshState();
 }
 
-void AAbilityCharacterBase::RefreshFiniteState()
+void AAbilityCharacterBase::RefreshState()
 {
 	switch (GetCharacterMovement()->MovementMode)
 	{
 		case EMovementMode::MOVE_Walking:
 		{
-			if(GetVelocity().Size() > 0.2f)
-			{
-				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
-			}
-			else
-			{
-				FSM->SwitchStateByClass<UAbilityCharacterState_Idle>();
-			}
+			FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
 			break;
 		}
 		case EMovementMode::MOVE_Falling:
@@ -225,7 +220,6 @@ void AAbilityCharacterBase::Tick(float DeltaTime)
 
 	if (!IsDead()) return;
 
-	RefreshFiniteState();
 }
 
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
@@ -508,6 +502,36 @@ UAbilityCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(AssetID);
 }
 
+FGameplayAttributeData AAbilityCharacterBase::GetAttributeData(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeData(InAttribute);
+}
+
+float AAbilityCharacterBase::GetAttributeValue(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeValue(InAttribute);
+}
+
+void AAbilityCharacterBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
+{
+	AttributeSet->SetAttributeValue(InAttribute, InValue);
+}
+
+TArray<FGameplayAttribute> AAbilityCharacterBase::GetAllAttributes() const
+{
+	return AttributeSet->GetAllAttributes();
+}
+
+TArray<FGameplayAttribute> AAbilityCharacterBase::GetPersistentAttributes() const
+{
+	return AttributeSet->GetPersistentAttributes();
+}
+
+UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
+{
+	return AttributeSet;
+}
+
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 {
 	return Interaction;
@@ -567,66 +591,6 @@ int32 AAbilityCharacterBase::GetTotalEXP() const
 FString AAbilityCharacterBase::GetHeadInfo() const
 {
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
-}
-
-float AAbilityCharacterBase::GetHealth() const
-{
-	return AttributeSet->GetHealth();
-}
-
-void AAbilityCharacterBase::SetHealth(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetHealthAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityCharacterBase::GetMaxHealth() const
-{
-	return AttributeSet->GetMaxHealth();
-}
-
-void AAbilityCharacterBase::SetMaxHealth(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetMaxHealthAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityCharacterBase::GetMoveSpeed() const
-{
-	return AttributeSet->GetMoveSpeed();
-}
-
-void AAbilityCharacterBase::SetMoveSpeed(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetMoveSpeedAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityCharacterBase::GetRotationSpeed() const
-{
-	return AttributeSet->GetRotationSpeed();
-}
-
-void AAbilityCharacterBase::SetRotationSpeed(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetRotationSpeedAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityCharacterBase::GetJumpForce() const
-{
-	return AttributeSet->GetJumpForce();
-}
-
-void AAbilityCharacterBase::SetJumpForce(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetJumpForceAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityCharacterBase::GetPhysicsDamage() const
-{
-	return AttributeSet->GetPhysicsDamage();
-}
-
-float AAbilityCharacterBase::GetMagicDamage() const
-{
-	return AttributeSet->GetMagicDamage();
 }
 
 FVector AAbilityCharacterBase::GetMoveVelocity(bool bIgnoreZ) const

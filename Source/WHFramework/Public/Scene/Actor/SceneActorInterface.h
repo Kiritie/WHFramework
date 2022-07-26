@@ -42,5 +42,5 @@ public:
 	bool IsVisible() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void SetActorVisible(bool bVisible);
+	void SetActorVisible(bool bNewVisible);
 };

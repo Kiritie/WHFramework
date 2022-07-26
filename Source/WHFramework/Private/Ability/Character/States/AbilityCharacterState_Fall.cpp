@@ -2,7 +2,9 @@
 
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
 
+#include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 
 UAbilityCharacterState_Fall::UAbilityCharacterState_Fall()
 {
@@ -16,11 +18,7 @@ void UAbilityCharacterState_Fall::OnInitialize(UFSMComponent* InFSMComponent, in
 
 bool UAbilityCharacterState_Fall::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	if(!Super::OnEnterValidate(InLastFiniteState)) return false;
-	
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	return Character->GetCharacterMovement()->IsFalling();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityCharacterState_Fall::OnEnter(UFiniteStateBase* InLastFiniteState)
@@ -39,11 +37,7 @@ void UAbilityCharacterState_Fall::OnRefresh()
 
 bool UAbilityCharacterState_Fall::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
 {
-	if(!Super::OnLeaveValidate(InNextFiniteState)) return false;
-	
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	return !Character->GetCharacterMovement()->IsFalling() || InNextFiniteState && InNextFiniteState->IsA<UAbilityCharacterState_Jump>();
+	return Super::OnLeaveValidate(InNextFiniteState);
 }
 
 void UAbilityCharacterState_Fall::OnLeave(UFiniteStateBase* InNextFiniteState)

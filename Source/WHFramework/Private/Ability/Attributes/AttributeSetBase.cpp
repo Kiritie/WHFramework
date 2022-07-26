@@ -17,24 +17,35 @@ void UAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectMo
 	Super::PostGameplayEffectExecute(Data);
 }
 
-void UAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& AffectedAttribute, const FGameplayAttributeData& MaxAttribute, float NewMaxValue, const FGameplayAttribute& AffectedAttributeProperty)
+void UAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	const float CurrentMaxValue = MaxAttribute.GetCurrentValue();
-	if(!FMath::IsNearlyEqual(CurrentMaxValue, NewMaxValue) && AbilityComp)
+	const float CurrentMaxValue = InMaxAttribute.GetCurrentValue();
+	if(!FMath::IsNearlyEqual(CurrentMaxValue, InNewMaxValue) && AbilityComp)
 	{
-		const float CurrentValue = AffectedAttribute.GetCurrentValue();
-		float NewDelta = CurrentMaxValue > 0.f ? (CurrentValue / CurrentMaxValue * NewMaxValue - CurrentValue) : NewMaxValue;
-		AbilityComp->ApplyModToAttributeUnsafe(AffectedAttributeProperty, EGameplayModOp::Additive, NewDelta);
+		const float CurrentValue = InAffectedAttribute.GetCurrentValue();
+		float NewDelta = CurrentMaxValue > 0.f ? (CurrentValue / CurrentMaxValue * InNewMaxValue - CurrentValue) : InNewMaxValue;
+		AbilityComp->ApplyModToAttributeUnsafe(InAffectedAttributeProperty, EGameplayModOp::Additive, NewDelta);
 	}
 }
 
-FGameplayAttributeData* UAttributeSetBase::GetAttributeData(const FGameplayAttribute& Attribute)
+FGameplayAttributeData UAttributeSetBase::GetAttributeData(FGameplayAttribute InAttribute)
 {
-	return Attribute.GetGameplayAttributeData(this);
+	return *InAttribute.GetGameplayAttributeData(this);
 }
 
-TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes()
+float UAttributeSetBase::GetAttributeValue(FGameplayAttribute InAttribute)
+{
+	return GetAttributeData(InAttribute).GetCurrentValue();
+}
+
+void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
+{
+	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Override, InValue);
+}
+
+TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes() const
 {
 	TArray<FGameplayAttribute> AllAttributes;
 	for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
@@ -48,7 +59,7 @@ TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes()
 	return AllAttributes;
 }
 
-TArray<FGameplayAttribute> UAttributeSetBase::GetPersistentAttributes()
+TArray<FGameplayAttribute> UAttributeSetBase::GetPersistentAttributes() const
 {
 	TArray<FGameplayAttribute> PersistentAttributes;
 	for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)

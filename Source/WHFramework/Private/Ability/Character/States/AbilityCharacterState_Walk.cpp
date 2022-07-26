@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
 {
@@ -16,11 +17,7 @@ void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSMComponent, in
 
 bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
-	if(!Super::OnEnterValidate(InLastFiniteState)) return false;
-	
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	return Character->GetCharacterMovement()->IsWalking();
+	return Super::OnEnterValidate(InLastFiniteState);
 }
 
 void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastFiniteState)
@@ -35,11 +32,7 @@ void UAbilityCharacterState_Walk::OnRefresh()
 
 bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
 {
-	if(!Super::OnLeaveValidate(InNextFiniteState)) return false;
-	
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	return !Character->GetCharacterMovement()->IsFalling() || InNextFiniteState && InNextFiniteState->IsA<UAbilityCharacterState_Jump>();
+	return Super::OnLeaveValidate(InNextFiniteState);
 }
 
 void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextFiniteState)

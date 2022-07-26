@@ -55,6 +55,8 @@ public:
 		
 	virtual void OnDespawn_Implementation() override;
 
+	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:

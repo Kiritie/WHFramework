@@ -30,6 +30,24 @@ FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
 	return FVoxelWorldSaveData::Empty;
 }
 
+EVoxelWorldMode UVoxelModuleBPLibrary::GetWorldMode()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->GetWorldMode();
+	}
+	return EVoxelWorldMode::None;
+}
+
+EVoxelWorldState UVoxelModuleBPLibrary::GetWorldState()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->GetWorldState();
+	}
+	return EVoxelWorldState::None;
+}
+
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
 	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / UVoxelModuleBPLibrary::GetWorldData().GetChunkLength()),

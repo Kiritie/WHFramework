@@ -147,17 +147,30 @@ void AVoxelChunk::OnDespawn_Implementation()
 	bGenerated = false;
 
 	SolidMesh->ClearData();
-	SolidMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	
 	SemiMesh->ClearData();
-	SemiMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	
 	TransMesh->ClearData();
-	TransMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	VoxelMap.Empty();
 
 	Execute_SetActorVisible(this, false);
+}
+
+void AVoxelChunk::SetActorVisible_Implementation(bool bNewVisible)
+{
+	Super::SetActorVisible_Implementation(bNewVisible);
+
+	if(!bNewVisible)
+	{
+		SolidMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SemiMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		TransMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	else
+	{
+		SolidMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		SemiMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		TransMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	}
 }
 
 void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBatch)
@@ -178,7 +191,6 @@ void AVoxelChunk::Generate(bool bForceMode)
 	if(!SolidMesh->IsEmpty())
 	{
 		SolidMesh->CreateMesh();
-		SolidMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	}
 	else
 	{
@@ -188,7 +200,6 @@ void AVoxelChunk::Generate(bool bForceMode)
 	if(!SemiMesh->IsEmpty())
 	{
 		SemiMesh->CreateMesh();
-		SemiMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	}
 	else
 	{
@@ -198,7 +209,6 @@ void AVoxelChunk::Generate(bool bForceMode)
 	if(!TransMesh->IsEmpty())
 	{
 		TransMesh->CreateMesh();
-		TransMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
 	else
 	{

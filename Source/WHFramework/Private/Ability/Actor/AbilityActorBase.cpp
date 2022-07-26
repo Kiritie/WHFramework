@@ -15,7 +15,7 @@ AAbilityActorBase::AAbilityActorBase()
 	// AbilitySystem->SetIsReplicated(true);
 	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
+	// AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(FName("AttributeSet"));
 
 	ActorID = FGuid::NewGuid();
 	Container = nullptr;
@@ -25,7 +25,8 @@ void AAbilityActorBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	AbilitySystem->InitAbilityActorInfo(this, this);
+	InitializeAbilitySystem();
+
 	for(auto Iter : AttributeSet->GetAllAttributes())
 	{
 		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityActorBase::OnAttributeChange);
@@ -208,6 +209,31 @@ bool AAbilityActorBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, F
 
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
+}
+
+FGameplayAttributeData AAbilityActorBase::GetAttributeData(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeData(InAttribute);
+}
+
+float AAbilityActorBase::GetAttributeValue(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeValue(InAttribute);
+}
+
+void AAbilityActorBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
+{
+	AttributeSet->SetAttributeValue(InAttribute, InValue);
+}
+
+TArray<FGameplayAttribute> AAbilityActorBase::GetAllAttributes() const
+{
+	return AttributeSet->GetAllAttributes();
+}
+
+TArray<FGameplayAttribute> AAbilityActorBase::GetPersistentAttributes() const
+{
+	return AttributeSet->GetPersistentAttributes();
 }
 
 UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const

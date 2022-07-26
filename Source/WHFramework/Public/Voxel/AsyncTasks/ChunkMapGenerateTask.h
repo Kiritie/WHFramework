@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Math/MathTypes.h"
 
-class AVoxelChunk;
 class AVoxelModule;
 /**
  * 
@@ -14,12 +14,11 @@ class ChunkMapGenerateTask : public FNonAbandonableTask
 	friend class FAsyncTask<ChunkMapGenerateTask>;
 
 public:
-	ChunkMapGenerateTask(int32 InTaskIndex, class AVoxelModule* InVoxelModule, TArray<class AVoxelChunk*> InChunkMapGenerateQueue);
+	ChunkMapGenerateTask(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkMapGenerateQueue);
 
 protected:
-	int32 TaskIndex;
 	AVoxelModule* VoxelModule;
-	TArray<AVoxelChunk*> ChunkMapGenerateQueue;
+	TArray<FIndex> ChunkMapGenerateQueue;
 
 public:
 	void DoWork();

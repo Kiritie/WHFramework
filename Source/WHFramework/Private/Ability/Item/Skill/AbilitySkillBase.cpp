@@ -7,6 +7,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "TimerManager.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 
 AAbilitySkillBase::AAbilitySkillBase()
 {

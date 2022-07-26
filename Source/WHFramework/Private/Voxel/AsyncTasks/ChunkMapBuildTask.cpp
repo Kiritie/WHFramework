@@ -6,9 +6,8 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 
-ChunkMapBuildTask::ChunkMapBuildTask(int32 InTaskIndex, class AVoxelModule* InVoxelModule, TArray<AVoxelChunk*> InChunkMapBuildQueue)
+ChunkMapBuildTask::ChunkMapBuildTask(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkMapBuildQueue)
 {
-	TaskIndex = InTaskIndex;
 	VoxelModule = InVoxelModule;
 	ChunkMapBuildQueue = InChunkMapBuildQueue;
 }
@@ -20,23 +19,6 @@ void ChunkMapBuildTask::DoWork()
 		if(!CanWork()) return;
 		VoxelModule->BuildChunkMap(Iter, 0);
 	}
-	// if(VoxelModule->ChunkMapBuildTasks.IsValidIndex(TaskIndex))
-	// {
-	// 	VoxelModule->ChunkMapBuildTasks[TaskIndex] = nullptr;
-	// }
-	// bool bIsAllChunkBuilded = true;
-	// for(auto Iter : VoxelModule->ChunkMapBuildTasks)
-	// {
-	// 	if(Iter)
-	// 	{
-	// 		bIsAllChunkBuilded = false;
-	// 		break;
-	// 	}
-	// }
-	// if(bIsAllChunkBuilded)
-	// {
-	// 	VoxelModule->ChunkMapBuildTasks.Empty();
-	// }
 }
 
 bool ChunkMapBuildTask::CanWork() const

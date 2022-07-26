@@ -14,7 +14,7 @@ class UAbilitySystemComponentBase;
  * Ability Actor基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IAbilitySystemInterface
+class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface
 {
 	GENERATED_BODY()
 
@@ -98,15 +98,32 @@ public:
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetAttributeValue(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetAllAttributes() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const override;
 
 public:
+	UFUNCTION(BlueprintPure)
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	template<class T>
 	T* GetAttributeSet() const
 	{
-		return Cast<T>(AttributeSet);
+		return Cast<T>(GetAttributeSet());
 	}
+
 	UFUNCTION(BlueprintPure)
-	UAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
+	virtual UAttributeSetBase* GetAttributeSet() const override { return AttributeSet; }
 };

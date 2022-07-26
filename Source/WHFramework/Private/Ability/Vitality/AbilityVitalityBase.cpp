@@ -6,7 +6,6 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/VitalityInteractionComponent.h"
 #include "Ability/Abilities/VitalityAbilityBase.h"
-#include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
@@ -62,6 +61,13 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 void AAbilityVitalityBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	InitializeAbilitySystem();
+
+	for(auto Iter : AttributeSet->GetAllAttributes())
+	{
+		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityVitalityBase::OnAttributeChange);
+	}
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -189,69 +195,125 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 {
 }
 
-FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel)
+FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
 {
-	return Super::AcquireAbility(InAbility, InLevel);
+	if (AbilitySystem && InAbility)
+	{
+		FGameplayAbilitySpecDef SpecDef = FGameplayAbilitySpecDef();
+		SpecDef.Ability = InAbility;
+		FGameplayAbilitySpec AbilitySpec = FGameplayAbilitySpec(SpecDef, InLevel);
+		return AbilitySystem->GiveAbility(AbilitySpec);
+	}
+	return FGameplayAbilitySpecHandle();
 }
 
-bool AAbilityVitalityBase::ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation)
+bool AAbilityVitalityBase::ActiveAbility(FGameplayAbilitySpecHandle SpecHandle, bool bAllowRemoteActivation /*= false*/)
 {
-	return Super::ActiveAbility(AbilityHandle, bAllowRemoteActivation);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->TryActivateAbility(SpecHandle, bAllowRemoteActivation);
+	}
+	return false;
 }
 
-bool AAbilityVitalityBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation)
+bool AAbilityVitalityBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation /*= false*/)
 {
-	return Super::ActiveAbilityByClass(AbilityClass, bAllowRemoteActivation);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->TryActivateAbilityByClass(AbilityClass, bAllowRemoteActivation);
+	}
+	return false;
 }
 
-bool AAbilityVitalityBase::ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation)
+bool AAbilityVitalityBase::ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation /*= false*/)
 {
-	return Super::ActiveAbilityByTag(GameplayTagContainer, bAllowRemoteActivation);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->TryActivateAbilitiesByTag(GameplayTagContainer, bAllowRemoteActivation);
+	}
+	return false;
 }
 
 void AAbilityVitalityBase::CancelAbility(UAbilityBase* Ability)
 {
-	Super::CancelAbility(Ability);
+	if (AbilitySystem)
+	{
+		AbilitySystem->CancelAbility(Ability);
+	}
 }
 
 void AAbilityVitalityBase::CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle)
 {
-	Super::CancelAbilityByHandle(AbilityHandle);
+	if (AbilitySystem)
+	{
+		AbilitySystem->CancelAbilityHandle(AbilityHandle);
+	}
 }
 
-void AAbilityVitalityBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore)
+void AAbilityVitalityBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore/*=nullptr*/)
 {
-	Super::CancelAbilities(WithTags, WithoutTags, Ignore);
+	if (AbilitySystem)
+	{
+		AbilitySystem->CancelAbilities(&WithTags, &WithoutTags, Ignore);
+	}
 }
 
-void AAbilityVitalityBase::CancelAllAbilities(UAbilityBase* Ignore)
+void AAbilityVitalityBase::CancelAllAbilities(UAbilityBase* Ignore/*=nullptr*/)
 {
-	Super::CancelAllAbilities(Ignore);
+	if (AbilitySystem)
+	{
+		AbilitySystem->CancelAllAbilities(Ignore);
+	}
 }
 
 FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass)
 {
-	return Super::ApplyEffectByClass(EffectClass);
+	if (AbilitySystem)
+	{
+		auto effectContext = AbilitySystem->MakeEffectContext();
+		effectContext.AddSourceObject(this);
+		auto specHandle = AbilitySystem->MakeOutgoingSpec(EffectClass, GetLevelV(), effectContext);
+		if (specHandle.IsValid())
+		{
+			return AbilitySystem->ApplyGameplayEffectSpecToSelf(*specHandle.Data.Get());
+		}
+	}
+	return FActiveGameplayEffectHandle();
 }
 
 FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle)
 {
-	return Super::ApplyEffectBySpecHandle(SpecHandle);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	}
+	return FActiveGameplayEffectHandle();
 }
 
 FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpec(const FGameplayEffectSpec& Spec)
 {
-	return Super::ApplyEffectBySpec(Spec);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->ApplyGameplayEffectSpecToSelf(Spec);
+	}
+	return FActiveGameplayEffectHandle();
 }
 
-bool AAbilityVitalityBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove)
+bool AAbilityVitalityBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove/*=-1*/)
 {
-	return Super::RemoveEffect(Handle, StacksToRemove);
+	if (AbilitySystem)
+	{
+		return AbilitySystem->RemoveActiveGameplayEffect(Handle, StacksToRemove);
+	}
+	return false;
 }
 
 void AAbilityVitalityBase::GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities)
 {
-	Super::GetActiveAbilities(AbilityTags, ActiveAbilities);
+	if (AbilitySystem)
+	{
+		AbilitySystem->GetActiveAbilitiesWithTags(AbilityTags, ActiveAbilities);
+	}
 }
 
 bool AAbilityVitalityBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
@@ -311,41 +373,6 @@ int32 AAbilityVitalityBase::GetTotalEXP() const
 FString AAbilityVitalityBase::GetHeadInfo() const
 {
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
-}
-
-float AAbilityVitalityBase::GetHealth() const
-{
-	return GetAttributeSet<UVitalityAttributeSetBase>()->GetHealth();
-}
-
-void AAbilityVitalityBase::SetHealth(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityVitalityBase::GetMaxHealth() const
-{
-	return GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxHealth();
-}
-
-void AAbilityVitalityBase::SetMaxHealth(float InValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxHealthAttribute(), EGameplayModOp::Override, InValue);
-}
-
-float AAbilityVitalityBase::GetPhysicsDamage() const
-{
-	return GetAttributeSet<UVitalityAttributeSetBase>()->GetPhysicsDamage();
-}
-
-float AAbilityVitalityBase::GetMagicDamage() const
-{
-	return GetAttributeSet<UVitalityAttributeSetBase>()->GetMagicDamage();
-}
-
-UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
 void AAbilityVitalityBase::ModifyHealth(float InDeltaValue)
@@ -445,6 +472,46 @@ bool AAbilityVitalityBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 		return Chunk->DestroyVoxel(VoxelItem);
 	}
 	return false;
+}
+
+UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
+}
+
+FGameplayAttributeData AAbilityVitalityBase::GetAttributeData(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeData(InAttribute);
+}
+
+float AAbilityVitalityBase::GetAttributeValue(FGameplayAttribute InAttribute)
+{
+	return AttributeSet->GetAttributeValue(InAttribute);
+}
+
+void AAbilityVitalityBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
+{
+	AttributeSet->SetAttributeValue(InAttribute, InValue);
+}
+
+TArray<FGameplayAttribute> AAbilityVitalityBase::GetAllAttributes() const
+{
+	return AttributeSet->GetAllAttributes();
+}
+
+TArray<FGameplayAttribute> AAbilityVitalityBase::GetPersistentAttributes() const
+{
+	return AttributeSet->GetPersistentAttributes();
+}
+
+UAttributeSetBase* AAbilityVitalityBase::GetAttributeSet() const
+{
+	return AttributeSet;
+}
+
+UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
+{
+	return AbilitySystem;
 }
 
 UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const

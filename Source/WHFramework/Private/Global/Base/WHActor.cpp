@@ -10,6 +10,7 @@ AWHActor::AWHActor()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 
 	ActorID = FGuid::NewGuid();
+	bVisible = true;
 	Container = nullptr;
 }
 
@@ -39,12 +40,14 @@ void AWHActor::OnDespawn_Implementation()
 	Container = nullptr;
 }
 
-bool AWHActor::IsVisible_Implementation() const
+void AWHActor::SetActorVisible_Implementation(bool bNewVisible)
 {
-	return GetRootComponent()->IsVisible();
-}
-
-void AWHActor::SetActorVisible_Implementation(bool bVisible)
-{
-	GetRootComponent()->SetVisibility(bVisible, true);
+	bVisible = bNewVisible;
+	GetRootComponent()->SetVisibility(bNewVisible, true);
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors);
+	for(auto Iter : AttachedActors)
+	{
+		ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+	}
 }

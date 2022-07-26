@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
+#include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
@@ -28,14 +29,13 @@ class AAbilitySkillBase;
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IAbilitySystemInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
 	friend class UAbilityCharacterState_Death;
 	friend class UAbilityCharacterState_Default;
 	friend class UAbilityCharacterState_Fall;
-	friend class UAbilityCharacterState_Idle;
 	friend class UAbilityCharacterState_Jump;
 	friend class UAbilityCharacterState_Static;
 	friend class UAbilityCharacterState_Walk;
@@ -120,7 +120,7 @@ protected:
 
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
-	virtual void RefreshFiniteState();
+	virtual void RefreshState();
 
 public:
 	virtual void Tick(float DeltaTime) override;
@@ -205,9 +205,6 @@ public:
 	void SetMotionRate(float InMovementRate, float InRotationRate);
 
 public:
-	UFUNCTION(BlueprintPure)
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-
 	template<class T>
 	T& GetCharacterData() const
 	{
@@ -216,14 +213,33 @@ public:
 	
 	UAbilityCharacterDataBase& GetCharacterData() const;
 
+	UFUNCTION(BlueprintPure)
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetAttributeValue(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetAllAttributes() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const override;
+
 	template<class T>
 	T* GetAttributeSet() const
 	{
-		return Cast<T>(AttributeSet);
+		return Cast<T>(GetAttributeSet());
 	}
+
 	UFUNCTION(BlueprintPure)
-	UCharacterAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
-	
+	virtual UAttributeSetBase* GetAttributeSet() const override;
+
 	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
@@ -276,42 +292,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-		
-	UFUNCTION(BlueprintPure)
-	virtual float GetHealth() const override;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetHealth(float InValue) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetMaxHealth() const override;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetMaxHealth(float InValue) override;
-			
-	UFUNCTION(BlueprintPure)
-	virtual float GetMoveSpeed() const;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetMoveSpeed(float InValue);
-			
-	UFUNCTION(BlueprintPure)
-	virtual float GetRotationSpeed() const;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetRotationSpeed(float InValue);
-			
-	UFUNCTION(BlueprintPure)
-	virtual float GetJumpForce() const;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetJumpForce(float InValue);
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetPhysicsDamage() const override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual float GetMagicDamage() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FVector GetMoveVelocity(bool bIgnoreZ = true) const;
@@ -330,6 +310,20 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const;
+	
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, Health)
+	
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+
+	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
+
+	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
+
+	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

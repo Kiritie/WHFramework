@@ -36,6 +36,12 @@ public:
 	}
 	static FVoxelWorldSaveData& GetWorldData();
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static EVoxelWorldMode GetWorldMode();
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static EVoxelWorldState GetWorldState();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 public:

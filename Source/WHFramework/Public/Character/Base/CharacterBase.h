@@ -50,6 +50,8 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
 	FGuid ActorID;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	bool bVisible;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	
@@ -62,9 +64,9 @@ public:
 
 	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
 
-	virtual bool IsVisible_Implementation() const override;
+	virtual bool IsVisible_Implementation() const override { return bVisible; }
 
-	virtual void SetActorVisible_Implementation(bool bVisible) override;
+	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim

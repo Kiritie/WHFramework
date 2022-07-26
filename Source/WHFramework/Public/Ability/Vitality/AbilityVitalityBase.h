@@ -4,6 +4,7 @@
 
 #include "AbilityVitalityInterface.h"
 #include "Ability/Actor/AbilityActorBase.h"
+#include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Ability/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -24,7 +25,7 @@ class UAttributeSetBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AAbilityActorBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -45,6 +46,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilitySystemComponentBase* AbilitySystem;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityAttributeSetBase* AttributeSet;
+
 protected:
 	// stats
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
@@ -64,6 +71,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 EXPFactor;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FVoxelItem GenerateVoxelItem;
@@ -147,6 +157,55 @@ public:
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 public:
+	template<class T>
+	T& GetVitalityData() const
+	{
+		return static_cast<T&>(GetVitalityData());
+	}
+	
+	UAbilityVitalityDataBase& GetVitalityData() const;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetAttributeValue(FGameplayAttribute InAttribute) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetAllAttributes() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const override;
+
+	template<class T>
+	T* GetAttributeSet() const
+	{
+		return Cast<T>(GetAttributeSet());
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual UAttributeSetBase* GetAttributeSet() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual UInteractionComponent* GetInteractionComponent() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
+
+public:
+	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+
+	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
+
+	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+
+public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = false) const override;
 
@@ -169,9 +228,11 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetRaceID(FName InRaceID) override { RaceID = InRaceID; }
 
-	virtual int32 GetLevelV() const override { return Super::GetLevelV(); }
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetLevelV() const override { return Level; }
 
-	virtual void SetLevelV(int32 InLevel) override { Super::SetLevelV(InLevel); }
+	UFUNCTION(BlueprintCallable)
+	virtual void SetLevelV(int32 InLevel) override { Level = InLevel; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetEXP() const override { return EXP; }
@@ -193,44 +254,14 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-			
-	UFUNCTION(BlueprintPure)
-	virtual float GetHealth() const override;
-					
-	UFUNCTION(BlueprintCallable)
-	virtual void SetHealth(float InValue) override;
 
-	UFUNCTION(BlueprintPure)
-	virtual float GetMaxHealth() const override;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetMaxHealth(float InValue) override;
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, Health)
+
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
 	
-	UFUNCTION(BlueprintPure)
-	virtual float GetPhysicsDamage() const override;
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
-	UFUNCTION(BlueprintPure)
-	virtual float GetMagicDamage() const override;
-
-	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
-
-	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
-
-	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
-
-	template<class T>
-	T& GetVitalityData() const
-	{
-		return static_cast<T&>(GetVitalityData());
-	}
-	
-	UAbilityVitalityDataBase& GetVitalityData() const;
-
-	UFUNCTION(BlueprintPure)
-	virtual UInteractionComponent* GetInteractionComponent() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
+	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

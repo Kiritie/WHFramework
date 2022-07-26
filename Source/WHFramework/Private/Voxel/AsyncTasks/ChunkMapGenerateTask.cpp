@@ -6,9 +6,8 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 
-ChunkMapGenerateTask::ChunkMapGenerateTask(int32 InTaskIndex, class AVoxelModule* InVoxelModule, TArray<AVoxelChunk*> InChunkMapGenerateQueue)
+ChunkMapGenerateTask::ChunkMapGenerateTask(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkMapGenerateQueue)
 {
-	TaskIndex = InTaskIndex;
 	VoxelModule = InVoxelModule;
 	ChunkMapGenerateQueue = InChunkMapGenerateQueue;
 }
@@ -20,19 +19,6 @@ void ChunkMapGenerateTask::DoWork()
 		if(!CanWork()) return;
 		VoxelModule->GenerateChunkMap(Iter);
 	}
-	// bool bIsAllChunkGenerateed = true;
-	// for(auto Iter : VoxelModule->ChunkMapGenerateTasks)
-	// {
-	// 	if(&Iter->GetTask() != this && !Iter->IsDone())
-	// 	{
-	// 		bIsAllChunkGenerateed = false;
-	// 		break;
-	// 	}
-	// }
-	// if(bIsAllChunkGenerateed)
-	// {
-	// 	VoxelModule->ChunkMapGenerateTasks.Empty();
-	// }
 }
 
 bool ChunkMapGenerateTask::CanWork() const

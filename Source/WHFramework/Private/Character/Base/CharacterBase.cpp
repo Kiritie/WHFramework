@@ -29,6 +29,7 @@ ACharacterBase::ACharacterBase()
 	DefaultController = nullptr;
 
 	ActorID = FGuid::NewGuid();
+	bVisible = true;
 	Container = nullptr;
 }
 
@@ -73,14 +74,16 @@ void ACharacterBase::SpawnDefaultController()
 	DefaultController = Controller;
 }
 
-bool ACharacterBase::IsVisible_Implementation() const
+void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
 {
-	return GetRootComponent()->IsVisible();
-}
-
-void ACharacterBase::SetActorVisible_Implementation(bool bVisible)
-{
-	GetRootComponent()->SetVisibility(bVisible, true);
+	bVisible = bNewVisible;
+	GetRootComponent()->SetVisibility(bNewVisible, true);
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors);
+	for(auto Iter : AttachedActors)
+	{
+		ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+	}
 }
 
 bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem)

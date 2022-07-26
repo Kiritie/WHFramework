@@ -1,17 +1,20 @@
 #pragma once
 
+#include "AbilitySystemInterface.h"
 #include "Ability/AbilityModuleTypes.h"
 
 #include "AbilityActorInterface.generated.h"
 
+class UAttributeSetBase;
 class UAbilityBase;
+
 UINTERFACE()
-class WHFRAMEWORK_API UAbilityActorInterface : public UInterface
+class WHFRAMEWORK_API UAbilityActorInterface : public UAbilitySystemInterface
 {
 	GENERATED_BODY()
 };
 
-class WHFRAMEWORK_API IAbilityActorInterface
+class WHFRAMEWORK_API IAbilityActorInterface : public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -21,6 +24,8 @@ public:
 	virtual void SetLevelV(int32 InLevel) = 0;
 
 public:
+	virtual void InitializeAbilitySystem();
+	
 	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) = 0;
 
 	virtual bool ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation = false) = 0;
@@ -49,6 +54,20 @@ public:
 
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) = 0;
 
-protected:
+public:
+	virtual void RefreshAttributes();
+	
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) = 0;
+	
+	virtual UAttributeSetBase* GetAttributeSet() const = 0;
+
+	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) = 0;
+
+	virtual float GetAttributeValue(FGameplayAttribute InAttribute) = 0;
+
+	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) = 0;
+
+	virtual TArray<FGameplayAttribute> GetAllAttributes() const = 0;
+
+	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const = 0;
 };

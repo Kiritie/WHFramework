@@ -23,12 +23,21 @@ public:
 
 protected:
 	/** 当MaxAttribute发生改变时按比例设置Attribute */
-	virtual void AdjustAttributeForMaxChange(FGameplayAttributeData& AffectedAttribute, const FGameplayAttributeData& MaxAttribute, float NewMaxValue, const FGameplayAttribute& AffectedAttributeProperty);
+	virtual void AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty);
 
 public:
-	FGameplayAttributeData* GetAttributeData(const FGameplayAttribute& Attribute);
+	UFUNCTION(BlueprintPure)
+	FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute);
 
-	TArray<FGameplayAttribute> GetAllAttributes();
+	UFUNCTION(BlueprintPure)
+	float GetAttributeValue(FGameplayAttribute InAttribute);
 
-	TArray<FGameplayAttribute> GetPersistentAttributes();
+	UFUNCTION(BlueprintCallable)
+	void SetAttributeValue(FGameplayAttribute InAttribute, float InValue);
+
+	UFUNCTION(BlueprintPure)
+	TArray<FGameplayAttribute> GetAllAttributes() const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FGameplayAttribute> GetPersistentAttributes() const;
 };

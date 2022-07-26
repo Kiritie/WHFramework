@@ -101,6 +101,8 @@ protected:
 
 	virtual void UnloadData(bool bForceMode) override;
 
+	virtual void StopAsyncTasks();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 protected:
@@ -124,7 +126,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkDestroySpeed;
-					
+										
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkMapLoadSpeed;
+
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkMapBuildSpeed;
 					
@@ -142,19 +147,22 @@ protected:
 	TArray<FIndex> ChunkSpawnQueue;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelChunk*> ChunkMapBuildQueue;
+	TArray<FIndex> ChunkMapLoadQueue;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelChunk*> ChunkMapBuildQueue1;
+	TArray<FIndex> ChunkMapBuildQueue;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelChunk*> ChunkMapGenerateQueue;
+	TArray<FIndex> ChunkMapBuildQueue1;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelChunk*> ChunkGenerateQueue;
+	TArray<FIndex> ChunkMapGenerateQueue;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelChunk*> ChunkDestroyQueue;
+	TArray<FIndex> ChunkGenerateQueue;
+
+	UPROPERTY(Transient)
+	TArray<FIndex> ChunkDestroyQueue;
 
 private:
 	int32 ChunkSpawnBatch;
@@ -175,25 +183,27 @@ protected:
 	virtual void GenerateChunks(FIndex InIndex);
 
 public:
-	virtual void LoadChunkMap(AVoxelChunk* InChunk);
+	virtual void LoadChunkMap(FIndex InIndex);
 
-	virtual void BuildChunkMap(AVoxelChunk* InChunk, int32 InStage);
+	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
 
-	virtual void GenerateChunkMap(AVoxelChunk* InChunk);
+	virtual void GenerateChunkMap(FIndex InIndex);
 
-	virtual void GenerateChunk(AVoxelChunk* InChunk);
+	virtual void GenerateChunk(FIndex InIndex);
 
-	virtual void DestroyChunk(AVoxelChunk* InChunk);
+	virtual void DestroyChunk(FIndex InIndex);
 
 	virtual void AddToSpawnQueue(FIndex InIndex);
 
-	virtual void AddToMapBuildQueue(AVoxelChunk* InChunk);
+	virtual void AddToMapLoadQueue(FIndex InIndex);
 
-	virtual void AddToMapGenerateQueue(AVoxelChunk* InChunk);
+	virtual void AddToMapBuildQueue(FIndex InIndex, int32 InStage);
 
-	virtual void AddToGenerateQueue(AVoxelChunk* InChunk);
+	virtual void AddToMapGenerateQueue(FIndex InIndex);
 
-	virtual void AddToDestroyQueue(AVoxelChunk* InChunk);
+	virtual void AddToGenerateQueue(FIndex InIndex);
+
+	virtual void AddToDestroyQueue(FIndex InIndex);
 
 public:
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
