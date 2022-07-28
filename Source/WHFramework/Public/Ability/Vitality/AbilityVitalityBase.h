@@ -62,15 +62,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FName RaceID;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	int32 EXP;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	int32 BaseEXP;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	int32 EXPFactor;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
 	int32 Level;
@@ -139,12 +130,18 @@ public:
 	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) override;
 	
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void ModifyHealth(float InDeltaValue) override;
-				
-	UFUNCTION(BlueprintCallable)
-	virtual void ModifyEXP(float InDeltaValue) override;
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
@@ -235,33 +232,19 @@ public:
 	virtual void SetLevelV(int32 InLevel) override { Level = InLevel; }
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetEXP() const override { return EXP; }
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetEXP(int32 InEXP) override { EXP = InEXP; }
-		
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetBaseEXP() const override { return BaseEXP; }
-			
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetEXPFactor() const override { return EXPFactor; }
-
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetMaxEXP() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetTotalEXP() const override;
-
-	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
 
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, Health)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+			
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

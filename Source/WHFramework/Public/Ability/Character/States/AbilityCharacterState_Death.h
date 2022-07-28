@@ -44,4 +44,6 @@ public:
 
 protected:
 	IAbilityVitalityInterface* Killer;
+
+	bool bDeathStarted;
 };

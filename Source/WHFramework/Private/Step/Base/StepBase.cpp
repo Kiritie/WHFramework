@@ -204,7 +204,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 
 	if(bMergeSubStep)
 	{
@@ -335,7 +335,7 @@ void UStepBase::OnExecute()
 		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget);
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -383,7 +383,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -410,7 +410,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 
 	if(bMergeSubStep)
 	{

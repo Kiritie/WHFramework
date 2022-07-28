@@ -119,7 +119,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 }
 
 void UProcedureBase::OnRefresh()
@@ -154,7 +154,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 }
 
 void UProcedureBase::Guide()

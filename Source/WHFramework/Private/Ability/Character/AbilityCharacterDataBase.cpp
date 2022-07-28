@@ -5,7 +5,7 @@
 
 UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Character);
+	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Character);
 	MaxCount = 1;
 	Range = FVector(1.f, 1.f, 2.f);
 	EXP = 50;
@@ -16,6 +16,8 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 	// tags
 	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
 	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
-	// StaticTag = FGameplayTag::RequestGameplayTag("State.Vitality.Static");
+	// ActiveTag = FGameplayTag::RequestGameplayTag("State.Character.Active");
 	// FallingTag = FGameplayTag::RequestGameplayTag("State.Character.Falling");
+	// WalkingTag = FGameplayTag::RequestGameplayTag("State.Character.Walking");
+	// JumpingTag = FGameplayTag::RequestGameplayTag("State.Character.Jumping");
 }

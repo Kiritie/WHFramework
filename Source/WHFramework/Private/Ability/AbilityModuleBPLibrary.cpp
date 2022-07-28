@@ -7,9 +7,27 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
 
-FPrimaryAssetType UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType InItemType)
+const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityFromSpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
+{
+	UGameplayAbility* AbilityInstance = AbilitySpec.GetPrimaryInstance();
+	bIsInstance = true;
+
+	if (!AbilityInstance)
+	{
+		AbilityInstance = AbilitySpec.Ability;
+		bIsInstance = false;
+	}
+	return AbilityInstance;
+}
+
+FPrimaryAssetType UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType InItemType)
 {
 	return *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EAbilityItemType"), (int32)InItemType);
+}
+
+EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType InAssetType)
+{
+	return (EAbilityItemType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EAbilityItemType"), InAssetType.ToString());
 }
 
 FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractAction)

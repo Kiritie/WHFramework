@@ -13,27 +13,53 @@ class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
 
-#define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
-GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_ACCESSORS(PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
+#define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
+	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_ACCESSORS(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
-#define ATTRIBUTE_VALUE_ACCESSORS(ClassName, PropertyName) \
-ATTRIBUTE_VALUE_GETTER(ClassName, PropertyName) \
-ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName)
+#define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
+	ATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_GETTER(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_MODIFY(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName)
+
+#define ATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+	FORCEINLINE FGameplayAttribute Get##PropertyName##Attribute() const \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		return _AttributeSet->Get##PropertyName##Attribute(); \
+	}
 
 #define ATTRIBUTE_VALUE_GETTER(ClassName, PropertyName) \
-FORCEINLINE float Get##PropertyName() const \
-{ \
-	return Cast<ClassName>(GetAttributeSet())->Get##PropertyName(); \
-}
+	FORCEINLINE float Get##PropertyName() const \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		return _AttributeSet->Get##PropertyName(); \
+	}
 
 #define ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \
-FORCEINLINE void Set##PropertyName(float InValue) \
-{ \
-	GetAbilitySystemComponent()->ApplyModToAttributeUnsafe(Cast<ClassName>(GetAttributeSet())->Get##PropertyName##Attribute(), EGameplayModOp::Override, InValue); \
-}
+	FORCEINLINE void Set##PropertyName(float InValue) \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		_AttributeSet->SetAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InValue); \
+	}
+
+#define ATTRIBUTE_VALUE_MODIFY(ClassName, PropertyName) \
+	FORCEINLINE void Modify##PropertyName(float InDeltaValue) \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		_AttributeSet->ModifyAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InDeltaValue); \
+	}
+
+#define ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName) \
+	FORCEINLINE void Init##PropertyName(float InValue) \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		_AttributeSet->Init##PropertyName(InValue); \
+	}
 
 USTRUCT()
 struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContext
@@ -494,6 +520,11 @@ public:
 		return ID.IsValid();
 	}
 
+	FORCEINLINE virtual bool IsEmpty() const
+	{
+		return *this == Empty;
+	}
+
 	FORCEINLINE bool EqualType(FAbilityItem InItem) const
 	{
 		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
@@ -651,7 +682,6 @@ public:
 		Name = NAME_None;
 		RaceID = NAME_None;
 		Level = 0;
-		EXP = 0;
 		SpawnLocation = FVector::ZeroVector;
 		SpawnRotation = FRotator::ZeroRotator;
 	}
@@ -668,9 +698,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 Level;
-
-	UPROPERTY(BlueprintReadOnly)
-	int32 EXP;
 	
 	UPROPERTY()
 	FVector SpawnLocation;

@@ -6,7 +6,7 @@
 
 UAbilityEquipDataBase::UAbilityEquipDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Equip);
+	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Equip);
 	MaxCount = 1;
 	EquipClass = nullptr;
 	EquipPickUpClass = nullptr;

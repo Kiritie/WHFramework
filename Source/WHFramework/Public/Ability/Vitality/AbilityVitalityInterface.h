@@ -22,7 +22,7 @@ public:
 	
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 	
-	virtual void ModifyEXP(float InDeltaValue) = 0;
+	virtual void ModifyExp(float InDeltaValue) = 0;
 
 public:
 	virtual bool IsDead(bool bCheckDying = false) const = 0;
@@ -37,18 +37,6 @@ public:
 	virtual FName GetRaceID() const = 0;
 
 	virtual void SetRaceID(FName InRaceID) = 0;
-
-	virtual int32 GetEXP() const = 0;
-				
-	virtual void SetEXP(int32 InEXP) = 0;
-
-	virtual int32 GetBaseEXP() const = 0;
-	
-	virtual int32 GetEXPFactor() const = 0;
-
-	virtual int32 GetMaxEXP() const = 0;
-
-	virtual int32 GetTotalEXP() const = 0;
 
 	virtual FString GetHeadInfo() const = 0;
 		

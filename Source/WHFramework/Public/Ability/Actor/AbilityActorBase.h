@@ -95,6 +95,18 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) override;
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

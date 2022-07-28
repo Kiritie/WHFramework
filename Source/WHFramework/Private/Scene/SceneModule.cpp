@@ -275,7 +275,7 @@ void ASceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 	{
 		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakeString(InLevelPath.ToString()) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakeString(InLevelPath.ToString()) });
 }
 
 void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
@@ -288,7 +288,7 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	{
 		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakeString(InLevelPath.ToString()) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakeString(InLevelPath.ToString()) });
 }
 
 bool ASceneModule::HasSceneActor(FGuid InID, bool bEnsured) const

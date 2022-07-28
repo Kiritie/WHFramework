@@ -6,7 +6,7 @@
 
 UAbilityPropDataBase::UAbilityPropDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Prop);
+	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Prop);
 	MaxCount = 10;
 	PropClass = nullptr;
 	PropPickUpClass = nullptr;

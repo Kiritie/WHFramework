@@ -12,6 +12,7 @@
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
 	StateName = FName("Death");
+	bDeathStarted = false;
 }
 
 void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
@@ -34,10 +35,10 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	if(Killer)
 	{
-		Killer->ModifyEXP(Character->GetTotalEXP());
+		Killer->ModifyExp(Character->GetExp());
 	}
 
-	Character->SetEXP(0);
+	Character->SetExp(0);
 	Character->SetHealth(0.f);
 }
 
@@ -51,6 +52,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 	Super::OnLeave(InNextFiniteState);
 
 	Killer = nullptr;
+	bDeathStarted = false;
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

@@ -54,6 +54,8 @@ void ACharacterBase::OnDespawn_Implementation()
 {
 	Execute_SetActorVisible(this, false);
 
+	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+
 	if(Execute_IsAddToList(this))
 	{
 		USceneModuleBPLibrary::RemoveSceneActor(this);

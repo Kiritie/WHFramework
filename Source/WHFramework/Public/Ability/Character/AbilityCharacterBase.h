@@ -51,15 +51,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	int32 Level;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	int32 EXP;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	int32 BaseEXP;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	int32 EXPFactor;
-
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	float MovementRate;
@@ -69,11 +60,6 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	AController* OwnerController;
-
-protected:
-	FGameplayTag DeadTag;
-	
-	FGameplayTag DyingTag;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -188,18 +174,24 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
-				
-	UFUNCTION(BlueprintCallable)
-	virtual void ModifyEXP(float InDeltaValue) override;
-				
-	UFUNCTION(BlueprintCallable)
-	virtual void ModifyHealth(float InDeltaValue) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) override;
 
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	float Distance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
+	float GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
 									
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetMotionRate(float InMovementRate, float InRotationRate);
@@ -248,10 +240,22 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
+	virtual bool IsActive(bool bNeedNotDead = false) const;
+
+	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = false) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDying() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsFalling(bool bMovementMode = false) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWalking(bool bMovementMode = false) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsJumping() const;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -271,24 +275,6 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void SetLevelV(int32 InLevel) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetEXP() const override { return EXP; }
-		
-	UFUNCTION(BlueprintCallable)
-	virtual void SetEXP(int32 InEXP) override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetBaseEXP() const override { return BaseEXP; }
-	
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetEXPFactor() const override { return EXPFactor; }
-
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetMaxEXP() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetTotalEXP() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
@@ -311,19 +297,23 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const;
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, Health)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+		
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
-	ATTRIBUTE_VALUE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 
-	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 
-	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
 
-	ATTRIBUTE_VALUE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

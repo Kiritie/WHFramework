@@ -85,7 +85,7 @@ FSaveData* UVoxel::ToData()
 	static FVoxelItem SaveData;
 	SaveData.Reset();
 
-	SaveData.VoxelType = UVoxelModuleBPLibrary::GetVoxelTypeByAssetID(ID);
+	SaveData.VoxelType = UVoxelModuleBPLibrary::AssetIDToVoxelType(ID);
 	SaveData.ID = ID;
 	SaveData.Index = Index;
 	SaveData.Rotation = Rotation;

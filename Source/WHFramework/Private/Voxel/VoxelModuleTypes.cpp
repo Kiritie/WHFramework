@@ -16,7 +16,7 @@ FVoxelItem FVoxelItem::UnknownVoxel = FVoxelItem(FPrimaryAssetId(FName("Voxel"),
 FVoxelItem::FVoxelItem(EVoxelType InVoxelType, bool bInitSaveData) : FVoxelItem()
 {
 	VoxelType = InVoxelType;
-	ID = UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType);
+	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType);
 	if(bInitSaveData)
 	{
 		RefreshSaveData();
@@ -34,7 +34,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bInitSaveData) : FVoxel
 
 FVoxelItem::FVoxelItem(FVoxelSaveData& InSaveData) : FVoxelSaveData(InSaveData)
 {
-	ID = UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InSaveData.VoxelType);
+	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InSaveData.VoxelType);
 	RefreshSaveData();
 }
 

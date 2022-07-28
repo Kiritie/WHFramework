@@ -7,7 +7,11 @@
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 :	Health(100.f),
-	MaxHealth(100.f)
+	MaxHealth(100.f),
+	Exp(0.f),
+	MaxExp(100.f),
+	PhysicsDamage(0.f),
+	MagicDamage(0.f)
 {
 }
 
@@ -92,6 +96,8 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Exp, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxExp, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MagicDamage, COND_None, REPNOTIFY_Always);
 }
@@ -104,6 +110,16 @@ void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHe
 void UVitalityAttributeSetBase::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxHealth, OldMaxHealth);
+}
+
+void UVitalityAttributeSetBase::OnRep_Exp(const FGameplayAttributeData& OldExp)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, Exp, OldExp);
+}
+
+void UVitalityAttributeSetBase::OnRep_MaxExp(const FGameplayAttributeData& OldMaxExp)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxExp, OldMaxExp);
 }
 
 void UVitalityAttributeSetBase::OnRep_PhysicsDamage(const FGameplayAttributeData& OldPhysicsDamage)

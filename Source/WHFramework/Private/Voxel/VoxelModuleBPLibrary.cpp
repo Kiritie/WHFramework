@@ -11,12 +11,12 @@
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
-FPrimaryAssetId UVoxelModuleBPLibrary::GetAssetIDByVoxelType(EVoxelType InVoxelType)
+FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType)
 {
 	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
 }
 
-EVoxelType UVoxelModuleBPLibrary::GetVoxelTypeByAssetID(FPrimaryAssetId InAssetID)
+EVoxelType UVoxelModuleBPLibrary::AssetIDToVoxelType(FPrimaryAssetId InAssetID)
 {
 	return (EVoxelType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EVoxelType"), InAssetID.PrimaryAssetName.ToString().Mid(9));
 }
@@ -63,7 +63,7 @@ FVector UVoxelModuleBPLibrary::ChunkIndexToLocation(FIndex InIndex)
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(EVoxelType InVoxelType)
 {
-	return GetVoxel(UVoxelModuleBPLibrary::GetAssetIDByVoxelType(InVoxelType));
+	return GetVoxel(UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType));
 }
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)

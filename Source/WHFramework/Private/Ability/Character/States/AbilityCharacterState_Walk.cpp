@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
@@ -23,6 +24,10 @@ bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastFinite
 void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	Super::OnEnter(InLastFiniteState);
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().WalkingTag);
 }
 
 void UAbilityCharacterState_Walk::OnRefresh()
@@ -38,6 +43,10 @@ bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextFinite
 void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().WalkingTag);
 }
 
 void UAbilityCharacterState_Walk::OnTermination()

@@ -29,7 +29,7 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().StaticTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -46,7 +46,7 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().StaticTag);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);

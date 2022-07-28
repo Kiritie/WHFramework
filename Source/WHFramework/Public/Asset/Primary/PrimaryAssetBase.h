@@ -20,4 +20,6 @@ public:
 	virtual bool IsValid() const;
 	
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+
+	virtual bool EqualID(const FPrimaryAssetId& InAssetID) const;
 };

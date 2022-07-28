@@ -35,6 +35,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
 
-public:	
-	virtual bool EqualType(EAbilityItemType InItemType) const;
+public:
+	UFUNCTION(BlueprintPure)
+	EAbilityItemType GetItemType() const;
 };

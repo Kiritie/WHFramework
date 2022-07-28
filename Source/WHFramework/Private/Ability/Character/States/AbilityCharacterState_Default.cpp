@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 
 UAbilityCharacterState_Default::UAbilityCharacterState_Default()
 {
@@ -25,8 +26,10 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
+
 	Character->Execute_SetActorVisible(Character, true);
-	Character->SetHealth(-1.f);
+	Character->SetHealth(Character->GetMaxHealth());
 	Character->SetMotionRate(1, 1);
 }
 
@@ -38,6 +41,10 @@ void UAbilityCharacterState_Default::OnRefresh()
 void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	Super::OnLeave(InNextFiniteState);
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
 }
 
 void UAbilityCharacterState_Default::OnTermination()

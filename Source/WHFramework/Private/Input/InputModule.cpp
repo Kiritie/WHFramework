@@ -115,7 +115,7 @@ void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
 				}
 				default: break;
 			}
-			UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, TArray<FParameter>{ FParameter::MakePointer(&GlobalInputMode) });
+			UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakePointer(&GlobalInputMode) });
 		}
 	}
 }

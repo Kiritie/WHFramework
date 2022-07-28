@@ -53,6 +53,14 @@ public:
 	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) = 0;
 
 	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) = 0;
+	
+	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) = 0;
+	
+	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) = 0;
+
+	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) = 0;
+
+	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) = 0;
 
 public:
 	virtual void RefreshAttributes();

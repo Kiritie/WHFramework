@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 
 UAbilityCharacterState_Jump::UAbilityCharacterState_Jump()
 {
@@ -25,6 +26,8 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastFiniteState)
 	Super::OnEnter(InLastFiniteState);
 	
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+	
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().JumpingTag);
 
 	Character->Jump();
 }
@@ -39,6 +42,8 @@ void UAbilityCharacterState_Jump::OnLeave(UFiniteStateBase* InNextFiniteState)
 	Super::OnLeave(InNextFiniteState);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+	
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().JumpingTag);
 
 	Character->StopJumping();
 }

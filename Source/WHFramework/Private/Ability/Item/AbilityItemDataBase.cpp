@@ -6,7 +6,7 @@
 
 UAbilityItemDataBase::UAbilityItemDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::None);
+	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::None);
 
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();
@@ -17,7 +17,7 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	AbilityClass = nullptr;
 }
 
-bool UAbilityItemDataBase::EqualType(EAbilityItemType InItemType) const
+EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return Type == UAbilityModuleBPLibrary::GetAssetTypeByItemType(InItemType);
+	return UAbilityModuleBPLibrary::AssetTypeToItemType(Type);
 }

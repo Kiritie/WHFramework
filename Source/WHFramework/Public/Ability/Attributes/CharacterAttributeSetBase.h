@@ -18,15 +18,15 @@ public:
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MoveSpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData MoveSpeed;
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_RotationSpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData RotationSpeed;
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_JumpForce, Category = "CharacterAttributes")
 	FGameplayAttributeData JumpForce;
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
 
 public:
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;

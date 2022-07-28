@@ -21,10 +21,10 @@ class WHFRAMEWORK_API UVoxelModuleBPLibrary : public UBlueprintFunctionLibrary
 	// Asset
 public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FPrimaryAssetId GetAssetIDByVoxelType(EVoxelType InVoxelType);
+	static FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static EVoxelType GetVoxelTypeByAssetID(FPrimaryAssetId InAssetID);
+	static EVoxelType AssetIDToVoxelType(FPrimaryAssetId InAssetID);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Data

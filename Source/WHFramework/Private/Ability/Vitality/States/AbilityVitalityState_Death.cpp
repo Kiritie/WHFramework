@@ -32,10 +32,10 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	if(Killer)
 	{
-		Killer->ModifyEXP(Vitality->GetTotalEXP());
+		Killer->ModifyExp(Vitality->GetExp());
 	}
 
-	Vitality->SetEXP(0);
+	Vitality->SetExp(0);
 	Vitality->SetHealth(0.f);
 }
 

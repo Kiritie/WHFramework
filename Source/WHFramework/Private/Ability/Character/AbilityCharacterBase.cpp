@@ -8,6 +8,7 @@
 #include "TimerManager.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
@@ -73,9 +74,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Name = NAME_None;
 	RaceID = NAME_None;
 	Level = 0;
-	EXP = 0;
-	BaseEXP = 100;
-	EXPFactor = 2.f;
 
 	MovementRate = 1;
 	RotationRate = 1;
@@ -124,7 +122,6 @@ void AAbilityCharacterBase::OnDespawn_Implementation()
 	
 	RaceID = NAME_None;
 	Level = 0;
-	EXP = 0;
 	DefaultAbility = FAbilityData();
 }
 
@@ -137,7 +134,6 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 		AssetID = SaveData.ID;
 		SetRaceID(SaveData.RaceID);
 		SetLevelV(SaveData.Level);
-		SetEXP(SaveData.EXP);
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
@@ -154,7 +150,6 @@ FSaveData* AAbilityCharacterBase::ToData()
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
-	SaveData.EXP = EXP;
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
@@ -456,35 +451,52 @@ bool AAbilityCharacterBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClas
 	return false;
 }
 
-void AAbilityCharacterBase::ModifyEXP(float InDeltaValue)
+FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle)
 {
-	const int32 MaxEXP = GetMaxEXP();
-	int32 TempEXP = GetEXP();
-	TempEXP += InDeltaValue;
-	if (InDeltaValue > 0.f)
+	if (AbilitySystem)
 	{
-		if (TempEXP >= MaxEXP)
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
 		{
-			SetLevelV(Level + 1);
-			TempEXP -= MaxEXP;
+			return *Spec;
 		}
 	}
-	else
-	{
-		if (TempEXP < 0.f)
-		{
-			TempEXP = 0.f;
-		}
-	}
-	SetEXP(TempEXP);
+	return FGameplayAbilitySpec();
 }
 
-void AAbilityCharacterBase::ModifyHealth(float InDeltaValue)
+FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle GEHandle)
 {
-	if(InDeltaValue < 0.f && GetHealth() > 0.f || InDeltaValue > 0.f && GetHealth() < GetMaxHealth())
+	if (AbilitySystem)
 	{
-		AbilitySystem->ApplyModToAttributeUnsafe(AttributeSet->GetHealthAttribute(), EGameplayModOp::Additive, InDeltaValue);
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromGEHandle(GEHandle))
+		{
+			return *Spec;
+		}
 	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromClass(InAbilityClass))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByInputID(int32 InputID)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromInputID(InputID))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
 }
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
@@ -537,14 +549,34 @@ UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 	return Interaction;
 }
 
+bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().ActiveTag) && (!bNeedNotDead || !IsDead());
+}
+
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().DeadTag) || bCheckDying && IsDying();
 }
 
 bool AAbilityCharacterBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(DyingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().DyingTag);
+}
+
+bool AAbilityCharacterBase::IsFalling(bool bMovementMode) const
+{
+	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData().FallingTag) : GetCharacterMovement()->IsFalling();
+}
+
+bool AAbilityCharacterBase::IsWalking(bool bMovementMode) const
+{
+	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData().WalkingTag) : GetCharacterMovement()->IsWalking();
+}
+
+bool AAbilityCharacterBase::IsJumping() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().JumpingTag);
 }
 
 void AAbilityCharacterBase::SetNameV(FName InName)
@@ -561,31 +593,6 @@ void AAbilityCharacterBase::SetLevelV(int32 InLevel)
 {
 	Level = InLevel;
 	DefaultAbility.AbilityLevel = InLevel;
-}
-
-void AAbilityCharacterBase::SetEXP(int32 InEXP)
-{
-	EXP = InEXP;
-}
-
-int32 AAbilityCharacterBase::GetMaxEXP() const
-{
-	int32 MaxEXP = BaseEXP;
-	for (int i = 0; i < Level - 1; i++)
-	{
-		MaxEXP *= EXPFactor;
-	}
-	return MaxEXP;
-}
-
-int32 AAbilityCharacterBase::GetTotalEXP() const
-{
-	int32 TotalEXP = BaseEXP;
-	for (int i = 0; i < Level - 1; i++)
-	{
-		TotalEXP += TotalEXP * EXPFactor;
-	}
-	return EXP + TotalEXP - GetMaxEXP();
 }
 
 FString AAbilityCharacterBase::GetHeadInfo() const
@@ -619,7 +626,7 @@ float AAbilityCharacterBase::GetHalfHeight() const
 	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
-float AAbilityCharacterBase::Distance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/)
+float AAbilityCharacterBase::GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/)
 {
 	if(!InTargetCharacter || !InTargetCharacter->IsValidLowLevel()) return -1;
 	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetCharacter->GetActorLocation().X, InTargetCharacter->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetCharacter->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : InTargetCharacter->GetRadius());
@@ -636,6 +643,7 @@ void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, f
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
 	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
+	
 	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
 	{
 		if(DeltaValue != 0.f)

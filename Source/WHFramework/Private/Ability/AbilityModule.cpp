@@ -80,25 +80,32 @@ FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 
 AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
-	if(InItem == FAbilityItem::Empty) return nullptr;
+	if(!InItem.IsValid()) return nullptr;
 
 	AAbilityPickUpBase* PickUp = nullptr;
-
-	if(InItem.GetData().EqualType(EAbilityItemType::Voxel))
+	switch (InItem.GetData().GetItemType())
 	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Equip))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Prop))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
-	}
-	else if(InItem.GetData().EqualType(EAbilityItemType::Skill))
-	{
-		PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+		case EAbilityItemType::Voxel:
+		{
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
+			break;
+		}
+		case EAbilityItemType::Prop:
+		{
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
+			break;
+		}
+		case EAbilityItemType::Equip:
+		{
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
+			break;
+		}
+		case EAbilityItemType::Skill:
+		{
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+			break;
+		}
+		default: break;
 	}
 
 	if(PickUp)

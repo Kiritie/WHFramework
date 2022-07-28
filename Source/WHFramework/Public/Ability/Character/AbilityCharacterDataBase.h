@@ -36,8 +36,14 @@ public:
 	FGameplayTag DyingTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag StaticTag;
-	
+	FGameplayTag ActiveTag;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag 	FallingTag;
+	FGameplayTag FallingTag;
+				
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
+	FGameplayTag WalkingTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
+	FGameplayTag JumpingTag;
 };

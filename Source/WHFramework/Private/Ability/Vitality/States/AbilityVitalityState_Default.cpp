@@ -25,7 +25,7 @@ void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->SetHealth(-1.f);
+	Vitality->SetHealth(Vitality->GetMaxHealth());
 }
 
 void UAbilityVitalityState_Default::OnRefresh()

@@ -207,6 +207,54 @@ bool AAbilityActorBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, F
 	return false;
 }
 
+FGameplayAbilitySpec AAbilityActorBase::GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityActorBase::GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle GEHandle)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromGEHandle(GEHandle))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityActorBase::GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromClass(InAbilityClass))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityActorBase::GetAbilitySpecByInputID(int32 InputID)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromInputID(InputID))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
 }

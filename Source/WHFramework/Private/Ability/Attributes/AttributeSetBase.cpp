@@ -42,7 +42,31 @@ float UAttributeSetBase::GetAttributeValue(FGameplayAttribute InAttribute)
 void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	IAbilityActorInterface* AbilityActor = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
+	
+	FOnAttributeChangeData OnAttributeChangeData;
+	OnAttributeChangeData.Attribute = InAttribute;
+	OnAttributeChangeData.OldValue = GetAttributeValue(InAttribute);
+	
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Override, InValue);
+	OnAttributeChangeData.NewValue = GetAttributeValue(InAttribute);
+
+	AbilityActor->OnAttributeChange(OnAttributeChangeData);
+}
+
+void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
+{
+	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	IAbilityActorInterface* AbilityActor = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
+	
+	FOnAttributeChangeData OnAttributeChangeData;
+	OnAttributeChangeData.Attribute = InAttribute;
+	OnAttributeChangeData.OldValue = GetAttributeValue(InAttribute);
+	
+	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Additive, InDeltaValue);
+	OnAttributeChangeData.NewValue = GetAttributeValue(InAttribute);
+
+	AbilityActor->OnAttributeChange(OnAttributeChangeData);
 }
 
 TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes() const

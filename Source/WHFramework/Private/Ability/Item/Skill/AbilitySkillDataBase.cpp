@@ -5,7 +5,7 @@
 
 UAbilitySkillDataBase::UAbilitySkillDataBase()
 {
-	Type = UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Skill);
+	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Skill);
 	MaxCount = 1;
 	SkillType = ESkillType::None;
 	SkillMode = ESkillMode::None;

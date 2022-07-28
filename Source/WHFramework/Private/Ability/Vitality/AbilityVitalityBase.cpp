@@ -53,9 +53,6 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Name = NAME_None;
 	RaceID = NAME_None;
 	Level = 0;
-	EXP = 50;
-	BaseEXP = 100;
-	EXPFactor = 2.f;
 }
 
 void AAbilityVitalityBase::BeginPlay()
@@ -85,7 +82,6 @@ void AAbilityVitalityBase::OnDespawn_Implementation()
 
 	RaceID = NAME_None;
 	Level = 0;
-	EXP = 50;
 }
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
@@ -97,7 +93,6 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 		AssetID = SaveData.ID;
 		SetRaceID(SaveData.RaceID);
 		SetLevelV(SaveData.Level);
-		SetEXP(SaveData.EXP);
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
@@ -114,7 +109,6 @@ FSaveData* AAbilityVitalityBase::ToData()
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
-	SaveData.EXP = EXP;
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
@@ -340,6 +334,54 @@ bool AAbilityVitalityBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass
 	return false;
 }
 
+FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle GEHandle)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromGEHandle(GEHandle))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromClass(InAbilityClass))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByInputID(int32 InputID)
+{
+	if (AbilitySystem)
+	{
+		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromInputID(InputID))
+		{
+			return *Spec;
+		}
+	}
+	return FGameplayAbilitySpec();
+}
+
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DeadTag) || bCheckDying && IsDying();
@@ -350,57 +392,9 @@ bool AAbilityVitalityBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DyingTag);
 }
 
-int32 AAbilityVitalityBase::GetMaxEXP() const
-{
-	int32 MaxEXP = BaseEXP;
-	for (int i = 0; i < Level - 1; i++)
-	{
-		MaxEXP *= EXPFactor;
-	}
-	return MaxEXP;
-}
-
-int32 AAbilityVitalityBase::GetTotalEXP() const
-{
-	int32 TotalEXP = BaseEXP;
-	for (int i = 0; i < Level - 1; i++)
-	{
-		TotalEXP += TotalEXP * EXPFactor;
-	}
-	return EXP + TotalEXP - GetMaxEXP();
-}
-
 FString AAbilityVitalityBase::GetHeadInfo() const
 {
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
-}
-
-void AAbilityVitalityBase::ModifyHealth(float InDeltaValue)
-{
-	AbilitySystem->ApplyModToAttributeUnsafe(GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute(), EGameplayModOp::Additive, InDeltaValue);
-}
-
-void AAbilityVitalityBase::ModifyEXP(float InDeltaValue)
-{
-	const int32 MaxEXP = GetMaxEXP();
-	int32 TempEXP = GetEXP();
-	TempEXP += InDeltaValue;
-	if (InDeltaValue > 0.f)
-	{
-		if (TempEXP >= MaxEXP)
-		{
-			SetLevelV(Level + 1);
-			TempEXP -= MaxEXP;
-		}
-	}
-	else
-	{
-		if (TempEXP < 0.f)
-		{
-			TempEXP = 0.f;
-		}
-	}
-	SetEXP(TempEXP);
 }
 
 bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem)

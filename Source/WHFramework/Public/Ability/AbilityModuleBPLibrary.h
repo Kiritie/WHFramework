@@ -20,8 +20,18 @@ class WHFRAMEWORK_API UAbilityModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	//////////////////////////////////////////////////////////////////////////
+	// Interact
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static const UGameplayAbility* GetGameplayAbilityFromSpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Item
 	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FPrimaryAssetType GetAssetTypeByItemType(EAbilityItemType InItemType);
+	static FPrimaryAssetType ItemTypeToAssetType(EAbilityItemType InItemType);
+
+	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
+	static EAbilityItemType AssetTypeToItemType(FPrimaryAssetType InAssetType);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Interact

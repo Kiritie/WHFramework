@@ -18,19 +18,27 @@ public:
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Health, Category = "Vitality Attributes")
 	FGameplayAttributeData Health;
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxHealth, Category = "Vitality Attributes")
 	FGameplayAttributeData MaxHealth;
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "Vitality Attributes")
+	FGameplayAttributeData Exp;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxExp, Category = "Vitality Attributes")
+	FGameplayAttributeData MaxExp;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_PhysicsDamage, Category = "Damage")
 	FGameplayAttributeData PhysicsDamage;
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_MagicDamage, Category = "Damage")
 	FGameplayAttributeData MagicDamage;
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 
 public:
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
@@ -45,6 +53,12 @@ public:
 
 	UFUNCTION()
 	virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth);
+
+	UFUNCTION()
+	virtual void OnRep_Exp(const FGameplayAttributeData& OldExp);
+
+	UFUNCTION()
+	virtual void OnRep_MaxExp(const FGameplayAttributeData& OldMaxExp);
 
 	UFUNCTION()
 	virtual void OnRep_PhysicsDamage(const FGameplayAttributeData& OldPhysicsDamage);

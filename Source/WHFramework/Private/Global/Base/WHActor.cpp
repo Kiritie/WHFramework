@@ -27,6 +27,8 @@ void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 void AWHActor::OnDespawn_Implementation()
 {
 	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	
 	if(Execute_IsAddToList(this))
 	{

@@ -58,7 +58,7 @@ void UGlobalBPLibrary::PauseGame(EPauseGameMode PauseGameMode)
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseGameMode) } );
 }
 
 void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
@@ -81,7 +81,7 @@ void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, TArray<FParameter>{ FParameter::MakeInteger((int32)PauseGameMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseGameMode) } );
 }
 
 void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)

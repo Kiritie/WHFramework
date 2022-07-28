@@ -169,7 +169,7 @@ float AVoxelModule::GetWorldLength() const
 
 void AVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, TArray<FParameter>{FParameter::MakePointer(&WorldState)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, {FParameter::MakePointer(&WorldState)});
 }
 
 FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
@@ -300,7 +300,7 @@ void AVoxelModule::StopAsyncTasks()
 
 void AVoxelModule::GeneratePreviews()
 {
-	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::GetAssetTypeByItemType(EAbilityItemType::Voxel));
+	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 	if(VoxelDatas.Num() == 0) return;
 	
 	int32 tmpNum = 8;
