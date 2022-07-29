@@ -17,9 +17,9 @@ class WHFRAMEWORK_API UVoxelModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
+public:
 	//////////////////////////////////////////////////////////////////////////
 	// Asset
-public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType);
 
@@ -28,7 +28,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Data
-public:
 	template<class T>
 	static T& GetWorldData()
 	{
@@ -44,7 +43,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Index
-public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
 
@@ -52,8 +50,15 @@ public:
 	static FVector ChunkIndexToLocation(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Chunk
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static AVoxelChunk* FindChunkByIndex(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static AVoxelChunk* FindChunkByLocation(FVector InLocation);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Voxel
-public:
 	static UVoxel& GetVoxel(EVoxelType InVoxelType);
 
 	static UVoxel& GetVoxel(const FPrimaryAssetId& InVoxelID);
@@ -61,4 +66,20 @@ public:
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
 
 	static bool IsValid(UVoxel& InVoxel);
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Noise
+	static EVoxelType GetNoiseVoxelType(FIndex InIndex);
+
+	static UVoxelData& GetNoiseVoxelData(FIndex InIndex);
+
+	static int32 GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Trace
+	static bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
+
+	static bool ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
+
+	static bool VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult);
 };

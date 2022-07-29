@@ -31,5 +31,5 @@ public:
 	static void EnsureEditorCrash(const FString& Message, bool bNoCrash = false);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void DebugMessage(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, EDebugMode DebugMode = EDebugMode::All, int32 Key = -1, bool bNewerOnTop = true);
+	static void DebugMessage(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, EDebugMode DebugMode = EDebugMode::Screen, int32 Key = -1, bool bNewerOnTop = true);
 };

@@ -224,6 +224,16 @@ bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InP
 	return OutResult.Num() == 0 ? false : true;
 }
 
+FString UGlobalBPLibrary::BoolToString(bool InBool)
+{
+	return InBool ? TEXT("true") : TEXT("false");
+}
+
+bool UGlobalBPLibrary::StringToBool(const FString& InString)
+{
+	return InString == TEXT("true");
+}
+
 TArray<FString> UGlobalBPLibrary::NotNumberSymbols = TArray<FString>{ TEXT("."), TEXT(","), TEXT(" ") };
 
 bool UGlobalBPLibrary::TextIsNumber(const FText& InText)
@@ -301,6 +311,11 @@ bool UGlobalBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncN
 		}
 	}
 	return false;
+}
+
+bool UGlobalBPLibrary::ImplementedInBlueprint(const UFunction* Func)
+{
+	return Func && ensure(Func->GetOuter()) && Func->GetOuter()->IsA(UBlueprintGeneratedClass::StaticClass());
 }
 
 UWHGameInstance* UGlobalBPLibrary::GetGameInstance(TSubclassOf<UWHGameInstance> InClass)

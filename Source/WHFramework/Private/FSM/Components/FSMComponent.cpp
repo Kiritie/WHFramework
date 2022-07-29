@@ -99,19 +99,19 @@ void UFSMComponent::OnTermination()
 
 void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(!bInitialized || InState == CurrentState || !GetStates().Contains(InState)) return;
+	if(!bInitialized || InState == CurrentState || InState && !HasState(InState)) return;
 	
 	UFiniteStateBase* LastState = CurrentState;
 
 	if(!LastState || LastState->OnLeaveValidate(InState))
 	{
-		if(LastState)
-		{
-			LastState->OnLeave(InState);
-			CurrentState = nullptr;
-		}
 		if(!InState || InState->OnEnterValidate(LastState))
 		{
+			if(LastState)
+			{
+				LastState->OnLeave(InState);
+				CurrentState = nullptr;
+			}
 			if(InState)
 			{
 				CurrentState = InState;
@@ -123,7 +123,7 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 			}
 		}
 	}
-	if(InState == CurrentState)
+	if(CurrentState != LastState)
 	{
 		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
 		OnStateChanged.Broadcast(CurrentState);
@@ -201,6 +201,18 @@ void UFSMComponent::TerminateState(UFiniteStateBase* InState)
 	{
 		TempStates[i]->SetStateIndex(i);
 	}
+}
+
+bool UFSMComponent::HasState(UFiniteStateBase* InState) const
+{
+	for(auto Iter : StateMap)
+	{
+		if(Iter.Value == InState)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 bool UFSMComponent::HasStateByIndex(int32 InStateIndex) const

@@ -282,7 +282,7 @@ void AVoxelModule::StopAsyncTasks()
 		if(ChunkMapBuildTasks[i])
 		{
 			ChunkMapBuildTasks[i]->Cancel();
-			delete ChunkMapBuildTasks[i];
+			// delete ChunkMapBuildTasks[i];
 		}
 	}
 	ChunkMapBuildTasks.Empty();
@@ -292,7 +292,7 @@ void AVoxelModule::StopAsyncTasks()
 		if(ChunkMapGenerateTasks[i])
 		{
 			ChunkMapGenerateTasks[i]->Cancel();
-			delete ChunkMapGenerateTasks[i];
+			// delete ChunkMapGenerateTasks[i];
 		}
 	}
 	ChunkMapGenerateTasks.Empty();
@@ -537,7 +537,7 @@ void AVoxelModule::LoadChunkMap(FIndex InIndex)
 {
 	if (!ChunkMap.Contains(InIndex)) return;
 
-	AVoxelChunk* Chunk = FindChunk(InIndex);
+	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	Chunk->LoadSaveData(GetWorldData().GetChunkData(InIndex));
 
@@ -548,7 +548,7 @@ void AVoxelModule::BuildChunkMap(FIndex InIndex, int32 InStage)
 {
 	if (!ChunkMap.Contains(InIndex)) return;
 
-	AVoxelChunk* Chunk = FindChunk(InIndex);
+	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	Chunk->BuildMap(InStage);
 
@@ -559,7 +559,7 @@ void AVoxelModule::GenerateChunkMap(FIndex InIndex)
 {
 	if(!ChunkMap.Contains(InIndex)) return;
 
-	AVoxelChunk* Chunk = FindChunk(InIndex);
+	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	Chunk->GenerateMap();
 
@@ -570,7 +570,7 @@ void AVoxelModule::GenerateChunk(FIndex InIndex)
 {
 	if(!ChunkMap.Contains(InIndex)) return;
 
-	AVoxelChunk* Chunk = FindChunk(InIndex);
+	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	Chunk->Generate(WorldMode == EVoxelWorldMode::Normal);
 }
@@ -579,7 +579,7 @@ void AVoxelModule::DestroyChunk(FIndex InIndex)
 {
 	if(!ChunkMap.Contains(InIndex)) return;
 
-	AVoxelChunk* Chunk = FindChunk(InIndex);
+	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	if(ChunkMapLoadQueue.Contains(InIndex))
 	{
@@ -698,18 +698,18 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	return Chunk;
 }
 
-AVoxelChunk* AVoxelModule::FindChunk(FVector InLocation)
-{
-	return FindChunk(UVoxelModuleBPLibrary::LocationToChunkIndex(InLocation));
-}
-
-AVoxelChunk* AVoxelModule::FindChunk(FIndex InIndex)
+AVoxelChunk* AVoxelModule::FindChunkByIndex(FIndex InIndex)
 {
 	if(ChunkMap.Contains(InIndex))
 	{
 		return ChunkMap[InIndex];
 	}
 	return nullptr;
+}
+
+AVoxelChunk* AVoxelModule::FindChunkByLocation(FVector InLocation)
+{
+	return FindChunkByIndex(UVoxelModuleBPLibrary::LocationToChunkIndex(InLocation));
 }
 
 EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
@@ -759,7 +759,7 @@ UVoxelData& AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
 }
 
-int AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
+int32 AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
 {
 	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1) * WorldData->GetWorldHeight() * InScale.Z;
 }

@@ -14,6 +14,9 @@
 #include "Character/Base/CharacterDataBase.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Damage.h"
+#include "Perception/AISense_Sight.h"
 #include "Tasks/AITask_MoveTo.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
@@ -23,6 +26,10 @@
 ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
+
+	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(FName("StimuliSource"));
+	StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
+	StimuliSource->RegisterForSense(UAISense_Damage::StaticClass());
 
 	Name = NAME_None;
 	Anim = nullptr;
@@ -98,7 +105,7 @@ bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem)
 	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelItem)
 	{
 		FHitResult HitResult;
-		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
 		{
 			if(voxelItem.IsValid())
 			{
@@ -123,7 +130,7 @@ bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResul
 	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)
 	{
 		FHitResult HitResult;
-		if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
+		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
 		{
 			if(voxelItem.IsValid())
 			{

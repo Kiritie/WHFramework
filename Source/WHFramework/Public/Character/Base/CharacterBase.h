@@ -14,6 +14,7 @@
 
 #include "CharacterBase.generated.h"
 
+class UAIPerceptionStimuliSourceComponent;
 /**
  * 
  */
@@ -91,6 +92,13 @@ protected:
 	FVoxelItem GenerateVoxelItem;
 
 public:
+	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+
+	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
+
+	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+
+public:
 	UFUNCTION(BlueprintCallable)
 	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
 
@@ -100,12 +108,6 @@ public:
 	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) override;
 
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
-	
-	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
-
-	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
-
-	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
@@ -163,8 +165,15 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI
+protected: 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAIPerceptionStimuliSourceComponent* StimuliSource;
+
 public:
+	UFUNCTION(BlueprintPure)
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
+	
+	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

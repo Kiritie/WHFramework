@@ -106,6 +106,9 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
+	bool HasState(UFiniteStateBase* InState) const;
+
+	UFUNCTION(BlueprintPure)
 	bool HasStateByIndex(int32 InStateIndex) const;
 
 	template<class T>

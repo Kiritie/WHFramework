@@ -163,7 +163,16 @@ public:
 	*/
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
-		
+			
+	//////////////////////////////////////////////////////////////////////////
+	// String
+public:
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static FString BoolToString(bool InBool);
+
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool StringToBool(const FString& InString);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Text
 private:
@@ -177,7 +186,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
-		
+
 	//////////////////////////////////////////////////////////////////////////
 	// Json
 public:
@@ -193,6 +202,11 @@ public:
 	/// Execute Object Func
 public:
 	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Execute Object Func
+public:
+	static bool ImplementedInBlueprint(const UFunction* Func);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay

@@ -110,7 +110,7 @@ bool UVoxelDoor::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& 
 		case EMouseButton::Right:
 		{
 			FHitResult hitResult;
-			if (!AMainModule::GetModuleByClass<AVoxelModule>()->VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
+			if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
 			{
 				OpenOrClose();
 				return true;

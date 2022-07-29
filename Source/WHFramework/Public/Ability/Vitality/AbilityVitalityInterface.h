@@ -25,7 +25,7 @@ public:
 	virtual void ModifyExp(float InDeltaValue) = 0;
 
 public:
-	virtual bool IsDead(bool bCheckDying = false) const = 0;
+	virtual bool IsDead(bool bCheckDying = true) const = 0;
 	
 	virtual bool IsDying() const = 0;
 	

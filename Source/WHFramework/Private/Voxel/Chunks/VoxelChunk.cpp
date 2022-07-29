@@ -398,7 +398,7 @@ void AVoxelChunk::UpdateNeighbors()
 {
 	for(int32 i = 0; i < 6; i++)
 	{
-		Neighbors[i] = Module->FindChunk(Index + UMathBPLibrary::DirectionToIndex((EDirection)i));
+		Neighbors[i] = Module->FindChunkByIndex(Index + UMathBPLibrary::DirectionToIndex((EDirection)i));
 		if(Neighbors[i] != nullptr)
 		{
 			Neighbors[i]->Neighbors[(int32)UMathBPLibrary::InvertDirection((EDirection)i)] = this;

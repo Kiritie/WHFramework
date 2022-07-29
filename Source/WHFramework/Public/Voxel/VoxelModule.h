@@ -208,9 +208,9 @@ public:
 public:
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
 
-	virtual AVoxelChunk* FindChunk(FVector InLocation);
+	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex);
 
-	virtual AVoxelChunk* FindChunk(FIndex InIndex);
+	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
@@ -219,7 +219,7 @@ public:
 
 	virtual UVoxelData& GetNoiseVoxelData(FIndex InIndex);
 
-	virtual int GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
+	virtual int32 GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace

@@ -204,7 +204,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool IsDead(bool bCheckDying = false) const override;
+	virtual bool IsDead(bool bCheckDying = true) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDying() const override;

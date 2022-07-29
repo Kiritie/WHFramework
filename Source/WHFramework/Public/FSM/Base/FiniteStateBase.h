@@ -110,6 +110,11 @@ protected:
 	/// 状态机组件
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UFSMComponent* FSM;
+
+private:
+	bool bHasBlueprintOnEnterValidate;
+	bool bHasBlueprintOnLeaveValidate;
+	
 public:
 	FName GetStateName() const { return StateName; }
 	

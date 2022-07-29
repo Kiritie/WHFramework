@@ -324,10 +324,16 @@ public:
 
 	FGameplayAbilitySpecHandle AbilityHandle;
 
-	FORCEINLINE FAbilityData()
+public:
+	FAbilityData()
 	{
 		AbilityLevel = 1;
 		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+
+	bool IsValid() const
+	{
+		return AbilityHandle.IsValid();
 	}
 };
 

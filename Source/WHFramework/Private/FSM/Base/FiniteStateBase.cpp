@@ -7,12 +7,19 @@
 #include "Event/Handle/FiniteState/EventHandle_EnterFiniteState.h"
 #include "Event/Handle/FiniteState/EventHandle_LeaveFiniteState.h"
 #include "FSM/Components/FSMComponent.h"
+#include "Global/GlobalBPLibrary.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
 	StateName = FName("FiniteStateBase");
 	StateIndex = 0;
 	FSM = nullptr;
+
+	const UFunction* OnEnterValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnEnterValidate")));
+	bHasBlueprintOnEnterValidate = UGlobalBPLibrary::ImplementedInBlueprint(OnEnterValidateFunction);
+
+	const UFunction* OnLeaveValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnLeaveValidate")));
+	bHasBlueprintOnLeaveValidate = UGlobalBPLibrary::ImplementedInBlueprint(OnLeaveValidateFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -35,6 +42,7 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InState
 
 bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 {
+	if(bHasBlueprintOnEnterValidate && !K2_OnEnterValidate(InLastFiniteState)) return false;
 	return true;
 }
 
@@ -54,6 +62,7 @@ void UFiniteStateBase::OnRefresh()
 
 bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
 {
+	if(bHasBlueprintOnLeaveValidate && !K2_OnLeaveValidate(InNextFiniteState)) return false;
 	return true;
 }
 
