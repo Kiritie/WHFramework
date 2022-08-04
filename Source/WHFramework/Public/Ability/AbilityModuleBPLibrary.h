@@ -7,6 +7,8 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
+class UAbilitySystemComponentBase;
+class UAbilityBase;
 class ISceneContainerInterface;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
@@ -21,9 +23,12 @@ class WHFRAMEWORK_API UAbilityModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	// Interact
+	// Ability
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static const UGameplayAbility* GetGameplayAbilityFromSpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
+	static const UGameplayAbility* GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
+
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static bool GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Item

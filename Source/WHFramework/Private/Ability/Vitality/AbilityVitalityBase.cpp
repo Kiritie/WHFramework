@@ -60,11 +60,6 @@ void AAbilityVitalityBase::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeAbilitySystem();
-
-	for(auto Iter : AttributeSet->GetAllAttributes())
-	{
-		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityVitalityBase::OnAttributeChange);
-	}
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -189,197 +184,14 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 {
 }
 
-FGameplayAbilitySpecHandle AAbilityVitalityBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
+bool AAbilityVitalityBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	if (AbilitySystem && InAbility)
-	{
-		FGameplayAbilitySpecDef SpecDef = FGameplayAbilitySpecDef();
-		SpecDef.Ability = InAbility;
-		FGameplayAbilitySpec AbilitySpec = FGameplayAbilitySpec(SpecDef, InLevel);
-		return AbilitySystem->GiveAbility(AbilitySpec);
-	}
-	return FGameplayAbilitySpecHandle();
+	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
 }
 
-bool AAbilityVitalityBase::ActiveAbility(FGameplayAbilitySpecHandle SpecHandle, bool bAllowRemoteActivation /*= false*/)
+bool AAbilityVitalityBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbility(SpecHandle, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityVitalityBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilityByClass(AbilityClass, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityVitalityBase::ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilitiesByTag(GameplayTagContainer, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-void AAbilityVitalityBase::CancelAbility(UAbilityBase* Ability)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbility(Ability);
-	}
-}
-
-void AAbilityVitalityBase::CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilityHandle(AbilityHandle);
-	}
-}
-
-void AAbilityVitalityBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilities(&WithTags, &WithoutTags, Ignore);
-	}
-}
-
-void AAbilityVitalityBase::CancelAllAbilities(UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAllAbilities(Ignore);
-	}
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass)
-{
-	if (AbilitySystem)
-	{
-		auto effectContext = AbilitySystem->MakeEffectContext();
-		effectContext.AddSourceObject(this);
-		auto specHandle = AbilitySystem->MakeOutgoingSpec(EffectClass, GetLevelV(), effectContext);
-		if (specHandle.IsValid())
-		{
-			return AbilitySystem->ApplyGameplayEffectSpecToSelf(*specHandle.Data.Get());
-		}
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityVitalityBase::ApplyEffectBySpec(const FGameplayEffectSpec& Spec)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(Spec);
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-bool AAbilityVitalityBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove/*=-1*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->RemoveActiveGameplayEffect(Handle, StacksToRemove);
-	}
-	return false;
-}
-
-void AAbilityVitalityBase::GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->GetActiveAbilitiesWithTags(AbilityTags, ActiveAbilities);
-	}
-}
-
-bool AAbilityVitalityBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
-{
-	if (AbilitySystem && AbilityClass != nullptr)
-	{
-		float Cost = 0;
-		float Cooldown = 0;
-		EAbilityCostType CostType = EAbilityCostType::None;
-		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
-		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
-		{
-			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
-			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, Cost);
-			if (ModifierInfo.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
-			{
-				CostType = EAbilityCostType::Health;
-			}
-		}
-		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, Cooldown);
-		OutAbilityInfo = FAbilityInfo(CostType, Cost, Cooldown);
-		return true;
-	}
-	return false;
-}
-
-FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle GEHandle)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromGEHandle(GEHandle))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromClass(InAbilityClass))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityVitalityBase::GetAbilitySpecByInputID(int32 InputID)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromInputID(InputID))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
+	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
 }
 
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
@@ -397,105 +209,9 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
-bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem)
-{
-	bool bSuccess = false;
-	AVoxelChunk* chunk = InVoxelItem.Owner;
-	const FIndex index = InVoxelItem.Index;
-	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
-
-	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelItem)
-	{
-		FHitResult HitResult;
-		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
-		{
-			if(voxelItem.IsValid())
-			{
-				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
-			}
-			else
-			{
-				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
-			}
-		}
-	}
-	return bSuccess;
-}
-
-bool AAbilityVitalityBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult)
-{
-	bool bSuccess = false;
-	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
-	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
-
-	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)
-	{
-		FHitResult HitResult;
-		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
-		{
-			if(voxelItem.IsValid())
-			{
-				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
-			}
-			else
-			{
-				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
-			}
-		}
-	}
-	return bSuccess;
-}
-
-bool AAbilityVitalityBase::DestroyVoxel(FVoxelItem& InVoxelItem)
-{
-	if (InVoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
-	{
-		return InVoxelItem.Owner->DestroyVoxel(InVoxelItem);
-	}
-	return false;
-}
-
-bool AAbilityVitalityBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	AVoxelChunk* Chunk = InVoxelHitResult.GetOwner();
-	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
-
-	if (VoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
-	{
-		return Chunk->DestroyVoxel(VoxelItem);
-	}
-	return false;
-}
-
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
-}
-
-FGameplayAttributeData AAbilityVitalityBase::GetAttributeData(FGameplayAttribute InAttribute)
-{
-	return AttributeSet->GetAttributeData(InAttribute);
-}
-
-float AAbilityVitalityBase::GetAttributeValue(FGameplayAttribute InAttribute)
-{
-	return AttributeSet->GetAttributeValue(InAttribute);
-}
-
-void AAbilityVitalityBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
-{
-	AttributeSet->SetAttributeValue(InAttribute, InValue);
-}
-
-TArray<FGameplayAttribute> AAbilityVitalityBase::GetAllAttributes() const
-{
-	return AttributeSet->GetAllAttributes();
-}
-
-TArray<FGameplayAttribute> AAbilityVitalityBase::GetPersistentAttributes() const
-{
-	return AttributeSet->GetPersistentAttributes();
 }
 
 UAttributeSetBase* AAbilityVitalityBase::GetAttributeSet() const

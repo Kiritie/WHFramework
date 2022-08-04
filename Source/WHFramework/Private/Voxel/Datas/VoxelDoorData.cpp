@@ -31,4 +31,7 @@ UVoxelDoorData::UVoxelDoorData()
 	MeshNormals = TArray<FVector>();
 	MeshNormals.Add(FVector(1, -1, 0));
 	MeshNormals.Add(FVector(-1, -1, 0));
+
+	OpenSound = nullptr;
+	CloseSound = nullptr;
 }

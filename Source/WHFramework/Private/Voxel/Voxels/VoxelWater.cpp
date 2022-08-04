@@ -21,42 +21,42 @@ FSaveData* UVoxelWater::ToData()
 	return Super::ToData();
 }
 
-void UVoxelWater::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetHit(InTarget, InHitResult);
+	Super::OnGenerate(InAgent);
 }
 
-void UVoxelWater::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
 {
-	Super::OnTargetEnter(InTarget, InHitResult);
+	Super::OnReplace(InAgent, InOldVoxelItem);
 }
 
-void UVoxelWater::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnDestroy(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetStay(InTarget, InHitResult);
+	Super::OnDestroy(InAgent);
 }
 
-void UVoxelWater::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
 {
-	Super::OnTargetExit(InTarget, InHitResult);
+	Super::OnAgentHit(InAgent, InHitResult);
 }
 
-bool UVoxelWater::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelWater::OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentEnter(InAgent, InHitResult);
+}
+
+void UVoxelWater::OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentStay(InAgent, InHitResult);
+}
+
+void UVoxelWater::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentExit(InAgent, InHitResult);
+}
+
+bool UVoxelWater::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	return false;
-}
-
-bool UVoxelWater::OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	return Super::OnMouseUp(InMouseButton, InHitResult);
-}
-
-bool UVoxelWater::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	return Super::OnMouseHold(InMouseButton, InHitResult);
-}
-
-void UVoxelWater::OnMouseHover(const FVoxelHitResult& InHitResult)
-{
-	Super::OnMouseHover(InHitResult);
 }

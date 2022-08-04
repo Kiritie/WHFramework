@@ -9,6 +9,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
+class IVoxelAgentInterface;
 class AVoxelModule;
 class ACharacterBase;
 class UVoxel;
@@ -122,13 +123,13 @@ public:
 
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerateMesh = false);
 
-	virtual bool GenerateVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem);
+	virtual bool GenerateVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool DestroyVoxel(FIndex InIndex);
+	virtual bool ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelItem& InNewVoxelItem, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool DestroyVoxel(const FVoxelItem& InVoxelItem);
+	virtual bool DestroyVoxel(FIndex InIndex, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool ReplaceVoxel(const FVoxelItem& InOldVoxelItem, const FVoxelItem& InNewVoxelItem);
+	virtual bool DestroyVoxel(const FVoxelItem& InVoxelItem, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// SceneContainer
@@ -140,9 +141,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
 public:
-	virtual AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
+	virtual AVoxelAuxiliary* SpawnAuxiliary(const FVoxelItem& InVoxelItem);
 
-	virtual void DestroyAuxiliary(AVoxelAuxiliary* InAuxiliary);
+	virtual void DestroyAuxiliary(const FVoxelItem& InVoxelItem);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Components

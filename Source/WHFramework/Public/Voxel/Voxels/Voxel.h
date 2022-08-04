@@ -54,21 +54,21 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Events
 public:
-	virtual void OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnGenerate(IVoxelAgentInterface* InAgent);
 
-	virtual void OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem);
 
-	virtual void OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnDestroy(IVoxelAgentInterface* InAgent);
 
-	virtual void OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult);
+	virtual void OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult);
+	virtual void OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult);
+	virtual void OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult);
+	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual void OnMouseHover(const FVoxelHitResult& InHitResult);
+	virtual bool OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats
@@ -92,6 +92,8 @@ public:
 	AVoxelAuxiliary* Auxiliary;
 
 public:
+	bool IsValid() const;
+	
 	bool IsEmpty() const;
 
 	bool IsUnknown() const;
@@ -115,7 +117,19 @@ public:
 
 	FVector GetScale() const { return Scale; }
 
+	template<class T>
+	T* GetOwner() const
+	{
+		return Cast<T>(Owner);
+	}
+
 	AVoxelChunk* GetOwner() const { return Owner; }
+
+	template<class T>
+	T* GetAuxiliary() const
+	{
+		return Cast<T>(Auxiliary);
+	}
 
 	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
 };

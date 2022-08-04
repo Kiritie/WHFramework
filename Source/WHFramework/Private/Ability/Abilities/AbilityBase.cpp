@@ -211,6 +211,16 @@ void UAbilityBase::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGam
 // 	}
 // }
 
+void UAbilityBase::GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const
+{
+	Super::GetCooldownTimeRemainingAndDuration(Handle, ActorInfo, TimeRemaining, CooldownDuration);
+}
+
+void UAbilityBase::GetCooldownTimeRemainingAndDuration(float& TimeRemaining, float& CooldownDuration) const
+{
+	Super::GetCooldownTimeRemainingAndDuration(CurrentSpecHandle, CurrentActorInfo, TimeRemaining, CooldownDuration);
+}
+
 void UAbilityBase::SendTargetDataToServer(const FGameplayAbilityTargetDataHandle& TargetData)
 {
 	if (IsPredictingClient())

@@ -119,7 +119,7 @@ void AVoxelModule::OnPreparatory_Implementation()
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
 
-	UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(FName("Voxel"));
+	UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 
 	if(WorldMode != EVoxelWorldMode::None)
 	{

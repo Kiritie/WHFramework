@@ -244,22 +244,6 @@ public:
     void AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors);
 };
 
-/**
- * 能力耗费类型
- */
-UENUM(BlueprintType)
-enum class EAbilityCostType : uint8
-{
-	// 无
-	None,
-	// 生命值
-	Health,
-	// 魔法值
-	Mana,
-	// 体力值
-	Stamina
-};
-
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAbilityInfo
 {
@@ -267,26 +251,23 @@ struct WHFRAMEWORK_API FAbilityInfo
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	EAbilityCostType CostType;
+	FGameplayAttribute CostAttribute;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float Cost;
+	float CostValue;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float Cooldown;
+	float CooldownDuration;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float CooldownRemaining;
 
 	FORCEINLINE FAbilityInfo()
 	{
-		CostType = EAbilityCostType::None;
-		Cost = 0.f;
-		Cooldown = -1.f;
-	}
-
-	FORCEINLINE FAbilityInfo(EAbilityCostType InCostType, float InCost, float InCooldown)
-	{
-		CostType = InCostType;
-		Cost = InCost;
-		Cooldown = InCooldown;
+		CostAttribute = FGameplayAttribute();
+		CostValue = 0.f;
+		CooldownDuration = -1.f;
+		CooldownRemaining = 0.f;
 	}
 };
 
@@ -451,19 +432,19 @@ UENUM(BlueprintType)
 enum class EAbilityItemType : uint8
 {
 	// 无
-	None,
+	None UMETA(DisplayName="无"),
 	// 体素
-	Voxel,
+	Voxel UMETA(DisplayName="体素"),
 	// 道具
-	Prop,
+	Prop UMETA(DisplayName="道具"),
 	// 装备
-	Equip,
+	Equip UMETA(DisplayName="装备"),
 	// 技能
-	Skill,
+	Skill UMETA(DisplayName="技能"),
 	// 生命
-	Vitality,
+	Vitality UMETA(DisplayName="生命"),
 	// 角色
-	Character
+	Character UMETA(DisplayName="角色")
 };
 
 USTRUCT(BlueprintType)
@@ -521,9 +502,9 @@ public:
 
 	UAbilityItemDataBase& GetData() const;
 
-	FORCEINLINE virtual bool IsValid() const
+	FORCEINLINE virtual bool IsValid(bool bNeedNotNull = false) const
 	{
-		return ID.IsValid();
+		return ID.IsValid() && (!bNeedNotNull || Count > 0);
 	}
 
 	FORCEINLINE virtual bool IsEmpty() const

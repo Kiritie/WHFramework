@@ -6,6 +6,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Asset/AssetManagerBase.h"
+#include "Audio/AudioModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
@@ -78,6 +79,8 @@ void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 	Index = SaveData.Index;
 	Rotation = SaveData.Rotation;
 	Scale = SaveData.Scale;
+	Owner = SaveData.Owner;
+	Auxiliary = SaveData.Auxiliary;
 }
 
 FSaveData* UVoxel::ToData()
@@ -104,46 +107,62 @@ void UVoxel::RefreshData()
 	}
 }
 
-void UVoxel::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	
-}
-
-void UVoxel::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	
-}
-
-void UVoxel::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	
-}
-
-void UVoxel::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	
-}
-
-bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	if(!Owner || !Owner->IsValidLowLevel()) return false;
-
-	switch (InMouseButton)
+	if(InAgent)
 	{
-		case EMouseButton::Left:
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, Owner->IndexToLocation(Index));
+	}
+}
+
+void UVoxel::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
+{
+	if(InAgent)
+	{
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().ReplaceSound, Owner->IndexToLocation(Index));
+	}
+}
+
+void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
+{
+	if(InAgent)
+	{
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, Owner->IndexToLocation(Index));
+	}
+}
+
+void UVoxel::OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	
+}
+
+void UVoxel::OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	
+}
+
+void UVoxel::OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	
+}
+
+void UVoxel::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	
+}
+
+bool UVoxel::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+{
+	switch (InActionType)
+	{
+		case EVoxelActionType::Action1:
 		{
-			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
-			{
-				return VoxelAgentPlayer->DestroyVoxel(InHitResult);
-			}
+			return InAgent->DestroyVoxel(InHitResult);
 			break;
 		}
-		case EMouseButton::Right:
+		case EVoxelActionType::Action2:
 		{
-			if(IVoxelAgentInterface* VoxelAgentPlayer = UGlobalBPLibrary::GetPlayerCharacter<IVoxelAgentInterface>())
-			{
-				return VoxelAgentPlayer->GenerateVoxel(VoxelAgentPlayer->GetGenerateVoxelItem(), InHitResult);
-			}
+			return InAgent->GenerateVoxel(InHitResult);
 			break;
 		}
 		default: break;
@@ -151,19 +170,9 @@ bool UVoxel::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHi
 	return false;
 }
 
-bool UVoxel::OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+bool UVoxel::IsValid() const
 {
-	return false;
-}
-
-bool UVoxel::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	return false;
-}
-
-void UVoxel::OnMouseHover(const FVoxelHitResult& InHitResult)
-{
-	
+	return !IsEmpty() && !IsUnknown();
 }
 
 bool UVoxel::IsEmpty() const

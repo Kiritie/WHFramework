@@ -18,50 +18,50 @@ FSaveData* UVoxelPlant::ToData()
 	return Super::ToData();
 }
 
-void UVoxelPlant::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetHit(InTarget, InHitResult);
+	Super::OnGenerate(InAgent);
 }
 
-void UVoxelPlant::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
 {
-	Super::OnTargetEnter(InTarget, InHitResult);
+	Super::OnReplace(InAgent, InOldVoxelItem);
 }
 
-void UVoxelPlant::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnDestroy(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetStay(InTarget, InHitResult);
+	Super::OnDestroy(InAgent);
 }
 
-void UVoxelPlant::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
 {
-	Super::OnTargetExit(InTarget, InHitResult);
+	Super::OnAgentHit(InAgent, InHitResult);
 }
 
-bool UVoxelPlant::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelPlant::OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
 {
-	switch (InMouseButton)
+	Super::OnAgentEnter(InAgent, InHitResult);
+}
+
+void UVoxelPlant::OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentStay(InAgent, InHitResult);
+}
+
+void UVoxelPlant::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentExit(InAgent, InHitResult);
+}
+
+bool UVoxelPlant::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+{
+	switch (InActionType)
 	{
-		case EMouseButton::Left:
+		case EVoxelActionType::Action1:
 		{
-			return Super::OnMouseDown(InMouseButton, InHitResult);
+			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
 		}
 		default: break;
 	}
 	return false;
-}
-
-bool UVoxelPlant::OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	return Super::OnMouseUp(InMouseButton, InHitResult);
-}
-
-bool UVoxelPlant::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	return Super::OnMouseHold(InMouseButton, InHitResult);
-}
-
-void UVoxelPlant::OnMouseHover(const FVoxelHitResult& InHitResult)
-{
-	Super::OnMouseHover(InHitResult);
 }

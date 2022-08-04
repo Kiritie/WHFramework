@@ -13,7 +13,11 @@
 
 FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType)
 {
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
+	if(InVoxelType != EVoxelType::Empty)
+	{
+		return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
+	}
+	return FPrimaryAssetId();
 }
 
 EVoxelType UVoxelModuleBPLibrary::AssetIDToVoxelType(FPrimaryAssetId InAssetID)
@@ -99,14 +103,11 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 {
+	if(InVoxelItem.IsEmpty()) return UVoxel::GetEmpty();
+	if(InVoxelItem.IsUnknown()) return UVoxel::GetUnknown();
 	UVoxel& voxel = GetVoxel(InVoxelItem.ID);
 	voxel.LoadSaveData(&const_cast<FVoxelItem&>(InVoxelItem), true, true);
 	return voxel;
-}
-
-bool UVoxelModuleBPLibrary::IsValid(UVoxel& InVoxel)
-{
-	return InVoxel.IsValidLowLevel() && !InVoxel.IsEmpty() && !InVoxel.IsUnknown();
 }
 
 EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)

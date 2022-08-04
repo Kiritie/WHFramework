@@ -18,6 +18,14 @@ class AVoxelAuxiliary;
 class UVoxel;
 
 UENUM(BlueprintType)
+enum class EVoxelActionType : uint8
+{
+	Action1,
+	Action2,
+	Action3
+};
+
+UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
 	None,
@@ -169,6 +177,10 @@ struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem, public FVoxelSaveData
 	GENERATED_BODY()
 
 public:
+	static FVoxelItem Empty;
+	static FVoxelItem Unknown;
+
+public:
 	UPROPERTY(BlueprintReadWrite)
 	FIndex Index;
 
@@ -184,10 +196,6 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
-public:
-	static FVoxelItem EmptyVoxel;
-
-	static FVoxelItem UnknownVoxel;
 
 public:
 	FVoxelItem()
@@ -212,12 +220,10 @@ public:
 
 	FVoxelItem(const FPrimaryAssetId& InID, bool bInitSaveData = false);
 
-	FVoxelItem(FVoxelSaveData& InSaveData);
+	FVoxelItem(const FVoxelSaveData& InSaveData);
 
 public:
-	virtual bool IsValid() const override;
-	
-	bool IsEmpty() const;
+	virtual bool IsValid(bool bNeedNotNull = false) const override;
 
 	bool IsUnknown() const;
 
@@ -230,6 +236,8 @@ public:
 	}
 
 	UVoxel& GetVoxel() const;
+
+	AVoxelChunk* GetOwner() const;
 };
 
 USTRUCT(BlueprintType)
@@ -255,7 +263,7 @@ public:
 public:
 	UVoxel& GetVoxel() const;
 
-	AVoxelChunk* GetOwner() const;
+	AVoxelChunk* GetChunk() const;
 };
 
 USTRUCT(BlueprintType)

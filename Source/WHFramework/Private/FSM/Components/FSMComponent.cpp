@@ -97,9 +97,9 @@ void UFSMComponent::OnTermination()
 	CurrentState = nullptr;
 }
 
-void UFSMComponent::SwitchState(UFiniteStateBase* InState)
+bool UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(!bInitialized || InState == CurrentState || InState && !HasState(InState)) return;
+	if(!bInitialized || InState == CurrentState || InState && !HasState(InState)) return false;
 	
 	UFiniteStateBase* LastState = CurrentState;
 
@@ -127,80 +127,91 @@ void UFSMComponent::SwitchState(UFiniteStateBase* InState)
 	{
 		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
 		OnStateChanged.Broadcast(CurrentState);
+		return true;
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
+bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 {
 	if(HasStateByIndex(InStateIndex))
 	{
-		SwitchState(GetStateByIndex<UFiniteStateBase>(InStateIndex));
+		return SwitchState(GetStateByIndex<UFiniteStateBase>(InStateIndex));
 	}
 	else if(bInitialized)
 	{
 		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex);
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass)
+bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass)
 {
 	if(HasStateByClass<UFiniteStateBase>(InStateClass))
 	{
-		SwitchState(GetStateByClass<UFiniteStateBase>(InStateClass));
+		return SwitchState(GetStateByClass<UFiniteStateBase>(InStateClass));
 	}
 	else if(bInitialized)
 	{
 		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None"));
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchDefaultState()
+bool UFSMComponent::SwitchDefaultState()
 {
 	if(DefaultState)
 	{
-		SwitchStateByClass(DefaultState);
+		return SwitchStateByClass(DefaultState);
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchFinalState()
+bool UFSMComponent::SwitchFinalState()
 {
 	if(FinalState)
 	{
-		SwitchStateByClass(FinalState);
+		return SwitchStateByClass(FinalState);
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchLastState()
+bool UFSMComponent::SwitchLastState()
 {
 	if(CurrentState && CurrentState->GetStateIndex() > 0)
 	{
-		SwitchStateByIndex(CurrentState->GetStateIndex() - 1);
+		return SwitchStateByIndex(CurrentState->GetStateIndex() - 1);
 	}
+	return false;
 }
 
-void UFSMComponent::SwitchNextState()
+bool UFSMComponent::SwitchNextState()
 {
 	if(CurrentState && CurrentState->GetStateIndex() < StateMap.Num() - 1)
 	{
-		SwitchStateByIndex(CurrentState->GetStateIndex() + 1);
+		return SwitchStateByIndex(CurrentState->GetStateIndex() + 1);
 	}
+	return false;
 }
 
-void UFSMComponent::TerminateState(UFiniteStateBase* InState)
+bool UFSMComponent::TerminateState(UFiniteStateBase* InState)
 {
 	if(InState == CurrentState) CurrentState = nullptr;
-	
+
+	bool bSuccess = false;
 	if(StateMap.Contains(InState->GetStateName()))
 	{
 		StateMap.Remove(InState->GetStateName());
 		InState->OnTermination();
 		UObjectPoolModuleBPLibrary::DespawnObject(InState);
+		bSuccess = true;
 	}
 	const auto TempStates = GetStates();
 	for(int32 i = 0; i < TempStates.Num(); i++)
 	{
 		TempStates[i]->SetStateIndex(i);
 	}
+	return bSuccess;
 }
 
 bool UFSMComponent::HasState(UFiniteStateBase* InState) const

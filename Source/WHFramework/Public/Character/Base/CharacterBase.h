@@ -96,16 +96,10 @@ public:
 
 	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
 
-	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
-
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) override;
+	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 

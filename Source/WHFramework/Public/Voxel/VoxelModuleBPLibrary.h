@@ -64,8 +64,6 @@ public:
 	static UVoxel& GetVoxel(const FPrimaryAssetId& InVoxelID);
 
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
-
-	static bool IsValid(UVoxel& InVoxel);
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Noise

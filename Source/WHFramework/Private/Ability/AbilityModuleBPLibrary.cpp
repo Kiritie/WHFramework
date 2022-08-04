@@ -4,10 +4,11 @@
 #include "Ability/AbilityModuleBPLibrary.h"
 
 #include "Ability/AbilityModule.h"
+#include "Ability/Abilities/AbilityBase.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
 
-const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityFromSpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
+const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
 {
 	UGameplayAbility* AbilityInstance = AbilitySpec.GetPrimaryInstance();
 	bIsInstance = true;
@@ -18,6 +19,23 @@ const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityFromSpec(cons
 		bIsInstance = false;
 	}
 	return AbilityInstance;
+}
+
+bool UAbilityModuleBPLibrary::GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
+{
+	if (AbilityClass != nullptr)
+	{
+		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
+		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+		{
+			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
+			OutAbilityInfo.CostAttribute = ModifierInfo.Attribute;
+			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, OutAbilityInfo.CostValue);
+		}
+		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, OutAbilityInfo.CooldownDuration);
+		return true;
+	}
+	return false;
 }
 
 FPrimaryAssetType UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType InItemType)

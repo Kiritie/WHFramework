@@ -12,4 +12,11 @@ class WHFRAMEWORK_API UVoxelDoorData : public UVoxelData
 
 public:
 	UVoxelDoorData();
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USoundBase* OpenSound;
+						
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USoundBase* CloseSound;
 };

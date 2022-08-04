@@ -33,6 +33,11 @@ bool FParameters::HasParameter(FName InName, bool bEnsured) const
 	return false;
 }
 
+void FParameters::AddParameter(FName InName, FParameter InParameter)
+{
+	ParamSets.Add(FParameterSet(InName, InParameter));
+}
+
 void FParameters::SetParameter(FName InName, FParameter InParameter)
 {
 	if(HasParameter(InName, false))
@@ -48,7 +53,7 @@ void FParameters::SetParameter(FName InName, FParameter InParameter)
 	}
 	else
 	{
-		ParamSets.Add(FParameterSet(InName, InParameter));
+		AddParameter(InName, InParameter);
 	}
 }
 
@@ -92,9 +97,22 @@ void FParameters::RemoveParameter(FName InName)
 	}
 }
 
+void FParameters::RemoveParameters(FName InName)
+{
+	while(HasParameter(InName, false))
+	{
+		RemoveParameter(InName);
+	}
+}
+
 void FParameters::ClearAllParameter()
 {
 	ParamSets.Empty();
+}
+
+void FParameters::AddIntegerParameter(FName InName, int32 InValue)
+{
+	AddParameter(InName, FParameter::MakeInteger(InValue));
 }
 
 void FParameters::SetIntegerParameter(FName InName, int32 InValue)
@@ -124,6 +142,11 @@ TArray<int32> FParameters::GetIntegerParameters(FName InName, bool bEnsured) con
 	return TmpArr;
 }
 
+void FParameters::AddFloatParameter(FName InName, float InValue)
+{
+	AddParameter(InName, FParameter::MakeInteger(InValue));
+}
+
 void FParameters::SetFloatParameter(FName InName, float InValue)
 {
 	SetParameter(InName, FParameter::MakeInteger(InValue));
@@ -149,6 +172,11 @@ TArray<float> FParameters::GetFloatParameters(FName InName, bool bEnsured) const
 		}
 	}
 	return TmpArr;
+}
+
+void FParameters::AddStringParameter(FName InName, FString InValue)
+{
+	AddParameter(InName, FParameter::MakeString(InValue));
 }
 
 void FParameters::SetStringParameter(FName InName, FString InValue)
@@ -178,6 +206,11 @@ TArray<FString> FParameters::GetStringParameters(FName InName, bool bEnsured) co
 	return TmpArr;
 }
 
+void FParameters::AddTextParameter(FName InName, FText InValue)
+{
+	AddParameter(InName, FParameter::MakeText(InValue));
+}
+
 void FParameters::SetTextParameter(FName InName, FText InValue)
 {
 	SetParameter(InName, FParameter::MakeText(InValue));
@@ -203,6 +236,11 @@ TArray<FText> FParameters::GetTextParameters(FName InName, bool bEnsured) const
 		}
 	}
 	return TmpArr;
+}
+
+void FParameters::AddBooleanParameter(FName InName, bool InValue)
+{
+	AddParameter(InName, FParameter::MakeBoolean(InValue));
 }
 
 void FParameters::SetBooleanParameter(FName InName, bool InValue)
@@ -232,6 +270,11 @@ TArray<bool> FParameters::GetBooleanParameters(FName InName, bool bEnsured) cons
 	return TmpArr;
 }
 
+void FParameters::AddVectorParameter(FName InName, FVector InValue)
+{
+	AddParameter(InName, FParameter::MakeVector(InValue));
+}
+
 void FParameters::SetVectorParameter(FName InName, FVector InValue)
 {
 	SetParameter(InName, FParameter::MakeVector(InValue));
@@ -257,6 +300,11 @@ TArray<FVector> FParameters::GetVectorParameters(FName InName, bool bEnsured) co
 		}
 	}
 	return TmpArr;
+}
+
+void FParameters::AddRotatorParameter(FName InName, FRotator InValue)
+{
+	AddParameter(InName, FParameter::MakeRotator(InValue));
 }
 
 void FParameters::SetRotatorParameter(FName InName, FRotator InValue)
@@ -286,6 +334,11 @@ TArray<FRotator> FParameters::GetRotatorParameters(FName InName, bool bEnsured) 
 	return TmpArr;
 }
 
+void FParameters::AddColorParameter(FName InName, const FColor& InValue)
+{
+	AddParameter(InName, FParameter::MakeColor(InValue));
+}
+
 void FParameters::SetColorParameter(FName InName, const FColor& InValue)
 {
 	SetParameter(InName, FParameter::MakeColor(InValue));
@@ -311,6 +364,11 @@ TArray<FColor> FParameters::GetColorParameters(FName InName, bool bEnsured) cons
 		}
 	}
 	return TmpArr;
+}
+
+void FParameters::AddClassParameter(FName InName, UClass* InValue)
+{
+	AddParameter(InName, FParameter::MakeClass(InValue));
 }
 
 void FParameters::SetClassParameter(FName InName, UClass* InValue)
@@ -340,6 +398,11 @@ TArray<UClass*> FParameters::GetClassParameters(FName InName, bool bEnsured) con
 	return TmpArr;
 }
 
+void FParameters::AddObjectParameter(FName InName, UObject* InValue)
+{
+	AddParameter(InName, FParameter::MakeObject(InValue));
+}
+
 void FParameters::SetObjectParameter(FName InName, UObject* InValue)
 {
 	SetParameter(InName, FParameter::MakeObject(InValue));
@@ -365,6 +428,11 @@ TArray<UObject*> FParameters::GetObjectParameters(FName InName, bool bEnsured) c
 		}
 	}
 	return TmpArr;
+}
+
+void FParameters::AddPointerParameter(FName InName, void* InValue)
+{
+	AddParameter(InName, FParameter::MakePointer(InValue));
 }
 
 void FParameters::SetPointerParameter(FName InName, void* InValue)

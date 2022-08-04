@@ -27,7 +27,6 @@
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
-
 AAbilityCharacterBase::AAbilityCharacterBase()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -55,21 +54,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
 
-	// Set size for collision capsule
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
-	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
-	GetCapsuleComponent()->CanCharacterStepUpOn = ECanBeCharacterBase::ECB_No;
-
-	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -90), FRotator(0, -90, 0));
-	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	GetMesh()->SetCastShadow(false);
-
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0, 360, 0);
-	GetCharacterMovement()->JumpZVelocity = 420;
-	GetCharacterMovement()->AirControl = 0.2f;
-	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
-
 	// stats
 	Name = NAME_None;
 	RaceID = NAME_None;
@@ -80,11 +64,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 
 	// local
 	DefaultAbility = FAbilityData();
-
-	// Don't rotate when the controller rotates. Let that just affect the camera.
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
-	bUseControllerRotationRoll = false;
 
 	AutoPossessAI = EAutoPossessAI::Disabled;
 }
@@ -98,11 +77,6 @@ void AAbilityCharacterBase::BeginPlay()
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 
 	InitializeAbilitySystem();
-
-	for(auto Iter : AttributeSet->GetAllAttributes())
-	{
-		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityCharacterBase::OnAttributeChange);
-	}
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -306,199 +280,6 @@ void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteraction
 {
 }
 
-FGameplayAbilitySpecHandle AAbilityCharacterBase::AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel /*= 1*/)
-{
-	if (AbilitySystem && InAbility)
-	{
-		FGameplayAbilitySpecDef SpecDef = FGameplayAbilitySpecDef();
-		SpecDef.Ability = InAbility;
-		FGameplayAbilitySpec AbilitySpec = FGameplayAbilitySpec(SpecDef, InLevel);
-		return AbilitySystem->GiveAbility(AbilitySpec);
-	}
-	return FGameplayAbilitySpecHandle();
-}
-
-bool AAbilityCharacterBase::ActiveAbility(FGameplayAbilitySpecHandle SpecHandle, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbility(SpecHandle, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityCharacterBase::ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilityByClass(AbilityClass, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-bool AAbilityCharacterBase::ActiveAbilityByTag(const FGameplayTagContainer& AbilityTags, bool bAllowRemoteActivation /*= false*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->TryActivateAbilitiesByTag(AbilityTags, bAllowRemoteActivation);
-	}
-	return false;
-}
-
-void AAbilityCharacterBase::CancelAbility(UAbilityBase* Ability)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbility(Ability);
-	}
-}
-
-void AAbilityCharacterBase::CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilityHandle(AbilityHandle);
-	}
-}
-
-void AAbilityCharacterBase::CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAbilities(&WithTags, &WithoutTags, Ignore);
-	}
-}
-
-void AAbilityCharacterBase::CancelAllAbilities(UAbilityBase* Ignore/*=nullptr*/)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->CancelAllAbilities(Ignore);
-	}
-}
-
-FActiveGameplayEffectHandle AAbilityCharacterBase::ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass)
-{
-	if (AbilitySystem)
-	{
-		auto effectContext = AbilitySystem->MakeEffectContext();
-		effectContext.AddSourceObject(this);
-		auto specHandle = AbilitySystem->MakeOutgoingSpec(EffectClass, GetLevelV(), effectContext);
-		if (specHandle.IsValid())
-		{
-			return AbilitySystem->ApplyGameplayEffectSpecToSelf(*specHandle.Data.Get());
-		}
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityCharacterBase::ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-FActiveGameplayEffectHandle AAbilityCharacterBase::ApplyEffectBySpec(const FGameplayEffectSpec& Spec)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->ApplyGameplayEffectSpecToSelf(Spec);
-	}
-	return FActiveGameplayEffectHandle();
-}
-
-bool AAbilityCharacterBase::RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove/*=-1*/)
-{
-	if (AbilitySystem)
-	{
-		return AbilitySystem->RemoveActiveGameplayEffect(Handle, StacksToRemove);
-	}
-	return false;
-}
-
-void AAbilityCharacterBase::GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities)
-{
-	if (AbilitySystem)
-	{
-		AbilitySystem->GetActiveAbilitiesWithTags(AbilityTags, ActiveAbilities);
-	}
-}
-
-bool AAbilityCharacterBase::GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
-{
-	if (AbilitySystem && AbilityClass != nullptr)
-	{
-		float Cost = 0;
-		float Cooldown = 0;
-		EAbilityCostType CostType = EAbilityCostType::None;
-		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
-		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
-		{
-			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
-			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, Cost);
-			if (ModifierInfo.Attribute == AttributeSet->GetHealthAttribute())
-			{
-				CostType = EAbilityCostType::Health;
-			}
-		}
-		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, Cooldown);
-		OutAbilityInfo = FAbilityInfo(CostType, Cost, Cooldown);
-		return true;
-	}
-	return false;
-}
-
-FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle GEHandle)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromGEHandle(GEHandle))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromClass(InAbilityClass))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
-FGameplayAbilitySpec AAbilityCharacterBase::GetAbilitySpecByInputID(int32 InputID)
-{
-	if (AbilitySystem)
-	{
-		if(FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromInputID(InputID))
-		{
-			return *Spec;
-		}
-	}
-	return FGameplayAbilitySpec();
-}
-
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
@@ -512,31 +293,6 @@ UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() cons
 UAbilityCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(AssetID);
-}
-
-FGameplayAttributeData AAbilityCharacterBase::GetAttributeData(FGameplayAttribute InAttribute)
-{
-	return AttributeSet->GetAttributeData(InAttribute);
-}
-
-float AAbilityCharacterBase::GetAttributeValue(FGameplayAttribute InAttribute)
-{
-	return AttributeSet->GetAttributeValue(InAttribute);
-}
-
-void AAbilityCharacterBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
-{
-	AttributeSet->SetAttributeValue(InAttribute, InValue);
-}
-
-TArray<FGameplayAttribute> AAbilityCharacterBase::GetAllAttributes() const
-{
-	return AttributeSet->GetAllAttributes();
-}
-
-TArray<FGameplayAttribute> AAbilityCharacterBase::GetPersistentAttributes() const
-{
-	return AttributeSet->GetPersistentAttributes();
 }
 
 UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const

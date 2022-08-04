@@ -12,6 +12,8 @@
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterAnim.h"
 #include "Character/Base/CharacterDataBase.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
@@ -26,6 +28,24 @@
 ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
+
+	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
+	GetCapsuleComponent()->CanCharacterStepUpOn = ECanBeCharacterBase::ECB_No;
+
+	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -90), FRotator(0, -90, 0));
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCastShadow(false);
+
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+	GetCharacterMovement()->RotationRate = FRotator(0, 360, 0);
+	GetCharacterMovement()->JumpZVelocity = 420;
+	GetCharacterMovement()->AirControl = 0.2f;
+	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
+
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
 
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(FName("StimuliSource"));
 	StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
@@ -95,75 +115,14 @@ void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
 	}
 }
 
-bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem)
+bool ACharacterBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	bool bSuccess = false;
-	AVoxelChunk* chunk = InVoxelItem.Owner;
-	const FIndex index = InVoxelItem.Index;
-	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
-
-	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelItem)
-	{
-		FHitResult HitResult;
-		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
-		{
-			if(voxelItem.IsValid())
-			{
-				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
-			}
-			else
-			{
-				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
-			}
-		}
-	}
-	return bSuccess;
-}
-
-bool ACharacterBase::GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult)
-{
-	bool bSuccess = false;
-	AVoxelChunk* chunk = InVoxelHitResult.GetOwner();
-	const FIndex index = chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const FVoxelItem& voxelItem = chunk->GetVoxelItem(index);
-
-	if(!voxelItem.IsValid() || voxelItem.GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && voxelItem != InVoxelHitResult.VoxelItem)
-	{
-		FHitResult HitResult;
-		if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InVoxelItem, chunk->IndexToLocation(index), HitResult))
-		{
-			if(voxelItem.IsValid())
-			{
-				bSuccess = chunk->ReplaceVoxel(voxelItem, InVoxelItem);
-			}
-			else
-			{
-				bSuccess = chunk->GenerateVoxel(index, InVoxelItem);
-			}
-		}
-	}
-	return bSuccess;
-}
-
-bool ACharacterBase::DestroyVoxel(FVoxelItem& InVoxelItem)
-{
-	if (InVoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
-	{
-		return InVoxelItem.Owner->DestroyVoxel(InVoxelItem);
-	}
-	return false;
+	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
 }
 
 bool ACharacterBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	AVoxelChunk* Chunk = InVoxelHitResult.GetOwner();
-	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
-
-	if (VoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
-	{
-		return Chunk->DestroyVoxel(VoxelItem);
-	}
-	return false;
+	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
 }
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)

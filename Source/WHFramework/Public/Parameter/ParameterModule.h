@@ -58,6 +58,9 @@ public:
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintCallable)
+	virtual void AddParameter(FName InName, FParameter InParameter) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetParameter(FName InName, FParameter InParameter) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -68,12 +71,18 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void RemoveParameter(FName InName) override;
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void RemoveParameters(FName InName) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void ClearAllParameter() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Integer
+	UFUNCTION(BlueprintCallable)
+	virtual void AddIntegerParameter(FName InName, int32 InValue) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetIntegerParameter(FName InName, int32 InValue) override;
 
@@ -86,6 +95,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Float
 	UFUNCTION(BlueprintCallable)
+	virtual void AddFloatParameter(FName InName, float InValue) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetFloatParameter(FName InName, float InValue) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -96,6 +108,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// String
+	UFUNCTION(BlueprintCallable)
+	virtual void AddStringParameter(FName InName, const FString& InValue) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetStringParameter(FName InName, const FString& InValue) override;
 
@@ -108,6 +123,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Text
 	UFUNCTION(BlueprintCallable)
+	virtual void AddTextParameter(FName InName, const FText InValue) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetTextParameter(FName InName, const FText InValue) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -118,6 +136,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Boolean
+	UFUNCTION(BlueprintCallable)
+	virtual void AddBooleanParameter(FName InName, bool InValue) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetBooleanParameter(FName InName, bool InValue) override;
 
@@ -130,6 +151,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Vector
 	UFUNCTION(BlueprintCallable)
+	virtual void AddVectorParameter(FName InName, FVector InValue) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetVectorParameter(FName InName, FVector InValue) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -140,6 +164,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Rotator
+	UFUNCTION(BlueprintCallable)
+	virtual void AddRotatorParameter(FName InName, FRotator InValue) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetRotatorParameter(FName InName, FRotator InValue) override;
 
@@ -152,6 +179,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Color
 	UFUNCTION(BlueprintCallable)
+	virtual void AddColorParameter(FName InName, const FColor& InValue) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetColorParameter(FName InName, const FColor& InValue) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -162,6 +192,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Class
+	UFUNCTION(BlueprintCallable)
+	virtual void AddClassParameter(FName InName, UClass* InValue) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetClassParameter(FName InName, UClass* InValue) override;
 
@@ -174,6 +207,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Object
 	UFUNCTION(BlueprintCallable)
+	virtual void AddObjectParameter(FName InName, UObject* InValue) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetObjectParameter(FName InName, UObject* InValue) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -184,6 +220,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Pointer
+	virtual void AddPointerParameter(FName InName, void* InValue) override;
+
 	virtual void SetPointerParameter(FName InName, void* InValue) override;
 
 	virtual void* GetPointerParameter(FName InName, bool bEnsured = true) const override;

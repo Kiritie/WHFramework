@@ -22,7 +22,8 @@ UVoxelData::UVoxelData()
 		MeshUVDatas.Add(FVoxelMeshUVData());
 	}
 	GenerateSound = nullptr;
-	OperationSounds = TArray<USoundBase*>();
+	ReplaceSound = nullptr;
+	DestroySound = nullptr;
 }
 
 bool UVoxelData::GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation, FVector InScale) const

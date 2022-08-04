@@ -47,31 +47,31 @@ public:
 	/// State
 public:
 	UFUNCTION(BlueprintCallable)
-	void SwitchState(UFiniteStateBase* InState);
+	bool SwitchState(UFiniteStateBase* InState);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchStateByIndex(int32 InStateIndex);
+	bool SwitchStateByIndex(int32 InStateIndex);
 
 	template<class T>
-	void SwitchStateByClass() { SwitchStateByClass(T::StaticClass()); }
+	bool SwitchStateByClass() { return SwitchStateByClass(T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass);
+	bool SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchDefaultState();
+	bool SwitchDefaultState();
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchFinalState();
+	bool SwitchFinalState();
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchLastState();
+	bool SwitchLastState();
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchNextState();
+	bool SwitchNextState();
 
 	UFUNCTION(BlueprintCallable)
-	void TerminateState(UFiniteStateBase* InState);
+	bool TerminateState(UFiniteStateBase* InState);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats

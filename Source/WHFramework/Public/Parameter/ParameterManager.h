@@ -27,6 +27,8 @@ class WHFRAMEWORK_API IParameterManager
 public:
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const = 0;
 
+	virtual void AddParameter(FName InName, FParameter InParameter) = 0;
+
 	virtual void SetParameter(FName InName, FParameter InParameter) = 0;
 
 	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const = 0;
@@ -35,9 +37,13 @@ public:
 
 	virtual void RemoveParameter(FName InName) = 0;
 
+	virtual void RemoveParameters(FName InName) = 0;
+
 	virtual void ClearAllParameter() = 0;
 
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddIntegerParameter(FName InName, int32 InValue) = 0;
+
 	virtual void SetIntegerParameter(FName InName, int32 InValue) = 0;
 
 	virtual int32 GetIntegerParameter(FName InName, bool bEnsured = true) const = 0;
@@ -45,6 +51,8 @@ public:
 	virtual TArray<int32> GetIntegerParameters(FName InName, bool bEnsured = true) const = 0;
 	
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddFloatParameter(FName InName, float InValue) = 0;
+
 	virtual void SetFloatParameter(FName InName, float InValue) = 0;
 
 	virtual float GetFloatParameter(FName InName, bool bEnsured = true) const = 0;
@@ -52,6 +60,8 @@ public:
 	virtual TArray<float> GetFloatParameters(FName InName, bool bEnsured = true) const = 0;
 	
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddStringParameter(FName InName, const FString& InValue) = 0;
+
 	virtual void SetStringParameter(FName InName, const FString& InValue) = 0;
 
 	virtual FString GetStringParameter(FName InName, bool bEnsured = true) const = 0;
@@ -59,6 +69,8 @@ public:
 	virtual TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const = 0;
 		
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddTextParameter(FName InName, const FText InValue) = 0;
+
 	virtual void SetTextParameter(FName InName, const FText InValue) = 0;
 
 	virtual FText GetTextParameter(FName InName, bool bEnsured = true) const = 0;
@@ -66,6 +78,8 @@ public:
 	virtual TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const = 0;
 
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddBooleanParameter(FName InName, bool InValue) = 0;
+
 	virtual void SetBooleanParameter(FName InName, bool InValue) = 0;
 
 	virtual bool GetBooleanParameter(FName InName, bool bEnsured = true) const = 0;
@@ -73,6 +87,8 @@ public:
 	virtual TArray<bool> GetBooleanParameters(FName InName, bool bEnsured = true) const = 0;
 	
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddVectorParameter(FName InName, FVector InValue) = 0;
+
 	virtual void SetVectorParameter(FName InName, FVector InValue) = 0;
 
 	virtual FVector GetVectorParameter(FName InName, bool bEnsured = true) const = 0;
@@ -80,6 +96,8 @@ public:
 	virtual TArray<FVector> GetVectorParameters(FName InName, bool bEnsured = true) const = 0;
 	
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddRotatorParameter(FName InName, FRotator InValue) = 0;
+
 	virtual void SetRotatorParameter(FName InName, FRotator InValue) = 0;
 
 	virtual FRotator GetRotatorParameter(FName InName, bool bEnsured = true) const = 0;
@@ -87,6 +105,8 @@ public:
 	virtual TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true) const = 0;
 		
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddColorParameter(FName InName, const FColor& InValue) = 0;
+
 	virtual void SetColorParameter(FName InName, const FColor& InValue) = 0;
 
 	virtual FColor GetColorParameter(FName InName, bool bEnsured = true) const = 0;
@@ -94,6 +114,8 @@ public:
 	virtual TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true) const = 0;
 
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddClassParameter(FName InName, UClass* InValue) = 0;
+
 	virtual void SetClassParameter(FName InName, UClass* InValue) = 0;
 
 	virtual UClass* GetClassParameter(FName InName, bool bEnsured = true) const = 0;
@@ -101,6 +123,8 @@ public:
 	virtual TArray<UClass*> GetClassParameters(FName InName, bool bEnsured = true) const = 0;
 	
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddObjectParameter(FName InName, UObject* InValue) = 0;
+
 	virtual void SetObjectParameter(FName InName, UObject* InValue) = 0;
 
 	virtual UObject* GetObjectParameter(FName InName, bool bEnsured = true) const = 0;
@@ -108,6 +132,8 @@ public:
 	virtual TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const = 0;
 
 	//////////////////////////////////////////////////////////////////////////
+	virtual void AddPointerParameter(FName InName, void* InValue) = 0;
+
 	virtual void SetPointerParameter(FName InName, void* InValue) = 0;
 
 	virtual void* GetPointerParameter(FName InName, bool bEnsured = true) const = 0;

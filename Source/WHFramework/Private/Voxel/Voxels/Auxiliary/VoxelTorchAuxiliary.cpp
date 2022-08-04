@@ -4,6 +4,7 @@
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 #include "Components/PointLightComponent.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 
 // Sets default values

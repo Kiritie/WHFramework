@@ -10,6 +10,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "Character/Base/CharacterBase.h"
 
 AAIControllerBase::AAIControllerBase()
 {
@@ -57,7 +58,27 @@ void AAIControllerBase::OnUnPossess()
 
 void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	if (!GetPawn<ACharacterBase>()) return;
+	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
+	ACharacterBase* TargetCharacter = Cast<ACharacterBase>(Actor);
+
+	if (!OwnerCharacter || !TargetCharacter || TargetCharacter == OwnerCharacter) return;
+	
+	if (Stimulus.WasSuccessfullySensed())
+	{
+		if (!GetBlackboard()->GetTargetCharacter())
+		{
+			GetBlackboard()->SetTargetCharacter(TargetCharacter);
+			GetBlackboard()->SetIsLostTarget(false);
+		}
+		else if(TargetCharacter == GetBlackboard()->GetTargetCharacter())
+		{
+			GetBlackboard()->SetIsLostTarget(false);
+		}
+	}
+	else if(TargetCharacter == GetBlackboard()->GetTargetCharacter())
+	{
+		GetBlackboard()->SetIsLostTarget(true);
+	}
 }
 
 void AAIControllerBase::Tick(float DeltaTime)
@@ -81,7 +102,7 @@ void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset, ACh
 	if(BehaviorTreeAsset)
 	{
 		BlackboardAsset = DuplicateObject<UAIBlackboardBase>(Cast<UAIBlackboardBase>(InBehaviorTreeAsset->BlackboardAsset), nullptr);
-		BlackboardAsset->Initialize(GetBlackboardComponent(), InCharacter);
+		BlackboardAsset->OnInitialize(GetBlackboardComponent(), InCharacter);
 		BehaviorTreeAsset->BlackboardAsset = BlackboardAsset;
 	}
 }

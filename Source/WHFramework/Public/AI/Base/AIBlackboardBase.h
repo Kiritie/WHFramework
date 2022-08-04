@@ -21,15 +21,28 @@ private:
 public:
 	virtual void PostLoad() override;
 
-	virtual void Initialize(UBlackboardComponent* InComponent, ACharacterBase* InOwnerCharacter);
+	virtual void OnInitialize(UBlackboardComponent* InComponent, ACharacterBase* InOwnerCharacter);
 
-	virtual void Refresh();
+	virtual void OnRefresh();
+
+	virtual void OnValuePreChange(FName InValueName);
+
+	virtual void OnValueChanged(FName InValueName);
+
+public:
+	FOnBlackboardValuePreChange OnBlackboardValuePreChange;
+	FOnBlackboardValueChanged OnBlackboardValueChanged;
+
+public:
+	BLACKBOARD_VALUE_ACCESSORS_BOOL(IsLostTarget);
+	BLACKBOARD_VALUE_ACCESSORS_VECTOR(TargetLocation);
+	BLACKBOARD_VALUE_ACCESSORS_OBJECT(TargetCharacter);
 
 protected:
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UBlackboardComponent* Component;
 	
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	ACharacterBase* Character;
 	
 public:

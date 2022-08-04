@@ -369,6 +369,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	bool HasParameter(FName InName, bool bEnsured = true) const;
 
+	void AddParameter(FName InName, FParameter InParameter);
+
 	void SetParameter(FName InName, FParameter InParameter);
 
 	FParameter GetParameter(FName InName, bool bEnsured = true) const;
@@ -378,9 +380,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	void RemoveParameter(FName InName);
 
+	void RemoveParameters(FName InName);
+
 	void ClearAllParameter();
 
 	//////////////////////////////////////////////////////////////////////////
+	void AddIntegerParameter(FName InName, int32 InValue);
+
 	void SetIntegerParameter(FName InName, int32 InValue);
 
 	int32 GetIntegerParameter(FName InName, bool bEnsured = true) const;
@@ -388,6 +394,8 @@ public:
 	TArray<int32> GetIntegerParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddFloatParameter(FName InName, float InValue);
+
 	void SetFloatParameter(FName InName, float InValue);
 
 	float GetFloatParameter(FName InName, bool bEnsured = true) const;
@@ -395,6 +403,8 @@ public:
 	TArray<float> GetFloatParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddStringParameter(FName InName, FString InValue);
+
 	void SetStringParameter(FName InName, FString InValue);
 
 	FString GetStringParameter(FName InName, bool bEnsured = true) const;
@@ -402,6 +412,8 @@ public:
 	TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const;
 		
 	//////////////////////////////////////////////////////////////////////////
+	void AddTextParameter(FName InName, FText InValue);
+
 	void SetTextParameter(FName InName, FText InValue);
 
 	FText GetTextParameter(FName InName, bool bEnsured = true) const;
@@ -409,6 +421,8 @@ public:
 	TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const;
 
 	//////////////////////////////////////////////////////////////////////////
+	void AddBooleanParameter(FName InName, bool InValue);
+
 	void SetBooleanParameter(FName InName, bool InValue);
 
 	bool GetBooleanParameter(FName InName, bool bEnsured = true) const;
@@ -416,6 +430,8 @@ public:
 	TArray<bool> GetBooleanParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddVectorParameter(FName InName, FVector InValue);
+
 	void SetVectorParameter(FName InName, FVector InValue);
 
 	FVector GetVectorParameter(FName InName, bool bEnsured = true) const;
@@ -423,6 +439,8 @@ public:
 	TArray<FVector> GetVectorParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddRotatorParameter(FName InName, FRotator InValue);
+
 	void SetRotatorParameter(FName InName, FRotator InValue);
 
 	FRotator GetRotatorParameter(FName InName, bool bEnsured = true) const;
@@ -430,6 +448,8 @@ public:
 	TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true) const;
 		
 	//////////////////////////////////////////////////////////////////////////
+	void AddColorParameter(FName InName, const FColor& InValue);
+
 	void SetColorParameter(FName InName, const FColor& InValue);
 
 	FColor GetColorParameter(FName InName, bool bEnsured = true) const;
@@ -437,6 +457,8 @@ public:
 	TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true) const;
 
 	//////////////////////////////////////////////////////////////////////////
+	void AddClassParameter(FName InName, UClass* InValue);
+
 	void SetClassParameter(FName InName, UClass* InValue);
 
 	UClass* GetClassParameter(FName InName, bool bEnsured = true) const;
@@ -444,6 +466,8 @@ public:
 	TArray<UClass*> GetClassParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddObjectParameter(FName InName, UObject* InValue);
+
 	void SetObjectParameter(FName InName, UObject* InValue);
 
 	UObject* GetObjectParameter(FName InName, bool bEnsured = true) const;
@@ -451,6 +475,8 @@ public:
 	TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+	void AddPointerParameter(FName InName, void* InValue);
+
 	void SetPointerParameter(FName InName, void* InValue);
 
 	void* GetPointerParameter(FName InName, bool bEnsured = true) const;

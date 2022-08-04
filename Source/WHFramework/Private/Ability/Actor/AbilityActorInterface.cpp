@@ -2,12 +2,24 @@
 
 #include "Ability/Actor/AbilityActorInterface.h"
 
+#include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/AttributeSetBase.h"
+#include "Ability/Components/AbilitySystemComponentBase.h"
 
-void IAbilityActorInterface::InitializeAbilitySystem()
+void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActor* InAvatarActor)
 {
-	GetAbilitySystemComponent()->InitAbilityActorInfo(Cast<AActor>(this), Cast<AActor>(this));
-	RefreshAttributes();
+	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
+	UAttributeSetBase* AttributeSet = GetAttributeSet();
+	if(AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor ? InOwnerActor : Cast<AActor>(this), InAvatarActor ? InAvatarActor : Cast<AActor>(this));
+		RefreshAttributes();
+
+		for(auto Iter : AttributeSet->GetAllAttributes())
+		{
+			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
+		}
+	}
 }
 
 void IAbilityActorInterface::RefreshAttributes()
@@ -17,8 +29,8 @@ void IAbilityActorInterface::RefreshAttributes()
 	{
 		FOnAttributeChangeData OnAttributeChangeData;
 		OnAttributeChangeData.Attribute = Iter;
-		OnAttributeChangeData.OldValue = GetAttributeValue(Iter);
-		OnAttributeChangeData.NewValue = GetAttributeValue(Iter);
+		OnAttributeChangeData.OldValue = AttributeSet->GetAttributeValue(Iter);
+		OnAttributeChangeData.NewValue = AttributeSet->GetAttributeValue(Iter);
 		OnAttributeChange(OnAttributeChangeData);
 	}
 }

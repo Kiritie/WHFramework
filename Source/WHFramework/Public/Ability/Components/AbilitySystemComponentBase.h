@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AbilitySystemComponent.h"
+#include "Ability/AbilityModuleTypes.h"
 #include "AbilitySystemComponentBase.generated.h"
 
 class UAbilityBase;
@@ -88,13 +89,34 @@ public:
 
 	// Input bound to an ability is pressed
 	virtual void AbilityLocalInputPressed(int32 InputID) override;
+			
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FGameplayAbilitySpec FindAbilitySpecForHandle(FGameplayAbilitySpecHandle Handle);
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FGameplayAbilitySpec FindAbilitySpecForGEHandle(FActiveGameplayEffectHandle Handle);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FGameplayAbilitySpec FindAbilitySpecForClass(TSubclassOf<UGameplayAbility> AbilityClass);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FGameplayAbilitySpec FindAbilitySpecForInputID(int32 InputID);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FAbilityInfo GetAbilityInfoBySpec(FGameplayAbilitySpec Spec);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FAbilityInfo GetAbilityInfoByHandle(FGameplayAbilitySpecHandle Handle);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FAbilityInfo GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass);
 
 	// Exposes GetTagCount to Blueprint
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities", Meta = (DisplayName = "GetTagCount", ScriptName = "GetTagCount"))
 	int32 K2_GetTagCount(FGameplayTag TagToCheck) const;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
-	FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
 
 	// Turn on RPC batching in ASC. Off by default.
 	virtual bool ShouldDoServerAbilityRPCBatch() const override { return true; }

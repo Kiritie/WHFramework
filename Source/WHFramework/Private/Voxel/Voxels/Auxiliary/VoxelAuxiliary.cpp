@@ -67,7 +67,7 @@ FVoxelItem& AVoxelAuxiliary::GetVoxelItem() const
 	{
 		return Cast<AVoxelChunk>(Container.GetObject())->GetVoxelItem(VoxelIndex);
 	}
-	return FVoxelItem::EmptyVoxel;
+	return FVoxelItem::Empty;
 }
 
 UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const

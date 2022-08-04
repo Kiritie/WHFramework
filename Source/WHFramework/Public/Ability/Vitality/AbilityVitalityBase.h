@@ -103,53 +103,7 @@ public:
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 public:
-	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) override;
-
-	virtual bool ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation = false) override;
-
-	virtual bool ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation = false) override;
-
-	virtual bool ActiveAbilityByTag(const FGameplayTagContainer& GameplayTagContainer, bool bAllowRemoteActivation = false) override;
-
-	virtual void CancelAbility(UAbilityBase* Ability) override;
-
-	virtual void CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle) override;
-
-	virtual void CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore=nullptr) override;
-	
-	virtual void CancelAllAbilities(UAbilityBase* Ignore=nullptr) override;
-	
-	virtual FActiveGameplayEffectHandle ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass) override;
-	
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle) override;
-		
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpec(const FGameplayEffectSpec& Spec) override;
-
-	virtual bool RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove=-1) override;
-
-	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) override;
-	
-	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) override;
-
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) override;
+	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
@@ -161,21 +115,6 @@ public:
 	}
 	
 	UAbilityVitalityDataBase& GetVitalityData() const;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetAttributeValue(FGameplayAttribute InAttribute) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FGameplayAttribute> GetAllAttributes() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const override;
 
 	template<class T>
 	T* GetAttributeSet() const
@@ -183,16 +122,18 @@ public:
 		return Cast<T>(GetAttributeSet());
 	}
 
-	UFUNCTION(BlueprintPure)
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
-	UFUNCTION(BlueprintPure)
+	template<class T>
+	T* GetAbilitySystemComponent() const
+	{
+		return Cast<T>(GetAbilitySystemComponent());
+	}
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
-	UFUNCTION(BlueprintPure)
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:
@@ -200,7 +141,7 @@ public:
 
 	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
 
-	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
 
 public:
 	UFUNCTION(BlueprintPure)

@@ -132,61 +132,6 @@ public:
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
-public:
-	UFUNCTION(BlueprintCallable)
-	virtual FGameplayAbilitySpecHandle AcquireAbility(TSubclassOf<UAbilityBase> InAbility, int32 InLevel = 1) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool ActiveAbility(FGameplayAbilitySpecHandle AbilityHandle, bool bAllowRemoteActivation = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool ActiveAbilityByClass(TSubclassOf<UAbilityBase> AbilityClass, bool bAllowRemoteActivation = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool ActiveAbilityByTag(const FGameplayTagContainer& AbilityTags, bool bAllowRemoteActivation = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void CancelAbility(UAbilityBase* Ability) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void CancelAbilityByHandle(const FGameplayAbilitySpecHandle& AbilityHandle) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void CancelAbilities(const FGameplayTagContainer& WithTags, const FGameplayTagContainer& WithoutTags, UAbilityBase* Ignore = nullptr) override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void CancelAllAbilities(UAbilityBase* Ignore = nullptr) override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual FActiveGameplayEffectHandle ApplyEffectByClass(TSubclassOf<UGameplayEffect> EffectClass) override;
-	
-	UFUNCTION(BlueprintCallable)
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpecHandle(const FGameplayEffectSpecHandle& SpecHandle) override;
-		
-	UFUNCTION(BlueprintCallable)
-	virtual FActiveGameplayEffectHandle ApplyEffectBySpec(const FGameplayEffectSpec& Spec) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual bool RemoveEffect(FActiveGameplayEffectHandle Handle, int32 StacksToRemove=-1) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual void GetActiveAbilities(FGameplayTagContainer AbilityTags, TArray<UAbilityBase*>& ActiveAbilities) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual bool GetAbilityInfo(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo) override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByHandle(FGameplayAbilitySpecHandle Handle) override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByGEHandle(FActiveGameplayEffectHandle Handle) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByClass(TSubclassOf<UGameplayAbility> InAbilityClass) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAbilitySpec GetAbilitySpecByInputID(int32 InputID) override;
-
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 public:
@@ -205,23 +150,13 @@ public:
 	
 	UAbilityCharacterDataBase& GetCharacterData() const;
 
-	UFUNCTION(BlueprintPure)
+	template<class T>
+	T* GetAbilitySystemComponent() const
+	{
+		return Cast<T>(GetAbilitySystemComponent());
+	}
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-	
-	UFUNCTION(BlueprintPure)
-	virtual FGameplayAttributeData GetAttributeData(FGameplayAttribute InAttribute) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetAttributeValue(FGameplayAttribute InAttribute) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetAttributeValue(FGameplayAttribute InAttribute, float InValue) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FGameplayAttribute> GetAllAttributes() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FGameplayAttribute> GetPersistentAttributes() const override;
 
 	template<class T>
 	T* GetAttributeSet() const
@@ -229,13 +164,10 @@ public:
 		return Cast<T>(GetAttributeSet());
 	}
 
-	UFUNCTION(BlueprintPure)
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
-	UFUNCTION(BlueprintPure)
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
-	UFUNCTION(BlueprintPure)
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:

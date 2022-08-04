@@ -23,6 +23,8 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UPointLightComponent* LightComponent;
+public:
+	UPointLightComponent* GetLightComponent() const { return LightComponent; }
 
 protected:
 	// Called when the game starts or when spawned

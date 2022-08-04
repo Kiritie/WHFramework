@@ -3,6 +3,9 @@
 
 #include "Voxel/Voxels/VoxelTorch.h"
 
+#include "Components/PointLightComponent.h"
+#include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
+
 UVoxelTorch::UVoxelTorch()
 {
 	
@@ -18,50 +21,81 @@ FSaveData* UVoxelTorch::ToData()
 	return Super::ToData();
 }
 
-void UVoxelTorch::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetHit(InTarget, InHitResult);
+	Super::OnGenerate(InAgent);
+
+	if(bOn) TakeOn();
+	else TakeOff();
 }
 
-void UVoxelTorch::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
 {
-	Super::OnTargetEnter(InTarget, InHitResult);
+	Super::OnReplace(InAgent, InOldVoxelItem);
 }
 
-void UVoxelTorch::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnDestroy(IVoxelAgentInterface* InAgent)
 {
-	Super::OnTargetStay(InTarget, InHitResult);
+	Super::OnDestroy(InAgent);
 }
 
-void UVoxelTorch::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
 {
-	Super::OnTargetExit(InTarget, InHitResult);
+	Super::OnAgentHit(InAgent, InHitResult);
 }
 
-bool UVoxelTorch::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
 {
-	switch (InMouseButton)
+	Super::OnAgentEnter(InAgent, InHitResult);
+}
+
+void UVoxelTorch::OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentStay(InAgent, InHitResult);
+}
+
+void UVoxelTorch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentExit(InAgent, InHitResult);
+}
+
+bool UVoxelTorch::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+{
+	switch (InActionType)
 	{
-		case EMouseButton::Left:
+		case EVoxelActionType::Action1:
 		{
-			return Super::OnMouseDown(InMouseButton, InHitResult);
+			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
+		}
+		case EVoxelActionType::Action2:
+		{
+			Toggle();
 		}
 		default: break;
 	}
 	return false;
 }
 
-bool UVoxelTorch::OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::Toggle()
 {
-	return Super::OnMouseUp(InMouseButton, InHitResult);
+	if(!bOn) TakeOn();
+	else TakeOff();
 }
 
-bool UVoxelTorch::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelTorch::TakeOn()
 {
-	return Super::OnMouseHold(InMouseButton, InHitResult);
+	bOn = true;
+	if(GetAuxiliary<AVoxelTorchAuxiliary>())
+	{
+		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(true);
+	}
 }
 
-void UVoxelTorch::OnMouseHover(const FVoxelHitResult& InHitResult)
+void UVoxelTorch::TakeOff()
 {
-	Super::OnMouseHover(InHitResult);
+	bOn = false;
+	if(GetAuxiliary<AVoxelTorchAuxiliary>())
+	{
+		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(false);
+	}
 }

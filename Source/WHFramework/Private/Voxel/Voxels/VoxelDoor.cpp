@@ -3,10 +3,13 @@
 
 #include "Voxel/Voxels/VoxelDoor.h"
 
+#include "Audio/AudioModuleBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Datas/VoxelDoorData.h"
 
 UVoxelDoor::UVoxelDoor()
 {
@@ -47,72 +50,55 @@ FSaveData* UVoxelDoor::ToData()
 	return Super::ToData();
 }
 
-void UVoxelDoor::OpenOrClose()
+void UVoxelDoor::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(IsOpened()) OpenTheDoor();
-	else CloseTheDoor();
+	Super::OnGenerate(InAgent);
 }
 
-void UVoxelDoor::OpenTheDoor()
+void UVoxelDoor::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
 {
-	bOpened = true;
-	Rotation += FRotator(0, -90, 0);
-	Scale = FVector(1, 1, 1);
-	Owner->Generate();
-	if(GetData().OperationSounds.Num() > 0)
+	Super::OnReplace(InAgent, InOldVoxelItem);
+}
+
+void UVoxelDoor::OnDestroy(IVoxelAgentInterface* InAgent)
+{
+	Super::OnDestroy(InAgent);
+}
+
+void UVoxelDoor::OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentHit(InAgent, InHitResult);
+}
+
+void UVoxelDoor::OnAgentEnter(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentEnter(InAgent, InHitResult);
+}
+
+void UVoxelDoor::OnAgentStay(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentStay(InAgent, InHitResult);
+}
+
+void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult)
+{
+	Super::OnAgentExit(InAgent, InHitResult);
+}
+
+bool UVoxelDoor::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+{
+	switch (InActionType)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[0], Owner->IndexToLocation(Index));
-	}
-	RefreshData();
-}
-
-void UVoxelDoor::CloseTheDoor()
-{
-	bOpened = false;
-	Rotation += FRotator(0, 90, 0);
-	Scale = FVector(1, 1, 1);
-	Owner->Generate();
-	if(GetData().OperationSounds.Num() > 1)
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, GetData().OperationSounds[1], Owner->IndexToLocation(Index));
-	}
-	RefreshData();
-}
-
-void UVoxelDoor::OnTargetHit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	Super::OnTargetHit(InTarget, InHitResult);
-}
-
-void UVoxelDoor::OnTargetEnter(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	Super::OnTargetEnter(InTarget, InHitResult);
-}
-
-void UVoxelDoor::OnTargetStay(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	Super::OnTargetStay(InTarget, InHitResult);
-}
-
-void UVoxelDoor::OnTargetExit(IVoxelAgentInterface* InTarget, const FVoxelHitResult& InHitResult)
-{
-	Super::OnTargetExit(InTarget, InHitResult);
-}
-
-bool UVoxelDoor::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
-{
-	switch (InMouseButton)
-	{
-		case EMouseButton::Left:
+		case EVoxelActionType::Action1:
 		{
-			return Super::OnMouseDown(InMouseButton, InHitResult);
+			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
 		}
-		case EMouseButton::Right:
+		case EVoxelActionType::Action2:
 		{
 			FHitResult hitResult;
 			if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
 			{
-				OpenOrClose();
+				Toggle();
 				return true;
 			}
 			break;
@@ -122,17 +108,28 @@ bool UVoxelDoor::OnMouseDown(EMouseButton InMouseButton, const FVoxelHitResult& 
 	return false;
 }
 
-bool UVoxelDoor::OnMouseUp(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::Toggle()
 {
-	return Super::OnMouseUp(InMouseButton, InHitResult);
+	if(!bOpened) Open();
+	else Close();
 }
 
-bool UVoxelDoor::OnMouseHold(EMouseButton InMouseButton, const FVoxelHitResult& InHitResult)
+void UVoxelDoor::Open()
 {
-	return Super::OnMouseHold(InMouseButton, InHitResult);
+	bOpened = true;
+	Rotation += FRotator(0, -90, 0);
+	Scale = FVector(1, 1, 1);
+	Owner->Generate();
+	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, Owner->IndexToLocation(Index));
+	RefreshData();
 }
 
-void UVoxelDoor::OnMouseHover(const FVoxelHitResult& InHitResult)
+void UVoxelDoor::Close()
 {
-	Super::OnMouseHover(InHitResult);
+	bOpened = false;
+	Rotation += FRotator(0, 90, 0);
+	Scale = FVector(1, 1, 1);
+	Owner->Generate();
+	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, Owner->IndexToLocation(Index));
+	RefreshData();
 }

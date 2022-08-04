@@ -88,7 +88,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 	{
 		for (int i = 0; i < 6; i++)
 		{
-			if (!GetOwnerChunk() || GetOwnerChunk()->CheckAdjacent(InVoxelItem, (EDirection)i))
+			if (!GetOwnerChunk() || !GetOwnerChunk()->CheckAdjacent(InVoxelItem, (EDirection)i))
 			{
 				BuildFace(InVoxelItem, (EVoxelFacing)i);
 			}

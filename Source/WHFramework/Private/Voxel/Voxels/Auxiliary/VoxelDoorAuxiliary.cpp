@@ -85,10 +85,10 @@ void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAg
 
 void AVoxelDoorAuxiliary::OpenDoor()
 {
-	GetVoxelItem().GetVoxel<UVoxelDoor>().OpenTheDoor();
+	GetVoxelItem().GetVoxel<UVoxelDoor>().Open();
 }
 
 void AVoxelDoorAuxiliary::CloseDoor()
 {
-	GetVoxelItem().GetVoxel<UVoxelDoor>().CloseTheDoor();
+	GetVoxelItem().GetVoxel<UVoxelDoor>().Close();
 }

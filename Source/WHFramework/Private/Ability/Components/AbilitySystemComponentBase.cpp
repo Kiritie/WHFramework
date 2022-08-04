@@ -127,9 +127,40 @@ void UAbilitySystemComponentBase::AbilityLocalInputPressed(int32 InputID)
 	}
 }
 
-int32 UAbilitySystemComponentBase::K2_GetTagCount(FGameplayTag TagToCheck) const
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForHandle(FGameplayAbilitySpecHandle Handle)
 {
-	return GetTagCount(TagToCheck);
+	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(Handle))
+	{
+		return *Spec;
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForGEHandle(FActiveGameplayEffectHandle GEHandle)
+{
+	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromGEHandle(GEHandle))
+	{
+		return *Spec;
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForClass(TSubclassOf<UGameplayAbility> AbilityClass)
+{
+	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromClass(AbilityClass))
+	{
+		return *Spec;
+	}
+	return FGameplayAbilitySpec();
+}
+
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForInputID(int32 InputID)
+{
+	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromInputID(InputID))
+	{
+		return *Spec;
+	}
+	return FGameplayAbilitySpec();
 }
 
 FGameplayAbilitySpecHandle UAbilitySystemComponentBase::FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject)
@@ -148,6 +179,38 @@ FGameplayAbilitySpecHandle UAbilitySystemComponentBase::FindAbilitySpecHandleFor
 	}
 
 	return FGameplayAbilitySpecHandle();
+}
+
+FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoBySpec(FGameplayAbilitySpec Spec)
+{
+	if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.Ability))
+	{
+		FAbilityInfo AbilityInfo;
+		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+		{
+			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
+			AbilityInfo.CostAttribute = ModifierInfo.Attribute;
+			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, AbilityInfo.CostValue);
+		}
+		Ability->GetCooldownTimeRemainingAndDuration(AbilityInfo.CooldownRemaining, AbilityInfo.CooldownDuration);
+		return AbilityInfo;
+	}
+	return FAbilityInfo();
+}
+
+FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoByHandle(FGameplayAbilitySpecHandle Handle)
+{
+	return GetAbilityInfoBySpec(*FindAbilitySpecFromHandle(Handle));
+}
+
+FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass)
+{
+	return GetAbilityInfoBySpec(FindAbilitySpecForClass(AbilityClass));
+}
+
+int32 UAbilitySystemComponentBase::K2_GetTagCount(FGameplayTag TagToCheck) const
+{
+	return GetTagCount(TagToCheck);
 }
 
 void UAbilitySystemComponentBase::K2_AddLooseGameplayTag(const FGameplayTag& GameplayTag, int32 Count)

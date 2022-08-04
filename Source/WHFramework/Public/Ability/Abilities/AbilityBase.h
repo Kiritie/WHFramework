@@ -115,6 +115,12 @@ public:
 	void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const;
 	virtual void ApplyCost_Implementation(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const {};
 
+	/** Returns the time in seconds remaining on the currently active cooldown and the original duration for this cooldown. */
+	virtual void GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const override;
+
+	UFUNCTION(BlueprintCallable, Category = "Ability")
+	virtual void GetCooldownTimeRemainingAndDuration(float& TimeRemaining, float& CooldownDuration) const;
+
 	// UFUNCTION(BlueprintCallable, Category = "Ability")
 	// virtual void SetHUDReticle(TSubclassOf<class UHUDReticle> ReticleClass);
 	//

@@ -18,18 +18,14 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem) = 0;
+	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult);
 
-	virtual bool GenerateVoxel(FVoxelItem& InVoxelItem, const FVoxelHitResult& InVoxelHitResult) = 0;
-
-	virtual bool DestroyVoxel(FVoxelItem& InVoxelItem) = 0;
-
-	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) = 0;
+	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
 
 public:
 	virtual FVector GetWorldLocation() const = 0;
 
 	virtual FVoxelItem& GetGenerateVoxelItem() = 0;
 
-	virtual void SetGenerateVoxelItem(FVoxelItem InGenerateVoxelItem) = 0;
+	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) = 0;
 };

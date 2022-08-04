@@ -17,7 +17,7 @@ UAssetManagerBase& UAssetManagerBase::Get()
 
 	if(This)
 	{
-		UReferencePoolModuleBPLibrary::CreateReference<UAssetManagerBase>(This);
+		//UReferencePoolModuleBPLibrary::CreateReference<UAssetManagerBase>(This);
 		return *This;
 	}
 	else

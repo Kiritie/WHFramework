@@ -78,6 +78,11 @@ bool AParameterModule::HasParameter(FName InName, bool bEnsured) const
 	return Parameters.HasParameter(InName, bEnsured);
 }
 
+void AParameterModule::AddParameter(FName InName, FParameter InParameter)
+{
+	Parameters.AddParameter(InName, InParameter);
+}
+
 void AParameterModule::SetParameter(FName InName, FParameter InParameter)
 {
 	Parameters.SetParameter(InName, InParameter);
@@ -98,9 +103,19 @@ void AParameterModule::RemoveParameter(FName InName)
 	Parameters.RemoveParameter(InName);
 }
 
+void AParameterModule::RemoveParameters(FName InName)
+{
+	Parameters.RemoveParameters(InName);
+}
+
 void AParameterModule::ClearAllParameter()
 {
 	Parameters.ClearAllParameter();
+}
+
+void AParameterModule::AddIntegerParameter(FName InName, int32 InValue)
+{
+	Parameters.AddIntegerParameter(InName, InValue);
 }
 
 void AParameterModule::SetIntegerParameter(FName InName, int32 InValue)
@@ -118,6 +133,11 @@ TArray<int32> AParameterModule::GetIntegerParameters(FName InName, bool bEnsured
 	return Parameters.GetIntegerParameters(InName, bEnsured);
 }
 
+void AParameterModule::AddFloatParameter(FName InName, float InValue)
+{
+	Parameters.AddFloatParameter(InName, InValue);
+}
+
 void AParameterModule::SetFloatParameter(FName InName, float InValue)
 {
 	Parameters.SetFloatParameter(InName, InValue);
@@ -131,6 +151,11 @@ float AParameterModule::GetFloatParameter(FName InName, bool bEnsured) const
 TArray<float> AParameterModule::GetFloatParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetFloatParameters(InName, bEnsured);
+}
+
+void AParameterModule::AddStringParameter(FName InName, const FString& InValue)
+{
+	Parameters.AddStringParameter(InName, InValue);
 }
 
 void AParameterModule::SetStringParameter(FName InName, const FString& InValue)
@@ -148,6 +173,11 @@ TArray<FString> AParameterModule::GetStringParameters(FName InName, bool bEnsure
 	return Parameters.GetStringParameters(InName, bEnsured);
 }
 
+void AParameterModule::AddTextParameter(FName InName, const FText InValue)
+{
+	Parameters.AddTextParameter(InName, InValue);
+}
+
 void AParameterModule::SetTextParameter(FName InName, const FText InValue)
 {
 	Parameters.SetTextParameter(InName, InValue);
@@ -161,6 +191,11 @@ FText AParameterModule::GetTextParameter(FName InName, bool bEnsured) const
 TArray<FText> AParameterModule::GetTextParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetTextParameters(InName, bEnsured);
+}
+
+void AParameterModule::AddBooleanParameter(FName InName, bool InValue)
+{
+	Parameters.AddBooleanParameter(InName, InValue);
 }
 
 void AParameterModule::SetBooleanParameter(FName InName, bool InValue)
@@ -178,6 +213,11 @@ TArray<bool> AParameterModule::GetBooleanParameters(FName InName, bool bEnsured)
 	return Parameters.GetBooleanParameters(InName, bEnsured);
 }
 
+void AParameterModule::AddVectorParameter(FName InName, FVector InValue)
+{
+	Parameters.AddVectorParameter(InName, InValue);
+}
+
 void AParameterModule::SetVectorParameter(FName InName, FVector InValue)
 {
 	Parameters.SetVectorParameter(InName, InValue);
@@ -191,6 +231,11 @@ FVector AParameterModule::GetVectorParameter(FName InName, bool bEnsured) const
 TArray<FVector> AParameterModule::GetVectorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetVectorParameters(InName, bEnsured);
+}
+
+void AParameterModule::AddRotatorParameter(FName InName, FRotator InValue)
+{
+	Parameters.AddRotatorParameter(InName, InValue);
 }
 
 void AParameterModule::SetRotatorParameter(FName InName, FRotator InValue)
@@ -208,6 +253,11 @@ TArray<FRotator> AParameterModule::GetRotatorParameters(FName InName, bool bEnsu
 	return Parameters.GetRotatorParameters(InName, bEnsured);
 }
 
+void AParameterModule::AddColorParameter(FName InName, const FColor& InValue)
+{
+	Parameters.AddColorParameter(InName, InValue);
+}
+
 void AParameterModule::SetColorParameter(FName InName, const FColor& InValue)
 {
 	Parameters.SetColorParameter(InName, InValue);
@@ -221,6 +271,11 @@ FColor AParameterModule::GetColorParameter(FName InName, bool bEnsured) const
 TArray<FColor> AParameterModule::GetColorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetColorParameters(InName, bEnsured);
+}
+
+void AParameterModule::AddClassParameter(FName InName, UClass* InValue)
+{
+	Parameters.AddClassParameter(InName, InValue);
 }
 
 void AParameterModule::SetClassParameter(FName InName, UClass* InValue)
@@ -238,6 +293,11 @@ TArray<UClass*> AParameterModule::GetClassParameters(FName InName, bool bEnsured
 	return Parameters.GetClassParameters(InName, bEnsured);
 }
 
+void AParameterModule::AddObjectParameter(FName InName, UObject* InValue)
+{
+	Parameters.AddObjectParameter(InName, InValue);
+}
+
 void AParameterModule::SetObjectParameter(FName InName, UObject* InValue)
 {
 	Parameters.SetObjectParameter(InName, InValue);
@@ -251,6 +311,11 @@ UObject* AParameterModule::GetObjectParameter(FName InName, bool bEnsured) const
 TArray<UObject*> AParameterModule::GetObjectParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetObjectParameters(InName, bEnsured);
+}
+
+void AParameterModule::AddPointerParameter(FName InName, void* InValue)
+{
+	Parameters.AddPointerParameter(InName, InValue);
 }
 
 void AParameterModule::SetPointerParameter(FName InName, void* InValue)

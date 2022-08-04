@@ -46,9 +46,12 @@ public:
 			
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* GenerateSound;
+						
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USoundBase* ReplaceSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<USoundBase*> OperationSounds;
+	USoundBase* DestroySound;
 
 public:
 	FORCEINLINE bool IsComplex() const
