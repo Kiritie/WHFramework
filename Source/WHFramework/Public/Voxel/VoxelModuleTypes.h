@@ -68,7 +68,9 @@ enum class EVoxelType : uint8
 	Ice, //????
 	Glass, //????
 	Oak_Door, //?????
+	Oak_Door_Upper, //?????
 	Birch_Door, //???????
+	Birch_Door_Upper, //???????
 	Torch, //???
 	Water, // ?
 	Tall_Grass, //?????
@@ -84,6 +86,16 @@ enum class EVoxelType : uint8
 	Flower_Tulip_Red,
 	Flower_Tulip_White,
 	Unknown //δ?
+};
+
+/**
+ * ????
+ */
+UENUM(BlueprintType)
+enum class EVoxelPartType : uint8
+{
+	Main,
+	Part
 };
 
 /**
@@ -216,9 +228,9 @@ public:
 		Auxiliary = nullptr;
 	}
 		
-	FVoxelItem(EVoxelType InVoxelType, bool bInitSaveData = false);
+	FVoxelItem(EVoxelType InVoxelType, bool bRefreshData = false);
 
-	FVoxelItem(const FPrimaryAssetId& InID, bool bInitSaveData = false);
+	FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData = false);
 
 	FVoxelItem(const FVoxelSaveData& InSaveData);
 
@@ -227,7 +239,15 @@ public:
 
 	bool IsUnknown() const;
 
-	void RefreshSaveData();
+	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
+
+	void RefreshData();
+
+	FVoxelItem& GetMainItem() const;
+
+	FVoxelItem& GetPartItem(FIndex InIndex) const;
+
+	FVector GetRange() const;
 
 	template<class T>
 	T& GetVoxel() const

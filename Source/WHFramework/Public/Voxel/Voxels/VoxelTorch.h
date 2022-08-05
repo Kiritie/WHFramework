@@ -30,8 +30,6 @@ public:
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
 
-	virtual void OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem) override;
-
 	virtual void OnDestroy(IVoxelAgentInterface* InAgent) override;
 
 	virtual void OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;

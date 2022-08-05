@@ -56,8 +56,6 @@ public:
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent);
 
-	virtual void OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem);
-
 	virtual void OnDestroy(IVoxelAgentInterface* InAgent);
 
 	virtual void OnAgentHit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);

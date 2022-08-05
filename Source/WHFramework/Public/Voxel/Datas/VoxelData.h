@@ -27,11 +27,20 @@ public:
 	EVoxelTransparency Transparency;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector Range;
+	EVoxelPartType PartType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Main"))
+	TMap<FIndex, UVoxelData*> PartDatas;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Part"))
+	FIndex PartIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Part"))
+	UVoxelData* MainData;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Offset;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bCustomMesh;
 
@@ -46,35 +55,30 @@ public:
 			
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* GenerateSound;
-						
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	USoundBase* ReplaceSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* DestroySound;
 
 public:
-	FORCEINLINE bool IsComplex() const
+	FORCEINLINE FVector GetRange(FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const
 	{
-		return GetCeilRange() != FVector::OneVector;
-	}
-
-	FORCEINLINE FVector GetCeilRange(FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const
-	{
-		FVector range = GetFinalRange(InRotation, InScale);
-		range.X = FMath::CeilToFloat(range.X);
-		range.Y = FMath::CeilToFloat(range.Y);
-		range.Z = FMath::CeilToFloat(range.Z);
-		return range;
-	}
-
-	FORCEINLINE FVector GetFinalRange(FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const
-	{
-		FVector range = InRotation.RotateVector(Range * InScale);
-		range.X = FMath::Abs(range.X);
-		range.Y = FMath::Abs(range.Y);
-		range.Z = FMath::Abs(range.Z);
-		return range;
+		FVector Range = FVector::OneVector;
+		if(PartDatas.Num() > 0)
+		{
+			FVector PartRange;
+			for(auto Iter : PartDatas)
+			{
+				PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
+				PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
+				PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
+			}
+			Range += PartRange;
+		}
+		Range = InRotation.RotateVector(Range * InScale);
+		Range.X = FMath::Abs(Range.X);
+		Range.Y = FMath::Abs(Range.Y);
+		Range.Z = FMath::Abs(Range.Z);
+		return Range;
 	}
 
 	FORCEINLINE FVector2D GetUVCorner(EVoxelFacing InFacing, FVector2D InUVSize) const
@@ -102,6 +106,10 @@ public:
 			uvData = MeshUVDatas[InFaceIndex];
 		return FVector2D(uvData.UVSpan.X * InUVSize.X, uvData.UVSpan.Y * InUVSize.Y);
 	}
+
+	bool HasPartData(FIndex InIndex) const;
+
+	UVoxelData& GetPartData(FIndex InIndex);
 
 	bool GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const;
 };

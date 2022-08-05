@@ -89,6 +89,8 @@ void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
 
 void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
 {
+	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
+	
 	WidgetParams = InParams;
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);

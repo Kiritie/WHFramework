@@ -31,5 +31,5 @@ void AVoxelEntityAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxel
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelData>().GetFinalRange() * 0.5f);
+	BoxComponent->SetBoxExtent(GetVoxelItem().GetData<UVoxelData>().GetRange() * 0.5f);
 }

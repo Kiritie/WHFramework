@@ -29,5 +29,5 @@ void AVoxelTorchAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelI
 {
 	Super::Initialize(InOwnerChunk, InVoxelIndex);
 
-	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelData>().GetFinalRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
+	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelData>().GetRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
 }

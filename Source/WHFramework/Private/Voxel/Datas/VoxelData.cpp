@@ -13,7 +13,10 @@ UVoxelData::UVoxelData()
 	AuxiliaryClass = nullptr;
 	Transparency = EVoxelTransparency::Solid;
 	bCustomMesh = false;
-	Range = FVector::OneVector;
+	PartType = EVoxelPartType::Main;
+	PartDatas = TMap<FIndex, UVoxelData*>();
+	PartIndex = FIndex::ZeroIndex;
+	MainData = nullptr;
 	Offset = FVector::ZeroVector;
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
@@ -22,15 +25,29 @@ UVoxelData::UVoxelData()
 		MeshUVDatas.Add(FVoxelMeshUVData());
 	}
 	GenerateSound = nullptr;
-	ReplaceSound = nullptr;
 	DestroySound = nullptr;
+}
+
+bool UVoxelData::HasPartData(FIndex InIndex) const
+{
+	if(InIndex == FIndex::ZeroIndex) return true;
+	if(MainData) return MainData->HasPartData(InIndex);
+	return PartDatas.Contains(InIndex);
+}
+
+UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
+{
+	if(InIndex == FIndex::ZeroIndex) return *this;
+	if(MainData) return MainData->GetPartData(InIndex);
+	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
+	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
 }
 
 bool UVoxelData::GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation, FVector InScale) const
 {
 	if(bCustomMesh)
 	{
-		const FVector range = GetFinalRange(InRotation, InScale);
+		const FVector range = GetRange(InRotation, InScale);
 
 		for(auto Iter : MeshVertices)
 		{

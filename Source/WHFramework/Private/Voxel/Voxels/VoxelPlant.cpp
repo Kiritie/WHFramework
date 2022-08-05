@@ -23,11 +23,6 @@ void UVoxelPlant::OnGenerate(IVoxelAgentInterface* InAgent)
 	Super::OnGenerate(InAgent);
 }
 
-void UVoxelPlant::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
-{
-	Super::OnReplace(InAgent, InOldVoxelItem);
-}
-
 void UVoxelPlant::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	Super::OnDestroy(InAgent);

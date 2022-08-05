@@ -55,11 +55,6 @@ void UVoxelDoor::OnGenerate(IVoxelAgentInterface* InAgent)
 	Super::OnGenerate(InAgent);
 }
 
-void UVoxelDoor::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
-{
-	Super::OnReplace(InAgent, InOldVoxelItem);
-}
-
 void UVoxelDoor::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	Super::OnDestroy(InAgent);

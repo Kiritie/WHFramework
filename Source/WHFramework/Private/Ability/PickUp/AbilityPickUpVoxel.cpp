@@ -20,7 +20,7 @@ void AAbilityPickUpVoxel::Initialize(FAbilityItem InItem)
 {
 	Super::Initialize(InItem);
 
-	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>().Range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * (1 / Item.GetData<UVoxelData>().Range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(Item.GetData<UVoxelData>().GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * (1 / Item.GetData<UVoxelData>().GetRange().Z) * 0.2f);
 
 	MeshComponent->Initialize(EVoxelMeshType::PickUp);
 	MeshComponent->BuildVoxel(FVoxelItem(Item.ID));

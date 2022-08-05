@@ -29,11 +29,6 @@ void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
 	else TakeOff();
 }
 
-void UVoxelTorch::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
-{
-	Super::OnReplace(InAgent, InOldVoxelItem);
-}
-
 void UVoxelTorch::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	Super::OnDestroy(InAgent);

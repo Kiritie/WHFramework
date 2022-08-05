@@ -26,11 +26,6 @@ void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 	Super::OnGenerate(InAgent);
 }
 
-void UVoxelWater::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
-{
-	Super::OnReplace(InAgent, InOldVoxelItem);
-}
-
 void UVoxelWater::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	Super::OnDestroy(InAgent);

@@ -3,6 +3,7 @@
 
 #include "Voxel/Voxels/Voxel.h"
 
+#include "Ability/AbilityModuleBPLibrary.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Asset/AssetManagerBase.h"
@@ -10,6 +11,7 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Kismet/GameplayStatics.h"
+#include "Math/MathBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -103,7 +105,7 @@ void UVoxel::RefreshData()
 {
 	if(Owner)
 	{
-		Owner->GetVoxelItem(Index).RefreshSaveData();
+		Owner->GetVoxelItem(Index).RefreshData();
 	}
 }
 
@@ -111,15 +113,10 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	if(InAgent)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, Owner->IndexToLocation(Index));
-	}
-}
-
-void UVoxel::OnReplace(IVoxelAgentInterface* InAgent, const FVoxelItem& InOldVoxelItem)
-{
-	if(InAgent)
-	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().ReplaceSound, Owner->IndexToLocation(Index));
+		if(GetData().PartType == EVoxelPartType::Main)
+		{
+			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, Owner->IndexToLocation(Index));
+		}
 	}
 }
 
@@ -127,7 +124,22 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(InAgent)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, Owner->IndexToLocation(Index));
+		if(GetData().PartType == EVoxelPartType::Main)
+		{
+			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, Owner->IndexToLocation(Index));
+			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), Owner->IndexToLocation(Index) + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
+		}
+		if(Owner)
+		{
+			if(Owner->CheckNeighbors(Index, EVoxelType::Water, FVector::OneVector, true))
+			{
+				Owner->SetVoxelComplex(Index, EVoxelType::Water, true, InAgent);
+			}
+			if(!Owner->CheckAdjacent(Index, EDirection::Up))
+			{
+				Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Rotation), FVoxelItem::Empty, true, InAgent);
+			}
+		}
 	}
 }
 
