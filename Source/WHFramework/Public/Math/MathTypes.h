@@ -373,3 +373,31 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 {
 	return FCrc::MemCrc_DEPRECATED(&InPoint, sizeof(InPoint));
 }
+
+#define INDEX_ITERATOR(Iter, Range, Expression) \
+	FIndex Iter; \
+	if(Range != FVector::OneVector) \
+	{ \
+		for(Iter.X = 0; Iter.X < Range.X; Iter.X++) \
+		{ \
+			for(Iter.Y = 0; Iter.Y < Range.Y; Iter.Y++) \
+			{ \
+				for(Iter.Z = 0; Iter.Z < Range.Z; Iter.Z++) \
+				{ \
+					Expression \
+				} \
+			} \
+		} \
+	} \
+	else \
+	{ \
+		Expression \
+	}
+
+#define DIRECTION_ITERATOR(Iter, Expression) \
+	EDirection Iter; \
+	for(int32 _i = 0; _i < 6; _i++) \
+	{ \
+		Iter = (EDirection)_i; \
+		Expression \
+	}

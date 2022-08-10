@@ -13,7 +13,7 @@
 
 UVoxelDoor::UVoxelDoor()
 {
-	
+	bOpened = false;
 }
 
 void UVoxelDoor::OnDespawn_Implementation()
@@ -91,7 +91,7 @@ bool UVoxelDoor::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType
 		case EVoxelActionType::Action2:
 		{
 			FHitResult hitResult;
-			if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, Owner->IndexToLocation(Index), hitResult))
+			if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, GetLocation(), hitResult))
 			{
 				Toggle();
 				return true;
@@ -112,19 +112,15 @@ void UVoxelDoor::Toggle()
 void UVoxelDoor::Open()
 {
 	bOpened = true;
-	Rotation += FRotator(0, -90, 0);
-	Scale = FVector(1, 1, 1);
-	Owner->Generate();
-	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, Owner->IndexToLocation(Index));
 	RefreshData();
+	Owner->Generate();
+	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
 }
 
 void UVoxelDoor::Close()
 {
 	bOpened = false;
-	Rotation += FRotator(0, 90, 0);
-	Scale = FVector(1, 1, 1);
-	Owner->Generate();
-	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, Owner->IndexToLocation(Index));
 	RefreshData();
+	Owner->Generate();
+	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
 }

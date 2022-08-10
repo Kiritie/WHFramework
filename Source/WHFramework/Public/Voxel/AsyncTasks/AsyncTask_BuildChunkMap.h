@@ -9,16 +9,16 @@ class AVoxelModule;
 /**
  * 
  */
-class ChunkMapBuildTask : public FNonAbandonableTask
+class AsyncTask_BuildChunkMap : public FNonAbandonableTask
 {
-	friend class FAsyncTask<ChunkMapBuildTask>;
+	friend class FAsyncTask<AsyncTask_BuildChunkMap>;
 
 public:
-	ChunkMapBuildTask(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkMapBuildQueue);
+	AsyncTask_BuildChunkMap(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkQueue);
 
-protected:
+public:
 	AVoxelModule* VoxelModule;
-	TArray<FIndex> ChunkMapBuildQueue;
+	TArray<FIndex> ChunkQueue;
 
 public:
 	void DoWork();

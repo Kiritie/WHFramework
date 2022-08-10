@@ -16,7 +16,6 @@ FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FNam
 
 FVoxelItem::FVoxelItem(EVoxelType InVoxelType, bool bRefreshData) : FVoxelItem()
 {
-	VoxelType = InVoxelType;
 	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType);
 	if(bRefreshData)
 	{
@@ -33,10 +32,18 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData) : FVoxelI
 	}
 }
 
-FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FVoxelSaveData(InSaveData)
+FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveData)
 {
-	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InSaveData.VoxelType);
-	RefreshData();
+	TArray<FString> data;
+	InSaveData.StringData.ParseIntoArray(data, TEXT(";"));
+	if(data.Num() >= 3)
+	{
+		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*data[0]));
+		Index = FIndex(data[1]);
+		Rotation.InitFromString(data[2]);
+	}
+	Owner = nullptr;
+	Auxiliary = nullptr;
 }
 
 bool FVoxelItem::IsValid(bool bNeedNotNull) const
@@ -56,7 +63,20 @@ bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 
 void FVoxelItem::RefreshData()
 {
-	*this = GetVoxel().ToSaveDataRef<FVoxelItem>(true);
+	*this = GetVoxel().ToSaveDataRef<FVoxelSaveData>(true);
+}
+
+FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
+{
+	if(!bRefresh)
+	{
+		static FVoxelSaveData VoxelSaveData;
+		VoxelSaveData.Reset();
+		VoxelSaveData = FVoxelSaveData(*this);
+		VoxelSaveData.StringData = FString::Printf(TEXT("%d;%s;%s"), UVoxelModuleBPLibrary::AssetIDToVoxelType(ID), *Index.ToString(), *Rotation.ToString());
+		return VoxelSaveData;
+	}
+	return GetVoxel().ToSaveDataRef<FVoxelItem>(true).ToSaveData(false);
 }
 
 FVoxelItem& FVoxelItem::GetMainItem() const
@@ -77,9 +97,23 @@ FVoxelItem& FVoxelItem::GetPartItem(FIndex InIndex) const
 	return FVoxelItem::Empty;
 }
 
+EVoxelType FVoxelItem::GetVoxelType() const
+{
+	return UVoxelModuleBPLibrary::AssetIDToVoxelType(ID);
+}
+
 FVector FVoxelItem::GetRange() const
 {
-	return GetData<UVoxelData>().GetRange(Rotation, Scale);
+	return GetData<UVoxelData>().GetRange(Rotation);
+}
+
+FVector FVoxelItem::GetLocation(bool bWorldSpace) const
+{
+	if(Owner)
+	{
+		return Owner->IndexToLocation(Index, bWorldSpace);
+	}
+	return FVector::ZeroVector;
 }
 
 UVoxel& FVoxelItem::GetVoxel() const

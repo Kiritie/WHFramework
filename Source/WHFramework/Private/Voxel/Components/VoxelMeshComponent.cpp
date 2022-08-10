@@ -15,7 +15,7 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	BlockScale = 1;
 	OffsetScale = 1;
 	CenterOffset = FVector(0.5f);
-	MeshType = EVoxelMeshType::Chunk;
+	MeshNature = EVoxelMeshNature::Chunk;
 	Transparency = EVoxelTransparency::Solid;
 	Vertices = TArray<FVector>();
 	Triangles = TArray<int32>();
@@ -25,34 +25,34 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	Tangents = TArray<FProcMeshTangent>();
 }
 
-void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparency InTransparency /*= EVoxelTransparency::Solid*/)
+void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransparency InTransparency /*= EVoxelTransparency::Solid*/)
 {
-	MeshType = InMeshType;
+	MeshNature = InMeshNature;
 	Transparency = InTransparency;
-	switch (MeshType)
+	switch (MeshNature)
 	{
-		case EVoxelMeshType::Chunk:
+		case EVoxelMeshNature::Chunk:
 		{
 			BlockScale = 1.f;
 			OffsetScale = 1.f;
 			CenterOffset = FVector(0.5f);
 			break;
 		}
-		case EVoxelMeshType::PickUp:
+		case EVoxelMeshNature::PickUp:
 		{
 			BlockScale = 0.3f;
 			OffsetScale = 0;
 			CenterOffset = FVector::ZeroVector;
 			break;
 		}
-		case EVoxelMeshType::Entity:
+		case EVoxelMeshNature::Entity:
 		{
 			BlockScale = 0.3f;
 			OffsetScale = 0;
 			CenterOffset = FVector::ZeroVector;
 			break;
 		}
-		case EVoxelMeshType::Vitality:
+		case EVoxelMeshNature::Vitality:
 		{
 			BlockScale = 1.f;
 			OffsetScale = 0;
@@ -65,36 +65,40 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshType InMeshType, EVoxelTransparen
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
 	const UVoxelData& voxelData = InVoxelItem.GetData<UVoxelData>();
-	if(voxelData.bCustomMesh)
+	switch(voxelData.MeshType)
 	{
-		TArray<FVector> meshVertices, meshNormals;
-		if (voxelData.GetMeshDatas(meshVertices, meshNormals, InVoxelItem.Rotation, InVoxelItem.Scale))
+		case EVoxelMeshType::Custom:
 		{
-			for (int i = 0; i < meshVertices.Num(); i++)
+			TArray<FVector> meshVertices, meshNormals;
+			if (voxelData.GetMeshDatas(InVoxelItem, meshVertices, meshNormals, InVoxelItem.Rotation))
 			{
-				if (i > 0 && (i + 1) % 4 == 0)
+				for (int i = 0; i < meshVertices.Num(); i++)
 				{
-					FVector vertices[4];
-					for (int j = 0; j < 4; j++)
+					if (i > 0 && (i + 1) % 4 == 0)
 					{
-						vertices[j] = meshVertices[i - (3 - j)];
+						FVector vertices[4];
+						for (int j = 0; j < 4; j++)
+						{
+							vertices[j] = meshVertices[i - (3 - j)];
+						}
+						BuildFace(InVoxelItem, vertices, i / 4, meshNormals[i / 4]);
 					}
-					BuildFace(InVoxelItem, vertices, i / 4, meshNormals[i / 4]);
 				}
 			}
+			break;
 		}
-	}
-	else
-	{
-		for (int i = 0; i < 6; i++)
+		case EVoxelMeshType::Cube:
 		{
-			if (!GetOwnerChunk() || !GetOwnerChunk()->CheckAdjacent(InVoxelItem.Index, (EDirection)i))
-			{
-				BuildFace(InVoxelItem, (EVoxelFacing)i);
-			}
+			DIRECTION_ITERATOR(Iter,
+				if (!GetOwnerChunk() || !GetOwnerChunk()->CheckVoxelAdjacent(InVoxelItem.Index, Iter))
+				{
+					BuildFace(InVoxelItem, Iter);
+				}
+			)
+			break;
 		}
 	}
-	if (MeshType == EVoxelMeshType::PickUp || MeshType == EVoxelMeshType::Entity || MeshType == EVoxelMeshType::Vitality)
+	if (MeshNature == EVoxelMeshNature::PickUp || MeshNature == EVoxelMeshNature::Entity || MeshNature == EVoxelMeshNature::Vitality)
 	{
 		Transparency = voxelData.Transparency;
 	}
@@ -106,16 +110,16 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 	{
 		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollider);
 		UMaterialInterface* material = nullptr;
-		switch (MeshType)
+		switch (MeshNature)
 		{
-			case EVoxelMeshType::Chunk:
-			case EVoxelMeshType::PickUp:
-			case EVoxelMeshType::Vitality:
+			case EVoxelMeshNature::Chunk:
+			case EVoxelMeshNature::PickUp:
+			case EVoxelMeshNature::Vitality:
 			{
 				material = UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material;
 				break;
 			}
-			case EVoxelMeshType::Entity:
+			case EVoxelMeshNature::Entity:
 			{
 				material = UMaterialInstanceDynamic::Create(UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material, this);
 				Cast<UMaterialInstanceDynamic>(material)->SetScalarParameterValue(TEXT("Emissive"), 1);
@@ -157,14 +161,14 @@ void UVoxelMeshComponent::ClearData()
 	Tangents.Empty();
 }
 
-void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing InFacing)
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing)
 {
 	FVector vertices[4];
-	FVector range = InVoxelItem.GetData<UVoxelData>().GetRange(InVoxelItem.Rotation, InVoxelItem.Scale);
+	FVector range = InVoxelItem.GetRange();
 
 	switch (InFacing)
 	{
-		case EVoxelFacing::Up:
+		case EDirection::Up:
 		{
 			vertices[0] = FVector(-range.X, -range.Y, range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, -range.Y, range.Z) * 0.5f;
@@ -172,7 +176,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 			vertices[3] = FVector(-range.X, range.Y, range.Z) * 0.5f;
 			break;
 		}
-		case EVoxelFacing::Down:
+		case EDirection::Down:
 		{
 			vertices[0] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, range.Y, -range.Z) * 0.5f;
@@ -180,7 +184,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 			vertices[3] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EVoxelFacing::Forward:
+		case EDirection::Forward:
 		{
 			vertices[0] = FVector(range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, range.Y, range.Z) * 0.5f;
@@ -188,7 +192,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 			vertices[3] = FVector(range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EVoxelFacing::Back:
+		case EDirection::Back:
 		{
 			vertices[0] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(-range.X, -range.Y, range.Z) * 0.5f;
@@ -196,7 +200,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 			vertices[3] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EVoxelFacing::Left:
+		case EDirection::Left:
 		{
 			vertices[0] = FVector(range.X, -range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(range.X, -range.Y, range.Z) * 0.5f;
@@ -204,7 +208,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing 
 			vertices[3] = FVector(-range.X, -range.Y, -range.Z) * 0.5f;
 			break;
 		}
-		case EVoxelFacing::Right:
+		case EDirection::Right:
 		{
 			vertices[0] = FVector(-range.X, range.Y, -range.Z) * 0.5f;
 			vertices[1] = FVector(-range.X, range.Y, range.Z) * 0.5f;
@@ -225,10 +229,10 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	FVector2D uvSpan = voxelData.GetUVSpan(InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize);
 	InNormal = InVoxelItem.Rotation.RotateVector(InNormal);
 
-	FVector center = voxelData.GetRange(InVoxelItem.Rotation, InVoxelItem.Scale) * (CenterOffset + InVoxelItem.Rotation.RotateVector(voxelData.Offset) * OffsetScale);
+	FVector center = voxelData.GetRange(InVoxelItem.Rotation) * (CenterOffset + InVoxelItem.Rotation.RotateVector(voxelData.Offset) * OffsetScale);
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + center + InVoxelItem.Rotation.RotateVector(InVertices[i] * InVoxelItem.Scale)) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
+		Vertices.Add((InVoxelItem.Index.ToVector() + center + InVoxelItem.Rotation.RotateVector(InVertices[i])) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
 	}
 
 	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));

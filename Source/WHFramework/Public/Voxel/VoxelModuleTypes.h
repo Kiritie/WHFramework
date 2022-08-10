@@ -37,9 +37,12 @@ UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
-	Generating,
-	BasicGenerated,
-	FullGenerated
+	Spawning,
+	Destroying,
+	LoadingMap,
+	BuildingMap,
+	BuildingMesh,
+	Generating
 };
 
 /**
@@ -102,14 +105,10 @@ enum class EVoxelPartType : uint8
  * ????
  */
 UENUM(BlueprintType)
-enum class EVoxelFacing : uint8
+enum class EVoxelMeshType : uint8
 {
-	Up,
-	Down,
-	Forward,
-	Back,
-	Left,
-	Right
+	Cube,
+	Custom
 };
 
 /**
@@ -130,7 +129,7 @@ enum class EVoxelTransparency : uint8
  * ????????????
  */
 UENUM(BlueprintType)
-enum class EVoxelMeshType : uint8
+enum class EVoxelMeshNature : uint8
 {
 	// ?????
 	Chunk,
@@ -173,18 +172,23 @@ struct WHFRAMEWORK_API FVoxelSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadOnly)
-	EVoxelType VoxelType;
+	UPROPERTY()
+	FString StringData;
 
 public:
 	FVoxelSaveData()
 	{
-		VoxelType = EVoxelType::Empty;
+		StringData = TEXT("");
+	}
+		
+	FVoxelSaveData(const FSaveData& InSaveData) : FSaveData(InSaveData)
+	{
+		StringData = TEXT("");
 	}
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem, public FVoxelSaveData
+struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 {
 	GENERATED_BODY()
 
@@ -198,9 +202,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	FRotator Rotation;
-	
-	UPROPERTY(BlueprintReadWrite)
-	FVector Scale;
 
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Owner;
@@ -208,13 +209,11 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
-
 public:
 	FVoxelItem()
 	{
 		Index = FIndex::ZeroIndex;
 		Rotation = FRotator::ZeroRotator;
-		Scale = FVector::OneVector;
 		Owner = nullptr;
 		Auxiliary = nullptr;
 	}
@@ -223,11 +222,10 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Rotation = FRotator::ZeroRotator;
-		Scale = FVector::OneVector;
 		Owner = nullptr;
 		Auxiliary = nullptr;
 	}
-		
+
 	FVoxelItem(EVoxelType InVoxelType, bool bRefreshData = false);
 
 	FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData = false);
@@ -243,11 +241,17 @@ public:
 
 	void RefreshData();
 
+	FVoxelSaveData& ToSaveData(bool bRefresh = false) const;
+
 	FVoxelItem& GetMainItem() const;
 
 	FVoxelItem& GetPartItem(FIndex InIndex) const;
 
+	EVoxelType GetVoxelType() const;
+
 	FVector GetRange() const;
+
+	FVector GetLocation(bool bWorldSpace = true) const;
 
 	template<class T>
 	T& GetVoxel() const

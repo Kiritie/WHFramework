@@ -14,6 +14,13 @@ public:
 	UVoxelData();
 
 public:
+	virtual bool HasPartData(FIndex InIndex) const;
+
+	virtual UVoxelData& GetPartData(FIndex InIndex);
+
+	virtual bool GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation = FRotator::ZeroRotator) const;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 
@@ -29,25 +36,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelPartType PartType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Main"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Main"))
 	TMap<FIndex, UVoxelData*> PartDatas;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Part"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Part"))
 	FIndex PartIndex;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "Part == EVoxelPart::Part"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Part"))
 	UVoxelData* MainData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Offset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bCustomMesh;
+	EVoxelMeshType MeshType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bCustomMesh == true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "MeshType == EVoxelMeshType::Custom"))
 	TArray<FVector> MeshVertices;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bCustomMesh == true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "MeshType == EVoxelMeshType::Custom"))
 	TArray<FVector> MeshNormals;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -60,10 +67,10 @@ public:
 	USoundBase* DestroySound;
 
 public:
-	FORCEINLINE FVector GetRange(FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const
+	FORCEINLINE FVector GetRange(FRotator InRotation = FRotator::ZeroRotator) const
 	{
 		FVector Range = FVector::OneVector;
-		if(PartDatas.Num() > 0)
+		if(PartType == EVoxelPartType::Main && PartDatas.Num() > 0)
 		{
 			FVector PartRange;
 			for(auto Iter : PartDatas)
@@ -74,14 +81,14 @@ public:
 			}
 			Range += PartRange;
 		}
-		Range = InRotation.RotateVector(Range * InScale);
+		Range = InRotation.RotateVector(Range);
 		Range.X = FMath::Abs(Range.X);
 		Range.Y = FMath::Abs(Range.Y);
 		Range.Z = FMath::Abs(Range.Z);
 		return Range;
 	}
 
-	FORCEINLINE FVector2D GetUVCorner(EVoxelFacing InFacing, FVector2D InUVSize) const
+	FORCEINLINE FVector2D GetUVCorner(EDirection InFacing, FVector2D InUVSize) const
 	{
 		return GetUVCorner((int)InFacing, InUVSize);
 	}
@@ -94,7 +101,7 @@ public:
 		return FVector2D(uvData.UVCorner.X	 * InUVSize.X, (1 / InUVSize.Y - uvData.UVCorner.Y - uvData.UVSpan.Y) * InUVSize.Y);
 	}
 
-	FORCEINLINE FVector2D GetUVSpan(EVoxelFacing InFacing, FVector2D InUVSize) const
+	FORCEINLINE FVector2D GetUVSpan(EDirection InFacing, FVector2D InUVSize) const
 	{
 		return GetUVSpan((int)InFacing, InUVSize);
 	}
@@ -106,10 +113,4 @@ public:
 			uvData = MeshUVDatas[InFaceIndex];
 		return FVector2D(uvData.UVSpan.X * InUVSize.X, uvData.UVSpan.Y * InUVSize.Y);
 	}
-
-	bool HasPartData(FIndex InIndex) const;
-
-	UVoxelData& GetPartData(FIndex InIndex);
-
-	bool GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation = FRotator::ZeroRotator, FVector InScale = FVector::OneVector) const;
 };

@@ -34,7 +34,7 @@ void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 	VoxelID = InVoxelID;
 	if(GetVoxelData().IsValid())
 	{
-		MeshComponent->Initialize(EVoxelMeshType::Entity);
+		MeshComponent->Initialize(EVoxelMeshNature::Entity);
 		MeshComponent->BuildVoxel(FVoxelItem(VoxelID));
 		MeshComponent->CreateMesh(0, false);
 	}

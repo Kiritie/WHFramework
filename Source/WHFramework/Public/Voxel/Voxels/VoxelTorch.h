@@ -21,6 +21,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
 public:
+	virtual void OnDespawn_Implementation() override;
+
+	virtual void Serialize(FArchive& Ar) override;
+	
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;

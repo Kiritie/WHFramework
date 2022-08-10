@@ -8,7 +8,31 @@
 
 UVoxelTorch::UVoxelTorch()
 {
-	
+	bOn = false;
+}
+
+void UVoxelTorch::OnDespawn_Implementation()
+{
+	Super::OnDespawn_Implementation();
+
+	bOn = false;
+}
+
+void UVoxelTorch::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << bOn;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << bOn;
+		}
+	}
 }
 
 void UVoxelTorch::LoadData(FSaveData* InSaveData, bool bForceMode)

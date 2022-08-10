@@ -16,7 +16,7 @@ UVoxelDoorData::UVoxelDoorData()
 
 	Transparency = EVoxelTransparency::SemiTransparent;
 
-	bCustomMesh = true;
+	MeshType = EVoxelMeshType::Custom;
 	
 	MeshVertices = TArray<FVector>();
 	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
@@ -34,4 +34,29 @@ UVoxelDoorData::UVoxelDoorData()
 
 	OpenSound = nullptr;
 	CloseSound = nullptr;
+}
+
+bool UVoxelDoorData::GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation) const
+{
+	if(MeshType == EVoxelMeshType::Custom)
+	{
+		const FVector range = GetRange(InRotation);
+
+		const bool bOpened = InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened();
+
+		for(int32 i = (!bOpened ? 0 : MeshVertices.Num() / 2 - 1); i < (!bOpened ? MeshVertices.Num() / 2 : MeshVertices.Num()); i++)
+		{
+			if(MeshVertices.IsValidIndex(i))
+			{
+				OutMeshVertices.Add(MeshVertices[i] * range); 
+			}
+		}
+
+		for(auto Iter : MeshNormals)
+		{
+			OutMeshNormals.Add(Iter.GetSafeNormal());
+		}
+		return true;
+	}
+	return false;
 }

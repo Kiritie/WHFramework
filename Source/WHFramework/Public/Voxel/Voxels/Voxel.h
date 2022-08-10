@@ -79,9 +79,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere)
 	FRotator Rotation;
-	
-	UPROPERTY(VisibleAnywhere)
-	FVector Scale;
 
 	UPROPERTY(VisibleAnywhere)
 	AVoxelChunk* Owner;
@@ -111,9 +108,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	FIndex GetIndex() const { return Index; }
 
-	FRotator GetRotation() const { return Rotation; }
+	FVector GetLocation(bool bWorldSpace = true) const;
 
-	FVector GetScale() const { return Scale; }
+	FRotator GetRotation() const { return Rotation; }
 
 	template<class T>
 	T* GetOwner() const

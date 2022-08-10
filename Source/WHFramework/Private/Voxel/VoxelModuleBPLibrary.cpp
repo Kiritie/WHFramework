@@ -52,6 +52,33 @@ EVoxelWorldState UVoxelModuleBPLibrary::GetWorldState()
 	return EVoxelWorldState::None;
 }
 
+FVoxelWorldBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->GetWorldBasicData();
+	}
+	return FVoxelWorldBasicSaveData();
+}
+
+float UVoxelModuleBPLibrary::GetWorldLength()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->GetWorldLength();
+	}
+	return 0.f;
+}
+
+bool UVoxelModuleBPLibrary::IsBasicGenerated()
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->IsBasicGenerated();
+	}
+	return false;
+}
+
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
 	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / UVoxelModuleBPLibrary::GetWorldData().GetChunkLength()),
@@ -93,7 +120,7 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 	const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
 	if(voxelData.IsValid())
 	{
-		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : TSubclassOf<UVoxel>(StaticClass());
+		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : UVoxel::StaticClass();
 		UVoxel& voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(tmpClass);
 		voxel.SetID(InVoxelID);
 		return voxel;

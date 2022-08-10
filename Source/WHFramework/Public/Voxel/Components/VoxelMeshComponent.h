@@ -28,7 +28,7 @@ public:
 	FVector CenterOffset;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	EVoxelMeshType MeshType;
+	EVoxelMeshNature MeshNature;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	EVoxelTransparency Transparency;
@@ -47,7 +47,7 @@ private:
 	TArray<FProcMeshTangent> Tangents;
 
 public:
-	void Initialize(EVoxelMeshType InMeshType, EVoxelTransparency InTransparency = EVoxelTransparency::Solid);
+	void Initialize(EVoxelMeshNature InMeshNature, EVoxelTransparency InTransparency = EVoxelTransparency::Solid);
 	
 	void BuildVoxel(const FVoxelItem& InVoxelItem);
 
@@ -58,7 +58,7 @@ public:
 	void ClearData();
 
 private:
-	void BuildFace(const FVoxelItem& InVoxelItem, EVoxelFacing InFacing);
+	void BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing);
 
 	void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal);
 

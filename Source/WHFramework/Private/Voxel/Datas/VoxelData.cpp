@@ -12,42 +12,46 @@ UVoxelData::UVoxelData()
 	VoxelClass = nullptr;
 	AuxiliaryClass = nullptr;
 	Transparency = EVoxelTransparency::Solid;
-	bCustomMesh = false;
 	PartType = EVoxelPartType::Main;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
 	Offset = FVector::ZeroVector;
+	MeshType = EVoxelMeshType::Cube;
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
-	for (int i = 0; i < 6; i++)
-	{
-		MeshUVDatas.Add(FVoxelMeshUVData());
-	}
+	MeshUVDatas.SetNumZeroed(6);
 	GenerateSound = nullptr;
 	DestroySound = nullptr;
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
 {
-	if(InIndex == FIndex::ZeroIndex) return true;
-	if(MainData) return MainData->HasPartData(InIndex);
-	return PartDatas.Contains(InIndex);
+	if(PartType == EVoxelPartType::Main)
+	{
+		if(InIndex == FIndex::ZeroIndex) return true;
+		if(MainData) return MainData->HasPartData(InIndex);
+		return PartDatas.Contains(InIndex);
+	}
+	return false;
 }
 
 UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 {
-	if(InIndex == FIndex::ZeroIndex) return *this;
-	if(MainData) return MainData->GetPartData(InIndex);
-	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
+	if(PartType == EVoxelPartType::Main)
+	{
+		if(InIndex == FIndex::ZeroIndex) return *this;
+		if(MainData) return MainData->GetPartData(InIndex);
+		if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
+	}
 	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
 }
 
-bool UVoxelData::GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation, FVector InScale) const
+bool UVoxelData::GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation) const
 {
-	if(bCustomMesh)
+	if(MeshType == EVoxelMeshType::Custom)
 	{
-		const FVector range = GetRange(InRotation, InScale);
+		const FVector range = GetRange(InRotation);
 
 		for(auto Iter : MeshVertices)
 		{
@@ -58,11 +62,7 @@ bool UVoxelData::GetMeshDatas(TArray<FVector>& OutMeshVertices, TArray<FVector>&
 		{
 			OutMeshNormals.Add(Iter.GetSafeNormal());
 		}
+		return true;
 	}
-	else
-	{
-		OutMeshVertices = MeshVertices;
-		OutMeshNormals = MeshNormals;
-	}
-	return OutMeshVertices.Num() > 0;
+	return false;
 }

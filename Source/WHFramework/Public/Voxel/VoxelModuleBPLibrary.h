@@ -41,6 +41,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static EVoxelWorldState GetWorldState();
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FVoxelWorldBasicSaveData GetWorldBasicData();
+	
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static float GetWorldLength();
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static bool IsBasicGenerated();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")

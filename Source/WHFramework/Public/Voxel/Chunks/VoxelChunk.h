@@ -67,7 +67,7 @@ public:
 
 	virtual void BuildMap(int32 InStage);
 
-	virtual void GenerateMap();
+	virtual void BuildMesh();
 
 	virtual void SpawnActors();
 
@@ -100,6 +100,8 @@ public:
 public:
 	virtual bool HasVoxel(FIndex InIndex);
 
+	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
+
 	virtual UVoxel& GetVoxel(FIndex InIndex);
 
 	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ);
@@ -111,9 +113,9 @@ public:
 public:
 	virtual bool CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange = FVector::OneVector);
 
-	virtual bool CheckAdjacent(FIndex InIndex, EDirection InDirection);
+	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection);
 
-	virtual bool CheckNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::ZeroVector, bool bIgnoreBottom = false);
+	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bIgnoreBottom = false);
 
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
@@ -143,7 +145,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SolidMesh;
 	
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SemiMesh;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
@@ -153,7 +155,7 @@ protected:
 	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<AVoxelChunk*> Neighbors;
+	TMap<EDirection, AVoxelChunk*> Neighbors;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TArray<AAbilityPickUpBase*> PickUps;
@@ -183,6 +185,6 @@ public:
 
 	bool IsGenerated() const { return bGenerated; }
 
-	TArray<AVoxelChunk*> GetNeighbors() const { return Neighbors; }
+	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 };
 

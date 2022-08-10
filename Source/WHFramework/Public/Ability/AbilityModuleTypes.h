@@ -448,7 +448,7 @@ enum class EAbilityItemType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItem
+struct WHFRAMEWORK_API FAbilityItem : public FSaveData
 {
 	GENERATED_BODY()
 
@@ -476,6 +476,14 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 				
+	FORCEINLINE FAbilityItem(const FSaveData& InSaveData) : FSaveData(InSaveData)
+	{
+		ID = FPrimaryAssetId();
+		Count = 0;
+		Level = 0;
+		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+		
 	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
 	{
 		ID = InID;
@@ -492,7 +500,7 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 
-	virtual ~FAbilityItem() = default;
+	virtual ~FAbilityItem() override = default;
 
 	template<class T>
 	T& GetData() const

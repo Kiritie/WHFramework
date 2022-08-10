@@ -22,7 +22,6 @@ UVoxel::UVoxel()
 {
 	Index = FIndex::ZeroIndex;
 	Rotation = FRotator::ZeroRotator;
-	Scale = FVector::OneVector;
 	Owner = nullptr;
 	Auxiliary = nullptr;
 }
@@ -47,7 +46,6 @@ void UVoxel::OnDespawn_Implementation()
 	ID = FPrimaryAssetId();
 	Index = FIndex::ZeroIndex;
 	Rotation = FRotator::ZeroRotator;
-	Scale = FVector::OneVector;
 	Owner = nullptr;
 	Auxiliary = nullptr;
 }
@@ -55,32 +53,14 @@ void UVoxel::OnDespawn_Implementation()
 void UVoxel::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << Index;
-			Ar << Rotation;
-			Ar << Scale;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << Index;
-			Ar << Rotation;
-			Ar << Scale;
-		}
-	}
 }
 
 void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
 	const auto SaveData = InSaveData->CastRef<FVoxelItem>();
-
 	ID = SaveData.ID;
 	Index = SaveData.Index;
 	Rotation = SaveData.Rotation;
-	Scale = SaveData.Scale;
 	Owner = SaveData.Owner;
 	Auxiliary = SaveData.Auxiliary;
 }
@@ -90,11 +70,9 @@ FSaveData* UVoxel::ToData()
 	static FVoxelItem SaveData;
 	SaveData.Reset();
 
-	SaveData.VoxelType = UVoxelModuleBPLibrary::AssetIDToVoxelType(ID);
 	SaveData.ID = ID;
 	SaveData.Index = Index;
 	SaveData.Rotation = Rotation;
-	SaveData.Scale = Scale;
 	SaveData.Owner = Owner;
 	SaveData.Auxiliary = Auxiliary;
 
@@ -115,7 +93,7 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 	{
 		if(GetData().PartType == EVoxelPartType::Main)
 		{
-			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, Owner->IndexToLocation(Index));
+			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, GetLocation());
 		}
 	}
 }
@@ -126,16 +104,16 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	{
 		if(GetData().PartType == EVoxelPartType::Main)
 		{
-			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, Owner->IndexToLocation(Index));
-			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), Owner->IndexToLocation(Index) + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
+			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
+			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
 		}
 		if(Owner)
 		{
-			if(Owner->CheckNeighbors(Index, EVoxelType::Water, FVector::OneVector, true))
+			if(Owner->CheckVoxelNeighbors(Index - GetData().PartIndex, EVoxelType::Water, GetData().GetRange(), true))
 			{
 				Owner->SetVoxelComplex(Index, EVoxelType::Water, true, InAgent);
 			}
-			if(!Owner->CheckAdjacent(Index, EDirection::Up))
+			if(!Owner->CheckVoxelAdjacent(Index, EDirection::Up))
 			{
 				Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Rotation), FVoxelItem::Empty, true, InAgent);
 			}
@@ -200,4 +178,13 @@ bool UVoxel::IsUnknown() const
 UVoxelData& UVoxel::GetData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
+}
+
+FVector UVoxel::GetLocation(bool bWorldSpace) const
+{
+	if(Owner)
+	{
+		return Owner->IndexToLocation(Index, bWorldSpace);
+	}
+	return FVector::ZeroVector;
 }

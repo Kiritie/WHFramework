@@ -14,6 +14,9 @@ public:
 	UVoxelDoorData();
 
 public:
+	virtual bool GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation) const override;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* OpenSound;
 						
