@@ -103,13 +103,13 @@ void AVoxelModule::OnDestroy_Implementation()
 void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	UObjectPoolModuleBPLibrary::DespawnObject(UObjectPoolModuleBPLibrary::SpawnObject<AVoxelChunk>(nullptr, ChunkSpawnClass));
 }
 
 void AVoxelModule::OnPreparatory_Implementation()
 {
 	Super::OnPreparatory_Implementation();
+
+	UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxel>();
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelEmpty>();
@@ -118,8 +118,6 @@ void AVoxelModule::OnPreparatory_Implementation()
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelPlant>();
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
-
-	UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 
 	if(WorldMode != EVoxelWorldMode::None)
 	{

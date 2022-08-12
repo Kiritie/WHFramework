@@ -86,6 +86,20 @@ public:
 		Z = 0;
 	}
 
+	FORCEINLINE FIndex(int32 InX)
+	{
+		X = InX;
+		Y = InX;
+		Z = InX;
+	}
+
+	FORCEINLINE FIndex(int32 InX, int32 InY)
+	{
+		X = InX;
+		Y = InY;
+		Z = 0;
+	}
+
 	FORCEINLINE FIndex(int32 InX, int32 InY, int32 InZ)
 	{
 		X = InX;

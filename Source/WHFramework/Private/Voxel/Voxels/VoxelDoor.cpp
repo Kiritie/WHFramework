@@ -16,9 +16,9 @@ UVoxelDoor::UVoxelDoor()
 	bOpened = false;
 }
 
-void UVoxelDoor::OnDespawn_Implementation()
+void UVoxelDoor::OnReset_Implementation()
 {
-	Super::OnDespawn_Implementation();
+	Super::OnReset_Implementation();
 
 	bOpened = false;
 }
@@ -90,13 +90,13 @@ bool UVoxelDoor::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType
 		}
 		case EVoxelActionType::Action2:
 		{
-			FHitResult hitResult;
-			if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, GetLocation(), hitResult))
+			// FHitResult hitResult;
+			// if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, GetLocation(), hitResult))
 			{
 				Toggle();
 				return true;
 			}
-			break;
+			// break;
 		}
 		default: break;
 	}
@@ -113,14 +113,28 @@ void UVoxelDoor::Open()
 {
 	bOpened = true;
 	RefreshData();
-	Owner->Generate();
-	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
+	if(GetData().PartType == EVoxelPartType::Main)
+	{
+		for(auto Iter : GetItem().GetParts())
+		{
+			Iter.GetVoxel<UVoxelDoor>().Open();
+		}
+		Owner->Generate();
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
+	}
 }
 
 void UVoxelDoor::Close()
 {
 	bOpened = false;
 	RefreshData();
-	Owner->Generate();
-	UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
+	if(GetData().PartType == EVoxelPartType::Main)
+	{
+		for(auto Iter : GetItem().GetParts())
+		{ 
+			Iter.GetVoxel<UVoxelDoor>().Close();
+		}
+		Owner->Generate();
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
+	}
 }

@@ -14,26 +14,9 @@ AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 	Interaction->AddInteractionAction((EInteractAction)EVoxelInteractAction::Close);
 }
 
-// Called when the game starts or when spawned
-void AVoxelDoorAuxiliary::BeginPlay()
+void AVoxelDoorAuxiliary::Initialize(FIndex InVoxelIndex)
 {
-	Super::BeginPlay();
-
-}
-
-void AVoxelDoorAuxiliary::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	OpenDoor();
-}
-
-void AVoxelDoorAuxiliary::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	CloseDoor();
-}
-
-void AVoxelDoorAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex)
-{
-	Super::Initialize(InOwnerChunk, InVoxelIndex);
+	Super::Initialize(InVoxelIndex);
 }
 
 bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
@@ -44,19 +27,11 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 	{
 		case EVoxelInteractAction::Open:
 		{
-			if(!GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened())
-			{
-				return true;
-			}
-			break;
+			return !GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened();
 		}
 		case EVoxelInteractAction::Close:
 		{
-			if(GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened())
-			{
-				return true;
-			}
-			break;
+			return GetVoxelItem().GetVoxel<UVoxelDoor>().IsOpened();
 		}
 		default: return true;
 	}

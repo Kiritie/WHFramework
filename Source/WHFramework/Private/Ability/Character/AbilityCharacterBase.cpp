@@ -278,6 +278,7 @@ bool AAbilityCharacterBase::CanInteract(IInteractionAgentInterface* InInteractio
 
 void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
+	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
 }
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)

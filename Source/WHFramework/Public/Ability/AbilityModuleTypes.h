@@ -389,26 +389,26 @@ UENUM(BlueprintType)
 enum class EInteractAction : uint8
 {
 	// 无
-	None UMETA(DisplayName="无"),
+	None = 0 UMETA(DisplayName="无"),
 	// 复活
-	Revive UMETA(DisplayName="复活"),
+	Revive = 1 UMETA(DisplayName="复活"),
 	// 战斗
-	Fight UMETA(DisplayName="战斗"),
+	Fight = 2 UMETA(DisplayName="战斗"),
 	// 对话
-	Dialogue UMETA(DisplayName="对话"),
+	Dialogue = 3 UMETA(DisplayName="对话"),
 	// 交易
-	Transaction UMETA(DisplayName="交易"),
+	Transaction = 4 UMETA(DisplayName="交易"),
 	
-	Custom1 UMETA(Hidden),
-	Custom2 UMETA(Hidden),
-	Custom3 UMETA(Hidden),
-	Custom4 UMETA(Hidden),
-	Custom5 UMETA(Hidden),
-	Custom6 UMETA(Hidden),
-	Custom7 UMETA(Hidden),
-	Custom8 UMETA(Hidden),
-	Custom9 UMETA(Hidden),
-	Custom10 UMETA(Hidden)
+	Custom1 = 10 UMETA(Hidden),
+	Custom2 = 11 UMETA(Hidden),
+	Custom3 = 12 UMETA(Hidden),
+	Custom4 = 13 UMETA(Hidden),
+	Custom5 = 14 UMETA(Hidden),
+	Custom6 = 15 UMETA(Hidden),
+	Custom7 = 16 UMETA(Hidden),
+	Custom8 = 17 UMETA(Hidden),
+	Custom9 = 18 UMETA(Hidden),
+	Custom10 = 19 UMETA(Hidden)
 };
 
 /**

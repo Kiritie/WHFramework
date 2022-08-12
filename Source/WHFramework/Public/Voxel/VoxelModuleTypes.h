@@ -12,6 +12,7 @@
 
 #include "VoxelModuleTypes.generated.h"
 
+class IVoxelAgentInterface;
 class UVoxelData;
 class AVoxelChunk;
 class AVoxelAuxiliary;
@@ -209,6 +210,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
+	UPROPERTY(BlueprintReadOnly)
+	bool bGenerated;
+
 public:
 	FVoxelItem()
 	{
@@ -216,6 +220,7 @@ public:
 		Rotation = FRotator::ZeroRotator;
 		Owner = nullptr;
 		Auxiliary = nullptr;
+		bGenerated = false;
 	}
 		
 	FVoxelItem(const FAbilityItem& InAbilityItem) : FAbilityItem(InAbilityItem)
@@ -224,6 +229,7 @@ public:
 		Rotation = FRotator::ZeroRotator;
 		Owner = nullptr;
 		Auxiliary = nullptr;
+		bGenerated = false;
 	}
 
 	FVoxelItem(EVoxelType InVoxelType, bool bRefreshData = false);
@@ -233,19 +239,23 @@ public:
 	FVoxelItem(const FVoxelSaveData& InSaveData);
 
 public:
-	virtual bool IsValid(bool bNeedNotNull = false) const override;
+	void Generate(IVoxelAgentInterface* InAgent = nullptr);
+
+	void RefreshData(UVoxel* InVoxel = nullptr);
+
+	bool IsValid(bool bNeedNotNull = false) const override;
 
 	bool IsUnknown() const;
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
-	void RefreshData();
-
 	FVoxelSaveData& ToSaveData(bool bRefresh = false) const;
 
-	FVoxelItem& GetMainItem() const;
+	FVoxelItem& GetMain() const;
 
-	FVoxelItem& GetPartItem(FIndex InIndex) const;
+	FVoxelItem& GetPart(FIndex InIndex) const;
+
+	TArray<FVoxelItem> GetParts() const;
 
 	EVoxelType GetVoxelType() const;
 
@@ -262,6 +272,14 @@ public:
 	UVoxel& GetVoxel() const;
 
 	AVoxelChunk* GetOwner() const;
+
+	template<class T>
+	T& GetVoxelData() const
+	{
+		return static_cast<T&>(GetVoxelData());
+	}
+
+	UVoxelData& GetVoxelData() const;
 };
 
 USTRUCT(BlueprintType)

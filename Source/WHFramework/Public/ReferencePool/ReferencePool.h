@@ -38,7 +38,12 @@ public:
 	/**
 	* 获取引用
 	*/
-	UObject& Get();
+	template<class T>
+	T& Get(bool bReset = false)
+	{
+		return static_cast<T&>(Get(bReset));
+	}
+	UObject& Get(bool bReset = false);
 	/**
 	* 设置引用
 	*/

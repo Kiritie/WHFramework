@@ -16,13 +16,35 @@ UVoxelData::UVoxelData()
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
-	Offset = FVector::ZeroVector;
+	MeshScale = FVector::OneVector;
+	MeshOffset = FVector::ZeroVector;
 	MeshType = EVoxelMeshType::Cube;
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
-	MeshUVDatas.SetNumZeroed(6);
+	MeshUVDatas.SetNum(6);
 	GenerateSound = nullptr;
 	DestroySound = nullptr;
+}
+
+void UVoxelData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
+{
+	OutMeshScale = MeshScale;
+	OutMeshOffset = MeshOffset;
+}
+
+void UVoxelData::GetCustomMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const
+{
+	if(MeshType == EVoxelMeshType::Custom)
+	{
+		for(auto Iter : MeshVertices)
+		{
+			OutMeshVertices.Add(Iter);
+		}
+		for(auto Iter : MeshNormals)
+		{
+			OutMeshNormals.Add(Iter.GetSafeNormal());
+		}
+	}
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
@@ -45,24 +67,4 @@ UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 		if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
 	}
 	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
-}
-
-bool UVoxelData::GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation) const
-{
-	if(MeshType == EVoxelMeshType::Custom)
-	{
-		const FVector range = GetRange(InRotation);
-
-		for(auto Iter : MeshVertices)
-		{
-			OutMeshVertices.Add(Iter * range);
-		}
-
-		for(auto Iter : MeshNormals)
-		{
-			OutMeshNormals.Add(Iter.GetSafeNormal());
-		}
-		return true;
-	}
-	return false;
 }

@@ -254,8 +254,12 @@ public:
 					UserWidget->SetLastWidget(TemporaryUserWidget);
 					TemporaryUserWidget = UserWidget;
 				}
+				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
 			}
-			UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
+			else
+			{
+				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), true);
+			}
 			return true;
 		}
 		return false;

@@ -18,16 +18,15 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 	LightComponent->SetCastShadows(false);
 }
 
-// Called when the game starts or when spawned
 void AVoxelTorchAuxiliary::BeginPlay()
 {
 	Super::BeginPlay();
 
 }
 
-void AVoxelTorchAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex)
+void AVoxelTorchAuxiliary::Initialize(FIndex InVoxelIndex)
 {
-	Super::Initialize(InOwnerChunk, InVoxelIndex);
+	Super::Initialize(InVoxelIndex);
 
-	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetData<UVoxelData>().GetRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
+	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetVoxelData().GetRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
 }

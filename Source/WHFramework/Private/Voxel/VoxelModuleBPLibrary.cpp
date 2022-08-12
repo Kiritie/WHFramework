@@ -121,7 +121,7 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 	if(voxelData.IsValid())
 	{
 		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : UVoxel::StaticClass();
-		UVoxel& voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(tmpClass);
+		UVoxel& voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true, tmpClass);
 		voxel.SetID(InVoxelID);
 		return voxel;
 	}

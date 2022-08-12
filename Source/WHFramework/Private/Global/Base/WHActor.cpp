@@ -42,6 +42,11 @@ void AWHActor::OnDespawn_Implementation()
 	Container = nullptr;
 }
 
+void AWHActor::OnReset_Implementation()
+{
+	
+}
+
 void AWHActor::SetActorVisible_Implementation(bool bNewVisible)
 {
 	bVisible = bNewVisible;

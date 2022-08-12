@@ -24,12 +24,10 @@ void UInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedCompon
 {
 	if(!GetInteractionOwner() || OtherActor == GetOwner()) return;
 
-	if(OverlappingAgent) return;
-	
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
-		OverlappingAgent = OtherInteractionAgent;
-		OnAgentEnter(OverlappingAgent);
+		OnAgentEnter(OtherInteractionAgent);
+		OtherInteractionAgent->GetInteractionComponent()->OnAgentEnter(GetInteractionOwner());
 	}
 }
 
@@ -37,26 +35,32 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 {
 	if(!GetInteractionOwner() || OtherActor == GetOwner()) return;
 
-	if(!OverlappingAgent) return;
-
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
-		if(OverlappingAgent == OtherInteractionAgent)
-		{
-			OnAgentLeave(OverlappingAgent);
-			OverlappingAgent = nullptr;
-		}
+		OnAgentLeave(OtherInteractionAgent);
+		OtherInteractionAgent->GetInteractionComponent()->OnAgentLeave(GetInteractionOwner());
 	}
 }
 
 void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	InInteractionAgent->OnEnterInteract(GetInteractionOwner());
+	if(!InInteractionAgent) return;
+
+	OnAgentLeave(OverlappingAgent);
+
+	OverlappingAgent = InInteractionAgent;
+	GetInteractionOwner()->OnEnterInteract(OverlappingAgent);
 }
 
 void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	InInteractionAgent->OnLeaveInteract(GetInteractionAgent());
+	if(!InInteractionAgent) return;
+	
+	if(InInteractionAgent == OverlappingAgent)
+	{
+		OverlappingAgent = nullptr;
+		GetInteractionOwner()->OnLeaveInteract(InInteractionAgent);
+	}
 }
 
 bool UInteractionComponent::DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
@@ -65,8 +69,8 @@ bool UInteractionComponent::DoInteract(IInteractionAgentInterface* InInteraction
 	
 	if(GetInteractionOwner()->CanInteract(InInteractionAgent, InInteractAction))
 	{
-		SetInteractionAgent(InInteractionAgent);
 		GetInteractionOwner()->OnInteract(InInteractionAgent, InInteractAction);
+		InInteractionAgent->OnInteract(GetInteractionOwner(), InInteractAction);
 	}
 	return false;
 }
@@ -100,11 +104,6 @@ TArray<EInteractAction> UInteractionComponent::GetValidInteractActions(IInteract
 	return ReturnValues;
 }
 
-IInteractionAgentInterface* UInteractionComponent::GetInteractionOwner() const
-{
-	return Cast<IInteractionAgentInterface>(GetOwner());
-}
-
 void UInteractionComponent::SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent)
 {
 	InteractionAgent = InInteractionAgent;
@@ -112,4 +111,9 @@ void UInteractionComponent::SetInteractionAgent(IInteractionAgentInterface* InIn
 	{
 		InteractionAgent->GetInteractionComponent()->InteractionAgent = GetInteractionOwner();
 	}
+}
+
+IInteractionAgentInterface* UInteractionComponent::GetInteractionOwner() const
+{
+	return Cast<IInteractionAgentInterface>(GetOwner());
 }

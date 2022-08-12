@@ -16,47 +16,23 @@ UVoxelDoorData::UVoxelDoorData()
 
 	Transparency = EVoxelTransparency::SemiTransparent;
 
-	MeshType = EVoxelMeshType::Custom;
+	MeshScale = FVector(0.1f, 1.f, 1.f);
+	MeshOffset = FVector(-0.45f, 0.f, 0.f);
 	
-	MeshVertices = TArray<FVector>();
-	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(-0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, -0.5f));
-
-	MeshNormals = TArray<FVector>();
-	MeshNormals.Add(FVector(1, -1, 0));
-	MeshNormals.Add(FVector(-1, -1, 0));
-
 	OpenSound = nullptr;
 	CloseSound = nullptr;
 }
 
-bool UVoxelDoorData::GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation) const
+void UVoxelDoorData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
 {
-	if(MeshType == EVoxelMeshType::Custom)
+	if(InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened())
 	{
-		const FVector range = GetRange(InRotation);
-
-		const bool bOpened = InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened();
-
-		for(int32 i = (!bOpened ? 0 : MeshVertices.Num() / 2 - 1); i < (!bOpened ? MeshVertices.Num() / 2 : MeshVertices.Num()); i++)
-		{
-			if(MeshVertices.IsValidIndex(i))
-			{
-				OutMeshVertices.Add(MeshVertices[i] * range); 
-			}
-		}
-
-		for(auto Iter : MeshNormals)
-		{
-			OutMeshNormals.Add(Iter.GetSafeNormal());
-		}
-		return true;
+		OutMeshScale = FVector(1.f, 0.1f, 1.f);
+		OutMeshOffset = FVector(0.f, 0.45f, 0.f);
 	}
-	return false;
+	else
+	{
+		OutMeshScale = FVector(0.1f, 1.f, 1.f);
+		OutMeshOffset = FVector(-0.45f, 0.f, 0.f);
+	}
 }

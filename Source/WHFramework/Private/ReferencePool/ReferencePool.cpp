@@ -24,9 +24,10 @@ void UReferencePool::Create(UObject* InObject)
 	}
 }
 
-UObject& UReferencePool::Get()
+UObject& UReferencePool::Get(bool bReset)
 {
 	if(!Object) Create();
+	if(bReset) IReferencePoolInterface::Execute_OnReset(Object);
 	return *Object;
 }
 

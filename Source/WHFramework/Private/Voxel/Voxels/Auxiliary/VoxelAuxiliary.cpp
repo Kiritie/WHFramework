@@ -4,14 +4,11 @@
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 #include "Ability/Components/VoxelInteractionComponent.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
-// Sets default values
 AVoxelAuxiliary::AVoxelAuxiliary()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
-
 	Interaction = CreateDefaultSubobject<UVoxelInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
@@ -19,16 +16,17 @@ AVoxelAuxiliary::AVoxelAuxiliary()
 	VoxelIndex = FIndex::ZeroIndex;
 }
 
-// Called when the game starts or when spawned
 void AVoxelAuxiliary::BeginPlay()
 {
 	Super::BeginPlay();
 
 }
 
-void AVoxelAuxiliary::Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex)
+void AVoxelAuxiliary::Initialize(FIndex InVoxelIndex)
 {
 	VoxelIndex = InVoxelIndex;
+
+	Interaction->InitBoxExtent(GetVoxelItem().GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
 }
 
 void AVoxelAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -58,7 +56,7 @@ bool AVoxelAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent
 
 void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
-	
+	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
 }
 
 FVoxelItem& AVoxelAuxiliary::GetVoxelItem() const

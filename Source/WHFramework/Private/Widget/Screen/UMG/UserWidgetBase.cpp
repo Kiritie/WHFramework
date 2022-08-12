@@ -164,6 +164,8 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 {
+	if(WidgetState == EScreenWidgetState::Closing || WidgetState == EScreenWidgetState::Closed) return;
+	
 	WidgetState = EScreenWidgetState::Closing;
 	OnStateChanged(WidgetState);
 

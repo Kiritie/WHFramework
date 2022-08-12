@@ -3,6 +3,7 @@
 
 #include "Voxel/VoxelModuleTypes.h"
 
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -44,6 +45,19 @@ FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveDa
 	}
 	Owner = nullptr;
 	Auxiliary = nullptr;
+	bGenerated = false;
+}
+
+void FVoxelItem::Generate(IVoxelAgentInterface* InAgent)
+{
+	if(bGenerated) return;
+	
+	bGenerated = true;
+	if(Owner)
+	{
+		Owner->SpawnAuxiliary(Index);
+	}
+	GetVoxel().OnGenerate(InAgent);
 }
 
 bool FVoxelItem::IsValid(bool bNeedNotNull) const
@@ -58,12 +72,12 @@ bool FVoxelItem::IsUnknown() const
 
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || !InVoxelItem.IsValid() || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetData<UVoxelData>().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetData<UVoxelData>().Transparency != EVoxelTransparency::Transparent;
+	return !IsValid() || !InVoxelItem.IsValid() || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
 }
 
-void FVoxelItem::RefreshData()
+void FVoxelItem::RefreshData(UVoxel* InVoxel)
 {
-	*this = GetVoxel().ToSaveDataRef<FVoxelSaveData>(true);
+	*this = (InVoxel ? *InVoxel : GetVoxel()).ToSaveDataRef<FVoxelItem>(true);
 }
 
 FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
@@ -79,22 +93,33 @@ FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
 	return GetVoxel().ToSaveDataRef<FVoxelItem>(true).ToSaveData(false);
 }
 
-FVoxelItem& FVoxelItem::GetMainItem() const
+FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Owner)
-	{
-		return Owner->GetVoxelItem(Index + GetData<UVoxelData>().PartIndex);
-	}
+	if(Owner) return Owner->GetVoxelItem(Index - GetVoxelData().PartIndex);
 	return FVoxelItem::Empty;
 }
 
-FVoxelItem& FVoxelItem::GetPartItem(FIndex InIndex) const
+FVoxelItem& FVoxelItem::GetPart(FIndex InIndex) const
 {
-	if(Owner && GetData<UVoxelData>().HasPartData(InIndex))
+	if(Owner && GetVoxelData().HasPartData(InIndex))
 	{
 		return Owner->GetVoxelItem(Index + InIndex);
 	}
 	return FVoxelItem::Empty;
+}
+
+TArray<FVoxelItem> FVoxelItem::GetParts() const
+{
+	if(Owner)
+	{
+		TArray<FVoxelItem> parts;
+		for(auto Iter : GetVoxelData().PartDatas)
+		{
+			parts.Add(Owner->GetVoxelItem(Index + Iter.Key));
+		}
+		return parts;
+	}
+	return TArray<FVoxelItem>();
 }
 
 EVoxelType FVoxelItem::GetVoxelType() const
@@ -104,7 +129,7 @@ EVoxelType FVoxelItem::GetVoxelType() const
 
 FVector FVoxelItem::GetRange() const
 {
-	return GetData<UVoxelData>().GetRange(Rotation);
+	return GetVoxelData().GetRange(Rotation);
 }
 
 FVector FVoxelItem::GetLocation(bool bWorldSpace) const
@@ -127,9 +152,13 @@ AVoxelChunk* FVoxelItem::GetOwner() const
 	return UVoxelModuleBPLibrary::FindChunkByIndex(Index);
 }
 
+UVoxelData& FVoxelItem::GetVoxelData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
+}
+
 FVoxelHitResult::FVoxelHitResult()
 {
-	// FMemory::Memzero(this, sizeof(FVoxelHitResult));
 	VoxelItem = FVoxelItem();
 	Point = FVector();
 	Normal = FVector();
@@ -137,7 +166,6 @@ FVoxelHitResult::FVoxelHitResult()
 
 FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal)
 {
-	// FMemory::Memzero(this, sizeof(FVoxelHitResult));
 	VoxelItem = InVoxelItem;
 	Point = InPoint;
 	Normal = InNormal;

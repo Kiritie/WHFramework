@@ -14,13 +14,6 @@ public:
 	UVoxelData();
 
 public:
-	virtual bool HasPartData(FIndex InIndex) const;
-
-	virtual UVoxelData& GetPartData(FIndex InIndex);
-
-	virtual bool GetMeshDatas(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals, FRotator InRotation = FRotator::ZeroRotator) const;
-
-public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 
@@ -46,10 +39,13 @@ public:
 	UVoxelData* MainData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector Offset;
+	EVoxelMeshType MeshType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EVoxelMeshType MeshType;
+	FVector MeshScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MeshOffset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "MeshType == EVoxelMeshType::Custom"))
 	TArray<FVector> MeshVertices;
@@ -67,17 +63,25 @@ public:
 	USoundBase* DestroySound;
 
 public:
+	virtual void GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const;
+
+	virtual void GetCustomMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const;
+
+	bool HasPartData(FIndex InIndex) const;
+
+	UVoxelData& GetPartData(FIndex InIndex);
+
 	FORCEINLINE FVector GetRange(FRotator InRotation = FRotator::ZeroRotator) const
 	{
 		FVector Range = FVector::OneVector;
 		if(PartType == EVoxelPartType::Main && PartDatas.Num() > 0)
 		{
 			FVector PartRange;
-			for(auto Iter : PartDatas)
+			for(auto Iter = PartDatas.CreateConstIterator(); Iter; ++Iter)
 			{
-				PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
-				PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
-				PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
+				PartRange.X = FMath::Max(Iter->Key.X, PartRange.X);
+				PartRange.Y = FMath::Max(Iter->Key.Y, PartRange.Y);
+				PartRange.Z = FMath::Max(Iter->Key.Z, PartRange.Z);
 			}
 			Range += PartRange;
 		}
@@ -95,9 +99,11 @@ public:
 
 	FORCEINLINE FVector2D GetUVCorner(int InFaceIndex, FVector2D InUVSize) const
 	{
-		FVoxelMeshUVData uvData = FVoxelMeshUVData();
+		FVoxelMeshUVData uvData;
 		if (MeshUVDatas.Num() > InFaceIndex)
+		{
 			uvData = MeshUVDatas[InFaceIndex];
+		}
 		return FVector2D(uvData.UVCorner.X	 * InUVSize.X, (1 / InUVSize.Y - uvData.UVCorner.Y - uvData.UVSpan.Y) * InUVSize.Y);
 	}
 
@@ -108,9 +114,11 @@ public:
 
 	FORCEINLINE FVector2D GetUVSpan(int InFaceIndex, FVector2D InUVSize) const
 	{
-		FVoxelMeshUVData uvData = FVoxelMeshUVData();
+		FVoxelMeshUVData uvData;
 		if (MeshUVDatas.Num() > InFaceIndex)
+		{
 			uvData = MeshUVDatas[InFaceIndex];
+		}
 		return FVector2D(uvData.UVSpan.X * InUVSize.X, uvData.UVSpan.Y * InUVSize.Y);
 	}
 };

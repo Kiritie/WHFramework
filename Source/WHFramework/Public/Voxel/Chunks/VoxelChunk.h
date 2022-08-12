@@ -106,9 +106,9 @@ public:
 
 	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ);
 
-	virtual FVoxelItem& GetVoxelItem(FIndex InIndex);
+	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
 
-	virtual FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ);
+	virtual FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 public:
 	virtual bool CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange = FVector::OneVector);

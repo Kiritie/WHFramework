@@ -36,18 +36,14 @@ UVoxel& UVoxel::GetUnknown()
 	return UReferencePoolModuleBPLibrary::GetReference<UVoxelUnknown>();
 }
 
-void UVoxel::OnSpawn_Implementation(const TArray<FParameter>& InParams)
-{
-	
-}
-
-void UVoxel::OnDespawn_Implementation()
+void UVoxel::OnReset_Implementation()
 {
 	ID = FPrimaryAssetId();
 	Index = FIndex::ZeroIndex;
 	Rotation = FRotator::ZeroRotator;
 	Owner = nullptr;
 	Auxiliary = nullptr;
+	bGenerated = false;
 }
 
 void UVoxel::Serialize(FArchive& Ar)
@@ -63,6 +59,7 @@ void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 	Rotation = SaveData.Rotation;
 	Owner = SaveData.Owner;
 	Auxiliary = SaveData.Auxiliary;
+	bGenerated = SaveData.bGenerated;
 }
 
 FSaveData* UVoxel::ToData()
@@ -75,16 +72,14 @@ FSaveData* UVoxel::ToData()
 	SaveData.Rotation = Rotation;
 	SaveData.Owner = Owner;
 	SaveData.Auxiliary = Auxiliary;
+	SaveData.bGenerated = bGenerated;
 
 	return &SaveData;
 }
 
 void UVoxel::RefreshData()
 {
-	if(Owner)
-	{
-		Owner->GetVoxelItem(Index).RefreshData();
-	}
+	GetItem().RefreshData(this);
 }
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -148,12 +143,10 @@ bool UVoxel::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InA
 		case EVoxelActionType::Action1:
 		{
 			return InAgent->DestroyVoxel(InHitResult);
-			break;
 		}
 		case EVoxelActionType::Action2:
 		{
 			return InAgent->GenerateVoxel(InHitResult);
-			break;
 		}
 		default: break;
 	}
@@ -175,11 +168,6 @@ bool UVoxel::IsUnknown() const
 	return &UVoxel::GetUnknown() == this;
 }
 
-UVoxelData& UVoxel::GetData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
-}
-
 FVector UVoxel::GetLocation(bool bWorldSpace) const
 {
 	if(Owner)
@@ -187,4 +175,15 @@ FVector UVoxel::GetLocation(bool bWorldSpace) const
 		return Owner->IndexToLocation(Index, bWorldSpace);
 	}
 	return FVector::ZeroVector;
+}
+
+UVoxelData& UVoxel::GetData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
+}
+
+FVoxelItem& UVoxel::GetItem()
+{
+	if(Owner) return Owner->GetVoxelItem(Index);
+	return ToSaveDataRef<FVoxelItem>(true);
 }

@@ -38,13 +38,13 @@ public:
 	}
 
 	template<class T>
-	static T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	static T& GetReference(bool bReset = false, TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
-			return ReferencePoolModule->GetReference<T>(InType);
+			return ReferencePoolModule->GetReference<T>(bReset, InType);
 		}
-		return *NewObject<T>();
+		return *NewObject<T>(GetTransientPackage(), InType);
 	}
 
 	template<class T>

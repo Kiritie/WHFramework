@@ -2,34 +2,25 @@
 
 #pragma once
 
-#include "VoxelVirtualAuxiliary.h"
+#include "VoxelAuxiliary.h"
 #include "VoxelDoorAuxiliary.generated.h"
 
 class UVoxel;
 
 /**
- * �Ÿ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelDoorAuxiliary : public AVoxelVirtualAuxiliary
+class WHFRAMEWORK_API AVoxelDoorAuxiliary : public AVoxelAuxiliary
 {
 	GENERATED_BODY()
 	
 public:
-	// Sets default values for this actor's properties
 	AVoxelDoorAuxiliary();
 
+public:
+	virtual void Initialize(FIndex InVoxelIndex) override;
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
-
-	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex) override;
-
-public:	
-	virtual void Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex) override;
-
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;

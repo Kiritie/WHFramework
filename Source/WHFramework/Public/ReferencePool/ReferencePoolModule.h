@@ -68,11 +68,11 @@ public:
 	}
 
 	template<class T>
-	T& GetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	T& GetReference(bool bReset = false, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return *NewObject<T>();
+		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return *NewObject<T>(GetTransientPackage(), InType);
 
-		return static_cast<T&>(GetOrCreatePool<T>(InType)->Get());
+		return GetOrCreatePool<T>(InType)->Get<T>(bReset);
 	}
 
 	template<class T>

@@ -182,6 +182,7 @@ bool AAbilityVitalityBase::CanInteract(IInteractionAgentInterface* InInteraction
 
 void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
+	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
 }
 
 bool AAbilityVitalityBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)

@@ -11,9 +11,9 @@ UVoxelTorch::UVoxelTorch()
 	bOn = false;
 }
 
-void UVoxelTorch::OnDespawn_Implementation()
+void UVoxelTorch::OnReset_Implementation()
 {
-	Super::OnDespawn_Implementation();
+	Super::OnReset_Implementation();
 
 	bOn = false;
 }

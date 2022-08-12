@@ -16,3 +16,7 @@ void UWHObject::OnDespawn_Implementation()
 {
 	
 }
+
+void UWHObject::OnReset_Implementation()
+{
+}

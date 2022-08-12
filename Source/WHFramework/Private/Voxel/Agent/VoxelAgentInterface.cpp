@@ -16,7 +16,7 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 		VoxelItem.Owner = Chunk;
 		VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
 
-		// FRotator Rotation = (Chunk->IndexToLocation(VoxelItem.Index) + VoxelItem.GetData<UVoxelData>().GetRange() * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize - GetWorldLocation()).ToOrientationRotator();
+		// FRotator Rotation = (Chunk->IndexToLocation(VoxelItem.Index) + VoxelItem.GetVoxelData().GetRange() * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize - GetWorldLocation()).ToOrientationRotator();
 		// Rotation = FRotator(FRotator::ClampAxis(FMath::RoundToInt(Rotation.Pitch / 90) * 90.f), FRotator::ClampAxis(FMath::RoundToInt(Rotation.Yaw / 90) * 90.f), FRotator::ClampAxis(FMath::RoundToInt(Rotation.Roll / 90) * 90.f));
 		// VoxelItem.Rotation = Rotation;
 		
@@ -32,8 +32,8 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	AVoxelChunk* Chunk = InVoxelHitResult.GetChunk();
-	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem.GetMainItem();
-	if (VoxelItem.GetData<UVoxelData>().VoxelType != EVoxelType::Bedrock)
+	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
+	if (VoxelItem.GetVoxelType() != EVoxelType::Bedrock)
 	{
 		return Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this);
 	}

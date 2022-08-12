@@ -26,9 +26,9 @@ AAbilityModule::AAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
 
-	InteractActionMap = TMap<EInteractAction, FString>();
-	InteractActionMap.Add(EInteractAction::Custom1, TEXT("EVoxelInteractAction"));
-	InteractActionMap.Add(EInteractAction::Custom2, TEXT("EVoxelInteractAction"));
+	CustomInteractActionMap = TMap<EInteractAction, FString>();
+	CustomInteractActionMap.Add(EInteractAction::Custom1, TEXT("EVoxelInteractAction"));
+	CustomInteractActionMap.Add(EInteractAction::Custom2, TEXT("EVoxelInteractAction"));
 }
 
 #if WITH_EDITOR
@@ -71,9 +71,9 @@ void AAbilityModule::OnUnPause_Implementation()
 FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 {
 	FString EnumName = TEXT("EInteractAction");
-	if(InteractActionMap.Contains((EInteractAction)InInteractAction))
+	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
 	{
-		EnumName = InteractActionMap[(EInteractAction)InInteractAction];
+		EnumName = CustomInteractActionMap[(EInteractAction)InInteractAction];
 	}
 	return UGlobalBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
 }

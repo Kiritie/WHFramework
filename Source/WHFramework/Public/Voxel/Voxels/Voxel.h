@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Input/InputModuleTypes.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Global/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -39,9 +38,7 @@ public:
 public:
 	virtual int32 GetLimit_Implementation() const override { return 10000; }
 
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnReset_Implementation() override;
 
 	virtual void Serialize(FArchive& Ar) override;
 
@@ -86,6 +83,9 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	AVoxelAuxiliary* Auxiliary;
 
+	UPROPERTY(VisibleAnywhere)
+	bool bGenerated;
+
 public:
 	bool IsValid() const;
 	
@@ -93,19 +93,10 @@ public:
 
 	bool IsUnknown() const;
 
-	template<class T>
-	T& GetData() const
-	{
-		return static_cast<T&>(GetData());
-	}
-	
-	UVoxelData& GetData() const;
-
 	FPrimaryAssetId GetID() const { return ID; }
 
 	void SetID(FPrimaryAssetId InID) { ID = InID; }
 
-	UFUNCTION(BlueprintPure)
 	FIndex GetIndex() const { return Index; }
 
 	FVector GetLocation(bool bWorldSpace = true) const;
@@ -117,7 +108,6 @@ public:
 	{
 		return Cast<T>(Owner);
 	}
-
 	AVoxelChunk* GetOwner() const { return Owner; }
 
 	template<class T>
@@ -125,8 +115,16 @@ public:
 	{
 		return Cast<T>(Auxiliary);
 	}
-
 	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
+
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+	UVoxelData& GetData() const;
+
+	FVoxelItem& GetItem();
 };
 
 UCLASS()

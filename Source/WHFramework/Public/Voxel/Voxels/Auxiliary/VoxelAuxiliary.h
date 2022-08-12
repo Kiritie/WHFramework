@@ -21,16 +21,22 @@ class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public IInteractionAgen
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AVoxelAuxiliary();
 
 protected:
-	// Called when the game starts or when spawned
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class UVoxelInteractionComponent* Interaction;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FIndex VoxelIndex;
+
+protected:
 	virtual void BeginPlay() override;
 
 public:	
-	virtual void Initialize(AVoxelChunk* InOwnerChunk, FIndex InVoxelIndex);
+	virtual void Initialize(FIndex InVoxelIndex);
 
+protected:	
 	virtual int32 GetLimit_Implementation() const override { return 10000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
@@ -44,13 +50,6 @@ public:
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class UVoxelInteractionComponent* Interaction;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FIndex VoxelIndex;
 
 public:
 	FIndex GetVoxelIndex() const { return VoxelIndex; }

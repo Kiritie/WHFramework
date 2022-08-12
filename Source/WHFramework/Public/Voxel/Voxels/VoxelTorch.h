@@ -21,7 +21,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
 public:
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnReset_Implementation() override;
 
 	virtual void Serialize(FArchive& Ar) override;
 	

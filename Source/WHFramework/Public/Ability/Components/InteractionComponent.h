@@ -25,7 +25,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EInteractAction InteractingAction;
-	
+
 	IInteractionAgentInterface* OverlappingAgent;
 
 	IInteractionAgentInterface* InteractionAgent;
@@ -47,20 +47,20 @@ protected:
 public:
 	virtual bool DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction);
 
-public:
-	void AddInteractionAction(EInteractAction InInteractAction);
+	virtual void AddInteractionAction(EInteractAction InInteractAction);
 		
-	void RemoveInteractionAction(EInteractAction InInteractAction);
+	virtual void RemoveInteractionAction(EInteractAction InInteractAction);
 		
-	TArray<EInteractAction> GetValidInteractActions(IInteractionAgentInterface* InInteractionAgent) const;
+	virtual TArray<EInteractAction> GetValidInteractActions(IInteractionAgentInterface* InInteractionAgent) const;
 	
+public:
 	EInteractAction GetInteractingAction() const { return InteractingAction; }
 
 	IInteractionAgentInterface* GetOverlappingAgent() const { return OverlappingAgent; }
 
-	IInteractionAgentInterface* GetInteractionOwner() const;
-
 	IInteractionAgentInterface* GetInteractionAgent() const { return InteractionAgent; }
 
 	void SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent);
+
+	IInteractionAgentInterface* GetInteractionOwner() const;
 };

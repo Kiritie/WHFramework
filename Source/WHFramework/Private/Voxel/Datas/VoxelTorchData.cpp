@@ -13,19 +13,6 @@ UVoxelTorchData::UVoxelTorchData()
 
 	Transparency = EVoxelTransparency::Transparent;
 
-	MeshType = EVoxelMeshType::Custom;
-
-	MeshVertices = TArray<FVector>();
-	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(-0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, -0.5f));
-
-	MeshNormals = TArray<FVector>();
-	MeshNormals.Add(FVector(1, -1, 0));
-	MeshNormals.Add(FVector(-1, -1, 0));
+	MeshScale = FVector(0.2f, 0.2f, 0.8f);
+	MeshOffset = FVector(0.f, 0.f, -0.2f);
 }

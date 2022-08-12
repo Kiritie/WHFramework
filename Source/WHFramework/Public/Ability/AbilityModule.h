@@ -42,7 +42,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EInteractAction, FString> InteractActionMap;
+	TMap<EInteractAction, FString> CustomInteractActionMap;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Interact
