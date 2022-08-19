@@ -21,11 +21,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* MeshComponent;
 
-protected:
-	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
-
 public:
 	virtual void Initialize(FAbilityItem InItem) override;
+
+protected:
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

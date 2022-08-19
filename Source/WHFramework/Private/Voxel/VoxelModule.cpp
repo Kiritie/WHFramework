@@ -3,21 +3,25 @@
 
 #include "Voxel/VoxelModule.h"
 
+#include "ImageUtils.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Voxel/EventHandle_ChangeVoxelWorldState.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
+#include "Main/MainModuleBPLibrary.h"
 #include "Math/MathBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
+#include "Scene/SceneModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -29,6 +33,7 @@
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/VoxelWater.h"
 #include "Voxel/Voxels/Entity/VoxelEntity.h"
+#include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
 
 // Sets default values
 AVoxelModule::AVoxelModule()
@@ -36,10 +41,16 @@ AVoxelModule::AVoxelModule()
 	ModuleName = FName("VoxelModule");
 
 	VoxelsCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
+	VoxelsCapture->SetupAttachment(RootComponent);
+	VoxelsCapture->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));
+	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> VoxelsPreviewTexFinder(TEXT("TextureRenderTarget2D'/WHFramework/Voxel/Textures/RT_VoxelPreview.RT_VoxelPreview'"));
+	if(VoxelsPreviewTexFinder.Succeeded())
+	{
+		VoxelsCapture->TextureTarget = VoxelsPreviewTexFinder.Object;
+	}
 	VoxelsCapture->ProjectionType = ECameraProjectionMode::Orthographic;
 	VoxelsCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
-	VoxelsCapture->SetupAttachment(RootComponent);
-	VoxelsCapture->SetRelativeLocationAndRotation(FVector(0, 0, -500), FRotator(90, 0, 0));
+	VoxelsCapture->bCaptureEveryFrame = true;
 
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
@@ -50,7 +61,7 @@ AVoxelModule::AVoxelModule()
 	ChunkBasicSpawnRange = 1;
 	ChunkSpawnDistance = 3;
 
-	ChunkSpawnSpeed = 1000;
+	ChunkSpawnSpeed = 100;
 	ChunkDestroyDistance = 1;
 	ChunkDestroySpeed = 10;
 	ChunkMapLoadSpeed = 100;
@@ -71,20 +82,23 @@ AVoxelModule::AVoxelModule()
 	ChunkDestroyQueue = TArray<FIndex>();
 
 	WorldBasicData = FVoxelWorldBasicSaveData();
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid"));
-	if(SolidMatFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid_Unlit.M_Voxels_Solid_Unlit'"));
+	if(SolidMatFinder.Succeeded() && UnlitSolidMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SolidMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SolidMatFinder.Object, UnlitSolidMatFinder.Object, FVector2D(0.0625f, 0.5f)));
 	}
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent"));
-	if(SemiTransparentMatFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent_Unlit.M_Voxels_SemiTransparent_Unlit'"));
+	if(SemiTransparentMatFinder.Succeeded() && UnlitSemiTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SemiTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SemiTransparentMatFinder.Object, UnlitSemiTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
 	}
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent"));
-	if(TransparentMatFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent_Unlit.M_Voxels_Transparent_Unlit'"));
+	if(TransparentMatFinder.Succeeded() && UnlitTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
 	}
 }
 
@@ -119,10 +133,13 @@ void AVoxelModule::OnPreparatory_Implementation()
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
 	UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
 
+	GenerateVoxels();
+
 	if(WorldMode != EVoxelWorldMode::None)
 	{
-		static FVoxelWorldSaveData SaveData = FVoxelWorldSaveData(WorldBasicData);
-		LoadSaveData(&SaveData, WorldMode == EVoxelWorldMode::Normal);
+		static FVoxelWorldSaveData SaveData;
+		SaveData = FVoxelWorldSaveData(WorldBasicData);
+		LoadSaveData(&SaveData, true);
 	}
 }
 
@@ -147,6 +164,7 @@ void AVoxelModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
 
+	ChunkMap.Empty();
 	StopChunkTasks(ChunkMapLoadTasks);
 	StopChunkTasks(ChunkMapBuildTasks);
 	StopChunkTasks(ChunkMeshBuildTasks);
@@ -190,13 +208,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 		WorldData->WorldSeed = FMath::Rand();
 	}
 	WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
-	{
-		if(UWorldTimerComponent* WorldTimer = SceneModule->GetWorldTimer())
-		{
-			WorldTimer->SetTimeSeconds(WorldData->TimeSeconds);
-		}
-	}
+	USceneModuleBPLibrary::GetWorldTimer()->SetTimeSeconds(WorldData->TimeSeconds);
 
 	if(!bForceMode)
 	{
@@ -220,6 +232,7 @@ FSaveData* AVoxelModule::ToData()
 			WorldData->SetChunkData(Iter.Key, Iter.Value->ToSaveData<FVoxelChunkSaveData>());
 		}
 	}
+	WorldData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();
 	return WorldData;
 }
 
@@ -228,10 +241,6 @@ void AVoxelModule::UnloadData(bool bForceMode)
 	if(bForceMode)
 	{
 		SetWorldState(EVoxelWorldState::None);
-		
-		StopChunkTasks(ChunkMapLoadTasks);
-		StopChunkTasks(ChunkMapBuildTasks);
-		StopChunkTasks(ChunkMeshBuildTasks);
 
 		for(auto iter : ChunkMap)
 		{
@@ -241,6 +250,10 @@ void AVoxelModule::UnloadData(bool bForceMode)
 			}
 		}
 		ChunkMap.Empty();
+		
+		StopChunkTasks(ChunkMapLoadTasks);
+		StopChunkTasks(ChunkMapBuildTasks);
+		StopChunkTasks(ChunkMeshBuildTasks);
 
 		ChunkSpawnBatch = 0;
 		LastGenerateIndex = FIndex(-1, -1, -1);
@@ -278,10 +291,8 @@ void AVoxelModule::GenerateWorld()
 	const FIndex ChunkIndex = UVoxelModuleBPLibrary::LocationToChunkIndex(VoxelAgent->GetWorldLocation(), true);
 
 	// Check chunk spawn queue
-	if(LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(ChunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance)
+	if(WorldState != EVoxelWorldState::Spawning && (LastGenerateIndex == FIndex(-1, -1, -1) || FIndex::Distance(ChunkIndex, LastGenerateIndex, true) >= ChunkSpawnDistance))
 	{
-		if(ChunkSpawnQueue.Num() > 0) return;
-
 		for(int32 x = ChunkIndex.X - ChunkSpawnRange; x < ChunkIndex.X + ChunkSpawnRange; x++)
 		{
 			for(int32 y = ChunkIndex.Y - ChunkSpawnRange; y < ChunkIndex.Y + ChunkSpawnRange; y++)
@@ -358,30 +369,60 @@ void AVoxelModule::GenerateWorld()
 
 void AVoxelModule::GenerateVoxels()
 {
-	auto voxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
-	if(voxelDatas.Num() >0)
+	VoxelsCapture->OrthoWidth = WorldBasicData.BlockSize * 4.f;
+	
+	int32 tmpIndex = 0;
+	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
+	for(int32 i = 0; i < VoxelDatas.Num(); i++)
 	{
-		int32 tmpNum = 8;
-		int32 tmpIndex = 0;
-		VoxelsCapture->OrthoWidth = tmpNum * WorldData->BlockSize * 0.5f;
-		for (float x = -(tmpNum - 1) * 0.5f; x <= (tmpNum - 1) * 0.5f; x++)
+		if(VoxelDatas[i]->VoxelType == EVoxelType::Unknown || VoxelDatas[i]->PartType != EVoxelPartType::Main) continue;
+		
+		if(AVoxelEntityPreview* VoxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntityPreview>())
 		{
-			for (float y = -(tmpNum - 1) * 0.5f; y <= (tmpNum - 1) * 0.5f; y++)
-			{
-				if (tmpIndex < voxelDatas.Num())
-				{
-					if (AVoxelEntity* voxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntity>())
-					{
-						voxelEntity->Initialize(voxelDatas[tmpIndex]->GetPrimaryAssetId());
-						voxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-						voxelEntity->SetActorLocation(FVector(x * WorldData->BlockSize * 0.5f, y * WorldData->BlockSize * 0.5f, 0));
-						voxelEntity->SetActorRotation(FRotator(-70, 0, -180));
-						voxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0, 45, 0));
-						VoxelsCapture->ShowOnlyActors.Add(voxelEntity);
-					}
-					tmpIndex++;
-				}
-			}
+			VoxelEntity->Initialize(VoxelDatas[i]->GetPrimaryAssetId());
+			VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+			VoxelEntity->SetActorLocation(FVector((tmpIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (tmpIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
+			VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
+			VoxelsCapture->ShowOnlyActors.Add(VoxelEntity);
+
+			// VoxelsCapture->CaptureScene();
+			//
+			// constexpr int32 TextureWidth = 64;
+			// constexpr int32 TextureHeight = 64;
+			// constexpr int32 TextureSize = TextureWidth * TextureHeight;
+			//
+			// FRenderTarget* SourceTexture = VoxelsCapture->TextureTarget->GameThread_GetRenderTargetResource();
+			// TArray<FColor> SourcePixels;
+			// const FReadSurfaceDataFlags ReadSurfaceDataFlags(RCM_UNorm);
+			// SourceTexture->ReadPixels(SourcePixels, ReadSurfaceDataFlags);
+			//
+			// UTexture2D* NewTexture = UTexture2D::CreateTransient(TextureWidth, TextureHeight, PF_B8G8R8A8);
+			//
+			// uint8* NewPixels = new uint8[TextureSize * 4];
+			// for (int32 x = 0; x < TextureWidth; x++)
+			// {
+			// 	for (int32 y = 0; y < TextureHeight; y++)
+			// 	{
+			// 		const int32 newIndex = (x + y * TextureWidth) * 4;
+			// 		const int32 sourceIndex = (x + TextureWidth * (tmpIndex % 8)) + (y * TextureWidth * 8 + (tmpIndex / 8) * TextureSize * 8);
+			// 		NewPixels[newIndex] = SourcePixels[sourceIndex].B;
+			// 		NewPixels[newIndex + 1] = SourcePixels[sourceIndex].G;
+			// 		NewPixels[newIndex + 2] = SourcePixels[sourceIndex].R;
+			// 		NewPixels[newIndex + 3] = 255 - SourcePixels[sourceIndex].A;
+			// 	}
+			// }
+			//
+			// void* NewTextureData = NewTexture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+			// FMemory::Memcpy(NewTextureData, NewPixels, sizeof(uint8) * TextureSize * 4);
+			// NewTexture->GetPlatformData()->Mips[0].BulkData.Unlock();
+			//
+			// NewTexture->UpdateResource();
+			//
+			// VoxelDatas[i]->Icon = NewTexture;
+
+			VoxelDatas[i]->InitIconMat(VoxelsCapture->TextureTarget, 8, tmpIndex);
+
+			tmpIndex++;
 		}
 	}
 }
@@ -439,6 +480,7 @@ void AVoxelModule::DestroyChunk(FIndex InIndex)
 {
 	if(!ChunkMap.Contains(InIndex) || !RemoveFromDestroyQueue(InIndex)) return;
 	
+	RemoveFromSpawnQueue(InIndex);
 	RemoveFromMapLoadQueue(InIndex);
 	RemoveFromMapBuildQueue(InIndex, 0);
 	RemoveFromMapBuildQueue(InIndex, 1);
@@ -456,6 +498,8 @@ void AVoxelModule::DestroyChunk(FIndex InIndex)
 bool AVoxelModule::AddToSpawnQueue(FIndex InIndex)
 {
 	if(ChunkMap.Contains(InIndex)) return false;
+
+	RemoveFromDestroyQueue(InIndex);
 
 	ChunkSpawnQueue.AddUnique(InIndex);
 	return true;

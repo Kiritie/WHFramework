@@ -19,20 +19,23 @@ UVoxelDoorData::UVoxelDoorData()
 	MeshScale = FVector(0.1f, 1.f, 1.f);
 	MeshOffset = FVector(-0.45f, 0.f, 0.f);
 	
+	OpenMeshScale = FVector(1.f, 0.1f, 1.f);
+	OpenMeshOffset = FVector(0.f, 0.45f, 0.f);
+
 	OpenSound = nullptr;
 	CloseSound = nullptr;
 }
 
-void UVoxelDoorData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
+void UVoxelDoorData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, FVector& OutMeshScale, FVector& OutMeshOffset) const
 {
-	if(InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened())
+	if(InMeshNature == EVoxelMeshNature::Chunk && InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened())
 	{
-		OutMeshScale = FVector(1.f, 0.1f, 1.f);
-		OutMeshOffset = FVector(0.f, 0.45f, 0.f);
+		OutMeshScale = OpenMeshScale;
+		OutMeshOffset = OpenMeshOffset;
 	}
 	else
 	{
-		OutMeshScale = FVector(0.1f, 1.f, 1.f);
-		OutMeshOffset = FVector(-0.45f, 0.f, 0.f);
+		OutMeshScale = MeshScale;
+		OutMeshOffset = MeshOffset;
 	}
 }

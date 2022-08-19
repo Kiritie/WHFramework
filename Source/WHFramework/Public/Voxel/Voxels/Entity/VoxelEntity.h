@@ -23,7 +23,7 @@ public:
 	AVoxelEntity();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
 	FPrimaryAssetId VoxelID;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
@@ -43,8 +43,7 @@ public:
 		
 	virtual void OnDespawn_Implementation() override;
 
-	UVoxelData& GetVoxelData() const;
-
+public:
 	FPrimaryAssetId GetVoxelID() const { return VoxelID; }
 
 	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }

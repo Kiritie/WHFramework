@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ability/Item/AbilityItemDataBase.h"
+#include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelData.generated.h"
@@ -63,9 +64,9 @@ public:
 	USoundBase* DestroySound;
 
 public:
-	virtual void GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const;
+	virtual void GetDefaultMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, FVector& OutMeshScale, FVector& OutMeshOffset) const;
 
-	virtual void GetCustomMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const;
+	virtual void GetCustomMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const;
 
 	bool HasPartData(FIndex InIndex) const;
 
@@ -77,18 +78,18 @@ public:
 		if(PartType == EVoxelPartType::Main && PartDatas.Num() > 0)
 		{
 			FVector PartRange;
-			for(auto Iter = PartDatas.CreateConstIterator(); Iter; ++Iter)
+			for(auto Iter : PartDatas)
 			{
-				PartRange.X = FMath::Max(Iter->Key.X, PartRange.X);
-				PartRange.Y = FMath::Max(Iter->Key.Y, PartRange.Y);
-				PartRange.Z = FMath::Max(Iter->Key.Z, PartRange.Z);
+				PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
+				PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
+				PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
 			}
 			Range += PartRange;
 		}
-		Range = InRotation.RotateVector(Range);
-		Range.X = FMath::Abs(Range.X);
-		Range.Y = FMath::Abs(Range.Y);
-		Range.Z = FMath::Abs(Range.Z);
+		if(InRotation != FRotator::ZeroRotator)
+		{
+			Range = UMathBPLibrary::RotatorVector(InRotation, Range, true, true);
+		}
 		return Range;
 	}
 

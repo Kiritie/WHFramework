@@ -19,7 +19,7 @@ class WHFRAMEWORK_API UReferencePoolModuleBPLibrary : public UBlueprintFunctionL
 
 public:
 	template<class T>
-	static bool HasReference(TSubclassOf<UObject> InType = T::StaticClass())
+	static bool HasReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
@@ -29,7 +29,7 @@ public:
 	}
 
 	template<class T>
-	static void CreateReference(UObject* InObject = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	static void CreateReference(UObject* InObject = nullptr, TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
@@ -38,7 +38,7 @@ public:
 	}
 
 	template<class T>
-	static T& GetReference(bool bReset = false, TSubclassOf<UObject> InType = T::StaticClass())
+	static T& GetReference(bool bReset = false, TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
@@ -48,7 +48,7 @@ public:
 	}
 
 	template<class T>
-	static void ResetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	static void ResetReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{
@@ -57,7 +57,7 @@ public:
 	}
 
 	template<class T>
-	static void ClearReference(TSubclassOf<UObject> InType = T::StaticClass())
+	static void ClearReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
 		{

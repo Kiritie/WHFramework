@@ -21,10 +21,28 @@ class WHFRAMEWORK_API UMathBPLibrary : public UBlueprintFunctionLibrary
 	// Lerp
 public:
 	template<class U>
-	FORCEINLINE static FRotator Lerp(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
+	FORCEINLINE static FRotator LerpRotator(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
 	{
 		const FRotator Delta = B - A;
 		return A + (bNormalized ? Delta.GetNormalized() : Delta) * Alpha;
+	}
+
+	FORCEINLINE static FVector RotatorVector(const FRotator& Rotator, const FVector& Vector, bool bRound = false, bool bAbs = false)
+	{
+		FVector vector = Rotator.RotateVector(Vector);
+		if(bRound)
+		{
+			vector.X = FMath::RoundToFloat(vector.X);
+			vector.Y = FMath::RoundToFloat(vector.Y);
+			vector.Z = FMath::RoundToFloat(vector.Z);
+		}
+		if(bAbs)
+		{
+			vector.X = FMath::Abs(vector.X);
+			vector.Y = FMath::Abs(vector.Y);
+			vector.Z = FMath::Abs(vector.Z);
+		}
+		return vector;
 	}
 
 	//////////////////////////////////////////////////////////////////////////

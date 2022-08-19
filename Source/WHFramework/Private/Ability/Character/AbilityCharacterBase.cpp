@@ -118,7 +118,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 FSaveData* AAbilityCharacterBase::ToData()
 {
 	static FCharacterSaveData SaveData;
-	SaveData.Reset();
+	SaveData = FCharacterSaveData();
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;

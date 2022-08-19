@@ -13,7 +13,7 @@ AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 {
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->Initialize(EVoxelMeshNature::PickUp);
 }
 
 void AAbilityPickUpVoxel::Initialize(FAbilityItem InItem)
@@ -21,11 +21,9 @@ void AAbilityPickUpVoxel::Initialize(FAbilityItem InItem)
 	Super::Initialize(InItem);
 
 	const FVector range = Item.GetData<UVoxelData>().GetRange();
-	BoxComponent->SetBoxExtent(range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * (1 / range.Z) * 0.2f);
+	BoxComponent->SetBoxExtent(range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.15f);
 
-	MeshComponent->Initialize(EVoxelMeshNature::PickUp);
-	MeshComponent->BuildVoxel(FVoxelItem(Item.ID));
-	MeshComponent->CreateMesh(0, false);
+	MeshComponent->CreateVoxel(InItem);
 }
 
 void AAbilityPickUpVoxel::OnPickUp(IAbilityPickerInterface* InPicker)

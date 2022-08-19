@@ -26,13 +26,13 @@ UVoxelData::UVoxelData()
 	DestroySound = nullptr;
 }
 
-void UVoxelData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
+void UVoxelData::GetDefaultMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, FVector& OutMeshScale, FVector& OutMeshOffset) const
 {
 	OutMeshScale = MeshScale;
 	OutMeshOffset = MeshOffset;
 }
 
-void UVoxelData::GetCustomMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const
+void UVoxelData::GetCustomMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const
 {
 	if(MeshType == EVoxelMeshType::Custom)
 	{

@@ -36,27 +36,38 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			BlockScale = 1.f;
 			OffsetScale = 1.f;
 			CenterOffset = FVector(0.5f);
+			switch(Transparency)
+			{
+				case EVoxelTransparency::Solid:
+				case EVoxelTransparency::SemiTransparent:
+				{
+					SetCollisionProfileName(TEXT("SolidVoxel"));
+					break;
+				}
+				case EVoxelTransparency::Transparent:
+				{
+					SetCollisionProfileName(TEXT("TransVoxel"));
+					break;
+				}
+			}
+			SetCollisionEnabled(true);
 			break;
 		}
 		case EVoxelMeshNature::PickUp:
-		{
-			BlockScale = 0.3f;
-			OffsetScale = 0;
-			CenterOffset = FVector::ZeroVector;
-			break;
-		}
 		case EVoxelMeshNature::Entity:
+		case EVoxelMeshNature::Preview:
 		{
 			BlockScale = 0.3f;
 			OffsetScale = 0;
-			CenterOffset = FVector::ZeroVector;
+			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelMeshNature::Vitality:
 		{
 			BlockScale = 1.f;
-			OffsetScale = 0;
-			CenterOffset = FVector::ZeroVector;
+			OffsetScale = 1.f;
+			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			SetCollisionEnabled(false);
 			break;
 		}
 	}
@@ -70,7 +81,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 		case EVoxelMeshType::Custom:
 		{
 			TArray<FVector> meshVertices, meshNormals;
-			voxelData.GetCustomMeshData(InVoxelItem, meshVertices, meshNormals);
+			voxelData.GetCustomMeshData(InVoxelItem, MeshNature, meshVertices, meshNormals);
 			for (int i = 0; i < meshVertices.Num(); i++)
 			{
 				if (i > 0 && (i + 1) % 4 == 0)
@@ -96,40 +107,60 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 			break;
 		}
 	}
-	if (MeshNature == EVoxelMeshNature::PickUp || MeshNature == EVoxelMeshNature::Entity || MeshNature == EVoxelMeshNature::Vitality)
+}
+
+void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
+{
+	if(InVoxelItem.IsValid())
 	{
+		UVoxelData& voxelData = InVoxelItem.GetVoxelData();
+		const FVector range = voxelData.GetRange();
 		Transparency = voxelData.Transparency;
+		CenterOffset = FVector(0.f, 0.f, -range.Z * 0.5f + 0.5f);
+		INDEX_ITERATOR(partIndex, range,
+			UVoxelData& partData = voxelData.GetPartData(partIndex);
+			if(partData.IsValid())
+			{
+				FVoxelItem partItem;
+				partItem.ID = partData.GetPrimaryAssetId();
+				partItem.Index = partIndex;
+				BuildVoxel(partItem);
+			}
+		)
+		CreateMesh(0, false);
+	}
+	else
+	{
+		ClearMesh(0);
 	}
 }
 
 void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollider /*= true*/)
 {
-	if (Vertices.Num() > 0)
+	if (!IsEmpty())
 	{
 		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollider);
-		UMaterialInterface* material = nullptr;
 		switch (MeshNature)
 		{
 			case EVoxelMeshNature::Chunk:
 			case EVoxelMeshNature::PickUp:
+			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				material = UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material;
+				SetMaterial(InSectionIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material);
 				break;
 			}
-			case EVoxelMeshNature::Entity:
+			case EVoxelMeshNature::Preview:
 			{
-				material = UMaterialInstanceDynamic::Create(UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material, this);
-				Cast<UMaterialInstanceDynamic>(material)->SetScalarParameterValue(TEXT("Emissive"), 1);
+				SetMaterial(InSectionIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).UnlitMaterial);
 				break;
 			}
 		}
-		SetMaterial(InSectionIndex, material);
 		ClearData();
 	}
 	else
 	{
-		ClearMesh(0);
+		ClearMesh(InSectionIndex);
 	}
 }
 
@@ -221,15 +252,16 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 {
 	const int32 verNum = Vertices.Num();
 	const UVoxelData& voxelData = InVoxelItem.GetVoxelData();
-	FVector scale, offset; voxelData.GetDefaultMeshData(InVoxelItem, scale, offset);
+	FVector scale, offset;
+	voxelData.GetDefaultMeshData(InVoxelItem, MeshNature, scale, offset);
 	const FRotator& rotation = InVoxelItem.Rotation;
-	const FVector center = CenterOffset + rotation.RotateVector(offset) * OffsetScale;
+	const FVector center = CenterOffset + UMathBPLibrary::RotatorVector(rotation, offset) * OffsetScale;
 	const FVector2D uvCorner = voxelData.GetUVCorner(InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize);
 	const FVector2D uvSpan = voxelData.GetUVSpan(InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize);
-	
+
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + center + rotation.RotateVector(InVertices[i]) * scale) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
+		Vertices.Add((InVoxelItem.Index.ToVector() + center + UMathBPLibrary::RotatorVector(rotation, InVertices[i]) * scale) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
 	}
 
 	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));
@@ -244,7 +276,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	Triangles.Add(verNum + 2);
 	Triangles.Add(verNum + 0);
 
-	InNormal = rotation.RotateVector(InNormal);
+	InNormal = UMathBPLibrary::RotatorVector(rotation, InNormal);
 	Normals.Add(InNormal);
 	Normals.Add(InNormal);
 	Normals.Add(InNormal);
@@ -259,4 +291,27 @@ bool UVoxelMeshComponent::IsEmpty() const
 AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const
 {
 	return Cast<AVoxelChunk>(GetOwner());
+}
+
+void UVoxelMeshComponent::SetCollisionEnabled(ECollisionEnabled::Type NewType)
+{
+	Super::SetCollisionEnabled(NewType);
+}
+
+void UVoxelMeshComponent::SetCollisionEnabled(bool bNewEnable)
+{
+	switch(Transparency)
+	{
+		case EVoxelTransparency::Solid:
+		case EVoxelTransparency::SemiTransparent:
+		{
+			SetCollisionEnabled(bNewEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+			break;
+		}
+		case EVoxelTransparency::Transparent:
+		{
+			SetCollisionEnabled(bNewEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			break;
+		}
+	}
 }

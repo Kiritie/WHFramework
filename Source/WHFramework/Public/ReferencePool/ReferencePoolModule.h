@@ -48,7 +48,7 @@ protected:
 
 public:
 	template<class T>
-	bool HasReference(TSubclassOf<UObject> InType = T::StaticClass())
+	bool HasReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return false;
 
@@ -60,23 +60,23 @@ public:
 	}
 
 	template<class T>
-	void CreateReference(UObject* InObject = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	void CreateReference(UObject* InObject = nullptr, TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
 
-		GetOrCreatePool<T>(InType)->Create(InObject);
+		GetOrCreatePool(InType)->Create(InObject);
 	}
 
 	template<class T>
-	T& GetReference(bool bReset = false, TSubclassOf<UObject> InType = T::StaticClass())
+	T& GetReference(bool bReset = false, TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return *NewObject<T>(GetTransientPackage(), InType);
 
-		return GetOrCreatePool<T>(InType)->Get<T>(bReset);
+		return GetOrCreatePool(InType)->template Get<T>(bReset);
 	}
 
 	template<class T>
-	void ResetReference(TSubclassOf<UObject> InType = T::StaticClass())
+	void ResetReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
 
@@ -87,7 +87,7 @@ public:
 	}
 
 	template<class T>
-	void ClearReference(TSubclassOf<UObject> InType = T::StaticClass())
+	void ClearReference(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return;
 
@@ -101,7 +101,7 @@ public:
 
 protected:
 	template<class T>
-	UReferencePool* GetOrCreatePool(TSubclassOf<UObject> InType = T::StaticClass())
+	UReferencePool* GetOrCreatePool(TSubclassOf<T> InType = T::StaticClass())
 	{
 		if(!InType || !InType->ImplementsInterface(UReferencePoolInterface::StaticClass())) return nullptr;
 

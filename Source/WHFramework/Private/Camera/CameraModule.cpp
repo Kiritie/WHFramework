@@ -196,7 +196,7 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			if(CameraDoRotateDuration != 0.f)
 			{
 				CameraDoRotateTime = FMath::Clamp(CameraDoRotateTime + DeltaSeconds, 0.f, CameraDoRotateDuration);
-				GetPlayerController()->SetControlRotation(UMathBPLibrary::Lerp(CameraDoRotateRotation, TargetCameraRotation, UMathBPLibrary::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration), !CameraDoRotateRotation.Equals(TargetCameraRotation)));
+				GetPlayerController()->SetControlRotation(UMathBPLibrary::LerpRotator(CameraDoRotateRotation, TargetCameraRotation, UMathBPLibrary::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration), !CameraDoRotateRotation.Equals(TargetCameraRotation)));
 			}
 			else
 			{

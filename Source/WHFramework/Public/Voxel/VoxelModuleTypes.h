@@ -138,6 +138,8 @@ enum class EVoxelMeshNature : uint8
 	PickUp,
 	// ?????
 	Entity,
+	// ?????
+	Preview,
 	// ????????
 	Vitality
 };
@@ -173,18 +175,18 @@ struct WHFRAMEWORK_API FVoxelSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	FString StringData;
+	UPROPERTY(BlueprintReadOnly)
+	FString VoxelData;
 
 public:
 	FVoxelSaveData()
 	{
-		StringData = TEXT("");
+		VoxelData = TEXT("");
 	}
 		
 	FVoxelSaveData(const FSaveData& InSaveData) : FSaveData(InSaveData)
 	{
-		StringData = TEXT("");
+		VoxelData = TEXT("");
 	}
 };
 
@@ -231,6 +233,15 @@ public:
 		Auxiliary = nullptr;
 		bGenerated = false;
 	}
+	
+	FVoxelItem(const FVoxelItem& InVoxelItem, int InCount) : FAbilityItem(InVoxelItem, InCount)
+	{
+		Index = FIndex::ZeroIndex;
+		Rotation = FRotator::ZeroRotator;
+		Owner = nullptr;
+		Auxiliary = nullptr;
+		bGenerated = false;
+	}
 
 	FVoxelItem(EVoxelType InVoxelType, bool bRefreshData = false);
 
@@ -240,6 +251,8 @@ public:
 
 public:
 	void Generate(IVoxelAgentInterface* InAgent = nullptr);
+
+	void Destroy(IVoxelAgentInterface* InAgent = nullptr);
 
 	void RefreshData(UVoxel* InVoxel = nullptr);
 
@@ -274,12 +287,12 @@ public:
 	AVoxelChunk* GetOwner() const;
 
 	template<class T>
-	T& GetVoxelData() const
+	T& GetVoxelData(bool bLogWarning = true) const
 	{
-		return static_cast<T&>(GetVoxelData());
+		return static_cast<T&>(GetVoxelData(bLogWarning));
 	}
 
-	UVoxelData& GetVoxelData() const;
+	UVoxelData& GetVoxelData(bool bLogWarning = true) const;
 };
 
 USTRUCT(BlueprintType)
@@ -318,17 +331,22 @@ public:
 	UMaterialInterface* Material;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* UnlitMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector2D BlockUVSize;
 
 	FORCEINLINE FVoxelChunkMaterial()
 	{
 		Material = nullptr;
+		UnlitMaterial = nullptr;
 		BlockUVSize = FVector2D(0.0625f, 0.5f);
 	}
 
-	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, FVector2D InBlockUVSize)
+	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, FVector2D InBlockUVSize)
 	{
 		Material = InMaterial;
+		UnlitMaterial = InUnlitMaterial;
 		BlockUVSize = InBlockUVSize;
 	}
 };
@@ -356,14 +374,6 @@ public:
 	}
 
 public:
-	virtual void Reset() override
-	{
-		FSaveData::Reset();
-		Index = FIndex::ZeroIndex;
-		VoxelDatas.Empty();
-		PickUpDatas.Empty();
-	}
-
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
@@ -456,9 +466,9 @@ public:
 		return ChunkSize * ChunkHeightRange;
 	}
 
-	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency Transparency) const
+	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency InTransparency) const
 	{
-		const int32 Index = FMath::Clamp((int32)Transparency, 0, ChunkMaterials.Num());
+		const int32 Index = FMath::Clamp((int32)InTransparency, 0, ChunkMaterials.Num());
 		if(ChunkMaterials.IsValidIndex(Index))
 		{
 			return ChunkMaterials[Index];
@@ -481,7 +491,7 @@ public:
 	FORCEINLINE FVoxelWorldSaveData()
 	{
 		WorldSeed = 0;
-		TimeSeconds = 0.f;
+		TimeSeconds = -1.f;
 		RandomStream = FRandomStream();
 		LastCharacterRaceIndex = FIndex::ZeroIndex;
 		LastVitalityRaceIndex = FIndex::ZeroIndex;
@@ -490,7 +500,7 @@ public:
 	FORCEINLINE FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldBasicSaveData(InBasicSaveData)
 	{
 		WorldSeed = 0;
-		TimeSeconds = 0.f;
+		TimeSeconds = -1.f;
 		RandomStream = FRandomStream();
 		LastCharacterRaceIndex = FIndex::ZeroIndex;
 		LastVitalityRaceIndex = FIndex::ZeroIndex;

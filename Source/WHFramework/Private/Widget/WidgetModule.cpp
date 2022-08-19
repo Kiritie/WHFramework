@@ -25,7 +25,11 @@ AWidgetModule::AWidgetModule()
 
 	WorldWidgetClasses = TArray<TSubclassOf<UWorldWidgetBase>>();
 
-	WorldWidgetContainerClass = LoadClass<UWorldWidgetContainer>(nullptr, TEXT("WidgetBlueprint'/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer.WBP_WorldWidgetContainer_C'"));
+	static ConstructorHelpers::FClassFinder<UWorldWidgetContainer> WorldWidgetContainerClassFinder(TEXT("/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer.WBP_WorldWidgetContainer_C"));
+	if(WorldWidgetContainerClassFinder.Succeeded())
+	{
+		WorldWidgetContainerClass = WorldWidgetContainerClassFinder.Class;
+	}
 	WorldWidgetContainerZOrder = -1;
 	AllWorldWidgets = TMap<FName, FWorldWidgets>();
 	WorldWidgetContainer = nullptr;

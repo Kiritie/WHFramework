@@ -16,14 +16,12 @@ class AsyncTask_LoadChunkMap : public FNonAbandonableTask
 public:
 	AsyncTask_LoadChunkMap(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkQueue);
 
-public:
+protected:
 	AVoxelModule* VoxelModule;
 	TArray<FIndex> ChunkQueue;
 
 public:
 	void DoWork();
-
-	bool CanWork() const;
 
 public:
 	FORCEINLINE TStatId GetStatId() const

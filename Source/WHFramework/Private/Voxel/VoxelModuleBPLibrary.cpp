@@ -22,7 +22,11 @@ FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType
 
 EVoxelType UVoxelModuleBPLibrary::AssetIDToVoxelType(FPrimaryAssetId InAssetID)
 {
-	return (EVoxelType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EVoxelType"), InAssetID.PrimaryAssetName.ToString().Mid(9));
+	if(InAssetID.IsValid())
+	{
+		return (EVoxelType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EVoxelType"), InAssetID.PrimaryAssetName.ToString().Mid(9));
+	}
+	return EVoxelType::Empty;
 }
 
 FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
@@ -125,7 +129,7 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 		voxel.SetID(InVoxelID);
 		return voxel;
 	}
-	return UReferencePoolModuleBPLibrary::GetReference<UVoxel>();;
+	return UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true);
 }
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)

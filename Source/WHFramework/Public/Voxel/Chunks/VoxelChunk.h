@@ -102,9 +102,9 @@ public:
 
 	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
 
-	virtual UVoxel& GetVoxel(FIndex InIndex);
+	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
-	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ);
+	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
 

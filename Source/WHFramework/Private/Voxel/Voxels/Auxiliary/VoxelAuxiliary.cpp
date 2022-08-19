@@ -26,7 +26,7 @@ void AVoxelAuxiliary::Initialize(FIndex InVoxelIndex)
 {
 	VoxelIndex = InVoxelIndex;
 
-	Interaction->InitBoxExtent(GetVoxelItem().GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
+	Interaction->SetBoxExtent(GetVoxelItem().GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * FVector(1.5f, 1.5f, 0.5f));
 }
 
 void AVoxelAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)

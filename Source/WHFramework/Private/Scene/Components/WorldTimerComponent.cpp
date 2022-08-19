@@ -14,7 +14,7 @@ UWorldTimerComponent::UWorldTimerComponent()
 	SkyLight = nullptr;
 	SunLight = nullptr;
 
-	TimeSeconds = 0.f;
+	TimeSeconds = -1.f;
 	SecondsOfDay = 300.f;
 	SunriseTime = 6.f;
 	SunsetTime = 18.f;
@@ -27,6 +27,8 @@ UWorldTimerComponent::UWorldTimerComponent()
 void UWorldTimerComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	UpdateTimer();
 }
 
 void UWorldTimerComponent::SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer /*= true*/)
@@ -40,17 +42,23 @@ void UWorldTimerComponent::SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer /
 
 void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)
 {
+	if(TimeSeconds == -1.f)
+	{
+		UpdateLight(240.f);
+		return;
+	}
+	
 	TimeSeconds += DeltaSeconds;
 
 	#if ENGINE_MAJOR_VERSION == 4
-	float RemainSeconds = 0;
+	float RemainSeconds = 0.f;
 	#else if ENGINE_MAJOR_VERSION == 5
-	double RemainSeconds = 0;
+	double RemainSeconds = 0.f;
 	#endif
 	
 	CurrentDay = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay, RemainSeconds);
 
-	UpdateLight(RemainSeconds / SecondsOfDay * 360 + 200);
+	UpdateLight(RemainSeconds / SecondsOfDay * 360.f + 200.f);
 
 	CurrentHour = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 24, RemainSeconds);
 	CurrentMinute = UKismetMathLibrary::FMod(TimeSeconds, SecondsOfDay / 60, RemainSeconds);

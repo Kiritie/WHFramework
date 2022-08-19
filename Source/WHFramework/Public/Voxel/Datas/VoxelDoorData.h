@@ -14,9 +14,15 @@ public:
 	UVoxelDoorData();
 
 public:
-	virtual void GetDefaultMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const override;
+	virtual void GetDefaultMeshData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature, FVector& OutMeshScale, FVector& OutMeshOffset) const override;
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector OpenMeshScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector OpenMeshOffset;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* OpenSound;
 						

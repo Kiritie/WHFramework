@@ -8,14 +8,14 @@
 
 UVoxelTorch::UVoxelTorch()
 {
-	bOn = false;
+	bOn = true;
 }
 
 void UVoxelTorch::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 
-	bOn = false;
+	bOn = true;
 }
 
 void UVoxelTorch::Serialize(FArchive& Ar)

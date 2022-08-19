@@ -22,6 +22,38 @@ void UMainModuleBPLibrary::UnPauseAllModule()
 	}
 }
 
+void UMainModuleBPLibrary::PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->PauseModuleByClass(InModuleClass);
+	}
+}
+
+void UMainModuleBPLibrary::PauseModuleByName(const FName InModuleName)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->PauseModuleByName(InModuleName);
+	}
+}
+
+void UMainModuleBPLibrary::UnPauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->UnPauseModuleByClass(InModuleClass);
+	}
+}
+
+void UMainModuleBPLibrary::UnPauseModuleByName(const FName InModuleName)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->UnPauseModuleByName(InModuleName);
+	}
+}
+
 AMainModule* UMainModuleBPLibrary::GetMainModule(bool bInEditor)
 {
 	return AMainModule::Get(bInEditor);

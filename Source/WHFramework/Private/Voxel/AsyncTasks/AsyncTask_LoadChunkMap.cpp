@@ -16,12 +16,6 @@ void AsyncTask_LoadChunkMap::DoWork()
 {
 	for(auto Iter : ChunkQueue)
 	{
-		if(!CanWork()) return;
 		VoxelModule->LoadChunkMap(Iter);
 	}
-}
-
-bool AsyncTask_LoadChunkMap::CanWork() const
-{
-	return VoxelModule && VoxelModule->IsValidLowLevel() && UGlobalBPLibrary::IsPlaying();
 }

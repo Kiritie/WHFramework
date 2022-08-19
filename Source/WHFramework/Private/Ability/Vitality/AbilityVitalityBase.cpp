@@ -24,7 +24,7 @@
 AAbilityVitalityBase::AAbilityVitalityBase()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetCollisionProfileName(FName("Vitality"));
@@ -98,7 +98,7 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 FSaveData* AAbilityVitalityBase::ToData()
 {
 	static FVitalitySaveData SaveData;
-	SaveData.Reset();
+	SaveData = FVitalitySaveData();
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;

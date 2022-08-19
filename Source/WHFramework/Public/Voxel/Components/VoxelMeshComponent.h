@@ -50,6 +50,8 @@ public:
 	void Initialize(EVoxelMeshNature InMeshNature, EVoxelTransparency InTransparency = EVoxelTransparency::Solid);
 	
 	void BuildVoxel(const FVoxelItem& InVoxelItem);
+	
+	void CreateVoxel(const FVoxelItem& InVoxelItem);
 
 	void CreateMesh(int InSectionIndex = 0, bool bHasCollider = true);
 
@@ -66,4 +68,8 @@ public:
 	bool IsEmpty() const;
 
 	AVoxelChunk* GetOwnerChunk() const;
+
+	virtual void SetCollisionEnabled(ECollisionEnabled::Type NewType) override;
+
+	virtual void SetCollisionEnabled(bool bNewEnable);
 };

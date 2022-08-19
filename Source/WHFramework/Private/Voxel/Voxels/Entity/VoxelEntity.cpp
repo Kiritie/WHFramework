@@ -18,6 +18,7 @@ AVoxelEntity::AVoxelEntity()
 	MeshComponent->SetupAttachment(RootComponent);
 	MeshComponent->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->Initialize(EVoxelMeshNature::Entity);
 
 	VoxelID = FPrimaryAssetId();
 }
@@ -32,12 +33,7 @@ void AVoxelEntity::BeginPlay()
 void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 {
 	VoxelID = InVoxelID;
-	if(GetVoxelData().IsValid())
-	{
-		MeshComponent->Initialize(EVoxelMeshNature::Entity);
-		MeshComponent->BuildVoxel(FVoxelItem(VoxelID));
-		MeshComponent->CreateMesh(0, false);
-	}
+	MeshComponent->CreateVoxel(InVoxelID);
 }
 
 void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -51,9 +47,4 @@ void AVoxelEntity::OnDespawn_Implementation()
 	
 	VoxelID = FPrimaryAssetId();
 	MeshComponent->ClearMesh();
-}
-
-UVoxelData& AVoxelEntity::GetVoxelData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(VoxelID);
 }

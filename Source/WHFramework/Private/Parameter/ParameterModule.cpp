@@ -68,7 +68,7 @@ void AParameterModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 FSaveData* AParameterModule::ToData()
 {
 	static FParameterSaveData SaveData;
-	SaveData.Reset();
+	SaveData = FParameterSaveData();
 	SaveData.Parameters = Parameters;
 	return &SaveData;
 }

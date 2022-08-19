@@ -34,8 +34,17 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
+	
+	UPROPERTY(BlueprintReadOnly)
+	UMaterialInstanceDynamic* IconMat;
+
+protected:
+	UPROPERTY()
+	UMaterialInterface* IconSourceMat;
 
 public:
+	virtual void InitIconMat(UTexture* InTex, int32 InTexSize, int32 InIndex);
+
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
 };

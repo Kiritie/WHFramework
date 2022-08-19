@@ -30,12 +30,6 @@ protected:
 	TArray<uint8> Datas;
 
 public:
-	virtual void Reset()
-	{
-		bSaved = false;
-		Datas.Empty();
-	}
-
 	virtual bool IsSaved() const { return bSaved; }
 
 	virtual void MakeSaved() { bSaved = true; }
@@ -111,11 +105,4 @@ public:
 public:
 	UPROPERTY(BlueprintReadOnly)
 	TMap<FName, FSaveGameInfo> AllSaveGameInfo;
-
-public:
-	virtual void Reset() override
-	{
-		FSaveData::Reset();
-		AllSaveGameInfo.Empty();
-	}
 };

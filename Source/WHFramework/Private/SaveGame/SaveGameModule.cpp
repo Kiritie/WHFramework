@@ -85,7 +85,7 @@ void ASaveGameModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 FSaveData* ASaveGameModule::ToData()
 {
 	static FGeneralSaveData SaveData;
-	SaveData.Reset();
+	SaveData = FGeneralSaveData();
 	for(auto Iter1 : AllSaveGameInfo)
 	{
 		FSaveGameInfo SaveGameInfo;

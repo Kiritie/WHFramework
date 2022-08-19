@@ -65,7 +65,7 @@ void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 FSaveData* UVoxel::ToData()
 {
 	static FVoxelItem SaveData;
-	SaveData.Reset();
+	SaveData = FVoxelItem();
 
 	SaveData.ID = ID;
 	SaveData.Index = Index;
@@ -100,18 +100,11 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		if(GetData().PartType == EVoxelPartType::Main)
 		{
 			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
-			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
+			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Rotation) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
 		}
-		if(Owner)
+		if(!Owner->CheckVoxelAdjacent(Index, EDirection::Up))
 		{
-			if(Owner->CheckVoxelNeighbors(Index - GetData().PartIndex, EVoxelType::Water, GetData().GetRange(), true))
-			{
-				Owner->SetVoxelComplex(Index, EVoxelType::Water, true, InAgent);
-			}
-			if(!Owner->CheckVoxelAdjacent(Index, EDirection::Up))
-			{
-				Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Rotation), FVoxelItem::Empty, true, InAgent);
-			}
+			Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Rotation), FVoxelItem::Empty, true, InAgent);
 		}
 	}
 }

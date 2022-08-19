@@ -84,10 +84,52 @@ protected:
 	/// 模块列表
 	UPROPERTY(EditAnywhere, Replicated, Category = "MainModule")
 	TArray<TScriptInterface<IModule>> ModuleRefs;
-
-private:
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;
+
+public:
+	/**
+	 * 通过类型暂停模块
+	 */
+	template<class T>
+	static void PauseModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	{
+		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		{
+			Module->Execute_Pause(Module);
+		}
+	}
+	/**
+	* 通过名称取消暂停模块
+	*/
+	static void PauseModuleByName(const FName InModuleName)
+	{
+		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		{
+			Module->Execute_Pause(Module.GetObject());
+		}
+	}
+	/**
+	 * 通过类型暂停模块
+	 */
+	template<class T>
+	static void UnPauseModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	{
+		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		{
+			Module->Execute_UnPause(Module);
+		}
+	}
+	/**
+	* 通过名称取消暂停模块
+	*/
+	static void UnPauseModuleByName(const FName InModuleName)
+	{
+		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		{
+			Module->Execute_UnPause(Module.GetObject());
+		}
+	}
 
 public:
 	/**
@@ -95,9 +137,10 @@ public:
 	*/
 	static TArray<TScriptInterface<IModule>> GetAllModule(bool bInEditor = false)
 	{
-		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
+		AMainModule* MainModule = Get(bInEditor);
+		if(MainModule && MainModule->IsValidLowLevel())
 		{
-			return Get(bInEditor)->ModuleRefs;
+			return MainModule->ModuleRefs;
 		}
 		return TArray<TScriptInterface<IModule>>();
 	}
@@ -105,14 +148,10 @@ public:
 	 * 通过类型获取模块
 	 */
 	template<class T>
-	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<AModuleBase> InModuleClass = T::StaticClass())
+	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InModuleClass = T::StaticClass())
 	{
-		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
-		{
-			const FName ModuleName = IModule::Execute_GetModuleName(InModuleClass.GetDefaultObject());
-			return GetModuleByName<T>(ModuleName, bInEditor);
-		}
-		return nullptr;
+		const FName ModuleName = IModule::Execute_GetModuleName(InModuleClass.GetDefaultObject());
+		return GetModuleByName<T>(ModuleName, bInEditor);
 	}
 	/**
 	* 通过名称获取模块
@@ -120,11 +159,12 @@ public:
 	template<class T>
 	static T* GetModuleByName(const FName InModuleName, bool bInEditor = false)
 	{
-		if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
+		AMainModule* MainModule = Get(bInEditor);
+		if(MainModule && MainModule->IsValidLowLevel())
 		{
-			if(Get(bInEditor)->ModuleMap.Contains(InModuleName))
+			if(MainModule->ModuleMap.Contains(InModuleName))
 			{
-				return Cast<T>(Get(bInEditor)->ModuleMap[InModuleName].GetObject());
+				return Cast<T>(MainModule->ModuleMap[InModuleName].GetObject());
 			}
 		}
 		return nullptr;
@@ -133,7 +173,7 @@ public:
 	* 通过类型获取模块网络组件
 	*/
 	template<class T>
-	static T* GetModuleNetworkComponentByClass(bool bInEditor = false, TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass = T::StaticClass())
+	static T* GetModuleNetworkComponentByClass(bool bInEditor = false, TSubclassOf<T> InModuleNetworkComponentClass = T::StaticClass())
 	{
 		return Cast<T>(GetModuleNetworkComponentByClass(InModuleNetworkComponentClass, bInEditor));
 	}

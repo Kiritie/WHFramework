@@ -492,23 +492,23 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int InCount = -1)
+	FORCEINLINE FAbilityItem(const FAbilityItem& InVoxelItem, int InCount)
 	{
-		ID = InItem.ID;
-		Count = InCount == -1 ? InItem.Count : InCount;
-		Level = InItem.Level;
+		ID = InVoxelItem.ID;
+		Count = InCount;
+		Level = InVoxelItem.Level;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 
 	virtual ~FAbilityItem() override = default;
 
 	template<class T>
-	T& GetData() const
+	T& GetData(bool bLogWarning = true) const
 	{
-		return static_cast<T&>(GetData());
+		return static_cast<T&>(GetData(bLogWarning));
 	}
 
-	UAbilityItemDataBase& GetData() const;
+	UAbilityItemDataBase& GetData(bool bLogWarning = true) const;
 
 	FORCEINLINE virtual bool IsValid(bool bNeedNotNull = false) const
 	{

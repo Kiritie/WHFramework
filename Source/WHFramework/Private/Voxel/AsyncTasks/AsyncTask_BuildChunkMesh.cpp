@@ -16,12 +16,6 @@ void AsyncTask_BuildChunkMesh::DoWork()
 {
 	for(auto Iter : ChunkQueue)
 	{
-		if(!CanWork()) return;
 		VoxelModule->BuildChunkMesh(Iter);
 	}
-}
-
-bool AsyncTask_BuildChunkMesh::CanWork() const
-{
-	return VoxelModule && VoxelModule->IsValidLowLevel() && UGlobalBPLibrary::IsPlaying();
 }

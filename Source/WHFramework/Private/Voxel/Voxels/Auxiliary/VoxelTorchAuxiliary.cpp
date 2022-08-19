@@ -12,10 +12,10 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 {
 	LightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("LightComponent"));
 	LightComponent->SetupAttachment(RootComponent);
-	LightComponent->SetLightColor(FLinearColor(1, 0.75f, 0, 1));
-	LightComponent->SetIntensity(50000.f);
+	LightComponent->SetLightColor(FLinearColor(1, 0.8f, 0, 1));
+	LightComponent->SetIntensity(10000.f);
 	LightComponent->SetAttenuationRadius(1500.f);
-	LightComponent->SetCastShadows(false);
+	LightComponent->SetCastShadows(true);
 }
 
 void AVoxelTorchAuxiliary::BeginPlay()

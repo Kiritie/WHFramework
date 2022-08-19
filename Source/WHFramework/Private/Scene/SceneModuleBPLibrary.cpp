@@ -7,6 +7,24 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Scene/SceneModule.h"
 
+UWorldTimerComponent* USceneModuleBPLibrary::GetWorldTimer()
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		return SceneModule->GetWorldTimer();
+	}
+	return nullptr;
+}
+
+UWorldWeatherComponent* USceneModuleBPLibrary::GetWorldWeather()
+{
+	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	{
+		return SceneModule->GetWorldWeather();
+	}
+	return nullptr;
+}
+
 void USceneModuleBPLibrary::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())

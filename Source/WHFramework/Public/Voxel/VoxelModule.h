@@ -245,24 +245,20 @@ protected:
 	template<class T>
 	bool UpdateChunkTasks(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
 	{
+		for(auto iter = InTasks.CreateConstIterator(); iter; ++iter)
+		{
+			auto tmpTask = (*iter);
+			if(tmpTask->IsDone())
+			{
+				InTasks.Remove(tmpTask);
+				delete tmpTask;
+			}
+		}
 		if(InTasks.Num() < FMath::CeilToInt((float)InQueue.Num() / InSpeed))
 		{
 			const auto tmpTask = new FAsyncTask<T>(this, InQueue);
 			InTasks.Add(tmpTask);
 			tmpTask->StartBackgroundTask();
-		}
-		TArray<FAsyncTask<T>*> tmpTask;
-		for(auto iter : InTasks)
-		{
-			if(iter->IsDone())
-			{
-				tmpTask.Add(iter);
-			}
-		}
-		for(auto iter : tmpTask)
-		{
-			InTasks.Remove(iter);
-			delete iter;
 		}
 		return InQueue.Num() > 0 || InTasks.Num() > 0;
 	}
@@ -272,8 +268,8 @@ protected:
 	{
 		for(auto iter : InTasks)
 		{
-			iter->Cancel();
-			// delete iter;
+			iter->EnsureCompletion();
+			delete iter;
 		}
 		InTasks.Empty();
 	}

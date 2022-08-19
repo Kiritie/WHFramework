@@ -65,16 +65,11 @@ private:
 	
 public:
 	template<class T>
-	T* GetModuleNetCompByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass = T::StaticClass())
-	{
-		return Cast<T>(GetModuleNetCompByClass(InModuleClass));
-	}
-	
-	UModuleNetworkComponent* GetModuleNetCompByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass)
+	T* GetModuleNetCompByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
 	{
 		if(ModuleNetCompMap.Contains(InModuleClass))
 		{
-			return ModuleNetCompMap[InModuleClass];
+			return Cast<T>(ModuleNetCompMap[InModuleClass]);
 		}
 		return nullptr;
 	}

@@ -8,6 +8,8 @@
 
 #include "SceneModuleBPLibrary.generated.h"
 
+class UWorldWeatherComponent;
+class UWorldTimerComponent;
 class APhysicsVolumeBase;
 /**
  * 
@@ -18,6 +20,14 @@ class WHFRAMEWORK_API USceneModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	//////////////////////////////////////////////////////////////////////////
+	/// Components
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
+	static UWorldTimerComponent* GetWorldTimer();
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
+	static UWorldWeatherComponent* GetWorldWeather();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")

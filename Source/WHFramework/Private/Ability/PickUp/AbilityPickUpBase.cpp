@@ -72,10 +72,11 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 
 FSaveData* AAbilityPickUpBase::ToData()
 {
-	static auto saveData = FPickUpSaveData();
+	static FPickUpSaveData SaveData;
+	SaveData =  FPickUpSaveData();
 
-	saveData.Item = Item;
-	saveData.Location = GetActorLocation();
+	SaveData.Item = Item;
+	SaveData.Location = GetActorLocation();
 
-	return &saveData;
+	return &SaveData;
 }
