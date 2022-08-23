@@ -204,7 +204,7 @@ public:
 	FIndex Index;
 
 	UPROPERTY(BlueprintReadWrite)
-	FRotator Rotation;
+	ERightAngle Angle;
 
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Owner;
@@ -219,7 +219,7 @@ public:
 	FVoxelItem()
 	{
 		Index = FIndex::ZeroIndex;
-		Rotation = FRotator::ZeroRotator;
+		Angle = ERightAngle::RA_0;
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;
@@ -228,7 +228,7 @@ public:
 	FVoxelItem(const FAbilityItem& InAbilityItem) : FAbilityItem(InAbilityItem)
 	{
 		Index = FIndex::ZeroIndex;
-		Rotation = FRotator::ZeroRotator;
+		Angle = ERightAngle::RA_0;
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;
@@ -237,7 +237,7 @@ public:
 	FVoxelItem(const FVoxelItem& InVoxelItem, int InCount) : FAbilityItem(InVoxelItem, InCount)
 	{
 		Index = FIndex::ZeroIndex;
-		Rotation = FRotator::ZeroRotator;
+		Angle = ERightAngle::RA_0;
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;

@@ -67,7 +67,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats
-public:
+protected:
 	UPROPERTY(VisibleAnywhere)
 	FPrimaryAssetId ID;
 
@@ -75,7 +75,7 @@ public:
 	FIndex Index;
 
 	UPROPERTY(VisibleAnywhere)
-	FRotator Rotation;
+	ERightAngle Angle;
 
 	UPROPERTY(VisibleAnywhere)
 	AVoxelChunk* Owner;
@@ -93,6 +93,8 @@ public:
 
 	bool IsUnknown() const;
 
+	bool IsGenerated() const { return bGenerated; }
+
 	FPrimaryAssetId GetID() const { return ID; }
 
 	void SetID(FPrimaryAssetId InID) { ID = InID; }
@@ -101,7 +103,7 @@ public:
 
 	FVector GetLocation(bool bWorldSpace = true) const;
 
-	FRotator GetRotation() const { return Rotation; }
+	ERightAngle GetAngle() const { return Angle; }
 
 	template<class T>
 	T* GetOwner() const

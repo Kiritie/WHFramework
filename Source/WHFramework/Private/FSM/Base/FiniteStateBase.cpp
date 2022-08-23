@@ -16,10 +16,10 @@ UFiniteStateBase::UFiniteStateBase()
 	FSM = nullptr;
 
 	const UFunction* OnEnterValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnEnterValidate")));
-	bHasBlueprintOnEnterValidate = UGlobalBPLibrary::ImplementedInBlueprint(OnEnterValidateFunction);
+	bHasBlueprintOnEnterValidate = UGlobalBPLibrary::IsImplementedInBlueprint(OnEnterValidateFunction);
 
 	const UFunction* OnLeaveValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnLeaveValidate")));
-	bHasBlueprintOnLeaveValidate = UGlobalBPLibrary::ImplementedInBlueprint(OnLeaveValidateFunction);
+	bHasBlueprintOnLeaveValidate = UGlobalBPLibrary::IsImplementedInBlueprint(OnLeaveValidateFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)

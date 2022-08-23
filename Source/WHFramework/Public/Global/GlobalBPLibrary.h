@@ -28,9 +28,9 @@ class WHFRAMEWORK_API UGlobalBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
+public:
 	//////////////////////////////////////////////////////////////////////////
 	// State
-public:
 	/*
 	 * 当前是否为播放状态
 	 */
@@ -71,8 +71,6 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
 	static void SetTimeScale(float TimeScale);
-	
-public:
 	/*
 	 * 暂停游戏
 	 */
@@ -91,7 +89,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Enum
-public:
 	/*
 	 * 获取枚举值变量名称
 	 * @param InEnumName 枚举名称
@@ -118,7 +115,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize
-public:
 	/*
 	* 将目标对象数据保存到内存
 	* @param InObject 目标对象
@@ -154,7 +150,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex
-public:
 	/*
 	* 正则表达式匹配字串，匹配到返回true，没匹配到返回false
 	* @param InSourceStr 源字符串
@@ -166,7 +161,6 @@ public:
 			
 	//////////////////////////////////////////////////////////////////////////
 	// String
-public:
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FString BoolToString(bool InBool);
 
@@ -189,28 +183,23 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Json
-public:
 	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input
-public:
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Execute Object Func
-public:
+	// Object
 	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Execute Object Func
-public:
-	static bool ImplementedInBlueprint(const UFunction* Func);
+	// Blueprint
+	static bool IsImplementedInBlueprint(const UFunction* Func);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
-public:
 	template<class T>
 	static T* GetObjectInExistedWorld(TFunction<UObject*(UWorld*)>&& Callback, bool bInEditor = false)
 	{

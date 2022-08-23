@@ -41,7 +41,7 @@ FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveDa
 	{
 		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*data[0]));
 		Index = FIndex(data[1]);
-		Rotation.InitFromString(data[2]);
+		Angle = (ERightAngle)FCString::Atoi(*data[2]);
 	}
 	Owner = nullptr;
 	Auxiliary = nullptr;
@@ -99,7 +99,7 @@ FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
 	{
 		static FVoxelSaveData VoxelSaveData;
 		VoxelSaveData = FVoxelSaveData(*this);
-		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%s"), UVoxelModuleBPLibrary::AssetIDToVoxelType(ID), *Index.ToString(), *Rotation.ToString());
+		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), UVoxelModuleBPLibrary::AssetIDToVoxelType(ID), *Index.ToString(), Angle);
 		return VoxelSaveData;
 	}
 	return GetVoxel().ToSaveDataRef<FVoxelItem>(true).ToSaveData(false);
@@ -136,12 +136,12 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 
 EVoxelType FVoxelItem::GetVoxelType() const
 {
-	return UVoxelModuleBPLibrary::AssetIDToVoxelType(ID);
+	return GetVoxelData().VoxelType;
 }
 
 FVector FVoxelItem::GetRange() const
 {
-	return GetVoxelData().GetRange(Rotation);
+	return GetVoxelData().GetRange(Angle);
 }
 
 FVector FVoxelItem::GetLocation(bool bWorldSpace) const

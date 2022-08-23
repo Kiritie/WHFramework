@@ -104,17 +104,19 @@ void UVoxelTorch::Toggle()
 void UVoxelTorch::TakeOn()
 {
 	bOn = true;
+	RefreshData();
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(true);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(bOn);
 	}
 }
 
 void UVoxelTorch::TakeOff()
 {
 	bOn = false;
+	RefreshData();
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(false);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(bOn);
 	}
 }

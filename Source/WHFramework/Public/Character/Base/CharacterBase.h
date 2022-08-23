@@ -89,14 +89,14 @@ public:
 	/// Chunk
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FVoxelItem GenerateVoxelItem;
+	FPrimaryAssetId GenerateVoxelID;
 
 public:
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
 
-	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
 
-	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 public:
 	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;

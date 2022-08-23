@@ -25,7 +25,7 @@ public:
 public:
 	virtual FVector GetWorldLocation() const = 0;
 
-	virtual FVoxelItem& GetGenerateVoxelItem() = 0;
+	virtual FPrimaryAssetId GetGenerateVoxelID() const = 0;
 
-	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) = 0;
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) = 0;
 };

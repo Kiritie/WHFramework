@@ -17,9 +17,9 @@ class WHFRAMEWORK_API UMathBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
-	//////////////////////////////////////////////////////////////////////////
-	// Lerp
 public:
+	//////////////////////////////////////////////////////////////////////////
+	// Rotator
 	template<class U>
 	FORCEINLINE static FRotator LerpRotator(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
 	{
@@ -27,39 +27,39 @@ public:
 		return A + (bNormalized ? Delta.GetNormalized() : Delta) * Alpha;
 	}
 
-	FORCEINLINE static FVector RotatorVector(const FRotator& Rotator, const FVector& Vector, bool bRound = false, bool bAbs = false)
-	{
-		FVector vector = Rotator.RotateVector(Vector);
-		if(bRound)
-		{
-			vector.X = FMath::RoundToFloat(vector.X);
-			vector.Y = FMath::RoundToFloat(vector.Y);
-			vector.Z = FMath::RoundToFloat(vector.Z);
-		}
-		if(bAbs)
-		{
-			vector.X = FMath::Abs(vector.X);
-			vector.Y = FMath::Abs(vector.Y);
-			vector.Z = FMath::Abs(vector.Z);
-		}
-		return vector;
-	}
+	//////////////////////////////////////////////////////////////////////////
+	// Vector
+	static FVector RotatorVector(const FVector& Vector, const FRotator& Rotator, bool bRound = false, bool bAbsolute = false);
+
+	static FVector RotatorVector(const FVector& Vector, ERightAngle Angle, bool bRound = false, bool bAbsolute = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Index
-public:
+	// RightAngle
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float RightAngleToFloat(ERightAngle InAngle);
+
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static ERightAngle GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Direction
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
 	static EDirection InvertDirection(EDirection InDirection);
 
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static FVector DirectionToVector(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
+	static EDirection RotateDirection(EDirection InDirection, ERightAngle InAngle);
 
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static FIndex DirectionToIndex(EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
+	static FVector DirectionToVector(EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
 
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, FRotator InRotation = FRotator::ZeroRotator);
+	static FIndex DirectionToIndex(EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
+
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
 	
+	//////////////////////////////////////////////////////////////////////////
+	// Ease
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
 	static float EvaluateByCurve(UCurveFloat* InCurve, float InTime, float InDuration);
 	
@@ -67,11 +67,11 @@ public:
 	static float EvaluateByEaseType(EEaseType InEaseType, float InTime, float InDuration);
 
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static float BounceEaseIn(float InTime, float InDuration, float IUnusedOvershootOrAmplitude, float InUnusedPeriod);
+	static float BounceEaseIn(float InTime, float InDuration);
 	
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static float BounceEaseInOut(float InTime, float InDuration, float InUnusedOvershootOrAmplitude, float InUnusedPeriod);
+	static float BounceEaseInOut(float InTime, float InDuration);
 	
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static float BounceEaseOut(float InTime, float InDuration, float InUnusedOvershootOrAmplitude, float InUnusedPeriod);
+	static float BounceEaseOut(float InTime, float InDuration);
 };

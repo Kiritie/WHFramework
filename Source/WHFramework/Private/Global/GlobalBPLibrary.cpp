@@ -313,7 +313,7 @@ bool UGlobalBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncN
 	return false;
 }
 
-bool UGlobalBPLibrary::ImplementedInBlueprint(const UFunction* Func)
+bool UGlobalBPLibrary::IsImplementedInBlueprint(const UFunction* Func)
 {
 	return Func && ensure(Func->GetOuter()) && Func->GetOuter()->IsA(UBlueprintGeneratedClass::StaticClass());
 }

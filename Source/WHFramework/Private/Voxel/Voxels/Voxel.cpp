@@ -20,10 +20,12 @@
 
 UVoxel::UVoxel()
 {
+	ID = FPrimaryAssetId();
 	Index = FIndex::ZeroIndex;
-	Rotation = FRotator::ZeroRotator;
+	Angle = ERightAngle::RA_0;
 	Owner = nullptr;
 	Auxiliary = nullptr;
+	bGenerated = false;
 }
 
 UVoxel& UVoxel::GetEmpty()
@@ -40,7 +42,7 @@ void UVoxel::OnReset_Implementation()
 {
 	ID = FPrimaryAssetId();
 	Index = FIndex::ZeroIndex;
-	Rotation = FRotator::ZeroRotator;
+	Angle = ERightAngle::RA_0;
 	Owner = nullptr;
 	Auxiliary = nullptr;
 	bGenerated = false;
@@ -56,7 +58,7 @@ void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 	const auto SaveData = InSaveData->CastRef<FVoxelItem>();
 	ID = SaveData.ID;
 	Index = SaveData.Index;
-	Rotation = SaveData.Rotation;
+	Angle = SaveData.Angle;
 	Owner = SaveData.Owner;
 	Auxiliary = SaveData.Auxiliary;
 	bGenerated = SaveData.bGenerated;
@@ -69,7 +71,7 @@ FSaveData* UVoxel::ToData()
 
 	SaveData.ID = ID;
 	SaveData.Index = Index;
-	SaveData.Rotation = Rotation;
+	SaveData.Angle = Angle;
 	SaveData.Owner = Owner;
 	SaveData.Auxiliary = Auxiliary;
 	SaveData.bGenerated = bGenerated;
@@ -100,11 +102,11 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		if(GetData().PartType == EVoxelPartType::Main)
 		{
 			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
-			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Rotation) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
+			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Angle) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f, Owner);
 		}
 		if(!Owner->CheckVoxelAdjacent(Index, EDirection::Up))
 		{
-			Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Rotation), FVoxelItem::Empty, true, InAgent);
+			Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Angle), FVoxelItem::Empty, true, InAgent);
 		}
 	}
 }

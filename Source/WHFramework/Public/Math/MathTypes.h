@@ -47,17 +47,29 @@ enum class EEaseType : uint8
 };
 
 /**
- * ????
+ * 方向
  */
 UENUM(BlueprintType)
 enum class EDirection : uint8
 {
-	Up,
-	Down,
 	Forward,
-	Back,
+	Right,
+	Backward,
 	Left,
-	Right
+	Up,
+	Down
+};
+
+/**
+ * 直角
+ */
+UENUM(BlueprintType)
+enum class ERightAngle : uint8
+{
+	RA_0 UMETA(DisplayName = "0"),
+	RA_90 UMETA(DisplayName = "90"),
+	RA_180 UMETA(DisplayName = "180"),
+	RA_270 UMETA(DisplayName = "270")
 };
 
 USTRUCT(BlueprintType)

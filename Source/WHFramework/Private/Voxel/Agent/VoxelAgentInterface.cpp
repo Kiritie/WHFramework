@@ -8,27 +8,23 @@
 
 bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	if(!GetGenerateVoxelItem().IsValid()) return false;
+	if(!GetGenerateVoxelID().IsValid()) return false;
 	
-	if(AVoxelChunk* Chunk = InVoxelHitResult.GetChunk())
+	AVoxelChunk* Chunk = InVoxelHitResult.GetChunk();
+	
+	FVoxelItem VoxelItem;
+	VoxelItem.ID = GetGenerateVoxelID();
+	VoxelItem.Owner = Chunk;
+	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FRotator Rotation = (VoxelItem.GetLocation() + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f - GetWorldLocation()).ToOrientationRotator();
+	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
+	
+	FHitResult HitResult;
+	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, VoxelItem.GetLocation(), HitResult))
 	{
-		FVoxelItem VoxelItem = GetGenerateVoxelItem();
-		VoxelItem.Owner = Chunk;
-		VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-
-		FRotator Rotation = (Chunk->IndexToLocation(VoxelItem.Index) + VoxelItem.GetVoxelData().GetRange() * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize - GetWorldLocation()).ToOrientationRotator();
-		Rotation = FRotator(FRotator::ClampAxis(FMath::RoundToInt(Rotation.Pitch / 90.f) * 90.f), FRotator::ClampAxis(FMath::RoundToInt(Rotation.Yaw / 90.f) * 90.f), FRotator::ClampAxis(FMath::RoundToInt(Rotation.Roll / 90.f) * 90.f));
-		VoxelItem.Rotation = Rotation;
-
-		WHDebug(Rotation.ToString());
-		
-		FHitResult HitResult;
-		if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, Chunk->IndexToLocation(VoxelItem.Index), HitResult))
-		{
-			return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
-		}
+		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
 	}
-	return false;
+	 return false;
 }
 
 bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)

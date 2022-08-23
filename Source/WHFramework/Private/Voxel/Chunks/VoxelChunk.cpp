@@ -343,9 +343,9 @@ void AVoxelChunk::GenerateNeighbors(FIndex InIndex, bool bForceMode)
 
 void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForceMode)
 {
-	if(InX <= 0 && Neighbors[EDirection::Back])
+	if(InX <= 0 && Neighbors[EDirection::Backward])
 	{
-		Neighbors[EDirection::Back]->Generate(bForceMode);
+		Neighbors[EDirection::Backward]->Generate(bForceMode);
 	}
 	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Forward])
 	{
@@ -463,9 +463,9 @@ FVoxelItem& AVoxelChunk::GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMai
 {
 	if(InX < 0)
 	{
-		if(Neighbors[EDirection::Back])
+		if(Neighbors[EDirection::Backward])
 		{
-			return Neighbors[EDirection::Back]->GetVoxelItem(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
+			return Neighbors[EDirection::Backward]->GetVoxelItem(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
 		}
 		return FVoxelItem::Unknown;
 	}
@@ -545,7 +545,7 @@ bool AVoxelChunk::CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVec
 bool AVoxelChunk::CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection)
 {
 	const FVoxelItem& voxelItem = GetVoxelItem(InIndex);
-	const FIndex adjacentIndex = UMathBPLibrary::GetAdjacentIndex(InIndex, InDirection, voxelItem.Rotation);
+	const FIndex adjacentIndex = UMathBPLibrary::GetAdjacentIndex(InIndex, InDirection, voxelItem.Angle);
 	
 	if(!voxelItem.IsValid() || LocalIndexToWorld(adjacentIndex).Z <= 0) return true;
 	
@@ -693,9 +693,9 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 {
 	if(InX < 0)
 	{
-		if(Neighbors[EDirection::Back])
+		if(Neighbors[EDirection::Backward])
 		{
-			return Neighbors[EDirection::Back]->SetVoxelComplex(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
+			return Neighbors[EDirection::Backward]->SetVoxelComplex(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
@@ -741,20 +741,23 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	{
 		const FIndex index = FIndex(InX, InY, InZ);
 		const bool bDestroying = !InVoxelItem.IsValid();
-		const FVoxelItem& voxelItem = !bDestroying ? InVoxelItem : GetVoxelItem(index);
+		FVoxelItem voxelItem = !bDestroying ? InVoxelItem : GetVoxelItem(index);
 		UVoxelData& voxelData = voxelItem.GetVoxelData(false);
 		if(voxelData.IsValid() && voxelData.PartType == EVoxelPartType::Main)
 		{
-			const FVector range = voxelData.GetRange(voxelItem.Rotation);
+			const FVector range = voxelData.GetRange(voxelItem.Angle);
 			if(!CheckVoxel(index, InVoxelItem, range))
 			{
-				EVoxelType voxelType = EVoxelType::Empty;
 				if(bDestroying)
 				{
 					// Replace with water
 					if(CheckVoxelNeighbors(index, EVoxelType::Water, range, true))
 					{
-						voxelType = EVoxelType::Water;
+						voxelItem.ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType::Water);
+					}
+					else
+					{
+						voxelItem.ID = FPrimaryAssetId();
 					}
 				}
 				bool bSuccess = true;
@@ -762,17 +765,17 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 					UVoxelData& partData = voxelData.GetPartData(partIndex);
 					if(partData.IsValid())
 					{
-						if(!bDestroying) voxelType = partData.VoxelType;
+						if(!bDestroying) voxelItem.ID = partData.GetPrimaryAssetId();
 						if(partData.PartType == EVoxelPartType::Main)
 						{
-							if(!SetVoxelSample(index, voxelType, bGenerate, InAgent))
+							if(!SetVoxelSample(index, voxelItem, bGenerate, InAgent))
 							{
 								bSuccess = false;
 							}
 						}
 						else
 						{
-							if(!SetVoxelComplex(index + partIndex, voxelType, bGenerate, InAgent))
+							if(!SetVoxelComplex(index + partIndex, voxelItem, bGenerate, InAgent))
 							{
 								bSuccess = false;
 							}
@@ -803,24 +806,16 @@ void AVoxelChunk::AddSceneActor(AActor* InActor)
 		ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
 	}
 
+	ISceneActorInterface::Execute_SetContainer(InActor, this);
+
 	if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(InActor))
 	{
-		const FIndex VoxelIndex = Auxiliary->GetVoxelIndex();
-		if(HasVoxel(VoxelIndex) && VoxelMap[VoxelIndex].Auxiliary != Auxiliary)
-		{
-			VoxelMap[VoxelIndex].Auxiliary = Auxiliary;
-			Auxiliary->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-			Auxiliary->Execute_SetContainer(Auxiliary, this);
-		}
+		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 	}
 	else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
-		if(!PickUps.Contains(PickUp))
-		{
-			PickUp->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-			PickUp->Execute_SetContainer(PickUp, this);
-			PickUps.Add(PickUp);
-		}
+		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+	 	PickUps.Add(PickUp);
 	}
 }
 
@@ -828,20 +823,15 @@ void AVoxelChunk::RemoveSceneActor(AActor* InActor)
 {
 	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) != this) return;
 
+	ISceneActorInterface::Execute_SetContainer(InActor, nullptr);
+
 	if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(InActor))
 	{
-		const FIndex VoxelIndex = Auxiliary->GetVoxelIndex();
-		if(HasVoxel(VoxelIndex) && VoxelMap[VoxelIndex].Auxiliary == Auxiliary)
-		{
-			VoxelMap[VoxelIndex].Auxiliary = nullptr;
-			Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			Auxiliary->Execute_SetContainer(Auxiliary, nullptr);
-		}
+		InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	}
 	else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
-		PickUp->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		PickUp->Execute_SetContainer(PickUp, nullptr);
+		InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		PickUps.Remove(PickUp);
 	}
 }
@@ -854,11 +844,9 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FIndex InIndex)
 		const auto& VoxelData = VoxelItem.GetVoxelData();
 		if(VoxelData.AuxiliaryClass && VoxelData.PartType == EVoxelPartType::Main)
 		{
-			const FVector Location = VoxelItem.GetLocation() + VoxelData.GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f;
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
 			{
 				AddSceneActor(Auxiliary);
-				Auxiliary->SetActorLocationAndRotation(Location, VoxelItem.Rotation);
 				Auxiliary->Initialize(VoxelItem.Index);
 				return Auxiliary;
 			}
@@ -869,11 +857,10 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FIndex InIndex)
 
 void AVoxelChunk::DestroyAuxiliary(FIndex InIndex)
 {
-	auto& VoxelItem = GetVoxelItem(InIndex);
+	const auto& VoxelItem = GetVoxelItem(InIndex);
 	if(VoxelItem.Auxiliary)
 	{
 		UObjectPoolModuleBPLibrary::DespawnObject(VoxelItem.Auxiliary);
-		VoxelItem.Auxiliary = nullptr;
 	}
 }
 

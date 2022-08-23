@@ -67,7 +67,7 @@ protected:
 	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FVoxelItem GenerateVoxelItem;
+	FPrimaryAssetId GenerateVoxelID;
 
 protected:
 	// Called when the game starts or when spawned
@@ -139,9 +139,9 @@ public:
 public:
 	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
 
-	virtual FVoxelItem& GetGenerateVoxelItem() override { return GenerateVoxelItem; }
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
 
-	virtual void SetGenerateVoxelItem(const FVoxelItem& InGenerateVoxelItem) override { GenerateVoxelItem = InGenerateVoxelItem; }
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 public:
 	UFUNCTION(BlueprintPure)

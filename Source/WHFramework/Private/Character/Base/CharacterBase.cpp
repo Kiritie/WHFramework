@@ -58,6 +58,8 @@ ACharacterBase::ACharacterBase()
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
+
+	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void ACharacterBase::BeginPlay()

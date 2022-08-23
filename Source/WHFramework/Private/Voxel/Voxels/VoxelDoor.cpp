@@ -90,13 +90,8 @@ bool UVoxelDoor::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType
 		}
 		case EVoxelActionType::Action2:
 		{
-			// FHitResult hitResult;
-			// if (!UVoxelModuleBPLibrary::VoxelTraceSingle(InHitResult.VoxelItem, GetLocation(), hitResult))
-			{
-				Toggle();
-				return true;
-			}
-			// break;
+			Toggle();
+			break;
 		}
 		default: break;
 	}

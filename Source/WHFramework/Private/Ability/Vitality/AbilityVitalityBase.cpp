@@ -53,6 +53,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Name = NAME_None;
 	RaceID = NAME_None;
 	Level = 0;
+	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void AAbilityVitalityBase::BeginPlay()
