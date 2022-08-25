@@ -88,6 +88,8 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 	
+	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+
 protected:
 	virtual void Turn(float InRate);
 

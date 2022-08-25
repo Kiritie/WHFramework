@@ -10,15 +10,13 @@ void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActo
 {
 	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
 	UAttributeSetBase* AttributeSet = GetAttributeSet();
-	if(AbilitySystemComponent)
-	{
-		AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor ? InOwnerActor : Cast<AActor>(this), InAvatarActor ? InAvatarActor : Cast<AActor>(this));
-		RefreshAttributes();
 
-		for(auto Iter : AttributeSet->GetAllAttributes())
-		{
-			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
-		}
+	AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor ? InOwnerActor : Cast<AActor>(this), InAvatarActor ? InAvatarActor : Cast<AActor>(this));
+	RefreshAttributes();
+
+	for(auto Iter : AttributeSet->GetAllAttributes())
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
 	}
 }
 

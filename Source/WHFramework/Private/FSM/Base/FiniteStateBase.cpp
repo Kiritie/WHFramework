@@ -48,7 +48,10 @@ bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
 
 void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
+	if(FSM->bShowDebugMessage)
+	{
+		WHLog(WH_FSM, Log, TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
+	}
 
 	K2_OnEnter(InLastFiniteState);
 
@@ -68,7 +71,10 @@ bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
 
 void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
-	WHLog(WH_FSM, Log, TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
+	if(FSM->bShowDebugMessage)
+	{
+		WHLog(WH_FSM, Log, TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString());
+	}
 
 	K2_OnLeave(InNextFiniteState);
 

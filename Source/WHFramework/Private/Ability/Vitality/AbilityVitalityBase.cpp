@@ -58,9 +58,9 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 
 void AAbilityVitalityBase::BeginPlay()
 {
-	Super::BeginPlay();
-
 	InitializeAbilitySystem();
+
+	Super::BeginPlay();
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -78,7 +78,7 @@ void AAbilityVitalityBase::OnDespawn_Implementation()
 
 	RaceID = NAME_None;
 	Level = 0;
-}
+} 
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {

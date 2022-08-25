@@ -29,5 +29,8 @@ public:
 	virtual void Initialize(FIndex InVoxelIndex) override;
 
 public:
+	void SetLightVisible(bool bNewVisible);
+
+public:
 	UPointLightComponent* GetLightComponent() const { return LightComponent; }
 };

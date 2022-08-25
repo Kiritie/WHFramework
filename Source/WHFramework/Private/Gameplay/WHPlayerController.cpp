@@ -13,6 +13,7 @@
 #include "Event/EventModuleNetworkComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Main/MainModule.h"
@@ -374,6 +375,23 @@ void AWHPlayerController::MoveForward(float InValue)
 	{
 		IWHPlayerInterface::Execute_MoveForward(GetPawn(), InValue);
 	}
+}
+
+bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
+{
+	int32 viewportSizeX, viewportSizeY;
+	FVector sightPos, rayDirection;
+	GetViewportSize(viewportSizeX, viewportSizeY);
+	if(DeprojectScreenPositionToWorld(viewportSizeX * 0.5f, viewportSizeY * 0.5f, sightPos, rayDirection))
+	{
+		const FVector rayStart = PlayerCameraManager->GetCameraLocation();
+		const FVector rayEnd = rayStart + rayDirection * InRayDistance;
+		TArray<AActor*> ignoreActors = InIgnoreActors;
+		ignoreActors.AddUnique(GetPawn());
+		ignoreActors.AddUnique(GetPlayerPawn());
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	}
+	return false;
 }
 
 void AWHPlayerController::MoveRight(float InValue)

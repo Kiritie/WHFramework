@@ -100,6 +100,12 @@ protected:
 	float WidgetRefreshTime;
 	
 	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetAutoVisibility;
+	
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoHide == true"))
+	float WidgetShowDistance;
+
+	UPROPERTY(EditDefaultsOnly)
 	TArray<FParameter> WidgetParams;
 
 	UPROPERTY(EditDefaultsOnly)

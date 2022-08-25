@@ -88,6 +88,12 @@ public:
 	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Trace
+public:
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static ETraceTypeQuery GetGameTraceChannel(ECollisionChannel InGameTraceType);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Enum
 	/*
 	 * 获取枚举值变量名称

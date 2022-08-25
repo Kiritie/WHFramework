@@ -91,3 +91,18 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	Range = UMathBPLibrary::RotatorVector(Range, InAngle, true, true);
 	return Range;
 }
+
+bool UVoxelData::IsEmpty() const
+{
+	return VoxelType == EVoxelType::Empty;
+}
+
+bool UVoxelData::IsUnknown() const
+{
+	return VoxelType == EVoxelType::Unknown;
+}
+
+bool UVoxelData::IsCustom() const
+{
+	return VoxelType >= EVoxelType::Custom1;
+}

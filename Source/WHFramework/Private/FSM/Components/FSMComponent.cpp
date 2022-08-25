@@ -22,6 +22,8 @@ UFSMComponent::UFSMComponent()
 
 	StateMap = TMap<FName, UFiniteStateBase*>();
 
+	bShowDebugMessage = false;
+
 	bInitialized = false;
 }
 
@@ -140,7 +142,10 @@ bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	}
 	else if(bInitialized)
 	{
-		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex);
+		if(bShowDebugMessage)
+		{
+			WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex);
+		}
 	}
 	return false;
 }
@@ -153,7 +158,10 @@ bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	}
 	else if(bInitialized)
 	{
-		WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None"));
+		if(bShowDebugMessage)
+		{
+			WHLog(WH_FSM, Warning, TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None"));
+		}
 	}
 	return false;
 }

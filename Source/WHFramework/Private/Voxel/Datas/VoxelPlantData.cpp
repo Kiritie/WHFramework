@@ -12,7 +12,7 @@ UVoxelPlantData::UVoxelPlantData()
 	Transparency = EVoxelTransparency::Transparent;
 
 	MeshType = EVoxelMeshType::Custom;
-	
+
 	MeshVertices = TArray<FVector>();
 	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
 	MeshVertices.Add(FVector(-0.5f, -0.5f, 0.5f));
@@ -22,6 +22,8 @@ UVoxelPlantData::UVoxelPlantData()
 	MeshVertices.Add(FVector(0.5f, -0.5f, 0.5f));
 	MeshVertices.Add(FVector(-0.5f, 0.5f, 0.5f));
 	MeshVertices.Add(FVector(-0.5f, 0.5f, -0.5f));
+
+	MeshUVDatas.SetNum(2);
 
 	MeshScale = FVector(0.6f, 0.6f, 0.8f);
 	MeshOffset = FVector(0.f, 0.f, -0.1f);

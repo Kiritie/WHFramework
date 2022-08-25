@@ -16,12 +16,16 @@ void UAIBlackboardBase::PostLoad()
 	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, ADWCharacter);
 }
 
-void UAIBlackboardBase::OnInitialize(UBlackboardComponent* InComponent, ACharacterBase* InOwnerCharacter)
+void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, ACharacterBase* InCharacter)
 {
 	Component = InComponent;
-	Character = InOwnerCharacter;
+	Character = InCharacter;
 	OnBlackboardValuePreChange.AddUObject(this, &UAIBlackboardBase::OnValuePreChange);
 	OnBlackboardValueChanged.AddUObject(this, &UAIBlackboardBase::OnValueChanged);
+}
+
+void UAIBlackboardBase::Refresh()
+{
 	OnRefresh();
 }
 
@@ -36,7 +40,6 @@ void UAIBlackboardBase::OnValuePreChange(FName InValueName)
 
 void UAIBlackboardBase::OnValueChanged(FName InValueName)
 {
-	OnRefresh();
 	if(InValueName.IsEqual(FName("IsLostTarget")))
 	{
 		if(GetIsLostTarget() && GetTargetCharacter<AActor>())

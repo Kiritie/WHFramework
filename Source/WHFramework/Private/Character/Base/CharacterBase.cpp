@@ -113,7 +113,10 @@ void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
-		ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+		if(Iter && Iter->Implements<USceneActorInterface>())
+		{
+			ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+		}
 	}
 }
 

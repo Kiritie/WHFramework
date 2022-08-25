@@ -21,8 +21,11 @@ private:
 public:
 	virtual void PostLoad() override;
 
-	virtual void OnInitialize(UBlackboardComponent* InComponent, ACharacterBase* InOwnerCharacter);
+	virtual void Initialize(UBlackboardComponent* InComponent, ACharacterBase* InCharacter);
 
+	virtual void Refresh();
+
+protected:
 	virtual void OnRefresh();
 
 	virtual void OnValuePreChange(FName InValueName);

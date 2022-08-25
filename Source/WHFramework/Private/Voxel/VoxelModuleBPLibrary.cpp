@@ -13,20 +13,9 @@
 
 FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType)
 {
-	if(InVoxelType != EVoxelType::Empty)
-	{
-		return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
-	}
-	return FPrimaryAssetId();
-}
+	if(InVoxelType == EVoxelType::Empty) FPrimaryAssetId();
 
-EVoxelType UVoxelModuleBPLibrary::AssetIDToVoxelType(FPrimaryAssetId InAssetID)
-{
-	if(InAssetID.IsValid())
-	{
-		return (EVoxelType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EVoxelType"), InAssetID.PrimaryAssetName.ToString().Mid(9));
-	}
-	return EVoxelType::Empty;
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("EVoxelType"), (int32)InVoxelType)));
 }
 
 FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
@@ -168,29 +157,47 @@ int32 UVoxelModuleBPLibrary::GetNoiseTerrainHeight(FVector InOffset, FVector InS
 	return -1;
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
 	{
-		return VoxelModule->ChunkTraceSingle(InChunk, InRadius, InHalfHeight, OutHitResult);
+		return VoxelModule->ChunkTraceSingle(InChunk, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
 	{
-		return VoxelModule->ChunkTraceSingle(RayStart, RayEnd, InRadius, InHalfHeight, OutHitResult);
+		return VoxelModule->ChunkTraceSingle(InRayStart, InRayEnd, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
 
-bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
 	{
-		return VoxelModule->VoxelTraceSingle(InVoxelItem, InPoint, OutHitResult);
+		return VoxelModule->VoxelTraceSingle(InVoxelItem, InVoxelTraceType, InIgnoreActors, OutHitResult);
+	}
+	return false;
+}
+
+bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->VoxelRaycastSinge(InRayStart, InRayEnd, InVoxelTraceType, InIgnoreActors, OutHitResult);
+	}
+	return false;
+}
+
+bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+{
+	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	{
+		return VoxelModule->VoxelRaycastSinge(InDistance, InVoxelTraceType, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }

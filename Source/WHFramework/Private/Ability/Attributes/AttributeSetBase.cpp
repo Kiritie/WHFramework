@@ -42,7 +42,7 @@ float UAttributeSetBase::GetAttributeValue(FGameplayAttribute InAttribute)
 void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	IAbilityActorInterface* AbilityActor = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
+	IAbilityActorInterface* AbilityActor = Cast<IAbilityActorInterface>(AbilityComp->GetAvatarActor());
 	
 	FOnAttributeChangeData OnAttributeChangeData;
 	OnAttributeChangeData.Attribute = InAttribute;
@@ -57,7 +57,7 @@ void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float 
 void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	IAbilityActorInterface* AbilityActor = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
+	IAbilityActorInterface* AbilityActor = Cast<IAbilityActorInterface>(AbilityComp->GetAvatarActor());
 	
 	FOnAttributeChangeData OnAttributeChangeData;
 	OnAttributeChangeData.Attribute = InAttribute;

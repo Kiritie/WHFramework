@@ -175,8 +175,6 @@ protected:
 	TMap<FIndex, FVoxelItem> VoxelMap;
 	
 public:
-	virtual bool IsEntity() const;
-
 	AVoxelModule* GetModule() const { return Module; }
 
 	FIndex GetIndex() const { return Index; }

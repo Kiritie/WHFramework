@@ -75,4 +75,11 @@ public:
 	virtual UVoxelData& GetPartData(FIndex InIndex);
 
 	virtual FVector GetRange(ERightAngle InAngle = ERightAngle::RA_0) const;
+
+public:
+	bool IsEmpty() const;
+
+	bool IsUnknown() const;
+
+	bool IsCustom() const;
 };

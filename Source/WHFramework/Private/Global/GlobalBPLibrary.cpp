@@ -89,6 +89,11 @@ void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreferenc
 	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
 
+ETraceTypeQuery UGlobalBPLibrary::GetGameTraceChannel(ECollisionChannel InGameTraceType)
+{
+	return UEngineTypes::ConvertToTraceType(InGameTraceType);
+}
+
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
 	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))

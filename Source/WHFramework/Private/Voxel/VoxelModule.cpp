@@ -82,6 +82,7 @@ AVoxelModule::AVoxelModule()
 	ChunkDestroyQueue = TArray<FIndex>();
 
 	WorldBasicData = FVoxelWorldBasicSaveData();
+	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid_Unlit.M_Voxels_Solid_Unlit'"));
 	if(SolidMatFinder.Succeeded() && UnlitSolidMatFinder.Succeeded())
@@ -375,7 +376,7 @@ void AVoxelModule::GenerateVoxels()
 	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 	for(int32 i = 0; i < VoxelDatas.Num(); i++)
 	{
-		if(VoxelDatas[i]->VoxelType == EVoxelType::Unknown || VoxelDatas[i]->PartType != EVoxelPartType::Main) continue;
+		if(VoxelDatas[i]->IsUnknown() || VoxelDatas[i]->IsCustom() || VoxelDatas[i]->PartType != EVoxelPartType::Main) continue;
 		
 		if(AVoxelEntityPreview* VoxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntityPreview>())
 		{
@@ -385,40 +386,40 @@ void AVoxelModule::GenerateVoxels()
 			VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
 			VoxelsCapture->ShowOnlyActors.Add(VoxelEntity);
 
-			// VoxelsCapture->CaptureScene();
-			//
-			// constexpr int32 TextureWidth = 64;
-			// constexpr int32 TextureHeight = 64;
-			// constexpr int32 TextureSize = TextureWidth * TextureHeight;
-			//
-			// FRenderTarget* SourceTexture = VoxelsCapture->TextureTarget->GameThread_GetRenderTargetResource();
-			// TArray<FColor> SourcePixels;
-			// const FReadSurfaceDataFlags ReadSurfaceDataFlags(RCM_UNorm);
-			// SourceTexture->ReadPixels(SourcePixels, ReadSurfaceDataFlags);
-			//
-			// UTexture2D* NewTexture = UTexture2D::CreateTransient(TextureWidth, TextureHeight, PF_B8G8R8A8);
-			//
-			// uint8* NewPixels = new uint8[TextureSize * 4];
-			// for (int32 x = 0; x < TextureWidth; x++)
-			// {
-			// 	for (int32 y = 0; y < TextureHeight; y++)
-			// 	{
-			// 		const int32 newIndex = (x + y * TextureWidth) * 4;
-			// 		const int32 sourceIndex = (x + TextureWidth * (tmpIndex % 8)) + (y * TextureWidth * 8 + (tmpIndex / 8) * TextureSize * 8);
-			// 		NewPixels[newIndex] = SourcePixels[sourceIndex].B;
-			// 		NewPixels[newIndex + 1] = SourcePixels[sourceIndex].G;
-			// 		NewPixels[newIndex + 2] = SourcePixels[sourceIndex].R;
-			// 		NewPixels[newIndex + 3] = 255 - SourcePixels[sourceIndex].A;
-			// 	}
-			// }
-			//
-			// void* NewTextureData = NewTexture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
-			// FMemory::Memcpy(NewTextureData, NewPixels, sizeof(uint8) * TextureSize * 4);
-			// NewTexture->GetPlatformData()->Mips[0].BulkData.Unlock();
-			//
-			// NewTexture->UpdateResource();
-			//
-			// VoxelDatas[i]->Icon = NewTexture;
+			/* VoxelsCapture->CaptureScene();
+			
+			constexpr int32 TextureWidth = 64;
+			constexpr int32 TextureHeight = 64;
+			constexpr int32 TextureSize = TextureWidth * TextureHeight;
+			
+			FRenderTarget* SourceTexture = VoxelsCapture->TextureTarget->GameThread_GetRenderTargetResource();
+			TArray<FColor> SourcePixels;
+			const FReadSurfaceDataFlags ReadSurfaceDataFlags(RCM_UNorm);
+			SourceTexture->ReadPixels(SourcePixels, ReadSurfaceDataFlags);
+			
+			UTexture2D* NewTexture = UTexture2D::CreateTransient(TextureWidth, TextureHeight, PF_B8G8R8A8);
+			
+			uint8* NewPixels = new uint8[TextureSize * 4];
+			for (int32 x = 0; x < TextureWidth; x++)
+			{
+				for (int32 y = 0; y < TextureHeight; y++)
+				{
+					const int32 newIndex = (x + y * TextureWidth) * 4;
+					const int32 sourceIndex = (x + TextureWidth * (tmpIndex % 8)) + (y * TextureWidth * 8 + (tmpIndex / 8) * TextureSize * 8);
+					NewPixels[newIndex] = SourcePixels[sourceIndex].B;
+					NewPixels[newIndex + 1] = SourcePixels[sourceIndex].G;
+					NewPixels[newIndex + 2] = SourcePixels[sourceIndex].R;
+					NewPixels[newIndex + 3] = 255 - SourcePixels[sourceIndex].A;
+				}
+			}
+			
+			void* NewTextureData = NewTexture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+			FMemory::Memcpy(NewTextureData, NewPixels, sizeof(uint8) * TextureSize * 4);
+			NewTexture->GetPlatformData()->Mips[0].BulkData.Unlock();
+			
+			NewTexture->UpdateResource();
+			
+			VoxelDatas[i]->Icon = NewTexture; */
 
 			VoxelDatas[i]->InitIconMat(VoxelsCapture->TextureTarget, 8, tmpIndex);
 
@@ -750,21 +751,50 @@ UVoxelData& AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
 
 int32 AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
 {
-	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1) * WorldData->GetWorldHeight() * InScale.Z;
+	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1.f) * WorldData->GetWorldHeight() * InScale.Z;
 }
 
-bool AVoxelModule::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+bool AVoxelModule::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
+	FVector rayStart = InChunk->GetActorLocation() + FVector(FMath::FRandRange(1.f, WorldData->ChunkSize - 1), FMath::FRandRange(1.f, WorldData->ChunkSize - 1), WorldData->ChunkSize) * WorldData->BlockSize;
+	rayStart.X = ((int32)(rayStart.X / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize;
+	rayStart.Y = ((int32)(rayStart.Y / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize;
+	FVector rayEnd = rayStart + FVector::DownVector * WorldData->GetChunkLength();
+	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
+}
+
+bool AVoxelModule::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	return UKismetSystemLibrary::CapsuleTraceSingle(this, InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(InChunkTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+}
+
+bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	const FVector size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
+	const FVector location = InVoxelItem.GetLocation();
+	return UKismetSystemLibrary::BoxTraceSingle(this, location + size, location + size, size, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+}
+
+bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+{
+	FHitResult hitResult;
+	if(UKismetSystemLibrary::LineTraceSingle(this, InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
+	{
+		OutHitResult = FVoxelHitResult(hitResult);
+		return OutHitResult.IsValid();
+	}
 	return false;
 }
 
-bool AVoxelModule::ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult)
+bool AVoxelModule::VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
-	return false;
-}
-
-bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult)
-{
+	FHitResult hitResult;
+	const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController();
+	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, InVoxelTraceType, InIgnoreActors, hitResult))
+	{
+		OutHitResult = FVoxelHitResult(hitResult);
+		return OutHitResult.IsValid();
+	}
 	return false;
 }
 

@@ -36,7 +36,6 @@ protected:
 public:	
 	virtual void Initialize(FIndex InVoxelIndex);
 
-protected:	
 	virtual int32 GetLimit_Implementation() const override { return 10000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;

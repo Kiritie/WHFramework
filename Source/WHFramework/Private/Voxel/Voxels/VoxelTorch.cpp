@@ -49,8 +49,10 @@ void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	Super::OnGenerate(InAgent);
 
-	if(bOn) TakeOn();
-	else TakeOff();
+	if(GetAuxiliary<AVoxelTorchAuxiliary>())
+	{
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
+	}
 }
 
 void UVoxelTorch::OnDestroy(IVoxelAgentInterface* InAgent)
@@ -107,7 +109,7 @@ void UVoxelTorch::TakeOn()
 	RefreshData();
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(bOn);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
 	}
 }
 
@@ -117,6 +119,6 @@ void UVoxelTorch::TakeOff()
 	RefreshData();
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->GetLightComponent()->SetVisibility(bOn);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
 	}
 }

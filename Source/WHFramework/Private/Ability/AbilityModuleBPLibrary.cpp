@@ -5,7 +5,6 @@
 
 #include "Ability/AbilityModule.h"
 #include "Ability/Abilities/AbilityBase.h"
-#include "Asset/AssetModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"
 
 const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
@@ -55,54 +54,6 @@ FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractActi
 		return AbilityModule->GetInteractActionDisplayName(InInteractAction);
 	}
 	return FText::GetEmpty();
-}
-
-FVitalityRaceData UAbilityModuleBPLibrary::RandomVitalityRaceData()
-{
-	TArray<FVitalityRaceData> raceDatas;
-	if(UAssetModuleBPLibrary::ReadDataTable<FVitalityRaceData>(raceDatas))
-	{
-		float tmpNum1 = 0;
-		float tmpNum2 = 0;
-		for (int32 i = 0; i < raceDatas.Num(); i++)
-		{
-			tmpNum1 += raceDatas[i].Proportion;
-		}
-		tmpNum1 = FMath::FRandRange(0, tmpNum1);
-		for (int32 i = 0; i < raceDatas.Num(); i++)
-		{
-			tmpNum2 += raceDatas[i].Proportion;
-			if (tmpNum1 <= tmpNum2)
-			{
-				return raceDatas[i];
-			}
-		}
-	}
-	return FVitalityRaceData();
-}
-
-FCharacterRaceData UAbilityModuleBPLibrary::RandomCharacterRaceData()
-{
-	TArray<FCharacterRaceData> raceDatas;
-	if(UAssetModuleBPLibrary::ReadDataTable<FCharacterRaceData>(raceDatas))
-	{
-		float tmpNum1 = 0;
-		float tmpNum2 = 0;
-		for (int32 i = 0; i < raceDatas.Num(); i++)
-		{
-			tmpNum1 += raceDatas[i].Proportion;
-		}
-		tmpNum1 = FMath::FRandRange(0, tmpNum1);
-		for (int32 i = 0; i < raceDatas.Num(); i++)
-		{
-			tmpNum2 += raceDatas[i].Proportion;
-			if (tmpNum1 <= tmpNum2)
-			{
-				return raceDatas[i];
-			}
-		}
-	}
-	return FCharacterRaceData();
 }
 
 AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)

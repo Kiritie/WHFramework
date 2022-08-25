@@ -20,12 +20,12 @@ public:
 public:
 	virtual void Initialize(FIndex InVoxelIndex) override;
 
-protected:
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
-	virtual void OpenDoor();
+public:
+	void OpenDoor();
 
-	virtual void CloseDoor();
+	void CloseDoor();
 };

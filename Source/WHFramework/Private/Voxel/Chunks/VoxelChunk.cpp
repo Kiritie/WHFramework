@@ -207,7 +207,7 @@ void AVoxelChunk::Generate(bool bForceMode)
 
 	for(auto& Iter : VoxelMap)
 	{
-		Iter.Value.Generate();
+		Iter.Value.OnGenerate();
 	}
 
 	if(bForceMode)
@@ -659,13 +659,13 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 			VoxelMap.Emplace(InIndex, VoxelItem);
 			VoxelMap[InIndex].Owner = this;
 			VoxelMap[InIndex].Index = InIndex;
-			if(bGenerate) VoxelMap[InIndex].Generate(InAgent);
+			if(bGenerate) VoxelMap[InIndex].OnGenerate(InAgent);
 			bSuccess = true;
 		}
 	}
 	else if(HasVoxel(InIndex))
 	{
-		if(bGenerate) VoxelMap[InIndex].Destroy(InAgent);
+		if(bGenerate) VoxelMap[InIndex].OnDestroy(InAgent);
 		VoxelMap.Remove(InIndex);
 		bSuccess = true;
 	}
@@ -810,11 +810,11 @@ void AVoxelChunk::AddSceneActor(AActor* InActor)
 
 	if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(InActor))
 	{
-		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+		Auxiliary->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 	}
 	else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
-		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+		PickUp->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 	 	PickUps.Add(PickUp);
 	}
 }
@@ -827,11 +827,11 @@ void AVoxelChunk::RemoveSceneActor(AActor* InActor)
 
 	if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(InActor))
 	{
-		InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	}
 	else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
 	{
-		InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		PickUp->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		PickUps.Remove(PickUp);
 	}
 }
@@ -862,9 +862,4 @@ void AVoxelChunk::DestroyAuxiliary(FIndex InIndex)
 	{
 		UObjectPoolModuleBPLibrary::DespawnObject(VoxelItem.Auxiliary);
 	}
-}
-
-bool AVoxelChunk::IsEntity() const
-{
-	return !SolidMesh->IsEmpty() || !SemiMesh->IsEmpty();
 }

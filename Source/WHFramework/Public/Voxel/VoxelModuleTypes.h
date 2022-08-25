@@ -53,6 +53,7 @@ UENUM(BlueprintType)
 enum class EVoxelType : uint8
 {
 	Empty, //??
+	Unknown,
 	Bedrock, //????
 	Dirt, //????
 	Stone, //??
@@ -89,7 +90,16 @@ enum class EVoxelType : uint8
 	Flower_Tulip_Pink,
 	Flower_Tulip_Red,
 	Flower_Tulip_White,
-	Unknown //δ?
+	Custom1,
+	Custom2,
+	Custom3,
+	Custom4,
+	Custom5,
+	Custom6,
+	Custom7,
+	Custom8,
+	Custom9,
+	Custom10
 };
 
 /**
@@ -250,9 +260,9 @@ public:
 	FVoxelItem(const FVoxelSaveData& InSaveData);
 
 public:
-	void Generate(IVoxelAgentInterface* InAgent = nullptr);
+	void OnGenerate(IVoxelAgentInterface* InAgent = nullptr);
 
-	void Destroy(IVoxelAgentInterface* InAgent = nullptr);
+	void OnDestroy(IVoxelAgentInterface* InAgent = nullptr);
 
 	void RefreshData(UVoxel* InVoxel = nullptr);
 
@@ -311,11 +321,20 @@ public:
 	FVoxelItem VoxelItem;
 
 public:
-	FVoxelHitResult();
+	FVoxelHitResult()
+	{
+		VoxelItem = FVoxelItem();
+		Point = FVector();
+		Normal = FVector();
+	}
+	
+	FVoxelHitResult(const FHitResult& InHitResult);
 	
 	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal);
 
 public:
+	bool IsValid() const;
+
 	UVoxel& GetVoxel() const;
 
 	AVoxelChunk* GetChunk() const;
@@ -411,8 +430,8 @@ public:
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
 
-		VitalityRaceDensity = 50.f;
-		CharacterRaceDensity = 50.f;
+		VitalityRaceDensity = 10.f;
+		CharacterRaceDensity = 10.f;
 	}
 
 public:

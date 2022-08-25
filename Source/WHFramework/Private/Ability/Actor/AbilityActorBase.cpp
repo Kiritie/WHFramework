@@ -23,14 +23,9 @@ AAbilityActorBase::AAbilityActorBase()
 
 void AAbilityActorBase::BeginPlay()
 {
-	Super::BeginPlay();
-	
 	InitializeAbilitySystem();
-
-	for(auto Iter : AttributeSet->GetAllAttributes())
-	{
-		AbilitySystem->GetGameplayAttributeValueChangeDelegate(Iter).AddUObject(this, &AAbilityActorBase::OnAttributeChange);
-	}
+	
+	Super::BeginPlay();
 }
 
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)

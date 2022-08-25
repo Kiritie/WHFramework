@@ -48,7 +48,7 @@ FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveDa
 	bGenerated = false;
 }
 
-void FVoxelItem::Generate(IVoxelAgentInterface* InAgent)
+void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	if(bGenerated) return;
 	
@@ -60,7 +60,7 @@ void FVoxelItem::Generate(IVoxelAgentInterface* InAgent)
 	GetVoxel().OnGenerate(InAgent);
 }
 
-void FVoxelItem::Destroy(IVoxelAgentInterface* InAgent)
+void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(!bGenerated) return;
 	
@@ -97,9 +97,9 @@ FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
 {
 	if(!bRefresh)
 	{
-		static FVoxelSaveData VoxelSaveData;
+		static FVoxelSaveData VoxelSaveData;	
 		VoxelSaveData = FVoxelSaveData(*this);
-		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), UVoxelModuleBPLibrary::AssetIDToVoxelType(ID), *Index.ToString(), Angle);
+		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), GetVoxelType(), *Index.ToString(), Angle);
 		return VoxelSaveData;
 	}
 	return GetVoxel().ToSaveDataRef<FVoxelItem>(true).ToSaveData(false);
@@ -169,11 +169,14 @@ UVoxelData& FVoxelItem::GetVoxelData(bool bLogWarning) const
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID, bLogWarning);
 }
 
-FVoxelHitResult::FVoxelHitResult()
+FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
-	VoxelItem = FVoxelItem();
-	Point = FVector();
-	Normal = FVector();
+	if(AVoxelChunk* chunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
+	{
+		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		Point = InHitResult.ImpactPoint;
+		Normal = InHitResult.ImpactNormal;
+	}
 }
 
 FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal)
@@ -181,6 +184,11 @@ FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint,
 	VoxelItem = InVoxelItem;
 	Point = InPoint;
 	Normal = InNormal;
+}
+
+bool FVoxelHitResult::IsValid() const
+{
+	return VoxelItem.IsValid();
 }
 
 UVoxel& FVoxelHitResult::GetVoxel() const

@@ -2,9 +2,11 @@
 
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
+#include "../../../../../../../Source/DreamWorld/Public/DWTypes.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
@@ -20,7 +22,12 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
 	
 	FHitResult HitResult;
-	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, VoxelItem.GetLocation(), HitResult))
+	TArray<AActor*> IgnoreActors;
+	if(VoxelItem.Auxiliary)
+	{
+		IgnoreActors.Add(VoxelItem.Auxiliary);
+	}
+	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, (ECollisionChannel)EDWGameTraceType::Voxel, IgnoreActors, HitResult))
 	{
 		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
 	}

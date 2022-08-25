@@ -30,3 +30,8 @@ void AVoxelTorchAuxiliary::Initialize(FIndex InVoxelIndex)
 
 	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetVoxelData().GetRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
 }
+
+void AVoxelTorchAuxiliary::SetLightVisible(bool bNewVisible)
+{
+	LightComponent->SetVisibility(bNewVisible);
+}

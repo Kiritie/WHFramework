@@ -5,6 +5,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Global/GlobalBPLibrary.h"
 
 UCharacterAnim::UCharacterAnim()
 {
@@ -23,7 +24,7 @@ void UCharacterAnim::NativeUpdateAnimation(float DeltaSeconds)
 
 	ACharacter* Character = Cast<ACharacter>(TryGetPawnOwner());
 
-	if(!Character) return;
+	if(!Character || !UGlobalBPLibrary::IsPlaying()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	

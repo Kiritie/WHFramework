@@ -16,8 +16,8 @@ AAIControllerBase::AAIControllerBase()
 {
 	bAttachToPawn = true;
 
-	AIPerception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
-	AIPerception->OnTargetPerceptionUpdated.AddDynamic(this, &AAIControllerBase::OnTargetPerceptionUpdated);
+	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
+	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AAIControllerBase::OnTargetPerceptionUpdated);
 
 	FAISenseAffiliationFilter affiliationFilter;
 	affiliationFilter.bDetectEnemies = true;
@@ -30,11 +30,11 @@ AAIControllerBase::AAIControllerBase()
 	sightSenseConfig->PeripheralVisionAngleDegrees = 90;
 	sightSenseConfig->DetectionByAffiliation = affiliationFilter;
 	sightSenseConfig->SetMaxAge(5);
-	AIPerception->ConfigureSense(*sightSenseConfig);
-	AIPerception->SetDominantSense(*sightSenseConfig->GetSenseImplementation());
+	PerceptionComponent->ConfigureSense(*sightSenseConfig);
+	PerceptionComponent->SetDominantSense(*sightSenseConfig->GetSenseImplementation());
 
-	const auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
-	AIPerception->ConfigureSense(*damageSenseConfig);
+	auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
+	PerceptionComponent->ConfigureSense(*damageSenseConfig);
 }
 
 void AAIControllerBase::OnPossess(APawn* InPawn)
@@ -43,9 +43,8 @@ void AAIControllerBase::OnPossess(APawn* InPawn)
 
 	if(const IAIAgentInterface* AIAgent = Cast<IAIAgentInterface>(InPawn))
 	{
-		InitBehaviorTree(AIAgent->GetBehaviorTreeAsset(), Cast<ACharacterBase>(InPawn));
-	
-		RunBehaviorTree();
+		InitBehaviorTree(AIAgent->GetBehaviorTreeAsset());
+		RunBehaviorTree(BehaviorTreeAsset);
 	}
 }
 
@@ -84,32 +83,43 @@ void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Sti
 void AAIControllerBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
+
+	if(!OwnerCharacter) return;
+
+	if(IsRunningBehaviorTree())
+	{
+		if(BlackboardAsset)
+		{
+			BlackboardAsset->Refresh();
+		}
+	}
 }
 
-bool AAIControllerBase::RunBehaviorTree()
-{
-	return RunBehaviorTree(BehaviorTreeAsset);
-}
-
-bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
-{
-	return Super::RunBehaviorTree(BTAsset);
-}
-
-void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset, ACharacterBase* InCharacter)
+void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset)
 {
 	BehaviorTreeAsset = DuplicateObject<UBehaviorTree>(InBehaviorTreeAsset, this);
 	if(BehaviorTreeAsset)
 	{
 		BlackboardAsset = DuplicateObject<UAIBlackboardBase>(Cast<UAIBlackboardBase>(InBehaviorTreeAsset->BlackboardAsset), nullptr);
-		BlackboardAsset->OnInitialize(GetBlackboardComponent(), InCharacter);
 		BehaviorTreeAsset->BlackboardAsset = BlackboardAsset;
 	}
 }
 
+bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
+{
+	const bool ReturnValue = Super::RunBehaviorTree(BTAsset);
+	if(BlackboardAsset)
+	{
+		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<ACharacterBase>());
+	}
+	return ReturnValue;
+}
+
 void AAIControllerBase::StopBehaviorTree()
 {
-	if (GetBehaviorTreeComponent() && GetBehaviorTreeComponent()->IsRunning())
+	if(IsRunningBehaviorTree())
 	{
 		GetBehaviorTreeComponent()->StopTree();
 	}
@@ -118,4 +128,9 @@ void AAIControllerBase::StopBehaviorTree()
 UBehaviorTreeComponent* AAIControllerBase::GetBehaviorTreeComponent() const
 {
 	return Cast<UBehaviorTreeComponent>(GetBrainComponent());
+}
+
+bool AAIControllerBase::IsRunningBehaviorTree() const
+{
+	return GetBehaviorTreeComponent() && GetBehaviorTreeComponent()->IsRunning();
 }

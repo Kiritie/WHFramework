@@ -91,6 +91,9 @@ public:
 	/// 状态列表
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	TArray<TSubclassOf<UFiniteStateBase>> States;
+	/// 显示调试信息
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug")
+	bool bShowDebugMessage;
 	/// 当状态改变
 	UPROPERTY(BlueprintAssignable)
 	FOnFiniteStateChanged OnStateChanged;

@@ -5,10 +5,12 @@
 
 #include "Blueprint/SlateBlueprintLibrary.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Camera/CameraModuleBPLibrary.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Slate/SGameLayerManager.h"
 #include "Widget/WidgetModule.h"
@@ -28,6 +30,8 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
+	bWidgetAutoVisibility = false;
+	WidgetShowDistance = 0;
 	WidgetParams = TArray<FParameter>();
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
@@ -52,8 +56,12 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 				}
 			}
 		}
+		if(bWidgetAutoVisibility)
+		{
+			const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
+			SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+		}
 	}
-
 }
 
 void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)

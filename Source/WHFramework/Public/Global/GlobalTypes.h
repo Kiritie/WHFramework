@@ -66,3 +66,9 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 		ArIsSaveGame = true;
 	}
 };
+
+#define DON(Index, Count, Expression) \
+for(int32 Index = 0; Index < Count; Index++) \
+{ \
+	Expression \
+}

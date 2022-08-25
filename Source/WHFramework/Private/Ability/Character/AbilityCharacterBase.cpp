@@ -71,12 +71,12 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 // Called when the game starts or when spawned
 void AAbilityCharacterBase::BeginPlay()
 {
-	Super::BeginPlay();
-
 	DefaultGravityScale = GetCharacterMovement()->GravityScale;
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 
 	InitializeAbilitySystem();
+
+	Super::BeginPlay();
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)

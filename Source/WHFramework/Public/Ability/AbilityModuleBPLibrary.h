@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilityModuleTypes.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
@@ -45,11 +46,30 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Race
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FVitalityRaceData RandomVitalityRaceData();
-	
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FCharacterRaceData RandomCharacterRaceData();
+	template<class T>
+	static T GetRandomRaceData()
+	{
+		TArray<T> raceDatas;
+		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas))
+		{
+			float tmpNum1 = 0;
+			float tmpNum2 = 0;
+			for (int32 i = 0; i < raceDatas.Num(); i++)
+			{
+				tmpNum1 += raceDatas[i].Proportion;
+			}
+			tmpNum1 = FMath::FRandRange(0, tmpNum1);
+			for (int32 i = 0; i < raceDatas.Num(); i++)
+			{
+				tmpNum2 += raceDatas[i].Proportion;
+				if (tmpNum1 <= tmpNum2)
+				{
+					return raceDatas[i];
+				}
+			}
+		}
+		return T();
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp

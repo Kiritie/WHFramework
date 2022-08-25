@@ -24,9 +24,6 @@ public:
     AAIControllerBase();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAIPerceptionComponent* AIPerception;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
 	UBehaviorTree* BehaviorTreeAsset;
 
@@ -44,17 +41,13 @@ protected:
 public:
 	virtual void Tick(float DeltaTime) override;
 	
-	virtual void InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset, ACharacterBase* InCharacter);
-
-	virtual bool RunBehaviorTree();
+	virtual void InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset);
 
 	virtual bool RunBehaviorTree(UBehaviorTree* BTAsset) override;
 
 	virtual void StopBehaviorTree();
 
 public:
-	UAIPerceptionComponent* GetAIPerception() const { return AIPerception; }
-
 	UBehaviorTree* GetBehaviorTree() const { return BehaviorTreeAsset; }
 
 	template<class T>
@@ -66,4 +59,6 @@ public:
 	UAIBlackboardBase* GetBlackboard() const { return BlackboardAsset; }
 
 	UBehaviorTreeComponent* GetBehaviorTreeComponent() const;
+
+	bool IsRunningBehaviorTree() const;
 };

@@ -23,9 +23,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType);
 
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static EVoxelType AssetIDToVoxelType(FPrimaryAssetId InAssetID);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 	template<class T>
@@ -84,9 +81,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
-	static bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
+	static bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
-	static bool ChunkTraceSingle(FVector RayStart, FVector RayEnd, float InRadius, float InHalfHeight, FHitResult& OutHitResult);
+	static bool ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
-	static bool VoxelTraceSingle(const FVoxelItem& InVoxelItem, FVector InPoint, FHitResult& OutHitResult);
+	static bool VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+		
+	static bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
+
+	static bool VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 };
