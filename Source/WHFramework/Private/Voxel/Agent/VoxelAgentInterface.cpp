@@ -2,7 +2,6 @@
 
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
-#include "../../../../../../../Source/DreamWorld/Public/DWTypes.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -27,10 +26,10 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	{
 		IgnoreActors.Add(VoxelItem.Auxiliary);
 	}
-	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, (ECollisionChannel)EDWGameTraceType::Voxel, IgnoreActors, HitResult))
-	{
-		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
-	}
+	// if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, (ECollisionChannel)EDWGameTraceType::Voxel, IgnoreActors, HitResult))
+	// {
+	// 	return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
+	// }
 	 return false;
 }
 

@@ -42,7 +42,6 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
-	FSM->bAutoSwitchDefault = true;
 	FSM->GroupName = FName("Vitality");
 	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
 	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
@@ -58,14 +57,19 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 
 void AAbilityVitalityBase::BeginPlay()
 {
-	InitializeAbilitySystem();
-
 	Super::BeginPlay();
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
 }
@@ -82,11 +86,10 @@ void AAbilityVitalityBase::OnDespawn_Implementation()
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	auto SaveData = InSaveData->CastRef<FVitalitySaveData>();
+	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 	
 	if(bForceMode)
 	{
-		AssetID = SaveData.ID;
 		SetRaceID(SaveData.RaceID);
 		SetLevelV(SaveData.Level);
 		SetActorLocation(SaveData.SpawnLocation);

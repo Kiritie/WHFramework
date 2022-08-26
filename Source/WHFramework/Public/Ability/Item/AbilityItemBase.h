@@ -29,6 +29,8 @@ protected:
 	AAbilityCharacterBase* OwnerCharacter;
 
 protected:
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation() override;

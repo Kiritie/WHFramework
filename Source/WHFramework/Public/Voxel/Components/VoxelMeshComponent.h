@@ -65,7 +65,9 @@ private:
 	void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal);
 
 public:
-	bool IsEmpty() const;
+	bool HasData() const;
+
+	bool HasMesh();
 
 	AVoxelChunk* GetOwnerChunk() const;
 

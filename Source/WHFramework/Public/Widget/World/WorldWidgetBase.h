@@ -36,7 +36,7 @@ public:
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
+	virtual int32 GetLimit_Implementation() const override { return 0; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
@@ -156,6 +156,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetInputMode() const override { return InputMode; }
+
+	template<class T>
+	T* GetOwnerActor() const
+	{
+		return Cast<T>(OwnerActor);
+	}
 
 	UFUNCTION(BlueprintPure)
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }

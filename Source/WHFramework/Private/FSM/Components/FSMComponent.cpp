@@ -69,8 +69,11 @@ void UFSMComponent::OnInitialize()
 	}
 
 	bInitialized = true;
-	
-	SwitchDefaultState();
+
+	if(bAutoSwitchDefault)
+	{
+		SwitchDefaultState();
+	}
 }
 
 void UFSMComponent::OnRefresh()

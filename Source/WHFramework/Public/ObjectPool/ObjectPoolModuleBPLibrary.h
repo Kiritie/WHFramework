@@ -28,7 +28,15 @@ public:
 		return nullptr;
 	}
 
-	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams = nullptr);
+	template<class T>
+	static T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+		{
+			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
+		}
+		return nullptr;
+	}
 
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleBPLibrary")
 	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);

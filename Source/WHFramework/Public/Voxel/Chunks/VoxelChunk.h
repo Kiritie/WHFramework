@@ -47,9 +47,6 @@ protected:
 	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
@@ -63,7 +60,7 @@ public:
 public:
 	virtual void Initialize(AVoxelModule* InModule,  FIndex InIndex, int32 InBatch);
 
-	virtual void Generate(bool bForceMode = false);
+	virtual void Generate(bool bBuildMesh, bool bForceMode = false);
 
 	virtual void BuildMap(int32 InStage);
 
@@ -142,13 +139,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SolidMesh;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SemiMesh;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* TransMesh;
 
 	//////////////////////////////////////////////////////////////////////////

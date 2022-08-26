@@ -286,7 +286,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
 public:
-	virtual bool ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+	virtual bool ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
 	virtual bool ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
@@ -297,5 +297,7 @@ public:
 	virtual bool VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 public:
-	int GetChunkNum(bool bNeedGenerated = false) const;
+	int32 GetChunkNum(bool bNeedGenerated = false) const;
+
+	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
 };

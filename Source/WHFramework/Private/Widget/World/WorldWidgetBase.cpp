@@ -56,11 +56,11 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 				}
 			}
 		}
-		if(bWidgetAutoVisibility)
-		{
-			const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
-			SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
-		}
+	}
+	if(bWidgetAutoVisibility)
+	{
+		const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
+		SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 	}
 }
 

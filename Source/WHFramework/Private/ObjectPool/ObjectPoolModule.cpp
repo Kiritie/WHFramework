@@ -89,7 +89,7 @@ UObjectPool* AObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
 		ObjectPool = NewObject<UObjectPool>(this);
 	}
 	const int32 _Limit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-	ObjectPool->Initialize(_Limit >= 0 ? (_Limit != 0 ? _Limit : DefaultLimit) : 0, InType);
+	ObjectPool->Initialize(_Limit != -1 ? _Limit : DefaultLimit, InType);
 	ObjectPools.Add(InType, ObjectPool);
 	return ObjectPool;
 }
@@ -111,11 +111,6 @@ bool AObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 		return ObjectPools[InType]->GetCount() > 0;
 	}
 	return false;
-}
-
-UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams)
-{
-	return SpawnObject(InType, InParams ? *InParams : TArray<FParameter>());
 }
 
 UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)

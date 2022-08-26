@@ -114,7 +114,7 @@ void UVoxelDoor::Open()
 		{
 			Iter.GetVoxel<UVoxelDoor>().Open();
 		}
-		Owner->Generate();
+		Owner->Generate(true);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
 	}
 }
@@ -129,7 +129,7 @@ void UVoxelDoor::Close()
 		{ 
 			Iter.GetVoxel<UVoxelDoor>().Close();
 		}
-		Owner->Generate();
+		Owner->Generate(true);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
 	}
 }

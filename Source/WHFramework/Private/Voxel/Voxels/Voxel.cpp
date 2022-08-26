@@ -55,7 +55,7 @@ void UVoxel::Serialize(FArchive& Ar)
 
 void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	const auto SaveData = InSaveData->CastRef<FVoxelItem>();
+	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 	ID = SaveData.ID;
 	Index = SaveData.Index;
 	Angle = SaveData.Angle;

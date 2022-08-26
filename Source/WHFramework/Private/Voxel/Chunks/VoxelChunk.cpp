@@ -117,12 +117,6 @@ void AVoxelChunk::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor*
 {
 }
 
-// Called every frame
-void AVoxelChunk::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
 void AVoxelChunk::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 }
@@ -169,53 +163,30 @@ void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBat
 	UpdateNeighbors();
 }
 
-void AVoxelChunk::Generate(bool bForceMode)
+void AVoxelChunk::Generate(bool bBuildMesh, bool bForceMode)
 {
-	if(bGenerated)
+	if(bBuildMesh)
 	{
 		BuildMesh();
-	}
-	
-	if(!SolidMesh->IsEmpty())
-	{
-		SolidMesh->CreateMesh();
-	}
-	else
-	{
-		SolidMesh->ClearMesh();
-	}
-	
-	if(!SemiMesh->IsEmpty())
-	{
-		SemiMesh->CreateMesh();
-	}
-	else
-	{
-		SemiMesh->ClearMesh();
-	}
-	
-	if(!TransMesh->IsEmpty())
-	{
-		TransMesh->CreateMesh();
-	}
-	else
-	{
-		TransMesh->ClearMesh();
 	}
 
 	Execute_SetActorVisible(this, true);
 
-	for(auto& Iter : VoxelMap)
-	{
-		Iter.Value.OnGenerate();
-	}
+	SolidMesh->CreateMesh();
+	SemiMesh->CreateMesh();
+	TransMesh->CreateMesh();
+
+	bGenerated = true;
 
 	if(bForceMode)
 	{
+		for(auto& Iter : VoxelMap)
+		{
+			Iter.Value.OnGenerate();
+		}
+
 		SpawnActors();
 	}
-	
-	bGenerated = true;
 }
 
 void AVoxelChunk::BuildMap(int32 InStage)
@@ -329,9 +300,9 @@ void AVoxelChunk::SpawnActors()
 
 void AVoxelChunk::DestroyActors()
 {
-	for(auto& Iter : PickUps)
+	for(auto Iter = PickUps.CreateConstIterator(); Iter; ++Iter)
 	{
-		UObjectPoolModuleBPLibrary::DespawnObject(Iter);
+		UObjectPoolModuleBPLibrary::DespawnObject(*Iter);
 	}
 	PickUps.Empty();
 }
@@ -345,27 +316,27 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForce
 {
 	if(InX <= 0 && Neighbors[EDirection::Backward])
 	{
-		Neighbors[EDirection::Backward]->Generate(bForceMode);
+		Neighbors[EDirection::Backward]->Generate(true, bForceMode);
 	}
 	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Forward])
 	{
-		Neighbors[EDirection::Forward]->Generate(bForceMode);
+		Neighbors[EDirection::Forward]->Generate(true, bForceMode);
 	}
 	if(InY <= 0 && Neighbors[EDirection::Left])
 	{
-		Neighbors[EDirection::Left]->Generate(bForceMode);
+		Neighbors[EDirection::Left]->Generate(true, bForceMode);
 	}
 	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Right])
 	{
-		Neighbors[EDirection::Right]->Generate(bForceMode);
+		Neighbors[EDirection::Right]->Generate(true, bForceMode);
 	}
 	if(InZ <= 0 && Neighbors[EDirection::Down])
 	{
-		Neighbors[EDirection::Down]->Generate(bForceMode);
+		Neighbors[EDirection::Down]->Generate(true, bForceMode);
 	}
 	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Up])
 	{
-		Neighbors[EDirection::Up]->Generate(bForceMode);
+		Neighbors[EDirection::Up]->Generate(true, bForceMode);
 	}
 }
 
@@ -672,7 +643,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 
 	if(bSuccess && bGenerate)
 	{
-		Generate();
+		Generate(true);
 		GenerateNeighbors(InIndex);
 	}
 

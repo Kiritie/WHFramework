@@ -137,8 +137,9 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 
 void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollider /*= true*/)
 {
-	if (!IsEmpty())
+	if (HasData())
 	{
+		SetCollisionEnabled(true);
 		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollider);
 		switch (MeshNature)
 		{
@@ -168,14 +169,11 @@ void UVoxelMeshComponent::ClearMesh(int InSectionIndex /*= 0*/)
 {
 	if (GetNumSections() > 0)
 	{
-		if (InSectionIndex >= 0 && InSectionIndex < GetNumSections())
-		{
-			ClearMeshSection(InSectionIndex);
-		}
-		else
-		{
-			ClearAllMeshSections();
-		}
+		ClearMeshSection(InSectionIndex);
+	}
+	if (!HasMesh())
+	{
+		SetCollisionEnabled(false);
 	}
 	ClearData();
 }
@@ -282,9 +280,25 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	Normals.Add(InNormal);
 }
 
-bool UVoxelMeshComponent::IsEmpty() const
+bool UVoxelMeshComponent::HasData() const
 {
-	return Vertices.Num() == 0;
+	return Vertices.Num() > 0;
+}
+
+bool UVoxelMeshComponent::HasMesh()
+{
+	bool ReturnValue = false;
+	for(int32 i = 0; i < GetNumSections(); i++)
+	{
+		if(const auto MeshSection = GetProcMeshSection(i))
+		{
+			if(!MeshSection->ProcVertexBuffer.IsEmpty())
+			{
+				ReturnValue = true;
+			}
+		}
+	}
+	return ReturnValue;
 }
 
 AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const

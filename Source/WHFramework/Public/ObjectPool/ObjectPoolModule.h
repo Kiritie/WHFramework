@@ -98,9 +98,13 @@ public:
 	template<class T>
 	T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
+		return Cast<T>(SpawnObject(InType, InParams ? *InParams : TArray<FParameter>()));
+	}
+	template<class T>
+	T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
+	{
 		return Cast<T>(SpawnObject(InType, InParams));
 	}
-	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>* InParams = nullptr);
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
 	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 

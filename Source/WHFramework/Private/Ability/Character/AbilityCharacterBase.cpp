@@ -44,7 +44,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Interaction->AddInteractionAction(EInteractAction::Revive);
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
-	FSM->bAutoSwitchDefault = true;
 	FSM->GroupName = FName("Character");
 	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
@@ -71,17 +70,22 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 // Called when the game starts or when spawned
 void AAbilityCharacterBase::BeginPlay()
 {
+	Super::BeginPlay();
+
 	DefaultGravityScale = GetCharacterMovement()->GravityScale;
 	DefaultAirControl = GetCharacterMovement()->AirControl;
-
-	InitializeAbilitySystem();
-
-	Super::BeginPlay();
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
 }
@@ -101,11 +105,10 @@ void AAbilityCharacterBase::OnDespawn_Implementation()
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	auto SaveData = InSaveData->CastRef<FCharacterSaveData>();
+	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
 	
 	if(bForceMode)
 	{
-		AssetID = SaveData.ID;
 		SetRaceID(SaveData.RaceID);
 		SetLevelV(SaveData.Level);
 		SetActorLocation(SaveData.SpawnLocation);

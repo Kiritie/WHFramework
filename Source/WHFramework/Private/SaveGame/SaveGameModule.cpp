@@ -67,7 +67,7 @@ void ASaveGameModule::OnTermination_Implementation()
 
 void ASaveGameModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 {
-	const auto SaveData = InSaveData->CastRef<FGeneralSaveData>();
+	const auto& SaveData = InSaveData->CastRef<FGeneralSaveData>();
 	for(auto Iter1 : SaveData.AllSaveGameInfo)
 	{
 		for(auto Iter2 : Iter1.Value.Array)

@@ -23,14 +23,14 @@ AAbilityActorBase::AAbilityActorBase()
 
 void AAbilityActorBase::BeginPlay()
 {
-	InitializeAbilitySystem();
-	
 	Super::BeginPlay();
 }
 
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
+
+	InitializeAbilitySystem();
 }
 
 void AAbilityActorBase::OnDespawn_Implementation()

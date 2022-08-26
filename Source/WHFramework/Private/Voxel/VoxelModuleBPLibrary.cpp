@@ -157,11 +157,11 @@ int32 UVoxelModuleBPLibrary::GetNoiseTerrainHeight(FVector InOffset, FVector InS
 	return -1;
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(AVoxelChunk* InChunk, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
 	{
-		return VoxelModule->ChunkTraceSingle(InChunk, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
+		return VoxelModule->ChunkTraceSingle(InChunkIndex, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
