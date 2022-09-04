@@ -6,6 +6,7 @@
 #include "AbilityModuleTypes.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Math/MathBPLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
 class UAbilitySystemComponentBase;
@@ -47,28 +48,23 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
-	static T GetRandomRaceData()
+	static TArray<T> GetNoiseRaceDatas(FIndex InIndex, int32 InOffset)
 	{
-		TArray<T> raceDatas;
-		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas))
+		TArray<T> raceDatas1;
+		TArray<T> raceDatas2;
+		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas1))
 		{
-			float tmpNum1 = 0;
-			float tmpNum2 = 0;
-			for (int32 i = 0; i < raceDatas.Num(); i++)
+			for(auto raceData = raceDatas1.CreateConstIterator(); raceData; ++raceData)
 			{
-				tmpNum1 += raceDatas[i].Proportion;
-			}
-			tmpNum1 = FMath::FRandRange(0, tmpNum1);
-			for (int32 i = 0; i < raceDatas.Num(); i++)
-			{
-				tmpNum2 += raceDatas[i].Proportion;
-				if (tmpNum1 <= tmpNum2)
+				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InIndex, raceData->NoiseScale, InOffset);
+				WHDebug(FString::Printf(TEXT("%s : %f"), *InIndex.ToString(), noiseHeight));
+				if(noiseHeight > 0.f)
 				{
-					return raceDatas[i];
+					//raceDatas2.Add(iter);
 				}
 			}
 		}
-		return T();
+		return raceDatas2;
 	}
 
 	//////////////////////////////////////////////////////////////////////////

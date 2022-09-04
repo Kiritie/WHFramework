@@ -26,11 +26,11 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	{
 		IgnoreActors.Add(VoxelItem.Auxiliary);
 	}
-	// if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, (ECollisionChannel)EDWGameTraceType::Voxel, IgnoreActors, HitResult))
-	// {
-	// 	return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
-	// }
-	 return false;
+	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, UVoxelModuleBPLibrary::GetChunkTraceType(), IgnoreActors, HitResult))
+	{
+		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
+	}
+	return false;
 }
 
 bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)

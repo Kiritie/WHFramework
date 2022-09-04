@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -78,10 +78,6 @@ public:
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
 	FVoxelWorldBasicSaveData GetWorldBasicData() const { return WorldBasicData; }
-	
-	float GetWorldLength() const;
-
-	bool IsBasicGenerated() const;
 
 protected:
 	void SetWorldState(EVoxelWorldState InWorldState);
@@ -91,14 +87,14 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 protected:
-	FVoxelWorldSaveData* WorldData;
+	static FVoxelWorldSaveData* WorldData;
 public:
 	template<class T>
-	T& GetWorldData()
+	static T& GetWorldData()
 	{
 		return static_cast<T&>(GetWorldData());
 	}
-	FVoxelWorldSaveData& GetWorldData() const;
+	static FVoxelWorldSaveData& GetWorldData();
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
@@ -245,20 +241,29 @@ protected:
 	template<class T>
 	bool UpdateChunkTasks(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
 	{
-		for(auto iter = InTasks.CreateConstIterator(); iter; ++iter)
+		if(InTasks.Num() == 0)
 		{
-			auto tmpTask = (*iter);
-			if(tmpTask->IsDone())
-			{
-				InTasks.Remove(tmpTask);
-				delete tmpTask;
-			}
+			DON(i, FMath::CeilToInt((float)InQueue.Num() / InSpeed),
+				TArray<FIndex> tmpArr;
+				DON(j, FMath::Min(InQueue.Num() - i * InSpeed, InSpeed),
+					tmpArr.Add(InQueue[i * InSpeed + j]);
+				)
+				const auto tmpTask = new FAsyncTask<T>(this, tmpArr);
+				InTasks.Add(tmpTask);
+				tmpTask->StartBackgroundTask();
+			)
 		}
-		if(InTasks.Num() < FMath::CeilToInt((float)InQueue.Num() / InSpeed))
+		else
 		{
-			const auto tmpTask = new FAsyncTask<T>(this, InQueue);
-			InTasks.Add(tmpTask);
-			tmpTask->StartBackgroundTask();
+			for(auto iter = InTasks.CreateConstIterator(); iter; ++iter)
+			{
+				auto tmpTask = (*iter);
+				if(tmpTask->IsDone())
+				{
+					InTasks.Remove(tmpTask);
+					delete tmpTask;
+				}
+			}
 		}
 		return InQueue.Num() > 0 || InTasks.Num() > 0;
 	}
@@ -274,30 +279,16 @@ protected:
 		InTasks.Empty();
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-	// Noise
-public:
-	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
-
-	virtual UVoxelData& GetNoiseVoxelData(FIndex InIndex);
-
-	virtual int32 GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Trace
-public:
-	virtual bool ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
-
-	virtual bool ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
-
-	virtual bool VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
-		
-	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
-
-	virtual bool VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
-
 public:
 	int32 GetChunkNum(bool bNeedGenerated = false) const;
 
+	float GetWorldLength() const;
+
+	bool IsBasicGenerated() const;
+
 	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
+	
+	virtual ECollisionChannel GetChunkTraceType() const;
+	
+	virtual ECollisionChannel GetVoxelTraceType() const;
 };

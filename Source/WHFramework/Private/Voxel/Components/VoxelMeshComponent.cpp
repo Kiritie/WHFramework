@@ -39,9 +39,13 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			switch(Transparency)
 			{
 				case EVoxelTransparency::Solid:
-				case EVoxelTransparency::SemiTransparent:
 				{
 					SetCollisionProfileName(TEXT("SolidVoxel"));
+					break;
+				}
+				case EVoxelTransparency::SemiTransparent:
+				{
+					SetCollisionProfileName(TEXT("SemiVoxel"));
 					break;
 				}
 				case EVoxelTransparency::Transparent:

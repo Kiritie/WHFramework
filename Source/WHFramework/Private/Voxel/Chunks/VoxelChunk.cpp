@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.PickUp/
+// Fill out your copyright notice in the Description page of Project Settings.PickUp/
 
 
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -170,22 +170,26 @@ void AVoxelChunk::Generate(bool bBuildMesh, bool bForceMode)
 		BuildMesh();
 	}
 
-	Execute_SetActorVisible(this, true);
+	if(!bGenerated)
+	{
+		Execute_SetActorVisible(this, true);
+	}
 
 	SolidMesh->CreateMesh();
 	SemiMesh->CreateMesh();
 	TransMesh->CreateMesh();
 
-	bGenerated = true;
-
-	if(bForceMode)
+	if(!bGenerated)
 	{
 		for(auto& Iter : VoxelMap)
 		{
 			Iter.Value.OnGenerate();
 		}
-
-		SpawnActors();
+		if(bForceMode)
+		{
+			SpawnActors();
+		}
+		bGenerated = true;
 	}
 }
 
@@ -196,7 +200,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		case 0:
 		{
 			INDEX_ITERATOR(voxelIndex, FVector(UVoxelModuleBPLibrary::GetWorldData().ChunkSize),
-				const EVoxelType voxelType = Module->GetNoiseVoxelType(LocalIndexToWorld(voxelIndex));
+				const EVoxelType voxelType = UVoxelModuleBPLibrary::GetNoiseVoxelType(LocalIndexToWorld(voxelIndex));
 				if(voxelType != EVoxelType::Empty)
 				{
 					SetVoxelSample(voxelIndex, voxelType);
@@ -627,9 +631,9 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 		if(IsOnTheChunk(InIndex))
 		{
 			FVoxelItem VoxelItem = FVoxelItem(InVoxelItem);
+			VoxelItem.Owner = this;
+			VoxelItem.Index = InIndex;
 			VoxelMap.Emplace(InIndex, VoxelItem);
-			VoxelMap[InIndex].Owner = this;
-			VoxelMap[InIndex].Index = InIndex;
 			if(bGenerate) VoxelMap[InIndex].OnGenerate(InAgent);
 			bSuccess = true;
 		}

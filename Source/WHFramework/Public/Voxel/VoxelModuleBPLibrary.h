@@ -75,10 +75,6 @@ public:
 	// Noise
 	static EVoxelType GetNoiseVoxelType(FIndex InIndex);
 
-	static UVoxelData& GetNoiseVoxelData(FIndex InIndex);
-
-	static int32 GetNoiseTerrainHeight(FVector InOffset, FVector InScale);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
 	static bool ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
@@ -90,4 +86,8 @@ public:
 	static bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 	static bool VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
+
+	static ECollisionChannel GetChunkTraceType();
+
+	static ECollisionChannel GetVoxelTraceType();
 };

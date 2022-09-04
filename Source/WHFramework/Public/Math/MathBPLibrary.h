@@ -74,4 +74,9 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
 	static float BounceEaseOut(float InTime, float InDuration);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Noise
+	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
+	static float GetNoiseHeight(FIndex InIndex, FVector InScale, int32 InOffset = 0);
 };

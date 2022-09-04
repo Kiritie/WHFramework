@@ -303,6 +303,16 @@ public:
 	}
 
 	UVoxelData& GetVoxelData(bool bLogWarning = true) const;
+
+	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
+	{
+		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level) && (A.Index == B.Index);
+	}
+
+	FORCEINLINE friend bool operator!=(const FVoxelItem& A, const FVoxelItem& B)
+	{
+		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level) && (A.Index != B.Index);
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -512,8 +522,6 @@ public:
 		WorldSeed = 0;
 		TimeSeconds = -1.f;
 		RandomStream = FRandomStream();
-		LastCharacterRaceIndex = FIndex::ZeroIndex;
-		LastVitalityRaceIndex = FIndex::ZeroIndex;
 	}
 	
 	FORCEINLINE FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldBasicSaveData(InBasicSaveData)
@@ -521,8 +529,6 @@ public:
 		WorldSeed = 0;
 		TimeSeconds = -1.f;
 		RandomStream = FRandomStream();
-		LastCharacterRaceIndex = FIndex::ZeroIndex;
-		LastVitalityRaceIndex = FIndex::ZeroIndex;
 	}
 
 public:
@@ -536,12 +542,6 @@ public:
 	
 	UPROPERTY(Transient)
 	FRandomStream RandomStream;
-
-	UPROPERTY(Transient)
-	FIndex LastVitalityRaceIndex;
-
-	UPROPERTY(Transient)
-	FIndex LastCharacterRaceIndex;
 	
 public:
 	virtual void MakeSaved() override

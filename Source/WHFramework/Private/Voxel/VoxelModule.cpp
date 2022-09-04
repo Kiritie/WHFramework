@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Voxel/VoxelModule.h"
@@ -13,7 +13,6 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Voxel/EventHandle_ChangeVoxelWorldState.h"
 #include "Gameplay/WHPlayerInterface.h"
-#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Math/MathBPLibrary.h"
@@ -34,6 +33,9 @@
 #include "Voxel/Voxels/VoxelWater.h"
 #include "Voxel/Voxels/Entity/VoxelEntity.h"
 #include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
+#include "Global/GlobalBPLibrary.h"
+
+FVoxelWorldSaveData* AVoxelModule::WorldData = nullptr;
 
 // Sets default values
 AVoxelModule::AVoxelModule()
@@ -171,17 +173,6 @@ void AVoxelModule::OnTermination_Implementation()
 	StopChunkTasks(ChunkMeshBuildTasks);
 }
 
-float AVoxelModule::GetWorldLength() const
-{
-	return WorldData->ChunkSize * ChunkSpawnRange * 2;
-}
-
-bool AVoxelModule::IsBasicGenerated() const
-{
-	const int32 basicNum = FMath::Square(ChunkBasicSpawnRange * 2) * WorldData->ChunkHeightRange;
-	return GetChunkNum(true) >= basicNum;
-}
-
 void AVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 {
 	if(WorldState != InWorldState)
@@ -196,7 +187,7 @@ void AVoxelModule::OnWorldStateChanged()
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeVoxelWorldState::StaticClass(), EEventNetType::Single, this, {FParameter::MakePointer(&WorldState)});
 }
 
-FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
+FVoxelWorldSaveData& AVoxelModule::GetWorldData()
 {
 	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
 }
@@ -696,103 +687,6 @@ AVoxelChunk* AVoxelModule::FindChunkByLocation(FVector InLocation)
 	return FindChunkByIndex(UVoxelModuleBPLibrary::LocationToChunkIndex(InLocation));
 }
 
-EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
-{
-	const FVector offsetIndex = FVector(InIndex.X + WorldData->WorldSeed, InIndex.Y + WorldData->WorldSeed, InIndex.Z);
-
-	const int32 plainHeight = GetNoiseTerrainHeight(offsetIndex, WorldData->TerrainPlainScale);
-	const int32 mountainHeight = GetNoiseTerrainHeight(offsetIndex, WorldData->TerrainMountainScale);
-
-	const int32 baseHeight = FMath::Clamp(FMath::Max(plainHeight, mountainHeight) + int32(WorldData->GetWorldHeight() * WorldData->TerrainBaseHeight), 0, WorldData->GetWorldHeight() - 1);
-
-	const int32 stoneHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, WorldData->TerrainStoneVoxelScale), 0, WorldData->GetWorldHeight() - 1);
-	const int32 sandHeight = FMath::Clamp(GetNoiseTerrainHeight(offsetIndex, WorldData->TerrainSandVoxelScale), 0, WorldData->GetWorldHeight() - 1);
-
-	const int32 waterHeight = FMath::Clamp(int32(WorldData->GetWorldHeight() * WorldData->TerrainWaterVoxelHeight), 0, WorldData->GetWorldHeight() - 1);
-	const int32 bedrockHeight = FMath::Clamp(int32(WorldData->GetWorldHeight() * WorldData->TerrainBedrockVoxelHeight), 0, WorldData->GetWorldHeight() - 1);
-
-	if(InIndex.Z < baseHeight)
-	{
-		if(InIndex.Z <= bedrockHeight)
-		{
-			return EVoxelType::Bedrock; //Bedrock
-		}
-		else if(InIndex.Z <= stoneHeight)
-		{
-			return EVoxelType::Stone; //Stone
-		}
-		return EVoxelType::Dirt; //Dirt
-	}
-	else if(InIndex.Z <= sandHeight)
-	{
-		return EVoxelType::Sand; //Sand
-	}
-	else if(InIndex.Z <= waterHeight)
-	{
-		return EVoxelType::Water; //Water
-	}
-	else if(InIndex.Z == baseHeight)
-	{
-		return EVoxelType::Grass; //Grass
-	}
-	return EVoxelType::Empty; //Empty
-}
-
-UVoxelData& AVoxelModule::GetNoiseVoxelData(FIndex InIndex)
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(FPrimaryAssetId::FromString(*FString::Printf(TEXT("Voxel_%d"), (int32)GetNoiseVoxelType(InIndex))));
-}
-
-int32 AVoxelModule::GetNoiseTerrainHeight(FVector InOffset, FVector InScale)
-{
-	return (FMath::PerlinNoise2D(FVector2D(InOffset.X * InScale.X, InOffset.Y * InScale.Y)) + 1.f) * WorldData->GetWorldHeight() * InScale.Z;
-}
-
-bool AVoxelModule::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	FVector chunkPos = UVoxelModuleBPLibrary::ChunkIndexToLocation(InChunkIndex);
-	FVector rayStart = FVector(FMath::FRandRange(1.f, WorldData->ChunkSize - 1), FMath::FRandRange(1.f, WorldData->ChunkSize - 1), WorldData->ChunkSize * WorldData->ChunkHeightRange) * WorldData->BlockSize;
-	rayStart.X = chunkPos.X + ((int32)(rayStart.X / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize;
-	rayStart.Y = chunkPos.Y + ((int32)(rayStart.Y / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize;
-	FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0);
-	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
-}
-
-bool AVoxelModule::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	return UKismetSystemLibrary::CapsuleTraceSingle(this, InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(InChunkTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
-}
-
-bool AVoxelModule::VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	const FVector size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
-	const FVector location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(this, location + size, location + size, size, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
-}
-
-bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
-{
-	FHitResult hitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(this, InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
-	{
-		OutHitResult = FVoxelHitResult(hitResult);
-		return OutHitResult.IsValid();
-	}
-	return false;
-}
-
-bool AVoxelModule::VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
-{
-	FHitResult hitResult;
-	const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController();
-	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, InVoxelTraceType, InIgnoreActors, hitResult))
-	{
-		OutHitResult = FVoxelHitResult(hitResult);
-		return OutHitResult.IsValid();
-	}
-	return false;
-}
-
 int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 {
 	int32 num = 0;
@@ -807,6 +701,17 @@ int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 		}
 	}
 	return num;
+}
+
+float AVoxelModule::GetWorldLength() const
+{
+	return WorldData->ChunkSize * ChunkSpawnRange * 2;
+}
+
+bool AVoxelModule::IsBasicGenerated() const
+{
+	const int32 basicNum = FMath::Square(ChunkBasicSpawnRange * 2) * WorldData->ChunkHeightRange;
+	return GetChunkNum(true) >= basicNum;
 }
 
 bool AVoxelModule::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
@@ -824,4 +729,14 @@ bool AVoxelModule::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
 		return true;
 	}
 	return FindChunkByIndex(InIndex) && FindChunkByIndex(InIndex)->IsGenerated();
+}
+
+ECollisionChannel AVoxelModule::GetChunkTraceType() const
+{
+	return ECollisionChannel::ECC_MAX;
+}
+
+ECollisionChannel AVoxelModule::GetVoxelTraceType() const
+{
+	return ECollisionChannel::ECC_MAX;
 }

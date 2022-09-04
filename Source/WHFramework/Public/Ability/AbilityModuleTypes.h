@@ -15,7 +15,7 @@ class AAbilityEquipBase;
 
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_ACCESSORS(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
@@ -606,7 +606,7 @@ public:
 	FString Detail;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Proportion;
+	FVector NoiseScale;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FAbilityItem> Items;
@@ -616,7 +616,7 @@ public:
 		ID = NAME_None;
 		Name = NAME_None;
 		Detail = TEXT("");
-		Proportion = 1;
+		NoiseScale = FVector(1.f);
 		Items = TArray<FAbilityItem>();
 	}
 

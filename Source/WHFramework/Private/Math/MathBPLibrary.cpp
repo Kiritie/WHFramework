@@ -412,3 +412,9 @@ float UMathBPLibrary::BounceEaseOut(float InTime, float InDuration)
 	InTime = InTime - 0.9545454f;
 	return (((7.5625f * InTime) * InTime) + 0.984375f);
 }
+
+float UMathBPLibrary::GetNoiseHeight(FIndex InIndex, FVector InScale, int32 InOffset /*= 0*/)
+{
+	const float noiseHeight = FMath::PerlinNoise2D(FVector2D((InIndex.X + InOffset) * InScale.X, (InIndex.Y + InOffset) * InScale.Y));
+	return FMath::Clamp((noiseHeight + 1.f) * InScale.Z, 0.f, 1.f);
+}
