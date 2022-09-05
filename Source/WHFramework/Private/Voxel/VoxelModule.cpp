@@ -377,41 +377,6 @@ void AVoxelModule::GenerateVoxels()
 			VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
 			VoxelsCapture->ShowOnlyActors.Add(VoxelEntity);
 
-			/* VoxelsCapture->CaptureScene();
-			
-			constexpr int32 TextureWidth = 64;
-			constexpr int32 TextureHeight = 64;
-			constexpr int32 TextureSize = TextureWidth * TextureHeight;
-			
-			FRenderTarget* SourceTexture = VoxelsCapture->TextureTarget->GameThread_GetRenderTargetResource();
-			TArray<FColor> SourcePixels;
-			const FReadSurfaceDataFlags ReadSurfaceDataFlags(RCM_UNorm);
-			SourceTexture->ReadPixels(SourcePixels, ReadSurfaceDataFlags);
-			
-			UTexture2D* NewTexture = UTexture2D::CreateTransient(TextureWidth, TextureHeight, PF_B8G8R8A8);
-			
-			uint8* NewPixels = new uint8[TextureSize * 4];
-			for (int32 x = 0; x < TextureWidth; x++)
-			{
-				for (int32 y = 0; y < TextureHeight; y++)
-				{
-					const int32 newIndex = (x + y * TextureWidth) * 4;
-					const int32 sourceIndex = (x + TextureWidth * (tmpIndex % 8)) + (y * TextureWidth * 8 + (tmpIndex / 8) * TextureSize * 8);
-					NewPixels[newIndex] = SourcePixels[sourceIndex].B;
-					NewPixels[newIndex + 1] = SourcePixels[sourceIndex].G;
-					NewPixels[newIndex + 2] = SourcePixels[sourceIndex].R;
-					NewPixels[newIndex + 3] = 255 - SourcePixels[sourceIndex].A;
-				}
-			}
-			
-			void* NewTextureData = NewTexture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
-			FMemory::Memcpy(NewTextureData, NewPixels, sizeof(uint8) * TextureSize * 4);
-			NewTexture->GetPlatformData()->Mips[0].BulkData.Unlock();
-			
-			NewTexture->UpdateResource();
-			
-			VoxelDatas[i]->Icon = NewTexture; */
-
 			VoxelDatas[i]->InitIconMat(VoxelsCapture->TextureTarget, 8, tmpIndex);
 
 			tmpIndex++;

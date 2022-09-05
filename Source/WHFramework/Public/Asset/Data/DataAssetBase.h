@@ -10,7 +10,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class WHFRAMEWORK_API UDataAssetBase : public UDataAsset
 {
 	GENERATED_BODY()

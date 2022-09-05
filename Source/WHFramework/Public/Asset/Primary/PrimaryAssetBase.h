@@ -4,7 +4,7 @@
 
 #include "PrimaryAssetBase.generated.h"
 
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, Blueprintable)
 class WHFRAMEWORK_API UPrimaryAssetBase : public UPrimaryDataAsset
 {
 	GENERATED_BODY()

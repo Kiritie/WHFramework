@@ -4,6 +4,7 @@
 
 #include "VoxelModuleTypes.h"
 #include "GameFramework/Actor.h"
+#include "Global/GlobalTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/AsyncTasks/AsyncTask_LoadChunkMap.h"
@@ -241,23 +242,24 @@ protected:
 	template<class T>
 	bool UpdateChunkTasks(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
 	{
-		if(InTasks.Num() == 0)
+		if(InTasks.Num() == 0 && InQueue.Num() > 0)
 		{
-			DON(i, FMath::CeilToInt((float)InQueue.Num() / InSpeed),
+			TArray<FIndex> tmpQueue = InQueue;
+			DON(i, FMath::CeilToInt((float)tmpQueue.Num() / InSpeed),
 				TArray<FIndex> tmpArr;
-				DON(j, FMath::Min(InQueue.Num() - i * InSpeed, InSpeed),
-					tmpArr.Add(InQueue[i * InSpeed + j]);
+				DON(j, FMath::Min(InSpeed, tmpQueue.Num() - i * InSpeed),
+					tmpArr.Add(tmpQueue[i * InSpeed + j]);
 				)
 				const auto tmpTask = new FAsyncTask<T>(this, tmpArr);
 				InTasks.Add(tmpTask);
 				tmpTask->StartBackgroundTask();
 			)
 		}
-		else
+		else if(InTasks.Num() > 0)
 		{
 			for(auto iter = InTasks.CreateConstIterator(); iter; ++iter)
 			{
-				auto tmpTask = (*iter);
+				auto tmpTask = *iter;
 				if(tmpTask->IsDone())
 				{
 					InTasks.Remove(tmpTask);

@@ -261,9 +261,9 @@ void AVoxelChunk::BuildMap(int32 InStage)
 
 void AVoxelChunk::BuildMesh()
 {
-	for(auto& iter : VoxelMap)
+	for(auto iter = VoxelMap.CreateConstIterator(); iter; ++iter)
 	{
-		const FVoxelItem& voxelItem = iter.Value;
+		const FVoxelItem& voxelItem = iter->Value;
 		if(voxelItem.IsValid())
 		{
 			switch(voxelItem.GetVoxelData().Transparency)
@@ -304,9 +304,9 @@ void AVoxelChunk::SpawnActors()
 
 void AVoxelChunk::DestroyActors()
 {
-	for(auto Iter = PickUps.CreateConstIterator(); Iter; ++Iter)
+	for(auto iter = PickUps.CreateConstIterator(); iter; ++iter)
 	{
-		UObjectPoolModuleBPLibrary::DespawnObject(*Iter);
+		UObjectPoolModuleBPLibrary::DespawnObject(*iter);
 	}
 	PickUps.Empty();
 }
