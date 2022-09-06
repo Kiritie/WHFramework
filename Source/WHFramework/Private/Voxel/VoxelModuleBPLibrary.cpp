@@ -168,32 +168,32 @@ EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 	return EVoxelType::Empty; //Empty
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	FVector chunkPos = UVoxelModuleBPLibrary::ChunkIndexToLocation(InChunkIndex);
 	FVector rayStart = FVector(GetWorldData().RandomStream.FRandRange(1.f, GetWorldData().ChunkSize - 1), GetWorldData().RandomStream.FRandRange(1.f, GetWorldData().ChunkSize - 1), GetWorldData().ChunkSize * GetWorldData().ChunkHeightRange) * GetWorldData().BlockSize;
 	rayStart.X = chunkPos.X + ((int32)(rayStart.X / GetWorldData().BlockSize) + 0.5f) * GetWorldData().BlockSize;
 	rayStart.Y = chunkPos.Y + ((int32)(rayStart.Y / GetWorldData().BlockSize) + 0.5f) * GetWorldData().BlockSize;
 	FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0);
-	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InChunkTraceType, InIgnoreActors, OutHitResult);
+	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, ECollisionChannel InChunkTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	return UKismetSystemLibrary::CapsuleTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(InChunkTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	return UKismetSystemLibrary::CapsuleTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }
 
-bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	const FVector size = InVoxelItem.GetRange() * GetWorldData().BlockSize * 0.5f;
 	const FVector location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(AMainModule::Get(), location + size, location + size, size, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	return UKismetSystemLibrary::BoxTraceSingle(AMainModule::Get(), location + size, location + size, size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }
 
-bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult hitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(InVoxelTraceType), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
+	if(UKismetSystemLibrary::LineTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
 	{
 		OutHitResult = FVoxelHitResult(hitResult);
 		return OutHitResult.IsValid();
@@ -201,11 +201,11 @@ bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayE
 	return false;
 }
 
-bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, ECollisionChannel InVoxelTraceType, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult hitResult;
 	const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController();
-	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, InVoxelTraceType, InIgnoreActors, hitResult))
+	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceType(), InIgnoreActors, hitResult))
 	{
 		OutHitResult = FVoxelHitResult(hitResult);
 		return OutHitResult.IsValid();

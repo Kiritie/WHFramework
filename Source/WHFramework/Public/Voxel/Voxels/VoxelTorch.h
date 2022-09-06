@@ -29,6 +29,8 @@ public:
 
 	virtual FSaveData* ToData() override;
 
+	virtual bool HasArchive() override { return true; }
+
 	//////////////////////////////////////////////////////////////////////////
 	// Events
 public:

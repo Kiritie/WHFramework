@@ -54,7 +54,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraModule")
 	ACameraPawnBase* DefaultCamera;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCameraClass != nullptr"), Category = "CameraModule")
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCamera != nullptr"), Category = "CameraModule")
 	bool DefaultInstantSwitch;
 
 	UPROPERTY(VisibleAnywhere, Category = "CameraModule")

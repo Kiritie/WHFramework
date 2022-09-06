@@ -32,5 +32,6 @@ void UGeneralSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AMainModule::GetModuleByClass<ASaveGameModule>()->ToSaveData());
+	const auto& SaveData = AMainModule::GetModuleByClass<ASaveGameModule>()->ToSaveDataRef<FGeneralSaveData>();
+	GetSaveDataRef<FGeneralSaveData>().AllSaveGameInfo = SaveData.AllSaveGameInfo;
 }

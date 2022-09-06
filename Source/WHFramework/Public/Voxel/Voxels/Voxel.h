@@ -46,7 +46,7 @@ public:
 
 	virtual FSaveData* ToData() override;
 
-	virtual  void RefreshData();
+	virtual void RefreshData();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Events

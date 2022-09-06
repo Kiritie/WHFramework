@@ -390,8 +390,6 @@ void AVoxelModule::LoadChunkMap(FIndex InIndex)
 	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 
 	Chunk->LoadSaveData(WorldData->GetChunkData(InIndex));
-
-	AddToMeshBuildQueue(InIndex);
 }
 
 void AVoxelModule::BuildChunkMap(FIndex InIndex, int32 InStage)
@@ -400,15 +398,6 @@ void AVoxelModule::BuildChunkMap(FIndex InIndex, int32 InStage)
 	if(!Chunk || !RemoveFromMapBuildQueue(InIndex, InStage)) return;
 
 	Chunk->BuildMap(InStage);
-
-	if(InStage < 1)
-	{
-		AddToMapBuildQueue(InIndex, InStage + 1);
-	}
-	else
-	{
-		AddToMeshBuildQueue(InIndex);
-	}
 }
 
 void AVoxelModule::BuildChunkMesh(FIndex InIndex)
@@ -417,8 +406,6 @@ void AVoxelModule::BuildChunkMesh(FIndex InIndex)
 	if(!Chunk || !RemoveFromMeshBuildQueue(InIndex)) return;
 
 	Chunk->BuildMesh();
-
-	AddToGenerateQueue(InIndex);
 }
 
 void AVoxelModule::GenerateChunk(FIndex InIndex)
@@ -624,8 +611,9 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 			}
 			else
 			{
-				AddToMapBuildQueue(InIndex, 0);
+				DON(i, 2, AddToMapBuildQueue(InIndex, i);)
 			}
+			AddToMeshBuildQueue(InIndex);
 			for(auto Iter : Chunk->GetNeighbors())
 			{
 				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
@@ -633,6 +621,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 					AddToMeshBuildQueue(Iter.Value->GetIndex());
 				}
 			}
+			AddToGenerateQueue(InIndex);
 		}
 	}
 	return Chunk;

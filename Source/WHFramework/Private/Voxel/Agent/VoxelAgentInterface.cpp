@@ -26,7 +26,7 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	{
 		IgnoreActors.Add(VoxelItem.Auxiliary);
 	}
-	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, UVoxelModuleBPLibrary::GetChunkTraceType(), IgnoreActors, HitResult))
+	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, IgnoreActors, HitResult))
 	{
 		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
 	}

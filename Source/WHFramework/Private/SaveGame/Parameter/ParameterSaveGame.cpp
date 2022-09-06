@@ -32,5 +32,6 @@ void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AMainModule::GetModuleByClass<AParameterModule>()->ToSaveData());
+	const auto& SaveData = AMainModule::GetModuleByClass<AParameterModule>()->ToSaveDataRef<FParameterSaveData>();
+	GetSaveDataRef<FParameterSaveData>().Parameters = SaveData.Parameters;
 }

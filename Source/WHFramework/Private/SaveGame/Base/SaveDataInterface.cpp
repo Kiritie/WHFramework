@@ -7,7 +7,7 @@
 void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, bool bForceMode, bool bLoadMemoryData)
 {
 	LoadData(InSaveData, bForceMode);
-	if (bLoadMemoryData)
+	if (bLoadMemoryData && HasArchive())
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), InSaveData->GetDatas());
 	}
@@ -16,7 +16,7 @@ void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, bool bForceMode, bo
 FSaveData* ISaveDataInterface::ToSaveData(bool bSaveMemoryData)
 {
 	FSaveData* SaveData = ToData();
-	if (bSaveMemoryData)
+	if (bSaveMemoryData && HasArchive())
 	{
 		UGlobalBPLibrary::SaveObjectDataToMemory(Cast<UObject>(this), SaveData->GetDatas());
 	}
@@ -26,7 +26,7 @@ FSaveData* ISaveDataInterface::ToSaveData(bool bSaveMemoryData)
 void ISaveDataInterface::UnloadSaveData(bool bForceMode, bool bUnLoadMemoryData)
 {
 	UnloadData(bForceMode);
-	if (bUnLoadMemoryData)
+	if (bUnLoadMemoryData && HasArchive())
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), TArray<uint8>());
 	}

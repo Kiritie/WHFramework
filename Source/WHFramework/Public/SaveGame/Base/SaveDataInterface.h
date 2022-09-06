@@ -41,4 +41,6 @@ protected:
 	virtual FSaveData* ToData() = 0;
 
 	virtual void UnloadData(bool bForceMode) { }
+
+	virtual bool HasArchive() { return false; }
 };

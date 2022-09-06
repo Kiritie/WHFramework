@@ -23,7 +23,6 @@ public:
 	virtual ~FSaveData() { }
 
 protected:
-	UPROPERTY()
 	bool bSaved;
 
 	UPROPERTY()
