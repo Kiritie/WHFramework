@@ -182,6 +182,7 @@ void AVoxelChunk::Generate(bool bBuildMesh, bool bForceMode)
 
 	if(!bGenerated)
 	{
+		bGenerated = true;
 		for(auto& Iter : VoxelMap)
 		{
 			Iter.Value.OnGenerate();
@@ -190,7 +191,6 @@ void AVoxelChunk::Generate(bool bBuildMesh, bool bForceMode)
 		{
 			SpawnActors();
 		}
-		bGenerated = true;
 	}
 }
 
