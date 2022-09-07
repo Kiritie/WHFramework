@@ -70,10 +70,8 @@ bool UVoxelModuleBPLibrary::IsBasicGenerated()
 
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
-	FIndex chunkIndex = FIndex(FMath::FloorToInt(InLocation.X / GetWorldData().GetChunkLength()),
-		FMath::FloorToInt(InLocation.Y / GetWorldData().GetChunkLength()),
-		bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z / GetWorldData().GetChunkLength()));
-	return chunkIndex;
+	InLocation /= GetWorldData().GetChunkLength();
+	return FIndex(FMath::FloorToInt(InLocation.X), FMath::FloorToInt(InLocation.Y), bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z));
 }
 
 FVector UVoxelModuleBPLibrary::ChunkIndexToLocation(FIndex InIndex)
@@ -128,54 +126,69 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 
 EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 {
-	const int32 worldHeight = GetWorldData().GetWorldHeight();
+	const auto& worldData = GetWorldData();
+	const FRandomStream& randomStream = worldData.RandomStream;
 
-	const int32 plainHeight = UMathBPLibrary::GetNoiseHeight(InIndex, GetWorldData().TerrainPlainScale, GetWorldData().WorldSeed) * worldHeight;
-	const int32 mountainHeight = UMathBPLibrary::GetNoiseHeight(InIndex, GetWorldData().TerrainMountainScale, GetWorldData().WorldSeed) * worldHeight;
+	const int32 worldHeight = worldData.GetWorldHeight();
+	const FVector2D worldLocation = FVector2D(InIndex.X, InIndex.Y);
 
-	const int32 baseHeight = FMath::Max(plainHeight, mountainHeight) + worldHeight * GetWorldData().TerrainBaseHeight;
+	const int32 plainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainPlainScale, worldData.WorldSeed, true) * worldHeight;
+	const int32 mountainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainMountainScale, worldData.WorldSeed, true) * worldHeight;
 
-	const int32 stoneHeight = UMathBPLibrary::GetNoiseHeight(InIndex, GetWorldData().TerrainStoneVoxelScale, GetWorldData().WorldSeed) * worldHeight;
-	const int32 sandHeight = UMathBPLibrary::GetNoiseHeight(InIndex, GetWorldData().TerrainSandVoxelScale, GetWorldData().WorldSeed) * worldHeight;
-
-	const int32 waterHeight = worldHeight * GetWorldData().TerrainWaterVoxelHeight;
-	const int32 bedrockHeight = worldHeight * GetWorldData().TerrainBedrockVoxelHeight;
+	const int32 baseHeight = FMath::Max(plainHeight, mountainHeight) + worldData.TerrainBaseHeight * worldHeight;
 
 	if(InIndex.Z < baseHeight)
 	{
-		if(InIndex.Z <= bedrockHeight)
+		if(InIndex.Z <= worldData.TerrainBedrockVoxelHeight * worldHeight)
 		{
 			return EVoxelType::Bedrock; //Bedrock
 		}
-		else if(InIndex.Z <= stoneHeight)
+		else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainStoneVoxelScale, worldData.WorldSeed, true) * worldHeight)
 		{
 			return EVoxelType::Stone; //Stone
 		}
 		return EVoxelType::Dirt; //Dirt
 	}
-	else if(InIndex.Z <= sandHeight)
+	else
 	{
-		return EVoxelType::Sand; //Sand
-	}
-	else if(InIndex.Z <= waterHeight)
-	{
-		return EVoxelType::Water; //Water
-	}
-	else if(InIndex.Z == baseHeight)
-	{
-		return EVoxelType::Grass; //Grass
+		const int32 waterHeight = worldData.TerrainWaterVoxelHeight * worldHeight;
+		if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainSandVoxelScale, worldData.WorldSeed, true) * worldHeight)
+		{
+			return EVoxelType::Sand; //Sand
+		}
+		else if(InIndex.Z <= waterHeight)
+		{
+			return EVoxelType::Water; //Water
+		}
+		else if(InIndex.Z == baseHeight)
+		{
+			return EVoxelType::Grass; //Grass
+		}
+		else if(InIndex.Z == baseHeight + 1 && InIndex.Z != waterHeight + 1)
+		{
+			if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainTreeVoxelScale, worldData.WorldSeed, true) * worldHeight)
+			{
+				return randomStream.FRand() < 0.7f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
+			}
+			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainPlantVoxelScale, worldData.WorldSeed, true) * worldHeight)
+			{
+				return randomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)randomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
+			}
+		}
 	}
 	return EVoxelType::Empty; //Empty
 }
 
 bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	FVector chunkPos = UVoxelModuleBPLibrary::ChunkIndexToLocation(InChunkIndex);
-	FVector rayStart = FVector(GetWorldData().RandomStream.FRandRange(1.f, GetWorldData().ChunkSize - 1), GetWorldData().RandomStream.FRandRange(1.f, GetWorldData().ChunkSize - 1), GetWorldData().ChunkSize * GetWorldData().ChunkHeightRange) * GetWorldData().BlockSize;
-	rayStart.X = chunkPos.X + ((int32)(rayStart.X / GetWorldData().BlockSize) + 0.5f) * GetWorldData().BlockSize;
-	rayStart.Y = chunkPos.Y + ((int32)(rayStart.Y / GetWorldData().BlockSize) + 0.5f) * GetWorldData().BlockSize;
-	FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0);
-	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
+	const auto& worldData = GetWorldData();
+	const float& chunkLength = worldData.GetChunkLength();
+	const FVector chunkLocation = ChunkIndexToLocation(InChunkIndex);
+	FVector rayStart = FVector(worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.GetWorldHeight(true) + 500.f);
+	rayStart.X = chunkLocation.X + ((int32)(rayStart.X / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
+	rayStart.Y = chunkLocation.Y + ((int32)(rayStart.Y / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
+	const FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0.f);
+	return ChunkTraceSingle(rayStart, rayEnd, InRadius * 0.95f, InHalfHeight, InIgnoreActors, OutHitResult);
 }
 
 bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)

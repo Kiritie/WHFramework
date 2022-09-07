@@ -672,10 +672,9 @@ bool AVoxelModule::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
 {
 	if(bCheckVerticals)
 	{
-		for(int32 i = 0; i < WorldData->ChunkHeightRange; i++)
+		for(auto Iter : GetVerticalChunks(InIndex))
 		{
-			const FIndex Index = FIndex(InIndex.X, InIndex.Y, i);
-			if(!FindChunkByIndex(Index) || !FindChunkByIndex(Index)->IsGenerated())
+			if(!Iter->IsGenerated())
 			{
 				return false;
 			}
@@ -683,6 +682,21 @@ bool AVoxelModule::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
 		return true;
 	}
 	return FindChunkByIndex(InIndex) && FindChunkByIndex(InIndex)->IsGenerated();
+}
+
+TArray<AVoxelChunk*> AVoxelModule::GetVerticalChunks(FIndex InIndex)
+{
+	TArray<AVoxelChunk*> ReturnValue;
+	for(int32 i = 0; i < WorldData->ChunkHeightRange; i++)
+	{
+		const FIndex Index = FIndex(InIndex.X, InIndex.Y, i);
+		if(AVoxelChunk* Chunk = FindChunkByIndex(Index))
+		{
+			ReturnValue.Add(Chunk);
+		}
+	}
+	return ReturnValue;
+
 }
 
 ECollisionChannel AVoxelModule::GetChunkTraceType() const

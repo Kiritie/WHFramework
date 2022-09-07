@@ -86,9 +86,12 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 		FString Expr = #InExpression;\
 		FString File = __FILE__;\
 		int32 Line = __LINE__;\
-		UE_LOG(LogTemp, Error, TEXT("WHFramework UE4 CRASH"));\
-		UE_LOG(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
-		UE_LOG(LogTemp, Error, InFormat, ##__VA_ARGS__); \
+		WHLog(LogTemp, Error, TEXT("WHFramework CRASH"));\
+		WHLog(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
+		if(InFormat != TEXT("")) \
+		{ \
+			WHLog(LogTemp, Error, InFormat, ##__VA_ARGS__); \
+		} \
 	} \
 	return false; \
 })()))

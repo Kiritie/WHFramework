@@ -48,23 +48,22 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
-	static TArray<T> GetNoiseRaceDatas(FIndex InIndex, int32 InOffset)
+	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)
 	{
-		TArray<T> raceDatas1;
-		TArray<T> raceDatas2;
-		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas1))
+		TArray<T> raceDatas;
+		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas))
 		{
-			for(auto raceData = raceDatas1.CreateConstIterator(); raceData; ++raceData)
+			for(auto iter : raceDatas)
 			{
-				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InIndex, raceData->NoiseScale, InOffset);
-				WHDebug(FString::Printf(TEXT("%s : %f"), *InIndex.ToString(), noiseHeight));
+				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, iter.NoiseScale, InOffset);
+				WHLog(LogTemp, Warning, TEXT("%s : %f"), *InLocation.ToString(), noiseHeight);
 				if(noiseHeight > 0.f)
 				{
-					//raceDatas2.Add(iter);
+					OutDatas.Add(iter);
 				}
 			}
 		}
-		return raceDatas2;
+		return OutDatas.Num() > 0;
 	}
 
 	//////////////////////////////////////////////////////////////////////////

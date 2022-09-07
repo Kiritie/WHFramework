@@ -8,21 +8,24 @@
 #include "Debug/DebugModule.h"
 #include "Debug/DebugModuleTypes.h"
 
-void UDebugModuleBPLibrary::EnsureCrash(const FString& Message, bool bNoCrash)
+void UDebugModuleBPLibrary::Ensure(bool Expression)
 {
-	ensureMsgf(bNoCrash, TEXT("%s"), *Message);
+	ensureAlways(Expression);
 }
 
-void UDebugModuleBPLibrary::EnsureEditorCrash(const FString& Message, bool bNoCrash)
+void UDebugModuleBPLibrary::EnsureEditor(bool Expression)
 {
-#if WITH_EDITOR
-	ensureEditorMsgf(bNoCrash, TEXT("%s"), *Message);
-#else
-	if(!bNoCrash)
-	{
-		WHLog(LogTemp, Error, TEXT("Ensure Editor Crash : %s"), *Message);
-	}
-#endif
+	ensureEditor(Expression);
+}
+
+void UDebugModuleBPLibrary::EnsureMsgf(const FString& Message, bool Expression)
+{
+	ensureMsgf(Expression, TEXT("%s"), *Message);
+}
+
+void UDebugModuleBPLibrary::EnsureEditorMsgf(const FString& Message, bool Expression)
+{
+	ensureEditorMsgf(Expression, TEXT("%s"), *Message);
 }
 
 void UDebugModuleBPLibrary::DebugMessage(const FString& Message, const FColor& DisplayColor, float Duration, EDebugMode DebugMode, int32 Key, bool bNewerOnTop)

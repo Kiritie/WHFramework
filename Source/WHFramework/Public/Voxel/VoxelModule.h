@@ -290,6 +290,8 @@ public:
 
 	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
 	
+	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex);
+
 	virtual ECollisionChannel GetChunkTraceType() const;
 	
 	virtual ECollisionChannel GetVoxelTraceType() const;

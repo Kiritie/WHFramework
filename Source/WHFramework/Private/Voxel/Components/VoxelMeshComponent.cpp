@@ -121,7 +121,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 		const FVector range = voxelData.GetRange();
 		Transparency = voxelData.Transparency;
 		CenterOffset = FVector(0.f, 0.f, -range.Z * 0.5f + 0.5f);
-		INDEX_ITERATOR(partIndex, range,
+		INDEX_ITERATOR(partIndex, range, false,
 			UVoxelData& partData = voxelData.GetPartData(partIndex);
 			if(partData.IsValid())
 			{

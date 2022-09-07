@@ -78,5 +78,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
 	UFUNCTION(BlueprintPure, Category = "MathBPLibrary")
-	static float GetNoiseHeight(FIndex InIndex, FVector InScale, int32 InOffset = 0);
+	static float GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bUnsigned = false);
 };

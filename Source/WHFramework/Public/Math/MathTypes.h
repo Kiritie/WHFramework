@@ -400,15 +400,15 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 	return FCrc::MemCrc_DEPRECATED(&InPoint, sizeof(InPoint));
 }
 
-#define INDEX_ITERATOR(Iter, Range, Expression) \
+#define INDEX_ITERATOR(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
 	if(Range != FVector::OneVector) \
 	{ \
-		for(Iter.X = 0; Iter.X < Range.X; Iter.X++) \
+		for(Iter.X = bFromCenter ? -Range.X : 0; Iter.X < Range.X; Iter.X++) \
 		{ \
-			for(Iter.Y = 0; Iter.Y < Range.Y; Iter.Y++) \
+			for(Iter.Y = bFromCenter ? -Range.Y : 0; Iter.Y < Range.Y; Iter.Y++) \
 			{ \
-				for(Iter.Z = 0; Iter.Z < Range.Z; Iter.Z++) \
+				for(Iter.Z = bFromCenter ? -Range.Z : 0; Iter.Z < Range.Z; Iter.Z++) \
 				{ \
 					Expression \
 				} \

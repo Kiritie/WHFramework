@@ -6,6 +6,7 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
+#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
@@ -68,6 +69,10 @@ public:
 
 	virtual void SpawnActors();
 
+	virtual void LoadActors(FSaveData* InSaveData);
+
+	virtual void GenerateActors();
+
 	virtual void DestroyActors();
 
 protected:
@@ -112,7 +117,7 @@ public:
 
 	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection);
 
-	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bIgnoreBottom = false);
+	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false);
 
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
@@ -169,6 +174,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bGenerated;
 
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bActorsGenerated;
+
 	TMap<FIndex, FVoxelItem> VoxelMap;
 	
 public:
@@ -181,5 +189,7 @@ public:
 	bool IsGenerated() const { return bGenerated; }
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
+
+	FVector GetLocation() const { return UVoxelModuleBPLibrary::ChunkIndexToLocation(Index); }
 };
 

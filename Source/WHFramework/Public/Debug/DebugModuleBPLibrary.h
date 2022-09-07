@@ -25,10 +25,16 @@ class WHFRAMEWORK_API UDebugModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void EnsureCrash(const FString& Message, bool bNoCrash = false);
+	static void Ensure(bool Expression = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void EnsureEditorCrash(const FString& Message, bool bNoCrash = false);
+	static void EnsureMsgf(const FString& Message, bool Expression = true);
+		
+	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
+	static void EnsureEditor(bool Expression = true);
+
+	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
+	static void EnsureEditorMsgf(const FString& Message, bool Expression = true);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
 	static void DebugMessage(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, EDebugMode DebugMode = EDebugMode::Screen, int32 Key = -1, bool bNewerOnTop = true);

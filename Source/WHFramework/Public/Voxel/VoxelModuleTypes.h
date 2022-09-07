@@ -435,6 +435,8 @@ public:
 		TerrainMountainScale = FVector(0.03f, 0.03f, 0.25f);
 		TerrainStoneVoxelScale = FVector(0.05f, 0.05f, 0.18f);
 		TerrainSandVoxelScale = FVector(0.04f, 0.04f, 0.21f);
+		TerrainPlantVoxelScale = FVector(0.04f, 0.04f, 0.21f);
+		TerrainTreeVoxelScale = FVector(0.04f, 0.04f, 0.21f);
 		TerrainWaterVoxelHeight = 0.3f;
 		TerrainBedrockVoxelHeight = 0.02f;
 
@@ -476,6 +478,12 @@ public:
 	FVector TerrainSandVoxelScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector TerrainPlantVoxelScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector TerrainTreeVoxelScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FVoxelChunkMaterial> ChunkMaterials;
 							
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -490,9 +498,9 @@ public:
 		return ChunkSize * BlockSize;
 	}
 
-	FORCEINLINE int32 GetWorldHeight() const
+	FORCEINLINE int32 GetWorldHeight(bool bLength = false) const
 	{
-		return ChunkSize * ChunkHeightRange;
+		return ChunkSize * ChunkHeightRange * (bLength ? BlockSize : 1.f);
 	}
 
 	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency InTransparency) const
@@ -544,15 +552,7 @@ public:
 	FRandomStream RandomStream;
 	
 public:
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-	}
-
-	virtual bool IsExistChunkData(FIndex InChunkIndex) const
-	{
-		return false;
-	}
+	virtual bool IsExistChunkData(FIndex InChunkIndex) const { return false; }
 
 	template<class T>
 	T* GetChunkData(FIndex InChunkIndex)
@@ -560,13 +560,7 @@ public:
 		return static_cast<T*>(GetChunkData(InChunkIndex));
 	}
 
-	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex)
-	{
-		return nullptr;
-	}
+	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) { return nullptr; }
 
-	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData)
-	{
-		
-	}
+	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
 };

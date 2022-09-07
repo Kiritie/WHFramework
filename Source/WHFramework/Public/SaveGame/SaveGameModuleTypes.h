@@ -23,9 +23,10 @@ public:
 	virtual ~FSaveData() { }
 
 protected:
+	UPROPERTY(Transient)
 	bool bSaved;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<uint8> Datas;
 
 public:

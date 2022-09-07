@@ -35,6 +35,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData) : FVoxelI
 
 FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveData)
 {
+	RefreshData();
 	TArray<FString> data;
 	InSaveData.VoxelData.ParseIntoArray(data, TEXT(";"));
 	if(data.Num() >= 3)
