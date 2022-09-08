@@ -184,11 +184,11 @@ bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius
 	const auto& worldData = GetWorldData();
 	const float& chunkLength = worldData.GetChunkLength();
 	const FVector chunkLocation = ChunkIndexToLocation(InChunkIndex);
-	FVector rayStart = FVector(worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.GetWorldHeight(true) + 500.f);
+	FVector rayStart = FVector(worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.GetWorldHeight(true));
 	rayStart.X = chunkLocation.X + ((int32)(rayStart.X / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
 	rayStart.Y = chunkLocation.Y + ((int32)(rayStart.Y / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
 	const FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0.f);
-	return ChunkTraceSingle(rayStart, rayEnd, InRadius * 0.95f, InHalfHeight, InIgnoreActors, OutHitResult);
+	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
 }
 
 bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
@@ -201,6 +201,11 @@ bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, cons
 	const FVector size = InVoxelItem.GetRange() * GetWorldData().BlockSize * 0.5f;
 	const FVector location = InVoxelItem.GetLocation();
 	return UKismetSystemLibrary::BoxTraceSingle(AMainModule::Get(), location + size, location + size, size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+}
+
+bool UVoxelModuleBPLibrary::VoxelTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	return UKismetSystemLibrary::CapsuleTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }
 
 bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

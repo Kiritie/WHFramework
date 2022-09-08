@@ -7,8 +7,9 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {
 	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Character);
 	MaxCount = 1;
-	Range = FVector(1.f, 1.f, 2.f);
 	Class = nullptr;
+	Radius = 24.f;
+	HalfHeight = 69.f;
 
 	// tags
 	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");

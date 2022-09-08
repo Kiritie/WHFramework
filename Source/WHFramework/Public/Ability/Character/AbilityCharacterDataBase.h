@@ -15,11 +15,15 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector Range;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityCharacterBase> Class;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Radius;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float HalfHeight;
+	
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
 	FGameplayTag DeadTag;
 

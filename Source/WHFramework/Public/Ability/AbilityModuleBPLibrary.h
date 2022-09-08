@@ -53,13 +53,13 @@ public:
 		TArray<T> raceDatas;
 		if(UAssetModuleBPLibrary::ReadDataTable(raceDatas))
 		{
-			for(auto iter : raceDatas)
+			for(int32 i = 0; i < raceDatas.Num(); i++)
 			{
-				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, iter.NoiseScale, InOffset);
-				WHLog(LogTemp, Warning, TEXT("%s : %f"), *InLocation.ToString(), noiseHeight);
-				if(noiseHeight > 0.f)
+				const auto& raceData = raceDatas[i];
+				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1), true);
+				if(noiseHeight > raceData.NoiseScale.Z)
 				{
-					OutDatas.Add(iter);
+					OutDatas.Add(raceData);
 				}
 			}
 		}

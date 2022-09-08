@@ -80,7 +80,10 @@ public:
 		TArray<T*> LoadedItems;
 		for(auto Iter : LoadPrimaryAssets(InPrimaryAssetType, bLogWarning))
 		{
-			LoadedItems.Add(Cast<T>(Iter));
+			if(T* LoadedItem = Cast<T>(Iter))
+			{
+				LoadedItems.Add(LoadedItem);
+			}
 		}
 		return LoadedItems;
 	}

@@ -9,6 +9,7 @@
 #define DEG_2_RAD (0.01745329f)
 
 #define Vector_Empty FVector(MAX_flt)
+#define Index_Empty FIndex(MAX_int32)
 
 UENUM(BlueprintType)
 enum class EEaseType : uint8
@@ -145,10 +146,18 @@ public:
 		return FString::Printf(TEXT("%d,%d,%d"), X, Y, Z);
 	}
 
-	FORCEINLINE static float Distance(FIndex A, FIndex B, bool bIgnoreZ = false)
+	FORCEINLINE float DistanceTo(const FIndex& Index, bool bIgnoreZ = false, bool bFromCenter = false) const
 	{
-		if (bIgnoreZ) A.Z = B.Z = 0;
-		return FVector::Distance(A.ToVector(), B.ToVector());
+		const FVector VectorA = ToVector() + (bFromCenter ? FVector::UpVector * 0.5f : FVector::ZeroVector);
+		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
+		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
+	}
+
+	FORCEINLINE static float Distance(const FIndex& A, const FIndex& B, bool bIgnoreZ = false)
+	{
+		const FVector VectorA = A.ToVector();
+		const FVector VectorB = B.ToVector();
+		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
 	}
 
 	FORCEINLINE friend bool operator==(const FIndex& A, const FIndex& B)

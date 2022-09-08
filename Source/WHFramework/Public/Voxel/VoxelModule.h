@@ -219,23 +219,21 @@ public:
 protected:
 	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc)
 	{
-		int32 index = 0;
-		while(index < InSpeed && InQueue.Num() > 0)
-		{
-			InFunc(InQueue[0]);
-			index++;
-		}
+		const int32 tmpNum = FMath::Min(InSpeed, InQueue.Num());
+		DON(i, tmpNum,
+			InFunc(InQueue[i]);
+		)
+		InQueue.RemoveAt(0, tmpNum);
 		return InQueue.Num() > 0;
 	}
 	
 	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage)
 	{
-		int32 index = 0;
-		while(index < InSpeed && InQueue.Num() > 0)
-		{
-			InFunc(InQueue[0], InStage);
-			index++;
-		}
+		const int32 tmpNum = FMath::Min(InSpeed, InQueue.Num());
+		DON(i, tmpNum,
+			InFunc(InQueue[i], InStage);
+		)
+		InQueue.RemoveAt(0, tmpNum);
 		return InQueue.Num() > 0;
 	}
 	
@@ -257,11 +255,15 @@ protected:
 		}
 		else if(InTasks.Num() > 0)
 		{
-			for(auto iter = InTasks.CreateConstIterator(); iter; ++iter)
+			for(auto task = InTasks.CreateConstIterator(); task; ++task)
 			{
-				auto tmpTask = *iter;
+				auto tmpTask = *task;
 				if(tmpTask->IsDone())
 				{
+					for(auto index : tmpTask->GetTask().GetChunkQueue())
+					{
+						InQueue.Remove(index);
+					}
 					InTasks.Remove(tmpTask);
 					delete tmpTask;
 				}

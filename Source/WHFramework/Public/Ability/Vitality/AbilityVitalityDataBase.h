@@ -15,19 +15,13 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector Range;
+	TSubclassOf<AAbilityVitalityBase> Class;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 EXP;
+	float Radius;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 BaseEXP;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 EXPFactor;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityVitalityBase> Class;
+	float HalfHeight;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")

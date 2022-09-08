@@ -48,7 +48,7 @@ protected:
 	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return 5000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
@@ -144,13 +144,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SolidMesh;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* SemiMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* TransMesh;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -187,6 +187,8 @@ public:
 	int32 GetBatch() const { return Batch; }
 
 	bool IsGenerated() const { return bGenerated; }
+	
+	AVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 

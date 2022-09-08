@@ -435,15 +435,12 @@ public:
 		TerrainMountainScale = FVector(0.03f, 0.03f, 0.25f);
 		TerrainStoneVoxelScale = FVector(0.05f, 0.05f, 0.18f);
 		TerrainSandVoxelScale = FVector(0.04f, 0.04f, 0.21f);
-		TerrainPlantVoxelScale = FVector(0.04f, 0.04f, 0.21f);
-		TerrainTreeVoxelScale = FVector(0.04f, 0.04f, 0.21f);
-		TerrainWaterVoxelHeight = 0.3f;
+		TerrainPlantVoxelScale = FVector(0.5f, 0.5f, 0.3f);
+		TerrainTreeVoxelScale = FVector(0.8f, 0.8f, 0.23f);
 		TerrainBedrockVoxelHeight = 0.02f;
+		TerrainWaterVoxelHeight = 0.25f;
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
-
-		VitalityRaceDensity = 10.f;
-		CharacterRaceDensity = 10.f;
 	}
 
 public:
@@ -485,12 +482,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FVoxelChunkMaterial> ChunkMaterials;
-							
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float VitalityRaceDensity;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float CharacterRaceDensity;
 
 public:
 	FORCEINLINE float GetChunkLength() const

@@ -171,7 +171,7 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 
 void UVoxelMeshComponent::ClearMesh(int InSectionIndex /*= 0*/)
 {
-	if (GetNumSections() > 0)
+	if (GetNumSections() > InSectionIndex)
 	{
 		ClearMeshSection(InSectionIndex);
 	}
@@ -291,18 +291,17 @@ bool UVoxelMeshComponent::HasData() const
 
 bool UVoxelMeshComponent::HasMesh()
 {
-	bool ReturnValue = false;
 	for(int32 i = 0; i < GetNumSections(); i++)
 	{
 		if(const auto MeshSection = GetProcMeshSection(i))
 		{
 			if(!MeshSection->ProcVertexBuffer.IsEmpty())
 			{
-				ReturnValue = true;
+				return true;
 			}
 		}
 	}
-	return ReturnValue;
+	return false;
 }
 
 AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const

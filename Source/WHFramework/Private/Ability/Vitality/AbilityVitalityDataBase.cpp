@@ -7,11 +7,9 @@ UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 {
 	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Vitality);
 	MaxCount = 1;
-	Range = FVector::OneVector;
-	EXP = 50;
-	BaseEXP = 100;
-	EXPFactor = 2.f;
 	Class = nullptr;
+	Radius = 40.f;
+	HalfHeight = 40.f;
 
 	// tags
 	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");

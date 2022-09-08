@@ -81,8 +81,7 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 	{
 		for(auto Iter : ItemPaths)
 		{
-			UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(Iter.TryLoad());
-			if(LoadedItem)
+			if(UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(Iter.TryLoad()))
 			{
 				LoadedItems.Add(LoadedItem);
 				PrimaryAssetMap.Emplace(LoadedItem->GetPrimaryAssetId(), LoadedItem);

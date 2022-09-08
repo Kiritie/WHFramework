@@ -587,6 +587,25 @@ public:
 	TArray<FAbilityItem> Items;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FRaceItem : public FAbilityItem
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditCondition = "Count == 0"))
+	int32 MinCount;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditCondition = "Count == 0"))
+	int32 MaxCount;
+
+	FORCEINLINE FRaceItem()
+	{
+		MinCount = 0;
+		MaxCount = 0;
+	}
+};
+
 /**
  * 种族数据
  */
@@ -607,17 +626,17 @@ public:
 				
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector NoiseScale;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FAbilityItem> Items;
+	TArray<FRaceItem> Items;
 
 	FORCEINLINE FRaceData()
 	{
 		ID = NAME_None;
 		Name = NAME_None;
 		Detail = TEXT("");
-		NoiseScale = FVector(1.f);
-		Items = TArray<FAbilityItem>();
+		NoiseScale = FVector::OneVector;
+		Items = TArray<FRaceItem>();
 	}
 
 	FORCEINLINE bool IsValid() const

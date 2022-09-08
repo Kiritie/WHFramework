@@ -144,6 +144,8 @@ void AVoxelChunk::OnDespawn_Implementation()
 
 	VoxelMap.Empty();
 
+	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+
 	Execute_SetActorVisible(this, false);
 }
 
@@ -333,9 +335,9 @@ void AVoxelChunk::GenerateActors()
 
 void AVoxelChunk::DestroyActors()
 {
-	for(auto iter = PickUps.CreateConstIterator(); iter; ++iter)
+	while(PickUps.Num() > 0)
 	{
-		UObjectPoolModuleBPLibrary::DespawnObject(*iter);
+		UObjectPoolModuleBPLibrary::DespawnObject(PickUps[0]);
 	}
 	PickUps.Empty();
 }
@@ -347,29 +349,29 @@ void AVoxelChunk::GenerateNeighbors(FIndex InIndex, bool bForceMode)
 
 void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForceMode)
 {
-	if(InX <= 0 && Neighbors[EDirection::Backward])
+	if(InX <= 0 && GetNeighbor(EDirection::Backward))
 	{
-		Neighbors[EDirection::Backward]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Backward)->Generate(true, bForceMode);
 	}
-	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Forward])
+	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Forward))
 	{
-		Neighbors[EDirection::Forward]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Forward)->Generate(true, bForceMode);
 	}
-	if(InY <= 0 && Neighbors[EDirection::Left])
+	if(InY <= 0 && GetNeighbor(EDirection::Left))
 	{
-		Neighbors[EDirection::Left]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Left)->Generate(true, bForceMode);
 	}
-	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Right])
+	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Right))
 	{
-		Neighbors[EDirection::Right]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Right)->Generate(true, bForceMode);
 	}
-	if(InZ <= 0 && Neighbors[EDirection::Down])
+	if(InZ <= 0 && GetNeighbor(EDirection::Down))
 	{
-		Neighbors[EDirection::Down]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Down)->Generate(true, bForceMode);
 	}
-	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && Neighbors[EDirection::Up])
+	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Up))
 	{
-		Neighbors[EDirection::Up]->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Up)->Generate(true, bForceMode);
 	}
 }
 
@@ -432,12 +434,54 @@ FIndex AVoxelChunk::WorldIndexToLocal(FIndex InIndex) const
 
 bool AVoxelChunk::HasVoxel(FIndex InIndex)
 {
-	return VoxelMap.Contains(InIndex);
+	return HasVoxel(InIndex.X, InIndex.Y, InIndex.Z);
 }
 
 bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ)
 {
-	return HasVoxel(FIndex(InX, InY, InZ));
+	if(InX < 0)
+	{
+		if(GetNeighbor(EDirection::Backward))
+		{
+			return GetNeighbor(EDirection::Backward)->HasVoxel(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ);
+		}
+	}
+	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
+	{
+		if(GetNeighbor(EDirection::Forward))
+		{
+			return GetNeighbor(EDirection::Forward)->HasVoxel(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ);
+		}
+	}
+	else if(InY < 0)
+	{
+		if(GetNeighbor(EDirection::Left))
+		{
+			return GetNeighbor(EDirection::Left)->HasVoxel(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ);
+		}
+	}
+	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
+	{
+		if(GetNeighbor(EDirection::Right))
+		{
+			return GetNeighbor(EDirection::Right)->HasVoxel(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ);
+		}
+	}
+	else if(InZ < 0)
+	{
+		if(GetNeighbor(EDirection::Down))
+		{
+			return GetNeighbor(EDirection::Down)->HasVoxel(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize);
+		}
+	}
+	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
+	{
+		if(GetNeighbor(EDirection::Up))
+		{
+			return GetNeighbor(EDirection::Up)->HasVoxel(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize);
+		}
+	}
+	return VoxelMap.Contains(FIndex(InX, InY, InZ));
 }
 
 UVoxel& AVoxelChunk::GetVoxel(FIndex InIndex, bool bMainPart)
@@ -459,41 +503,41 @@ FVoxelItem& AVoxelChunk::GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMai
 {
 	if(InX < 0)
 	{
-		if(Neighbors[EDirection::Backward])
+		if(GetNeighbor(EDirection::Backward))
 		{
-			return Neighbors[EDirection::Backward]->GetVoxelItem(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
+			return GetNeighbor(EDirection::Backward)->GetVoxelItem(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
 		}
 		return FVoxelItem::Unknown;
 	}
 	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(Neighbors[EDirection::Forward])
+		if(GetNeighbor(EDirection::Forward))
 		{
-			return Neighbors[EDirection::Forward]->GetVoxelItem(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
+			return GetNeighbor(EDirection::Forward)->GetVoxelItem(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, bMainPart);
 		}
 		return FVoxelItem::Unknown;
 	}
 	else if(InY < 0)
 	{
-		if(Neighbors[EDirection::Left])
+		if(GetNeighbor(EDirection::Left))
 		{
-			return Neighbors[EDirection::Left]->GetVoxelItem(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, bMainPart);
+			return GetNeighbor(EDirection::Left)->GetVoxelItem(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, bMainPart);
 		}
 		return FVoxelItem::Unknown;
 	}
 	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(Neighbors[EDirection::Right])
+		if(GetNeighbor(EDirection::Right))
 		{
-			return Neighbors[EDirection::Right]->GetVoxelItem(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, bMainPart);
+			return GetNeighbor(EDirection::Right)->GetVoxelItem(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, bMainPart);
 		}
 		return FVoxelItem::Unknown;
 	}
 	else if(InZ < 0)
 	{
-		if(Neighbors[EDirection::Down])
+		if(GetNeighbor(EDirection::Down))
 		{
-			return Neighbors[EDirection::Down]->GetVoxelItem(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, bMainPart);
+			return GetNeighbor(EDirection::Down)->GetVoxelItem(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, bMainPart);
 		}
 		else if(Index.Z > 0)
 		{
@@ -502,9 +546,9 @@ FVoxelItem& AVoxelChunk::GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMai
 	}
 	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(Neighbors[EDirection::Up])
+		if(GetNeighbor(EDirection::Up))
 		{
-			return Neighbors[EDirection::Up]->GetVoxelItem(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, bMainPart);
+			return GetNeighbor(EDirection::Up)->GetVoxelItem(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, bMainPart);
 		}
 		else if(Index.Z < UVoxelModuleBPLibrary::GetWorldData().ChunkHeightRange)
 		{
@@ -689,48 +733,48 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 {
 	if(InX < 0)
 	{
-		if(Neighbors[EDirection::Backward])
+		if(GetNeighbor(EDirection::Backward))
 		{
-			return Neighbors[EDirection::Backward]->SetVoxelComplex(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Backward)->SetVoxelComplex(InX + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InX >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(Neighbors[EDirection::Forward])
+		if(GetNeighbor(EDirection::Forward))
 		{
-			return Neighbors[EDirection::Forward]->SetVoxelComplex(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Forward)->SetVoxelComplex(InX - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY < 0)
 	{
-		if(Neighbors[EDirection::Left])
+		if(GetNeighbor(EDirection::Left))
 		{
-			return Neighbors[EDirection::Left]->SetVoxelComplex(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Left)->SetVoxelComplex(InX, InY + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(Neighbors[EDirection::Right])
+		if(GetNeighbor(EDirection::Right))
 		{
-			return Neighbors[EDirection::Right]->SetVoxelComplex(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Right)->SetVoxelComplex(InX, InY - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InZ < 0)
 	{
-		if(Neighbors[EDirection::Down])
+		if(GetNeighbor(EDirection::Down))
 		{
-			return Neighbors[EDirection::Down]->SetVoxelComplex(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Down)->SetVoxelComplex(InX, InY, InZ + UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InZ >= UVoxelModuleBPLibrary::GetWorldData().ChunkSize)
 	{
-		if(!Neighbors[EDirection::Up])
+		if(!GetNeighbor(EDirection::Up))
 		{
 			Module->SpawnChunk(Index + UMathBPLibrary::DirectionToIndex(EDirection::Up), !bGenerate);
 		}
-		if(Neighbors[EDirection::Up])
+		if(GetNeighbor(EDirection::Up))
 		{
-			return Neighbors[EDirection::Up]->SetVoxelComplex(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerate, InAgent);
+			return GetNeighbor(EDirection::Up)->SetVoxelComplex(InX, InY, InZ - UVoxelModuleBPLibrary::GetWorldData().ChunkSize, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else
