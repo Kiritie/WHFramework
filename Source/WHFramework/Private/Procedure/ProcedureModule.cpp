@@ -18,6 +18,8 @@
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AProcedureModule)
 
 // ParamSets default values
 AProcedureModule::AProcedureModule()

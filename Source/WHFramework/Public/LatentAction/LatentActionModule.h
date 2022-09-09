@@ -20,6 +20,8 @@ UCLASS()
 class WHFRAMEWORK_API ALatentActionModule : public AModuleBase
 {
 	GENERATED_BODY()
+		
+	MODULE_INSTANCE_DECLARE(ALatentActionModule)
 
 public:
 	ALatentActionModule();

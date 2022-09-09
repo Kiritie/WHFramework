@@ -14,6 +14,8 @@ UCLASS()
 class WHFRAMEWORK_API AReferencePoolModule : public AModuleBase
 {
 	GENERATED_BODY()
+		
+	MODULE_INSTANCE_DECLARE(AReferencePoolModule)
 
 public:
 	// ParamSets default values for this actor's properties

@@ -21,7 +21,7 @@ void AAbilityPickUpVoxel::Initialize(FAbilityItem InItem)
 	Super::Initialize(InItem);
 
 	const FVector range = Item.GetData<UVoxelData>().GetRange();
-	BoxComponent->SetBoxExtent(range * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.15f);
+	BoxComponent->SetBoxExtent(range * AVoxelModule::Get()->GetWorldData().BlockSize * 0.15f);
 
 	MeshComponent->CreateVoxel(InItem);
 }

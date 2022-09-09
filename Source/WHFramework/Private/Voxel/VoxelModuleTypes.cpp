@@ -174,7 +174,7 @@ FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
 	if(AVoxelChunk* chunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
 	{
-		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - AVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
 		Point = InHitResult.ImpactPoint;
 		Normal = InHitResult.ImpactNormal;
 	}

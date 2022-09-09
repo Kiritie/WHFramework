@@ -49,7 +49,7 @@ EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType 
 
 FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractAction)
 {
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->GetInteractActionDisplayName(InInteractAction);
 	}
@@ -58,7 +58,7 @@ FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractActi
 
 AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->SpawnPickUp(InItem, InLocation, InContainer);
 	}
@@ -67,7 +67,7 @@ AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FV
 
 AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->SpawnPickUp(InSaveData, InContainer);
 	}
@@ -76,7 +76,7 @@ AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, 
 
 AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->SpawnCharacter(InSaveData, InContainer);
 	}
@@ -85,7 +85,7 @@ AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSave
 
 AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(AAbilityModule* AbilityModule = AMainModule::GetModuleByClass<AAbilityModule>())
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->SpawnVitality(InSaveData, InContainer);
 	}

@@ -8,7 +8,7 @@
 
 UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
-	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 	{
 		return ObjectPoolModule->SpawnObject(InType, InParams);
 	}
@@ -17,7 +17,7 @@ UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, co
 
 void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
 {
-	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 	{
 		ObjectPoolModule->DespawnObject(InObject);
 	}
@@ -25,7 +25,7 @@ void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
 
 void UObjectPoolModuleBPLibrary::ClearObject(TSubclassOf<UObject> InType)
 {
-	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 	{
 		ObjectPoolModule->ClearObject(InType);
 	}
@@ -33,7 +33,7 @@ void UObjectPoolModuleBPLibrary::ClearObject(TSubclassOf<UObject> InType)
 
 void UObjectPoolModuleBPLibrary::ClearAllObject()
 {
-	if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 	{
 		ObjectPoolModule->ClearAllObject();
 	}

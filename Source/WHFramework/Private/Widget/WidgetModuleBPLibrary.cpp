@@ -8,7 +8,7 @@
 
 UUserWidgetBase* UWidgetModuleBPLibrary::GetMainUserWidget()
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetMainUserWidget();
 	}
@@ -17,7 +17,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::GetMainUserWidget()
 
 UUserWidgetBase* UWidgetModuleBPLibrary::GetTemporaryUserWidget()
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetTemporaryUserWidget();
 	}
@@ -26,7 +26,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::GetTemporaryUserWidget()
 
 bool UWidgetModuleBPLibrary::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->HasUserWidgetClass(InWidgetClass);
 	}
@@ -35,7 +35,7 @@ bool UWidgetModuleBPLibrary::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InW
 
 bool UWidgetModuleBPLibrary::HasUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->HasUserWidget(InWidgetClass);
 	}
@@ -44,7 +44,7 @@ bool UWidgetModuleBPLibrary::HasUserWidget(TSubclassOf<UUserWidgetBase> InWidget
 
 UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetUserWidget(InWidgetClass);
 	}
@@ -53,7 +53,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidget(TSubclassOf<UUserWidgetBa
 
 UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidgetByName(FName InWidgetName, TSubclassOf<UUserWidgetBase> InWidgetClass)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetUserWidgetByName(InWidgetName, InWidgetClass);
 	}
@@ -62,7 +62,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidgetByName(FName InWidgetName,
 
 UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->CreateUserWidget(InWidgetClass, InOwner);
 	}
@@ -71,7 +71,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidge
 
 UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InWidgetName, AActor* InOwner)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->CreateUserWidgetByName(InWidgetName, InOwner);
 	}
@@ -80,7 +80,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InWidgetNa
 
 bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, AActor* InOwner)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->InitializeUserWidget(InWidgetClass, InOwner);
 	}
@@ -89,7 +89,7 @@ bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> I
 
 bool UWidgetModuleBPLibrary::OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->OpenUserWidget(InWidgetClass, InParams, bInstant);
 	}
@@ -98,7 +98,7 @@ bool UWidgetModuleBPLibrary::OpenUserWidget(TSubclassOf<UUserWidgetBase> InWidge
 
 bool UWidgetModuleBPLibrary::OpenUserWidgetByName(FName InWidgetName, const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->OpenUserWidgetByName(InWidgetName, InParams, bInstant);
 	}
@@ -107,7 +107,7 @@ bool UWidgetModuleBPLibrary::OpenUserWidgetByName(FName InWidgetName, const TArr
 
 bool UWidgetModuleBPLibrary::CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->CloseUserWidget(InWidgetClass, bInstant);
 	}
@@ -116,7 +116,7 @@ bool UWidgetModuleBPLibrary::CloseUserWidget(TSubclassOf<UUserWidgetBase> InWidg
 
 bool UWidgetModuleBPLibrary::ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->ToggleUserWidget(InWidgetClass, bInstant);
 	}
@@ -125,7 +125,7 @@ bool UWidgetModuleBPLibrary::ToggleUserWidget(TSubclassOf<UUserWidgetBase> InWid
 
 bool UWidgetModuleBPLibrary::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWidgetClass, bool bRecovery)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->DestroyUserWidget(InWidgetClass, bRecovery);
 	}
@@ -134,7 +134,7 @@ bool UWidgetModuleBPLibrary::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InWi
 
 void UWidgetModuleBPLibrary::CloseAllUserWidget(bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		WidgetModule->CloseAllUserWidget(bInstant);
 	}
@@ -142,7 +142,7 @@ void UWidgetModuleBPLibrary::CloseAllUserWidget(bool bInstant)
 
 void UWidgetModuleBPLibrary::CloseAllSlateWidget(bool bInstant)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		WidgetModule->CloseAllSlateWidget(bInstant);
 	}
@@ -150,7 +150,7 @@ void UWidgetModuleBPLibrary::CloseAllSlateWidget(bool bInstant)
 
 UWorldWidgetContainer* UWidgetModuleBPLibrary::GetWorldWidgetContainer()
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetWorldWidgetContainer();
 	}
@@ -159,7 +159,7 @@ UWorldWidgetContainer* UWidgetModuleBPLibrary::GetWorldWidgetContainer()
 
 bool UWidgetModuleBPLibrary::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->HasWorldWidget(InWidgetClass, InWidgetIndex);
 	}
@@ -168,7 +168,7 @@ bool UWidgetModuleBPLibrary::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InWidg
 
 UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetWorldWidget(InWidgetClass, InWidgetIndex);
 	}
@@ -177,7 +177,7 @@ UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidget(TSubclassOf<UWorldWidge
 
 UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetWorldWidgetByName(InWidgetName, InWidgetClass, InWidgetIndex);
 	}
@@ -186,7 +186,7 @@ UWorldWidgetBase* UWidgetModuleBPLibrary::GetWorldWidgetByName(FName InWidgetNam
 
 TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetWorldWidgets(InWidgetClass);
 	}
@@ -195,7 +195,7 @@ TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgets(TSubclassOf<UW
 
 TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgetsByName(FName InWidgetName)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->GetWorldWidgetsByName(InWidgetName);
 	}
@@ -204,7 +204,7 @@ TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgetsByName(FName In
 
 UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->CreateWorldWidget(InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
 	}
@@ -213,7 +213,7 @@ UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWi
 
 UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->CreateWorldWidgetByName(InWidgetName, InWidgetClass, InOwner, InLocation, InSceneComp, InParams);
 	}
@@ -222,7 +222,7 @@ UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InWidget
 
 bool UWidgetModuleBPLibrary::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		return WidgetModule->DestroyWorldWidget(InWidgetClass, InWidgetIndex, bRecovery);
 	}
@@ -231,7 +231,7 @@ bool UWidgetModuleBPLibrary::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> In
 
 void UWidgetModuleBPLibrary::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InWidgetClass, bool bRecovery)
 {
-	if(AWidgetModule* WidgetModule = AMainModule::GetModuleByClass<AWidgetModule>())
+	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
 		WidgetModule->DestroyWorldWidgets(InWidgetClass, bRecovery);
 	}

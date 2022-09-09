@@ -182,7 +182,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 		default: break;
 	}
 
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}

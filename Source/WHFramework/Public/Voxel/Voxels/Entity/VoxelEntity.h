@@ -7,6 +7,7 @@
 
 #include "VoxelEntity.generated.h"
 
+class AVoxelAuxiliary;
 class UVoxelData;
 class UVoxelMeshComponent;
 
@@ -23,11 +24,14 @@ public:
 	AVoxelEntity();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
-	FPrimaryAssetId VoxelID;
-
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* MeshComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId VoxelID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	AVoxelAuxiliary* Auxiliary;
 
 protected:
 	// Called when the game starts or when spawned
@@ -44,7 +48,9 @@ public:
 	virtual void OnDespawn_Implementation() override;
 
 public:
+	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
+
 	FPrimaryAssetId GetVoxelID() const { return VoxelID; }
 
-	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
+	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
 };

@@ -10,7 +10,7 @@
 
 bool UParameterModuleBPLibrary::HasGlobalParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->HasParameter(InName, bEnsured);
 	}
@@ -20,7 +20,7 @@ bool UParameterModuleBPLibrary::HasGlobalParameter(FName InName, bool bEnsured)
 
 void UParameterModuleBPLibrary::AddGlobalParameter(FName InName, FParameter InParameter)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddParameter(InName, InParameter);
 	}
@@ -28,7 +28,7 @@ void UParameterModuleBPLibrary::AddGlobalParameter(FName InName, FParameter InPa
 
 void UParameterModuleBPLibrary::SetGlobalParameter(FName InName, FParameter InParameter)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetParameter(InName, InParameter);
 	}
@@ -36,7 +36,7 @@ void UParameterModuleBPLibrary::SetGlobalParameter(FName InName, FParameter InPa
 
 FParameter UParameterModuleBPLibrary::GetGlobalParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetParameter(InName, bEnsured);
 	}
@@ -46,7 +46,7 @@ FParameter UParameterModuleBPLibrary::GetGlobalParameter(FName InName, bool bEns
 
 TArray<FParameter> UParameterModuleBPLibrary::GetGlobalParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetParameters(InName, bEnsured);
 	}
@@ -56,7 +56,7 @@ TArray<FParameter> UParameterModuleBPLibrary::GetGlobalParameters(FName InName, 
 
 void UParameterModuleBPLibrary::RemoveGlobalParameter(FName InName)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->RemoveParameter(InName);
 	}
@@ -64,7 +64,7 @@ void UParameterModuleBPLibrary::RemoveGlobalParameter(FName InName)
 
 void UParameterModuleBPLibrary::RemoveGlobalParameters(FName InName)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->RemoveParameters(InName);
 	}
@@ -72,7 +72,7 @@ void UParameterModuleBPLibrary::RemoveGlobalParameters(FName InName)
 
 void UParameterModuleBPLibrary::ClearAllGlobalParameter()
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->ClearAllParameter();
 	}
@@ -81,7 +81,7 @@ void UParameterModuleBPLibrary::ClearAllGlobalParameter()
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalIntegerParameter(FName InName, int32 InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddIntegerParameter(InName, InValue);
 	}
@@ -89,7 +89,7 @@ void UParameterModuleBPLibrary::AddGlobalIntegerParameter(FName InName, int32 In
 
 void UParameterModuleBPLibrary::SetGlobalIntegerParameter(FName InName, int32 InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetIntegerParameter(InName, InValue);
 	}
@@ -97,7 +97,7 @@ void UParameterModuleBPLibrary::SetGlobalIntegerParameter(FName InName, int32 In
 
 int32 UParameterModuleBPLibrary::GetGlobalIntegerParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetIntegerParameter(InName, bEnsured);
 	}
@@ -107,7 +107,7 @@ int32 UParameterModuleBPLibrary::GetGlobalIntegerParameter(FName InName, bool bE
 
 TArray<int32> UParameterModuleBPLibrary::GetGlobalIntegerParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetIntegerParameters(InName, bEnsured);
 	}
@@ -118,7 +118,7 @@ TArray<int32> UParameterModuleBPLibrary::GetGlobalIntegerParameters(FName InName
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalFloatParameter(FName InName, float InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddFloatParameter(InName, InValue);
 	}
@@ -126,7 +126,7 @@ void UParameterModuleBPLibrary::AddGlobalFloatParameter(FName InName, float InVa
 
 void UParameterModuleBPLibrary::SetGlobalFloatParameter(FName InName, float InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetFloatParameter(InName, InValue);
 	}
@@ -134,7 +134,7 @@ void UParameterModuleBPLibrary::SetGlobalFloatParameter(FName InName, float InVa
 
 float UParameterModuleBPLibrary::GetGlobalFloatParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetFloatParameter(InName, bEnsured);
 	}
@@ -144,7 +144,7 @@ float UParameterModuleBPLibrary::GetGlobalFloatParameter(FName InName, bool bEns
 
 TArray<float> UParameterModuleBPLibrary::GetGlobalFloatParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetFloatParameters(InName, bEnsured);
 	}
@@ -155,7 +155,7 @@ TArray<float> UParameterModuleBPLibrary::GetGlobalFloatParameters(FName InName, 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalStringParameter(FName InName, const FString& InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddStringParameter(InName, InValue);
 	}
@@ -163,7 +163,7 @@ void UParameterModuleBPLibrary::AddGlobalStringParameter(FName InName, const FSt
 
 void UParameterModuleBPLibrary::SetGlobalStringParameter(FName InName, const FString& InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetStringParameter(InName, InValue);
 	}
@@ -171,7 +171,7 @@ void UParameterModuleBPLibrary::SetGlobalStringParameter(FName InName, const FSt
 
 FString UParameterModuleBPLibrary::GetGlobalStringParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetStringParameter(InName, bEnsured);
 	}
@@ -181,7 +181,7 @@ FString UParameterModuleBPLibrary::GetGlobalStringParameter(FName InName, bool b
 
 TArray<FString> UParameterModuleBPLibrary::GetGlobalStringParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetStringParameters(InName, bEnsured);
 	}
@@ -192,7 +192,7 @@ TArray<FString> UParameterModuleBPLibrary::GetGlobalStringParameters(FName InNam
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalTextParameter(FName InName, const FText InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddTextParameter(InName, InValue);
 	}
@@ -200,7 +200,7 @@ void UParameterModuleBPLibrary::AddGlobalTextParameter(FName InName, const FText
 
 void UParameterModuleBPLibrary::SetGlobalTextParameter(FName InName, const FText InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetTextParameter(InName, InValue);
 	}
@@ -208,7 +208,7 @@ void UParameterModuleBPLibrary::SetGlobalTextParameter(FName InName, const FText
 
 FText UParameterModuleBPLibrary::GetGlobalTextParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetTextParameter(InName, bEnsured);
 	}
@@ -218,7 +218,7 @@ FText UParameterModuleBPLibrary::GetGlobalTextParameter(FName InName, bool bEnsu
 
 TArray<FText> UParameterModuleBPLibrary::GetGlobalTextParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetTextParameters(InName, bEnsured);
 	}
@@ -229,7 +229,7 @@ TArray<FText> UParameterModuleBPLibrary::GetGlobalTextParameters(FName InName, b
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalBooleanParameter(FName InName, bool InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddBooleanParameter(InName, InValue);
 	}
@@ -237,7 +237,7 @@ void UParameterModuleBPLibrary::AddGlobalBooleanParameter(FName InName, bool InV
 
 void UParameterModuleBPLibrary::SetGlobalBooleanParameter(FName InName, bool InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetBooleanParameter(InName, InValue);
 	}
@@ -245,7 +245,7 @@ void UParameterModuleBPLibrary::SetGlobalBooleanParameter(FName InName, bool InV
 
 bool UParameterModuleBPLibrary::GetGlobalBooleanParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetBooleanParameter(InName, bEnsured);
 	}
@@ -255,7 +255,7 @@ bool UParameterModuleBPLibrary::GetGlobalBooleanParameter(FName InName, bool bEn
 
 TArray<bool> UParameterModuleBPLibrary::GetGlobalBooleanParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetBooleanParameters(InName, bEnsured);
 	}
@@ -266,7 +266,7 @@ TArray<bool> UParameterModuleBPLibrary::GetGlobalBooleanParameters(FName InName,
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalVectorParameter(FName InName, FVector InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddVectorParameter(InName, InValue);
 	}
@@ -274,7 +274,7 @@ void UParameterModuleBPLibrary::AddGlobalVectorParameter(FName InName, FVector I
 
 void UParameterModuleBPLibrary::SetGlobalVectorParameter(FName InName, FVector InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetVectorParameter(InName, InValue);
 	}
@@ -282,7 +282,7 @@ void UParameterModuleBPLibrary::SetGlobalVectorParameter(FName InName, FVector I
 
 FVector UParameterModuleBPLibrary::GetGlobalVectorParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetVectorParameter(InName, bEnsured);
 	}
@@ -292,7 +292,7 @@ FVector UParameterModuleBPLibrary::GetGlobalVectorParameter(FName InName, bool b
 
 TArray<FVector> UParameterModuleBPLibrary::GetGlobalVectorParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetVectorParameters(InName, bEnsured);
 	}
@@ -303,7 +303,7 @@ TArray<FVector> UParameterModuleBPLibrary::GetGlobalVectorParameters(FName InNam
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalRotatorParameter(FName InName, FRotator InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddRotatorParameter(InName, InValue);
 	}
@@ -311,7 +311,7 @@ void UParameterModuleBPLibrary::AddGlobalRotatorParameter(FName InName, FRotator
 
 void UParameterModuleBPLibrary::SetGlobalRotatorParameter(FName InName, FRotator InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetRotatorParameter(InName, InValue);
 	}
@@ -319,7 +319,7 @@ void UParameterModuleBPLibrary::SetGlobalRotatorParameter(FName InName, FRotator
 
 FRotator UParameterModuleBPLibrary::GetGlobalRotatorParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetRotatorParameter(InName, bEnsured);
 	}
@@ -329,7 +329,7 @@ FRotator UParameterModuleBPLibrary::GetGlobalRotatorParameter(FName InName, bool
 
 TArray<FRotator> UParameterModuleBPLibrary::GetGlobalRotatorParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetRotatorParameters(InName, bEnsured);
 	}
@@ -340,7 +340,7 @@ TArray<FRotator> UParameterModuleBPLibrary::GetGlobalRotatorParameters(FName InN
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalColorParameter(FName InName, const FColor& InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddColorParameter(InName, InValue);
 	}
@@ -348,7 +348,7 @@ void UParameterModuleBPLibrary::AddGlobalColorParameter(FName InName, const FCol
 
 void UParameterModuleBPLibrary::SetGlobalColorParameter(FName InName, const FColor& InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetColorParameter(InName, InValue);
 	}
@@ -356,7 +356,7 @@ void UParameterModuleBPLibrary::SetGlobalColorParameter(FName InName, const FCol
 
 FColor UParameterModuleBPLibrary::GetGlobalColorParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetColorParameter(InName, bEnsured);
 	}
@@ -366,7 +366,7 @@ FColor UParameterModuleBPLibrary::GetGlobalColorParameter(FName InName, bool bEn
 
 TArray<FColor> UParameterModuleBPLibrary::GetGlobalColorParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetColorParameters(InName, bEnsured);
 	}
@@ -377,7 +377,7 @@ TArray<FColor> UParameterModuleBPLibrary::GetGlobalColorParameters(FName InName,
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalClassParameter(FName InName, UClass* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddClassParameter(InName, InValue);
 	}
@@ -385,7 +385,7 @@ void UParameterModuleBPLibrary::AddGlobalClassParameter(FName InName, UClass* In
 
 void UParameterModuleBPLibrary::SetGlobalClassParameter(FName InName, UClass* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetClassParameter(InName, InValue);
 	}
@@ -393,7 +393,7 @@ void UParameterModuleBPLibrary::SetGlobalClassParameter(FName InName, UClass* In
 
 UClass* UParameterModuleBPLibrary::GetGlobalClassParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetClassParameter(InName, bEnsured);
 	}
@@ -403,7 +403,7 @@ UClass* UParameterModuleBPLibrary::GetGlobalClassParameter(FName InName, bool bE
 
 TArray<UClass*> UParameterModuleBPLibrary::GetGlobalClassParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetClassParameters(InName, bEnsured);
 	}
@@ -414,7 +414,7 @@ TArray<UClass*> UParameterModuleBPLibrary::GetGlobalClassParameters(FName InName
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleBPLibrary::AddGlobalObjectParameter(FName InName, UObject* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddObjectParameter(InName, InValue);
 	}
@@ -422,7 +422,7 @@ void UParameterModuleBPLibrary::AddGlobalObjectParameter(FName InName, UObject* 
 
 void UParameterModuleBPLibrary::SetGlobalObjectParameter(FName InName, UObject* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetObjectParameter(InName, InValue);
 	}
@@ -430,7 +430,7 @@ void UParameterModuleBPLibrary::SetGlobalObjectParameter(FName InName, UObject* 
 
 UObject* UParameterModuleBPLibrary::GetGlobalObjectParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetObjectParameter(InName, bEnsured);
 	}
@@ -440,7 +440,7 @@ UObject* UParameterModuleBPLibrary::GetGlobalObjectParameter(FName InName, bool 
 
 TArray<UObject*> UParameterModuleBPLibrary::GetGlobalObjectParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetObjectParameters(InName, bEnsured);
 	}
@@ -450,7 +450,7 @@ TArray<UObject*> UParameterModuleBPLibrary::GetGlobalObjectParameters(FName InNa
 
 void UParameterModuleBPLibrary::AddPointerParameter(FName InName, void* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->AddPointerParameter(InName, InValue);
 	}
@@ -458,7 +458,7 @@ void UParameterModuleBPLibrary::AddPointerParameter(FName InName, void* InValue)
 
 void UParameterModuleBPLibrary::SetPointerParameter(FName InName, void* InValue)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		ParameterModule->SetPointerParameter(InName, InValue);
 	}
@@ -466,7 +466,7 @@ void UParameterModuleBPLibrary::SetPointerParameter(FName InName, void* InValue)
 
 void* UParameterModuleBPLibrary::GetPointerParameter(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetPointerParameter(InName, bEnsured);
 	}
@@ -476,7 +476,7 @@ void* UParameterModuleBPLibrary::GetPointerParameter(FName InName, bool bEnsured
 
 TArray<void*> UParameterModuleBPLibrary::GetPointerParameters(FName InName, bool bEnsured)
 {
-	if(AParameterModule* ParameterModule = AMainModule::GetModuleByClass<AParameterModule>())
+	if(AParameterModule* ParameterModule = AParameterModule::Get())
 	{
 		return ParameterModule->GetPointerParameters(InName, bEnsured);
 	}

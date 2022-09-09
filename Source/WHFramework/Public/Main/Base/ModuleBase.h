@@ -6,6 +6,7 @@
 
 #include "Main/Base/Module.h"
 #include "Global/Base/WHActor.h"
+#include "Main/MainModuleTypes.h"
 #include "ModuleBase.generated.h"
 
 UCLASS()

@@ -152,12 +152,12 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				SetMaterial(InSectionIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).Material);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(Transparency).Material);
 				break;
 			}
 			case EVoxelMeshNature::Preview:
 			{
-				SetMaterial(InSectionIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(Transparency).UnlitMaterial);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(Transparency).UnlitMaterial);
 				break;
 			}
 		}
@@ -259,11 +259,11 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	scale = UMathBPLibrary::RotatorVector(scale, InVoxelItem.Angle, false, true);
 	offset = CenterOffset + UMathBPLibrary::RotatorVector(offset, InVoxelItem.Angle) * OffsetScale;
 	FVector2D uvCorner, uvSpan;
-	voxelData.GetUVData(InVoxelItem, InFaceIndex, UVoxelModuleBPLibrary::GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize, uvCorner, uvSpan);
+	voxelData.GetUVData(InVoxelItem, InFaceIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize, uvCorner, uvSpan);
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * scale + offset) * UVoxelModuleBPLibrary::GetWorldData().BlockSize * BlockScale);
+		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * scale + offset) * AVoxelModule::Get()->GetWorldData().BlockSize * BlockScale);
 	}
 
 	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));

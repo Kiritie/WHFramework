@@ -28,7 +28,7 @@ public:
 	template<class T>
 	static T* GetDataAsset(FName InDataAssetName = NAME_None)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataAsset<T>(InDataAssetName);
 		}
@@ -38,7 +38,7 @@ public:
 	template<class T>
 	static T& GetDataAssetRef(FName InDataAssetName = NAME_None)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataAssetRef<T>(InDataAssetName);
 		}
@@ -54,7 +54,7 @@ public:
 	template<class T>
 	static T* CreateDataAsset(FName InDataAssetName = NAME_None)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->CreateDataAsset<T>(InDataAssetName);
 		}
@@ -67,7 +67,7 @@ public:
 	template<class T>
 	static bool RemoveDataAsset(FName InDataAssetName = NAME_None)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->RemoveDataAsset<T>(InDataAssetName);
 		}
@@ -92,7 +92,7 @@ public:
 	template<class T>
 	static bool GetDataTableRow(int32 InRowIndex, T& OutRow)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataTableRow<T>(InRowIndex, OutRow);
 		}
@@ -102,7 +102,7 @@ public:
 	template<class T>
 	static bool GetDataTableRow(FName InRowName, T& OutRow)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataTableRow<T>(InRowName, OutRow);
 		}
@@ -112,7 +112,7 @@ public:
 	template<class T>
 	static bool GetDataTableRow(UDataTable* InDataTable, int32 InRowIndex, T& OutRow)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataTableRow<T>(InDataTable, InRowIndex, OutRow);
 		}
@@ -122,7 +122,7 @@ public:
 	template<class T>
 	static bool GetDataTableRow(UDataTable* InDataTable, FName InRowName, T& OutRow)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->GetDataTableRow<T>(InDataTable, InRowName, OutRow);
 		}
@@ -132,7 +132,7 @@ public:
 	template<class T>
 	static bool ReadDataTable(TArray<T>& OutRows)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->ReadDataTable<T>(OutRows);
 		}
@@ -142,7 +142,7 @@ public:
 	template<class T>
 	static bool ReadDataTable(UDataTable* InDataTable, TArray<T>& OutRows)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->ReadDataTable<T>(InDataTable, OutRows);
 		}
@@ -152,7 +152,7 @@ public:
 	template<class T>
 	static bool ReadDataTable(TMap<FName, T>& OutRows)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->ReadDataTable<T>(OutRows);
 		}
@@ -162,7 +162,7 @@ public:
 	template<class T>
 	static bool ReadDataTable(UDataTable* InDataTable, TMap<FName, T>& OutRows)
 	{
-		if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
 			return AssetModule->ReadDataTable<T>(InDataTable, OutRows);
 		}

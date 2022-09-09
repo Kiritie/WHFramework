@@ -9,7 +9,7 @@
 
 UWorldTimerComponent* USceneModuleBPLibrary::GetWorldTimer()
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetWorldTimer();
 	}
@@ -18,7 +18,7 @@ UWorldTimerComponent* USceneModuleBPLibrary::GetWorldTimer()
 
 UWorldWeatherComponent* USceneModuleBPLibrary::GetWorldWeather()
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetWorldWeather();
 	}
@@ -27,7 +27,7 @@ UWorldWeatherComponent* USceneModuleBPLibrary::GetWorldWeather()
 
 void USceneModuleBPLibrary::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AsyncLoadLevel(InLevelPath, OnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
 	}
@@ -35,7 +35,7 @@ void USceneModuleBPLibrary::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoad
 
 void USceneModuleBPLibrary::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AsyncUnloadLevel(InLevelPath, InOnAsyncUnloadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
 	}
@@ -43,7 +43,7 @@ void USceneModuleBPLibrary::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUn
 
 float USceneModuleBPLibrary::GetAsyncLoadLevelProgress(FName InLevelPath)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetAsyncLoadLevelProgress(InLevelPath);
 	}
@@ -52,7 +52,7 @@ float USceneModuleBPLibrary::GetAsyncLoadLevelProgress(FName InLevelPath)
 
 float USceneModuleBPLibrary::GetAsyncUnloadLevelProgress(FName InLevelPath)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetAsyncUnloadLevelProgress(InLevelPath);
 	}
@@ -61,7 +61,7 @@ float USceneModuleBPLibrary::GetAsyncUnloadLevelProgress(FName InLevelPath)
 
 bool USceneModuleBPLibrary::HasSceneActor(FGuid InID, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->HasSceneActor(InID, bEnsured);
 	}
@@ -70,7 +70,7 @@ bool USceneModuleBPLibrary::HasSceneActor(FGuid InID, bool bEnsured)
 
 AActor* USceneModuleBPLibrary::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetSceneActor(InID, InClass, bEnsured);
 	}
@@ -79,7 +79,7 @@ AActor* USceneModuleBPLibrary::GetSceneActor(FGuid InID, TSubclassOf<AActor> InC
 
 void USceneModuleBPLibrary::AddSceneActor(AActor* InActor)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddSceneActor(InActor);
 	}
@@ -87,7 +87,7 @@ void USceneModuleBPLibrary::AddSceneActor(AActor* InActor)
 
 void USceneModuleBPLibrary::RemoveSceneActor(AActor* InActor)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddSceneActor(InActor);
 	}
@@ -95,7 +95,7 @@ void USceneModuleBPLibrary::RemoveSceneActor(AActor* InActor)
 
 bool USceneModuleBPLibrary::HasTargetPointByName(FName InName, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->HasTargetPointByName(InName, bEnsured);
 	}
@@ -104,7 +104,7 @@ bool USceneModuleBPLibrary::HasTargetPointByName(FName InName, bool bEnsured)
 
 ATargetPoint* USceneModuleBPLibrary::GetTargetPointByName(FName InName, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetTargetPointByName(InName, bEnsured);
 	}
@@ -113,7 +113,7 @@ ATargetPoint* USceneModuleBPLibrary::GetTargetPointByName(FName InName, bool bEn
 
 void USceneModuleBPLibrary::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddTargetPointByName(InName, InPoint);
 	}
@@ -121,7 +121,7 @@ void USceneModuleBPLibrary::AddTargetPointByName(FName InName, ATargetPoint* InP
 
 void USceneModuleBPLibrary::RemoveTargetPointByName(FName InName)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->RemoveTargetPointByName(InName);
 	}
@@ -129,7 +129,7 @@ void USceneModuleBPLibrary::RemoveTargetPointByName(FName InName)
 
 bool USceneModuleBPLibrary::HasScenePointByName(FName InName, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->HasScenePointByName(InName, bEnsured);
 	}
@@ -138,7 +138,7 @@ bool USceneModuleBPLibrary::HasScenePointByName(FName InName, bool bEnsured)
 
 USceneComponent* USceneModuleBPLibrary::GetScenePointByName(FName InName, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetScenePointByName(InName, bEnsured);
 	}
@@ -147,7 +147,7 @@ USceneComponent* USceneModuleBPLibrary::GetScenePointByName(FName InName, bool b
 
 void USceneModuleBPLibrary::AddScenePointByName(FName InName, USceneComponent* InSceneComp)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddScenePointByName(InName, InSceneComp);
 	}
@@ -155,7 +155,7 @@ void USceneModuleBPLibrary::AddScenePointByName(FName InName, USceneComponent* I
 
 void USceneModuleBPLibrary::RemoveScenePointByName(FName InName)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->RemoveScenePointByName(InName);
 	}
@@ -163,7 +163,7 @@ void USceneModuleBPLibrary::RemoveScenePointByName(FName InName)
 
 bool USceneModuleBPLibrary::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->HasPhysicsVolumeByClass(InClass, bEnsured);
 	}
@@ -172,7 +172,7 @@ bool USceneModuleBPLibrary::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBa
 
 bool USceneModuleBPLibrary::HasPhysicsVolumeByName(FName InName, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->HasPhysicsVolumeByName(InName, bEnsured);
 	}
@@ -181,7 +181,7 @@ bool USceneModuleBPLibrary::HasPhysicsVolumeByName(FName InName, bool bEnsured)
 
 APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetPhysicsVolumeByClass(InClass, bEnsured);
 	}
@@ -190,7 +190,7 @@ APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolumeByClass(TSubclassOf<A
 
 APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		return SceneModule->GetPhysicsVolumeByName(InName, InClass, bEnsured);
 	}
@@ -199,7 +199,7 @@ APhysicsVolumeBase* USceneModuleBPLibrary::GetPhysicsVolumeByName(FName InName, 
 
 void USceneModuleBPLibrary::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddPhysicsVolume(InPhysicsVolume);
 	}
@@ -207,7 +207,7 @@ void USceneModuleBPLibrary::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume
 
 void USceneModuleBPLibrary::AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->AddPhysicsVolumeByName(InName, InPhysicsVolume);
 	}
@@ -215,7 +215,7 @@ void USceneModuleBPLibrary::AddPhysicsVolumeByName(FName InName, APhysicsVolumeB
 
 void USceneModuleBPLibrary::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->RemovePhysicsVolume(InPhysicsVolume);
 	}
@@ -223,7 +223,7 @@ void USceneModuleBPLibrary::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVol
 
 void USceneModuleBPLibrary::RemovePhysicsVolumeByName(FName InName)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->RemovePhysicsVolumeByName(InName);
 	}
@@ -231,7 +231,7 @@ void USceneModuleBPLibrary::RemovePhysicsVolumeByName(FName InName)
 
 void USceneModuleBPLibrary::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp)
 {
-	if(ASceneModule* SceneModule = AMainModule::GetModuleByClass<ASceneModule>())
+	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
 		SceneModule->SpawnWorldText(InText, InTextColor, InTextStyle, InLocation, InSceneComp);
 	}

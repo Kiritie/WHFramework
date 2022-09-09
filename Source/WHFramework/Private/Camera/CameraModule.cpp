@@ -13,6 +13,8 @@
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
 #include "Net/UnrealNetwork.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ACameraModule)
 
 // Sets default values
 ACameraModule::ACameraModule()

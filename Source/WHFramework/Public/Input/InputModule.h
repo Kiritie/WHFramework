@@ -13,7 +13,9 @@ UCLASS()
 class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
 {
 	GENERATED_BODY()
-	
+			
+	MODULE_INSTANCE_DECLARE(AInputModule)
+
 public:	
 	AInputModule();
 

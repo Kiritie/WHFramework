@@ -4,6 +4,7 @@
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 #include "Ability/Components/VoxelInteractionComponent.h"
+#include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -13,7 +14,7 @@ AVoxelAuxiliary::AVoxelAuxiliary()
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
-	VoxelIndex = FIndex::ZeroIndex;
+	VoxelItem = FVoxelItem::Empty;
 }
 
 void AVoxelAuxiliary::BeginPlay()
@@ -22,13 +23,14 @@ void AVoxelAuxiliary::BeginPlay()
 
 }
 
-void AVoxelAuxiliary::Initialize(FIndex InVoxelIndex)
+void AVoxelAuxiliary::Initialize(FVoxelItem InVoxelItem)
 {
-	VoxelIndex = InVoxelIndex;
-
-	const FVoxelItem& VoxelItem = GetVoxelItem();
-	SetActorLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f);
-	Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModuleBPLibrary::GetWorldData().BlockSize * FVector(1.5f, 1.5f, 0.5f));
+	VoxelItem = InVoxelItem;
+	if(VoxelItem.Owner)
+	{
+		SetActorLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
+		Interaction->SetBoxExtent(VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * FVector(1.5f, 1.5f, 0.5f));
+	}
 }
 
 void AVoxelAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -40,7 +42,7 @@ void AVoxelAuxiliary::OnDespawn_Implementation()
 {
 	Super::OnDespawn_Implementation();
 
-	VoxelIndex = FIndex::ZeroIndex;
+	VoxelItem = FVoxelItem::Empty;
 }
 
 void AVoxelAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
@@ -59,15 +61,6 @@ bool AVoxelAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent
 void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
 	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
-}
-
-FVoxelItem& AVoxelAuxiliary::GetVoxelItem() const
-{
-	if(Container)
-	{
-		return Cast<AVoxelChunk>(Container.GetObject())->GetVoxelItem(VoxelIndex);
-	}
-	return FVoxelItem::Empty;
 }
 
 UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const

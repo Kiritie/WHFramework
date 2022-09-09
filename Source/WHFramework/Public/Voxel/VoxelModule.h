@@ -30,6 +30,8 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterfa
 	friend class AsyncTask_BuildChunkMap;
 	friend class AsyncTask_BuildChunkMesh;
 	friend class AsyncTask_LoadChunkMap;
+		
+	MODULE_INSTANCE_DECLARE(AVoxelModule)
 
 public:	
 	// Sets default values for this actor's properties
@@ -88,14 +90,14 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 protected:
-	static FVoxelWorldSaveData* WorldData;
+	FVoxelWorldSaveData* WorldData;
 public:
 	template<class T>
-	static T& GetWorldData()
+	T& GetWorldData() const
 	{
 		return static_cast<T&>(GetWorldData());
 	}
-	static FVoxelWorldSaveData& GetWorldData();
+	FVoxelWorldSaveData& GetWorldData() const;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
@@ -139,6 +141,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkGenerateSpeed;
+	
+	UPROPERTY(Transient)
+	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
 protected:
 	int32 ChunkSpawnBatch;
@@ -146,9 +151,7 @@ protected:
 	FIndex LastGenerateIndex;
 
 	FIndex LastStayChunkIndex;
-	
-	TMap<FIndex, AVoxelChunk*> ChunkMap;
-	
+
 	TArray<FIndex> ChunkSpawnQueue;
 
 	TArray<FIndex> ChunkMapLoadQueue;
@@ -215,6 +218,15 @@ public:
 	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex);
 
 	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation);
+	
+public:
+	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
+
+	virtual FVector ChunkIndexToLocation(FIndex InIndex);
+
+	virtual FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
+
+	virtual FVector VoxelIndexToLocation(FIndex InIndex);
 
 protected:
 	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc)
@@ -297,4 +309,6 @@ public:
 	virtual ECollisionChannel GetChunkTraceType() const;
 	
 	virtual ECollisionChannel GetVoxelTraceType() const;
+
+	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
 };

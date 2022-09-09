@@ -4,6 +4,8 @@
 #include "LatentAction/LatentActionModule.h"
 
 #include "Debug/DebugModuleTypes.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ALatentActionModule)
 
 ALatentActionModule::ALatentActionModule()
 {

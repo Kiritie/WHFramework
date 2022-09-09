@@ -21,7 +21,7 @@ public:
 	template<class T>
 	static T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+		if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 		{
 			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
 		}
@@ -31,7 +31,7 @@ public:
 	template<class T>
 	static T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+		if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 		{
 			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
 		}
@@ -47,7 +47,7 @@ public:
 	template<class T>
 	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(AObjectPoolModule* ObjectPoolModule = AMainModule::GetModuleByClass<AObjectPoolModule>())
+		if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 		{
 			ObjectPoolModule->ClearObject<T>(InType);
 		}

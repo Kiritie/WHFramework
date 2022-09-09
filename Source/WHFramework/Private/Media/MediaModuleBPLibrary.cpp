@@ -11,7 +11,7 @@
 
 void UMediaModuleBPLibrary::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->AddMediaPlayerToList(InMediaPlayer);
 	}
@@ -19,7 +19,7 @@ void UMediaModuleBPLibrary::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer
 
 void UMediaModuleBPLibrary::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->RemoveMediaPlayerFromList(InMediaPlayer);
 	}
@@ -27,7 +27,7 @@ void UMediaModuleBPLibrary::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaP
 
 void UMediaModuleBPLibrary::RemoveMediaPlayerFromListByName(const FName InMediaPlayerName)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->RemoveMediaPlayerFromListByName(InMediaPlayerName);
 	}
@@ -35,7 +35,7 @@ void UMediaModuleBPLibrary::RemoveMediaPlayerFromListByName(const FName InMediaP
 
 AMediaPlayerBase* UMediaModuleBPLibrary::GetMediaPlayerByName(const FName InMediaPlayerName)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		return MediaModule->GetMediaPlayerByName(InMediaPlayerName);
 	}
@@ -44,7 +44,7 @@ AMediaPlayerBase* UMediaModuleBPLibrary::GetMediaPlayerByName(const FName InMedi
 
 void UMediaModuleBPLibrary::PlayMediaPlayerMovie(const FName InMediaPlayerName, const FName InMovieName, bool bMulticast)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->PlayMediaPlayerMovie(InMediaPlayerName, InMovieName, bMulticast);
 	}
@@ -52,7 +52,7 @@ void UMediaModuleBPLibrary::PlayMediaPlayerMovie(const FName InMediaPlayerName, 
 
 void UMediaModuleBPLibrary::PlayMediaPlayerMovieWithDelegate(const FName InMediaPlayerName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->PlayMovieWithDelegate(InMediaPlayerName, InMovieName, InOnMoviePlayFinishedDelegate, bMulticast);
 	}
@@ -60,7 +60,7 @@ void UMediaModuleBPLibrary::PlayMediaPlayerMovieWithDelegate(const FName InMedia
 
 void UMediaModuleBPLibrary::StopMediaPlayerMovie(const FName InMediaPlayerName, bool bSkip, bool bMulticast)
 {
-	if(AMediaModule* MediaModule = AMainModule::GetModuleByClass<AMediaModule>())
+	if(AMediaModule* MediaModule = AMediaModule::Get())
 	{
 		MediaModule->StopMediaPlayerMovie(InMediaPlayerName, bSkip, bMulticast);
 	}

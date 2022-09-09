@@ -3,9 +3,11 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 #include "Components/PointLightComponent.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Datas/VoxelTorchData.h"
 
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
@@ -16,6 +18,9 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 	LightComponent->SetIntensity(10000.f);
 	LightComponent->SetAttenuationRadius(1500.f);
 	LightComponent->SetCastShadows(true);
+
+	EffectComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("EffectComponent"));
+	EffectComponent->SetupAttachment(RootComponent);
 }
 
 void AVoxelTorchAuxiliary::BeginPlay()
@@ -24,14 +29,21 @@ void AVoxelTorchAuxiliary::BeginPlay()
 
 }
 
-void AVoxelTorchAuxiliary::Initialize(FIndex InVoxelIndex)
+void AVoxelTorchAuxiliary::Initialize(FVoxelItem InVoxelItem)
 {
-	Super::Initialize(InVoxelIndex);
+	Super::Initialize(InVoxelItem);
 
-	LightComponent->SetRelativeLocation(FVector::UpVector * GetVoxelItem().GetVoxelData().GetRange().Z * 0.5f * UVoxelModuleBPLibrary::GetWorldData().BlockSize);
+	if(InVoxelItem.IsValid())
+	{
+		LightComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
+		EffectComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
+		EffectComponent->SetTemplate(InVoxelItem.GetVoxelData<UVoxelTorchData>().Effect);
+		EffectComponent->SetRelativeScale3D(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale * (InVoxelItem.Owner ? 1.f : 0.3f));
+	}
 }
 
 void AVoxelTorchAuxiliary::SetLightVisible(bool bNewVisible)
 {
 	LightComponent->SetVisibility(bNewVisible);
+	EffectComponent->SetVisibility(bNewVisible);
 }

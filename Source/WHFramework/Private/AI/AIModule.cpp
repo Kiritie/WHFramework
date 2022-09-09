@@ -4,6 +4,8 @@
 #include "AI/AIModule.h"
 
 #include "Net/UnrealNetwork.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AAIModule)
 
 // Sets default values
 AAIModule::AAIModule()

@@ -2,6 +2,8 @@
 
 
 #include "Debug/DebugModule.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ADebugModule)
 
 // Sets default values
 ADebugModule::ADebugModule()

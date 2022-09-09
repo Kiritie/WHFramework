@@ -9,7 +9,7 @@
 
 bool UAssetModuleBPLibrary::HasDataAsset(FName InDataAssetName)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->HasDataAsset(InDataAssetName);
 	}
@@ -18,7 +18,7 @@ bool UAssetModuleBPLibrary::HasDataAsset(FName InDataAssetName)
 
 UDataAssetBase* UAssetModuleBPLibrary::GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->GetDataAsset(InDataAssetClass, InDataAssetName);
 	}
@@ -27,7 +27,7 @@ UDataAssetBase* UAssetModuleBPLibrary::GetDataAsset(TSubclassOf<UDataAssetBase> 
 
 UDataAssetBase* UAssetModuleBPLibrary::CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->CreateDataAsset(InDataAssetClass, InDataAssetName);
 	}
@@ -36,7 +36,7 @@ UDataAssetBase* UAssetModuleBPLibrary::CreateDataAsset(TSubclassOf<UDataAssetBas
 
 bool UAssetModuleBPLibrary::RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->RemoveDataAsset(InDataAssetClass, InDataAssetName);
 	}
@@ -45,7 +45,7 @@ bool UAssetModuleBPLibrary::RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAs
 
 void UAssetModuleBPLibrary::RemoveAllDataAsset()
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		AssetModule->RemoveAllDataAsset();
 	}
@@ -53,7 +53,7 @@ void UAssetModuleBPLibrary::RemoveAllDataAsset()
 
 bool UAssetModuleBPLibrary::AddDataTable(UDataTable* InDataTable)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->AddDataTable(InDataTable);
 	}
@@ -62,7 +62,7 @@ bool UAssetModuleBPLibrary::AddDataTable(UDataTable* InDataTable)
 
 bool UAssetModuleBPLibrary::RemoveDataTable(UDataTable* InDataTable)
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->RemoveDataTable(InDataTable);
 	}
@@ -71,7 +71,7 @@ bool UAssetModuleBPLibrary::RemoveDataTable(UDataTable* InDataTable)
 
 void UAssetModuleBPLibrary::RemoveAllDataTable()
 {
-	if(AAssetModule* AssetModule = AMainModule::GetModuleByClass<AAssetModule>())
+	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		AssetModule->RemoveAllDataTable();
 	}

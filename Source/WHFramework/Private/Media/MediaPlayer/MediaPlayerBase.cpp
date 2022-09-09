@@ -37,7 +37,7 @@ void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bM
 		{
 			MultiPlayMovie(InMovieName);
 		}
-		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleByClass<UMediaModuleNetworkComponent>())
+		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UMediaModuleNetworkComponent>())
 		{
 			MediaModuleNetworkComponent->ServerPlayMovieMulticast(this, InMovieName);
 		}
@@ -71,7 +71,7 @@ void AMediaPlayerBase::StopMovie_Implementation(bool bSkip, bool bMulticast)
 		{
 			MultiStopMovie(bSkip);
 		}
-		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleByClass<UMediaModuleNetworkComponent>())
+		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UMediaModuleNetworkComponent>())
 		{
 			MediaModuleNetworkComponent->ServerStopMovieMulticast(this, bSkip);
 		}

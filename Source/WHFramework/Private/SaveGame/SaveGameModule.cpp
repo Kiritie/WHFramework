@@ -8,6 +8,8 @@
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Base/SaveGameBase.h"
 #include "SaveGame/General/GeneralSaveGame.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ASaveGameModule)
 
 // ParamSets default values
 ASaveGameModule::ASaveGameModule()

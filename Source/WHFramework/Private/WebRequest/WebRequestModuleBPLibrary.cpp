@@ -8,7 +8,7 @@
 
 bool UWebRequestModuleBPLibrary::IsWebLocalMode()
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->IsLocalMode();
 	}
@@ -17,7 +17,7 @@ bool UWebRequestModuleBPLibrary::IsWebLocalMode()
 
 void UWebRequestModuleBPLibrary::SetWebLocalMode(bool bInLocalMode)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		WebRequestModule->SetLocalMode(bInLocalMode);
 	}
@@ -25,7 +25,7 @@ void UWebRequestModuleBPLibrary::SetWebLocalMode(bool bInLocalMode)
 
 FString UWebRequestModuleBPLibrary::GetWebServerURL()
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->GetServerURL();
 	}
@@ -34,7 +34,7 @@ FString UWebRequestModuleBPLibrary::GetWebServerURL()
 
 void UWebRequestModuleBPLibrary::SetWebServerURL(const FString& InServerURL)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		WebRequestModule->SetServerURL(InServerURL);
 	}
@@ -42,7 +42,7 @@ void UWebRequestModuleBPLibrary::SetWebServerURL(const FString& InServerURL)
 
 int32 UWebRequestModuleBPLibrary::GetWebServerPort()
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->GetServerPort();
 	}
@@ -51,7 +51,7 @@ int32 UWebRequestModuleBPLibrary::GetWebServerPort()
 
 void UWebRequestModuleBPLibrary::SetWebServerPort(int32 InServerPort)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		WebRequestModule->SetServerPort(InServerPort);
 	}
@@ -59,7 +59,7 @@ void UWebRequestModuleBPLibrary::SetWebServerPort(int32 InServerPort)
 
 bool UWebRequestModuleBPLibrary::HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->HasWebInterface(InWebInterfaceClass);
 	}
@@ -68,7 +68,7 @@ bool UWebRequestModuleBPLibrary::HasWebInterface(TSubclassOf<UWebInterfaceBase> 
 
 UWebInterfaceBase* UWebRequestModuleBPLibrary::GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->GetWebInterface(InWebInterfaceClass);
 	}
@@ -77,7 +77,7 @@ UWebInterfaceBase* UWebRequestModuleBPLibrary::GetWebInterface(TSubclassOf<UWebI
 
 UWebInterfaceBase* UWebRequestModuleBPLibrary::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->CreateWebInterface(InWebInterfaceClass);
 	}
@@ -86,7 +86,7 @@ UWebInterfaceBase* UWebRequestModuleBPLibrary::CreateWebInterface(TSubclassOf<UW
 
 bool UWebRequestModuleBPLibrary::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->RegisterWebInterface(InWebInterfaceClass, InOnWebRequestComplete);
 	}
@@ -95,7 +95,7 @@ bool UWebRequestModuleBPLibrary::RegisterWebInterface(TSubclassOf<UWebInterfaceB
 
 bool UWebRequestModuleBPLibrary::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->UnRegisterWebInterface(InWebInterfaceClass, InOnWebRequestComplete);
 	}
@@ -104,7 +104,7 @@ bool UWebRequestModuleBPLibrary::UnRegisterWebInterface(TSubclassOf<UWebInterfac
 
 bool UWebRequestModuleBPLibrary::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->UnRegisterAllWebInterface(InWebInterfaceClass);
 	}
@@ -113,7 +113,7 @@ bool UWebRequestModuleBPLibrary::UnRegisterAllWebInterface(TSubclassOf<UWebInter
 
 bool UWebRequestModuleBPLibrary::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->ClearWebInterface(InWebInterfaceClass);
 	}
@@ -122,7 +122,7 @@ bool UWebRequestModuleBPLibrary::ClearWebInterface(TSubclassOf<UWebInterfaceBase
 
 void UWebRequestModuleBPLibrary::ClearAllWebInterface()
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		WebRequestModule->ClearAllWebInterface();
 	}
@@ -130,7 +130,7 @@ void UWebRequestModuleBPLibrary::ClearAllWebInterface()
 
 bool UWebRequestModuleBPLibrary::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->SendWebRequest(InWebInterfaceClass, InMethod, InHeadMap, InContent);
 	}
@@ -139,7 +139,7 @@ bool UWebRequestModuleBPLibrary::SendWebRequest(TSubclassOf<UWebInterfaceBase> I
 
 bool UWebRequestModuleBPLibrary::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(AWebRequestModule* WebRequestModule = AMainModule::GetModuleByClass<AWebRequestModule>())
+	if(AWebRequestModule* WebRequestModule = AWebRequestModule::Get())
 	{
 		return WebRequestModule->K2_SendWebRequest(InWebInterfaceClass, InMethod, InHeadMap, InContent);
 	}

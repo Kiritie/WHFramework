@@ -12,4 +12,11 @@ class WHFRAMEWORK_API UVoxelTorchData : public UVoxelData
 
 public:
 	UVoxelTorchData();
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UParticleSystem* Effect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector EffectScale;
 };

@@ -14,7 +14,9 @@ UCLASS()
 class WHFRAMEWORK_API AMediaModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
+			
+	MODULE_INSTANCE_DECLARE(AMediaModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	AMediaModule();

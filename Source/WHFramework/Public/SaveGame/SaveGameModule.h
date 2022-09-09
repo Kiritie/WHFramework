@@ -19,11 +19,13 @@ class WHFRAMEWORK_API ASaveGameModule : public AModuleBase, public ISaveDataInte
 	GENERATED_BODY()
 
 	friend class USaveGameBase;
-	
+				
+	MODULE_INSTANCE_DECLARE(ASaveGameModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	ASaveGameModule();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

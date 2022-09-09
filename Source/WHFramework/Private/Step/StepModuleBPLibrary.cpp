@@ -12,7 +12,7 @@
 
 UStepBase* UStepModuleBPLibrary::GetCurrentStep()
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		return StepModule->GetCurrentStep();
 	}
@@ -21,7 +21,7 @@ UStepBase* UStepModuleBPLibrary::GetCurrentStep()
 
 URootStepBase* UStepModuleBPLibrary::GetCurrentRootStep()
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		return StepModule->GetCurrentRootStep();
 	}
@@ -30,7 +30,7 @@ URootStepBase* UStepModuleBPLibrary::GetCurrentRootStep()
 
 void UStepModuleBPLibrary::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->StartStep(InRootStepIndex, bSkipSteps);
 	}
@@ -38,7 +38,7 @@ void UStepModuleBPLibrary::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 
 void UStepModuleBPLibrary::EndStep(bool bRestoreSteps)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->EndStep(bRestoreSteps);
 	}
@@ -46,7 +46,7 @@ void UStepModuleBPLibrary::EndStep(bool bRestoreSteps)
 
 void UStepModuleBPLibrary::RestoreStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->RestoreStep(InStep);
 	}
@@ -54,7 +54,7 @@ void UStepModuleBPLibrary::RestoreStep(UStepBase* InStep)
 
 void UStepModuleBPLibrary::EnterStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->EnterStep(InStep);
 	}
@@ -62,7 +62,7 @@ void UStepModuleBPLibrary::EnterStep(UStepBase* InStep)
 
 void UStepModuleBPLibrary::RefreshStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->RefreshStep(InStep);
 	}
@@ -70,7 +70,7 @@ void UStepModuleBPLibrary::RefreshStep(UStepBase* InStep)
 
 void UStepModuleBPLibrary::GuideStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->GuideStep(InStep);
 	}
@@ -78,7 +78,7 @@ void UStepModuleBPLibrary::GuideStep(UStepBase* InStep)
 
 void UStepModuleBPLibrary::ExecuteStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->ExecuteStep(InStep);
 	}
@@ -86,7 +86,7 @@ void UStepModuleBPLibrary::ExecuteStep(UStepBase* InStep)
 
 void UStepModuleBPLibrary::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecuteResult)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->CompleteStep(InStep, InStepExecuteResult);
 	}
@@ -94,7 +94,7 @@ void UStepModuleBPLibrary::CompleteStep(UStepBase* InStep, EStepExecuteResult In
 
 void UStepModuleBPLibrary::LeaveStep(UStepBase* InStep)
 {
-	if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+	if(AStepModule* StepModule = AStepModule::Get())
 	{
 		StepModule->LeaveStep(InStep);
 	}

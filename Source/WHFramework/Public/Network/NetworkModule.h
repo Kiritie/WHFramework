@@ -12,11 +12,13 @@ UCLASS()
 class WHFRAMEWORK_API ANetworkModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
+				
+	MODULE_INSTANCE_DECLARE(ANetworkModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	ANetworkModule();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

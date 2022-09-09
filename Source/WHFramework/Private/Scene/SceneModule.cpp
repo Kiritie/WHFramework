@@ -18,6 +18,8 @@
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleBPLibrary.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ASceneModule)
 
 ASceneModule::ASceneModule()
 {

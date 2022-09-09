@@ -121,7 +121,7 @@ void AWHPlayerController::Turn(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		if(!CameraModule->GetCameraRotateKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraRotateKey()))
 		{
@@ -134,7 +134,7 @@ void AWHPlayerController::LookUp(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		if(!CameraModule->GetCameraRotateKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraRotateKey()))
 		{
@@ -147,7 +147,7 @@ void AWHPlayerController::PanH(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		if(!CameraModule->GetCameraPanMoveKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraPanMoveKey()))
 		{
@@ -162,7 +162,7 @@ void AWHPlayerController::PanV(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		if(!CameraModule->GetCameraPanMoveKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraPanMoveKey()))
 		{
@@ -177,7 +177,7 @@ void AWHPlayerController::ZoomCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		if(!CameraModule->GetCameraZoomKey().IsValid() || IsInputKeyDown(CameraModule->GetCameraZoomKey()))
 		{
@@ -307,7 +307,7 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+			if(ACameraModule* CameraModule = ACameraModule::Get())
 			{
 				CameraModule->AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
 			}
@@ -329,7 +329,7 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
 		if(TouchPinchValuePrevious != -1.f)
 		{
-			if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+			if(ACameraModule* CameraModule = ACameraModule::Get())
 			{
 				CameraModule->AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
 			}
@@ -348,7 +348,7 @@ void AWHPlayerController::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InL
 			const FRotator Rotation = GetControlRotation();
 			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
-			if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+			if(ACameraModule* CameraModule = ACameraModule::Get())
 			{
 				CameraModule->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (CameraModule->IsReverseCameraPanMove() ? -1.f : 1.f));
 			}

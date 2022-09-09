@@ -4,6 +4,8 @@
 #include "ReferencePool/ReferencePoolModule.h"
 
 #include "ReferencePool/ReferencePool.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AReferencePoolModule)
 
 // Sets default values
 AReferencePoolModule::AReferencePoolModule()

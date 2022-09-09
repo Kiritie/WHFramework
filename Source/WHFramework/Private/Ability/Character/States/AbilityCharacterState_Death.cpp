@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Scene/Container/SceneContainerInterface.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -32,6 +33,11 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DyingTag);
+
+	if(Character->Container)
+	{
+		Character->Container->RemoveSceneActor(Character);
+	}
 
 	if(Killer)
 	{

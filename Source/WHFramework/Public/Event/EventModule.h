@@ -13,11 +13,13 @@ UCLASS()
 class WHFRAMEWORK_API AEventModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
+			
+	MODULE_INSTANCE_DECLARE(AEventModule)
+
 public:
 	// ParamSets default values for this actor's properties
 	AEventModule();
-	
+
 protected:
 	TMap<TSubclassOf<UEventHandleBase>, FEventHandleInfo> EventHandleInfos;
 

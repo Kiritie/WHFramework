@@ -19,6 +19,8 @@ UCLASS()
 class WHFRAMEWORK_API AProcedureModule : public AModuleBase
 {
 	GENERATED_BODY()
+		
+	MODULE_INSTANCE_DECLARE(AProcedureModule)
 
 public:
 	// ParamSets default values for this actor's properties

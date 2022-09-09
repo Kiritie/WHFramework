@@ -20,6 +20,8 @@
 #include "Step/StepModuleNetworkComponent.h"
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AStepModule)
 
 // ParamSets default values
 AStepModule::AStepModule()

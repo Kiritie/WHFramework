@@ -9,6 +9,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetContainer.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AWidgetModule)
 
 // Sets default values
 AWidgetModule::AWidgetModule()

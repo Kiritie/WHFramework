@@ -20,6 +20,8 @@
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AAbilityModule)
 
 // Sets default values
 AAbilityModule::AAbilityModule()

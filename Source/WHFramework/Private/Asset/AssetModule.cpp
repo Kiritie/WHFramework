@@ -2,6 +2,8 @@
 
 
 #include "Asset/AssetModule.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AAssetModule)
 
 // Sets default values
 AAssetModule::AAssetModule()

@@ -56,7 +56,7 @@ void ARoamCameraPawn::Tick(float DeltaTime)
 void ARoamCameraPawn::MoveForward_Implementation(float InValue)
 {
 	const FVector Direction = GetControlRotation().Vector();
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraMovementInput(Direction, InValue);
 	}
@@ -65,7 +65,7 @@ void ARoamCameraPawn::MoveForward_Implementation(float InValue)
 void ARoamCameraPawn::MoveRight_Implementation(float InValue)
 {
 	const FVector Direction = FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Y);
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraMovementInput(Direction, InValue);
 	}
@@ -73,7 +73,7 @@ void ARoamCameraPawn::MoveRight_Implementation(float InValue)
 
 void ARoamCameraPawn::MoveUp_Implementation(float InValue)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraMovementInput(FVector::UpVector, InValue);
 	}

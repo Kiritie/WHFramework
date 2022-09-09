@@ -9,6 +9,8 @@
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Parameter/ParameterModuleBPLibrary.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AWebRequestModule)
 
 // Sets default values
 AWebRequestModule::AWebRequestModule()

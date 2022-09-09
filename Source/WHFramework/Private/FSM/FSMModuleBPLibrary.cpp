@@ -5,7 +5,7 @@
 
 void UFSMModuleBPLibrary::RegisterFSM(UFSMComponent* InFSM)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->RegisterFSM(InFSM);
 	}
@@ -13,7 +13,7 @@ void UFSMModuleBPLibrary::RegisterFSM(UFSMComponent* InFSM)
 
 void UFSMModuleBPLibrary::UnregisterFSM(UFSMComponent* InFSM)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->UnregisterFSM(InFSM);
 	}
@@ -21,7 +21,7 @@ void UFSMModuleBPLibrary::UnregisterFSM(UFSMComponent* InFSM)
 
 void UFSMModuleBPLibrary::SwitchFSMGroupStateByIndex(const FName InFSMGroup, int32 InStateIndex)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupStateByIndex(InFSMGroup, InStateIndex);
 	}
@@ -29,7 +29,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupStateByIndex(const FName InFSMGroup, int
 
 void UFSMModuleBPLibrary::SwitchFSMGroupStateByClass(const FName InFSMGroup, TSubclassOf<UFiniteStateBase> InStateClass)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupStateByClass(InFSMGroup, InStateClass);
 	}
@@ -37,7 +37,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupStateByClass(const FName InFSMGroup, TSu
 
 void UFSMModuleBPLibrary::SwitchFSMGroupDefaultState(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupDefaultState(InFSMGroup);
 	}
@@ -45,7 +45,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupDefaultState(const FName InFSMGroup)
 
 void UFSMModuleBPLibrary::SwitchFSMGroupFinalState(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupFinalState(InFSMGroup);
 	}
@@ -53,7 +53,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupFinalState(const FName InFSMGroup)
 
 void UFSMModuleBPLibrary::SwitchFSMGroupLastState(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupLastState(InFSMGroup);
 	}
@@ -61,7 +61,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupLastState(const FName InFSMGroup)
 
 void UFSMModuleBPLibrary::SwitchFSMGroupNextState(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		FSMModule->SwitchFSMGroupNextState(InFSMGroup);
 	}
@@ -69,7 +69,7 @@ void UFSMModuleBPLibrary::SwitchFSMGroupNextState(const FName InFSMGroup)
 
 bool UFSMModuleBPLibrary::HasFSMGroup(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		return FSMModule->HasFSMGroup(InFSMGroup);
 	}
@@ -78,7 +78,7 @@ bool UFSMModuleBPLibrary::HasFSMGroup(const FName InFSMGroup)
 
 TArray<UFSMComponent*> UFSMModuleBPLibrary::GetFSMGroupArray(const FName InFSMGroup)
 {
-	if(AFSMModule* FSMModule = AMainModule::GetModuleByClass<AFSMModule>())
+	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
 		return FSMModule->GetFSMGroupArray(InFSMGroup);
 	}

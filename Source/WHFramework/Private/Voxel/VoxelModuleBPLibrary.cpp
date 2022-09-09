@@ -20,12 +20,16 @@ FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType
 
 FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
 {
-	return AVoxelModule::GetWorldData();
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->GetWorldData();
+	}
+	return FVoxelWorldSaveData::Empty;
 }
 
 EVoxelWorldMode UVoxelModuleBPLibrary::GetWorldMode()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldMode();
 	}
@@ -34,7 +38,7 @@ EVoxelWorldMode UVoxelModuleBPLibrary::GetWorldMode()
 
 EVoxelWorldState UVoxelModuleBPLibrary::GetWorldState()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldState();
 	}
@@ -43,7 +47,7 @@ EVoxelWorldState UVoxelModuleBPLibrary::GetWorldState()
 
 FVoxelWorldBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldBasicData();
 	}
@@ -52,7 +56,7 @@ FVoxelWorldBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
 
 float UVoxelModuleBPLibrary::GetWorldLength()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldLength();
 	}
@@ -61,7 +65,7 @@ float UVoxelModuleBPLibrary::GetWorldLength()
 
 bool UVoxelModuleBPLibrary::IsBasicGenerated()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->IsBasicGenerated();
 	}
@@ -70,18 +74,43 @@ bool UVoxelModuleBPLibrary::IsBasicGenerated()
 
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
-	InLocation /= GetWorldData().GetChunkLength();
-	return FIndex(FMath::FloorToInt(InLocation.X), FMath::FloorToInt(InLocation.Y), bIgnoreZ ? 0 : FMath::FloorToInt(InLocation.Z));
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->LocationToChunkIndex(InLocation, bIgnoreZ);
+	}
+	return FIndex::ZeroIndex;
 }
 
 FVector UVoxelModuleBPLibrary::ChunkIndexToLocation(FIndex InIndex)
 {
-	return InIndex.ToVector() * GetWorldData().GetChunkLength();
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->ChunkIndexToLocation(InIndex);
+	}
+	return FVector::ZeroVector;
+}
+
+FIndex UVoxelModuleBPLibrary::LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->LocationToVoxelIndex(InLocation, bIgnoreZ);
+	}
+	return FIndex::ZeroIndex;
+}
+
+FVector UVoxelModuleBPLibrary::VoxelIndexToLocation(FIndex InIndex)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->VoxelIndexToLocation(InIndex);
+	}
+	return FVector::ZeroVector;
 }
 
 AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByIndex(FIndex InIndex)
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->FindChunkByIndex(InIndex);
 	}
@@ -90,7 +119,7 @@ AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByIndex(FIndex InIndex)
 
 AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByLocation(FVector InLocation)
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->FindChunkByLocation(InLocation);
 	}
@@ -99,7 +128,7 @@ AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByLocation(FVector InLocation)
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(EVoxelType InVoxelType)
 {
-	return GetVoxel(UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType));
+	return GetVoxel(VoxelTypeToAssetID(InVoxelType));
 }
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
@@ -126,57 +155,11 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 
 EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 {
-	const auto& worldData = GetWorldData();
-	const FRandomStream& randomStream = worldData.RandomStream;
-
-	const int32 worldHeight = worldData.GetWorldHeight();
-	const FVector2D worldLocation = FVector2D(InIndex.X, InIndex.Y);
-
-	const int32 plainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainPlainScale, worldData.WorldSeed, true) * worldHeight;
-	const int32 mountainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainMountainScale, worldData.WorldSeed, true) * worldHeight;
-
-	const int32 baseHeight = FMath::Max(plainHeight, mountainHeight) + worldData.TerrainBaseHeight * worldHeight;
-
-	if(InIndex.Z < baseHeight)
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		if(InIndex.Z <= worldData.TerrainBedrockVoxelHeight * worldHeight)
-		{
-			return EVoxelType::Bedrock; //Bedrock
-		}
-		else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainStoneVoxelScale, worldData.WorldSeed, true) * worldHeight)
-		{
-			return EVoxelType::Stone; //Stone
-		}
-		return EVoxelType::Dirt; //Dirt
+		return VoxelModule->GetNoiseVoxelType(InIndex);
 	}
-	else
-	{
-		const int32 waterHeight = worldData.TerrainWaterVoxelHeight * worldHeight;
-		if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainSandVoxelScale, worldData.WorldSeed, true) * worldHeight)
-		{
-			return EVoxelType::Sand; //Sand
-		}
-		else if(InIndex.Z <= waterHeight)
-		{
-			return EVoxelType::Water; //Water
-		}
-		else if(InIndex.Z == baseHeight)
-		{
-			return EVoxelType::Grass; //Grass
-		}
-		else if(InIndex.Z == baseHeight + 1 && InIndex.Z != waterHeight + 1)
-		{
-			if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainTreeVoxelScale, worldData.WorldSeed, true) * worldHeight)
-			{
-				return randomStream.FRand() < 0.7f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
-			}
-			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, worldData.TerrainPlantVoxelScale, worldData.WorldSeed, true) * worldHeight)
-			{
-				return randomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)randomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
-			}
-		}
-	}
-	return EVoxelType::Empty; //Empty
+	return EVoxelType::Empty;
 }
 
 bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
@@ -233,7 +216,7 @@ bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, const TArray<AAc
 
 ECollisionChannel UVoxelModuleBPLibrary::GetChunkTraceType()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetChunkTraceType();
 	}
@@ -242,7 +225,7 @@ ECollisionChannel UVoxelModuleBPLibrary::GetChunkTraceType()
 
 ECollisionChannel UVoxelModuleBPLibrary::GetVoxelTraceType()
 {
-	if(AVoxelModule* VoxelModule = AMainModule::GetModuleByClass<AVoxelModule>())
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetVoxelTraceType();
 	}

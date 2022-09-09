@@ -10,6 +10,8 @@
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AAudioModule)
 
 // Sets default values
 AAudioModule::AAudioModule()

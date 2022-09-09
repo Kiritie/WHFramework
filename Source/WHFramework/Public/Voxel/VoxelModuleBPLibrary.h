@@ -30,6 +30,7 @@ public:
 	{
 		return static_cast<T&>(GetWorldData());
 	}
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVoxelWorldSaveData& GetWorldData();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
@@ -54,6 +55,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVector ChunkIndexToLocation(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FVector VoxelIndexToLocation(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
@@ -89,7 +96,9 @@ public:
 
 	static bool VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static ECollisionChannel GetChunkTraceType();
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static ECollisionChannel GetVoxelTraceType();
 };

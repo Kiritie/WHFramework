@@ -22,11 +22,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UPointLightComponent* LightComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UParticleSystemComponent* EffectComponent;
+
 protected:
 	virtual void BeginPlay() override;
 
 public:	
-	virtual void Initialize(FIndex InVoxelIndex) override;
+	virtual void Initialize(FVoxelItem InVoxelItem) override;
 
 public:
 	void SetLightVisible(bool bNewVisible);

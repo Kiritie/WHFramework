@@ -18,7 +18,7 @@ public:
 	AVoxelDoorAuxiliary();
 
 public:
-	virtual void Initialize(FIndex InVoxelIndex) override;
+	virtual void Initialize(FVoxelItem InVoxelItem) override;
 
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 

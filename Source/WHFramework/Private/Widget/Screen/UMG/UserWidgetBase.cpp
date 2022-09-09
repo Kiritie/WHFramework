@@ -202,7 +202,7 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 		ParentWidget->RemoveChild(this);
 	}
 
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}
@@ -293,7 +293,7 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}
@@ -356,7 +356,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}

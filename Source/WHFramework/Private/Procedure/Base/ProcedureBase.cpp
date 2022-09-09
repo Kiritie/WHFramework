@@ -50,7 +50,7 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(true))
+		if(AProcedureModule* ProcedureModule = AProcedureModule::Get(true))
 		{
 			if(ProcedureModule->GetFirstProcedure() == this)
 			{
@@ -303,7 +303,7 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{
-			if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(true))
+			if(AProcedureModule* ProcedureModule = AProcedureModule::Get(true))
 			{
 				if(bFirstProcedure)
 				{

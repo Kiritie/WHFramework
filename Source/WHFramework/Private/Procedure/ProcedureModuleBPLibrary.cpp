@@ -11,7 +11,7 @@
 
 UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->GetCurrentProcedure();
 	}
@@ -20,7 +20,7 @@ UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProc
 
 bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->HasProcedureByIndex(InProcedureIndex);
 	}
@@ -29,7 +29,7 @@ bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
 
 UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->GetProcedureByIndex(InProcedureIndex, InProcedureClass);
 	}
@@ -38,7 +38,7 @@ UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByIndex(int32 InProcedure
 
 bool UProcedureModuleBPLibrary::HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->HasProcedureByClass(InProcedureClass);
 	}
@@ -47,7 +47,7 @@ bool UProcedureModuleBPLibrary::HasProcedureByClass(TSubclassOf<UProcedureBase> 
 
 UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->GetProcedureByClass(InProcedureClass);
 	}
@@ -56,7 +56,7 @@ UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProc
 
 bool UProcedureModuleBPLibrary::IsCurrentProcedure(UProcedureBase* InProcedure)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->IsCurrentProcedure(InProcedure);
 	}
@@ -65,7 +65,7 @@ bool UProcedureModuleBPLibrary::IsCurrentProcedure(UProcedureBase* InProcedure)
 
 bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InProcedureIndex)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		return ProcedureModule->IsCurrentProcedureIndex(InProcedureIndex);
 	}
@@ -74,7 +74,7 @@ bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InProcedureIndex)
 
 void UProcedureModuleBPLibrary::SwitchProcedure(UProcedureBase* InProcedure)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchProcedure(InProcedure);
 	}
@@ -82,7 +82,7 @@ void UProcedureModuleBPLibrary::SwitchProcedure(UProcedureBase* InProcedure)
 
 void UProcedureModuleBPLibrary::SwitchProcedureByIndex(int32 InProcedureIndex)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchProcedureByIndex(InProcedureIndex);
 	}
@@ -90,7 +90,7 @@ void UProcedureModuleBPLibrary::SwitchProcedureByIndex(int32 InProcedureIndex)
 
 void UProcedureModuleBPLibrary::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchProcedureByClass(InProcedureClass);
 	}
@@ -98,7 +98,7 @@ void UProcedureModuleBPLibrary::SwitchProcedureByClass(TSubclassOf<UProcedureBas
 
 void UProcedureModuleBPLibrary::SwitchFirstProcedure()
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchFirstProcedure();
 	}
@@ -106,7 +106,7 @@ void UProcedureModuleBPLibrary::SwitchFirstProcedure()
 
 void UProcedureModuleBPLibrary::SwitchLastProcedure()
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchLastProcedure();
 	}
@@ -114,7 +114,7 @@ void UProcedureModuleBPLibrary::SwitchLastProcedure()
 
 void UProcedureModuleBPLibrary::SwitchNextProcedure()
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->SwitchNextProcedure();
 	}
@@ -122,7 +122,7 @@ void UProcedureModuleBPLibrary::SwitchNextProcedure()
 
 void UProcedureModuleBPLibrary::GuideCurrentProcedure()
 {
-	if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
 		ProcedureModule->GuideCurrentProcedure();
 	}

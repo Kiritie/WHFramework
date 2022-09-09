@@ -10,7 +10,7 @@
 
 ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter()
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->GetCurrentCharacter();
 	}
@@ -19,7 +19,7 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter()
 
 ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->GetCurrentCharacter(InCharacterClass);
 	}
@@ -28,7 +28,7 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter(TSubclassOf<AChar
 
 void UCharacterModuleBPLibrary::SwitchCharacter(ACharacterBase* InCharacter)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		CharacterModule->SwitchCharacter(InCharacter);
 	}
@@ -36,7 +36,7 @@ void UCharacterModuleBPLibrary::SwitchCharacter(ACharacterBase* InCharacter)
 
 void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		CharacterModule->SwitchCharacterByClass(InCharacterClass);
 	}
@@ -44,7 +44,7 @@ void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBas
 
 void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InCharacterName)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		CharacterModule->SwitchCharacterByName(InCharacterName);
 	}
@@ -52,7 +52,7 @@ void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InCharacterName)
 
 bool UCharacterModuleBPLibrary::HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->HasCharacterByClass(InCharacterClass);
 	}
@@ -61,7 +61,7 @@ bool UCharacterModuleBPLibrary::HasCharacterByClass(TSubclassOf<ACharacterBase> 
 
 bool UCharacterModuleBPLibrary::HasCharacterByName(FName InCharacterName)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->HasCharacterByName(InCharacterName);
 	}
@@ -70,7 +70,7 @@ bool UCharacterModuleBPLibrary::HasCharacterByName(FName InCharacterName)
 
 ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->GetCharacterByClass(InCharacterClass);
 	}
@@ -79,7 +79,7 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByClass(TSubclassOf<AChar
 
 ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByName(FName InCharacterName)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		return CharacterModule->GetCharacterByName(InCharacterName);
 	}
@@ -88,7 +88,7 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByName(FName InCharacterN
 
 void UCharacterModuleBPLibrary::AddCharacterToList(ACharacterBase* InCharacter)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		CharacterModule->AddCharacterToList(InCharacter);
 	}
@@ -96,7 +96,7 @@ void UCharacterModuleBPLibrary::AddCharacterToList(ACharacterBase* InCharacter)
 
 void UCharacterModuleBPLibrary::RemoveCharacterFromList(ACharacterBase* InCharacter)
 {
-	if(ACharacterModule* CharacterModule = AMainModule::GetModuleByClass<ACharacterModule>())
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
 		CharacterModule->RemoveCharacterFromList(InCharacter);
 	}

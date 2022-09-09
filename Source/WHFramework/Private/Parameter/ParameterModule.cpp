@@ -7,6 +7,8 @@
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Parameter/ParameterSaveGame.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AParameterModule)
 
 // ParamSets default values
 AParameterModule::AParameterModule()

@@ -20,6 +20,8 @@ UCLASS()
 class WHFRAMEWORK_API ASceneModule : public AModuleBase, public ISceneContainerInterface
 {
 	GENERATED_BODY()
+		
+	MODULE_INSTANCE_DECLARE(ASceneModule)
 
 public:
 	ASceneModule();

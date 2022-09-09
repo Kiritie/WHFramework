@@ -21,7 +21,7 @@ public:
 	template<class T>
 	static bool HasReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 		{
 			return ReferencePoolModule->HasReference<T>(InType);
 		}
@@ -31,7 +31,7 @@ public:
 	template<class T>
 	static void CreateReference(UObject* InObject = nullptr, TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 		{
 			ReferencePoolModule->CreateReference<T>(InObject, InType);
 		}
@@ -40,7 +40,7 @@ public:
 	template<class T>
 	static T& GetReference(bool bReset = false, TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 		{
 			return ReferencePoolModule->GetReference<T>(bReset, InType);
 		}
@@ -50,7 +50,7 @@ public:
 	template<class T>
 	static void ResetReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 		{
 			ReferencePoolModule->ResetReference<T>(InType);
 		}
@@ -59,7 +59,7 @@ public:
 	template<class T>
 	static void ClearReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+		if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 		{
 			ReferencePoolModule->ClearReference<T>(InType);
 		}

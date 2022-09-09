@@ -21,7 +21,9 @@ UCLASS()
 class WHFRAMEWORK_API AWidgetModule : public AModuleBase, public IInputManager
 {
 	GENERATED_BODY()
-	
+			
+	MODULE_INSTANCE_DECLARE(AWidgetModule)
+
 public:	
 	AWidgetModule();
 

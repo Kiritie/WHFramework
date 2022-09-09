@@ -11,7 +11,7 @@
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCamera();
 	}
@@ -20,7 +20,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera()
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCamera(InCameraClass);
 	}
@@ -29,7 +29,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPaw
 
 UCameraComponent* UCameraModuleBPLibrary::GetCurrentCameraComp()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCameraComp();
 	}
@@ -38,7 +38,7 @@ UCameraComponent* UCameraModuleBPLibrary::GetCurrentCameraComp()
 
 USpringArmComponent* UCameraModuleBPLibrary::GetCurrentCameraBoom()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCameraBoom();
 	}
@@ -47,7 +47,7 @@ USpringArmComponent* UCameraModuleBPLibrary::GetCurrentCameraBoom()
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCameraByClass(InCameraClass);
 	}
@@ -56,7 +56,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPaw
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InCameraName)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCameraByName(InCameraName);
 	}
@@ -65,7 +65,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InCameraNam
 
 void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SwitchCamera(InCamera, bInstant);
 	}
@@ -73,7 +73,7 @@ void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInsta
 
 void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SwitchCameraByClass(InCameraClass, bInstant);
 	}
@@ -81,7 +81,7 @@ void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> In
 
 void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SwitchCameraByName(InCameraName, bInstant);
 	}
@@ -89,7 +89,7 @@ void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName, bool b
 
 void UCameraModuleBPLibrary::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->StartTrackTarget(InTargetActor, InTrackTargetMode, InTrackTargetSpace, InLocationOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, bInstant);
 	}
@@ -97,7 +97,7 @@ void UCameraModuleBPLibrary::StartTrackTarget(AActor* InTargetActor, ETrackTarge
 
 void UCameraModuleBPLibrary::EndTrackTarget(AActor* InTargetActor)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->EndTrackTarget(InTargetActor);
 	}
@@ -105,7 +105,7 @@ void UCameraModuleBPLibrary::EndTrackTarget(AActor* InTargetActor)
 
 void UCameraModuleBPLibrary::SetCameraLocation(FVector InLocation, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SetCameraLocation(InLocation, bInstant);
 	}
@@ -113,7 +113,7 @@ void UCameraModuleBPLibrary::SetCameraLocation(FVector InLocation, bool bInstant
 
 void UCameraModuleBPLibrary::DoCameraLocation(FVector InLocation, float InDuration, EEaseType InEaseType)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->DoCameraLocation(InLocation, InDuration, InEaseType);
 	}
@@ -121,7 +121,7 @@ void UCameraModuleBPLibrary::DoCameraLocation(FVector InLocation, float InDurati
 
 void UCameraModuleBPLibrary::StopDoCameraLocation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->StopDoCameraLocation();
 	}
@@ -129,7 +129,7 @@ void UCameraModuleBPLibrary::StopDoCameraLocation()
 
 void UCameraModuleBPLibrary::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SetCameraRotation(InYaw, InPitch, bInstant);
 	}
@@ -137,7 +137,7 @@ void UCameraModuleBPLibrary::SetCameraRotation(float InYaw, float InPitch, bool 
 
 void UCameraModuleBPLibrary::DoCameraRotation(float InYaw, float InPitch, float InDuration, EEaseType InEaseType)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->DoCameraRotation(InYaw, InPitch, InDuration, InEaseType);
 	}
@@ -145,7 +145,7 @@ void UCameraModuleBPLibrary::DoCameraRotation(float InYaw, float InPitch, float 
 
 void UCameraModuleBPLibrary::StopDoCameraRotation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->StopDoCameraRotation();
 	}
@@ -153,7 +153,7 @@ void UCameraModuleBPLibrary::StopDoCameraRotation()
 
 void UCameraModuleBPLibrary::SetCameraDistance(float InDistance, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SetCameraDistance(InDistance, bInstant);
 	}
@@ -161,7 +161,7 @@ void UCameraModuleBPLibrary::SetCameraDistance(float InDistance, bool bInstant)
 
 void UCameraModuleBPLibrary::DoCameraDistance(float InDistance, float InDuration, EEaseType InEaseType)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->DoCameraDistance(InDistance, InDuration, InEaseType);
 	}
@@ -169,7 +169,7 @@ void UCameraModuleBPLibrary::DoCameraDistance(float InDistance, float InDuration
 
 void UCameraModuleBPLibrary::StopDoCameraDistance()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->StopDoCameraDistance();
 	}
@@ -177,7 +177,7 @@ void UCameraModuleBPLibrary::StopDoCameraDistance()
 
 void UCameraModuleBPLibrary::SetCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SetCameraRotationAndDistance(InYaw, InPitch, InDistance, bInstant);
 	}
@@ -185,7 +185,7 @@ void UCameraModuleBPLibrary::SetCameraRotationAndDistance(float InYaw, float InP
 
 void UCameraModuleBPLibrary::DoCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->DoCameraRotationAndDistance(InYaw, InPitch, InDistance, InDuration, InEaseType);
 	}
@@ -193,7 +193,7 @@ void UCameraModuleBPLibrary::DoCameraRotationAndDistance(float InYaw, float InPi
 
 void UCameraModuleBPLibrary::SetCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, bool bInstant)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->SetCameraTransform(InLocation, InYaw, InPitch, InDistance, bInstant);
 	}
@@ -201,7 +201,7 @@ void UCameraModuleBPLibrary::SetCameraTransform(FVector InLocation, float InYaw,
 
 void UCameraModuleBPLibrary::DoCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType)
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->DoCameraTransform(InLocation, InYaw, InPitch, InDistance, InDuration, InEaseType);
 	}
@@ -209,7 +209,7 @@ void UCameraModuleBPLibrary::DoCameraTransform(FVector InLocation, float InYaw, 
 
 void UCameraModuleBPLibrary::StopDoCameraTransform()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->StopDoCameraTransform();
 	}
@@ -217,7 +217,7 @@ void UCameraModuleBPLibrary::StopDoCameraTransform()
 
 FVector UCameraModuleBPLibrary::GetCurrentCameraLocation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCameraLocation();
 	}
@@ -226,7 +226,7 @@ FVector UCameraModuleBPLibrary::GetCurrentCameraLocation()
 
 FRotator UCameraModuleBPLibrary::GetCurrentCameraRotation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCameraRotation();
 	}
@@ -234,7 +234,7 @@ FRotator UCameraModuleBPLibrary::GetCurrentCameraRotation()
 }
 float UCameraModuleBPLibrary::GetCurrentCameraDistance()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetCurrentCameraDistance();
 	}
@@ -243,7 +243,7 @@ float UCameraModuleBPLibrary::GetCurrentCameraDistance()
 
 FVector UCameraModuleBPLibrary::GetTargetCameraLocation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetTargetCameraLocation();
 	}
@@ -252,7 +252,7 @@ FVector UCameraModuleBPLibrary::GetTargetCameraLocation()
 
 FRotator UCameraModuleBPLibrary::GetTargetCameraRotation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetTargetCameraRotation();
 	}
@@ -261,7 +261,7 @@ FRotator UCameraModuleBPLibrary::GetTargetCameraRotation()
 
 float UCameraModuleBPLibrary::GetTargetCameraDistance()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetTargetCameraDistance();
 	}
@@ -270,7 +270,7 @@ float UCameraModuleBPLibrary::GetTargetCameraDistance()
 
 FVector UCameraModuleBPLibrary::GetRealCameraLocation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetRealCameraLocation();
 	}
@@ -279,7 +279,7 @@ FVector UCameraModuleBPLibrary::GetRealCameraLocation()
 
 FRotator UCameraModuleBPLibrary::GetRealCameraRotation()
 {
-	if(ACameraModule* CameraModule = AMainModule::GetModuleByClass<ACameraModule>())
+	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		return CameraModule->GetRealCameraRotation();
 	}

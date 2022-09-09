@@ -11,7 +11,7 @@
 
 void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
 {
-	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
+	if(AEventModule* EventModule = AEventModule::Get())
 	{
 		EventModule->SubscribeEvent(InEventHandleClass, InOwner, InFuncName);
 	}
@@ -19,7 +19,7 @@ void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InEvent
 
 void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
 {
-	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
+	if(AEventModule* EventModule = AEventModule::Get())
 	{
 		EventModule->UnsubscribeEvent(InEventHandleClass, InOwner, InFuncName);
 	}
@@ -27,7 +27,7 @@ void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEve
 
 void UEventModuleBPLibrary::UnsubscribeAllEvent()
 {
-	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
+	if(AEventModule* EventModule = AEventModule::Get())
 	{
 		EventModule->UnsubscribeAllEvent();
 	}
@@ -35,7 +35,7 @@ void UEventModuleBPLibrary::UnsubscribeAllEvent()
 
 void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	if(AEventModule* EventModule = AMainModule::GetModuleByClass<AEventModule>())
+	if(AEventModule* EventModule = AEventModule::Get())
 	{
 		EventModule->BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParams);
 	}

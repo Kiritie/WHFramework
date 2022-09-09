@@ -16,11 +16,13 @@ UCLASS()
 class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterManager, public ISaveDataInterface
 {
 	GENERATED_BODY()
-	
+				
+	MODULE_INSTANCE_DECLARE(AParameterModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	AParameterModule();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

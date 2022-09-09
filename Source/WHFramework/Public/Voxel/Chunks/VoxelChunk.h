@@ -6,7 +6,6 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
@@ -192,6 +191,6 @@ public:
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 
-	FVector GetLocation() const { return UVoxelModuleBPLibrary::ChunkIndexToLocation(Index); }
+	FVector GetChunkLocation() const;
 };
 

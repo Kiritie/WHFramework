@@ -36,7 +36,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
 
-	StepModule = AMainModule::GetModuleByClass<AStepModule>(!UGlobalBPLibrary::IsPlaying());
+	StepModule = AStepModule::Get(!UGlobalBPLibrary::IsPlaying());
 
 	if(StepModule)
 	{
@@ -183,7 +183,7 @@ void SStepEditorWidget::OnReset()
 
 void SStepEditorWidget::OnRefresh()
 {
-	StepModule = AMainModule::GetModuleByClass<AStepModule>(!bPreviewMode);
+	StepModule = AStepModule::Get(!bPreviewMode);
 	if(StepModule)
 	{
 		if(ListWidget)

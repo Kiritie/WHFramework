@@ -36,7 +36,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
 
-	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!UGlobalBPLibrary::IsPlaying());
+	ProcedureModule = AProcedureModule::Get(!UGlobalBPLibrary::IsPlaying());
 
 	if(ProcedureModule)
 	{
@@ -182,7 +182,7 @@ void SProcedureEditorWidget::OnReset()
 
 void SProcedureEditorWidget::OnRefresh()
 {
-	ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>(!bPreviewMode);
+	ProcedureModule = AProcedureModule::Get(!bPreviewMode);
 	if(ProcedureModule)
 	{
 		if(ListWidget)

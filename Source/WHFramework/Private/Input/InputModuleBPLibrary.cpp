@@ -9,7 +9,7 @@
 
 EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 {
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		return InputModule->GetGlobalInputMode();
 	}
@@ -18,7 +18,7 @@ EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 
 void UInputModuleBPLibrary::SetGlobalInputMode(EInputMode InInputMode)
 {
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->SetGlobalInputMode(InInputMode);
 	}
@@ -26,7 +26,7 @@ void UInputModuleBPLibrary::SetGlobalInputMode(EInputMode InInputMode)
 
 void UInputModuleBPLibrary::UpdateGlobalInputMode()
 {
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}

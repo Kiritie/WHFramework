@@ -88,7 +88,7 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}
@@ -144,7 +144,7 @@ void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 
-	if(AInputModule* InputModule = AMainModule::GetModuleByClass<AInputModule>())
+	if(AInputModule* InputModule = AInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}

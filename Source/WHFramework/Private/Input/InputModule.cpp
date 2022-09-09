@@ -12,6 +12,8 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AInputModule)
 
 // Sets default values
 AInputModule::AInputModule()

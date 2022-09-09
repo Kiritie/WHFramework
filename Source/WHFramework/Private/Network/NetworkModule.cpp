@@ -8,6 +8,8 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Network/NetworkModuleNetworkComponent.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ANetworkModule)
 
 // ParamSets default values
 ANetworkModule::ANetworkModule()

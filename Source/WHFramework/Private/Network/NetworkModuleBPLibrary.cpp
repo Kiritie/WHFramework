@@ -12,7 +12,7 @@
 
 bool UNetworkModuleBPLibrary::IsNetworkLocalMode()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->IsLocalMode();
 	}
@@ -21,7 +21,7 @@ bool UNetworkModuleBPLibrary::IsNetworkLocalMode()
 
 void UNetworkModuleBPLibrary::SetNetworkLocalMode(bool bInLocalMode)
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		NetworkModule->SetLocalMode(bInLocalMode);
 	}
@@ -29,7 +29,7 @@ void UNetworkModuleBPLibrary::SetNetworkLocalMode(bool bInLocalMode)
 
 FString UNetworkModuleBPLibrary::GetNetworkServerURL()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->GetServerURL();
 	}
@@ -38,7 +38,7 @@ FString UNetworkModuleBPLibrary::GetNetworkServerURL()
 
 void UNetworkModuleBPLibrary::SetNetworkServerURL(const FString& InServerURL)
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		NetworkModule->SetServerURL(InServerURL);
 	}
@@ -46,7 +46,7 @@ void UNetworkModuleBPLibrary::SetNetworkServerURL(const FString& InServerURL)
 
 int32 UNetworkModuleBPLibrary::GetNetworkServerPort()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->GetServerPort();
 	}
@@ -55,7 +55,7 @@ int32 UNetworkModuleBPLibrary::GetNetworkServerPort()
 
 void UNetworkModuleBPLibrary::SetNetworkServerPort(int32 InServerPort)
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		NetworkModule->SetServerPort(InServerPort);
 	}
@@ -63,7 +63,7 @@ void UNetworkModuleBPLibrary::SetNetworkServerPort(int32 InServerPort)
 
 FString UNetworkModuleBPLibrary::GetServerLocalURL()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->GetServerLocalURL();
 	}
@@ -72,7 +72,7 @@ FString UNetworkModuleBPLibrary::GetServerLocalURL()
 
 FString UNetworkModuleBPLibrary::GetServerLocalIP()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->GetServerLocalIP();
 	}
@@ -81,7 +81,7 @@ FString UNetworkModuleBPLibrary::GetServerLocalIP()
 
 int32 UNetworkModuleBPLibrary::GetServerLocalPort()
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->GetServerLocalPort();
 	}
@@ -90,7 +90,7 @@ int32 UNetworkModuleBPLibrary::GetServerLocalPort()
 
 bool UNetworkModuleBPLibrary::ConnectNetworkServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->ConnectServer(InServerURL, InServerPort, InOptions);
 	}
@@ -99,7 +99,7 @@ bool UNetworkModuleBPLibrary::ConnectNetworkServer(const FString& InServerURL, i
 
 bool UNetworkModuleBPLibrary::DisconnectNetworkServer(const FString& InLevelName)
 {
-	if(ANetworkModule* NetworkModule = AMainModule::GetModuleByClass<ANetworkModule>())
+	if(ANetworkModule* NetworkModule = ANetworkModule::Get())
 	{
 		return NetworkModule->DisconnectServer(InLevelName);
 	}

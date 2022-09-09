@@ -14,9 +14,9 @@ AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 	Interaction->AddInteractionAction((EInteractAction)EVoxelInteractAction::Close);
 }
 
-void AVoxelDoorAuxiliary::Initialize(FIndex InVoxelIndex)
+void AVoxelDoorAuxiliary::Initialize(FVoxelItem InVoxelItem)
 {
-	Super::Initialize(InVoxelIndex);
+	Super::Initialize(InVoxelItem);
 }
 
 bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)

@@ -14,6 +14,8 @@
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Network/NetworkModuleBPLibrary.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(AEventModule)
 
 // ParamSets default values
 AEventModule::AEventModule()

@@ -8,6 +8,8 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Net/UnrealNetwork.h"
+		
+MODULE_INSTANCE_IMPLEMENTATION(ACharacterModule)
 
 // Sets default values
 ACharacterModule::ACharacterModule()

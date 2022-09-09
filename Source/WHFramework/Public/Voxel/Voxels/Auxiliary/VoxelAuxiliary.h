@@ -28,14 +28,15 @@ protected:
 	class UVoxelInteractionComponent* Interaction;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FIndex VoxelIndex;
+	FVoxelItem VoxelItem;
 
 protected:
 	virtual void BeginPlay() override;
 
 public:	
-	virtual void Initialize(FIndex InVoxelIndex);
+	virtual void Initialize(FVoxelItem InVoxelItem);
 
+public:
 	virtual int32 GetLimit_Implementation() const override { return 10000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
@@ -51,9 +52,7 @@ public:
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 public:
-	FIndex GetVoxelIndex() const { return VoxelIndex; }
-
-	FVoxelItem& GetVoxelItem() const;
+	FVoxelItem& GetVoxelItem() { return VoxelItem; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

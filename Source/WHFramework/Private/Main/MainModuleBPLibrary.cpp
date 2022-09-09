@@ -66,7 +66,7 @@ TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModule(bool bInEdi
 
 AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor)
 {
-	return AMainModule::GetModuleByClass<AModuleBase>(bInEditor, InModuleClass);
+	return AMainModule::GetModuleByClass(bInEditor, InModuleClass);
 }
 
 TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InModuleName, bool bInEditor)

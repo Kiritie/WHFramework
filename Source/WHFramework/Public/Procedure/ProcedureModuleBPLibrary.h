@@ -37,7 +37,7 @@ public:
 	template<class T>
 	static T* GetProcedureByIndex(int32 InProcedureIndex)
 	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 		{
 			return ProcedureModule->GetProcedureByIndex<T>(InProcedureIndex);
 		}
@@ -49,7 +49,7 @@ public:
 	template<class T>
 	static bool HasProcedureByClass()
 	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 		{
 			return ProcedureModule->HasProcedureByClass<T>(T::StaticClass());
 		}
@@ -61,7 +61,7 @@ public:
 	template<class T>
 	static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass())
 	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 		{
 			return ProcedureModule->GetProcedureByClass<T>(InProcedureClass);
 		}
@@ -85,7 +85,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleBPLibrary")
 	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass)
 	{
-		if(AProcedureModule* ProcedureModule = AMainModule::GetModuleByClass<AProcedureModule>())
+		if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 		{
 			return ProcedureModule->IsCurrentProcedureClass(InProcedureClass);
 		}

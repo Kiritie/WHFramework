@@ -16,8 +16,8 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	FVoxelItem VoxelItem;
 	VoxelItem.ID = GetGenerateVoxelID();
 	VoxelItem.Owner = Chunk;
-	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModuleBPLibrary::GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const FRotator Rotation = (VoxelItem.GetLocation() + UVoxelModuleBPLibrary::GetWorldData().BlockSize * 0.5f - GetWorldLocation()).ToOrientationRotator();
+	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const FRotator Rotation = (VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f - GetWorldLocation()).ToOrientationRotator();
 	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
 	
 	FHitResult HitResult;

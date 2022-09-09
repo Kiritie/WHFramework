@@ -29,6 +29,8 @@ UCLASS()
 class WHFRAMEWORK_API AStepModule : public AModuleBase
 {
 	GENERATED_BODY()
+		
+	MODULE_INSTANCE_DECLARE(AStepModule)
 
 public:
 	// ParamSets default values for this actor's properties

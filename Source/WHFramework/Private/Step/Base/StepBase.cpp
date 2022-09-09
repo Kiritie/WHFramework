@@ -80,7 +80,7 @@ void UStepBase::OnUnGenerate()
 {
 	if(bFirstStep)
 	{
-		if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>(true))
+		if(AStepModule* StepModule = AStepModule::Get(true))
 		{
 			if(StepModule->GetFirstStep() == this)
 			{
@@ -535,7 +535,7 @@ EStepExecuteType UStepBase::GetStepExecuteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+		if(AStepModule* StepModule = AStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepExecuteType() != EStepExecuteType::None)
 			{
@@ -550,7 +550,7 @@ EStepLeaveType UStepBase::GetStepLeaveType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+		if(AStepModule* StepModule = AStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepLeaveType() != EStepLeaveType::None)
 			{
@@ -565,7 +565,7 @@ EStepCompleteType UStepBase::GetStepCompleteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>())
+		if(AStepModule* StepModule = AStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepCompleteType() != EStepCompleteType::None)
 			{
@@ -785,7 +785,7 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bFirstStep))
 		{
-			if(AStepModule* StepModule = AMainModule::GetModuleByClass<AStepModule>(true))
+			if(AStepModule* StepModule = AStepModule::Get(true))
 			{
 				if(bFirstStep)
 				{

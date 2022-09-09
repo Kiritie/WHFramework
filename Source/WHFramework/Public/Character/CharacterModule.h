@@ -15,6 +15,8 @@ UCLASS()
 class WHFRAMEWORK_API ACharacterModule : public AModuleBase
 {
 	GENERATED_BODY()
+	
+	MODULE_INSTANCE_DECLARE(ACharacterModule)
 
 public:
 	// ParamSets default values for this actor's properties

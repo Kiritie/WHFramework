@@ -9,7 +9,7 @@
 
 void UReferencePoolModuleBPLibrary::ClearAllReference()
 {
-	if(AReferencePoolModule* ReferencePoolModule = AMainModule::GetModuleByClass<AReferencePoolModule>())
+	if(AReferencePoolModule* ReferencePoolModule = AReferencePoolModule::Get())
 	{
 		ReferencePoolModule->ClearAllReference();
 	}

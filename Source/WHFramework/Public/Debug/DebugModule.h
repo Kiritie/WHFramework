@@ -11,7 +11,9 @@ UCLASS()
 class WHFRAMEWORK_API ADebugModule : public AModuleBase
 {
 	GENERATED_BODY()
-	
+		
+	MODULE_INSTANCE_DECLARE(ADebugModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	ADebugModule();
