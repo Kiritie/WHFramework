@@ -46,9 +46,7 @@ void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 		{
 			if(Auxiliary && !Auxiliary->IsA(voxelData.AuxiliaryClass))
 			{
-				Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-				UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
-				Auxiliary = nullptr;
+				DestroyAuxiliary();
 			}
 			if(!Auxiliary)
 			{
@@ -58,18 +56,14 @@ void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 			}
 			Auxiliary->Initialize(InVoxelID);
 		}
-		else
+		else if(Auxiliary)
 		{
-			Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
-			Auxiliary = nullptr;
+			DestroyAuxiliary();
 		}
 	}
 	else if(Auxiliary)
 	{
-		Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
-		Auxiliary = nullptr;
+		DestroyAuxiliary();
 	}
 }
 
@@ -84,10 +78,14 @@ void AVoxelEntity::OnDespawn_Implementation()
 	
 	VoxelID = FPrimaryAssetId();
 	MeshComponent->ClearMesh();
-	if(Auxiliary)
-	{
-		Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
-		Auxiliary = nullptr;
-	}
+	DestroyAuxiliary();
+}
+
+void AVoxelEntity::DestroyAuxiliary()
+{
+	if(!Auxiliary) return;
+	
+	Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
+	Auxiliary = nullptr;
 }

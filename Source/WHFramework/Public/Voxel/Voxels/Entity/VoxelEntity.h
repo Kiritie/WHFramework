@@ -47,6 +47,9 @@ public:
 		
 	virtual void OnDespawn_Implementation() override;
 
+protected:
+	virtual void DestroyAuxiliary();
+
 public:
 	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
 
