@@ -89,6 +89,27 @@ protected:
 
 public:
 	/**
+	 * 通过类型运行模块
+	 */
+	template<class T>
+	static void RunModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	{
+		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		{
+			Module->Execute_Run(Module);
+		}
+	}
+	/**
+	* 通过名称运行模块
+	*/
+	static void RunModuleByName(const FName InModuleName)
+	{
+		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		{
+			Module->Execute_Run(Module.GetObject());
+		}
+	}
+	/**
 	 * 通过类型暂停模块
 	 */
 	template<class T>
@@ -100,7 +121,7 @@ public:
 		}
 	}
 	/**
-	* 通过名称取消暂停模块
+	* 通过名称暂停模块
 	*/
 	static void PauseModuleByName(const FName InModuleName)
 	{
@@ -110,7 +131,7 @@ public:
 		}
 	}
 	/**
-	 * 通过类型暂停模块
+	 * 通过类型取消暂停模块
 	 */
 	template<class T>
 	static void UnPauseModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())

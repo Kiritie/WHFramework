@@ -42,11 +42,16 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 public:
+	virtual void Run_Implementation() override;
+	
 	virtual void Pause_Implementation() override;
 
 	virtual void UnPause_Implementation() override;
 
 protected:
+	/// 自动运行
+	UPROPERTY(EditAnywhere, Replicated)
+	bool bAutoRunModule;
 	/// 模块名称
 	UPROPERTY(EditDefaultsOnly, Replicated)
 	FName ModuleName;
@@ -59,6 +64,8 @@ public:
 	FModuleStateChanged OnModuleStateChanged;
 
 public:
+	virtual bool IsAutoRunModule_Implementation() const override { return bAutoRunModule; }
+
 	virtual FName GetModuleName_Implementation() const override { return ModuleName; }
 
 	virtual EModuleState GetModuleState_Implementation() const override { return ModuleState; }

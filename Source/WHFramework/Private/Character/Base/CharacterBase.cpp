@@ -96,6 +96,8 @@ void ACharacterBase::OnDespawn_Implementation()
 
 	Container = nullptr;
 	DefaultController = nullptr;
+
+	SetGenerateVoxelID(FPrimaryAssetId());
 }
 
 void ACharacterBase::SpawnDefaultController()

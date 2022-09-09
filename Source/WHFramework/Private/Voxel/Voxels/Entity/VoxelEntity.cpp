@@ -18,7 +18,7 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
+	MeshComponent->SetRelativeScale3D(FVector(0.3f));
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->Initialize(EVoxelMeshNature::Entity);
 
@@ -41,11 +41,28 @@ void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 
 	if(InVoxelID.IsValid())
 	{
-		Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID).AuxiliaryClass);
-		if(Auxiliary)
+		const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
+		if(voxelData.AuxiliaryClass)
 		{
-			Auxiliary->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
+			if(Auxiliary && !Auxiliary->IsA(voxelData.AuxiliaryClass))
+			{
+				Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+				UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
+				Auxiliary = nullptr;
+			}
+			if(!Auxiliary)
+			{
+				Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, voxelData.AuxiliaryClass);
+				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
+				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
+			}
 			Auxiliary->Initialize(InVoxelID);
+		}
+		else
+		{
+			Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
+			Auxiliary = nullptr;
 		}
 	}
 	else if(Auxiliary)

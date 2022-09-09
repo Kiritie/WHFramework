@@ -10,7 +10,6 @@ UENUM(BlueprintType)
 enum class EModuleState : uint8
 {
 	None,
-	Initialized,
 	Running,
 	Paused
 };
@@ -83,6 +82,11 @@ public:
 
 public:
 	/**
+	* 运行
+	*/
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Run();
+	/**
 	* 暂停
 	*/
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -94,6 +98,11 @@ public:
 	void UnPause();
 	
 public:
+	/**
+	* 是否自动运行
+	*/
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	bool IsAutoRunModule() const;
 	/**
 	* 获取模块名称
 	*/

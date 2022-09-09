@@ -251,7 +251,17 @@ void AMainModule::PreparatoryModules_Implementation()
 	{
 		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject());
+			if(ModuleRefs[i]->Execute_IsAutoRunModule(ModuleRefs[i].GetObject()))
+			{
+				if(ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::None)
+				{
+					ModuleRefs[i]->Execute_Run(ModuleRefs[i].GetObject());
+				}
+				else
+				{
+					ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject());
+				}
+			}
 		}
 	}
 }

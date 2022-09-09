@@ -14,13 +14,13 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 {
 	LightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("LightComponent"));
 	LightComponent->SetupAttachment(RootComponent);
-	LightComponent->SetLightColor(FLinearColor(1, 0.8f, 0, 1));
+	LightComponent->SetLightColor(FLinearColor(1.f, 0.8f, 0, 1.f));
 	LightComponent->SetIntensity(10000.f);
 	LightComponent->SetAttenuationRadius(1500.f);
 	LightComponent->SetCastShadows(true);
 
 	EffectComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("EffectComponent"));
-	EffectComponent->SetupAttachment(RootComponent);
+	EffectComponent->SetupAttachment(LightComponent);
 }
 
 void AVoxelTorchAuxiliary::BeginPlay()
@@ -36,9 +36,9 @@ void AVoxelTorchAuxiliary::Initialize(FVoxelItem InVoxelItem)
 	if(InVoxelItem.IsValid())
 	{
 		LightComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
-		EffectComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
-		EffectComponent->SetTemplate(InVoxelItem.GetVoxelData<UVoxelTorchData>().Effect);
-		EffectComponent->SetRelativeScale3D(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale * (InVoxelItem.Owner ? 1.f : 0.3f));
+		EffectComponent->SetTemplate(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectAsset);
+		EffectComponent->SetRelativeScale3D(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale);
+		EffectComponent->SetRelativeLocation(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectOffset);
 	}
 }
 

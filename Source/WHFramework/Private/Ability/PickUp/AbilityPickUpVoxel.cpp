@@ -13,6 +13,7 @@ AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 {
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
+	MeshComponent->SetRelativeScale3D(FVector(0.3f));
 	MeshComponent->Initialize(EVoxelMeshNature::PickUp);
 }
 

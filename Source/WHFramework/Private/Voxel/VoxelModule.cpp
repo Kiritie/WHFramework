@@ -120,6 +120,9 @@ void AVoxelModule::OnDestroy_Implementation()
 void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Open, TEXT("EVoxelInteractAction"));
+	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Close, TEXT("EVoxelInteractAction"));
 }
 
 void AVoxelModule::OnPreparatory_Implementation()

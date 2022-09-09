@@ -42,14 +42,17 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
+	//////////////////////////////////////////////////////////////////////////
+	// Interact
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EInteractAction, FString> CustomInteractActionMap;
 
-	//////////////////////////////////////////////////////////////////////////
-	// Interact
 public:
-	UFUNCTION(BlueprintPure)
+	void AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName);
+
+	void RemoveCustomInteractAction(int32 InInteractAction);
+
 	FText GetInteractActionDisplayName(int32 InInteractAction);
 
 	//////////////////////////////////////////////////////////////////////////

@@ -42,6 +42,12 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Interact
+	UFUNCTION(BlueprintCallable, Category = "AbilityModuleBPLibrary")
+	static void AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName);
+
+	UFUNCTION(BlueprintCallable, Category = "AbilityModuleBPLibrary")
+	static void RemoveCustomInteractAction(int32 InInteractAction);
+
 	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
 	static FText GetInteractActionDisplayName(int32 InInteractAction);
 

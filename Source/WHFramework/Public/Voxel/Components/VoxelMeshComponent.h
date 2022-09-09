@@ -19,10 +19,7 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float BlockScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float OffsetScale;
+	FVector OffsetScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector CenterOffset;

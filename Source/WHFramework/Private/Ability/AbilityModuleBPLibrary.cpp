@@ -47,6 +47,22 @@ EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType 
 	return (EAbilityItemType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("EAbilityItemType"), InAssetType.ToString());
 }
 
+void UAbilityModuleBPLibrary::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)
+{
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
+	{
+		AbilityModule->AddCustomInteractAction(InInteractAction, InTypeName);
+	}
+}
+
+void UAbilityModuleBPLibrary::RemoveCustomInteractAction(int32 InInteractAction)
+{
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
+	{
+		AbilityModule->RemoveCustomInteractAction(InInteractAction);
+	}
+}
+
 FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractAction)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())

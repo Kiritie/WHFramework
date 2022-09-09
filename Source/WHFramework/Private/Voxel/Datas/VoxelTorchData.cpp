@@ -16,6 +16,7 @@ UVoxelTorchData::UVoxelTorchData()
 	MeshScale = FVector(0.2f, 0.2f, 0.8f);
 	MeshOffset = FVector(0.f, 0.f, -0.2f);
 
-	Effect = nullptr;
+	EffectAsset = nullptr;
 	EffectScale = FVector::OneVector;
+	EffectOffset = FVector::ZeroVector;
 }

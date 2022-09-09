@@ -12,8 +12,7 @@
 UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bUseAsyncCooking = true;
-	BlockScale = 1;
-	OffsetScale = 1;
+	OffsetScale = FVector::OneVector;
 	CenterOffset = FVector(0.5f);
 	MeshNature = EVoxelMeshNature::Chunk;
 	Transparency = EVoxelTransparency::Solid;
@@ -33,8 +32,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 	{
 		case EVoxelMeshNature::Chunk:
 		{
-			BlockScale = 1.f;
-			OffsetScale = 1.f;
+			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
 			switch(Transparency)
 			{
@@ -61,15 +59,13 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 		case EVoxelMeshNature::Entity:
 		case EVoxelMeshNature::Preview:
 		{
-			BlockScale = 0.3f;
-			OffsetScale = 0;
+			OffsetScale = FVector::ZeroVector;
 			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelMeshNature::Vitality:
 		{
-			BlockScale = 1.f;
-			OffsetScale = 1.f;
+			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.f, 0.f, 0.5f);
 			SetCollisionEnabled(false);
 			break;
@@ -263,7 +259,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * scale + offset) * AVoxelModule::Get()->GetWorldData().BlockSize * BlockScale);
+		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * scale + offset) * AVoxelModule::Get()->GetWorldData().BlockSize);
 	}
 
 	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));

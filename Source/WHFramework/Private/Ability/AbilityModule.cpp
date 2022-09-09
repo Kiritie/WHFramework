@@ -29,8 +29,6 @@ AAbilityModule::AAbilityModule()
 	ModuleName = FName("AbilityModule");
 
 	CustomInteractActionMap = TMap<EInteractAction, FString>();
-	CustomInteractActionMap.Add(EInteractAction::Custom1, TEXT("EVoxelInteractAction"));
-	CustomInteractActionMap.Add(EInteractAction::Custom2, TEXT("EVoxelInteractAction"));
 }
 
 #if WITH_EDITOR
@@ -68,6 +66,19 @@ void AAbilityModule::OnPause_Implementation()
 void AAbilityModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAbilityModule::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)
+{
+	CustomInteractActionMap.Emplace((EInteractAction)InInteractAction, InTypeName);
+}
+
+void AAbilityModule::RemoveCustomInteractAction(int32 InInteractAction)
+{
+	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
+	{
+		CustomInteractActionMap.Remove((EInteractAction)InInteractAction);
+	}
 }
 
 FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)

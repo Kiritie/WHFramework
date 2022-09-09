@@ -15,8 +15,11 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UParticleSystem* Effect;
+	UParticleSystem* EffectAsset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector EffectScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector EffectOffset;
 };

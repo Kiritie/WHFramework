@@ -13,6 +13,8 @@ AModuleBase::AModuleBase()
 
 	bReplicates = true;
 
+	bAutoRunModule = true;
+	ModuleName = NAME_None;
 	ModuleState = EModuleState::None;
 }
 
@@ -35,14 +37,12 @@ void AModuleBase::OnStateChanged_Implementation(EModuleState InModuleState)
 
 void AModuleBase::OnInitialize_Implementation()
 {
-	ModuleState = EModuleState::Initialized;
-	Execute_OnStateChanged(this, ModuleState);
+	
 }
 
 void AModuleBase::OnPreparatory_Implementation()
 {
-	ModuleState = EModuleState::Running;
-	Execute_OnStateChanged(this, ModuleState);
+	
 }
 
 void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -52,14 +52,12 @@ void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AModuleBase::OnPause_Implementation()
 {
-	ModuleState = EModuleState::Paused;
-	Execute_OnStateChanged(this, ModuleState);
+	
 }
 
 void AModuleBase::OnUnPause_Implementation()
 {
-	ModuleState = EModuleState::Running;
-	Execute_OnStateChanged(this, ModuleState);
+	
 }
 
 void AModuleBase::OnTermination_Implementation()
@@ -67,10 +65,22 @@ void AModuleBase::OnTermination_Implementation()
 	
 }
 
+void AModuleBase::Run_Implementation()
+{
+	if(ModuleState == EModuleState::None)
+	{
+		ModuleState = EModuleState::Running;
+		Execute_OnStateChanged(this, ModuleState);
+		Execute_OnPreparatory(this);
+	}
+}
+
 void AModuleBase::Pause_Implementation()
 {
-	if(ModuleState == EModuleState::Running)
+	if(ModuleState != EModuleState::Paused)
 	{
+		ModuleState = EModuleState::Paused;
+		Execute_OnStateChanged(this, ModuleState);
 		Execute_OnPause(this);
 	}
 }
@@ -79,6 +89,8 @@ void AModuleBase::UnPause_Implementation()
 {
 	if(ModuleState == EModuleState::Paused)
 	{
+		ModuleState = EModuleState::Running;
+		Execute_OnStateChanged(this, ModuleState);
 		Execute_OnUnPause(this);
 	}
 }

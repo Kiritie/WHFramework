@@ -22,6 +22,22 @@ void UMainModuleBPLibrary::UnPauseAllModule()
 	}
 }
 
+void UMainModuleBPLibrary::RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->RunModuleByClass(InModuleClass);
+	}
+}
+
+void UMainModuleBPLibrary::RunModuleByName(const FName InModuleName)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->RunModuleByName(InModuleName);
+	}
+}
+
 void UMainModuleBPLibrary::PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
 	if(AMainModule* MainModule = GetMainModule())

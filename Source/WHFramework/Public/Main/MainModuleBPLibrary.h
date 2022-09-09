@@ -27,7 +27,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
 	static void UnPauseAllModule();
-		
+				
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void RunModuleByName(const FName InModuleName);
+
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
 	static void PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
 
