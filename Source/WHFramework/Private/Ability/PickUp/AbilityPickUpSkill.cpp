@@ -15,14 +15,14 @@ AAbilityPickUpSkill::AAbilityPickUpSkill()
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AAbilityPickUpSkill::Initialize(FAbilityItem InItem)
+void AAbilityPickUpSkill::Initialize_Implementation(FAbilityItem InItem)
 {
-	Super::Initialize(InItem);
+	Super::Initialize_Implementation(InItem);
 }
 
-void AAbilityPickUpSkill::OnPickUp(IAbilityPickerInterface* InPicker)
+void AAbilityPickUpSkill::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
 {
-	Super::OnPickUp(InPicker);
+	Super::OnPickUp_Implementation(InPicker);
 }
 
 UMeshComponent* AAbilityPickUpSkill::GetMeshComponent() const

@@ -68,9 +68,7 @@ public:
 
 	virtual TArray<FName> GetChildNames() const = 0;
 
-	virtual EWidgetType GetWidgetType() const = 0;
-
-	virtual EWidgetCategory GetWidgetCategory() const = 0;
+	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const = 0;
 
 	virtual EWidgetCreateType GetWidgetCreateType() const = 0;
 
@@ -80,13 +78,17 @@ public:
 
 	virtual EScreenWidgetState GetWidgetState() const = 0;
 
-	virtual IScreenWidgetInterface* GetLastWidget() const = 0;
+	virtual IScreenWidgetInterface* GetLastTemporary() const = 0;
 
-	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) = 0;
+	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) = 0;
 
 	virtual IScreenWidgetInterface* GetParentWidgetN() const = 0;
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) = 0;
+	
+	virtual IScreenWidgetInterface* GetTemporaryChild() const = 0;
+	
+	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) = 0;
 
 	virtual int32 GetChildNum() const = 0;
 

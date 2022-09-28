@@ -6,15 +6,6 @@
 #include "Main/MainModule.h"
 #include "Kismet/GameplayStatics.h"
 
-UUserWidgetBase* UWidgetModuleBPLibrary::GetMainUserWidget()
-{
-	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
-	{
-		return WidgetModule->GetMainUserWidget();
-	}
-	return nullptr;
-}
-
 UUserWidgetBase* UWidgetModuleBPLibrary::GetTemporaryUserWidget()
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())

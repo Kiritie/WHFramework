@@ -56,9 +56,6 @@ protected:
 
 private:
 	UPROPERTY(Transient)
-	UUserWidgetBase* MainUserWidget;
-
-	UPROPERTY(Transient)
 	UUserWidgetBase* TemporaryUserWidget;
 
 	UPROPERTY()
@@ -68,12 +65,6 @@ private:
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 public:
-	template<class T>
-	T* GetMainUserWidget() const { return Cast<T>(MainUserWidget); }
-	
-	UFUNCTION(BlueprintPure)
-	UUserWidgetBase* GetMainUserWidget() const { return MainUserWidget; }
-
 	template<class T>
 	T* GetTemporaryUserWidget() const { return Cast<T>(TemporaryUserWidget); }
 	
@@ -243,18 +234,29 @@ public:
 		{
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening && UserWidget->GetWidgetState() != EScreenWidgetState::Opened)
 			{
-				if(UserWidget->GetWidgetType() == EWidgetType::Main)
+				if(!UserWidget->GetParentWidgetN())
 				{
-					MainUserWidget = UserWidget;
-				}
-				if(!UserWidget->GetParentWidgetN() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
-				{
-					if(TemporaryUserWidget)
+					if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
 					{
-						TemporaryUserWidget->OnClose(true);
+						if(TemporaryUserWidget)
+						{
+							TemporaryUserWidget->Close(true);
+							UserWidget->SetLastTemporary(TemporaryUserWidget);
+						}
+						TemporaryUserWidget = UserWidget;
 					}
-					UserWidget->SetLastWidget(TemporaryUserWidget);
-					TemporaryUserWidget = UserWidget;
+				}
+				else
+				{
+					if(UserWidget->GetWidgetType(false) == EWidgetType::Temporary)
+					{
+						if(UserWidget->GetParentWidgetN()->GetTemporaryChild())
+						{
+							UserWidget->GetParentWidgetN()->GetTemporaryChild()->Close(true);
+							UserWidget->SetLastTemporary(UserWidget->GetParentWidgetN()->GetTemporaryChild());
+						}
+						UserWidget->GetParentWidgetN()->SetTemporaryChild(UserWidget);
+					}
 				}
 				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
 			}
@@ -288,13 +290,19 @@ public:
 		{
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Closing && UserWidget->GetWidgetState() != EScreenWidgetState::Closed)
 			{
-				if(UserWidget->GetWidgetType() == EWidgetType::Main)
+				if(!UserWidget->GetParentWidgetN())
 				{
-					MainUserWidget = nullptr;
+					if(UserWidget->GetWidgetType() == EWidgetType::Temporary)
+					{
+						TemporaryUserWidget = nullptr;
+					}
 				}
-				if(!UserWidget->GetParentWidgetN() && UserWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+				else
 				{
-					TemporaryUserWidget = nullptr;
+					if(UserWidget->GetWidgetType(false) == EWidgetType::Temporary)
+					{
+						UserWidget->GetParentWidgetN()->SetTemporaryChild(nullptr);
+					}
 				}
 				UserWidget->OnClose(bInstant);
 			}
@@ -421,13 +429,13 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(nullptr)))
 		{
-			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				if(TemporarySlateWidget)
 				{
 					TemporarySlateWidget->OnClose(true);
 				}
-				//SlateWidget->SetLastWidget(TemporarySlateWidget);
+				//SlateWidget->SetLastTemporary(TemporarySlateWidget);
 				TemporarySlateWidget = SlateWidget;
 			}
 			SlateWidget->OnOpen(*InParams, bInstant);
@@ -441,7 +449,7 @@ public:
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
 		{
-			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetCategory() == EWidgetCategory::Temporary)
+			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
 				TemporarySlateWidget = nullptr;
 			}

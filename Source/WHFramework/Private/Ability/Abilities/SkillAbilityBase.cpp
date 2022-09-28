@@ -2,5 +2,5 @@
 
 USkillAbilityBase::USkillAbilityBase()
 {
-	
+	bRetriggerInstancedAbility = true;
 }

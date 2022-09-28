@@ -113,5 +113,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp = nullptr);
+	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, AActor* InOwnerActor = nullptr, USceneComponent* InSceneComp = nullptr);
 };

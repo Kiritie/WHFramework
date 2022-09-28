@@ -64,7 +64,7 @@ void AWidgetModule::OnInitialize_Implementation()
 				UserWidgetClassMap.Add(WidgetName, Iter);
 			}
 			const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
-			if(DefaultObject->GetWidgetType() != EWidgetType::Child)
+			if(DefaultObject->GetParentName() == NAME_None)
 			{
 				switch(DefaultObject->GetWidgetCreateType())
 				{
@@ -245,7 +245,7 @@ void AWidgetModule::CloseAllUserWidget(bool bInstant)
 	{
 		if(Iter.Value)
 		{
-			Iter.Value->SetLastWidget(nullptr);
+			Iter.Value->SetLastTemporary(nullptr);
 			Iter.Value->Close(bInstant);
 		}
 	}
@@ -273,7 +273,7 @@ void AWidgetModule::CloseAllSlateWidget(bool bInstant)
 	{
 		if(Iter.Value)
 		{
-			Iter.Value->SetLastWidget(nullptr);
+			Iter.Value->SetLastTemporary(nullptr);
 			Iter.Value->Close(bInstant);
 		}
 	}
@@ -397,7 +397,7 @@ EInputMode AWidgetModule::GetNativeInputMode() const
     {
     	if(!Iter.Value) continue;
         const UUserWidgetBase* UserWidget = Iter.Value;
-    	if (UserWidget && UserWidget->GetWidgetState() == EScreenWidgetState::Opened && (int32)UserWidget->GetInputMode() > (int32)TmpInputMode)
+    	if (UserWidget && (UserWidget->GetWidgetState() == EScreenWidgetState::Opening || UserWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)UserWidget->GetInputMode() > (int32)TmpInputMode)
     	{
     		TmpInputMode = UserWidget->GetInputMode();
     	}
@@ -406,7 +406,7 @@ EInputMode AWidgetModule::GetNativeInputMode() const
 	{
 		if(!Iter.Value) continue;
 		const TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && (int32)SlateWidget->GetInputMode() > (int32)TmpInputMode)
+		if (SlateWidget && (SlateWidget->GetWidgetState() == EScreenWidgetState::Opening || SlateWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)SlateWidget->GetInputMode() > (int32)TmpInputMode)
 		{
 			TmpInputMode = SlateWidget->GetInputMode();
 		}

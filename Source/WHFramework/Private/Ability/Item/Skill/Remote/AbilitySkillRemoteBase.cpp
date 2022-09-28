@@ -7,6 +7,8 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "TimerManager.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Ability/Vitality/AbilityVitalityInterface.h"
 
 // Sets default values
 AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
@@ -16,7 +18,7 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
 	SphereComponent->SetupAttachment(RootComponent);
-	SphereComponent->SetCollisionProfileName(TEXT("Weapon"));
+	SphereComponent->SetCollisionProfileName(TEXT("Skill"));
 	SphereComponent->SetSphereRadius(50);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilitySkillRemoteBase::OnBeginOverlap);
 
@@ -29,21 +31,43 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 	MovementComponent->bRotationFollowsVelocity = true;
 	MovementComponent->ProjectileGravityScale = 0;
 	MovementComponent->BounceVelocityStopSimulatingThreshold = false;
+	MovementComponent->Velocity = FVector::ZeroVector;
 
 	DurationTime = 10;
 	InitialVelocity = FVector(3000, 0, 0);
 }
 
-void AAbilitySkillRemoteBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
+void AAbilitySkillRemoteBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	Super::Initialize(InOwnerCharacter);
+	Super::Initialize_Implementation(InOwnerCharacter, InItem);
 
-	MovementComponent->Velocity = GetActorRotation().RotateVector(InitialVelocity);
+	if(Execute_IsVisible(this))
+	{
+		SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		MovementComponent->Velocity = GetActorRotation().RotateVector(InitialVelocity);
+	}
+}
+
+void AAbilitySkillRemoteBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InParams);
+}
+
+void AAbilitySkillRemoteBase::OnDespawn_Implementation()
+{
+	Super::OnDespawn_Implementation();
+
+	SphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MovementComponent->Velocity = FVector::ZeroVector;
 }
 
 void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	OnHitTarget(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
+	if(OtherActor != GetOwnerCharacter())
+	{
+		OnHitTarget(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
+		UObjectPoolModuleBPLibrary::DespawnObject(this);
+	}
 }
 
 void AAbilitySkillRemoteBase::OnHitTarget_Implementation(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)

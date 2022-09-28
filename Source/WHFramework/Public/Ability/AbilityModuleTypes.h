@@ -4,6 +4,8 @@
 #include "Asset/AssetManagerBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Abilities/GameplayAbility.h"
+#include "Global/Base/WHObject.h"
+#include "GameplayTagContainer.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -60,6 +62,9 @@ class AAbilityEquipBase;
 		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
 		_AttributeSet->Init##PropertyName(InValue); \
 	}
+
+#define ATTRIBUTE_DELTAVALUE_CLAMP(PropertyName, DeltaValue) \
+	DeltaValue > 0.f ? FMath::Min(DeltaValue, GetMax##PropertyName() - Get##PropertyName()) : FMath::Max(DeltaValue, -Get##PropertyName())
 
 USTRUCT()
 struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContext
@@ -153,7 +158,7 @@ enum class EAbilityInputID : uint8
  * 目标类型
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin))
-class WHFRAMEWORK_API UTargetType : public UObject
+class WHFRAMEWORK_API UTargetType : public UWHObject
 {
 	GENERATED_BODY()
 
@@ -191,6 +196,20 @@ public:
 	UTargetType_UseEventData() {}
 
 	virtual void GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const override;
+};
+
+/**
+ * 伤害处理类
+ */
+UCLASS(Blueprintable, meta = (ShowWorldContextPin))
+class WHFRAMEWORK_API UDamageHandle : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	UDamageHandle() {}
+
+	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -262,12 +281,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	float CooldownRemaining;
 
+public:
 	FORCEINLINE FAbilityInfo()
 	{
 		CostAttribute = FGameplayAttribute();
 		CostValue = 0.f;
 		CooldownDuration = -1.f;
 		CooldownRemaining = 0.f;
+	}
+
+	FORCEINLINE bool IsCooldownning()
+	{
+		return CooldownRemaining > 0.f;
 	}
 };
 
@@ -492,10 +517,10 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InVoxelItem, int InCount)
+	FORCEINLINE FAbilityItem(const FAbilityItem& InVoxelItem, int32 InCount = -1)
 	{
 		ID = InVoxelItem.ID;
-		Count = InCount;
+		Count = InCount == -1 ? InVoxelItem.Count : InCount;
 		Level = InVoxelItem.Level;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}

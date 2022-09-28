@@ -59,6 +59,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
 	static TScriptInterface<IModule> GetModuleByName(const FName InModuleName, bool bInEditor = false);
 
-	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleClass, bool bInEditor = false);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
+	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor = false);
 };

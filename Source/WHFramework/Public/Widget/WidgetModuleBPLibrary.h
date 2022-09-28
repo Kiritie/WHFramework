@@ -21,19 +21,6 @@ class WHFRAMEWORK_API UWidgetModuleBPLibrary : public UBlueprintFunctionLibrary
 	// UserWidget
 public:
 	template<class T>
-	static T* GetMainUserWidget()
-	{
-		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
-		{
-			return WidgetModule->GetMainUserWidget<T>();
-		}
-		return nullptr;
-	}
-	
-	UFUNCTION(BlueprintPure, Category = "WidgetModuleBPLibrary")
-	static UUserWidgetBase* GetMainUserWidget();
-
-	template<class T>
 	static T* GetTemporaryUserWidget()
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())

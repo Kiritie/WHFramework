@@ -4,6 +4,8 @@
 
 #include "VitalityAttributeSetBase.generated.h"
 
+class UDamageHandle;
+
 /**
  * 生命属性集
  */
@@ -39,6 +41,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_MagicDamage, Category = "Damage")
 	FGameplayAttributeData MagicDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+			
+	UPROPERTY(VisibleAnywhere, Category = "Damage")
+	TSubclassOf<UDamageHandle> DamageHandle;
 
 public:
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;

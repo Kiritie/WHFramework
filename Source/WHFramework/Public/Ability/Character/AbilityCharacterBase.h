@@ -1,4 +1,4 @@
-﻿// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -143,14 +143,6 @@ public:
 
 public:
 	template<class T>
-	T& GetCharacterData() const
-	{
-		return static_cast<T&>(GetCharacterData());
-	}
-	
-	UAbilityCharacterDataBase& GetCharacterData() const;
-
-	template<class T>
 	T* GetAbilitySystemComponent() const
 	{
 		return Cast<T>(GetAbilitySystemComponent());
@@ -224,10 +216,10 @@ public:
 	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
 
 	UFUNCTION(BlueprintPure)
-	virtual float GetRadius() const;
+	virtual float GetRadius() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual float GetHalfHeight() const;
+	virtual float GetHalfHeight() const override;
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 	
@@ -250,7 +242,7 @@ public:
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
 	virtual void OnRep_Controller() override;

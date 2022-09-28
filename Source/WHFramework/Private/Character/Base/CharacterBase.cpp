@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/Base/CharacterBase.h"
@@ -169,7 +169,7 @@ void ACharacterBase::MultiPlayMontage_Implementation(UAnimMontage* InMontage)
 
 void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticast)
 {
-	UCharacterDataBase& CharacterData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UCharacterDataBase>(AssetID);
+	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
 	if(CharacterData.AnimMontages.Contains(InMontageName))
 	{
 		PlayMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
@@ -203,7 +203,7 @@ void ACharacterBase::MultiStopMontage_Implementation(UAnimMontage* InMontage)
 
 void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticast)
 {
-	UCharacterDataBase& CharacterData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UCharacterDataBase>(AssetID);
+	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
 	if(CharacterData.AnimMontages.Contains(InMontageName))
 	{
 		StopMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
@@ -302,6 +302,11 @@ void ACharacterBase::StopAIMove(bool bMulticast)
 void ACharacterBase::MultiStopAIMove_Implementation()
 {
 	StopAIMove(false);
+}
+
+UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
 }
 
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const

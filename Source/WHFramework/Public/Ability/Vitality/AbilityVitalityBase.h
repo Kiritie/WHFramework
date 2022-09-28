@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -174,6 +174,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual float GetRadius() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetHalfHeight() const override;
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
@@ -190,5 +196,5 @@ public:
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

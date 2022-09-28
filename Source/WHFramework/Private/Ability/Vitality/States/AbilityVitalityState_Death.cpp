@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 
@@ -37,6 +37,8 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	Vitality->SetExp(0);
 	Vitality->SetHealth(0.f);
+
+	DeathStart();
 }
 
 void UAbilityVitalityState_Death::OnRefresh()

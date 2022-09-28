@@ -8,6 +8,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Main/MainModule.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
+#include "Primary/PrimaryEntityInterface.h"
 
 #include "AssetModuleBPLibrary.generated.h"
 
@@ -175,19 +176,33 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// PrimaryAsset
 public:
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass"), Category = "AssetModuleBPLibrary")
-	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleBPLibrary")
+	static UPrimaryAssetBase* K2_LoadPrimaryAsset(FPrimaryAssetId InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
+	{
+		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
+	}
+
+	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
+	{
+		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
+	}
 	
 	template<class T>
 	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
 	{
 		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryAssetId, bLogWarning);
 	}
-		
-	template<class T>
-	static T* LoadPrimaryAsset(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
+				
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadEntityAsset"), Category = "AssetModuleBPLibrary")
+	static UPrimaryAssetBase* K2_LoadEntityAsset(const TScriptInterface<IPrimaryEntityInterface>& InPrimaryEntity, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryEntity, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->GetAssetID(), bLogWarning);
+	}
+
+	template<class T>
+	static T* LoadEntityAsset(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
+	{
+		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryEntity->GetAssetID(), bLogWarning);
 	}
 
 	template<class T>
@@ -197,13 +212,16 @@ public:
 	}
 
 	template<class T>
-	static T& LoadPrimaryAssetRef(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
+	static T& LoadEntityAssetRef(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryEntity, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryEntity->GetAssetID(), bLogWarning);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
-	static TArray<UPrimaryAssetBase*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true);
+	static TArray<UPrimaryAssetBase*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)
+	{
+		return UAssetManagerBase::Get().LoadPrimaryAssets(InPrimaryAssetType, bLogWarning);
+	}
 
 	template<class T>
 	static TArray<T*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)

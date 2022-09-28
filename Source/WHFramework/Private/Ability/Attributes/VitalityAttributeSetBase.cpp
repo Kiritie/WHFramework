@@ -1,9 +1,10 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 
 #include "GameplayEffectExtension.h"
-#include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "Ability/AbilityModuleTypes.h"
+#include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 :	Health(100.f),
@@ -13,6 +14,7 @@ UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 	PhysicsDamage(0.f),
 	MagicDamage(0.f)
 {
+	DamageHandle = UDamageHandle::StaticClass();
 }
 
 void UVitalityAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -43,49 +45,34 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 
 	AActor* TargetActor = nullptr;
 	IAbilityVitalityInterface* TargetVitality = nullptr;
-	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(TargetActor);
 	if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
 	{
 		TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
 		TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
-		TargetCharacter = Cast<AAbilityCharacterBase>(TargetActor);
 	}
 	
 	if (Data.EvaluatedData.Attribute.GetName().EndsWith("Damage"))
 	{
-		float LocalDamageDone = 0.f;
-		
 		AActor* SourceActor = nullptr;
-		AAbilityCharacterBase* SourceCharacter = nullptr;
 		if (Source && Source->AbilityActorInfo.IsValid() && Source->AbilityActorInfo->AvatarActor.IsValid())
 		{
 			SourceActor = Source->AbilityActorInfo->AvatarActor.Get();
-			SourceCharacter = Cast<AAbilityCharacterBase>(SourceActor);
 		}
+		FHitResult HitResult;
+		if (Context.GetHitResult())
+		{
+			HitResult = *Context.GetHitResult();
+		}
+
 		if(Data.EvaluatedData.Attribute.GetName().StartsWith("Physics"))
 		{
-			LocalDamageDone = GetPhysicsDamage();
+			UReferencePoolModuleBPLibrary::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), EDamageType::Physics, HitResult, SourceTags);
 			SetPhysicsDamage(0.f);
 		}
 		else if(Data.EvaluatedData.Attribute.GetName().StartsWith("Magic"))
 		{
-			LocalDamageDone = GetMagicDamage();
+			UReferencePoolModuleBPLibrary::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), EDamageType::Magic, HitResult, SourceTags);
 			SetMagicDamage(0.f);
-		}
-
-		if (LocalDamageDone > 0.f)
-		{
-			if (TargetVitality && !TargetVitality->IsDead())
-			{
-				TargetVitality->ModifyHealth(-LocalDamageDone);
-
-				FHitResult HitResult;
-				if (Context.GetHitResult())
-				{
-					HitResult = *Context.GetHitResult();
-				}
-				TargetVitality->HandleDamage(EDamageType::Physics, LocalDamageDone, true, HitResult, SourceTags, SourceActor);
-			}
 		}
 	}
 }

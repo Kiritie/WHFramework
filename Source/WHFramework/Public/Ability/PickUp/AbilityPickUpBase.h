@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -28,7 +28,7 @@ public:
 	AAbilityPickUpBase();
 
 protected:
-	UPROPERTY(VisibleAnywhere, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FAbilityItem Item;
 
 protected:
@@ -38,15 +38,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	URotatingMovementComponent* RotatingComponent;
 
-public:
-	virtual void Initialize(FAbilityItem InItem);
-
 protected:
-	UFUNCTION()
-	virtual void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
-
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 	
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
@@ -56,6 +48,17 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
+	
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Initialize(FAbilityItem InItem);
+
+protected:
+	UFUNCTION()
+	void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPickUp(const TScriptInterface<IAbilityPickerInterface>& InPicker);
 
 public:
 	FAbilityItem& GetItem() { return Item; }

@@ -294,11 +294,6 @@ UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() cons
 	return AbilitySystem;
 }
 
-UAbilityCharacterDataBase& AAbilityCharacterBase::GetCharacterData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(AssetID);
-}
-
 UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
 {
 	return AttributeSet;
@@ -316,27 +311,27 @@ bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().DeadTag) || bCheckDying && IsDying();
 }
 
 bool AAbilityCharacterBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().DyingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
 }
 
 bool AAbilityCharacterBase::IsFalling(bool bMovementMode) const
 {
-	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData().FallingTag) : GetCharacterMovement()->IsFalling();
+	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().FallingTag) : GetCharacterMovement()->IsFalling();
 }
 
 bool AAbilityCharacterBase::IsWalking(bool bMovementMode) const
 {
-	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData().WalkingTag) : GetCharacterMovement()->IsWalking();
+	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().WalkingTag) : GetCharacterMovement()->IsWalking();
 }
 
 bool AAbilityCharacterBase::IsJumping() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData().JumpingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().JumpingTag);
 }
 
 void AAbilityCharacterBase::SetNameV(FName InName)
@@ -406,9 +401,9 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	
 	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
 	{
-		if(DeltaValue != 0.f)
+		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), this);
 		}
 	}
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetMoveSpeedAttribute())
@@ -425,8 +420,12 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	}
 }
 
-void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	ModifyHealth(-LocalDamageDone);
+
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UGlobalBPLibrary::GetPlayerCharacter() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), this);
+
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));

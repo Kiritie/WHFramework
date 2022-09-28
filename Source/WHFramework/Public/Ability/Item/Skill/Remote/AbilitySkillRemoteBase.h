@@ -34,9 +34,16 @@ protected:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
 	FVector InitialVelocity;
-
+	
 public:
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
+	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
+
+protected:
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
 
 protected:
 	UFUNCTION()

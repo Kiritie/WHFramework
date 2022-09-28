@@ -127,13 +127,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetType WidgetType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType != EWidgetType::Child"))
-	EWidgetCategory WidgetCategory;
-
 	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	UPROPERTY(EditDefaultsOnly)
 	FName ParentName;
 		
 	UPROPERTY(EditDefaultsOnly)
@@ -142,19 +139,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
 	FAnchors WidgetAnchors;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
 	bool bWidgetAutoSize;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
 	FVector2D WidgetDrawSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetType == EWidgetType::Child"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
 	FVector2D WidgetAlignment;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -196,10 +193,12 @@ protected:
 	UPROPERTY(Transient)
 	AActor* OwnerActor;
 
-	IScreenWidgetInterface* LastWidget;
+	IScreenWidgetInterface* LastTemporary;
 	
 	IScreenWidgetInterface* ParentWidget;
-	
+		
+	IScreenWidgetInterface* TemporaryChild;
+
 	TArray<IScreenWidgetInterface*> ChildWidgets;
 
 	UPROPERTY(BlueprintAssignable)
@@ -212,13 +211,10 @@ private:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
-
-	UFUNCTION(BlueprintPure)
-	virtual EWidgetCategory GetWidgetCategory() const override
+	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const override
 	{
-		if(ParentWidget) return ParentWidget->GetWidgetCategory();
-		return WidgetCategory;
+		if(bInheritParent && ParentWidget) return ParentWidget->GetWidgetType();
+		return WidgetType;
 	}
 
 	UFUNCTION(BlueprintPure)
@@ -279,13 +275,17 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
-	virtual IScreenWidgetInterface* GetLastWidget() const override { return LastWidget; }
+	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 
-	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
+	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) override { LastTemporary = InLastTemporary; }
 
 	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
+	
+	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
+
+	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }

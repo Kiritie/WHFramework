@@ -80,8 +80,6 @@ public:
 protected:
 	EWidgetType WidgetType;
 
-	EWidgetCategory WidgetCategory;
-
 	FName WidgetName;
 
 	FName ParentName;
@@ -114,16 +112,20 @@ protected:
 
 	AActor* OwnerActor;
 	
-	IScreenWidgetInterface* LastWidget;
+	IScreenWidgetInterface* LastTemporary;
 	
 	IScreenWidgetInterface* ParentWidget;
-	
+			
+	IScreenWidgetInterface* TemporaryChild;
+
 	TArray<IScreenWidgetInterface*> ChildWidgets;
 
 public:
-	virtual EWidgetType GetWidgetType() const override { return WidgetType; }
-		
-	virtual EWidgetCategory GetWidgetCategory() const override { return WidgetCategory; }
+	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const override
+	{
+		if(bInheritParent && ParentWidget) return ParentWidget->GetWidgetType();
+		return WidgetType;
+	}
 
 	virtual FName GetWidgetName() const override { return WidgetName; }
 
@@ -164,13 +166,17 @@ public:
 
 	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
 
-	virtual IScreenWidgetInterface* GetLastWidget() const override { return LastWidget; }
+	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 
-	virtual void SetLastWidget(IScreenWidgetInterface* InLastWidget) override { LastWidget = InLastWidget; }
+	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) override { LastTemporary = InLastTemporary; }
 
 	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
+		
+	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
+
+	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
 
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 

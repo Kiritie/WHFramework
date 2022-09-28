@@ -473,10 +473,10 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 	}
 }
 
-void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp)
+void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, AActor* InOwnerActor, USceneComponent* InSceneComp)
 {
 	TArray<FParameter> Parameters = { FParameter::MakeString(InText), FParameter::MakeColor(InTextColor), FParameter::MakeInteger((int32)InTextStyle) };
-	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(this, InLocation, InSceneComp, &Parameters);
+	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(InOwnerActor, InLocation, InSceneComp, &Parameters);
 }
 
 FLinearColor ASceneModule::GetOutlineColor() const

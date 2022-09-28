@@ -184,7 +184,7 @@ public:
     /// World Text
 public:
 	UFUNCTION(BlueprintCallable)
-	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, USceneComponent* InSceneComp = nullptr);
+	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, AActor* InOwnerActor = nullptr, USceneComponent* InSceneComp = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline

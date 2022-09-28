@@ -18,13 +18,25 @@ UCharacterAnim::UCharacterAnim()
 	HorizontalSpeed = 0.f;
 }
 
+bool UCharacterAnim::HandleNotify(const FAnimNotifyEvent& AnimNotifyEvent)
+{
+	const FString NotifyName = AnimNotifyEvent.GetNotifyEventName().ToString().Mid(11);
+	NativeHandleNotify(NotifyName);
+	return false;
+}
+
+void UCharacterAnim::NativeHandleNotify(const FString& AnimNotifyName)
+{
+
+}
+
 void UCharacterAnim::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
-	ACharacter* Character = Cast<ACharacter>(TryGetPawnOwner());
+	ACharacterBase* Character = Cast<ACharacterBase>(TryGetPawnOwner());
 
-	if(!Character || !UGlobalBPLibrary::IsPlaying()) return;
+	if(!Character || !Character->GetAssetID().IsValid() || !UGlobalBPLibrary::IsPlaying()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	

@@ -26,14 +26,13 @@ protected:
 private:
 	FTimerHandle DestroyTimer;
 
+protected:
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
+
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation() override;
+	
 public:
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
-
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem) override;
-
-	virtual void Destroyed() override;
-
-public:
-	UFUNCTION(BlueprintPure)
-	FPrimaryAssetId GetSkillID() const;
+	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
 };

@@ -173,8 +173,6 @@ void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 
 void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp)
 {
-	if(!InSceneComp) return;
-	
 	if(!BindWidgetMap.Contains(InWidget))
 	{
 		BindWidgetMap.Add(InWidget, FWorldWidgetBindInfo(InLocation, InSceneComp));

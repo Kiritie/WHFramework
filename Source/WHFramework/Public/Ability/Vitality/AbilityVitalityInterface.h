@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Ability/Actor/AbilityActorInterface.h"
 
@@ -51,7 +51,11 @@ public:
 	virtual float GetPhysicsDamage() const = 0;
 		
 	virtual float GetMagicDamage() const = 0;
+	
+	virtual float GetRadius() const = 0;
+
+	virtual float GetHalfHeight() const = 0;
 
 public:
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 };

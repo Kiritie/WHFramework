@@ -15,26 +15,26 @@ AAbilitySkillBase::AAbilitySkillBase()
 	SocketName = NAME_None;
 }
 
-void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
+void AAbilitySkillBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::Initialize(InOwnerCharacter);
-
-	SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
-	SetActorRotation(OwnerCharacter->GetActorRotation());
+	Super::OnSpawn_Implementation(InParams);
 }
 
-void AAbilitySkillBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilitySkillBase::OnDespawn_Implementation()
 {
-	Super::Initialize(InOwnerCharacter, InItem);
-}
+	Super::OnDespawn_Implementation();
 
-void AAbilitySkillBase::Destroyed()
-{
-	Super::Destroyed();
 	GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
 }
 
-FPrimaryAssetId AAbilitySkillBase::GetSkillID() const
+void AAbilitySkillBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	return GetItemData().GetPrimaryAssetId();
+	Super::Initialize_Implementation(InOwnerCharacter, InItem);
+
+	SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
+	SetActorRotation(OwnerCharacter->GetActorRotation());
+
+	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this](){
+		UObjectPoolModuleBPLibrary::DespawnObject(this);	
+	}, DurationTime, false);
 }

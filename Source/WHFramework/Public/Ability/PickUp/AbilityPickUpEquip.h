@@ -20,10 +20,10 @@ protected:
 	UStaticMeshComponent* MeshComponent;
 
 public:
-	virtual void Initialize(FAbilityItem InItem) override;
+	virtual void Initialize_Implementation(FAbilityItem InItem) override;
 
 protected:
-	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
+	virtual void OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker) override;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

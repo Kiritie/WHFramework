@@ -32,7 +32,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DyingTag);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
 
 	if(Character->Container)
 	{
@@ -51,6 +51,13 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 void UAbilityCharacterState_Death::OnRefresh()
 {
 	Super::OnRefresh();
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	if (Character->IsDying() && !Character->IsFalling(true) && !bDeathStarted)
+	{
+		DeathStart();
+	}
 }
 
 void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
@@ -62,8 +69,8 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DeadTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DeadTag);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -73,19 +80,20 @@ void UAbilityCharacterState_Death::OnTermination()
 
 void UAbilityCharacterState_Death::DeathStart()
 {
-	DeathEnd();
+	bDeathStarted = true;
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->GetCharacterMovement()->SetActive(false);
+	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void UAbilityCharacterState_Death::DeathEnd()
 {
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	Character->Execute_SetActorVisible(Character, false);
-	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData().DyingTag);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData().DeadTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DeadTag);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(Character);
 }

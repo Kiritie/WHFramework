@@ -40,14 +40,6 @@ public:
 	{
 		return Cast<T>(LoadPrimaryAsset(InPrimaryAssetId, bLogWarning));
 	}
-		
-	template<class T>
-	T* LoadPrimaryAsset(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
-	{
-		if(!InPrimaryEntity) return nullptr;
-		
-		return LoadPrimaryAsset<T>(InPrimaryEntity->GetAssetID(), bLogWarning);
-	}
 
 	template<class T>
 	T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
@@ -60,14 +52,6 @@ public:
 		{
 			return UReferencePoolModuleBPLibrary::GetReference<T>();
 		}
-	}
-
-	template<class T>
-	T& LoadPrimaryAssetRef(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
-	{
-		if(!InPrimaryEntity) return UReferencePoolModuleBPLibrary::GetReference<T>();
-		
-		return LoadPrimaryAssetRef<T>(InPrimaryEntity->GetAssetID(), bLogWarning);
 	}
 
 	virtual TSharedPtr<FStreamableHandle> LoadPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority) override;

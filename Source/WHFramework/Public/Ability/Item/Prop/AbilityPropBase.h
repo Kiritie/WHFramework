@@ -21,5 +21,5 @@ protected:
 	UStaticMeshComponent* MeshComponent;
 
 public:
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter) override;
+	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
 };

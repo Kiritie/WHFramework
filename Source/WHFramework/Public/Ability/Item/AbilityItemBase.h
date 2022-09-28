@@ -22,10 +22,10 @@ public:
 	AAbilityItemBase();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category = "Default")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FAbilityItem Item;
 
-	UPROPERTY(VisibleAnywhere, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	AAbilityCharacterBase* OwnerCharacter;
 
 protected:
@@ -36,9 +36,8 @@ protected:
 	virtual void OnDespawn_Implementation() override;
 
 public:
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter);
-		
-	virtual void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem);
+	UFUNCTION(BlueprintNativeEvent)
+	void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty);
 
 public:
 	template<class T >
@@ -51,6 +50,8 @@ public:
 	{
 		return Item.GetData();
 	}
+
+	FAbilityItem& GetItem() { return Item; }
 
 	template<class T>
 	T* GetOwnerCharacter() const

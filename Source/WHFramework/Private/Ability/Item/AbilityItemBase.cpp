@@ -27,13 +27,8 @@ void AAbilityItemBase::OnDespawn_Implementation()
 	Super::OnDespawn_Implementation();
 }
 
-void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
+void AAbilityItemBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
 	OwnerCharacter = InOwnerCharacter;
-}
-
-void AAbilityItemBase::Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
-{
 	Item = InItem;
-	Initialize(InOwnerCharacter);
 }

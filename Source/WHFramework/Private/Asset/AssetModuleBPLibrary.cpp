@@ -76,13 +76,3 @@ void UAssetModuleBPLibrary::RemoveAllDataTable()
 		AssetModule->RemoveAllDataTable();
 	}
 }
-
-UPrimaryAssetBase* UAssetModuleBPLibrary::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass, bool bLogWarning)
-{
-	return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
-}
-
-TArray<UPrimaryAssetBase*> UAssetModuleBPLibrary::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
-{
-	return UAssetManagerBase::Get().LoadPrimaryAssets(InPrimaryAssetType, bLogWarning);
-}

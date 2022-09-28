@@ -90,7 +90,7 @@ TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InMo
 	return AMainModule::GetModuleByName<UObject>(InModuleName, bInEditor);
 }
 
-UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass( TSubclassOf<UModuleNetworkComponent> InModuleClass, bool bInEditor)
+UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor)
 {
-	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(bInEditor, InModuleClass);
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(bInEditor, InModuleNetworkComponentClass);
 }

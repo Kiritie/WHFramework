@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Ability/PickUp/AbilityPickUpBase.h"
@@ -18,7 +18,7 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
-	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
+	BoxComponent->SetBoxExtent(FVector(10, 10, 10));
 	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
@@ -26,32 +26,6 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 
 	Item = FAbilityItem::Empty;
 	Container = nullptr;
-}
-
-void AAbilityPickUpBase::Initialize(FAbilityItem InItem)
-{
-	Item = InItem;
-}
-
-void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if (OtherActor)
-	{
-		auto Picker = Cast<IAbilityPickerInterface>(OtherActor);
-		if (Picker)
-		{
-			OnPickUp(Picker);
-		}
-	}
-}
-
-void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
-{
-	if(InPicker)
-	{
-		InPicker->PickUp(this);
-	}
-	UObjectPoolModuleBPLibrary::DespawnObject(this);
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -79,4 +53,29 @@ FSaveData* AAbilityPickUpBase::ToData()
 	SaveData.Location = GetActorLocation();
 
 	return &SaveData;
+}
+
+void AAbilityPickUpBase::Initialize_Implementation(FAbilityItem InItem)
+{
+	Item = InItem;
+}
+
+void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor)
+	{
+		if (OtherActor->GetClass()->ImplementsInterface(UAbilityPickerInterface::StaticClass()))
+		{
+			OnPickUp(OtherActor);
+		}
+	}
+}
+
+void AAbilityPickUpBase::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
+{
+	if(InPicker)
+	{
+		InPicker->PickUp(this);
+	}
+	UObjectPoolModuleBPLibrary::DespawnObject(this);
 }

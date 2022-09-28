@@ -11,7 +11,7 @@ AAbilityPropBase::AAbilityPropBase()
 	MeshComponent->SetCastShadow(false);
 }
 
-void AAbilityPropBase::Initialize(AAbilityCharacterBase* InOwnerCharacter)
+void AAbilityPropBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	Super::Initialize(InOwnerCharacter);
+	Super::Initialize_Implementation(InOwnerCharacter, InItem);
 }

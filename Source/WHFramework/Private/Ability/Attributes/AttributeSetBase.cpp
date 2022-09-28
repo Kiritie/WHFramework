@@ -7,6 +7,11 @@ UAttributeSetBase::UAttributeSetBase()
 {
 }
 
+void UAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
+{
+	Super::PreAttributeBaseChange(Attribute, NewValue);
+}
+
 void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
@@ -25,7 +30,7 @@ void UAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& InAf
 	{
 		const float CurrentValue = InAffectedAttribute.GetCurrentValue();
 		float NewDelta = CurrentMaxValue > 0.f ? (CurrentValue / CurrentMaxValue * InNewMaxValue - CurrentValue) : InNewMaxValue;
-		AbilityComp->ApplyModToAttributeUnsafe(InAffectedAttributeProperty, EGameplayModOp::Additive, NewDelta);
+		ModifyAttributeValue(InAffectedAttributeProperty, NewDelta);
 	}
 }
 
@@ -51,7 +56,10 @@ void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float 
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Override, InValue);
 	OnAttributeChangeData.NewValue = GetAttributeValue(InAttribute);
 
-	AbilityActor->OnAttributeChange(OnAttributeChangeData);
+	if(OnAttributeChangeData.NewValue != OnAttributeChangeData.OldValue)
+	{
+		AbilityActor->OnAttributeChange(OnAttributeChangeData);
+	}
 }
 
 void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
@@ -66,7 +74,10 @@ void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, flo
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Additive, InDeltaValue);
 	OnAttributeChangeData.NewValue = GetAttributeValue(InAttribute);
 
-	AbilityActor->OnAttributeChange(OnAttributeChangeData);
+	if(OnAttributeChangeData.NewValue != OnAttributeChangeData.OldValue)
+	{
+		AbilityActor->OnAttributeChange(OnAttributeChangeData);
+	}
 }
 
 TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes() const

@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
 
@@ -214,6 +214,16 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
+float AAbilityVitalityBase::GetRadius() const
+{
+	return FMath::Max(BoxComponent->GetScaledBoxExtent().X, BoxComponent->GetScaledBoxExtent().Y);
+}
+
+float AAbilityVitalityBase::GetHalfHeight() const
+{
+	return BoxComponent->GetScaledBoxExtent().Z;
+}
+
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
@@ -239,15 +249,19 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
-		if(DeltaValue != 0.f)
+		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(FMath::Abs(DeltaValue)), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation());
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), this);
 		}
 	}
 }
 
-void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	ModifyHealth(-LocalDamageDone);
+
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), this);
+
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));

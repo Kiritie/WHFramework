@@ -14,6 +14,7 @@ class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
 class ACameraPawnBase;
+
 UCLASS()
 class WHFRAMEWORK_API ACameraModule : public AModuleBase
 {

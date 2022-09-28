@@ -11,8 +11,7 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SSlateWidgetBase::SSlateWidgetBase()
 {
-	WidgetType = EWidgetType::Default;
-	WidgetCategory = EWidgetCategory::Permanent;
+	WidgetType = EWidgetType::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
 	ChildNames = TArray<FName>();
@@ -29,8 +28,9 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetState = EScreenWidgetState::None;
 	InputMode = EInputMode::None;
 	OwnerActor = nullptr;
-	LastWidget = nullptr;
+	LastTemporary = nullptr;
 	ParentWidget = nullptr;
+	TemporaryChild = nullptr;
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
@@ -58,13 +58,13 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	WidgetState = EScreenWidgetState::Opening;
 	
-	switch (WidgetCategory)
+	switch (WidgetType)
 	{
-		case EWidgetCategory::Permanent:
+		case EWidgetType::Permanent:
 		{
 			SetVisibility(EVisibility::SelfHitTestInvisible);
 		}
-		case EWidgetCategory::Temporary:
+		case EWidgetType::Temporary:
 		{
 			//AddToViewport(WidgetZOrder);
 		}
@@ -164,18 +164,18 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 {
 	WidgetState = EScreenWidgetState::Closed;
 
-	switch (WidgetCategory)
+	switch (WidgetType)
 	{
-		case EWidgetCategory::Permanent:
+		case EWidgetType::Permanent:
 		{
 			SetVisibility(EVisibility::Hidden);
 			break;
 		}
-		case EWidgetCategory::Temporary:
+		case EWidgetType::Temporary:
 		{
-			if(!bInstant && GetLastWidget())
+			if(!bInstant && GetLastTemporary())
 			{
-				GetLastWidget()->Open();
+				GetLastTemporary()->Open();
 			}
 			//RemoveFromViewport();
 		}

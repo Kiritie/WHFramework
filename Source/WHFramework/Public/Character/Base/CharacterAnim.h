@@ -18,6 +18,10 @@ public:
 	UCharacterAnim();
 
 protected:
+	virtual bool HandleNotify(const FAnimNotifyEvent& AnimNotifyEvent) override;
+
+	virtual void NativeHandleNotify(const FString& AnimNotifyName);
+
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:

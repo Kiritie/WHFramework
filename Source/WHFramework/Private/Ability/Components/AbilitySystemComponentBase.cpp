@@ -183,24 +183,40 @@ FGameplayAbilitySpecHandle UAbilitySystemComponentBase::FindAbilitySpecHandleFor
 
 FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoBySpec(FGameplayAbilitySpec Spec)
 {
+	FAbilityInfo AbilityInfo;
 	if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.Ability))
 	{
-		FAbilityInfo AbilityInfo;
-		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+		if(Ability->GetCostGameplayEffect())
 		{
-			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
-			AbilityInfo.CostAttribute = ModifierInfo.Attribute;
-			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, AbilityInfo.CostValue);
+			if(Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+			{
+				const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
+				AbilityInfo.CostAttribute = ModifierInfo.Attribute;
+				ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CostValue);
+			}
 		}
-		Ability->GetCooldownTimeRemainingAndDuration(AbilityInfo.CooldownRemaining, AbilityInfo.CooldownDuration);
-		return AbilityInfo;
+		if(Ability->GetCooldownGameplayEffect())
+		{
+			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CooldownDuration);
+		}
 	}
-	return FAbilityInfo();
+	if(Spec.GetAbilityInstances().Num() > 0)
+	{
+		if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetAbilityInstances()[0]))
+		{
+			AbilityInfo.CooldownRemaining = Ability->GetCooldownTimeRemaining();
+		}
+	}
+	return AbilityInfo;
 }
 
 FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoByHandle(FGameplayAbilitySpecHandle Handle)
 {
-	return GetAbilityInfoBySpec(*FindAbilitySpecFromHandle(Handle));
+	if(auto AbilitySpec = FindAbilitySpecFromHandle(Handle))
+	{
+		return GetAbilityInfoBySpec(*AbilitySpec);
+	}
+	return FAbilityInfo();
 }
 
 FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass)
