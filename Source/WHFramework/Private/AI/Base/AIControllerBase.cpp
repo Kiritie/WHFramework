@@ -19,19 +19,19 @@ AAIControllerBase::AAIControllerBase()
 	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
 	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AAIControllerBase::OnTargetPerceptionUpdated);
 
-	FAISenseAffiliationFilter affiliationFilter;
-	affiliationFilter.bDetectEnemies = true;
-	affiliationFilter.bDetectFriendlies = true;
-	affiliationFilter.bDetectNeutrals = true;
+	FAISenseAffiliationFilter AffiliationFilter;
+	AffiliationFilter.bDetectEnemies = true;
+	AffiliationFilter.bDetectFriendlies = true;
+	AffiliationFilter.bDetectNeutrals = true;
 
-	auto sightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
-	sightSenseConfig->SightRadius = 1000;
-	sightSenseConfig->LoseSightRadius = 1200;
-	sightSenseConfig->PeripheralVisionAngleDegrees = 90;
-	sightSenseConfig->DetectionByAffiliation = affiliationFilter;
-	sightSenseConfig->SetMaxAge(5);
-	PerceptionComponent->ConfigureSense(*sightSenseConfig);
-	PerceptionComponent->SetDominantSense(*sightSenseConfig->GetSenseImplementation());
+	auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
+	SightSenseConfig->SightRadius = 1000;
+	SightSenseConfig->LoseSightRadius = 1200;
+	SightSenseConfig->PeripheralVisionAngleDegrees = 90;
+	SightSenseConfig->DetectionByAffiliation = AffiliationFilter;
+	SightSenseConfig->SetMaxAge(5);
+	PerceptionComponent->ConfigureSense(*SightSenseConfig);
+	PerceptionComponent->SetDominantSense(*SightSenseConfig->GetSenseImplementation());
 
 	auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
 	PerceptionComponent->ConfigureSense(*damageSenseConfig);
@@ -67,7 +67,6 @@ void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Sti
 		if (!GetBlackboard()->GetTargetCharacter())
 		{
 			GetBlackboard()->SetTargetCharacter(TargetCharacter);
-			GetBlackboard()->SetIsLostTarget(false);
 		}
 		else if(TargetCharacter == GetBlackboard()->GetTargetCharacter())
 		{
@@ -103,18 +102,21 @@ void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset)
 	if(BehaviorTreeAsset)
 	{
 		BlackboardAsset = DuplicateObject<UAIBlackboardBase>(Cast<UAIBlackboardBase>(InBehaviorTreeAsset->BlackboardAsset), nullptr);
-		BehaviorTreeAsset->BlackboardAsset = BlackboardAsset;
+		if(BlackboardAsset)
+		{
+			BehaviorTreeAsset->BlackboardAsset = BlackboardAsset;
+		}
 	}
 }
 
 bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 {
-	const bool ReturnValue = Super::RunBehaviorTree(BTAsset);
+	bool bSuccess = Super::RunBehaviorTree(BTAsset);
 	if(BlackboardAsset)
 	{
 		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<ACharacterBase>());
 	}
-	return ReturnValue;
+	return bSuccess;
 }
 
 void AAIControllerBase::StopBehaviorTree()

@@ -5,12 +5,27 @@
 
 #include "AI/Base/AIControllerBase.h"
 #include "Character/Base/CharacterBase.h"
+#include "BehaviorTree/BehaviorTree.h"
 
 
 UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	OwnerController = nullptr;
 	OwnerCharacter = nullptr;
+}
+
+void UAITaskBase::InitializeFromAsset(UBehaviorTree& Asset)
+{
+	Super::InitializeFromAsset(Asset);
+
+	//for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
+	//{
+	//	FStructProperty* Property = CastField<FStructProperty>(*PropertyIt);
+	//	if(Property && Property->Struct == FBlackboardKeySelector::StaticStruct())
+	//	{
+	//		((FBlackboardKeySelector&)Property).ResolveSelectedKey(*Asset.BlackboardAsset);
+	//	}
+	//}
 }
 
 bool UAITaskBase::InitTask(UBehaviorTreeComponent& OwnerComp)

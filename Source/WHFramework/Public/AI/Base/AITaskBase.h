@@ -17,13 +17,15 @@ class WHFRAMEWORK_API UAITaskBase : public UBTTaskNode
 	GENERATED_UCLASS_BODY()
 
 protected:
-	UPROPERTY(VisibleAnywhere, Category = "Default")
+	UPROPERTY(VisibleAnywhere)
 	AAIControllerBase* OwnerController;
 
-	UPROPERTY(VisibleAnywhere, Category = "Default")
+	UPROPERTY(VisibleAnywhere)
 	ACharacterBase* OwnerCharacter;
 	
 protected:
+	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
+
 	virtual bool InitTask(UBehaviorTreeComponent& OwnerComp);
 
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;

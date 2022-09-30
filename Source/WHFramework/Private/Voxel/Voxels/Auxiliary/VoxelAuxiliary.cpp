@@ -60,7 +60,7 @@ bool AVoxelAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent
 
 void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
-	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
+	
 }
 
 UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const

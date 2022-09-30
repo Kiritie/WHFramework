@@ -59,8 +59,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	}
 	if(bWidgetAutoVisibility)
 	{
-		const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
-		SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+		RefreshVisibility();
 	}
 }
 
@@ -125,6 +124,11 @@ void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocati
 			}
 		}
 	}
+
+	if(bWidgetAutoVisibility)
+	{
+		RefreshVisibility();
+	}
 }
 
 void UWorldWidgetBase::OnRefresh_Implementation()
@@ -164,6 +168,12 @@ void UWorldWidgetBase::Refresh_Implementation()
 	if(WidgetRefreshType == EWidgetRefreshType::None) return;
 
 	OnRefresh();
+}
+
+void UWorldWidgetBase::RefreshVisibility_Implementation()
+{
+	const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
+	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
 void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)

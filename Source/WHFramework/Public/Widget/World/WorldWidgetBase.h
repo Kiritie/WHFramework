@@ -57,8 +57,12 @@ public:
 	void Refresh();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RefreshVisibility();
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Destroy(bool bRecovery = false);
 
+public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void BindWidgetPoint(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp = nullptr);
 		

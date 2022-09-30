@@ -55,10 +55,10 @@ void AAbilitySkillRemoteBase::OnSpawn_Implementation(const TArray<FParameter>& I
 
 void AAbilitySkillRemoteBase::OnDespawn_Implementation()
 {
-	Super::OnDespawn_Implementation();
-
 	SphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MovementComponent->Velocity = FVector::ZeroVector;
+
+	Super::OnDespawn_Implementation();
 }
 
 void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)

@@ -81,8 +81,6 @@ protected:
 
 	float DefaultAirControl;
 
-	FVector MoveDirection;
-
 	FAbilityData DefaultAbility;
 
 protected:

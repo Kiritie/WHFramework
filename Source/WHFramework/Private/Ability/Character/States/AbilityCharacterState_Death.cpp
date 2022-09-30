@@ -9,6 +9,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
+#include "Ability/Components/InteractionComponent.h"
+#include "AI/Base/AIControllerBase.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -33,6 +35,11 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
+
+	if(Character->GetController<AAIControllerBase>())
+	{
+		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
+	}
 
 	if(Character->Container)
 	{
@@ -71,6 +78,10 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DeadTag);
+
+	Character->GetCharacterMovement()->SetActive(true);
+	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Character->GetInteractionComponent()->SetGenerateOverlapEvents(true);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -86,6 +97,7 @@ void UAbilityCharacterState_Death::DeathStart()
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
 }
 
 void UAbilityCharacterState_Death::DeathEnd()

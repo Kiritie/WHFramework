@@ -26,8 +26,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EInteractAction InteractingAction;
 
-	IInteractionAgentInterface* OverlappingAgent;
-
 	IInteractionAgentInterface* InteractionAgent;
 
 protected:
@@ -56,9 +54,9 @@ public:
 public:
 	EInteractAction GetInteractingAction() const { return InteractingAction; }
 
-	IInteractionAgentInterface* GetOverlappingAgent() const { return OverlappingAgent; }
-
 	IInteractionAgentInterface* GetInteractionAgent() const { return InteractionAgent; }
+
+	UInteractionComponent* GetInteractionComponent() const;
 
 	void SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent);
 

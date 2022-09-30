@@ -4,6 +4,7 @@
 #include "AI/Base/AIBlackboardBase.h"
 
 #include "Math/MathTypes.h"
+#include "Character/Base/CharacterBase.h"
 
 class UBlackboardKeyType_Class;
 
@@ -20,8 +21,6 @@ void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, ACharacter
 {
 	Component = InComponent;
 	Character = InCharacter;
-	OnBlackboardValuePreChange.AddUObject(this, &UAIBlackboardBase::OnValuePreChange);
-	OnBlackboardValueChanged.AddUObject(this, &UAIBlackboardBase::OnValueChanged);
 }
 
 void UAIBlackboardBase::Refresh()
@@ -36,23 +35,33 @@ void UAIBlackboardBase::OnRefresh()
 
 void UAIBlackboardBase::OnValuePreChange(FName InValueName)
 {
+	OnBlackboardValuePreChange.Broadcast(InValueName);
 }
 
 void UAIBlackboardBase::OnValueChanged(FName InValueName)
 {
+	OnBlackboardValueChanged.Broadcast(InValueName);
+
 	if(InValueName.IsEqual(FName("IsLostTarget")))
 	{
-		if(GetIsLostTarget() && GetTargetCharacter<AActor>())
+		if(GetIsLostTarget())
 		{
-			SetTargetLocation(GetTargetCharacter<AActor>()->GetActorLocation());
+			if(GetTargetCharacter<ACharacterBase>())
+			{
+				SetTargetLocation(GetTargetCharacter<ACharacterBase>()->GetActorLocation());
+			}
+			else
+			{
+				SetIsLostTarget(false);
+			}
+		}
+		else
+		{
+			SetTargetLocation(Vector_Empty);
 		}
 	}
 	else if(InValueName.IsEqual(FName("TargetCharacter")))
 	{
-		if(!GetTargetCharacter())
-		{
-			SetIsLostTarget(false);
-			SetTargetLocation(Vector_Empty);
-		}
+		SetIsLostTarget(false);
 	}
 }

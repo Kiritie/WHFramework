@@ -27,9 +27,9 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
-	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction);
+	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) = 0;
 
-	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction);
+	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) = 0;
 
 public:
 	virtual class UInteractionComponent* GetInteractionComponent() const = 0;

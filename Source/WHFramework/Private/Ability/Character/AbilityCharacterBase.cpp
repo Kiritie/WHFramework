@@ -41,6 +41,7 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
+
 	Interaction->AddInteractionAction(EInteractAction::Revive);
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
@@ -281,7 +282,7 @@ bool AAbilityCharacterBase::CanInteract(IInteractionAgentInterface* InInteractio
 
 void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
-	IInteractionAgentInterface::OnInteract(InInteractionAgent, InInteractAction);
+	
 }
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)

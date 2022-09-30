@@ -27,7 +27,6 @@ void UInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedCompon
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
 		OnAgentEnter(OtherInteractionAgent);
-		OtherInteractionAgent->GetInteractionComponent()->OnAgentEnter(GetInteractionOwner());
 	}
 }
 
@@ -38,28 +37,22 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
 		OnAgentLeave(OtherInteractionAgent);
-		OtherInteractionAgent->GetInteractionComponent()->OnAgentLeave(GetInteractionOwner());
 	}
 }
 
 void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(!InInteractionAgent) return;
-
-	OnAgentLeave(OverlappingAgent);
-
-	OverlappingAgent = InInteractionAgent;
-	GetInteractionOwner()->OnEnterInteract(OverlappingAgent);
+	if(InteractionAgent == nullptr)
+	{
+		SetInteractionAgent(InInteractionAgent);
+	}
 }
 
 void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(!InInteractionAgent) return;
-	
-	if(InInteractionAgent == OverlappingAgent)
+	if(InInteractionAgent == InteractionAgent)
 	{
-		OverlappingAgent = nullptr;
-		GetInteractionOwner()->OnLeaveInteract(InInteractionAgent);
+		SetInteractionAgent(nullptr);
 	}
 }
 
@@ -106,11 +99,28 @@ TArray<EInteractAction> UInteractionComponent::GetValidInteractActions(IInteract
 
 void UInteractionComponent::SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent)
 {
-	InteractionAgent = InInteractionAgent;
+	if(InInteractionAgent == InteractionAgent) return;
+
 	if(InteractionAgent)
 	{
-		InteractionAgent->GetInteractionComponent()->InteractionAgent = GetInteractionOwner();
+		GetInteractionOwner()->OnLeaveInteract(InteractionAgent);
 	}
+
+	InteractionAgent = InInteractionAgent;
+
+	if(InteractionAgent)
+	{
+		GetInteractionOwner()->OnEnterInteract(InteractionAgent);
+	}
+}
+
+UInteractionComponent* UInteractionComponent::GetInteractionComponent() const
+{
+	if(InteractionAgent)
+	{
+		return InteractionAgent->GetInteractionComponent();
+	}
+	return nullptr;
 }
 
 IInteractionAgentInterface* UInteractionComponent::GetInteractionOwner() const

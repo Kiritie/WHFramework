@@ -7,6 +7,7 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Ability/Components/InteractionComponent.h"
 
 UAbilityCharacterState_Static::UAbilityCharacterState_Static()
 {
@@ -33,6 +34,7 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
 }
 
 void UAbilityCharacterState_Static::OnRefresh()
@@ -50,6 +52,7 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Character->GetInteractionComponent()->SetGenerateOverlapEvents(true);
 }
 
 void UAbilityCharacterState_Static::OnTermination()

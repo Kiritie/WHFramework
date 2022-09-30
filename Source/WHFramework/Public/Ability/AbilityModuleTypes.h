@@ -668,6 +668,8 @@ public:
 	{
 		return !ID.IsNone();
 	}
+
+	virtual void OnDataTableChanged(const UDataTable* InDataTable, const FName InRowName) override;
 };
 
 USTRUCT(BlueprintType)

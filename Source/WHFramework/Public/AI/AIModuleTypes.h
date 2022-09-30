@@ -29,11 +29,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsInt(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
-	FORCEINLINE void Set##PropertyName(int32 InValue) const \
+	FORCEINLINE void Set##PropertyName(int32 InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsInt(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_INT(PropertyName) \
@@ -55,11 +55,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsFloat(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_FLOAT(PropertyName) \
-	FORCEINLINE void Set##PropertyName(float InValue) const \
+	FORCEINLINE void Set##PropertyName(float InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsFloat(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_FLOAT(PropertyName) \
@@ -81,11 +81,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsBool(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_BOOL(PropertyName) \
-	FORCEINLINE void Set##PropertyName(bool InValue) const \
+	FORCEINLINE void Set##PropertyName(bool InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsBool(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_BOOL(PropertyName) \
@@ -107,11 +107,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsString(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_STRING(PropertyName) \
-	FORCEINLINE void Set##PropertyName(FString InValue) const \
+	FORCEINLINE void Set##PropertyName(FString InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsString(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_STRING(PropertyName) \
@@ -133,11 +133,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsName(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_NAME(PropertyName) \
-	FORCEINLINE void Set##PropertyName(FName InValue) const \
+	FORCEINLINE void Set##PropertyName(FName InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsName(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_NAME(PropertyName) \
@@ -159,11 +159,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsVector(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_VECTOR(PropertyName) \
-	FORCEINLINE void Set##PropertyName(FVector InValue) const \
+	FORCEINLINE void Set##PropertyName(FVector InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsVector(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_VECTOR(PropertyName) \
@@ -185,11 +185,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsRotator(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_ROTATOR(PropertyName) \
-	FORCEINLINE void Set##PropertyName(FRotator InValue) const \
+	FORCEINLINE void Set##PropertyName(FRotator InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsRotator(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_ROTATOR(PropertyName) \
@@ -216,11 +216,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsObject(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_OBJECT(PropertyName) \
-	FORCEINLINE void Set##PropertyName(UObject* InValue) const \
+	FORCEINLINE void Set##PropertyName(UObject* InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsObject(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_OBJECT(PropertyName, ClassName) \
@@ -243,11 +243,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsClass(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_CLASS(PropertyName) \
-	FORCEINLINE void Set##PropertyName(UClass* InValue) const \
+	FORCEINLINE void Set##PropertyName(UClass* InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsClass(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_CLASS(PropertyName, ClassName) \
@@ -270,11 +270,11 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 		return Component->GetValueAsEnum(FName(#PropertyName)); \
 	}
 #define BLACKBOARD_VALUE_SETTER_ENUM(PropertyName) \
-	FORCEINLINE void Set##PropertyName(uint8 InValue) const \
+	FORCEINLINE void Set##PropertyName(uint8 InValue) \
 	{ \
-		OnBlackboardValuePreChange.Broadcast(FName(#PropertyName)); \
+		OnValuePreChange(FName(#PropertyName)); \
 		Component->SetValueAsEnum(FName(#PropertyName), InValue); \
-		OnBlackboardValueChanged.Broadcast(FName(#PropertyName)); \
+		OnValueChanged(FName(#PropertyName)); \
 	}
 
 #define BLACKBOARD_VALUE_GENERATE_ENUM(PropertyName, EnumTypeName) \
