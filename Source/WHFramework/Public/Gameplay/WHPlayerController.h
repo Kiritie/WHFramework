@@ -85,19 +85,24 @@ protected:
 
 	virtual void OnUnPossess() override;
 
-public:	
+public:
 	virtual void Tick(float DeltaTime) override;
 	
+	//////////////////////////////////////////////////////////////////////////
+	/// Raycast
+public:
 	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Input
 protected:
-	virtual void Turn(float InRate);
+	virtual void TurnCam(float InRate);
 
-	virtual void LookUp(float InRate);
+	virtual void LookUpCam(float InRate);
 	
-	virtual void PanH(float InRate);
+	virtual void PanHCam(float InRate);
 
-	virtual void PanV(float InRate);
+	virtual void PanVCam(float InRate);
 
 	virtual void ZoomCam(float InRate);
 
@@ -115,26 +120,6 @@ protected:
 
 	virtual void EndInteract(FKey InKey);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Player
-protected:
-	UPROPERTY(BlueprintReadOnly)
-	APawn* PlayerPawn;
-
-public:
-	template<class T>
-	T* GetPlayerPawn()
-	{
-		return Cast<T>(PlayerPawn);
-	}
-
-	UFUNCTION(BlueprintPure)
-	APawn* GetPlayerPawn() const { return PlayerPawn; }
-	
-	void SetPlayerPawn(APawn* InPlayerPawn) { PlayerPawn =  InPlayerPawn; }
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Input
 protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	float TouchInputRate;
@@ -153,10 +138,34 @@ private:
 	FTimerHandle TouchReleaseTimerHandle2;
 	FTimerHandle TouchReleaseTimerHandle3;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Player
+public:
+	virtual void TurnPlayer(float InValue);
+	
+	virtual void MoveHPlayer(float InValue);
+
+	virtual void MoveVPlayer(float InValue);
+
+	virtual void MoveForwardPlayer(float InValue);
+
+	virtual void MoveRightPlayer(float InValue);
+
+	virtual void MoveUpPlayer(float InValue);
+
 protected:
-	virtual void MoveForward(float InValue);
+	UPROPERTY(BlueprintReadOnly)
+	APawn* PlayerPawn;
 
-	virtual void MoveRight(float InValue);
+public:
+	template<class T>
+	T* GetPlayerPawn()
+	{
+		return Cast<T>(PlayerPawn);
+	}
 
-	virtual void MoveUp(float InValue);
+	UFUNCTION(BlueprintPure)
+	APawn* GetPlayerPawn() const { return PlayerPawn; }
+	
+	void SetPlayerPawn(APawn* InPlayerPawn) { PlayerPawn =  InPlayerPawn; }
 };

@@ -79,15 +79,20 @@ void AWHPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	
-	InputComponent->BindAxis(FName("Turn"), this, &AWHPlayerController::Turn);
-	InputComponent->BindAxis(FName("LookUp"), this, &AWHPlayerController::LookUp);
-	InputComponent->BindAxis(FName("PanH"), this, &AWHPlayerController::PanH);
-	InputComponent->BindAxis(FName("PanV"), this, &AWHPlayerController::PanV);
+	InputComponent->BindAxis(FName("Turn"), this, &AWHPlayerController::TurnCam);
+	InputComponent->BindAxis(FName("Turn"), this, &AWHPlayerController::TurnPlayer);
+	InputComponent->BindAxis(FName("LookUp"), this, &AWHPlayerController::LookUpCam);
+	InputComponent->BindAxis(FName("PanH"), this, &AWHPlayerController::PanHCam);
+	InputComponent->BindAxis(FName("PanH"), this, &AWHPlayerController::MoveHPlayer);
+	InputComponent->BindAxis(FName("PanV"), this, &AWHPlayerController::PanVCam);
+	InputComponent->BindAxis(FName("PanV"), this, &AWHPlayerController::MoveVPlayer);
 	InputComponent->BindAxis(FName("ZoomCam"), this, &AWHPlayerController::ZoomCam);
 
-	InputComponent->BindAxis(FName("MoveForward"), this, &AWHPlayerController::MoveForward);
-	InputComponent->BindAxis(FName("MoveRight"), this, &AWHPlayerController::MoveRight);
-	InputComponent->BindAxis(FName("MoveUp"), this, &AWHPlayerController::MoveUp);
+	InputComponent->BindAxis(FName("MoveH"), this, &AWHPlayerController::MoveHPlayer);
+	InputComponent->BindAxis(FName("MoveV"), this, &AWHPlayerController::MoveVPlayer);
+	InputComponent->BindAxis(FName("MoveForward"), this, &AWHPlayerController::MoveForwardPlayer);
+	InputComponent->BindAxis(FName("MoveRight"), this, &AWHPlayerController::MoveRightPlayer);
+	InputComponent->BindAxis(FName("MoveUp"), this, &AWHPlayerController::MoveUpPlayer);
 
 	InputComponent->BindAction(FName("Interact"), EInputEvent::IE_Pressed, this, &AWHPlayerController::StartInteract);
 	InputComponent->BindAction(FName("Interact"), EInputEvent::IE_Released, this, &AWHPlayerController::EndInteract);
@@ -117,7 +122,24 @@ void AWHPlayerController::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void AWHPlayerController::Turn(float InRate)
+bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
+{
+	int32 viewportSizeX, viewportSizeY;
+	FVector sightPos, rayDirection;
+	GetViewportSize(viewportSizeX, viewportSizeY);
+	if(DeprojectScreenPositionToWorld(viewportSizeX * 0.5f, viewportSizeY * 0.5f, sightPos, rayDirection))
+	{
+		const FVector rayStart = PlayerCameraManager->GetCameraLocation();
+		const FVector rayEnd = rayStart + rayDirection * InRayDistance;
+		TArray<AActor*> ignoreActors = InIgnoreActors;
+		ignoreActors.AddUnique(GetPawn());
+		ignoreActors.AddUnique(GetPlayerPawn());
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	}
+	return false;
+}
+
+void AWHPlayerController::TurnCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
@@ -130,7 +152,7 @@ void AWHPlayerController::Turn(float InRate)
 	}
 }
 
-void AWHPlayerController::LookUp(float InRate)
+void AWHPlayerController::LookUpCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
@@ -143,7 +165,7 @@ void AWHPlayerController::LookUp(float InRate)
 	}
 }
 
-void AWHPlayerController::PanH(float InRate)
+void AWHPlayerController::PanHCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
@@ -158,7 +180,7 @@ void AWHPlayerController::PanH(float InRate)
 	}
 }
 
-void AWHPlayerController::PanV(float InRate)
+void AWHPlayerController::PanVCam(float InRate)
 {
 	if(InRate == 0.f) return;
 
@@ -367,7 +389,37 @@ void AWHPlayerController::EndInteract(FKey InKey)
 	WidgetInteractionComp->ReleasePointerKey(InKey);
 }
 
-void AWHPlayerController::MoveForward(float InValue)
+void AWHPlayerController::TurnPlayer(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
+	{
+		IWHPlayerInterface::Execute_Turn(GetPawn(), InValue);
+	}
+}
+
+void AWHPlayerController::MoveHPlayer(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
+	{
+		IWHPlayerInterface::Execute_MoveH(GetPawn(), InValue);
+	}
+}
+
+void AWHPlayerController::MoveVPlayer(float InValue)
+{
+	if(InValue == 0.f) return;
+
+	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
+	{
+		IWHPlayerInterface::Execute_MoveV(GetPawn(), InValue);
+	}
+}
+
+void AWHPlayerController::MoveForwardPlayer(float InValue)
 {
 	if(InValue == 0.f) return;
 
@@ -377,24 +429,7 @@ void AWHPlayerController::MoveForward(float InValue)
 	}
 }
 
-bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
-{
-	int32 viewportSizeX, viewportSizeY;
-	FVector sightPos, rayDirection;
-	GetViewportSize(viewportSizeX, viewportSizeY);
-	if(DeprojectScreenPositionToWorld(viewportSizeX * 0.5f, viewportSizeY * 0.5f, sightPos, rayDirection))
-	{
-		const FVector rayStart = PlayerCameraManager->GetCameraLocation();
-		const FVector rayEnd = rayStart + rayDirection * InRayDistance;
-		TArray<AActor*> ignoreActors = InIgnoreActors;
-		ignoreActors.AddUnique(GetPawn());
-		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
-	}
-	return false;
-}
-
-void AWHPlayerController::MoveRight(float InValue)
+void AWHPlayerController::MoveRightPlayer(float InValue)
 {
 	if(InValue == 0.f) return;
 
@@ -404,7 +439,7 @@ void AWHPlayerController::MoveRight(float InValue)
 	}
 }
 
-void AWHPlayerController::MoveUp(float InValue)
+void AWHPlayerController::MoveUpPlayer(float InValue)
 {
 	if(InValue == 0.f) return;
 
