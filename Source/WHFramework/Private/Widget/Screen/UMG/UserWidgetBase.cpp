@@ -10,6 +10,7 @@
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"
+#include "Input/InputModuleBPLibrary.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -218,6 +219,10 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 	}
 	else
 	{
+		if(IsRooted())
+		{
+			RemoveFromRoot();
+		}
 		ConditionalBeginDestroy();
 	}
 }

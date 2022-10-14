@@ -257,11 +257,7 @@ void AWidgetModule::ClearAllUserWidget()
 	{
 		if(Iter.Value)
 		{
-			if(Iter.Value->IsRooted())
-			{
-				Iter.Value->RemoveFromRoot();
-			}
-			Iter.Value->ConditionalBeginDestroy();
+			Iter.Value->OnDestroy();
 		}
 	}
 	AllUserWidgets.Empty();
