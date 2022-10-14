@@ -69,6 +69,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static AVoxelChunk* FindChunkByLocation(FVector InLocation);
+		
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FVoxelItem& FindVoxelByIndex(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FVoxelItem& FindVoxelByLocation(FVector InLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel

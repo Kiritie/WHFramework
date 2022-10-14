@@ -60,6 +60,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 		case EVoxelMeshNature::Preview:
 		{
 			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector(0.5f);
 			SetCollisionEnabled(false);
 			break;
 		}

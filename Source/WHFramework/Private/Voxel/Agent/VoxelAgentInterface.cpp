@@ -20,12 +20,12 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	const FRotator Rotation = (VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f - GetWorldLocation()).ToOrientationRotator();
 	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
 	
-	FHitResult HitResult;
 	TArray<AActor*> IgnoreActors;
 	if(VoxelItem.Auxiliary)
 	{
 		IgnoreActors.Add(VoxelItem.Auxiliary);
 	}
+	FHitResult HitResult;
 	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, IgnoreActors, HitResult))
 	{
 		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);

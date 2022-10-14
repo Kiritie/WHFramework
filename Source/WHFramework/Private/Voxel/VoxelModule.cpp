@@ -66,22 +66,24 @@ AVoxelModule::AVoxelModule()
 	ChunkSpawnSpeed = 100;
 	ChunkDestroyDistance = 1;
 	ChunkDestroySpeed = 10;
+	ChunkGenerateSpeed = 1;
 	ChunkMapLoadSpeed = 100;
 	ChunkMapBuildSpeed = 100;
 	ChunkMeshBuildSpeed = 100;
-	ChunkGenerateSpeed = 1;
+	ChunkDataSaveSpeed = 50;
 
 	ChunkSpawnBatch = 0;
 	LastGenerateIndex = Index_Empty;
 	LastStayChunkIndex = Index_Empty;
 	ChunkMap = TMap<FIndex, AVoxelChunk*>();
 	ChunkSpawnQueue = TArray<FIndex>();
+	ChunkDestroyQueue = TArray<FIndex>();
+	ChunkGenerateQueue = TArray<FIndex>();
 	ChunkMapLoadQueue = TArray<FIndex>();
 	ChunkMapBuildQueue = TArray<FIndex>();
 	ChunkMapBuildQueue1 = TArray<FIndex>();
 	ChunkMeshBuildQueue = TArray<FIndex>();
-	ChunkGenerateQueue = TArray<FIndex>();
-	ChunkDestroyQueue = TArray<FIndex>();
+	ChunkDataSaveQueue = TArray<FIndex>();
 
 	WorldBasicData = FVoxelWorldBasicSaveData();
 	
@@ -260,6 +262,7 @@ void AVoxelModule::UnloadData(bool bForceMode)
 		ChunkMapBuildQueue1.Empty();
 		ChunkMeshBuildQueue.Empty();
 		ChunkGenerateQueue.Empty();
+		ChunkDataSaveQueue.Empty();
 		ChunkDestroyQueue.Empty();
 
 		WorldData = nullptr;
@@ -347,6 +350,11 @@ void AVoxelModule::GenerateWorld()
 	{
 		SetWorldState(EVoxelWorldState::BuildingMesh);
 	}
+	// Save chunk data
+	else if(UpdateChunkTasks(ChunkDataSaveQueue, ChunkDataSaveTasks, ChunkDataSaveSpeed))
+	{
+		SetWorldState(EVoxelWorldState::SavingData);
+	}
 	// Destroy chunk
 	else if(UpdateChunkQueue(ChunkDestroyQueue, ChunkDestroySpeed, [this](FIndex Index){ DestroyChunk(Index); }))
 	{
@@ -371,7 +379,7 @@ void AVoxelModule::GenerateVoxels()
 	auto VoxelDatas = UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 	for(int32 i = 0; i < VoxelDatas.Num(); i++)
 	{
-		if(VoxelDatas[i]->IsUnknown() || VoxelDatas[i]->IsCustom() || VoxelDatas[i]->PartType != EVoxelPartType::Main) continue;
+		if(VoxelDatas[i]->IsUnknown() || /*VoxelDatas[i]->IsCustom() || */VoxelDatas[i]->PartType != EVoxelPartType::Main) continue;
 		
 		if(AVoxelEntityPreview* VoxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntityPreview>())
 		{
@@ -412,6 +420,14 @@ void AVoxelModule::BuildChunkMesh(FIndex InIndex)
 	}
 }
 
+void AVoxelModule::SaveChunkData(FIndex InIndex)
+{
+	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
+	{
+		WorldData->SetChunkData(InIndex, Chunk->ToSaveData<FVoxelChunkSaveData>());
+	}
+}
+
 void AVoxelModule::GenerateChunk(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
@@ -424,10 +440,7 @@ void AVoxelModule::DestroyChunk(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
 	{
-		WorldData->SetChunkData(InIndex, Chunk->ToSaveData<FVoxelChunkSaveData>());
-		
 		UObjectPoolModuleBPLibrary::DespawnObject(Chunk);
-
 		ChunkMap.Remove(InIndex);
 	}
 }
@@ -536,6 +549,24 @@ bool AVoxelModule::RemoveFromMeshBuildQueue(FIndex InIndex)
 	return false;
 }
 
+bool AVoxelModule::AddToDataSaveQueue(FIndex InIndex)
+{
+	if(!ChunkMap.Contains(InIndex)) return false;
+	
+	ChunkDataSaveQueue.AddUnique(InIndex);
+	return true;
+}
+
+bool AVoxelModule::RemoveFromDataSaveQueue(FIndex InIndex)
+{
+	if(ChunkDataSaveQueue.Contains(InIndex))
+	{
+		ChunkDataSaveQueue.Remove(InIndex);
+		return true;
+	}
+	return false;
+}
+
 bool AVoxelModule::AddToGenerateQueue(FIndex InIndex)
 {
 	if(!ChunkMap.Contains(InIndex)) return false;
@@ -568,7 +599,10 @@ bool AVoxelModule::AddToDestroyQueue(FIndex InIndex)
 	RemoveFromMapBuildQueue(InIndex, 0);
 	RemoveFromMapBuildQueue(InIndex, 1);
 	RemoveFromMeshBuildQueue(InIndex);
+	RemoveFromDataSaveQueue(InIndex);
 	RemoveFromGenerateQueue(InIndex);
+
+	AddToDataSaveQueue(InIndex);
 
 	ChunkDestroyQueue.AddUnique(InIndex);
 	ChunkDestroyQueue.Sort([this](const FIndex& A, const FIndex& B){
@@ -640,6 +674,20 @@ AVoxelChunk* AVoxelModule::FindChunkByIndex(FIndex InIndex)
 AVoxelChunk* AVoxelModule::FindChunkByLocation(FVector InLocation)
 {
 	return FindChunkByIndex(LocationToChunkIndex(InLocation));
+}
+
+FVoxelItem& AVoxelModule::FindVoxelByIndex(FIndex InIndex)
+{
+	return FindVoxelByLocation(VoxelIndexToLocation(InIndex));
+}
+
+FVoxelItem& AVoxelModule::FindVoxelByLocation(FVector InLocation)
+{
+	if(AVoxelChunk* Chunk = FindChunkByLocation(InLocation))
+	{
+		return Chunk->GetVoxelItem(Chunk->LocationToIndex(InLocation));
+	}
+	return FVoxelItem::Empty;
 }
 
 FIndex AVoxelModule::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)

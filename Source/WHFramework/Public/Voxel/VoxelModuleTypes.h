@@ -40,10 +40,11 @@ enum class EVoxelWorldState : uint8
 	None,
 	Spawning,
 	Destroying,
+	Generating,
 	LoadingMap,
 	BuildingMap,
 	BuildingMesh,
-	Generating
+	SavingData
 };
 
 /**

@@ -126,6 +126,24 @@ AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByLocation(FVector InLocation)
 	return nullptr;
 }
 
+FVoxelItem& UVoxelModuleBPLibrary::FindVoxelByIndex(FIndex InIndex)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->FindVoxelByIndex(InIndex);
+	}
+	return FVoxelItem::Empty;
+}
+
+FVoxelItem& UVoxelModuleBPLibrary::FindVoxelByLocation(FVector InLocation)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->FindVoxelByLocation(InLocation);
+	}
+	return FVoxelItem::Empty;
+}
+
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(EVoxelType InVoxelType)
 {
 	return GetVoxel(VoxelTypeToAssetID(InVoxelType));
@@ -176,7 +194,9 @@ bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius
 
 bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	return UKismetSystemLibrary::CapsuleTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	FHitResult VoxelHitResult;
+	return UKismetSystemLibrary::CapsuleTraceSingle(AMainModule::Get(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true) &&
+		!VoxelTraceSingle(OutHitResult.Location, OutHitResult.Location, InRadius * 0.95f, InHalfHeight * 0.95f, {}, VoxelHitResult);
 }
 
 bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)

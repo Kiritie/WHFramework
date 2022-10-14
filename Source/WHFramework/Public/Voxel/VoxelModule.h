@@ -10,6 +10,7 @@
 #include "Voxel/AsyncTasks/AsyncTask_LoadChunkMap.h"
 #include "Voxel/AsyncTasks/AsyncTask_BuildChunkMap.h"
 #include "Voxel/AsyncTasks/AsyncTask_BuildChunkMesh.h"
+#include "AsyncTasks/AsyncTask_SaveChunkData.h"
 #include "VoxelModule.generated.h"
 
 class AVoxelChunk;
@@ -30,6 +31,7 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterfa
 	friend class AsyncTask_BuildChunkMap;
 	friend class AsyncTask_BuildChunkMesh;
 	friend class AsyncTask_LoadChunkMap;
+	friend class AsyncTask_SaveChunkData;
 		
 	MODULE_INSTANCE_DECLARE(AVoxelModule)
 
@@ -129,7 +131,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkDestroySpeed;
-										
+			
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	int32 ChunkGenerateSpeed;
+							
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkMapLoadSpeed;
 
@@ -138,9 +143,9 @@ protected:
 					
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkMeshBuildSpeed;
-
+	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkGenerateSpeed;
+	int32 ChunkDataSaveSpeed;
 	
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
@@ -163,6 +168,8 @@ protected:
 	TArray<FIndex> ChunkMeshBuildQueue;
 
 	TArray<FIndex> ChunkGenerateQueue;
+	
+	TArray<FIndex> ChunkDataSaveQueue;
 
 	TArray<FIndex> ChunkDestroyQueue;
 		
@@ -171,6 +178,8 @@ protected:
 	TArray<FAsyncTask<AsyncTask_BuildChunkMap>*> ChunkMapBuildTasks;
 	
 	TArray<FAsyncTask<AsyncTask_BuildChunkMesh>*> ChunkMeshBuildTasks;
+		
+	TArray<FAsyncTask<AsyncTask_SaveChunkData>*> ChunkDataSaveTasks;
 
 protected:
 	virtual void GenerateWorld();
@@ -183,6 +192,8 @@ protected:
 	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
 
 	virtual void BuildChunkMesh(FIndex InIndex);
+	
+	virtual void SaveChunkData(FIndex InIndex);
 
 	virtual void GenerateChunk(FIndex InIndex);
 
@@ -203,6 +214,10 @@ protected:
 	virtual bool AddToMeshBuildQueue(FIndex InIndex);
 
 	virtual bool RemoveFromMeshBuildQueue(FIndex InIndex);
+	
+	virtual bool AddToDataSaveQueue(FIndex InIndex);
+
+	virtual bool RemoveFromDataSaveQueue(FIndex InIndex);
 
 	virtual bool AddToGenerateQueue(FIndex InIndex);
 
@@ -219,6 +234,10 @@ public:
 
 	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation);
 	
+	virtual FVoxelItem& FindVoxelByIndex(FIndex InIndex);
+
+	virtual FVoxelItem& FindVoxelByLocation(FVector InLocation);
+
 public:
 	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
 

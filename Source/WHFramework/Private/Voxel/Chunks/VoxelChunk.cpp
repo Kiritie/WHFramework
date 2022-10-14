@@ -677,10 +677,14 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 		DIRECTION_ITERATOR(Iter2, 
 			if(!bIgnoreBottom || Iter2 != EDirection::Down)
 			{
-				FVoxelItem& NeighborItem = GetVoxelItem(InIndex + Iter1 + UMathBPLibrary::DirectionToIndex(Iter2));
-				if(NeighborItem.IsValid() && NeighborItem.GetVoxelData().VoxelType == InVoxelType)
+				const FIndex NeighborIndex = InIndex + Iter1 + UMathBPLibrary::DirectionToIndex(Iter2);
+				if(IsOnTheChunk(NeighborIndex))
 				{
-					return true;
+					FVoxelItem& NeighborItem = GetVoxelItem(NeighborIndex);
+					if(NeighborItem.IsValid() && NeighborItem.GetVoxelData().VoxelType == InVoxelType)
+					{
+						return true;
+					}
 				}
 			}
 		)
