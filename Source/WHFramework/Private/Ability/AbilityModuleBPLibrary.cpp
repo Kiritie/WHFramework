@@ -20,11 +20,11 @@ const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityBySpec(const 
 	return AbilityInstance;
 }
 
-bool UAbilityModuleBPLibrary::GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo)
+bool UAbilityModuleBPLibrary::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> AbilityClass, FAbilityInfo& OutAbilityInfo)
 {
 	if (AbilityClass != nullptr)
 	{
-		UAbilityBase* Ability = AbilityClass.GetDefaultObject();
+		UGameplayAbility* Ability = AbilityClass.GetDefaultObject();
 		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
 		{
 			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];

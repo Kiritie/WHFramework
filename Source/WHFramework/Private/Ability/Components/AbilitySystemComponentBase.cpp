@@ -200,12 +200,9 @@ FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoBySpec(FGameplayAbilityS
 			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CooldownDuration);
 		}
 	}
-	if(Spec.GetAbilityInstances().Num() > 0)
+	if(UGameplayAbility* Ability = Spec.GetPrimaryInstance())
 	{
-		if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetAbilityInstances()[0]))
-		{
-			AbilityInfo.CooldownRemaining = Ability->GetCooldownTimeRemaining();
-		}
+		AbilityInfo.CooldownRemaining = Ability->GetCooldownTimeRemaining();
 	}
 	return AbilityInfo;
 }

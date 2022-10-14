@@ -101,3 +101,8 @@ void FRaceData::OnDataTableChanged(const UDataTable* InDataTable, const FName In
 		RaceData->ID = *FString::Printf(TEXT("Race_%d"), InDataTable->GetRowNames().Find(InRowName));
 	}
 }
+
+EAbilityItemType FAbilityItem::GetType() const
+{
+	return GetData().GetItemType();
+}

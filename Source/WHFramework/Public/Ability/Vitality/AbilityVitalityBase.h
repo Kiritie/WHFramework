@@ -10,6 +10,7 @@
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
+#include "../Inventory/InventoryAgentInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
@@ -20,12 +21,13 @@ class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
+class UVitalityInventory;
 
 /**
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IInventoryAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -41,16 +43,19 @@ protected:
 	UBoxComponent* BoxComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityInteractionComponent* Interaction;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UFSMComponent* FSM;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVitalityAttributeSetBase* AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityInteractionComponent* Interaction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityInventory* Inventory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UFSMComponent* FSM;
 
 protected:
 	// stats
@@ -102,6 +107,20 @@ public:
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
+	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
+		
+	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
+
+	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
+
+	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+
+	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
+
 public:
 	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
@@ -133,6 +152,8 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
+	
+	virtual UInventory* GetInventory() const override;
 
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 

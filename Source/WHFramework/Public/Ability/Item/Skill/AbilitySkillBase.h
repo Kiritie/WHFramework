@@ -3,13 +3,14 @@
 #pragma once
 
 #include "Ability/Item/AbilityItemBase.h"
+#include "../../Interfaces/AbilityAttackerInterface.h"
 #include "AbilitySkillBase.generated.h"
 
 /**
  * 技能基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilitySkillBase : public AAbilityItemBase
+class WHFRAMEWORK_API AAbilitySkillBase : public AAbilityItemBase, public IAbilityAttackerInterface
 {
 	GENERATED_BODY()
 	
@@ -23,6 +24,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
 	float DurationTime;
 
+	UPROPERTY()
+	TArray<AActor*> HitTargets;
+
 private:
 	FTimerHandle DestroyTimer;
 
@@ -35,4 +39,13 @@ protected:
 	
 public:
 	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
+	
+public:
+	virtual bool CanHitTarget_Implementation(AActor* InTarget) override;
+
+	virtual void OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult) override;
+	
+	virtual void ClearHitTargets_Implementation();
+
+	virtual void SetHitAble_Implementation(bool bValue);
 };

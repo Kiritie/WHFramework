@@ -96,7 +96,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 	if(!InItem.IsValid()) return nullptr;
 
 	AAbilityPickUpBase* PickUp = nullptr;
-	switch (InItem.GetData().GetItemType())
+	switch (InItem.GetType())
 	{
 		case EAbilityItemType::Voxel:
 		{

@@ -20,6 +20,7 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 	SphereComponent->SetupAttachment(RootComponent);
 	SphereComponent->SetCollisionProfileName(TEXT("Skill"));
 	SphereComponent->SetSphereRadius(50);
+	SphereComponent->SetGenerateOverlapEvents(false);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilitySkillRemoteBase::OnBeginOverlap);
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
@@ -37,14 +38,11 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 	InitialVelocity = FVector(3000, 0, 0);
 }
 
-void AAbilitySkillRemoteBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	Super::Initialize_Implementation(InOwnerCharacter, InItem);
-
-	if(Execute_IsVisible(this))
+	if(Execute_CanHitTarget(this, OtherActor))
 	{
-		SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		MovementComponent->Velocity = GetActorRotation().RotateVector(InitialVelocity);
+		Execute_OnHitTarget(this, OtherActor, SweepResult);
 	}
 }
 
@@ -55,21 +53,41 @@ void AAbilitySkillRemoteBase::OnSpawn_Implementation(const TArray<FParameter>& I
 
 void AAbilitySkillRemoteBase::OnDespawn_Implementation()
 {
-	SphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MovementComponent->Velocity = FVector::ZeroVector;
-
 	Super::OnDespawn_Implementation();
+
+	Execute_SetHitAble(this, false);
+	Execute_ClearHitTargets(this);
+	MovementComponent->Velocity = FVector::ZeroVector;
 }
 
-void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AAbilitySkillRemoteBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
 {
-	if(OtherActor != GetOwnerCharacter())
-	{
-		OnHitTarget(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
-	}
+	Super::Initialize_Implementation(InOwnerCharacter, InItem);
+
+	Execute_SetHitAble(this, true);
+	MovementComponent->Velocity = GetActorRotation().RotateVector(InitialVelocity);
 }
 
-void AAbilitySkillRemoteBase::OnHitTarget_Implementation(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+bool AAbilitySkillRemoteBase::CanHitTarget_Implementation(AActor* InTarget)
 {
+	return Super::CanHitTarget_Implementation(InTarget);
+}
+
+void AAbilitySkillRemoteBase::OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult)
+{
+	Super::OnHitTarget_Implementation(InTarget, InHitResult);
+
+	UObjectPoolModuleBPLibrary::DespawnObject(this);
+}
+
+void AAbilitySkillRemoteBase::ClearHitTargets_Implementation()
+{
+	Super::ClearHitTargets_Implementation();
+}
+
+void AAbilitySkillRemoteBase::SetHitAble_Implementation(bool bValue)
+{
+	Super::SetHitAble_Implementation(bValue);
+
+	SphereComponent->SetGenerateOverlapEvents(bValue);
 }

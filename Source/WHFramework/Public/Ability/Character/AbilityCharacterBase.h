@@ -11,6 +11,7 @@
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
+#include "../Inventory/InventoryAgentInterface.h"
 
 #include "AbilityCharacterBase.generated.h"
 
@@ -24,12 +25,13 @@ class AController;
 class UAbilityBase;
 class UAbilitySystemComponentBase;
 class AAbilitySkillBase;
+class UCharacterInventory;
 
 /**
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface, public IInventoryAgentInterface
 {
 	GENERATED_BODY()
 
@@ -70,6 +72,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCharacterInteractionComponent* Interaction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UCharacterInventory* Inventory;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
@@ -129,6 +134,20 @@ public:
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+	
+	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
+		
+	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
+
+	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
+
+	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+
+	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
@@ -157,6 +176,8 @@ public:
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
+	
+	virtual UInventory* GetInventory() const override;
 
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 

@@ -42,17 +42,17 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 
 void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(InteractionAgent == nullptr)
+	if(InteractingAgent == nullptr)
 	{
-		SetInteractionAgent(InInteractionAgent);
+		SetInteractingAgent(InInteractionAgent);
 	}
 }
 
 void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(InInteractionAgent == InteractionAgent)
+	if(InInteractionAgent == InteractingAgent)
 	{
-		SetInteractionAgent(nullptr);
+		SetInteractingAgent(nullptr);
 	}
 }
 
@@ -97,28 +97,28 @@ TArray<EInteractAction> UInteractionComponent::GetValidInteractActions(IInteract
 	return ReturnValues;
 }
 
-void UInteractionComponent::SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent)
+void UInteractionComponent::SetInteractingAgent(IInteractionAgentInterface* InInteractingAgent)
 {
-	if(InInteractionAgent == InteractionAgent) return;
+	if(InInteractingAgent == InteractingAgent) return;
 
-	if(InteractionAgent)
+	if(InteractingAgent)
 	{
-		GetInteractionOwner()->OnLeaveInteract(InteractionAgent);
+		GetInteractionOwner()->OnLeaveInteract(InteractingAgent);
 	}
 
-	InteractionAgent = InInteractionAgent;
+	InteractingAgent = InInteractingAgent;
 
-	if(InteractionAgent)
+	if(InteractingAgent)
 	{
-		GetInteractionOwner()->OnEnterInteract(InteractionAgent);
+		GetInteractionOwner()->OnEnterInteract(InteractingAgent);
 	}
 }
 
-UInteractionComponent* UInteractionComponent::GetInteractionComponent() const
+UInteractionComponent* UInteractionComponent::GetInteractingComponent() const
 {
-	if(InteractionAgent)
+	if(InteractingAgent)
 	{
-		return InteractionAgent->GetInteractionComponent();
+		return InteractingAgent->GetInteractionComponent();
 	}
 	return nullptr;
 }

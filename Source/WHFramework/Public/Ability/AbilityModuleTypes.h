@@ -14,6 +14,8 @@ class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
+class UWidgetInventorySlotBase;
+class UInventorySlot;
 
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -460,6 +462,8 @@ enum class EAbilityItemType : uint8
 	None UMETA(DisplayName="无"),
 	// 体素
 	Voxel UMETA(DisplayName="体素"),
+	// 材料
+	Raw UMETA(DisplayName="材料"),
 	// 道具
 	Prop UMETA(DisplayName="道具"),
 	// 装备
@@ -534,6 +538,8 @@ public:
 	}
 
 	UAbilityItemDataBase& GetData(bool bLogWarning = true) const;
+	
+	EAbilityItemType GetType() const;
 
 	FORCEINLINE virtual bool IsValid(bool bNeedNotNull = false) const
 	{
@@ -610,6 +616,191 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FAbilityItem> Items;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryRefresh);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UInventorySlot*, InInventorySlot);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotRefresh);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotCanceled);
+
+UENUM(BlueprintType)
+enum class ESplitSlotType : uint8
+{
+	None,
+	Default,
+	Shortcut,
+	Auxiliary,
+	Equip,
+	Skill
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FQueryItemInfo
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FQueryItemInfo()
+	{
+		Item = FAbilityItem();
+		Slots = TArray<UInventorySlot*>();
+	}
+
+	FORCEINLINE FQueryItemInfo(FAbilityItem InItem, TArray<UInventorySlot*> InSlots)
+	{
+		Item = InItem;
+		Slots = InSlots;
+	}
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TArray<UInventorySlot*> Slots;
+
+public:
+	FORCEINLINE bool IsSuccess() const
+	{
+		return Item.Count > 0;
+	}
+
+	FORCEINLINE friend FQueryItemInfo operator+(FQueryItemInfo& A, FQueryItemInfo& B)
+	{
+		A.Item += B.Item;
+		for(auto Iter : B.Slots)
+		{
+			A.Slots.Add(Iter);
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FQueryItemInfo operator+=(FQueryItemInfo& A, FQueryItemInfo B)
+	{
+		A.Item = B.Item;
+		for(auto Iter : B.Slots)
+		{
+			A.Slots.Add(Iter);
+		}
+		return A;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSplitSlotInfo
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FSplitSlotInfo()
+	{
+		StartIndex = 0;
+		TotalCount = 0;
+	}
+
+	FORCEINLINE FSplitSlotInfo(int32 InStartIndex, int32 InTotalCount)
+	{
+		StartIndex = InStartIndex;
+		TotalCount = InTotalCount;
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	int32 StartIndex;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	int32 TotalCount;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSplitSlotData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FSplitSlotData()
+	{
+		Slots = TArray<UInventorySlot*>();
+	}
+	
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	TArray<UInventorySlot*> Slots;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetSplitSlotData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FWidgetSplitSlotData()
+	{
+		Slots = TArray<UWidgetInventorySlotBase*>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	TArray<UWidgetInventorySlotBase*> Slots;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInventorySaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FInventorySaveData()
+	{
+		SplitInfos = TMap<ESplitSlotType, FSplitSlotInfo>();
+		Items = TArray<FAbilityItem>();
+		SelectedIndex = -1;
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<ESplitSlotType, FSplitSlotInfo> SplitInfos;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityItem> Items;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	int32 SelectedIndex;
+
+public:
+	FSplitSlotInfo GetSplitSlotInfo(ESplitSlotType InSplitSlotType) const
+	{
+		if(SplitInfos.Contains(InSplitSlotType))
+		{
+			return SplitInfos[InSplitSlotType];
+		}
+		return FSplitSlotInfo();
+	}
+
+	void AddItem(const FAbilityItem& InItem, ESplitSlotType InSplitSlotType = ESplitSlotType::None)
+	{
+		FSplitSlotInfo SplitSlotInfo = GetSplitSlotInfo(InSplitSlotType);
+		for(int32 i = SplitSlotInfo.StartIndex; i < (SplitSlotInfo.TotalCount > 0 ? SplitSlotInfo.TotalCount : Items.Num()); i++)
+		{
+			if(Items.IsValidIndex(i) && !Items[i].IsValid())
+			{
+				Items[i] = InItem;
+				break;
+			}
+		}
+	}
+};
+
+/**
+ * 查询项类型
+ */
+UENUM(BlueprintType)
+enum class EQueryItemType : uint8
+{
+	// 获取
+	Get,
+	// 添加
+	Add,
+	// 移除
+	Remove,
 };
 
 USTRUCT(BlueprintType)
@@ -723,6 +914,7 @@ public:
 		Name = NAME_None;
 		RaceID = NAME_None;
 		Level = 0;
+		InventoryData = FInventorySaveData();
 		SpawnLocation = FVector::ZeroVector;
 		SpawnRotation = FRotator::ZeroRotator;
 	}
@@ -739,7 +931,10 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 Level;
-	
+		
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
+
 	UPROPERTY()
 	FVector SpawnLocation;
 	

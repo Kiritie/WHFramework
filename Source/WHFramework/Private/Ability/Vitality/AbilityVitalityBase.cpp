@@ -19,6 +19,8 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Ability/Inventory/VitalityInventory.h"
+#include "Ability/AbilityModuleBPLibrary.h"
 
 // Sets default values
 AAbilityVitalityBase::AAbilityVitalityBase()
@@ -29,6 +31,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetCollisionProfileName(FName("Vitality"));
 	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
+	BoxComponent->CanCharacterStepUpOn = ECB_No;
 	SetRootComponent(BoxComponent);
 
 	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
@@ -36,7 +39,9 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
-	
+			
+	//Inventory = CreateDefaultSubobject<UVitalityInventory>(FName("Inventory"));
+
 	Interaction = CreateDefaultSubobject<UVitalityInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
@@ -46,7 +51,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
 	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
-	
+
 	// stats
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
@@ -97,6 +102,8 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 	}
 
 	SetNameV(SaveData.Name);
+
+	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
 }
 
 FSaveData* AAbilityVitalityBase::ToData()
@@ -108,6 +115,8 @@ FSaveData* AAbilityVitalityBase::ToData()
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
+
+	SaveData.InventoryData = Inventory->ToSaveDataRef<FInventorySaveData>();
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
@@ -189,6 +198,50 @@ void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionA
 	
 }
 
+void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
+{
+
+}
+
+void AAbilityVitalityBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
+{
+
+}
+
+void AAbilityVitalityBase::OnAssembleItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityVitalityBase::OnDischargeItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
+{
+	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+}
+
+void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
+{
+	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+	{
+		SetGenerateVoxelID(InItem.ID);
+	}
+	else
+	{
+		SetGenerateVoxelID(FPrimaryAssetId());
+	}
+}
+
+void AAbilityVitalityBase::OnAuxiliaryItem(const FAbilityItem& InItem)
+{
+
+}
+
 bool AAbilityVitalityBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
@@ -242,6 +295,11 @@ UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
 UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
 {
 	return Interaction;
+}
+
+UInventory* AAbilityVitalityBase::GetInventory() const
+{
+	return Inventory;
 }
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)

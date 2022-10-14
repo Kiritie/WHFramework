@@ -26,7 +26,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EInteractAction InteractingAction;
 
-	IInteractionAgentInterface* InteractionAgent;
+	IInteractionAgentInterface* InteractingAgent;
 
 protected:
 	// Called when the game starts or when spawned
@@ -54,11 +54,11 @@ public:
 public:
 	EInteractAction GetInteractingAction() const { return InteractingAction; }
 
-	IInteractionAgentInterface* GetInteractionAgent() const { return InteractionAgent; }
+	IInteractionAgentInterface* GetInteractingAgent() const { return InteractingAgent; }
 
-	UInteractionComponent* GetInteractionComponent() const;
+	UInteractionComponent* GetInteractingComponent() const;
 
-	void SetInteractionAgent(IInteractionAgentInterface* InInteractionAgent);
+	void SetInteractingAgent(IInteractionAgentInterface* InInteractingAgent);
 
 	IInteractionAgentInterface* GetInteractionOwner() const;
 };

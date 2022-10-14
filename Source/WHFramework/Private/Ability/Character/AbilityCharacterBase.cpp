@@ -24,6 +24,8 @@
 #include "Perception/AISense_Damage.h"
 #include "Perception/AISense_Sight.h"
 #include "Scene/SceneModuleBPLibrary.h"
+#include "Ability/Inventory/CharacterInventory.h"
+#include "Ability/AbilityModuleBPLibrary.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
@@ -38,6 +40,8 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 
 	// AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 	
+	//Inventory = CreateDefaultSubobject<UCharacterInventory>(FName("Inventory"));
+
 	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
@@ -117,6 +121,8 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 	}
 
 	SetNameV(SaveData.Name);
+
+	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
 }
 
 FSaveData* AAbilityCharacterBase::ToData()
@@ -128,6 +134,10 @@ FSaveData* AAbilityCharacterBase::ToData()
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
+
+	SaveData.InventoryData = Inventory->ToSaveDataRef<FInventorySaveData>();
+
+	SaveData.DefaultAbility = DefaultAbility;
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
@@ -165,7 +175,10 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	RefreshState();
+	if(IsActive(true))
+	{
+		RefreshState();
+	}
 }
 
 void AAbilityCharacterBase::RefreshState()
@@ -265,6 +278,10 @@ void AAbilityCharacterBase::UnJump()
 
 void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)
 {
+	if(InPickUp)
+	{
+		Inventory->AddItemByRange(InPickUp->GetItem(), -1);
+	}
 }
 
 void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
@@ -285,6 +302,50 @@ void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteraction
 	
 }
 
+void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
+{
+
+}
+
+void AAbilityCharacterBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
+{
+
+}
+
+void AAbilityCharacterBase::OnAssembleItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityCharacterBase::OnDischargeItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
+{
+	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+}
+
+void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
+{
+	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+	{
+		SetGenerateVoxelID(InItem.ID);
+	}
+	else
+	{
+		SetGenerateVoxelID(FPrimaryAssetId());
+	}
+}
+
+void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
+{
+
+}
+
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
@@ -303,6 +364,11 @@ UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 {
 	return Interaction;
+}
+
+UInventory* AAbilityCharacterBase::GetInventory() const
+{
+	return Inventory;
 }
 
 bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
@@ -393,7 +459,7 @@ void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, f
 	MovementRate = InMovementRate;
 	RotationRate = InRotationRate;
 	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
-	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed(), 0) * RotationRate;
+	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed() * RotationRate, 0);
 }
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
@@ -413,7 +479,7 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	}
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetRotationSpeedAttribute())
 	{
-		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue, 0) * RotationRate;
+		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
 	}
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetJumpForceAttribute())
 	{

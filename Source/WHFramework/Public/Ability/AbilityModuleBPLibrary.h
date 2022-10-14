@@ -10,7 +10,7 @@
 #include "AbilityModuleBPLibrary.generated.h"
 
 class UAbilitySystemComponentBase;
-class UAbilityBase;
+class UGameplayAbility;
 class ISceneContainerInterface;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
@@ -30,7 +30,7 @@ public:
 	static const UGameplayAbility* GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
 
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static bool GetAbilityInfoByClass(TSubclassOf<UAbilityBase> AbilityClass, FAbilityInfo& OutAbilityInfo);
+	static bool GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> AbilityClass, FAbilityInfo& OutAbilityInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Item
@@ -63,7 +63,7 @@ public:
 			{
 				const auto& raceData = raceDatas[i];
 				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1), true);
-				if(noiseHeight > raceData.NoiseScale.Z)
+				if(noiseHeight >= raceData.NoiseScale.Z)
 				{
 					OutDatas.Add(raceData);
 				}

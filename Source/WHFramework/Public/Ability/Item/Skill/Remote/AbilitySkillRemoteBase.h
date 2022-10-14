@@ -32,11 +32,12 @@ protected:
 	UProjectileMovementComponent* MovementComponent;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Default")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector InitialVelocity;
 	
-public:
-	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
+protected:
+	UFUNCTION()
+	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -45,12 +46,17 @@ protected:
 
 	virtual void OnDespawn_Implementation() override;
 
-protected:
-	UFUNCTION()
-	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+public:
+	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;
+		
+public:
+	virtual bool CanHitTarget_Implementation(AActor* InTarget) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnHitTarget(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	virtual void OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult) override;
+	
+	virtual void ClearHitTargets_Implementation();
+
+	virtual void SetHitAble_Implementation(bool bValue);
 
 public:
 	UFUNCTION(BlueprintPure)
