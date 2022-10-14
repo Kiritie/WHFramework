@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 
-#include "Engine/TargetPoint.h"
 #include "Main/Base/ModuleBase.h"
 
-#include "Engine/LatentActionManager.h"
 #include "LatentAction/LatentActionModuleTypes.h"
 
 #include "LatentActionModule.generated.h"
+
+class ATargetPoint;
 
 
 /**

@@ -1,9 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "LatentAction/LatentActionModule.h"
 
 #include "Debug/DebugModuleTypes.h"
+#include "Engine/LatentActionManager.h"
+#include "Engine/TargetPoint.h"
+#include "Main/MainModule.h"
 		
 MODULE_INSTANCE_IMPLEMENTATION(ALatentActionModule)
 

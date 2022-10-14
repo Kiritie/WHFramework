@@ -207,6 +207,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static FParameter MakeStringParameter(FString InValue);
+	
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static FParameter MakeTextParameter(FText InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static FParameter MakeBooleanParameter(bool InValue);
