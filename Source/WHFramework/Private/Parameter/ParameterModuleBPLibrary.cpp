@@ -499,6 +499,11 @@ FParameter UParameterModuleBPLibrary::MakeStringParameter(FString InValue)
 	return FParameter::MakeString(InValue);
 }
 
+FParameter UParameterModuleBPLibrary::MakeTextParameter(FText InValue)
+{
+	return FParameter::MakeText(InValue);
+}
+
 FParameter UParameterModuleBPLibrary::MakeBooleanParameter(bool InValue)
 {
 	return FParameter::MakeBoolean(InValue);
