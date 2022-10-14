@@ -104,8 +104,10 @@ void UFSMComponent::OnTermination()
 
 bool UFSMComponent::SwitchState(UFiniteStateBase* InState)
 {
-	if(!bInitialized || InState == CurrentState || InState && !HasState(InState)) return false;
+	if(!bInitialized || InState && !HasState(InState)) return false;
 	
+	if(InState == CurrentState) return true;
+
 	UFiniteStateBase* LastState = CurrentState;
 
 	if(!LastState || LastState->OnLeaveValidate(InState))
