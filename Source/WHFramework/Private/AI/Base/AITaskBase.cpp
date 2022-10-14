@@ -10,6 +10,9 @@
 
 UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bNotifyTick = true;
+	bNotifyTaskFinished = true;
+
 	OwnerController = nullptr;
 	OwnerCharacter = nullptr;
 }
