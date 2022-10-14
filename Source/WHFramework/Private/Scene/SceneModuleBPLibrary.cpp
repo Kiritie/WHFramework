@@ -161,6 +161,15 @@ void USceneModuleBPLibrary::RemoveScenePointByName(FName InName)
 	}
 }
 
+APhysicsVolume* USceneModuleBPLibrary::GetDefaultPhysicsVolume()
+{
+	if(ASceneModule* SceneModule = ASceneModule::Get())
+	{
+		return SceneModule->GetWorld()->GetDefaultPhysicsVolume();
+	}
+	return nullptr;
+}
+
 bool USceneModuleBPLibrary::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
 	if(ASceneModule* SceneModule = ASceneModule::Get())

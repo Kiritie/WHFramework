@@ -11,6 +11,7 @@
 class UWorldWeatherComponent;
 class UWorldTimerComponent;
 class APhysicsVolumeBase;
+class APhysicsVolume;
 /**
  * 
  */
@@ -86,6 +87,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Physics Volume
+	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
+	static APhysicsVolume* GetDefaultPhysicsVolume();
+	
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
 	static bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
 	
