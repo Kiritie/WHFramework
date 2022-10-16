@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Ability/AbilityModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -42,5 +42,5 @@ protected:
 
 	virtual void UnloadData(bool bForceMode) { }
 
-	virtual bool HasArchive() { return false; }
+	virtual bool HasArchive() const { return false; }
 };
