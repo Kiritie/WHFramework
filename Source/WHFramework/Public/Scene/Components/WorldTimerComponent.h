@@ -31,33 +31,31 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
 	float SecondsOfDay;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
-	float SunriseTime;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
-	float SunsetTime;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	int CurrentDay;
+	int32 CurrentDay;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	int CurrentHour;
+	int32 CurrentHour;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	int CurrentMinute;
+	int32 CurrentMinute;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	int CurrentSeconds;
+	int32 CurrentSeconds;
 		
 protected:
 	virtual void BeginPlay() override;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void SetTimeSeconds(int InTimeSeconds, bool bUpdateTimer = true);
+	void InitializeTimer(float InSecondsOfDay);
 
+	UFUNCTION(BlueprintCallable)
 	void UpdateTimer(float DeltaSeconds = 0.f);
+
+	UFUNCTION(BlueprintCallable)
+	void SetCurrentTime(float InTimeSeconds, bool bUpdateTimer = true);
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent)
@@ -65,26 +63,29 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintPure)
+	float GetSunriseTime() const;
+
+	UFUNCTION(BlueprintPure)
+	float GetNoonTime() const;
+
+	UFUNCTION(BlueprintPure)
+	float GetSunsetTime() const;
+
+	UFUNCTION(BlueprintPure)
 	float GetSecondsOfDay() const { return SecondsOfDay; }
 
 	UFUNCTION(BlueprintPure)
-	float GetSunriseTime() const { return SunriseTime; }
+	float GetTimeSeconds() const { return TimeSeconds; }
 
 	UFUNCTION(BlueprintPure)
-	float GetSunsetTime() const { return SunsetTime; }
+	int32 GetCurrentDay() const { return CurrentDay; }
 
 	UFUNCTION(BlueprintPure)
-	int GetTimeSeconds() const { return TimeSeconds; }
+	int32 GetCurrentHour() const { return CurrentHour; }
 
 	UFUNCTION(BlueprintPure)
-	int GetCurrentDay() const { return CurrentDay; }
+	int32 GetCurrentMinute() const { return CurrentMinute; }
 
 	UFUNCTION(BlueprintPure)
-	int GetCurrentHour() const { return CurrentHour; }
-
-	UFUNCTION(BlueprintPure)
-	int GetCurrentMinute() const { return CurrentMinute; }
-
-	UFUNCTION(BlueprintPure)
-	int GetCurrentSeconds() const { return CurrentSeconds; }
+	int32 GetCurrentSeconds() const { return CurrentSeconds; }
 };
