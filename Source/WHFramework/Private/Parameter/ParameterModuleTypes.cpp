@@ -29,7 +29,7 @@ bool FParameters::HasParameter(FName InName, bool bEnsured) const
 			return true;
 		}
 	}
-	ensureEditor(bEnsured);
+	ensureEditor(!bEnsured);
 	return false;
 }
 
