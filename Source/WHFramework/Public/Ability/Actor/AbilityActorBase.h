@@ -56,7 +56,7 @@ public:
 	virtual int32 GetLevelV() const override { return Level; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetLevelV(int32 InLevel) override { Level = InLevel; }
+	virtual bool SetLevelV(int32 InLevel) override;
 
 	template<class T>
 	T* GetAttributeSet() const

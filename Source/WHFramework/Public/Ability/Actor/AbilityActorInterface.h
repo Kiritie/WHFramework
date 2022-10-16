@@ -28,7 +28,7 @@ public:
 public:
 	virtual int32 GetLevelV() const = 0;
 
-	virtual void SetLevelV(int32 InLevel) = 0;
+	virtual bool SetLevelV(int32 InLevel) = 0;
 
 	virtual UAttributeSetBase* GetAttributeSet() const = 0;
 };

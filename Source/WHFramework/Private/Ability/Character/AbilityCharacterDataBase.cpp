@@ -8,6 +8,7 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Character);
 	MaxCount = 1;
 	Class = nullptr;
+	PEClass = nullptr;
 	Radius = 24.f;
 	HalfHeight = 69.f;
 

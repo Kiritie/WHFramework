@@ -66,9 +66,6 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	MovementRate = 1;
 	RotationRate = 1;
 
-	// local
-	DefaultAbility = FAbilityData();
-
 	AutoPossessAI = EAutoPossessAI::Disabled;
 }
 
@@ -105,7 +102,6 @@ void AAbilityCharacterBase::OnDespawn_Implementation()
 	
 	RaceID = NAME_None;
 	Level = 0;
-	DefaultAbility = FAbilityData();
 }
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
@@ -119,8 +115,12 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
-
 	SetNameV(SaveData.Name);
+
+	if(!SaveData.IsSaved())
+	{
+		ResetData();
+	}
 
 	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
 }
@@ -137,12 +137,15 @@ FSaveData* AAbilityCharacterBase::ToData()
 
 	SaveData.InventoryData = Inventory->ToSaveDataRef<FInventorySaveData>();
 
-	SaveData.DefaultAbility = DefaultAbility;
-
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 
 	return &SaveData;
+}
+
+void AAbilityCharacterBase::ResetData()
+{
+	SetHealth(GetMaxHealth());
 }
 
 void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -238,6 +241,10 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 				}
 			}
 		}
+	}
+	if(Ar.IsLoading())
+	{
+		RefreshAttributes();
 	}
 }
 
@@ -411,10 +418,26 @@ void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 	RaceID = InRaceID;
 }
 
-void AAbilityCharacterBase::SetLevelV(int32 InLevel)
+bool AAbilityCharacterBase::SetLevelV(int32 InLevel)
 {
-	Level = InLevel;
-	DefaultAbility.AbilityLevel = InLevel;
+	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
+	InLevel = FMath::Clamp(InLevel, 0, CharacterData.MaxLevel != -1 ? CharacterData.MaxLevel : InLevel);
+
+	if(Level != InLevel)
+	{
+		Level = InLevel;
+
+		auto EffectContext = AbilitySystem->MakeEffectContext();
+		EffectContext.AddSourceObject(this);
+		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(CharacterData.PEClass, InLevel, EffectContext);
+		if (SpecHandle.IsValid())
+		{
+			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
+		}
+
+		return true;
+	}
+	return false;
 }
 
 FString AAbilityCharacterBase::GetHeadInfo() const
@@ -466,7 +489,15 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 {
 	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 	
-	if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	{
+		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		{
+			SetLevelV(GetLevelV() + 1);
+			SetExp(0.f);
+		}
+	}
+	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
 	{
 		if(DeltaValue > 0.f)
 		{

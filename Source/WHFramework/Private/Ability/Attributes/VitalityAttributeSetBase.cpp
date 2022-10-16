@@ -7,10 +7,10 @@
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
-:	Health(100.f),
-	MaxHealth(100.f),
-	Exp(0.f),
-	MaxExp(100.f),
+:	Exp(0.f),
+	MaxExp(50.f),
+	Health(50.f),
+	MaxHealth(50.f),
 	PhysicsDamage(0.f),
 	MagicDamage(0.f)
 {

@@ -16,6 +16,9 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityVitalityBase> Class;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UGameplayEffect> PEClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius;

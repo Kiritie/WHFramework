@@ -38,7 +38,7 @@ void AAbilitySkillBase::Initialize_Implementation(AAbilityCharacterBase* InOwner
 	SetActorRotation(OwnerCharacter->GetActorRotation());
 
 	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this](){
-		UObjectPoolModuleBPLibrary::DespawnObject(this);	
+		UObjectPoolModuleBPLibrary::DespawnObject(this);
 	}, DurationTime, false);
 }
 

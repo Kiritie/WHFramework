@@ -29,7 +29,7 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
 
 	Character->Execute_SetActorVisible(Character, true);
-	Character->SetHealth(Character->GetMaxHealth());
+	Character->ResetData();
 	Character->SetMotionRate(1, 1);
 }
 

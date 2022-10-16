@@ -5,6 +5,7 @@
 #include "AbilityCharacterDataBase.generated.h"
 
 class AAbilityCharacterBase;
+class UGameplayEffect;
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityCharacterDataBase : public UAbilityItemDataBase
 {
@@ -16,6 +17,9 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityCharacterBase> Class;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UGameplayEffect> PEClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius;

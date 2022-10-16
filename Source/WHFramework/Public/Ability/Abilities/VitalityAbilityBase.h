@@ -4,6 +4,8 @@
 
 #include "VitalityAbilityBase.generated.h"
 
+class AAbilityVitalityBase;
+
 /**
  * 生命Ability基类
  */
@@ -16,6 +18,12 @@ public:
 	UVitalityAbilityBase();
 
 public:
-	UFUNCTION(BlueprintPure)
-	class AAbilityVitalityBase* GetOwnerVitality() const;
+	template<class T>
+	T* GetOwnerVitality() const
+	{
+		return Cast<T>(GetOwningActorFromActorInfo());
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
+	AAbilityVitalityBase* GetOwnerVitality(TSubclassOf<AAbilityVitalityBase> InOwnerClass = nullptr) const;
 };

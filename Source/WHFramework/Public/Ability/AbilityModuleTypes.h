@@ -787,6 +787,14 @@ public:
 			}
 		}
 	}
+
+	void ClearAllItem()
+	{
+		for(auto& Iter : Items)
+		{
+			Iter = FAbilityItem::Empty;
+		}
+	}
 };
 
 /**
@@ -819,6 +827,7 @@ public:
 	{
 		MinCount = 0;
 		MaxCount = 0;
+		Level = 1;
 	}
 };
 
@@ -913,7 +922,7 @@ public:
 	{
 		Name = NAME_None;
 		RaceID = NAME_None;
-		Level = 0;
+		Level = 1;
 		InventoryData = FInventorySaveData();
 		SpawnLocation = FVector::ZeroVector;
 		SpawnRotation = FRotator::ZeroRotator;
@@ -940,9 +949,6 @@ public:
 	
 	UPROPERTY()
 	FRotator SpawnRotation;
-
-	UPROPERTY()
-	FAbilityData DefaultAbility;
 
 public:
 	template<class T>

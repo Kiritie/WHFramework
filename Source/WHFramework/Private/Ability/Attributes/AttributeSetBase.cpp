@@ -29,7 +29,7 @@ void UAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& InAf
 	if(!FMath::IsNearlyEqual(CurrentMaxValue, InNewMaxValue) && AbilityComp)
 	{
 		const float CurrentValue = InAffectedAttribute.GetCurrentValue();
-		float NewDelta = CurrentMaxValue > 0.f ? (CurrentValue / CurrentMaxValue * InNewMaxValue - CurrentValue) : InNewMaxValue;
+		float NewDelta = CurrentMaxValue > 0.f ? ((CurrentValue / CurrentMaxValue) * InNewMaxValue - CurrentValue) : InNewMaxValue;
 		ModifyAttributeValue(InAffectedAttributeProperty, NewDelta);
 	}
 }
@@ -58,7 +58,7 @@ void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float 
 
 	if(OnAttributeChangeData.NewValue != OnAttributeChangeData.OldValue)
 	{
-		AbilityActor->OnAttributeChange(OnAttributeChangeData);
+		//AbilityActor->OnAttributeChange(OnAttributeChangeData);
 	}
 }
 
@@ -76,7 +76,7 @@ void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, flo
 
 	if(OnAttributeChangeData.NewValue != OnAttributeChangeData.OldValue)
 	{
-		AbilityActor->OnAttributeChange(OnAttributeChangeData);
+		//AbilityActor->OnAttributeChange(OnAttributeChangeData);
 	}
 }
 

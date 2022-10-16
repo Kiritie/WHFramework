@@ -100,8 +100,12 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
-
 	SetNameV(SaveData.Name);
+	
+	if(!SaveData.IsSaved())
+	{
+		ResetData();
+	}
 
 	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
 }
@@ -122,6 +126,11 @@ FSaveData* AAbilityVitalityBase::ToData()
 	SaveData.SpawnRotation = GetActorRotation();
 
 	return &SaveData;
+}
+
+void AAbilityVitalityBase::ResetData()
+{
+	SetHealth(GetMaxHealth());
 }
 
 void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
@@ -166,6 +175,10 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 				}
 			}
 		}
+	}
+	if(Ar.IsLoading())
+	{
+		RefreshAttributes();
 	}
 }
 
@@ -262,6 +275,28 @@ bool AAbilityVitalityBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DyingTag);
 }
 
+bool AAbilityVitalityBase::SetLevelV(int32 InLevel)
+{
+	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
+	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
+
+	if(Level != InLevel)
+	{
+		Level = InLevel;
+
+		auto EffectContext = AbilitySystem->MakeEffectContext();
+		EffectContext.AddSourceObject(this);
+		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(VitalityData.PEClass, InLevel, EffectContext);
+		if (SpecHandle.IsValid())
+		{
+			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
+		}
+
+		return true;
+	}
+	return false;
+}
+
 FString AAbilityVitalityBase::GetHeadInfo() const
 {
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
@@ -304,7 +339,15 @@ UInventory* AAbilityVitalityBase::GetInventory() const
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
+	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	{
+		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		{
+			SetLevelV(GetLevelV() + 1);
+			SetExp(0.f);
+		}
+	}
+	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)

@@ -181,4 +181,14 @@ protected:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Ability|Animation", Meta = (AdvancedDisplay = "OverrideBlendOutTime"))
 	void MontageStopForAllMeshes(float OverrideBlendOutTime = -1.0f);
+
+public:
+	template<class T>
+	T* GetOwnerActor() const
+	{
+		return Cast<T>(GetOwningActorFromActorInfo());
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
+	AActor* GetOwnerActor(TSubclassOf<AActor> InOwnerClass = nullptr) const;
 };

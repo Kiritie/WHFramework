@@ -80,6 +80,16 @@ void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttrib
 {
 }
 
+bool AAbilityActorBase::SetLevelV(int32 InLevel)
+{
+	if(Level != InLevel)
+	{
+		Level = InLevel;
+		return true;
+	}
+	return false;
+}
+
 UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystem;

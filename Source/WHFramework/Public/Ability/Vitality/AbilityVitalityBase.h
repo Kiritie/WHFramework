@@ -87,11 +87,15 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
+	
+	virtual void ResetData();
 
 	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
 
 public:
 	virtual void Tick(float DeltaTime) override;
+
+	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;
 
@@ -191,7 +195,7 @@ public:
 	virtual int32 GetLevelV() const override { return Level; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetLevelV(int32 InLevel) override { Level = InLevel; }
+	virtual bool SetLevelV(int32 InLevel) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
@@ -201,14 +205,14 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
 			
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	

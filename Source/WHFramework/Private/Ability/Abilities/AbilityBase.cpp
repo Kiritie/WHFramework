@@ -1,4 +1,4 @@
-﻿#include "Ability/Abilities/AbilityBase.h"
+#include "Ability/Abilities/AbilityBase.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
@@ -331,4 +331,9 @@ void UAbilityBase::MontageStopForAllMeshes(float OverrideBlendOutTime)
 			AbilitySystemComponent->StopAllCurrentMontages(OverrideBlendOutTime);
 		}
 	}
+}
+
+AActor* UAbilityBase::GetOwnerActor(TSubclassOf<AActor> InOwnerClass /*= nullptr*/) const
+{
+	return Cast<AActor>(GetOwningActorFromActorInfo());
 }

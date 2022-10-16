@@ -292,10 +292,10 @@ protected:
 
 public:
 	/** 根据标签获取当前激活的Ability列表 */
-	void GetActiveAbilitiesWithTags(const FGameplayTagContainer & AbilityTags, TArray<UAbilityBase*>& ActiveAbilities);
+	virtual void GetActiveAbilitiesWithTags(const FGameplayTagContainer & AbilityTags, TArray<UAbilityBase*>& ActiveAbilities);
 
 	/** 获取Ability的默认等级，由角色派生 */
-	int32 GetDefaultAbilityLevel() const;
+	virtual int32 GetDefaultAbilityLevel() const;
 
 public:
 	/** 通过Actor获取AbilitySystemComponent */
