@@ -23,13 +23,13 @@ public:
 public:
 	virtual void OnReset_Implementation() override;
 
+	virtual bool HasArchive() const override { return true; }
+
 	virtual void Serialize(FArchive& Ar) override;
 	
 	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
 
 	virtual FSaveData* ToData() override;
-
-	virtual bool HasArchive() override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
 	// Events

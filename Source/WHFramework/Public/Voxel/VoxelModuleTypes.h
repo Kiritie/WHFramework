@@ -521,6 +521,7 @@ public:
 	{
 		WorldSeed = 0;
 		TimeSeconds = -1.f;
+		SecondsOfDay = 600.f;
 		RandomStream = FRandomStream();
 	}
 	
@@ -528,6 +529,7 @@ public:
 	{
 		WorldSeed = 0;
 		TimeSeconds = -1.f;
+		SecondsOfDay = 600.f;
 		RandomStream = FRandomStream();
 	}
 
@@ -538,8 +540,11 @@ public:
 	int32 WorldSeed;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	int32 TimeSeconds;
-	
+	float TimeSeconds;
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float SecondsOfDay;
+
 	UPROPERTY(Transient)
 	FRandomStream RandomStream;
 	

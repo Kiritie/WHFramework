@@ -205,7 +205,8 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, bool bForceMode)
 		WorldData->WorldSeed = FMath::Rand();
 	}
 	WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-	USceneModuleBPLibrary::GetWorldTimer()->SetTimeSeconds(WorldData->TimeSeconds);
+	USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
+	USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
 
 	if(!bForceMode)
 	{
@@ -230,6 +231,7 @@ FSaveData* AVoxelModule::ToData()
 		}
 	}
 	WorldData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();
+	WorldData->SecondsOfDay = USceneModuleBPLibrary::GetWorldTimer()->GetSecondsOfDay();
 	return WorldData;
 }
 
