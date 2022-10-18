@@ -187,7 +187,7 @@ void FWHFrameworkEditorModule::RegisterMenus()
 		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
 	}
 
-	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar");
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
 	{
 		FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("WHFramework");
 		{
