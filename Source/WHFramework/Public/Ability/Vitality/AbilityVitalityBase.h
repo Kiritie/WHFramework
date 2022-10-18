@@ -101,6 +101,8 @@ public:
 
 	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
 
+	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
+
 	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;

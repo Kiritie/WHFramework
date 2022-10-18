@@ -106,7 +106,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoVisibility;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoHide == true"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoVisibility == true"))
 	float WidgetShowDistance;
 
 	UPROPERTY(EditDefaultsOnly)

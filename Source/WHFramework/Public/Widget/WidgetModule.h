@@ -614,7 +614,7 @@ public:
 	{
 		if(!WorldWidgetClassMap.Contains(InWidgetName))
 		{
-			ensureEditor(true);
+			ensureEditor(false);
 			WHLog(WH_Widget, Warning, TEXT("Failed to create world widget. Module does not contain this type: %s"), *InWidgetName.ToString());
 			return nullptr;
 		}

@@ -184,8 +184,20 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->GetStateByClass<UAbilityVitalityState_Death>()->Killer = InKiller;
+	if(InKiller)
+	{
+		FSM->GetStateByClass<UAbilityVitalityState_Death>()->Killer = InKiller;
+		InKiller->Kill(this);
+	}
 	FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
+}
+
+void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
+{
+	if(InTarget == this)
+	{
+		Death(this);
+	}
 }
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)

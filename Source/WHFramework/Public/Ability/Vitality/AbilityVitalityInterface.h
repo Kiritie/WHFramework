@@ -18,6 +18,8 @@ class WHFRAMEWORK_API IAbilityVitalityInterface : public IAbilityActorInterface
 public:
 	virtual void Death(IAbilityVitalityInterface* InKiller) = 0;
 	
+	virtual void Kill(IAbilityVitalityInterface* InTarget) = 0;
+	
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) = 0;
 	
 	virtual void ModifyHealth(float InDeltaValue) = 0;

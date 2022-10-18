@@ -4,19 +4,10 @@
 #include "Voxel/Chunks/VoxelChunk.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Ability/Item/Equip/AbilityEquipDataBase.h"
-#include "Ability/Item/Prop/AbilityPropDataBase.h"
-#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
-#include "Ability/PickUp/AbilityPickUpEquip.h"
-#include "Ability/PickUp/AbilityPickUpProp.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
-#include "Ability/PickUp/AbilityPickUpSkill.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
-#include "Audio/AudioModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Components/BoxComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -152,7 +143,8 @@ void AVoxelChunk::OnDespawn_Implementation()
 
 void AVoxelChunk::SetActorVisible_Implementation(bool bNewVisible)
 {
-	Super::SetActorVisible_Implementation(bNewVisible);
+	bVisible = bNewVisible;
+	GetRootComponent()->SetVisibility(bNewVisible, true);
 
 	SolidMesh->SetCollisionEnabled(bNewVisible);
 	SemiMesh->SetCollisionEnabled(bNewVisible);

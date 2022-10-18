@@ -2,10 +2,7 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "TimerManager.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
@@ -17,15 +14,13 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/CharacterInteractionComponent.h"
-#include "Asset/AssetModuleBPLibrary.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
-#include "Perception/AISense_Damage.h"
-#include "Perception/AISense_Sight.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Ability/Inventory/CharacterInventory.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/PickUp/AbilityPickUpBase.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
@@ -250,8 +245,20 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->GetStateByClass<UAbilityCharacterState_Death>()->Killer = InKiller;
+	if(InKiller)
+	{
+		FSM->GetStateByClass<UAbilityCharacterState_Death>()->Killer = InKiller;
+		InKiller->Kill(this);
+	}
 	FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
+}
+
+void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
+{
+	if(InTarget == this)
+	{
+		Death(this);
+	}
 }
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
