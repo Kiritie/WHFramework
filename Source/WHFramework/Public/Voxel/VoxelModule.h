@@ -69,22 +69,27 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World")
+	UPROPERTY(EditAnywhere, Category = "World")
 	EVoxelWorldMode WorldMode;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
+	UPROPERTY(VisibleAnywhere, Category = "World")
 	EVoxelWorldState WorldState;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World")
+	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
 public:
+	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
 
+	UFUNCTION(BlueprintPure)
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
-	FVoxelWorldBasicSaveData GetWorldBasicData() const { return WorldBasicData; }
+	UFUNCTION(BlueprintPure)
+	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
 
 protected:
+	void SetWorldMode(EVoxelWorldMode InWorldMode);
+
 	void SetWorldState(EVoxelWorldState InWorldState);
 
 	virtual void OnWorldStateChanged();
@@ -102,11 +107,11 @@ public:
 	FVoxelWorldSaveData& GetWorldData() const;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 
-	virtual void UnloadData(bool bForceMode) override;
+	virtual void UnloadData(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk

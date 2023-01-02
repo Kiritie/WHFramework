@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Kismet/BlueprintAsyncActionBase.h"
 #include "AbilitySystemComponent.h"
 #include "AsyncTask_AttributeChanged.generated.h"

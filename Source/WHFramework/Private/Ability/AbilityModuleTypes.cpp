@@ -93,15 +93,6 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 	}
 }
 
-void FRaceData::OnDataTableChanged(const UDataTable* InDataTable, const FName InRowName)
-{
-	FString tmpStr;
-	if(auto RaceData = InDataTable->FindRow<FRaceData>(InRowName, tmpStr))
-	{
-		RaceData->ID = *FString::Printf(TEXT("Race_%d"), InDataTable->GetRowNames().Find(InRowName));
-	}
-}
-
 EAbilityItemType FAbilityItem::GetType() const
 {
 	return GetData().GetItemType();

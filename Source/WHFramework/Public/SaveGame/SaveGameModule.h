@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "SaveGameModuleTypes.h"
 #include "Base/SaveDataInterface.h"
@@ -48,7 +48,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -191,22 +191,22 @@ public:
 	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	T* LoadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* LoadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode));
+		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, InPhase));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
+	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
 
 	template<class T>
-	bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool UnloadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
+		return UnloadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
+	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
 
 	template<class T>
 	bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "UObject/Object.h"
 #include "AbilityVitalityStateBase.generated.h"

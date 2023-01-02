@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "DebugModuleBPLibrary.h"
 
 // 编辑器

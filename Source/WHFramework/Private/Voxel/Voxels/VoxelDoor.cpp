@@ -40,9 +40,9 @@ void UVoxelDoor::Serialize(FArchive& Ar)
 	}
 }
 
-void UVoxelDoor::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVoxelDoor::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UVoxelDoor::ToData()
@@ -114,7 +114,7 @@ void UVoxelDoor::Open()
 		{
 			Iter.GetVoxel<UVoxelDoor>().Open();
 		}
-		Owner->Generate(true);
+		Owner->Generate(EPhase::Second);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
 	}
 }
@@ -129,7 +129,7 @@ void UVoxelDoor::Close()
 		{ 
 			Iter.GetVoxel<UVoxelDoor>().Close();
 		}
-		Owner->Generate(true);
+		Owner->Generate(EPhase::Second);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
 	}
 }

@@ -23,11 +23,11 @@ void USaveGameBase::OnSave_Implementation()
 {
 }
 
-void USaveGameBase::OnLoad_Implementation(bool bForceMode)
+void USaveGameBase::OnLoad_Implementation(EPhase InPhase)
 {
 }
 
-void USaveGameBase::OnUnload_Implementation(bool bForceMode)
+void USaveGameBase::OnUnload_Implementation(EPhase InPhase)
 {
 }
 
@@ -52,14 +52,14 @@ bool USaveGameBase::Save(bool bRefresh)
 	return USaveGameModuleBPLibrary::SaveSaveGame(GetClass(), SaveIndex, bRefresh);
 }
 
-bool USaveGameBase::Load(bool bForceMode)
+bool USaveGameBase::Load(EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::LoadSaveGame(GetClass(), SaveIndex, bForceMode) != nullptr;
+	return USaveGameModuleBPLibrary::LoadSaveGame(GetClass(), SaveIndex, InPhase) != nullptr;
 }
 
-bool USaveGameBase::Unload(bool bForceMode)
+bool USaveGameBase::Unload(EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::UnloadSaveGame(GetClass(), SaveIndex, bForceMode);
+	return USaveGameModuleBPLibrary::UnloadSaveGame(GetClass(), SaveIndex, InPhase);
 }
 
 bool USaveGameBase::Reset()

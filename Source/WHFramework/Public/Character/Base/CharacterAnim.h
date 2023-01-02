@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Animation/AnimInstance.h"
 #include "CharacterAnim.generated.h"
 

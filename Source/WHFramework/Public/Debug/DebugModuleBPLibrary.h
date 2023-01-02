@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "DebugModuleBPLibrary.generated.h"
 

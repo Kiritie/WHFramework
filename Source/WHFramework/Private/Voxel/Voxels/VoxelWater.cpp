@@ -11,9 +11,9 @@ UVoxelWater::UVoxelWater()
 	
 }
 
-void UVoxelWater::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVoxelWater::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UVoxelWater::ToData()

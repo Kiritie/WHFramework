@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Math/MathTypes.h"
@@ -30,8 +30,8 @@ UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
 	None,
-	Normal,
-	Preview,
+	Game,
+	Preview
 };
 
 UENUM(BlueprintType)
@@ -442,6 +442,9 @@ public:
 		TerrainWaterVoxelHeight = 0.25f;
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
+
+		TimeSeconds = -1.f;
+		SecondsOfDay = 600.f;
 	}
 
 public:
@@ -483,6 +486,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FVoxelChunkMaterial> ChunkMaterials;
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float TimeSeconds;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SecondsOfDay;
 
 public:
 	FORCEINLINE float GetChunkLength() const
@@ -520,16 +529,12 @@ public:
 	FORCEINLINE FVoxelWorldSaveData()
 	{
 		WorldSeed = 0;
-		TimeSeconds = -1.f;
-		SecondsOfDay = 600.f;
 		RandomStream = FRandomStream();
 	}
 	
 	FORCEINLINE FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldBasicSaveData(InBasicSaveData)
 	{
 		WorldSeed = 0;
-		TimeSeconds = -1.f;
-		SecondsOfDay = 600.f;
 		RandomStream = FRandomStream();
 	}
 
@@ -538,12 +543,6 @@ public:
 	
 	UPROPERTY(BlueprintReadOnly)
 	int32 WorldSeed;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float TimeSeconds;
-		
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float SecondsOfDay;
 
 	UPROPERTY(Transient)
 	FRandomStream RandomStream;

@@ -35,9 +35,9 @@ void UVoxelTorch::Serialize(FArchive& Ar)
 	}
 }
 
-void UVoxelTorch::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVoxelTorch::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UVoxelTorch::ToData()

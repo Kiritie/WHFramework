@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Camera/Base/CameraPawnBase.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "RoamCameraPawn.generated.h"

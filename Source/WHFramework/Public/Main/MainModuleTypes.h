@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #define MODULE_INSTANCE_DECLARE(ModuleClass) \
 protected: \

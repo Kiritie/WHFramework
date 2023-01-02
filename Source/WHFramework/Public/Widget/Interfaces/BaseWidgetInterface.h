@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "TickAbleWidgetInterface.h"
 
 #include "Input/InputModuleTypes.h"

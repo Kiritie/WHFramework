@@ -99,25 +99,33 @@ void AAbilityCharacterBase::OnDespawn_Implementation()
 	Level = 0;
 }
 
-void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	
-	if(bForceMode)
-	{
-		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
-	}
-	SetNameV(SaveData.Name);
 
-	if(!SaveData.IsSaved())
+	switch(InPhase)
 	{
-		ResetData();
-	}
+		case EPhase::Primary:
+		{
+			SetActorLocation(SaveData.SpawnLocation);
+			SetActorRotation(SaveData.SpawnRotation);
+		}
+		case EPhase::Second:
+		case EPhase::Final:
+		{
+			SetRaceID(SaveData.RaceID);
+			SetLevelV(SaveData.Level);
+			SetNameV(SaveData.Name);
+		
+			Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
-	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
+			if(!SaveData.IsSaved())
+			{
+				ResetData();
+			}
+			break;
+		}
+	}
 }
 
 FSaveData* AAbilityCharacterBase::ToData()

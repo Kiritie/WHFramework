@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "json.h"
 
 #include "ParameterModuleTypes.generated.h"

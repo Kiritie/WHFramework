@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "UObject/Interface.h"
 #include "AIAgentInterface.generated.h"

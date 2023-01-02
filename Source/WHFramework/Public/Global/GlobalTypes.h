@@ -56,6 +56,14 @@ enum class EPauseGameMode : uint8
 	OnlyModules
 };
 
+UENUM(BlueprintType)
+enum class EPhase : uint8
+{
+	Primary,
+	Second,
+	Final
+};
+
 /*
 * 数据保存档案
 */

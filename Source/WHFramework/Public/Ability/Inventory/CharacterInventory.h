@@ -19,11 +19,11 @@ public:
 	UCharacterInventory();
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 
-	virtual void UnloadData(bool bForceMode) override;
+	virtual void UnloadData(EPhase InPhase) override;
 
 public:
 	virtual FQueryItemInfo QueryItemByRange(EQueryItemType InActionType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1) override;

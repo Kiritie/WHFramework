@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "InteractionComponent.h"
 #include "VitalityInteractionComponent.generated.h"

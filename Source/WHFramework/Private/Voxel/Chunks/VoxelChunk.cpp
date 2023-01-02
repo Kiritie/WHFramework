@@ -56,7 +56,7 @@ void AVoxelChunk::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AVoxelChunk::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	for(auto& Iter : SaveData.VoxelDatas)
@@ -159,34 +159,47 @@ void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBat
 	UpdateNeighbors();
 }
 
-void AVoxelChunk::Generate(bool bBuildMesh, bool bForceMode)
+void AVoxelChunk::Generate(EPhase InPhase)
 {
-	if(bBuildMesh)
+	switch(InPhase)
 	{
-		BuildMesh();
+		case EPhase::Primary:
+		{
+			CreateMesh();
+			for(auto& Iter : VoxelMap)
+			{
+				Iter.Value.OnGenerate();
+			}
+			SpawnActors();
+			break;
+		}
+		case EPhase::Second:
+		{
+			if(bGenerated)
+			{
+				BuildMesh();
+			}
+			CreateMesh();
+			break;
+		}
+		case EPhase::Final:
+		{
+			if(!bGenerated)
+			{
+				SpawnActors();
+			}
+			break;
+		}
 	}
 
-	if(!bGenerated)
-	{
-		Execute_SetActorVisible(this, true);
-	}
+	bGenerated = true;
+}
 
+void AVoxelChunk::CreateMesh()
+{
 	SolidMesh->CreateMesh();
 	SemiMesh->CreateMesh();
 	TransMesh->CreateMesh();
-
-	if(!bGenerated)
-	{
-		bGenerated = true;
-		for(auto& Iter : VoxelMap)
-		{
-			Iter.Value.OnGenerate();
-		}
-		if(bForceMode)
-		{
-			SpawnActors();
-		}
-	}
 }
 
 void AVoxelChunk::BuildMap(int32 InStage)
@@ -335,36 +348,36 @@ void AVoxelChunk::DestroyActors()
 	PickUps.Empty();
 }
 
-void AVoxelChunk::GenerateNeighbors(FIndex InIndex, bool bForceMode)
+void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)
 {
-	GenerateNeighbors(InIndex.X, InIndex.Y, InIndex.Z, bForceMode);
+	GenerateNeighbors(InIndex.X, InIndex.Y, InIndex.Z, InPhase);
 }
 
-void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForceMode)
+void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPhase)
 {
 	if(InX <= 0 && GetNeighbor(EDirection::Backward))
 	{
-		GetNeighbor(EDirection::Backward)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Backward)->Generate(InPhase);
 	}
 	else if(InX >= AVoxelModule::Get()->GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Forward))
 	{
-		GetNeighbor(EDirection::Forward)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Forward)->Generate(InPhase);
 	}
 	if(InY <= 0 && GetNeighbor(EDirection::Left))
 	{
-		GetNeighbor(EDirection::Left)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Left)->Generate(InPhase);
 	}
 	else if(InY >= AVoxelModule::Get()->GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Right))
 	{
-		GetNeighbor(EDirection::Right)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Right)->Generate(InPhase);
 	}
 	if(InZ <= 0 && GetNeighbor(EDirection::Down))
 	{
-		GetNeighbor(EDirection::Down)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Down)->Generate(InPhase);
 	}
 	else if(InZ >= AVoxelModule::Get()->GetWorldData().ChunkSize - 1 && GetNeighbor(EDirection::Up))
 	{
-		GetNeighbor(EDirection::Up)->Generate(true, bForceMode);
+		GetNeighbor(EDirection::Up)->Generate(InPhase);
 	}
 }
 
@@ -709,7 +722,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 
 	if(bSuccess && bGenerate)
 	{
-		Generate(true);
+		Generate(EPhase::Second);
 		GenerateNeighbors(InIndex);
 	}
 

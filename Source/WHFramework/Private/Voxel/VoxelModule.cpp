@@ -147,7 +147,7 @@ void AVoxelModule::OnPreparatory_Implementation()
 	{
 		static FVoxelWorldSaveData SaveData;
 		SaveData = FVoxelWorldSaveData(WorldBasicData);
-		LoadSaveData(&SaveData, true);
+		LoadSaveData(&SaveData, EPhase::Primary);
 	}
 }
 
@@ -178,6 +178,14 @@ void AVoxelModule::OnTermination_Implementation()
 	StopChunkTasks(ChunkMeshBuildTasks);
 }
 
+void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
+{
+	if(WorldMode != InWorldMode)
+	{
+		WorldMode = InWorldMode;
+	}
+}
+
 void AVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 {
 	if(WorldState != InWorldState)
@@ -197,26 +205,62 @@ FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
 	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
 }
 
-void AVoxelModule::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	WorldData = InSaveData->Cast<FVoxelWorldSaveData>();
-	if(WorldData->WorldSeed == 0)
-	{
-		WorldData->WorldSeed = FMath::Rand();
-	}
-	WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-	USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
-	USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
+	auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
 
-	if(!bForceMode)
+	switch(InPhase)
 	{
-		WorldMode = EVoxelWorldMode::Normal;
-		for(auto Iter : ChunkMap)
+		case EPhase::Primary:
 		{
-			if(Iter.Value && Iter.Value->IsGenerated())
+			SetWorldMode(EVoxelWorldMode::Preview);
+
+			if(!WorldData)
 			{
-				Iter.Value->SpawnActors();
+				WorldData = new FVoxelWorldSaveData();
 			}
+
+			WorldData->BlockSize = SaveData.BlockSize;
+			WorldData->ChunkSize = SaveData.ChunkSize;
+			WorldData->ChunkHeightRange = SaveData.ChunkHeightRange;
+			WorldData->TerrainBaseHeight = SaveData.TerrainBaseHeight;
+			WorldData->TerrainPlainScale = SaveData.TerrainPlainScale;
+			WorldData->TerrainMountainScale = SaveData.TerrainMountainScale;
+			WorldData->TerrainStoneVoxelScale = SaveData.TerrainStoneVoxelScale;
+			WorldData->TerrainSandVoxelScale = SaveData.TerrainSandVoxelScale;
+			WorldData->TerrainPlantVoxelScale = SaveData.TerrainPlantVoxelScale;
+			WorldData->TerrainTreeVoxelScale = SaveData.TerrainTreeVoxelScale;
+			WorldData->TerrainBedrockVoxelHeight = SaveData.TerrainBedrockVoxelHeight;
+			WorldData->TerrainWaterVoxelHeight = SaveData.TerrainWaterVoxelHeight;
+			WorldData->ChunkMaterials = SaveData.ChunkMaterials;
+
+			WorldData->WorldSeed = SaveData.WorldSeed;
+			if(WorldData->WorldSeed == 0)
+			{
+				WorldData->WorldSeed = FMath::Rand();
+			}
+			WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
+		}
+		case EPhase::Second:
+		{
+			WorldData->TimeSeconds = SaveData.TimeSeconds;
+			WorldData->SecondsOfDay = SaveData.SecondsOfDay;
+			USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
+			USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
+			break;
+		}
+		case EPhase::Final:
+		{
+			SetWorldMode(EVoxelWorldMode::Game);
+
+			for(auto Iter : ChunkMap)
+			{
+				if(Iter.Value)
+				{
+					Iter.Value->Generate(EPhase::Final);
+				}
+			}
+			break;
 		}
 	}
 }
@@ -235,49 +279,57 @@ FSaveData* AVoxelModule::ToData()
 	return WorldData;
 }
 
-void AVoxelModule::UnloadData(bool bForceMode)
+void AVoxelModule::UnloadData(EPhase InPhase)
 {
-	if(bForceMode)
+	switch(InPhase)
 	{
-		SetWorldState(EVoxelWorldState::None);
-
-		for(auto iter : ChunkMap)
+		case EPhase::Primary:
 		{
-			if(iter.Value)
+			SetWorldMode(EVoxelWorldMode::None);
+			SetWorldState(EVoxelWorldState::None);
+
+			for(auto iter : ChunkMap)
 			{
-				UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
+				if(iter.Value)
+				{
+					UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
+				}
 			}
-		}
-		ChunkMap.Empty();
+			ChunkMap.Empty();
 		
-		StopChunkTasks(ChunkMapLoadTasks);
-		StopChunkTasks(ChunkMapBuildTasks);
-		StopChunkTasks(ChunkMeshBuildTasks);
+			StopChunkTasks(ChunkMapLoadTasks);
+			StopChunkTasks(ChunkMapBuildTasks);
+			StopChunkTasks(ChunkMeshBuildTasks);
 
-		ChunkSpawnBatch = 0;
-		LastGenerateIndex = Index_Empty;
-		LastStayChunkIndex = Index_Empty;
+			ChunkSpawnBatch = 0;
+			LastGenerateIndex = Index_Empty;
+			LastStayChunkIndex = Index_Empty;
 
-		ChunkSpawnQueue.Empty();
-		ChunkMapLoadQueue.Empty();
-		ChunkMapBuildQueue.Empty();
-		ChunkMapBuildQueue1.Empty();
-		ChunkMeshBuildQueue.Empty();
-		ChunkGenerateQueue.Empty();
-		ChunkDataSaveQueue.Empty();
-		ChunkDestroyQueue.Empty();
+			ChunkSpawnQueue.Empty();
+			ChunkMapLoadQueue.Empty();
+			ChunkMapBuildQueue.Empty();
+			ChunkMapBuildQueue1.Empty();
+			ChunkMeshBuildQueue.Empty();
+			ChunkGenerateQueue.Empty();
+			ChunkDataSaveQueue.Empty();
+			ChunkDestroyQueue.Empty();
 
-		WorldData = nullptr;
-	}
-	else
-	{
-		WorldMode = EVoxelWorldMode::Preview;
-		for(auto Iter : ChunkMap)
+			WorldData = nullptr;
+			break;
+		}
+		case EPhase::Second:
+		case EPhase::Final:
 		{
-			if(Iter.Value && Iter.Value->IsGenerated())
+			SetWorldMode(EVoxelWorldMode::Preview);
+
+			for(auto Iter : ChunkMap)
 			{
-				Iter.Value->DestroyActors();
+				if(Iter.Value && Iter.Value->IsGenerated())
+				{
+					Iter.Value->DestroyActors();
+				}
 			}
+			break;
 		}
 	}
 }
@@ -434,7 +486,20 @@ void AVoxelModule::GenerateChunk(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
 	{
-		Chunk->Generate(false, WorldMode == EVoxelWorldMode::Normal);
+		switch(WorldMode)
+		{
+			case EVoxelWorldMode::Game:
+			{
+				Chunk->Generate(EPhase::Primary);
+				break;
+			}
+			case EVoxelWorldMode::Preview:
+			{
+				Chunk->Generate(EPhase::Second);
+				break;
+			}
+			default: break;
+		}
 	}
 }
 

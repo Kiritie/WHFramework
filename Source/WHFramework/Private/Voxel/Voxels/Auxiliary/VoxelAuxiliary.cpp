@@ -28,7 +28,7 @@ void AVoxelAuxiliary::Initialize(FVoxelItem InVoxelItem)
 	VoxelItem = InVoxelItem;
 	if(VoxelItem.Owner)
 	{
-		SetActorLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
+		SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
 		Interaction->SetBoxExtent(VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * FVector(1.5f, 1.5f, 0.5f));
 	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/AbilityModuleTypes.h"
 
 #include "AbilityCharacterDataBase.generated.h"
 
@@ -27,6 +28,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float HalfHeight;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FInventorySaveData InventoryData;
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
 	FGameplayTag DeadTag;

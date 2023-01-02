@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Base/WebRequestHandleBase.h"
 #include "UObject/Object.h"
 #include "WebRequestHandle_GetText.generated.h"

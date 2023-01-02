@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "GameFramework/Actor.h"
 #include "ObjectPool/ObjectPoolInterface.h"

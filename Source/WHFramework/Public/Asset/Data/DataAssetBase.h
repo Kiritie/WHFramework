@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Engine/DataAsset.h"
 #include "Dom/JsonObject.h"
 #include "DataAssetBase.generated.h"

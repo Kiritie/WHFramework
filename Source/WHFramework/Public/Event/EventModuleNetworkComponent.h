@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Main/Base/ModuleNetworkComponent.h"
 #include "Parameter/ParameterModuleTypes.h"

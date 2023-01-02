@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Abilities/Tasks/AbilityTask.h"
 #include "Abilities/Tasks/AbilityTask_WaitTargetData.h"
 #include "AbilityTask_ServerWaitForClientTargetData.generated.h"

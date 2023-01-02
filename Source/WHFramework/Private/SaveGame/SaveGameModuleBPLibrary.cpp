@@ -148,20 +148,20 @@ bool USaveGameModuleBPLibrary::SaveAllSaveGame(bool bRefresh)
 	return false;
 }
 
-USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bForceMode)
+USaveGameBase* USaveGameModuleBPLibrary::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, EPhase InPhase)
 {
 	if(ASaveGameModule* SaveGameModule = ASaveGameModule::Get())
 	{
-		return SaveGameModule->LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
+		return SaveGameModule->LoadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
 	}
 	return nullptr;
 }
 
-bool USaveGameModuleBPLibrary::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bForceMode)
+bool USaveGameModuleBPLibrary::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, EPhase InPhase)
 {
 	if(ASaveGameModule* SaveGameModule = ASaveGameModule::Get())
 	{
-		return SaveGameModule->UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
+		return SaveGameModule->UnloadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
 	}
 	return false;
 }

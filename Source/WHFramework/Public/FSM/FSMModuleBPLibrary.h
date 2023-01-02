@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "FSMModule.h"
 #include "FSMModuleTypes.h"
 

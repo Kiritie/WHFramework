@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "InputManager.h"
 #include "Main/Base/ModuleBase.h"

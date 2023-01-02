@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -27,10 +27,10 @@ public:
 	void OnSave();
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnLoad(bool bForceMode);
+	void OnLoad(EPhase InPhase);
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnUnload(bool bForceMode);
+	void OnUnload(EPhase InPhase);
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnReset();
@@ -49,10 +49,10 @@ public:
 	bool Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
-	bool Load(bool bForceMode = false);
+	bool Load(EPhase InPhase = EPhase::Primary);
 
 	UFUNCTION(BlueprintCallable)
-	bool Unload(bool bForceMode = false);
+	bool Unload(EPhase InPhase = EPhase::Primary);
 
 	UFUNCTION(BlueprintCallable)
 	bool Reset();

@@ -6,6 +6,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Global/Base/WHObject.h"
 #include "GameplayTagContainer.h"
+#include "Asset/AssetModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -322,7 +323,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityData : public FTableRowBase
+struct WHFRAMEWORK_API FAbilityData : public FDataTableRowBase
 {
 	GENERATED_BODY()
 
@@ -835,20 +836,33 @@ public:
  * 种族数据
  */
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FRaceData : public FTableRowBase
+struct WHFRAMEWORK_API FRaceDataBase : public FDataTableRowBase
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadWrite)
-	FName ID;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString Detail;
-				
+
+	FORCEINLINE FRaceDataBase()
+	{
+		Name = NAME_None;
+		Detail = TEXT("");
+	}
+};
+
+/**
+ * 种族数据
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FRaceData : public FRaceDataBase
+{
+	GENERATED_BODY()
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector NoiseScale;
 
@@ -857,19 +871,9 @@ public:
 
 	FORCEINLINE FRaceData()
 	{
-		ID = NAME_None;
-		Name = NAME_None;
-		Detail = TEXT("");
 		NoiseScale = FVector::OneVector;
 		Items = TArray<FRaceItem>();
 	}
-
-	FORCEINLINE bool IsValid() const
-	{
-		return !ID.IsNone();
-	}
-
-	virtual void OnDataTableChanged(const UDataTable* InDataTable, const FName InRowName) override;
 };
 
 USTRUCT(BlueprintType)
@@ -891,6 +895,21 @@ struct WHFRAMEWORK_API FCharacterRaceData : public FRaceData
 public:
 	FORCEINLINE FCharacterRaceData()
 	{
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPlayerRaceData : public FRaceDataBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityItem> Items;
+
+	FORCEINLINE FPlayerRaceData()
+	{
+		Items = TArray<FAbilityItem>();
 	}
 };
 
@@ -929,13 +948,13 @@ public:
 	}
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 	FPrimaryAssetId ID;
 
 	UPROPERTY(BlueprintReadWrite)
 	FName Name;
 		
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadWrite)
 	FName RaceID;
 
 	UPROPERTY(BlueprintReadWrite)

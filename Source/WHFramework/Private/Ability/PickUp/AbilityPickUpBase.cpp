@@ -40,7 +40,7 @@ void AAbilityPickUpBase::OnDespawn_Implementation()
 	Container = nullptr;
 }
 
-void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 }
 

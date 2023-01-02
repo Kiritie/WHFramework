@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 UENUM(BlueprintType)
 enum class ECameraCollisionMode : uint8

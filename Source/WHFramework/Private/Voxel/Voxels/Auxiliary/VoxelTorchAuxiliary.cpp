@@ -35,10 +35,11 @@ void AVoxelTorchAuxiliary::Initialize(FVoxelItem InVoxelItem)
 
 	if(InVoxelItem.IsValid())
 	{
-		LightComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
 		EffectComponent->SetTemplate(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectAsset);
 		EffectComponent->SetRelativeScale3D(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale);
-		EffectComponent->SetRelativeLocation(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectOffset);
+		EffectComponent->SetRelativeLocation(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectOffset * AVoxelModule::Get()->GetWorldData().BlockSize);
+		
+		LightComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
 	}
 }
 

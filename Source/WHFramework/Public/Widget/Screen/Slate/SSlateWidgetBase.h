@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Widget/Interfaces/ScreenWidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"

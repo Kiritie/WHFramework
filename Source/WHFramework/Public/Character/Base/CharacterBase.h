@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "CharacterInterface.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"

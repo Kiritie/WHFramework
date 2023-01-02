@@ -89,25 +89,34 @@ void AAbilityVitalityBase::OnDespawn_Implementation()
 	Level = 0;
 } 
 
-void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	
-	if(bForceMode)
-	{
-		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
-	}
-	SetNameV(SaveData.Name);
-	
-	if(!SaveData.IsSaved())
-	{
-		ResetData();
-	}
 
-	Inventory->LoadSaveData(&SaveData.InventoryData, bForceMode);
+	switch(InPhase)
+	{
+		case EPhase::Primary:
+		{
+			SetActorLocation(SaveData.SpawnLocation);
+			SetActorRotation(SaveData.SpawnRotation);
+			break;
+		}
+		case EPhase::Second:
+		case EPhase::Final:
+		{
+			SetRaceID(SaveData.RaceID);
+			SetLevelV(SaveData.Level);
+			SetNameV(SaveData.Name);
+
+			Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+
+			if(!SaveData.IsSaved())
+			{
+				ResetData();
+			}
+			break;
+		}
+	}
 }
 
 FSaveData* AAbilityVitalityBase::ToData()

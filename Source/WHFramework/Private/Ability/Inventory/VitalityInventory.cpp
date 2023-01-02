@@ -7,9 +7,9 @@ UVitalityInventory::UVitalityInventory()
 	
 }
 
-void UVitalityInventory::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVitalityInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UVitalityInventory::ToData()
@@ -17,9 +17,9 @@ FSaveData* UVitalityInventory::ToData()
 	return Super::ToData();
 }
 
-void UVitalityInventory::UnloadData(bool bForceMode)
+void UVitalityInventory::UnloadData(EPhase InPhase)
 {
-	Super::UnloadData(bForceMode);
+	Super::UnloadData(InPhase);
 }
 
 void UVitalityInventory::DiscardAllItem()

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilityGlobals.generated.h"
 

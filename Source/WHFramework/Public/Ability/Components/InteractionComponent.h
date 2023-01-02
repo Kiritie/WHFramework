@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Components/BoxComponent.h"
 #include "InteractionComponent.generated.h"

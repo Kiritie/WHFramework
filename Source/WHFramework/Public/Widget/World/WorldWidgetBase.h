@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Components/WidgetComponent.h"

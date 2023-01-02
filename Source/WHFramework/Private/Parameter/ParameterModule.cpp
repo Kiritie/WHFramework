@@ -62,7 +62,7 @@ void AParameterModule::OnTermination_Implementation()
 	USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
 }
 
-void AParameterModule::LoadData(FSaveData* InSaveData, bool bForceMode)
+void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
 }

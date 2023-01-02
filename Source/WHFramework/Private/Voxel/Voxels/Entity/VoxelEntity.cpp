@@ -18,7 +18,6 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetRelativeScale3D(FVector(0.3f));
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->Initialize(EVoxelMeshNature::Entity);
 

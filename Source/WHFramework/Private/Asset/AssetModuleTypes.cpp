@@ -8,3 +8,8 @@ UAbilityItemDataBase& FAbilityItem::GetData(bool bLogWarning) const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID, bLogWarning);
 }
+
+void FDataTableRowBase::OnInitializeRow(const FName& InRowName)
+{
+	ID = InRowName;
+}

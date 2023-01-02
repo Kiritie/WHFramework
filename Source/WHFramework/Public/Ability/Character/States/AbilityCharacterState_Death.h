@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "AbilityCharacterStateBase.h"
 #include "UObject/Object.h"
 #include "AbilityCharacterState_Death.generated.h"

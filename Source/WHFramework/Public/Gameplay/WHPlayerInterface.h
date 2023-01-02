@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Character/CharacterModuleTypes.h"
 #include "UObject/Interface.h"

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"

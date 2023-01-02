@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Audio/AudioModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"

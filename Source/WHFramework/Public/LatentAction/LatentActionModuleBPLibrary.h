@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "LatentActionModule.h"
 #include "Engine/TargetPoint.h"

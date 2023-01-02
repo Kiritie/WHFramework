@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "AbilityModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "Scene/Container/SceneContainerInterface.h"

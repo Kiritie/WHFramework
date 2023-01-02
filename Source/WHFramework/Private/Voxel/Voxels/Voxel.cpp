@@ -53,7 +53,7 @@ void UVoxel::Serialize(FArchive& Ar)
 	Super::Serialize(Ar);
 }
 
-void UVoxel::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 	ID = SaveData.ID;

@@ -42,7 +42,7 @@ public:
 
 	virtual void Serialize(FArchive& Ar) override;
 
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 

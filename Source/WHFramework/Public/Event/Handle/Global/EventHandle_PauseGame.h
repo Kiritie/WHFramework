@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Global/GlobalTypes.h"
 #include "Parameter/ParameterModuleTypes.h"

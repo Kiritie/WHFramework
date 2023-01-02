@@ -167,7 +167,7 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 	if(InVoxelItem.IsEmpty()) return UVoxel::GetEmpty();
 	if(InVoxelItem.IsUnknown()) return UVoxel::GetUnknown();
 	UVoxel& voxel = GetVoxel(InVoxelItem.ID);
-	voxel.LoadSaveData(&const_cast<FVoxelItem&>(InVoxelItem), true, true);
+	voxel.LoadSaveData(&const_cast<FVoxelItem&>(InVoxelItem), EPhase::Primary, true);
 	return voxel;
 }
 

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Styling/SlateWidgetStyle.h"
 #include "Styling/SlateWidgetStyleContainerBase.h"
 

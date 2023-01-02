@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Components/ArrowComponent.h"
 #include "Media/MediaPlayer/MediaPlayerBase.h"

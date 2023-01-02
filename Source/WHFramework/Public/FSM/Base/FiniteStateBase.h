@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "Global/Base/WHObject.h"
 
 #include "FiniteStateBase.generated.h"

@@ -8,9 +8,9 @@ UVoxelPlant::UVoxelPlant()
 	
 }
 
-void UVoxelPlant::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UVoxelPlant::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UVoxelPlant::ToData()

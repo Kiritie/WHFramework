@@ -2,6 +2,7 @@
 
 
 #include "Asset/AssetModule.h"
+#include "Asset/AssetModuleTypes.h"
 		
 MODULE_INSTANCE_IMPLEMENTATION(AAssetModule)
 
@@ -39,6 +40,11 @@ void AAssetModule::OnInitialize_Implementation()
 	{
 		if(Iter)
 		{
+			FString ContextStr;
+			Iter->ForeachRow<FDataTableRowBase>(ContextStr, [](const FName& Key, const FDataTableRowBase& Value)
+			{
+				const_cast<FDataTableRowBase&>(Value).OnInitializeRow(Key);
+			});
 			DataTableMap.Add(Iter->RowStruct, Iter);
 		}
 	}

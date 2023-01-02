@@ -33,7 +33,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -60,7 +60,9 @@ public:
 public:
 	virtual void Initialize(AVoxelModule* InModule,  FIndex InIndex, int32 InBatch);
 
-	virtual void Generate(bool bBuildMesh, bool bForceMode = false);
+	virtual void Generate(EPhase InPhase = EPhase::Primary);
+
+	virtual void CreateMesh();
 
 	virtual void BuildMap(int32 InStage);
 
@@ -75,9 +77,9 @@ public:
 	virtual void DestroyActors();
 
 protected:
-	virtual void GenerateNeighbors(FIndex InIndex, bool bForceMode = false);
+	virtual void GenerateNeighbors(FIndex InIndex, EPhase InPhase = EPhase::Primary);
 
-	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ, bool bForceMode = false);
+	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPhase = EPhase::Primary);
 
 	virtual void UpdateNeighbors();
 

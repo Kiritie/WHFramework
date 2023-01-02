@@ -1,8 +1,8 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "SaveGameModuleTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -146,22 +146,22 @@ public:
 	static bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	static T* LoadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static T* LoadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, bForceMode));
+		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, InPhase));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"), Category = "SaveGameModuleBPLibrary")
-	static USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
+	static USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
 
 	template<class T>
-	static bool UnloadSaveGame(int32 InSaveIndex = -1, bool bForceMode = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static bool UnloadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
-		return UnloadSaveGame(InSaveGameClass, InSaveIndex, bForceMode);
+		return UnloadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModuleBPLibrary")
-	static bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bForceMode = false);
+	static bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
 
 	template<class T>
 	static bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

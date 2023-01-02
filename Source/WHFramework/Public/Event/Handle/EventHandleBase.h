@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Event/EventModuleTypes.h"
 #include "Global/Base/WHObject.h"

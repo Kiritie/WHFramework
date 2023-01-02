@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "Main/MainModule.h"
 #include "ReferencePoolModule.h"

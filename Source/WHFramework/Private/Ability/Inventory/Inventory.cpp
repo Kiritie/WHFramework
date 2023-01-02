@@ -23,70 +23,77 @@ UInventory::UInventory()
 	SkillSlotClass = UInventorySkillSlot::StaticClass();
 }
 
-void UInventory::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FInventorySaveData>();
 
-	if(bForceMode)
+	switch(InPhase)
 	{
-		for(auto Iter : Slots)
+		case EPhase::Primary:
 		{
-			UObjectPoolModuleBPLibrary::DespawnObject(Iter);
-		}
-		Slots.Empty();
-		SplitInfos = SaveData.SplitInfos;
-		for (auto Iter : SplitInfos)
-		{
-			for (int32 i = Iter.Value.StartIndex; i < Iter.Value.StartIndex + Iter.Value.TotalCount; i++)
+			for(auto Iter : Slots)
 			{
-				UInventorySlot* Slot = nullptr;
-				switch(Iter.Key)
+				UObjectPoolModuleBPLibrary::DespawnObject(Iter);
+			}
+			Slots.Empty();
+			SplitInfos = SaveData.SplitInfos;
+			for (auto Iter : SplitInfos)
+			{
+				for (int32 i = Iter.Value.StartIndex; i < Iter.Value.StartIndex + Iter.Value.TotalCount; i++)
 				{
-					case ESplitSlotType::Default:
+					UInventorySlot* Slot = nullptr;
+					switch(Iter.Key)
 					{
-						Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventorySlot>();
-						Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
-						break;
+						case ESplitSlotType::Default:
+						{
+							Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventorySlot>();
+							Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
+							break;
+						}
+						case ESplitSlotType::Shortcut:
+						{
+							Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryShortcutSlot>(nullptr, ShortcutSlotClass);
+							Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
+							break;
+						}
+						case ESplitSlotType::Auxiliary:
+						{
+							Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryAuxiliarySlot>(nullptr, AuxiliarySlotClass);
+							Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
+							break;
+						}
+						case ESplitSlotType::Equip:
+						{
+							Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryEquipSlot>(nullptr, EquipSlotClass);
+							Cast<UInventoryEquipSlot>(Slot)->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::Equip, Iter.Key, i - Iter.Value.StartIndex);
+							break;
+						}
+						case ESplitSlotType::Skill:
+						{
+							Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventorySkillSlot>(nullptr, SkillSlotClass);
+							Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::Skill, Iter.Key);
+							break;
+						}
+						default: break;
 					}
-					case ESplitSlotType::Shortcut:
-					{
-						Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryShortcutSlot>(nullptr, ShortcutSlotClass);
-						Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
-						break;
-					}
-					case ESplitSlotType::Auxiliary:
-					{
-						Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryAuxiliarySlot>(nullptr, AuxiliarySlotClass);
-						Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::None, Iter.Key);
-						break;
-					}
-					case ESplitSlotType::Equip:
-					{
-						Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventoryEquipSlot>(nullptr, EquipSlotClass);
-						Cast<UInventoryEquipSlot>(Slot)->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::Equip, Iter.Key, i - Iter.Value.StartIndex);
-						break;
-					}
-					case ESplitSlotType::Skill:
-					{
-						Slot = UObjectPoolModuleBPLibrary::SpawnObject<UInventorySkillSlot>(nullptr, SkillSlotClass);
-						Slot->OnInitialize(this, FAbilityItem::Empty, EAbilityItemType::Skill, Iter.Key);
-						break;
-					}
-					default: break;
+					Slots.Add(Slot);
 				}
-				Slots.Add(Slot);
 			}
 		}
-	}
-
-	for (int32 i = 0; i < Slots.Num(); i++)
-	{
-		Slots[i]->SetItem(SaveData.Items.IsValidIndex(i) ? SaveData.Items[i] : FAbilityItem::Empty);
-		if(i == SaveData.SelectedIndex)
+		case EPhase::Second:
+		case EPhase::Final:
 		{
-			SetSelectedSlot(Slots[i]);
+			for (int32 i = 0; i < Slots.Num(); i++)
+			{
+				Slots[i]->SetItem(SaveData.Items.IsValidIndex(i) ? SaveData.Items[i] : FAbilityItem::Empty);
+				if(i == SaveData.SelectedIndex)
+				{
+					SetSelectedSlot(Slots[i]);
+				}
+			}
+			break;
 		}
-	}
+	}	
 }
 
 FSaveData* UInventory::ToData()
@@ -107,7 +114,7 @@ FSaveData* UInventory::ToData()
 	return &SaveData;
 }
 
-void UInventory::UnloadData(bool bForceMode)
+void UInventory::UnloadData(EPhase InPhase)
 {
 	SplitInfos.Empty();
 	for(auto Iter : Slots)

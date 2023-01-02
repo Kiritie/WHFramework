@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 #include "UObject/ObjectMacros.h"
 #include "Engine/Blueprint.h"
 #include "StepBlueprint.generated.h"

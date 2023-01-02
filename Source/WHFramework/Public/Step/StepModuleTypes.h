@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "UObject/NoExportTypes.h"
 #include "StepModuleTypes.generated.h"

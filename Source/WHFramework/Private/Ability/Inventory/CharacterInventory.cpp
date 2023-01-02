@@ -8,9 +8,9 @@ UCharacterInventory::UCharacterInventory()
 	
 }
 
-void UCharacterInventory::LoadData(FSaveData* InSaveData, bool bForceMode)
+void UCharacterInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::LoadData(InSaveData, bForceMode);
+	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* UCharacterInventory::ToData()
@@ -18,9 +18,9 @@ FSaveData* UCharacterInventory::ToData()
 	return Super::ToData();
 }
 
-void UCharacterInventory::UnloadData(bool bForceMode)
+void UCharacterInventory::UnloadData(EPhase InPhase)
 {
-	Super::UnloadData(bForceMode);
+	Super::UnloadData(InPhase);
 }
 
 FQueryItemInfo UCharacterInventory::QueryItemByRange(EQueryItemType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)

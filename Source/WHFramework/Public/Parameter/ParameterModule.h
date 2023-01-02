@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "WHFramework.h"
 
 #include "ParameterManager.h"
 #include "ParameterModuleTypes.h"
@@ -45,7 +45,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, bool bForceMode) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 
