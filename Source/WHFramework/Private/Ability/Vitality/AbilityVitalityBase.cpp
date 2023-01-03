@@ -101,12 +101,12 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			SetActorRotation(SaveData.SpawnRotation);
 			break;
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		case EPhase::Final:
 		{
+			SetNameV(SaveData.Name);
 			SetRaceID(SaveData.RaceID);
 			SetLevelV(SaveData.Level);
-			SetNameV(SaveData.Name);
 
 			Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 

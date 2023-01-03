@@ -80,7 +80,7 @@ void UInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				}
 			}
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		case EPhase::Final:
 		{
 			for (int32 i = 0; i < Slots.Num(); i++)

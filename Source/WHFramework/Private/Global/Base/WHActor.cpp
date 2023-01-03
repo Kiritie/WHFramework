@@ -16,6 +16,21 @@ AWHActor::AWHActor()
 
 void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
+	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
+	{
+		SetActorLocation(InParams[0].GetVectorValue());
+	}
+
+	if(InParams.IsValidIndex(1) && InParams[1].GetParameterType() == EParameterType::Rotator)
+	{
+		SetActorRotation(InParams[1].GetRotatorValue());
+	}
+
+	if(InParams.IsValidIndex(2) && InParams[2].GetParameterType() == EParameterType::Vector)
+	{
+		SetActorScale3D(InParams[2].GetVectorValue());
+	}
+
 	Execute_SetActorVisible(this, true);
 	
 	if(Execute_IsAddToList(this))

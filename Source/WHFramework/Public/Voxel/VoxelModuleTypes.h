@@ -30,7 +30,7 @@ UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
 	None,
-	Game,
+	InGame,
 	Preview
 };
 

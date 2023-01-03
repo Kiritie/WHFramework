@@ -49,10 +49,10 @@ public:
 	bool Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
-	bool Load(EPhase InPhase = EPhase::Primary);
+	bool Load(EPhase InPhase = EPhase::Lesser);
 
 	UFUNCTION(BlueprintCallable)
-	bool Unload(EPhase InPhase = EPhase::Primary);
+	bool Unload(EPhase InPhase = EPhase::Lesser);
 
 	UFUNCTION(BlueprintCallable)
 	bool Reset();

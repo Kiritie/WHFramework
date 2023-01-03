@@ -54,6 +54,7 @@ AVoxelModule::AVoxelModule()
 	VoxelsCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
 	VoxelsCapture->bCaptureEveryFrame = true;
 
+	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
 
@@ -143,7 +144,7 @@ void AVoxelModule::OnPreparatory_Implementation()
 
 	GenerateVoxels();
 
-	if(WorldMode != EVoxelWorldMode::None)
+	if(bAutoGenerate)
 	{
 		static FVoxelWorldSaveData SaveData;
 		SaveData = FVoxelWorldSaveData(WorldBasicData);
@@ -241,7 +242,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		{
 			WorldData->TimeSeconds = SaveData.TimeSeconds;
 			WorldData->SecondsOfDay = SaveData.SecondsOfDay;
@@ -251,7 +252,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 		case EPhase::Final:
 		{
-			SetWorldMode(EVoxelWorldMode::Game);
+			SetWorldMode(EVoxelWorldMode::InGame);
 
 			for(auto Iter : ChunkMap)
 			{
@@ -317,7 +318,7 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 			WorldData = nullptr;
 			break;
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		case EPhase::Final:
 		{
 			SetWorldMode(EVoxelWorldMode::Preview);
@@ -488,14 +489,14 @@ void AVoxelModule::GenerateChunk(FIndex InIndex)
 	{
 		switch(WorldMode)
 		{
-			case EVoxelWorldMode::Game:
+			case EVoxelWorldMode::InGame:
 			{
 				Chunk->Generate(EPhase::Primary);
 				break;
 			}
 			case EVoxelWorldMode::Preview:
 			{
-				Chunk->Generate(EPhase::Second);
+				Chunk->Generate(EPhase::Lesser);
 				break;
 			}
 			default: break;

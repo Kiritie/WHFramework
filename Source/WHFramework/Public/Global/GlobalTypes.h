@@ -60,7 +60,7 @@ UENUM(BlueprintType)
 enum class EPhase : uint8
 {
 	Primary,
-	Second,
+	Lesser,
 	Final
 };
 

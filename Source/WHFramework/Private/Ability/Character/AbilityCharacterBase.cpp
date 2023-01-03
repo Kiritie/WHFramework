@@ -77,11 +77,6 @@ void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InP
 {
 	Super::OnSpawn_Implementation(InParams);
 
-	if(InParams.IsValidIndex(0))
-	{
-		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
 	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
@@ -110,12 +105,12 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			SetActorLocation(SaveData.SpawnLocation);
 			SetActorRotation(SaveData.SpawnRotation);
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		case EPhase::Final:
 		{
+			SetNameV(SaveData.Name);
 			SetRaceID(SaveData.RaceID);
 			SetLevelV(SaveData.Level);
-			SetNameV(SaveData.Name);
 		
 			Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 

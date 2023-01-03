@@ -4,6 +4,7 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
+#include "FSM/Components/FSMComponent.h"
 
 UAbilityCharacterState_Default::UAbilityCharacterState_Default()
 {
@@ -36,6 +37,8 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 void UAbilityCharacterState_Default::OnRefresh()
 {
 	Super::OnRefresh();
+
+	TrySwitchToWalk();
 }
 
 void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
@@ -50,4 +53,9 @@ void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState
 void UAbilityCharacterState_Default::OnTermination()
 {
 	Super::OnTermination();
+}
+
+void UAbilityCharacterState_Default::TrySwitchToWalk()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
 }

@@ -157,6 +157,7 @@ protected:
 	FPrimaryAssetId AssetID;
 
 public:
+	UFUNCTION(BlueprintPure)
 	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
 	
 	template<class T>

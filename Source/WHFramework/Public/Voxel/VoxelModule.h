@@ -70,6 +70,9 @@ protected:
 	// World
 protected:
 	UPROPERTY(EditAnywhere, Category = "World")
+	bool bAutoGenerate;
+
+	UPROPERTY(VisibleAnywhere, Category = "World")
 	EVoxelWorldMode WorldMode;
 
 	UPROPERTY(VisibleAnywhere, Category = "World")

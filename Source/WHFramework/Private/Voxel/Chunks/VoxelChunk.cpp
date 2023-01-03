@@ -173,7 +173,7 @@ void AVoxelChunk::Generate(EPhase InPhase)
 			SpawnActors();
 			break;
 		}
-		case EPhase::Second:
+		case EPhase::Lesser:
 		{
 			if(bGenerated)
 			{
@@ -722,7 +722,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 
 	if(bSuccess && bGenerate)
 	{
-		Generate(EPhase::Second);
+		Generate(EPhase::Lesser);
 		GenerateNeighbors(InIndex);
 	}
 

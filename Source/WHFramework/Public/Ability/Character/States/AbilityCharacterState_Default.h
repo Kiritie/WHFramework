@@ -32,4 +32,7 @@ public:
 	virtual void OnLeave(UFiniteStateBase* InNextFiniteState) override;
 
 	virtual void OnTermination() override;
+
+protected:
+	virtual void TrySwitchToWalk();
 };

@@ -71,6 +71,11 @@ void ACharacterBase::BeginPlay()
 
 void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
+	if(InParams.IsValidIndex(0))
+	{
+		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
 	Execute_SetActorVisible(this, true);
 
 	if(Execute_IsAddToList(this))

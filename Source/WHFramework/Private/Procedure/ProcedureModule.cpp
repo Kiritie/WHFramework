@@ -112,9 +112,9 @@ void AProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 		{
 			CurrentProcedure->OnLeave(InProcedure);
 		}
-		InProcedure->OnEnter(CurrentProcedure);
-
+		UProcedureBase* LastProcedure = CurrentProcedure;
 		CurrentProcedure = InProcedure;
+		InProcedure->OnEnter(LastProcedure);
 	}
 }
 

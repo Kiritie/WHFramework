@@ -191,22 +191,22 @@ public:
 	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	T* LoadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* LoadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, InPhase));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
+	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser);
 
 	template<class T>
-	bool UnloadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool UnloadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		return UnloadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Primary);
+	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser);
 
 	template<class T>
 	bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
