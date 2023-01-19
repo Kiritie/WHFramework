@@ -5,7 +5,7 @@
 
 #include "ReferencePool/ReferencePool.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AReferencePoolModule)
+MODULE_INSTANCE_IMPLEMENTATION(AReferencePoolModule, false)
 
 // Sets default values
 AReferencePoolModule::AReferencePoolModule()
@@ -32,9 +32,9 @@ void AReferencePoolModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AReferencePoolModule::OnPreparatory_Implementation()
+void AReferencePoolModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AReferencePoolModule::OnRefresh_Implementation(float DeltaSeconds)

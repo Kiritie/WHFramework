@@ -14,7 +14,7 @@
 #include "Math/MathBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ACameraModule)
+MODULE_INSTANCE_IMPLEMENTATION(ACameraModule, false)
 
 // Sets default values
 ACameraModule::ACameraModule()
@@ -151,11 +151,11 @@ void ACameraModule::OnInitialize_Implementation()
 	}
 }
 
-void ACameraModule::OnPreparatory_Implementation()
+void ACameraModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	if(DefaultCamera)
+	if(InPhase == EPhase::Final && DefaultCamera)
 	{
 		SwitchCamera(DefaultCamera, DefaultInstantSwitch);
 	}

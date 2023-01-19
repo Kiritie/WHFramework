@@ -4,7 +4,7 @@
 #include "Asset/AssetModule.h"
 #include "Asset/AssetModuleTypes.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAssetModule)
+MODULE_INSTANCE_IMPLEMENTATION(AAssetModule, false)
 
 // Sets default values
 AAssetModule::AAssetModule()
@@ -16,7 +16,7 @@ AAssetModule::AAssetModule()
 #if WITH_EDITOR
 void AAssetModule::OnGenerate_Implementation()
 {
-	
+	Super::OnGenerate_Implementation();
 }
 
 void AAssetModule::OnDestroy_Implementation()
@@ -50,9 +50,9 @@ void AAssetModule::OnInitialize_Implementation()
 	}
 }
 
-void AAssetModule::OnPreparatory_Implementation()
+void AAssetModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AAssetModule::OnRefresh_Implementation(float DeltaSeconds)

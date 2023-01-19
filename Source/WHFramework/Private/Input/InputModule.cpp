@@ -13,7 +13,7 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AInputModule)
+MODULE_INSTANCE_IMPLEMENTATION(AInputModule, false)
 
 // Sets default values
 AInputModule::AInputModule()
@@ -38,11 +38,14 @@ void AInputModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AInputModule::OnPreparatory_Implementation()
+void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	UpdateInputMode();
+	if(InPhase == EPhase::Final)
+	{
+		UpdateInputMode();
+	}
 }
 
 void AInputModule::OnRefresh_Implementation(float DeltaSeconds)

@@ -9,7 +9,7 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ACharacterModule)
+MODULE_INSTANCE_IMPLEMENTATION(ACharacterModule, false)
 
 // Sets default values
 ACharacterModule::ACharacterModule()
@@ -49,11 +49,11 @@ void ACharacterModule::OnInitialize_Implementation()
 	}
 }
 
-void ACharacterModule::OnPreparatory_Implementation()
+void ACharacterModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	if(DefaultCharacter)
+	if(InPhase == EPhase::Final && DefaultCharacter)
 	{
 		SwitchCharacter(DefaultCharacter);
 	}

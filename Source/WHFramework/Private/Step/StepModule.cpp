@@ -21,7 +21,7 @@
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AStepModule)
+MODULE_INSTANCE_IMPLEMENTATION(AStepModule, false)
 
 // ParamSets default values
 AStepModule::AStepModule()
@@ -73,11 +73,11 @@ void AStepModule::OnInitialize_Implementation()
 	}
 }
 
-void AStepModule::OnPreparatory_Implementation()
+void AStepModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	if(bAutoStartFirst)
+	if(InPhase == EPhase::Final && bAutoStartFirst)
 	{
 		StartStep(-1, true);
 	}

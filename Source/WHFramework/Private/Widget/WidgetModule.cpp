@@ -10,7 +10,7 @@
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AWidgetModule)
+MODULE_INSTANCE_IMPLEMENTATION(AWidgetModule, false)
 
 // Sets default values
 AWidgetModule::AWidgetModule()
@@ -103,9 +103,9 @@ void AWidgetModule::OnInitialize_Implementation()
 	}
 }
 
-void AWidgetModule::OnPreparatory_Implementation()
+void AWidgetModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)

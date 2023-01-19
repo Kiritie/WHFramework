@@ -40,7 +40,7 @@ void AModuleBase::OnInitialize_Implementation()
 	
 }
 
-void AModuleBase::OnPreparatory_Implementation()
+void AModuleBase::OnPreparatory_Implementation(EPhase InPhase)
 {
 	
 }
@@ -71,7 +71,7 @@ void AModuleBase::Run_Implementation()
 	{
 		ModuleState = EModuleState::Running;
 		Execute_OnStateChanged(this, ModuleState);
-		Execute_OnPreparatory(this);
+		Execute_OnPreparatory(this, EPhase::Final);
 	}
 }
 

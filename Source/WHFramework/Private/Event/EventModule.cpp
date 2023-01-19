@@ -15,7 +15,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Network/NetworkModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AEventModule)
+MODULE_INSTANCE_IMPLEMENTATION(AEventModule, false)
 
 // ParamSets default values
 AEventModule::AEventModule()
@@ -47,9 +47,9 @@ void AEventModule::OnInitialize_Implementation()
 	}
 }
 
-void AEventModule::OnPreparatory_Implementation()
+void AEventModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AEventModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -219,7 +219,7 @@ void AEventModule::SpawnEventManager()
 		EventManager = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
         if(EventManager)
         {
-        	EventManager->OnInitialize();
+        	EventManager->Execute_OnInitialize(EventManager);
 #if(WITH_EDITOR)
         	EventManager->SetActorLabel(TEXT("EventManager"));
 #endif

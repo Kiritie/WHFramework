@@ -11,7 +11,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAudioModule)
+MODULE_INSTANCE_IMPLEMENTATION(AAudioModule, false)
 
 // Sets default values
 AAudioModule::AAudioModule()
@@ -36,9 +36,9 @@ void AAudioModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAudioModule::OnPreparatory_Implementation()
+void AAudioModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AAudioModule::OnRefresh_Implementation(float DeltaSeconds)

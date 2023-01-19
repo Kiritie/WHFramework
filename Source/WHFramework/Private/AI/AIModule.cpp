@@ -5,7 +5,7 @@
 
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAIModule)
+MODULE_INSTANCE_IMPLEMENTATION(AAIModule, false)
 
 // Sets default values
 AAIModule::AAIModule()
@@ -17,13 +17,11 @@ AAIModule::AAIModule()
 void AAIModule::OnGenerate_Implementation()
 {
 	Super::OnGenerate_Implementation();
-
 }
 
 void AAIModule::OnDestroy_Implementation()
 {
 	Super::OnDestroy_Implementation();
-
 }
 #endif
 
@@ -32,9 +30,9 @@ void AAIModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAIModule::OnPreparatory_Implementation()
+void AAIModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AAIModule::OnRefresh_Implementation(float DeltaSeconds)

@@ -5,7 +5,7 @@
 
 #include "FSM/Components/FSMComponent.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AFSMModule)
+MODULE_INSTANCE_IMPLEMENTATION(AFSMModule, false)
 
 // ParamSets default values
 AFSMModule::AFSMModule()
@@ -32,9 +32,9 @@ void AFSMModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AFSMModule::OnPreparatory_Implementation()
+void AFSMModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AFSMModule::OnRefresh_Implementation(float DeltaSeconds)

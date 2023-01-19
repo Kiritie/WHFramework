@@ -19,7 +19,7 @@
 #include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ASceneModule)
+MODULE_INSTANCE_IMPLEMENTATION(ASceneModule, false)
 
 ASceneModule::ASceneModule()
 {
@@ -101,61 +101,64 @@ void ASceneModule::OnInitialize_Implementation()
 	OutlineMatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, OutlineMat);
 }
 
-void ASceneModule::OnPreparatory_Implementation()
+void ASceneModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	APostProcessVolume* UnboundPostProcessVolume = nullptr;
-	
-	for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
+	if(InPhase == EPhase::Primary)
 	{
-		if (PostProcessVolumeInterface)
+		APostProcessVolume* UnboundPostProcessVolume = nullptr;
+	
+		for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
 		{
-			if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
+			if (PostProcessVolumeInterface)
 			{
-				if (PostProcessVolume->bUnbound)
+				if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
 				{
-					UnboundPostProcessVolume = PostProcessVolume;
+					if (PostProcessVolume->bUnbound)
+					{
+						UnboundPostProcessVolume = PostProcessVolume;
+						break;
+					}
+				}
+			}
+		}
+	
+		if (!UnboundPostProcessVolume)
+		{
+			APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
+		
+			if (PostProcessVolume)
+			{
+				PostProcessVolume->bUnbound = true;
+				UnboundPostProcessVolume = PostProcessVolume;
+			}
+		}
+	
+		if (UnboundPostProcessVolume)
+		{
+			bool bNeedAddMat = true;
+			// 查找是否描边材质已经添加
+			for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
+			{
+				if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
+				{
+					if (OutlineMatInst)
+					{
+						UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
+					}
+					bNeedAddMat = false;
 					break;
 				}
 			}
-		}
-	}
-	
-	if (!UnboundPostProcessVolume)
-	{
-		APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
-		
-		if (PostProcessVolume)
-		{
-			PostProcessVolume->bUnbound = true;
-			UnboundPostProcessVolume = PostProcessVolume;
-		}
-	}
-	
-	if (UnboundPostProcessVolume)
-	{
-		bool bNeedAddMat = true;
-		// 查找是否描边材质已经添加
-		for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
-		{
-			if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
+			if (bNeedAddMat)
 			{
-				if (OutlineMatInst)
-				{
-					UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
-				}
-				bNeedAddMat = false;
-				break;
+				UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
 			}
 		}
-		if (bNeedAddMat)
-		{
-			UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
-		}
-	}
 	
-	SetOutlineColor(OutlineColor);
+		SetOutlineColor(OutlineColor);
+	}
 }
 
 void ASceneModule::OnRefresh_Implementation(float DeltaSeconds)

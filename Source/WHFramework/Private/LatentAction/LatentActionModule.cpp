@@ -7,7 +7,7 @@
 #include "Engine/TargetPoint.h"
 #include "Main/MainModule.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ALatentActionModule)
+MODULE_INSTANCE_IMPLEMENTATION(ALatentActionModule, false)
 
 ALatentActionModule::ALatentActionModule()
 {
@@ -31,9 +31,9 @@ void ALatentActionModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void ALatentActionModule::OnPreparatory_Implementation()
+void ALatentActionModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void ALatentActionModule::OnRefresh_Implementation(float DeltaSeconds)

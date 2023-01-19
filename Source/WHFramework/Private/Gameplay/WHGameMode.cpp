@@ -7,27 +7,56 @@
 
 AWHGameMode::AWHGameMode()
 {
-	
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 void AWHGameMode::OnInitialize_Implementation()
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		MainModule->InitializeModules();
+		MainModule->Execute_OnInitialize(MainModule);
 	}
 }
 
-void AWHGameMode::OnPreparatory_Implementation()
+void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 {
-	
+	if(AMainModule* MainModule = AMainModule::Get())
+	{
+		if(InPhase != EPhase::Final)
+		{
+			MainModule->Execute_OnPreparatory(MainModule, InPhase);
+		}
+		else if(MainModule->Execute_IsAutoRunModule(MainModule))
+		{
+			MainModule->Execute_Run(MainModule);
+		}
+	}
+}
+
+void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
+{
+	if(AMainModule* MainModule = AMainModule::Get())
+	{
+		if(MainModule->Execute_GetModuleState(MainModule) == EModuleState::Running)
+		{
+			MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
+		}
+	}
+}
+
+void AWHGameMode::OnTermination_Implementation()
+{
+	if(AMainModule* MainModule = AMainModule::Get())
+	{
+		MainModule->Execute_OnTermination(MainModule);
+	}
 }
 
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
-	OnInitialize();
+	Execute_OnInitialize(this);
 }
 
 void AWHGameMode::InitGameState()
@@ -36,7 +65,7 @@ void AWHGameMode::InitGameState()
 
 	if(AWHGameState* WHGameState = Cast<AWHGameState>(GameState))
 	{
-		WHGameState->OnInitialize();
+		WHGameState->Execute_OnInitialize(WHGameState);
 	}
 }
 
@@ -46,7 +75,7 @@ APlayerController* AWHGameMode::SpawnPlayerController(ENetRole InRemoteRole, con
 	
 	if(AWHPlayerController* WHPlayerController = Cast<AWHPlayerController>(PlayerController))
 	{
-		WHPlayerController->OnInitialize();
+		WHPlayerController->Execute_OnInitialize(WHPlayerController);
 	}
 	return PlayerController;
 }
@@ -65,5 +94,21 @@ void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	OnPreparatory();
+	Execute_OnPreparatory(this, EPhase::Primary);
+	Execute_OnPreparatory(this, EPhase::Lesser);
+	Execute_OnPreparatory(this, EPhase::Final);
+}
+
+void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	Execute_OnTermination(this);
+}
+
+void AWHGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	Execute_OnRefresh(this, DeltaSeconds);
 }

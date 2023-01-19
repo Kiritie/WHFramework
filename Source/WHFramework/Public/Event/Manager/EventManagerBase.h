@@ -21,8 +21,7 @@ public:
 	AEventManagerBase();
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
+	virtual void OnInitialize_Implementation() override;
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)

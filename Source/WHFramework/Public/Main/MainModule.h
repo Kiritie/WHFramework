@@ -14,75 +14,61 @@
 
 #include "MainModule.generated.h"
 
-class AModuleBase;
-
 UCLASS()
-class WHFRAMEWORK_API AMainModule : public AWHActor
+class WHFRAMEWORK_API AMainModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
+	MODULE_INSTANCE_DECLARE(AMainModule)
+
 public:	
 	// ParamSets default values for this actor's properties
 	AMainModule();
-
-	virtual ~AMainModule() override;
-
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Instance
-protected:
-	static AMainModule* Instance;
-	#if WITH_EDITOR
-	static AMainModule* InstanceEditor;
-	#endif
-
-public:
-	static AMainModule* Get(bool bInEditor = false);
-
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
+public:
+#if WITH_EDITOR
+	virtual void OnGenerate_Implementation() override;
+
+	virtual void OnDestroy_Implementation() override;
+#endif
+	
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnPause_Implementation() override;
+
+	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Modules
 public:	
 #if WITH_EDITOR
-	UFUNCTION(CallInEditor, BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(CallInEditor, BlueprintNativeEvent)
 	void GenerateModules();
     
-	UFUNCTION(CallInEditor, BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(CallInEditor, BlueprintNativeEvent)
 	void DestroyModules();
 #endif
 
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
-	void InitializeModules();
-    
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
-	void PreparatoryModules();
-
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
-    void RefreshModules(float DeltaSeconds);
-    
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent)
     void PauseModules();
     
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
+	UFUNCTION(BlueprintNativeEvent)
     void UnPauseModules();
-
-	UFUNCTION(BlueprintNativeEvent, Category = "MainModule")
-	void TerminationModules();
 
 protected:
 	/// 模块类
-	UPROPERTY(EditAnywhere, Category = "MainModule")
+	UPROPERTY(EditAnywhere)
 	TArray<TSubclassOf<AModuleBase>> ModuleClasses;
 	/// 模块列表
-	UPROPERTY(EditAnywhere, Replicated, Category = "MainModule")
+	UPROPERTY(EditAnywhere, Replicated)
 	TArray<TScriptInterface<IModule>> ModuleRefs;
 	UPROPERTY()
 	TMap<FName, TScriptInterface<IModule>> ModuleMap;

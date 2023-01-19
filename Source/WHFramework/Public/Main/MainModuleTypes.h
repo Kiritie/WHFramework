@@ -12,7 +12,7 @@ public: \
 	static ModuleClass* Get(bool bInEditor = false); \
 	virtual ~##ModuleClass();
 
-#define MODULE_INSTANCE_IMPLEMENTATION(ModuleClass) \
+#define MODULE_INSTANCE_IMPLEMENTATION(ModuleClass, bMainModule) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
 ModuleClass* ModuleClass::Get(bool bInEditor) \
@@ -21,7 +21,9 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!Instance) \
 		{ \
-			Instance = AMainModule::GetModuleByClass<ModuleClass>(false); \
+			Instance = bMainModule ? UGlobalBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+                                     				return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
+                                     			}, false) : AMainModule::GetModuleByClass<ModuleClass>(false); \
 		} \
 		return Instance; \
 	} \
@@ -29,7 +31,9 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!InstanceEditor) \
 		{ \
-			InstanceEditor = AMainModule::GetModuleByClass<ModuleClass>(true); \
+			InstanceEditor = bMainModule ? UGlobalBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+                             				return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
+                             			}, true) : AMainModule::GetModuleByClass<ModuleClass>(true); \
 		} \
 		return InstanceEditor; \
 	} \

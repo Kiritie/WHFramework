@@ -6,7 +6,7 @@
 #include "Media/MediaPlayer/MediaPlayerBase.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AMediaModule)
+MODULE_INSTANCE_IMPLEMENTATION(AMediaModule, false)
 
 // Sets default values
 AMediaModule::AMediaModule()
@@ -33,9 +33,9 @@ void AMediaModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AMediaModule::OnPreparatory_Implementation()
+void AMediaModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AMediaModule::OnRefresh_Implementation(float DeltaSeconds)

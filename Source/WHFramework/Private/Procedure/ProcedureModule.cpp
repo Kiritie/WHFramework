@@ -19,7 +19,7 @@
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AProcedureModule)
+MODULE_INSTANCE_IMPLEMENTATION(AProcedureModule, false)
 
 // ParamSets default values
 AProcedureModule::AProcedureModule()
@@ -52,25 +52,27 @@ void AProcedureModule::OnDestroy_Implementation()
 void AProcedureModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	if(!FirstProcedure && Procedures.Num() > 0)
-	{
-		FirstProcedure = Procedures[0];
-	}
-	for(auto Iter : Procedures)
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
 }
 
-void AProcedureModule::OnPreparatory_Implementation()
+void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	if(bAutoSwitchFirst && FirstProcedure)
+	if(InPhase == EPhase::Primary)
+	{
+		if(!FirstProcedure && Procedures.Num() > 0)
+		{
+			FirstProcedure = Procedures[0];
+		}
+		for(auto Iter : Procedures)
+		{
+			if(Iter)
+			{
+				Iter->OnInitialize();
+			}
+		}
+	}
+	else if(InPhase == EPhase::Final && bAutoSwitchFirst && FirstProcedure)
 	{
 		SwitchProcedure(FirstProcedure);
 	}

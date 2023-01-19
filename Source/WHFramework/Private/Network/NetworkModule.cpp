@@ -9,7 +9,7 @@
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ANetworkModule)
+MODULE_INSTANCE_IMPLEMENTATION(ANetworkModule, false)
 
 // ParamSets default values
 ANetworkModule::ANetworkModule()
@@ -38,9 +38,9 @@ void ANetworkModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void ANetworkModule::OnPreparatory_Implementation()
+void ANetworkModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void ANetworkModule::OnRefresh_Implementation(float DeltaSeconds)

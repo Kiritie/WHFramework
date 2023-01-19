@@ -21,7 +21,7 @@
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAbilityModule)
+MODULE_INSTANCE_IMPLEMENTATION(AAbilityModule, false)
 
 // Sets default values
 AAbilityModule::AAbilityModule()
@@ -48,9 +48,9 @@ void AAbilityModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAbilityModule::OnPreparatory_Implementation()
+void AAbilityModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AAbilityModule::OnRefresh_Implementation(float DeltaSeconds)

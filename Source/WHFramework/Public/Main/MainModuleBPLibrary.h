@@ -23,12 +23,6 @@ class WHFRAMEWORK_API UMainModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void PauseAllModule();
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void UnPauseAllModule();
-				
-	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
 	static void RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
@@ -46,6 +40,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
 	static void UnPauseModuleByName(const FName InModuleName);
 
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void PauseMainModule();
+
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void UnPauseMainModule();
+
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void PauseAllModule();
+
+	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
+	static void UnPauseAllModule();
+				
 public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
 	static AMainModule* GetMainModule(bool bInEditor = false);

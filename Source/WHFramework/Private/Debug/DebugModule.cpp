@@ -3,7 +3,7 @@
 
 #include "Debug/DebugModule.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ADebugModule)
+MODULE_INSTANCE_IMPLEMENTATION(ADebugModule, false)
 
 // Sets default values
 ADebugModule::ADebugModule()
@@ -29,9 +29,9 @@ void ADebugModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void ADebugModule::OnPreparatory_Implementation()
+void ADebugModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void ADebugModule::OnRefresh_Implementation(float DeltaSeconds)

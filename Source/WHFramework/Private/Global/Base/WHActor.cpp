@@ -14,6 +14,26 @@ AWHActor::AWHActor()
 	Container = nullptr;
 }
 
+void AWHActor::OnInitialize_Implementation()
+{
+	
+}
+
+void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
+{
+	
+}
+
+void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void AWHActor::OnTermination_Implementation()
+{
+	
+}
+
 void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
@@ -71,5 +91,31 @@ void AWHActor::SetActorVisible_Implementation(bool bNewVisible)
 	for(auto Iter : AttachedActors)
 	{
 		ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+	}
+}
+
+void AWHActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if(!Execute_IsCustomLifecycle(this))
+	{
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
+}
+
+void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if(!Execute_IsCustomLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
+}
+
+void AWHActor::Tick(float DeltaSeconds)
+{
+	if(!Execute_IsCustomLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
 	}
 }

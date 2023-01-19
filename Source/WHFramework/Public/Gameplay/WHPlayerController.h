@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "WHFramework.h"
+#include "Global/Base/WHActor.h"
 #include "GameFramework/PlayerController.h"
 #include "Math/MathTypes.h"
 
@@ -10,11 +10,14 @@
 
 class IWHPlayerInterface;
 class UModuleNetworkComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerPawnChanged, class APawn*, InPlayerPawn);
+
 /**
  * 
  */
 UCLASS(hidecategories = (Tick, ComponentTick, Replication, ComponentReplication, Activation, Variable, Game, Physics, Rendering, Collision, Actor, Input, Tags, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API AWHPlayerController : public APlayerController
+class WHFRAMEWORK_API AWHPlayerController : public APlayerController, public IWHActorInterface
 {
 
 private:
@@ -24,13 +27,15 @@ public:
 	AWHPlayerController();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
+	/// WHActor
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
+	virtual void OnInitialize_Implementation() override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPreparatory();
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
@@ -79,6 +84,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
 	virtual void SetupInputComponent() override;
 
 	virtual void OnPossess(APawn* InPawn) override;
@@ -157,6 +164,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	APawn* PlayerPawn;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnPlayerPawnChanged OnPlayerPawnChanged;
+
 public:
 	template<class T>
 	T* GetPlayerPawn()
@@ -166,6 +176,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
-	
-	void SetPlayerPawn(APawn* InPlayerPawn) { PlayerPawn =  InPlayerPawn; }
+
+	FOnPlayerPawnChanged& GetOnPlayerPawnChanged() { return OnPlayerPawnChanged; }
+
+protected:
+	virtual void SetPlayerPawn(APawn* InPlayerPawn);
 };

@@ -32,19 +32,13 @@
 #include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
-AMainModule* AMainModule::Instance = nullptr;
-#if WITH_EDITOR
-AMainModule* AMainModule::InstanceEditor = nullptr;
-#endif
+MODULE_INSTANCE_IMPLEMENTATION(AMainModule, true)
 
 // ParamSets default values
 AMainModule::AMainModule()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
-	bReplicates = true;
-
+	ModuleName = FName("MainModule");
+	
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAbilityModule::StaticClass());
 	ModuleClasses.Add(AAIModule::StaticClass());
@@ -75,69 +69,86 @@ AMainModule::AMainModule()
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
 }
 
-AMainModule::~AMainModule()
+#if WITH_EDITOR
+void AMainModule::OnGenerate_Implementation()
 {
-	if(Instance == this)
+	Super::OnGenerate_Implementation();
+}
+
+void AMainModule::OnDestroy_Implementation()
+{
+	Super::OnDestroy_Implementation();
+}
+#endif
+
+void AMainModule::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		Instance = nullptr;
-	}
-	#if WITH_EDITOR
-	if(InstanceEditor == this)
-	{
-		InstanceEditor = nullptr;
-	}
-	#endif
-}
-
-// Called when the game starts or when spawned
-void AMainModule::BeginPlay()
-{
-	Super::BeginPlay();
-
-	PreparatoryModules();
-}
-
-void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	TerminationModules();
-}
-
-// Called every frame
-void AMainModule::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	RefreshModules(DeltaTime);
-}
-
-AMainModule* AMainModule::Get(bool bInEditor)
-{
-	#if WITH_EDITOR
-	if(!bInEditor)
-	{
-	#endif
-		if(!Instance || !Instance->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
-			Instance = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
-				return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
-			}, false);
+			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i].GetObject());
 		}
-		return Instance;
-	#if WITH_EDITOR
 	}
-	else
+}
+
+void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(!InstanceEditor || !InstanceEditor->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
-			InstanceEditor = UGlobalBPLibrary::GetObjectInExistedWorld<AMainModule>([](const UWorld* World) {
-				return UGameplayStatics::GetActorOfClass(World, AMainModule::StaticClass());
-			}, true);
+			if(InPhase != EPhase::Final)
+			{
+				ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject(), InPhase);
+			}
+			else if(ModuleRefs[i]->Execute_IsAutoRunModule(ModuleRefs[i].GetObject()))
+			{
+				ModuleRefs[i]->Execute_Run(ModuleRefs[i].GetObject());
+			}
 		}
-		return InstanceEditor;
 	}
-	#endif
+}
+
+void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
+	{
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::Running)
+		{
+			ModuleRefs[i]->Execute_OnRefresh(ModuleRefs[i].GetObject(), DeltaSeconds);
+		}
+	}
+}
+
+void AMainModule::OnPause_Implementation()
+{
+	Super::OnPause_Implementation();
+}
+
+void AMainModule::OnUnPause_Implementation()
+{
+	Super::OnUnPause_Implementation();
+}
+
+void AMainModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+
+	for(int32 i = 0; i < ModuleRefs.Num(); i++)
+	{
+		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		{
+			ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i].GetObject());
+		}
+	}
+	ModuleMap.Empty();
 }
 
 #if WITH_EDITOR
@@ -150,10 +161,10 @@ void AMainModule::GenerateModules_Implementation()
 	{
 		if(const IModule* Module = Cast<IModule>(Iter))
 		{
-			const FName ModuleName = Module->Execute_GetModuleName(Iter);
-			Iter->SetActorLabel(ModuleName.ToString());
+			const FName Name = Module->Execute_GetModuleName(Iter);
+			Iter->SetActorLabel(Name.ToString());
 			ModuleRefs.AddUnique(Iter);
-			ModuleMap.Emplace(ModuleName, Iter);
+			ModuleMap.Emplace(Name, Iter);
 		}
 	}
 
@@ -203,12 +214,12 @@ void AMainModule::GenerateModules_Implementation()
 
 		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(ModuleClasses[i], ActorSpawnParameters))
 		{
-			const FName ModuleName = Module->Execute_GetModuleName(Module);
-			Module->SetActorLabel(ModuleName.ToString());
+			const FName Name = Module->Execute_GetModuleName(Module);
+			Module->SetActorLabel(Name.ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			Module->Execute_OnGenerate(Module);
 			ModuleRefs.AddUnique(Module);
-			ModuleMap.Emplace(ModuleName, Module);
+			ModuleMap.Emplace(Name, Module);
 		}
 	}
 
@@ -234,49 +245,6 @@ void AMainModule::DestroyModules_Implementation()
 }
 #endif
 
-void AMainModule::InitializeModules_Implementation()
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
-		{
-			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i].GetObject());
-		}
-	}
-}
-
-void AMainModule::PreparatoryModules_Implementation()
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
-		{
-			if(ModuleRefs[i]->Execute_IsAutoRunModule(ModuleRefs[i].GetObject()))
-			{
-				if(ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::None)
-				{
-					ModuleRefs[i]->Execute_Run(ModuleRefs[i].GetObject());
-				}
-				else
-				{
-					ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject());
-				}
-			}
-		}
-	}
-}
-
-void AMainModule::RefreshModules_Implementation(float DeltaSeconds)
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::Running)
-		{
-			ModuleRefs[i]->Execute_OnRefresh(ModuleRefs[i].GetObject(), DeltaSeconds);
-		}
-	}
-}
-
 void AMainModule::PauseModules_Implementation()
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
@@ -297,18 +265,6 @@ void AMainModule::UnPauseModules_Implementation()
 			ModuleRefs[i]->Execute_UnPause(ModuleRefs[i].GetObject());
 		}
 	}
-}
-
-void AMainModule::TerminationModules_Implementation()
-{
-	for(int32 i = 0; i < ModuleRefs.Num(); i++)
-	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
-		{
-			ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i].GetObject());
-		}
-	}
-	ModuleMap.Empty();
 }
 
 UModuleNetworkComponent* AMainModule::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor)

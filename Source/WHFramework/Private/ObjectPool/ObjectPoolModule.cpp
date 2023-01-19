@@ -5,7 +5,7 @@
 
 #include "ObjectPool/ObjectPool.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AObjectPoolModule)
+MODULE_INSTANCE_IMPLEMENTATION(AObjectPoolModule, false)
 
 // Sets default values
 AObjectPoolModule::AObjectPoolModule()
@@ -33,9 +33,9 @@ void AObjectPoolModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AObjectPoolModule::OnPreparatory_Implementation()
+void AObjectPoolModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AObjectPoolModule::OnRefresh_Implementation(float DeltaSeconds)

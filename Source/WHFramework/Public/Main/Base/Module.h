@@ -18,7 +18,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, I
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UModule : public UInterface
+class UModule : public UWHActorInterface
 {
 	GENERATED_BODY()
 };
@@ -26,7 +26,7 @@ class UModule : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IModule
+class WHFRAMEWORK_API IModule : public IWHActorInterface
 {
 	GENERATED_BODY()
 
@@ -50,21 +50,6 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnStateChanged(EModuleState InModuleState);
 	/**
-	* 当初始化
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
-	/**
-	* 当准备
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPreparatory();
-	/**
-	* 当刷新
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh(float DeltaSeconds);
-	/**
 	* 当暂停
 	*/
 	UFUNCTION(BlueprintNativeEvent)
@@ -74,11 +59,6 @@ public:
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	void OnUnPause();
-	/**
-	* 当结束
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnTermination();
 
 public:
 	/**

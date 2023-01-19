@@ -31,7 +31,7 @@ public:
 
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation() override;
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
@@ -40,6 +40,9 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsCustomLifecycle_Implementation() const override { return true; }
 
 public:
 	virtual void Run_Implementation() override;

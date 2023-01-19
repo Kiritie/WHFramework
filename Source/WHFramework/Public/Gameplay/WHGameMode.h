@@ -3,13 +3,15 @@
 #pragma once
 
 #include "GameFramework/GameModeBase.h"
+#include "Global/GlobalTypes.h"
+#include "Global/Base/WHActor.h"
 #include "WHGameMode.generated.h"
 
 /**
  * 游戏模式基类
  */
 UCLASS()
-class WHFRAMEWORK_API AWHGameMode : public AGameModeBase
+class WHFRAMEWORK_API AWHGameMode : public AGameModeBase, public IWHActorInterface
 {
 	GENERATED_BODY()
 
@@ -17,16 +19,16 @@ public:
 	AWHGameMode();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
+	/// WHActor
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
+	virtual void OnInitialize_Implementation() override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPreparatory();
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Inherits
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
 public:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
@@ -41,4 +43,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
 };

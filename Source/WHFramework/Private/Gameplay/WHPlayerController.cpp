@@ -63,7 +63,17 @@ void AWHPlayerController::OnInitialize_Implementation()
 	
 }
 
-void AWHPlayerController::OnPreparatory_Implementation()
+void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
+{
+	
+}
+
+void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void AWHPlayerController::OnTermination_Implementation()
 {
 	
 }
@@ -72,7 +82,14 @@ void AWHPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	OnPreparatory();
+	Execute_OnPreparatory(this, EPhase::Final);
+}
+
+void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	Execute_OnTermination(this);
 }
 
 void AWHPlayerController::SetupInputComponent()
@@ -108,7 +125,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 
 	if(InPawn->Implements<UWHPlayerInterface>() && !InPawn->IsA<ACameraPawnBase>())
 	{
-		PlayerPawn = InPawn;
+		SetPlayerPawn(InPawn);
 	}
 }
 
@@ -120,6 +137,8 @@ void AWHPlayerController::OnUnPossess()
 void AWHPlayerController::Tick(float DeltaTime) 
 {
 	Super::Tick(DeltaTime);
+
+	Execute_OnRefresh(this, DeltaTime);
 }
 
 bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
@@ -446,5 +465,14 @@ void AWHPlayerController::MoveUpPlayer(float InValue)
 	if(GetPawn() && GetPawn()->Implements<UWHPlayerInterface>())
 	{
 		IWHPlayerInterface::Execute_MoveUp(GetPawn(), InValue);
+	}
+}
+
+void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
+{
+	if(PlayerPawn != InPlayerPawn)
+	{
+		PlayerPawn = InPlayerPawn;
+		OnPlayerPawnChanged.Broadcast(PlayerPawn);
 	}
 }

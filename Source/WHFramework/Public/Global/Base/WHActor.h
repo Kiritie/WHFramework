@@ -10,16 +10,75 @@
 #include "Scene/Actor/SceneActorInterface.h"
 #include "WHActor.generated.h"
 
+// This class does not need to be modified.
+UINTERFACE(MinimalAPI)
+class UWHActorInterface : public UInterface
+{
+	GENERATED_BODY()
+};
+
+/**
+ * 
+ */
+class WHFRAMEWORK_API IWHActorInterface
+{
+	GENERATED_BODY()
+
+	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
+public:
+	/**
+	* 当初始化
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnInitialize();
+	/**
+	* 当准备
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPreparatory(EPhase InPhase);
+	/**
+	* 当刷新
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnRefresh(float DeltaSeconds);
+	/**
+	* 当结束
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnTermination();
+
+protected:
+	/**
+	* 是否自定义生命周期
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsCustomLifecycle() const;
+};
+
 /**
  * 
  */
 UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
-class WHFRAMEWORK_API AWHActor : public AActor, public ISceneActorInterface, public IObjectPoolInterface, public IReferencePoolInterface
+class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface, public IReferencePoolInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	AWHActor();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsCustomLifecycle_Implementation() const override { return false; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -33,7 +92,7 @@ public:
 	virtual void OnReset_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Actor
+	/// SceneActor
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
 	FGuid ActorID;
@@ -54,4 +113,12 @@ public:
 	virtual bool IsVisible_Implementation() const override { return bVisible; }
 
 	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
 };

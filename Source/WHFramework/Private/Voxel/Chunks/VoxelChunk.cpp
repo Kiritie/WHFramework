@@ -161,6 +161,10 @@ void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBat
 
 void AVoxelChunk::Generate(EPhase InPhase)
 {
+	if(!Execute_IsVisible(this))
+	{
+		Execute_SetActorVisible(this, true);
+	}
 	switch(InPhase)
 	{
 		case EPhase::Primary:
@@ -180,6 +184,13 @@ void AVoxelChunk::Generate(EPhase InPhase)
 				BuildMesh();
 			}
 			CreateMesh();
+			if(!bGenerated)
+			{
+				for(auto& Iter : VoxelMap)
+				{
+					Iter.Value.OnGenerate();
+				}
+			}
 			break;
 		}
 		case EPhase::Final:

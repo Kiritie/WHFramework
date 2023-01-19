@@ -10,7 +10,7 @@
 #include "Parameter/ParameterModuleBPLibrary.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AWebRequestModule)
+MODULE_INSTANCE_IMPLEMENTATION(AWebRequestModule, false)
 
 // Sets default values
 AWebRequestModule::AWebRequestModule()
@@ -47,9 +47,9 @@ void AWebRequestModule::OnInitialize_Implementation()
 	}
 }
 
-void AWebRequestModule::OnPreparatory_Implementation()
+void AWebRequestModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 }
 
 void AWebRequestModule::OnRefresh_Implementation(float DeltaSeconds)

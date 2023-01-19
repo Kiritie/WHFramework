@@ -3,13 +3,14 @@
 #pragma once
 
 #include "GameFramework/GameStateBase.h"
+#include "Global/Base/WHActor.h"
 #include "WHGameState.generated.h"
 
 /**
  *
  */
 UCLASS()
-class WHFRAMEWORK_API AWHGameState : public AGameStateBase
+class WHFRAMEWORK_API AWHGameState : public AGameStateBase, public IWHActorInterface
 {
 	GENERATED_BODY()
 
@@ -17,16 +18,21 @@ public:
 	AWHGameState();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
+	/// WHActor
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize();
-	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPreparatory();
+	virtual void OnInitialize_Implementation() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Inherits
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
 };

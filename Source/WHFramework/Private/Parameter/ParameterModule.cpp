@@ -8,7 +8,7 @@
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Parameter/ParameterSaveGame.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AParameterModule)
+MODULE_INSTANCE_IMPLEMENTATION(AParameterModule, false)
 
 // ParamSets default values
 AParameterModule::AParameterModule()
@@ -33,11 +33,14 @@ void AParameterModule::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AParameterModule::OnPreparatory_Implementation()
+void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
+	if(InPhase == EPhase::Lesser)
+	{
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
+	}
 }
 
 void AParameterModule::OnRefresh_Implementation(float DeltaSeconds)

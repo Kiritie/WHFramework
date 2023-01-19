@@ -9,7 +9,7 @@
 #include "SaveGame/Base/SaveGameBase.h"
 #include "SaveGame/General/GeneralSaveGame.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ASaveGameModule)
+MODULE_INSTANCE_IMPLEMENTATION(ASaveGameModule, false)
 
 // ParamSets default values
 ASaveGameModule::ASaveGameModule()
@@ -36,13 +36,16 @@ void ASaveGameModule::OnDestroy_Implementation()
 void ASaveGameModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	LoadSaveData(LoadOrCreateSaveGame(GeneralSaveGame, 0)->GetSaveData());
 }
 
-void ASaveGameModule::OnPreparatory_Implementation()
+void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
+
+	if(InPhase == EPhase::Primary)
+	{
+		LoadSaveData(LoadOrCreateSaveGame(GeneralSaveGame, 0)->GetSaveData());
+	}
 }
 
 void ASaveGameModule::OnRefresh_Implementation(float DeltaSeconds)

@@ -6,22 +6,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
-void UMainModuleBPLibrary::PauseAllModule()
-{
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->PauseModules();
-	}
-}
-
-void UMainModuleBPLibrary::UnPauseAllModule()
-{
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->UnPauseModules();
-	}
-}
-
 void UMainModuleBPLibrary::RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
 	if(AMainModule* MainModule = GetMainModule())
@@ -67,6 +51,38 @@ void UMainModuleBPLibrary::UnPauseModuleByName(const FName InModuleName)
 	if(AMainModule* MainModule = GetMainModule())
 	{
 		MainModule->UnPauseModuleByName(InModuleName);
+	}
+}
+
+void UMainModuleBPLibrary::PauseMainModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->Execute_Pause(MainModule);
+	}
+}
+
+void UMainModuleBPLibrary::UnPauseMainModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->Execute_UnPause(MainModule);
+	}
+}
+
+void UMainModuleBPLibrary::PauseAllModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->PauseModules();
+	}
+}
+
+void UMainModuleBPLibrary::UnPauseAllModule()
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->UnPauseModules();
 	}
 }
 

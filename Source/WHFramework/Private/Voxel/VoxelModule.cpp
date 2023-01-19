@@ -35,7 +35,7 @@
 #include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
 #include "Global/GlobalBPLibrary.h"
 
-MODULE_INSTANCE_IMPLEMENTATION(AVoxelModule)
+MODULE_INSTANCE_IMPLEMENTATION(AVoxelModule, false)
 
 // Sets default values
 AVoxelModule::AVoxelModule()
@@ -128,27 +128,32 @@ void AVoxelModule::OnInitialize_Implementation()
 	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Close, TEXT("EVoxelInteractAction"));
 }
 
-void AVoxelModule::OnPreparatory_Implementation()
+void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation();
+	Super::OnPreparatory_Implementation(InPhase);
 
-	UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
-
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxel>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelEmpty>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelUnknown>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelDoor>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelPlant>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
-	UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
-
-	GenerateVoxels();
-
-	if(bAutoGenerate)
+	if(InPhase == EPhase::Primary)
 	{
-		static FVoxelWorldSaveData SaveData;
-		SaveData = FVoxelWorldSaveData(WorldBasicData);
-		LoadSaveData(&SaveData, EPhase::Primary);
+		UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
+
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxel>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelEmpty>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelUnknown>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelDoor>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelPlant>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
+		UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
+	}
+	else if(InPhase == EPhase::Final)
+	{
+		GenerateVoxels();
+
+		if(bAutoGenerate)
+		{
+			static FVoxelWorldSaveData SaveData;
+			SaveData = FVoxelWorldSaveData(WorldBasicData);
+			LoadSaveData(&SaveData, EPhase::Primary);
+		}
 	}
 }
 
