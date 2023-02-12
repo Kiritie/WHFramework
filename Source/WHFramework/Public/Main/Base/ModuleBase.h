@@ -17,6 +17,9 @@ class WHFRAMEWORK_API AModuleBase : public AWHActor, public IModule
 public:	
 	// ParamSets default values for this actor's properties
 	AModuleBase();
+	~AModuleBase();
+
+	virtual void DestructModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WHFramework.h"
+#include "UObject/UObjectGlobals.h"
 
 #define MODULE_INSTANCE_DECLARE(ModuleClass) \
 protected: \
@@ -10,7 +11,7 @@ protected: \
 	static ModuleClass* InstanceEditor; \
 public: \
 	static ModuleClass* Get(bool bInEditor = false); \
-	virtual ~##ModuleClass();
+	virtual void DestructModule() override;
 
 #define MODULE_INSTANCE_IMPLEMENTATION(ModuleClass, bMainModule) \
 ModuleClass* ModuleClass::Instance = nullptr; \
@@ -38,7 +39,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 		return InstanceEditor; \
 	} \
 } \
-ModuleClass::~##ModuleClass() \
+void ModuleClass::##DestructModule() \
 { \
 	if(Instance == this) \
 	{ \

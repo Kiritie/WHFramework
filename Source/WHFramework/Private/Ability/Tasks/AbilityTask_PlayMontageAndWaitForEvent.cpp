@@ -7,6 +7,7 @@
 #include "AbilitySystemGlobals.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Animation/AnimInstance.h"
+#include "Debug/DebugModuleTypes.h"
 
 UAbilityTask_PlayMontageAndWaitForEvent::UAbilityTask_PlayMontageAndWaitForEvent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -17,7 +18,7 @@ UAbilityTask_PlayMontageAndWaitForEvent::UAbilityTask_PlayMontageAndWaitForEvent
 
 UAbilitySystemComponentBase* UAbilityTask_PlayMontageAndWaitForEvent::GetTargetASC()
 {
-	return Cast<UAbilitySystemComponentBase>(AbilitySystemComponent);
+	return Cast<UAbilitySystemComponentBase>(AbilitySystemComponent.Get());
 }
 
 void UAbilityTask_PlayMontageAndWaitForEvent::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)
@@ -154,17 +155,17 @@ void UAbilityTask_PlayMontageAndWaitForEvent::Activate()
 		}
 		else
 		{
-			ABILITY_LOG(Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent call to PlayMontage failed!"));
+			WHLog(WH_Ability, Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent call to PlayMontage failed!"));
 		}
 	}
 	else
 	{
-		ABILITY_LOG(Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent called on invalid AbilitySystemComponent"));
+		WHLog(WH_Ability, Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent called on invalid AbilitySystemComponent"));
 	}
 
 	if (!bPlayedMontage)
 	{
-		ABILITY_LOG(Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay),*InstanceName.ToString());
+		WHLog(WH_Ability, Warning, TEXT("UAbilityTask_PlayMontageAndWaitForEvent called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay),*InstanceName.ToString());
 		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnCancelled.Broadcast(FGameplayTag(), FGameplayEventData());
@@ -176,7 +177,7 @@ void UAbilityTask_PlayMontageAndWaitForEvent::Activate()
 
 void UAbilityTask_PlayMontageAndWaitForEvent::ExternalCancel()
 {
-	check(AbilitySystemComponent);
+	check(AbilitySystemComponent.Get());
 
 	OnAbilityCancelled();
 
@@ -224,7 +225,7 @@ bool UAbilityTask_PlayMontageAndWaitForEvent::StopPlayingMontage()
 
 	// Check if the montage is still playing
 	// The ability would have been interrupted, in which case we should automatically stop the montage
-	if (AbilitySystemComponent && Ability)
+	if (AbilitySystemComponent.Get() && Ability)
 	{
 		if (AbilitySystemComponent->GetAnimatingAbility() == Ability
 			&& AbilitySystemComponent->GetCurrentMontage() == MontageToPlay)

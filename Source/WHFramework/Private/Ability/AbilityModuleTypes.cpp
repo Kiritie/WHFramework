@@ -27,9 +27,9 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	{
 		OutHitResults.Add(*FoundHitResult);
 	}
-	else if (EventData.Target)
+	else if (EventData.Target.Get())
 	{
-		OutActors.Add(const_cast<AActor*>(EventData.Target));
+		OutActors.Add(const_cast<AActor*>(EventData.Target.Get()));
 	}
 }
 

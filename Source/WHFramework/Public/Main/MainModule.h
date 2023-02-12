@@ -3,14 +3,8 @@
 #pragma once
 
 #include "WHFramework.h"
-#include "GameFramework/Actor.h"
-#include "Main/Base/Module.h"
-#include "MainModuleTypes.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Main/Base/ModuleBase.h"
-#include "Main/Base/ModuleNetworkComponent.h"
-#include "Gameplay/WHPlayerController.h"
-#include "Kismet/GameplayStatics.h"
+#include "Base/ModuleNetworkComponent.h"
+#include "Base/ModuleBase.h"
 
 #include "MainModule.generated.h"
 
@@ -45,6 +39,9 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsCustomLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Modules

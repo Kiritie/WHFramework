@@ -281,7 +281,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 	FBlackboardEntry PropertyName##Entry; \
 	PropertyName##Entry.EntryName = FName(#PropertyName); \
 	UBlackboardKeyType_Enum* PropertyName##EntryKeyType = NewObject<UBlackboardKeyType_Enum>(); \
-	PropertyName##EntryKeyType->EnumType = FindObject<UEnum>(ANY_PACKAGE, *FString(#EnumTypeName), true); \
+	PropertyName##EntryKeyType->EnumType = FindObject<UEnum>(nullptr, *FString(#EnumTypeName), true); \
 	PropertyName##EntryKeyType->EnumName = TEXT(#EnumTypeName); \
 	PropertyName##Entry.KeyType = PropertyName##EntryKeyType; \
 	Keys.Add(PropertyName##Entry);

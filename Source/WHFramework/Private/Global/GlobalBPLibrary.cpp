@@ -96,7 +96,7 @@ ETraceTypeQuery UGlobalBPLibrary::GetGameTraceChannel(ECollisionChannel InGameTr
 
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
+	if(UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
 	{
 		return EnumPtr->GetAuthoredNameStringByValue(InEnumValue);
 	}
@@ -105,7 +105,7 @@ FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, in
 
 FText UGlobalBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
+	if(UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
 	{
 		return EnumPtr->GetDisplayNameTextByValue(InEnumValue);
 	}
@@ -114,7 +114,7 @@ FText UGlobalBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 
 int32 UGlobalBPLibrary::GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName)
 {
-	if(UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, *InEnumName, true))
+	if(UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
 	{
 		return EnumPtr->GetValueByNameString(InValueName);
 	}
@@ -158,7 +158,7 @@ void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, FParameterMap In
 		if(FoundProperty)
 		{
 			void* Value = FoundProperty->ContainerPtrToValuePtr<void*>(InObject);
-			FoundProperty->ImportText(*pair.Value,Value,PPF_None,InObject);
+			FoundProperty->ImportText_Direct(*pair.Value, Value, InObject, PPF_None);
 		}
 		else
 		{
@@ -199,7 +199,7 @@ void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutPar
 					{
 						FString Temp;
 						void* Value = Property->ContainerPtrToValuePtr<void*>(InClass->GetDefaultObject());
-						Property->ExportTextItem(Temp,Value,nullptr,nullptr,PPF_None);
+						Property->ExportTextItem_Direct(Temp, Value, nullptr, nullptr, PPF_None);
 						OutParams.Add(PropertyName,Temp);
 					}
 				}

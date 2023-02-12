@@ -110,8 +110,8 @@ void UAnimTextBlock::OnTick_Implementation(float DeltaSeconds)
 					{
 						case ETextAnimDirection::Up:
 						{
-							Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, Iter.TextBlock->RenderTransform.Translation.Y - TextBox->GetDesiredSize().Y / Iter.AnimTime * DeltaSeconds * 2));
-							if(Iter.TextBlock->RenderTransform.Translation.Y <= -TextBox->GetDesiredSize().Y)
+							Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, Iter.TextBlock->GetRenderTransform().Translation.Y - TextBox->GetDesiredSize().Y / Iter.AnimTime * DeltaSeconds * 2));
+							if(Iter.TextBlock->GetRenderTransform().Translation.Y <= -TextBox->GetDesiredSize().Y)
 							{
 								Iter.TextBlock->SetText(Iter.CurrentText);
 								Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, TextBox->GetDesiredSize().Y));
@@ -120,8 +120,8 @@ void UAnimTextBlock::OnTick_Implementation(float DeltaSeconds)
 						}
 						case ETextAnimDirection::Down:
 						{
-							Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, Iter.TextBlock->RenderTransform.Translation.Y + TextBox->GetDesiredSize().Y / Iter.AnimTime * DeltaSeconds * 2));
-							if(Iter.TextBlock->RenderTransform.Translation.Y >= TextBox->GetDesiredSize().Y)
+							Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, Iter.TextBlock->GetRenderTransform().Translation.Y + TextBox->GetDesiredSize().Y / Iter.AnimTime * DeltaSeconds * 2));
+							if(Iter.TextBlock->GetRenderTransform().Translation.Y >= TextBox->GetDesiredSize().Y)
 							{
 								Iter.TextBlock->SetText(Iter.CurrentText);
 								Iter.TextBlock->SetRenderTranslation(FVector2D(0.f, -TextBox->GetDesiredSize().Y));

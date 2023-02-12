@@ -15,7 +15,7 @@ UAbilityTask_WaitForEvent::UAbilityTask_WaitForEvent(const FObjectInitializer& O
 
 UAbilitySystemComponentBase* UAbilityTask_WaitForEvent::GetTargetASC()
 {
-	return Cast<UAbilitySystemComponentBase>(AbilitySystemComponent);
+	return Cast<UAbilitySystemComponentBase>(AbilitySystemComponent.Get());
 }
 
 void UAbilityTask_WaitForEvent::OnGameplayEvent(FGameplayTag EventTag, const FGameplayEventData* Payload)
@@ -53,7 +53,7 @@ void UAbilityTask_WaitForEvent::Activate()
 	}
 	else
 	{
-		ABILITY_LOG(Warning, TEXT("UAbilityTask_WaitForEvent called on invalid AbilitySystemComponent"));
+		WHLog(WH_Ability, Warning, TEXT("UAbilityTask_WaitForEvent called on invalid AbilitySystemComponent"));
 	}
 
 	SetWaitingOnAvatar();
@@ -61,7 +61,7 @@ void UAbilityTask_WaitForEvent::Activate()
 
 void UAbilityTask_WaitForEvent::ExternalCancel()
 {
-	check(AbilitySystemComponent);
+	check(AbilitySystemComponent.Get());
 
 	Super::ExternalCancel();
 }

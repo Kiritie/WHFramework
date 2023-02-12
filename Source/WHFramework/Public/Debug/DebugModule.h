@@ -14,7 +14,7 @@ class WHFRAMEWORK_API ADebugModule : public AModuleBase
 		
 	MODULE_INSTANCE_DECLARE(ADebugModule)
 
-public:	
+public:
 	// ParamSets default values for this actor's properties
 	ADebugModule();
 

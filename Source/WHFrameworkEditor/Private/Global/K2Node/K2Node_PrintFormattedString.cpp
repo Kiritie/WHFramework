@@ -466,7 +466,7 @@ void UK2Node_PrintFormattedString::ExpandNode(class FKismetCompilerContext& Comp
 			}
 			else if (ArgumentPinCategory == UEdGraphSchema_K2::PC_Byte || ArgumentPinCategory == UEdGraphSchema_K2::PC_Enum)
 			{
-				static UEnum* TextGenderEnum = FindObjectChecked<UEnum>(ANY_PACKAGE, TEXT("ETextGender"), /*ExactClass*/true);
+				static UEnum* TextGenderEnum = FindObjectChecked<UEnum>(nullptr, TEXT("ETextGender"), /*ExactClass*/true);
 				if (ArgumentPin->PinType.PinSubCategoryObject == TextGenderEnum)
 				{
 					MakeFormatArgumentDataStruct->GetSchema()->TrySetDefaultValue(*ArgumentTypePin, TEXT("Gender"));
@@ -633,7 +633,7 @@ bool UK2Node_PrintFormattedString::IsConnectionDisallowed(const UEdGraphPin* MyP
 		}
 		else if (OtherPinCategory == UEdGraphSchema_K2::PC_Byte || OtherPinCategory == UEdGraphSchema_K2::PC_Enum)
 		{
-			static UEnum* TextGenderEnum = FindObjectChecked<UEnum>(ANY_PACKAGE, TEXT("ETextGender"), /*ExactClass*/true);
+			static UEnum* TextGenderEnum = FindObjectChecked<UEnum>(nullptr, TEXT("ETextGender"), /*ExactClass*/true);
 			if (OtherPin->PinType.PinSubCategoryObject == TextGenderEnum)
 			{
 				bIsValidType = true;

@@ -200,7 +200,7 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 {
 	if(IsInViewport())
 	{
-		RemoveFromViewport();
+		RemoveFromParent();
 	}
 	if(ParentWidget)
 	{
@@ -331,7 +331,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		{
 			if(IsInViewport())
 			{
-				RemoveFromViewport();
+				RemoveFromParent();
 			}
 		}
 	}

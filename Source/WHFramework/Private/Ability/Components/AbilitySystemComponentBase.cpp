@@ -8,6 +8,7 @@
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Net/UnrealNetwork.h"
+#include "Debug/DebugModuleTypes.h"
 
 static TAutoConsoleVariable<float> CVarReplayMontageErrorThreshold(
 	TEXT("GS.replay.MontageErrorThreshold"),
@@ -318,13 +319,13 @@ FActiveGameplayEffectHandle UAbilitySystemComponentBase::BP_ApplyGameplayEffectT
 {
 	if (Target == nullptr)
 	{
-		ABILITY_LOG(Log, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString());
+		WHLog(WH_Ability, Log, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString());
 		return FActiveGameplayEffectHandle();
 	}
 
 	if (GameplayEffectClass == nullptr)
 	{
-		ABILITY_LOG(Error, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString());
+		WHLog(WH_Ability, Error, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString());
 		return FActiveGameplayEffectHandle();
 	}
 
@@ -774,7 +775,7 @@ void UAbilitySystemComponentBase::AnimMontage_UpdateReplicatedDataForMesh(FGamep
 			int32 NextSectionID = AnimInstance->Montage_GetNextSectionID(AnimMontageInfo.LocalMontageInfo.AnimMontage, CurrentSectionID);
 			if (NextSectionID >= (256 - 1))
 			{
-				ABILITY_LOG(Error, TEXT("AnimMontage_UpdateReplicatedData. NextSectionID = %d.  RepAnimMontageInfo.Position: %.2f, CurrentSectionID: %d. LocalAnimMontageInfo.AnimMontage %s"),
+				WHLog(WH_Ability, Error, TEXT("AnimMontage_UpdateReplicatedData. NextSectionID = %d.  RepAnimMontageInfo.Position: %.2f, CurrentSectionID: %d. LocalAnimMontageInfo.AnimMontage %s"),
 					NextSectionID, OutRepAnimMontageInfo.RepMontageInfo.Position, CurrentSectionID, *GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage));
 				ensure(NextSectionID < (256 - 1));
 			}
@@ -825,15 +826,15 @@ void UAbilitySystemComponentBase::OnRep_ReplicatedAnimMontageForMesh()
 			bool DebugMontage = (CVar && CVar->GetValueOnGameThread() == 1);
 			if (DebugMontage)
 			{
-				ABILITY_LOG(Warning, TEXT("\n\nOnRep_ReplicatedAnimMontage, %s"), *GetNameSafe(this));
-				ABILITY_LOG(Warning, TEXT("\tAnimMontage: %s\n\tPlayRate: %f\n\tPosition: %f\n\tBlendTime: %f\n\tNextSectionID: %d\n\tIsStopped: %d"),
+				WHLog(WH_Ability, Log, TEXT("\n\nOnRep_ReplicatedAnimMontage, %s"), *GetNameSafe(this));
+				WHLog(WH_Ability, Log, TEXT("\tAnimMontage: %s\n\tPlayRate: %f\n\tPosition: %f\n\tBlendTime: %f\n\tNextSectionID: %d\n\tIsStopped: %d"),
 					*GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage),
 					NewRepMontageInfoForMesh.RepMontageInfo.PlayRate,
 					NewRepMontageInfoForMesh.RepMontageInfo.Position,
 					NewRepMontageInfoForMesh.RepMontageInfo.BlendTime,
 					NewRepMontageInfoForMesh.RepMontageInfo.NextSectionID,
 					NewRepMontageInfoForMesh.RepMontageInfo.IsStopped);
-				ABILITY_LOG(Warning, TEXT("\tLocalAnimMontageInfo.AnimMontage: %s\n\tPosition: %f"),
+				WHLog(WH_Ability, Log, TEXT("\tLocalAnimMontageInfo.AnimMontage: %s\n\tPosition: %f"),
 					*GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage), AnimInstance->Montage_GetPosition(AnimMontageInfo.LocalMontageInfo.AnimMontage));
 			}
 
@@ -847,7 +848,7 @@ void UAbilitySystemComponentBase::OnRep_ReplicatedAnimMontageForMesh()
 
 				if (AnimMontageInfo.LocalMontageInfo.AnimMontage == nullptr)
 				{
-					ABILITY_LOG(Warning, TEXT("OnRep_ReplicatedAnimMontage: PlayMontageSimulated failed. Name: %s, AnimMontage: %s"), *GetNameSafe(this), *GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage));
+					WHLog(WH_Ability, Warning, TEXT("OnRep_ReplicatedAnimMontage: PlayMontageSimulated failed. Name: %s, AnimMontage: %s"), *GetNameSafe(this), *GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage));
 					return;
 				}
 

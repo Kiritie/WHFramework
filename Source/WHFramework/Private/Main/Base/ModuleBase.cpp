@@ -18,6 +18,16 @@ AModuleBase::AModuleBase()
 	ModuleState = EModuleState::None;
 }
 
+AModuleBase::~AModuleBase()
+{
+	DestructModule();
+}
+
+void AModuleBase::DestructModule()
+{
+
+}
+
 #if WITH_EDITOR
 void AModuleBase::OnGenerate_Implementation()
 {

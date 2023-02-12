@@ -15,6 +15,7 @@
 #include "Widget/Screen/Slate/SSlateWidgetBase.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 #include "World/WorldWidgetBase.h"
+#include "Debug/DebugModuleTypes.h"
 #include "WidgetModule.generated.h"
 
 UCLASS()

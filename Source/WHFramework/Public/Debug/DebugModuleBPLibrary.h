@@ -14,7 +14,6 @@ enum class EDebugMode : uint8
 	Console
 };
 
-class ADebugModule;
 /**
  * 
  */
