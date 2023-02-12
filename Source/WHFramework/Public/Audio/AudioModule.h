@@ -15,7 +15,7 @@ class WHFRAMEWORK_API AAudioModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(AAudioModule)
+	GENERATED_MODULE(AAudioModule)
 
 public:	
 	// ParamSets default values for this actor's properties

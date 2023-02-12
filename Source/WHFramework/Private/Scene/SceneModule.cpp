@@ -19,7 +19,7 @@
 #include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ASceneModule, false)
+IMPLEMENTATION_MODULE(ASceneModule)
 
 ASceneModule::ASceneModule()
 {

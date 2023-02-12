@@ -9,7 +9,7 @@
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ANetworkModule, false)
+IMPLEMENTATION_MODULE(ANetworkModule)
 
 // ParamSets default values
 ANetworkModule::ANetworkModule()

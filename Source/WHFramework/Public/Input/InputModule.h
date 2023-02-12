@@ -14,7 +14,7 @@ class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
 {
 	GENERATED_BODY()
 			
-	MODULE_INSTANCE_DECLARE(AInputModule)
+	GENERATED_MODULE(AInputModule)
 
 public:	
 	AInputModule();

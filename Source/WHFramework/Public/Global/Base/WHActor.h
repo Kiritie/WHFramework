@@ -49,10 +49,10 @@ public:
 
 protected:
 	/**
-	* 是否自定义生命周期
+	* 是否使用默认生命周期
 	*/
 	UFUNCTION(BlueprintNativeEvent)
-	bool IsCustomLifecycle() const;
+	bool IsDefaultLifecycle() const;
 };
 
 /**
@@ -78,7 +78,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual bool IsCustomLifecycle_Implementation() const override { return false; }
+	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool

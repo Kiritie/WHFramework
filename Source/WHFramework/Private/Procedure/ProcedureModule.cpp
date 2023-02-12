@@ -19,7 +19,7 @@
 #include "Scene/SceneModule.h"
 #include "Scene/SceneModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AProcedureModule, false)
+IMPLEMENTATION_MODULE(AProcedureModule)
 
 // ParamSets default values
 AProcedureModule::AProcedureModule()

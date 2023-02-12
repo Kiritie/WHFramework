@@ -8,7 +8,7 @@
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Parameter/ParameterSaveGame.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AParameterModule, false)
+IMPLEMENTATION_MODULE(AParameterModule)
 
 // ParamSets default values
 AParameterModule::AParameterModule()

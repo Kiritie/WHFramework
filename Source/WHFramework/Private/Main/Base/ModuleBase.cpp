@@ -18,16 +18,6 @@ AModuleBase::AModuleBase()
 	ModuleState = EModuleState::None;
 }
 
-AModuleBase::~AModuleBase()
-{
-	DestructModule();
-}
-
-void AModuleBase::DestructModule()
-{
-
-}
-
 #if WITH_EDITOR
 void AModuleBase::OnGenerate_Implementation()
 {
@@ -72,7 +62,7 @@ void AModuleBase::OnUnPause_Implementation()
 
 void AModuleBase::OnTermination_Implementation()
 {
-	
+	OnTermination_Internal();
 }
 
 void AModuleBase::Run_Implementation()

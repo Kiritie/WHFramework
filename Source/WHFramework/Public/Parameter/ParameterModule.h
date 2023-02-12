@@ -17,7 +17,7 @@ class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterMa
 {
 	GENERATED_BODY()
 				
-	MODULE_INSTANCE_DECLARE(AParameterModule)
+	GENERATED_MODULE(AParameterModule)
 
 public:	
 	// ParamSets default values for this actor's properties

@@ -5,7 +5,7 @@
 
 #include "FSM/Components/FSMComponent.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AFSMModule, false)
+IMPLEMENTATION_MODULE(AFSMModule)
 
 // ParamSets default values
 AFSMModule::AFSMModule()

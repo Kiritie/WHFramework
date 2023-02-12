@@ -17,9 +17,6 @@ class WHFRAMEWORK_API AModuleBase : public AWHActor, public IModule
 public:	
 	// ParamSets default values for this actor's properties
 	AModuleBase();
-	~AModuleBase();
-
-	virtual void DestructModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -44,8 +41,10 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
+	virtual void OnTermination_Internal() { }
+
 protected:
-	virtual bool IsCustomLifecycle_Implementation() const override { return true; }
+	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
 public:
 	virtual void Run_Implementation() override;

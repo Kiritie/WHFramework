@@ -35,7 +35,7 @@
 #include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
 #include "Global/GlobalBPLibrary.h"
 
-MODULE_INSTANCE_IMPLEMENTATION(AVoxelModule, false)
+IMPLEMENTATION_MODULE(AVoxelModule)
 
 // Sets default values
 AVoxelModule::AVoxelModule()

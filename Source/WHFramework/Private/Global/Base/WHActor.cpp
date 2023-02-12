@@ -98,7 +98,7 @@ void AWHActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(!Execute_IsCustomLifecycle(this))
+	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnPreparatory(this, EPhase::Final);
 	}
@@ -106,7 +106,7 @@ void AWHActor::BeginPlay()
 
 void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if(!Execute_IsCustomLifecycle(this))
+	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this);
 	}
@@ -114,7 +114,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AWHActor::Tick(float DeltaSeconds)
 {
-	if(!Execute_IsCustomLifecycle(this))
+	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

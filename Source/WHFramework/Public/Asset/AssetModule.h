@@ -15,7 +15,7 @@ class WHFRAMEWORK_API AAssetModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(AAssetModule)
+	GENERATED_MODULE(AAssetModule)
 
 public:	
 	// ParamSets default values for this actor's properties

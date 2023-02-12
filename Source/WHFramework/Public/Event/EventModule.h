@@ -14,7 +14,7 @@ class WHFRAMEWORK_API AEventModule : public AModuleBase
 {
 	GENERATED_BODY()
 			
-	MODULE_INSTANCE_DECLARE(AEventModule)
+	GENERATED_MODULE(AEventModule)
 
 public:
 	// ParamSets default values for this actor's properties

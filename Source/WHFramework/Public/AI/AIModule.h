@@ -15,7 +15,7 @@ class WHFRAMEWORK_API AAIModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
-	MODULE_INSTANCE_DECLARE(AAIModule)
+	GENERATED_MODULE(AAIModule)
 
 public:
 	// ParamSets default values for this actor's properties

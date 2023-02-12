@@ -12,7 +12,7 @@ class WHFRAMEWORK_API ADebugModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(ADebugModule)
+	GENERATED_MODULE(ADebugModule)
 
 public:
 	// ParamSets default values for this actor's properties

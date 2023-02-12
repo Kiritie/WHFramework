@@ -5,7 +5,7 @@
 
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAIModule, false)
+IMPLEMENTATION_MODULE(AAIModule)
 
 // Sets default values
 AAIModule::AAIModule()

@@ -13,7 +13,7 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AInputModule, false)
+IMPLEMENTATION_MODULE(AInputModule)
 
 // Sets default values
 AInputModule::AInputModule()

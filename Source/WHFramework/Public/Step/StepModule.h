@@ -30,7 +30,7 @@ class WHFRAMEWORK_API AStepModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(AStepModule)
+	GENERATED_MODULE(AStepModule)
 
 public:
 	// ParamSets default values for this actor's properties

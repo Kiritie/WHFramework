@@ -9,7 +9,7 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ACharacterModule, false)
+IMPLEMENTATION_MODULE(ACharacterModule)
 
 // Sets default values
 ACharacterModule::ACharacterModule()

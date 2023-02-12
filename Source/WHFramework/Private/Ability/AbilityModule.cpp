@@ -21,7 +21,7 @@
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAbilityModule, false)
+IMPLEMENTATION_MODULE(AAbilityModule)
 
 // Sets default values
 AAbilityModule::AAbilityModule()

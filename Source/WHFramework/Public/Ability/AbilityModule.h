@@ -17,7 +17,7 @@ class WHFRAMEWORK_API AAbilityModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
-	MODULE_INSTANCE_DECLARE(AAbilityModule)
+	GENERATED_MODULE(AAbilityModule)
 
 public:	
 	// ParamSets default values for this actor's properties

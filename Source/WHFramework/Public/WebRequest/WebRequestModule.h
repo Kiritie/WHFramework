@@ -16,7 +16,7 @@ class WHFRAMEWORK_API AWebRequestModule : public AModuleBase
 {
 	GENERATED_BODY()
 			
-	MODULE_INSTANCE_DECLARE(AWebRequestModule)
+	GENERATED_MODULE(AWebRequestModule)
 
 public:	
 	// ParamSets default values for this actor's properties

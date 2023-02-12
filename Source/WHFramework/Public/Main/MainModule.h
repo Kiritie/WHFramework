@@ -13,7 +13,7 @@ class WHFRAMEWORK_API AMainModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
-	MODULE_INSTANCE_DECLARE(AMainModule)
+	GENERATED_MAIN_MODULE(AMainModule)
 
 public:	
 	// ParamSets default values for this actor's properties
@@ -39,9 +39,6 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation() override;
-
-protected:
-	virtual bool IsCustomLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Modules

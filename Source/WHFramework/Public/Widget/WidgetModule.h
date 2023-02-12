@@ -23,7 +23,7 @@ class WHFRAMEWORK_API AWidgetModule : public AModuleBase, public IInputManager
 {
 	GENERATED_BODY()
 			
-	MODULE_INSTANCE_DECLARE(AWidgetModule)
+	GENERATED_MODULE(AWidgetModule)
 
 public:	
 	AWidgetModule();

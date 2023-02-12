@@ -33,7 +33,7 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterfa
 	friend class AsyncTask_LoadChunkMap;
 	friend class AsyncTask_SaveChunkData;
 		
-	MODULE_INSTANCE_DECLARE(AVoxelModule)
+	GENERATED_MODULE(AVoxelModule)
 
 public:	
 	// Sets default values for this actor's properties

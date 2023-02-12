@@ -14,7 +14,7 @@
 #include "Math/MathBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ACameraModule, false)
+IMPLEMENTATION_MODULE(ACameraModule)
 
 // Sets default values
 ACameraModule::ACameraModule()

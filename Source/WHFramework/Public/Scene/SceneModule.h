@@ -21,7 +21,7 @@ class WHFRAMEWORK_API ASceneModule : public AModuleBase, public ISceneContainerI
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(ASceneModule)
+	GENERATED_MODULE(ASceneModule)
 
 public:
 	ASceneModule();

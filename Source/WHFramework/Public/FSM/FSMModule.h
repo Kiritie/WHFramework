@@ -19,7 +19,7 @@ class WHFRAMEWORK_API AFSMModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(AFSMModule)
+	GENERATED_MODULE(AFSMModule)
 
 public:
 	// ParamSets default values for this actor's properties

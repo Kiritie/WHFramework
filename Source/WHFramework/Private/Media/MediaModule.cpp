@@ -6,7 +6,7 @@
 #include "Media/MediaPlayer/MediaPlayerBase.h"
 #include "Net/UnrealNetwork.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AMediaModule, false)
+IMPLEMENTATION_MODULE(AMediaModule)
 
 // Sets default values
 AMediaModule::AMediaModule()

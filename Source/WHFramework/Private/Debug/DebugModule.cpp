@@ -3,7 +3,7 @@
 
 #include "Debug/DebugModule.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ADebugModule, false)
+IMPLEMENTATION_MODULE(ADebugModule)
 
 // Sets default values
 ADebugModule::ADebugModule()

@@ -21,7 +21,7 @@ class WHFRAMEWORK_API ALatentActionModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	MODULE_INSTANCE_DECLARE(ALatentActionModule)
+	GENERATED_MODULE(ALatentActionModule)
 
 public:
 	ALatentActionModule();

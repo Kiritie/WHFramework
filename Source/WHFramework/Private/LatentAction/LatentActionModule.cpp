@@ -7,7 +7,7 @@
 #include "Engine/TargetPoint.h"
 #include "Main/MainModule.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(ALatentActionModule, false)
+IMPLEMENTATION_MODULE(ALatentActionModule)
 
 ALatentActionModule::ALatentActionModule()
 {

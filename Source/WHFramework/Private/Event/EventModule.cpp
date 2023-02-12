@@ -15,7 +15,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Network/NetworkModuleBPLibrary.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AEventModule, false)
+IMPLEMENTATION_MODULE(AEventModule)
 
 // ParamSets default values
 AEventModule::AEventModule()

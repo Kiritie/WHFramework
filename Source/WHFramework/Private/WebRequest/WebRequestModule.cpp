@@ -4,13 +4,14 @@
 #include "WebRequest/WebRequestModule.h"
 
 #include "HttpModule.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Parameter/ParameterModuleBPLibrary.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AWebRequestModule, false)
+IMPLEMENTATION_MODULE(AWebRequestModule)
 
 // Sets default values
 AWebRequestModule::AWebRequestModule()
@@ -231,7 +232,7 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 
 		HttpRequest->SetContentAsString(InContent.ToString());
 
-		HttpRequest->SetVerb(UGlobalBPLibrary::GetEnumValueDisplayName(TEXT("EWebRequestMethod"), (int32)InMethod).ToString());
+		HttpRequest->SetVerb(UGlobalBPLibrary::GetEnumValueDisplayName(TEXT("/Script/WHFramework.EWebRequestMethod"), (int32)InMethod).ToString());
 
 		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString());
 

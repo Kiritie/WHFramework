@@ -5,7 +5,7 @@
 
 #include "ObjectPool/ObjectPool.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AObjectPoolModule, false)
+IMPLEMENTATION_MODULE(AObjectPoolModule)
 
 // Sets default values
 AObjectPoolModule::AObjectPoolModule()

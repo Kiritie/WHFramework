@@ -31,7 +31,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
-MODULE_INSTANCE_IMPLEMENTATION(AMainModule, true)
+IMPLEMENTATION_MAIN_MODULE(AMainModule)
 
 // ParamSets default values
 AMainModule::AMainModule()

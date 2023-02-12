@@ -10,7 +10,7 @@
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AWidgetModule, false)
+IMPLEMENTATION_MODULE(AWidgetModule)
 
 // Sets default values
 AWidgetModule::AWidgetModule()

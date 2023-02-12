@@ -20,7 +20,7 @@ class WHFRAMEWORK_API ACameraModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
-	MODULE_INSTANCE_DECLARE(ACameraModule)
+	GENERATED_MODULE(ACameraModule)
 
 public:
 	// ParamSets default values for this actor's properties

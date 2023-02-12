@@ -11,7 +11,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
 		
-MODULE_INSTANCE_IMPLEMENTATION(AAudioModule, false)
+IMPLEMENTATION_MODULE(AAudioModule)
 
 // Sets default values
 AAudioModule::AAudioModule()

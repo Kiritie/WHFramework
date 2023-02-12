@@ -158,7 +158,7 @@ void AAbilityCharacterBase::BindASCInput()
 	if (!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
 	{
 		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
-			FString("CancelTarget"), FTopLevelAssetPath(NAME_None, FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
 
 		bASCInputBound = true;
 	}

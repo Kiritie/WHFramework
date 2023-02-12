@@ -13,7 +13,7 @@ class WHFRAMEWORK_API ANetworkModule : public AModuleBase
 {
 	GENERATED_BODY()
 				
-	MODULE_INSTANCE_DECLARE(ANetworkModule)
+	GENERATED_MODULE(ANetworkModule)
 
 public:	
 	// ParamSets default values for this actor's properties
