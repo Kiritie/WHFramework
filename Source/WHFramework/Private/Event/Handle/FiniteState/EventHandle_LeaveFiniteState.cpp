@@ -8,7 +8,7 @@ UEventHandle_LeaveFiniteState::UEventHandle_LeaveFiniteState()
 	EventType = EEventType::Multicast;
 }
 
-void UEventHandle_LeaveFiniteState::OnDespawn_Implementation()
+void UEventHandle_LeaveFiniteState::OnDespawn_Implementation(bool bRecovery)
 {
 	State = nullptr;
 	FSM = nullptr;

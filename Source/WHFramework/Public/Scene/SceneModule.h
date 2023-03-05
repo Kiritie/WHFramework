@@ -26,6 +26,8 @@ class WHFRAMEWORK_API ASceneModule : public AModuleBase, public ISceneContainerI
 public:
 	ASceneModule();
 
+	~ASceneModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -45,6 +47,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 	
+	virtual void OnTermination_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:

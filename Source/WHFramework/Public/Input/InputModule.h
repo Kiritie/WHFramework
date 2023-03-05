@@ -19,6 +19,8 @@ class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
 public:	
 	AInputModule();
 
+	~AInputModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -37,6 +39,8 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode

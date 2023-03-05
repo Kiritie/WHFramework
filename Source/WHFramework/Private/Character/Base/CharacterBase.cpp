@@ -84,7 +84,7 @@ void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	}
 }
 
-void ACharacterBase::OnDespawn_Implementation()
+void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Execute_SetActorVisible(this, false);
 

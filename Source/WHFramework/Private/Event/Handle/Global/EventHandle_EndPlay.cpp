@@ -10,7 +10,7 @@ UEventHandle_EndPlay::UEventHandle_EndPlay()
 	bIsSimulating = false;
 }
 
-void UEventHandle_EndPlay::OnDespawn_Implementation()
+void UEventHandle_EndPlay::OnDespawn_Implementation(bool bRecovery)
 {
 	bIsSimulating = false;
 }

@@ -68,6 +68,11 @@ AMainModule::AMainModule()
 	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
 }
 
+AMainModule::~AMainModule()
+{
+	TERMINATION_MAIN_MODULE(AMainModule)
+}
+
 #if WITH_EDITOR
 void AMainModule::OnGenerate_Implementation()
 {
@@ -144,7 +149,7 @@ void AMainModule::OnTermination_Implementation()
 	{
 		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i].GetObject());
+			ModuleRefs[i]->Execute_Termination(ModuleRefs[i].GetObject());
 		}
 	}
 	ModuleMap.Empty();

@@ -11,9 +11,9 @@ UWebRequestHandle_GetJson::UWebRequestHandle_GetJson()
 	Json = nullptr;
 }
 
-void UWebRequestHandle_GetJson::OnDespawn_Implementation()
+void UWebRequestHandle_GetJson::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	Json = nullptr;
 }

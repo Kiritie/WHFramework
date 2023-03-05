@@ -20,7 +20,7 @@ public:
 	UWebRequestHandle_GetJson();
 
 public:
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void Fill(const FWebRequestResult& InWebRequestResult) override;

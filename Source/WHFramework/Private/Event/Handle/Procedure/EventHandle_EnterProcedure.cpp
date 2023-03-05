@@ -9,7 +9,7 @@ UEventHandle_EnterProcedure::UEventHandle_EnterProcedure()
 	Procedure = nullptr;
 }
 
-void UEventHandle_EnterProcedure::OnDespawn_Implementation()
+void UEventHandle_EnterProcedure::OnDespawn_Implementation(bool bRecovery)
 {
 	Procedure = nullptr;
 }

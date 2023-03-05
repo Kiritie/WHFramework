@@ -21,6 +21,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AAIModule();
 
+	~AAIModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -39,6 +41,8 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

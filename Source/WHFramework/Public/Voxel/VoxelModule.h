@@ -39,6 +39,8 @@ public:
 	// Sets default values for this actor's properties
 	AVoxelModule();
 
+	~AVoxelModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -121,6 +123,9 @@ protected:
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TSubclassOf<AVoxelChunk> ChunkSpawnClass;
+	
+	UPROPERTY(EditAnywhere, Category = "Voxel")
+	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkSpawnRange;
@@ -154,7 +159,7 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkDataSaveSpeed;
-	
+
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 

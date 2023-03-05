@@ -28,6 +28,8 @@ class WHFRAMEWORK_API AWidgetModule : public AModuleBase, public IInputManager
 public:	
 	AWidgetModule();
 
+	~AWidgetModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -635,6 +637,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
 	UWorldWidgetBase* CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+
+	bool DestroyWorldWidget(UWorldWidgetBase* InWorldWidget, bool bRecovery = false)
+	{
+		if(!InWorldWidget) return false;
+
+		const FName WidgetName = InWorldWidget->GetWidgetName();
+		
+		return DestroyWorldWidgetByName(WidgetName, InWorldWidget->GetWidgetIndex(), bRecovery);
+	}
 
 	template<class T>
 	bool DestroyWorldWidget(int32 InWidgetIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())

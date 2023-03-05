@@ -82,9 +82,9 @@ void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InP
 	FSM->SwitchDefaultState();
 }
 
-void AAbilityCharacterBase::OnDespawn_Implementation()
+void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	FSM->SwitchState(nullptr);
 

@@ -24,44 +24,61 @@ UObject* UObjectPool::Spawn(const TArray<FParameter>& InParams)
 	if(Count > 0)
 	{
 		Queue.Dequeue(Object);
+		SpawnImpl(Object);
 		Count--;
 	}
 	else
 	{
-		Object = SpawnImpl();
+		Object = SpawnImpl(nullptr);
 	}
 	IObjectPoolInterface::Execute_OnSpawn(Object, InParams);
 	return Object;
 }
 
-UObject* UObjectPool::SpawnImpl()
+UObject* UObjectPool::SpawnImpl(UObject* InObject)
 {
-	UObject* Object = NewObject<UObject>(GetTransientPackage(), Type);
-	Object->AddToRoot();
-	return Object;
-}
-
-void UObjectPool::Despawn(UObject* InObject)
-{
-	IObjectPoolInterface::Execute_OnDespawn(InObject);
-	if(Count >= Limit)
+	if(!InObject)
 	{
-		DespawnImpl(InObject);
+		InObject = NewObject<UObject>(GetTransientPackage(), Type);
 	}
-	else
-	{
-		Queue.Enqueue(InObject);
-		Count++;
-	}
-}
-
-void UObjectPool::DespawnImpl(UObject* InObject)
-{
-	if(InObject->IsRooted())
+	else if(InObject->IsRooted())
 	{
 		InObject->RemoveFromRoot();
 	}
-	InObject->ConditionalBeginDestroy();
+	return InObject;
+}
+
+void UObjectPool::Despawn(UObject* InObject, bool bRecovery)
+{
+	IObjectPoolInterface::Execute_OnDespawn(InObject, bRecovery);
+	if(bRecovery && Count < Limit)
+	{
+		DespawnImpl(InObject, true);
+		Queue.Enqueue(InObject);
+		Count++;
+	}
+	else
+	{
+		DespawnImpl(InObject, false);
+	}
+}
+
+void UObjectPool::DespawnImpl(UObject* InObject, bool bRecovery)
+{
+	if(!bRecovery)
+	{
+		if(InObject->IsRooted())
+		{
+			InObject->RemoveFromRoot();
+		}
+	}
+	else
+	{
+		if(!InObject->IsRooted())
+		{
+			InObject->AddToRoot();
+		}
+	}
 }
 
 void UObjectPool::Clear()
@@ -71,7 +88,7 @@ void UObjectPool::Clear()
 	{
 		if(Object)
 		{
-			DespawnImpl(Object);
+			DespawnImpl(Object, false);
 		}
 	}
 	Queue.Empty();

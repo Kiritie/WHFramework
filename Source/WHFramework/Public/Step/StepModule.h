@@ -36,6 +36,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AStepModule();
 
+	~AStepModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

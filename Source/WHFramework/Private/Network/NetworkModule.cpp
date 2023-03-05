@@ -21,6 +21,11 @@ ANetworkModule::ANetworkModule()
 	ServerPort = 7777;
 }
 
+ANetworkModule::~ANetworkModule()
+{
+	TERMINATION_MODULE(ANetworkModule)
+}
+
 #if WITH_EDITOR
 void ANetworkModule::OnGenerate_Implementation()
 {
@@ -56,6 +61,11 @@ void ANetworkModule::OnPause_Implementation()
 void ANetworkModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ANetworkModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 FString ANetworkModule::GetServerURL() const

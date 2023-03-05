@@ -16,6 +16,11 @@ AMediaModule::AMediaModule()
 	MediaPlayers = TArray<AMediaPlayerBase*>();
 }
 
+AMediaModule::~AMediaModule()
+{
+	TERMINATION_MODULE(AMediaModule)
+}
+
 #if WITH_EDITOR
 void AMediaModule::OnGenerate_Implementation()
 {
@@ -51,6 +56,11 @@ void AMediaModule::OnPause_Implementation()
 void AMediaModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AMediaModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AMediaModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)

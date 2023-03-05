@@ -16,6 +16,11 @@ AObjectPoolModule::AObjectPoolModule()
 	ObjectPools = TMap<TSubclassOf<UObject>, UObjectPool*>();
 }
 
+AObjectPoolModule::~AObjectPoolModule()
+{
+	TERMINATION_MODULE(AObjectPoolModule)
+}
+
 #if WITH_EDITOR
 void AObjectPoolModule::OnGenerate_Implementation()
 {
@@ -56,6 +61,7 @@ void AObjectPoolModule::OnUnPause_Implementation()
 void AObjectPoolModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
+
 	ClearAllObject();
 }
 
@@ -131,7 +137,7 @@ UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArra
 	return ObjectPool->Spawn(InParams);
 }
 
-void AObjectPoolModule::DespawnObject(UObject* InObject)
+void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 {
 	if(!InObject) return;
 
@@ -147,7 +153,14 @@ void AObjectPoolModule::DespawnObject(UObject* InObject)
 	{
 		ObjectPool = GetPool(InType);
 	}
-	ObjectPool->Despawn(InObject);
+	if(ModuleState != EModuleState::Terminated)
+	{
+		ObjectPool->Despawn(InObject, bRecovery);
+	}
+	else
+	{
+		ObjectPool->DespawnImpl(InObject, false);
+	}
 }
 
 void AObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)

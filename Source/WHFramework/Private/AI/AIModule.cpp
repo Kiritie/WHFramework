@@ -13,6 +13,11 @@ AAIModule::AAIModule()
 	ModuleName = FName("AIModule");
 }
 
+AAIModule::~AAIModule()
+{
+	TERMINATION_MODULE(AAIModule)
+}
+
 #if WITH_EDITOR
 void AAIModule::OnGenerate_Implementation()
 {
@@ -48,6 +53,11 @@ void AAIModule::OnPause_Implementation()
 void AAIModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAIModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AAIModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

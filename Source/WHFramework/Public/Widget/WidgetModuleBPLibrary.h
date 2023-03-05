@@ -441,7 +441,7 @@ public:
 	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
-	T* CreateWorldWidgetByName(FName InWidgetName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
+	static T* CreateWorldWidgetByName(FName InWidgetName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -450,8 +450,18 @@ public:
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InWidgetClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
+	static UWorldWidgetBase* CreateWorldWidgetByName(FName InWidgetName, TSubclassOf<UWorldWidgetBase> InWidgetClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+
+	//UFUNCTION(BlueprintCallable)
+	static bool DestroyWorldWidget(UWorldWidgetBase* InWorldWidget, bool bRecovery = false)
+	{
+		if(!InWorldWidget) return false;
+
+		const FName WidgetName = InWorldWidget->GetWidgetName();
+		
+		return DestroyWorldWidgetByName(WidgetName, InWorldWidget->GetWidgetIndex(), bRecovery);
+	}
 
 	template<class T>
 	static bool DestroyWorldWidget(int32 InWidgetIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InWidgetClass = T::StaticClass())
@@ -466,8 +476,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InWidgetClass, int32 InWidgetIndex, bool bRecovery = false);
 
-	UFUNCTION(BlueprintCallable)
-	bool DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery = false)
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
+	static bool DestroyWorldWidgetByName(FName InWidgetName, int32 InWidgetIndex, bool bRecovery = false)
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -493,7 +503,7 @@ public:
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
-			WidgetModule->DestroyWorldWidgetsByName(InWidgetName);
+			WidgetModule->DestroyWorldWidgetsByName(InWidgetName, bRecovery);
 		}
 	}
 };

@@ -10,7 +10,7 @@ UEventHandle_PauseGame::UEventHandle_PauseGame()
 	PauseGameMode = EPauseGameMode::Default;
 }
 
-void UEventHandle_PauseGame::OnDespawn_Implementation()
+void UEventHandle_PauseGame::OnDespawn_Implementation(bool bRecovery)
 {
 	PauseGameMode = EPauseGameMode::Default;
 }

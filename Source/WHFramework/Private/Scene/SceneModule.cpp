@@ -66,6 +66,11 @@ ASceneModule::ASceneModule()
 	OutlineMatInst = nullptr;
 }
 
+ASceneModule::~ASceneModule()
+{
+	TERMINATION_MODULE(ASceneModule)
+}
+
 #if WITH_EDITOR
 void ASceneModule::OnGenerate_Implementation()
 {
@@ -183,6 +188,11 @@ void ASceneModule::OnPause_Implementation()
 void ASceneModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ASceneModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)

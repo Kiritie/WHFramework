@@ -31,6 +31,11 @@ AAbilityModule::AAbilityModule()
 	CustomInteractActionMap = TMap<EInteractAction, FString>();
 }
 
+AAbilityModule::~AAbilityModule()
+{
+	TERMINATION_MODULE(AAbilityModule)
+}
+
 #if WITH_EDITOR
 void AAbilityModule::OnGenerate_Implementation()
 {
@@ -66,6 +71,11 @@ void AAbilityModule::OnPause_Implementation()
 void AAbilityModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAbilityModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AAbilityModule::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)

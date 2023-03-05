@@ -14,7 +14,7 @@ UWebInterfaceBase::UWebInterfaceBase()
 	HandleMap = TMap<FString, UWebRequestHandleBase*>();
 }
 
-void UWebInterfaceBase::OnDespawn_Implementation()
+void UWebInterfaceBase::OnDespawn_Implementation(bool bRecovery)
 {
 	OnWebRequestComplete.Clear();
 	for(auto Iter : HandleMap)

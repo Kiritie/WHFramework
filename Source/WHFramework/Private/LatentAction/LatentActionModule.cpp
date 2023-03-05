@@ -14,6 +14,11 @@ ALatentActionModule::ALatentActionModule()
 	ModuleName = FName("LatentActionModule");
 }
 
+ALatentActionModule::~ALatentActionModule()
+{
+	TERMINATION_MODULE(ALatentActionModule)
+}
+
 #if WITH_EDITOR
 void ALatentActionModule::OnGenerate_Implementation()
 {
@@ -49,6 +54,11 @@ void ALatentActionModule::OnPause_Implementation()
 void ALatentActionModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ALatentActionModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void ALatentActionModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)

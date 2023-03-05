@@ -22,7 +22,7 @@ public:
 	class UStepBase* Step;
 	
 public:
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 };

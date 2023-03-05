@@ -51,14 +51,14 @@ public:
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
-	virtual void Initialize(AVoxelModule* InModule,  FIndex InIndex, int32 InBatch);
+	virtual void Initialize(FIndex InIndex, int32 InBatch);
 
 	virtual void Generate(EPhase InPhase = EPhase::Primary);
 
@@ -158,13 +158,7 @@ protected:
 	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TMap<EDirection, AVoxelChunk*> Neighbors;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<AAbilityPickUpBase*> PickUps;
-
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	AVoxelModule* Module;
+	EVoxelChunkState State;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	FIndex Index;
@@ -173,21 +167,21 @@ protected:
 	int32 Batch;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	bool bGenerated;
-
+	TMap<EDirection, AVoxelChunk*> Neighbors;
+	
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	bool bActorsGenerated;
+	TArray<AAbilityPickUpBase*> PickUps;
 
 	TMap<FIndex, FVoxelItem> VoxelMap;
 	
 public:
-	AVoxelModule* GetModule() const { return Module; }
-
 	FIndex GetIndex() const { return Index; }
 
 	int32 GetBatch() const { return Batch; }
 
-	bool IsGenerated() const { return bGenerated; }
+	bool IsBuilded() const { return State == EVoxelChunkState::Builded || IsGenerated(); }
+
+	bool IsGenerated() const { return State == EVoxelChunkState::Generated || State == EVoxelChunkState::Finally; }
 	
 	AVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
 

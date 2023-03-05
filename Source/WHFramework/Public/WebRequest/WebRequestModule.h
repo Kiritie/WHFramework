@@ -22,6 +22,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AWebRequestModule();
 
+	~AWebRequestModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

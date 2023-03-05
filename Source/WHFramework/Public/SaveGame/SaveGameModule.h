@@ -26,6 +26,8 @@ public:
 	// ParamSets default values for this actor's properties
 	ASaveGameModule();
 
+	~ASaveGameModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

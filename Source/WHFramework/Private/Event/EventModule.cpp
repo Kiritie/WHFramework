@@ -25,6 +25,11 @@ AEventModule::AEventModule()
 	EventManagerClass = AEventManagerBase::StaticClass();
 }
 
+AEventModule::~AEventModule()
+{
+	TERMINATION_MODULE(AEventModule)
+}
+
 #if WITH_EDITOR
 void AEventModule::OnGenerate_Implementation()
 {
@@ -65,6 +70,11 @@ void AEventModule::OnPause_Implementation()
 void AEventModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AEventModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)

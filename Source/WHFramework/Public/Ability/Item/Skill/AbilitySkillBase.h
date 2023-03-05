@@ -35,7 +35,7 @@ protected:
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 	
 public:
 	virtual void Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty) override;

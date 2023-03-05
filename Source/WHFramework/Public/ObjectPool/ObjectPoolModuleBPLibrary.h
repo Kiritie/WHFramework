@@ -42,7 +42,7 @@ public:
 	static UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
-	static void DespawnObject(UObject* InObject);
+	static void DespawnObject(UObject* InObject, bool bRecovery = true);
 
 	template<class T>
 	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())

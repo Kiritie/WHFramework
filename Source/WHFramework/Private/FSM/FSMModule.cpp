@@ -15,6 +15,11 @@ AFSMModule::AFSMModule()
 	FSMGroupMap = TMap<FName, FFSMGroupInfo>();
 }
 
+AFSMModule::~AFSMModule()
+{
+	TERMINATION_MODULE(AFSMModule)
+}
+
 #if WITH_EDITOR
 void AFSMModule::OnGenerate_Implementation()
 {

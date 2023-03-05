@@ -26,6 +26,7 @@ UProcedureBase::UProcedureBase()
 
 	OperationTarget = nullptr;
 	bTrackTarget = false;
+	TrackTargetMode = ETrackTargetMode::LocationOnly;
 
 	CameraViewPawn = nullptr;
 	CameraViewMode = EProcedureCameraViewMode::None;
@@ -69,6 +70,7 @@ void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
 	InNewProcedure->ProcedureIndex = ProcedureIndex;
 	InNewProcedure->OperationTarget = OperationTarget;
 	InNewProcedure->bTrackTarget = bTrackTarget;
+	InNewProcedure->TrackTargetMode = TrackTargetMode;
 	InNewProcedure->CameraViewPawn = CameraViewPawn;
 	InNewProcedure->CameraViewMode = CameraViewMode;
 	InNewProcedure->CameraViewSpace = CameraViewSpace;
@@ -106,7 +108,12 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	K2_OnEnter(InLastProcedure);
 
 	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
-	
+
+	if(bTrackTarget)
+	{
+		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+	}
+
 	ResetCameraView();
 
 	switch(ProcedureGuideType)
@@ -264,6 +271,32 @@ void UProcedureBase::ResetCameraView()
 			break;
 		}
 		default: break;
+	}
+}
+
+void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
+{
+	if(OperationTarget != InOperationTarget)
+	{
+		OperationTarget = InOperationTarget;
+		if(OperationTarget)
+		{
+			if(bTrackTarget)
+			{
+				UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+			}
+			if(bResetCameraView)
+			{
+				ResetCameraView();
+			}
+		}
+		else
+		{
+			if(bTrackTarget)
+			{
+				UCameraModuleBPLibrary::EndTrackTarget();
+			}
+		}
 	}
 }
 

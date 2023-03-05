@@ -24,7 +24,7 @@ void UEventHandleBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 {
 }
 
-void UEventHandleBase::OnDespawn_Implementation()
+void UEventHandleBase::OnDespawn_Implementation(bool bRecovery)
 {
 	EventType = EEventType::Multicast;
 }

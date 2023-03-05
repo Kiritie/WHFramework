@@ -59,7 +59,7 @@ void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	}
 }
 
-void AWHActor::OnDespawn_Implementation()
+void AWHActor::OnDespawn_Implementation(bool bRecovery)
 {
 	Execute_SetActorVisible(this, false);
 

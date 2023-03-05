@@ -39,7 +39,7 @@ void APhysicsVolumeBase::OnSpawn_Implementation(const TArray<FParameter>& InPara
 {
 }
 
-void APhysicsVolumeBase::OnDespawn_Implementation()
+void APhysicsVolumeBase::OnDespawn_Implementation(bool bRecovery)
 {
 	VolumeName = NAME_None;
 }

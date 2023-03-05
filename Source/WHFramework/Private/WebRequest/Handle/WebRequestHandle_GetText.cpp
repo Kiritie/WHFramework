@@ -10,9 +10,9 @@ UWebRequestHandle_GetText::UWebRequestHandle_GetText()
 	Text = TEXT("");
 }
 
-void UWebRequestHandle_GetText::OnDespawn_Implementation()
+void UWebRequestHandle_GetText::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	Text = TEXT("");
 }

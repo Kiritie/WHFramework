@@ -22,6 +22,11 @@ ACharacterModule::ACharacterModule()
 	CurrentCharacter = nullptr;
 }
 
+ACharacterModule::~ACharacterModule()
+{
+	TERMINATION_MODULE(ACharacterModule)
+}
+
 #if WITH_EDITOR
 void ACharacterModule::OnGenerate_Implementation()
 {
@@ -72,6 +77,11 @@ void ACharacterModule::OnPause_Implementation()
 void ACharacterModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ACharacterModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void ACharacterModule::AddCharacterToList(ACharacterBase* InCharacter)

@@ -41,8 +41,6 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
-	virtual void OnTermination_Internal() { }
-
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
@@ -52,6 +50,8 @@ public:
 	virtual void Pause_Implementation() override;
 
 	virtual void UnPause_Implementation() override;
+
+	virtual void Termination_Implementation() override;
 
 protected:
 	/// 自动运行

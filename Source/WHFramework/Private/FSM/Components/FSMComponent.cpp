@@ -38,7 +38,10 @@ void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	OnTermination();
+	if(UGlobalBPLibrary::IsPlaying())
+	{
+		OnTermination();
+	}
 }
 
 void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

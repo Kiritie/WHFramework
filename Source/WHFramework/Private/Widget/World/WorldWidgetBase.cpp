@@ -68,7 +68,7 @@ void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 	
 }
 
-void UWorldWidgetBase::OnDespawn_Implementation()
+void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
 	OwnerActor = nullptr;
 	WidgetParams.Empty();
@@ -153,14 +153,7 @@ void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 		InputModule->UpdateInputMode();
 	}
 
-	if(bRecovery)
-	{
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
-	}
-	else
-	{
-		ConditionalBeginDestroy();
-	}
+	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
 }
 
 void UWorldWidgetBase::Refresh_Implementation()

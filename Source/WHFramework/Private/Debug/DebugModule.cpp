@@ -12,6 +12,11 @@ ADebugModule::ADebugModule()
 
 }
 
+ADebugModule::~ADebugModule()
+{
+	TERMINATION_MODULE(ADebugModule)
+}
+
 #if WITH_EDITOR
 void ADebugModule::OnGenerate_Implementation()
 {
@@ -47,4 +52,9 @@ void ADebugModule::OnPause_Implementation()
 void ADebugModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ADebugModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }

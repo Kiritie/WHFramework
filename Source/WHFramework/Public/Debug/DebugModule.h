@@ -18,6 +18,8 @@ public:
 	// ParamSets default values for this actor's properties
 	ADebugModule();
 
+	~ADebugModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -36,4 +38,6 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
 };

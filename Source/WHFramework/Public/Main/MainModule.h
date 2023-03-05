@@ -18,6 +18,8 @@ class WHFRAMEWORK_API AMainModule : public AModuleBase
 public:	
 	// ParamSets default values for this actor's properties
 	AMainModule();
+
+	~AMainModule();
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Module

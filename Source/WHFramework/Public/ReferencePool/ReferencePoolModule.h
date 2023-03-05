@@ -21,6 +21,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AReferencePoolModule();
 
+	~AReferencePoolModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

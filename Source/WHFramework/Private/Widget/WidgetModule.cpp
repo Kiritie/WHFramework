@@ -38,6 +38,11 @@ AWidgetModule::AWidgetModule()
 	WorldWidgetClassMap = TMap<FName, TSubclassOf<UWorldWidgetBase>>();
 }
 
+AWidgetModule::~AWidgetModule()
+{
+	TERMINATION_MODULE(AWidgetModule)
+}
+
 #if WITH_EDITOR
 void AWidgetModule::OnGenerate_Implementation()
 {
@@ -374,11 +379,7 @@ void AWidgetModule::ClearAllWorldWidget()
 		{
 			if(Iter2)
 			{
-				if(Iter2->IsRooted())
-				{
-					Iter2->RemoveFromRoot();
-				}
-				Iter2->ConditionalBeginDestroy();
+				UObjectPoolModuleBPLibrary::DespawnObject(Iter2, false);
 			}
 		}
 		Iter1.Value.WorldWidgets.Empty();

@@ -8,7 +8,7 @@ UEventHandle_EndStep::UEventHandle_EndStep()
 	EventType = EEventType::Multicast;
 }
 
-void UEventHandle_EndStep::OnDespawn_Implementation()
+void UEventHandle_EndStep::OnDespawn_Implementation(bool bRecovery)
 {
 }
 

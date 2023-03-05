@@ -47,6 +47,16 @@ enum class EVoxelWorldState : uint8
 	SavingData
 };
 
+UENUM(BlueprintType)
+enum class EVoxelChunkState : uint8
+{
+	None,
+	Spawned,
+	Builded,
+	Generated,
+	Finally
+};
+
 /**
  * ????????
  */

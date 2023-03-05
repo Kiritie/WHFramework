@@ -25,6 +25,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AFSMModule();
 
+	~AFSMModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

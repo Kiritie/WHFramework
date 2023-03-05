@@ -7,6 +7,8 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Inventory/Inventory.h"
+#include "Ability/Inventory/InventoryAgentInterface.h"
+#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -32,7 +34,7 @@ void UInventorySlot::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	
 }
 
-void UInventorySlot::OnDespawn_Implementation()
+void UInventorySlot::OnDespawn_Implementation(bool bRecovery)
 {
 	SetItem(FAbilityItem::Empty);
 	Inventory = nullptr;

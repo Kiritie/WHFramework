@@ -33,9 +33,9 @@ void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InPara
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AAbilityPickUpBase::OnDespawn_Implementation()
+void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 	Item = FAbilityItem::Empty;
 	Container = nullptr;
 }

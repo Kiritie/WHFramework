@@ -21,6 +21,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AAudioModule();
 
+	~AAudioModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -40,6 +42,8 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 	
+	virtual void OnTermination_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 public:

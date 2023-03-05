@@ -33,9 +33,9 @@ void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParam
 	InitializeAbilitySystem();
 }
 
-void AAbilityActorBase::OnDespawn_Implementation()
+void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 }
 
 void AAbilityActorBase::Tick(float DeltaTime)

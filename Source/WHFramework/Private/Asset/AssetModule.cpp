@@ -13,6 +13,11 @@ AAssetModule::AAssetModule()
 
 }
 
+AAssetModule::~AAssetModule()
+{
+	TERMINATION_MODULE(AAssetModule)
+}
+
 #if WITH_EDITOR
 void AAssetModule::OnGenerate_Implementation()
 {
@@ -68,6 +73,11 @@ void AAssetModule::OnPause_Implementation()
 void AAssetModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAssetModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 bool AAssetModule::HasDataAsset(FName InDataAssetName) const

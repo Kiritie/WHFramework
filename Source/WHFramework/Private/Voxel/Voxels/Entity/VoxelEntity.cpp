@@ -71,9 +71,9 @@ void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AVoxelEntity::OnDespawn_Implementation()
+void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 	
 	VoxelID = FPrimaryAssetId();
 	MeshComponent->ClearMesh();

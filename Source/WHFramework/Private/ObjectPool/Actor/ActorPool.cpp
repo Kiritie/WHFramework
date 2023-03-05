@@ -9,18 +9,24 @@ UActorPool::UActorPool()
 {
 }
 
-UObject* UActorPool::SpawnImpl()
+UObject* UActorPool::SpawnImpl(UObject* InObject)
 {
-	FActorSpawnParameters ActorSpawnParameters;
-	ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	UObject* Object = GetWorld()->SpawnActor<AActor>(Type, ActorSpawnParameters);
-	return Object;
+	if(!InObject)
+	{
+		FActorSpawnParameters ActorSpawnParameters;
+		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		InObject = GetWorld()->SpawnActor<AActor>(Type, ActorSpawnParameters);
+	}
+	return InObject;
 }
 
-void UActorPool::DespawnImpl(UObject* InObject)
+void UActorPool::DespawnImpl(UObject* InObject, bool bRecovery)
 {
-	if(AActor* Actor = Cast<AActor>(InObject))
+	if(!bRecovery)
 	{
-		Actor->Destroy();
+		if(AActor* Actor = Cast<AActor>(InObject))
+		{
+			Actor->Destroy();
+		}
 	}
 }

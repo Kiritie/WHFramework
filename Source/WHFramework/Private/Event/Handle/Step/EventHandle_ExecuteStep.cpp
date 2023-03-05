@@ -10,7 +10,7 @@ UEventHandle_ExecuteStep::UEventHandle_ExecuteStep()
 	EventType = EEventType::Multicast;
 }
 
-void UEventHandle_ExecuteStep::OnDespawn_Implementation()
+void UEventHandle_ExecuteStep::OnDespawn_Implementation(bool bRecovery)
 {
 	Step = nullptr;
 }

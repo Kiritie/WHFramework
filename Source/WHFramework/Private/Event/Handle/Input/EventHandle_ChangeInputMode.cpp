@@ -10,7 +10,7 @@ UEventHandle_ChangeInputMode::UEventHandle_ChangeInputMode()
 	InputMode = EInputMode::None;
 }
 
-void UEventHandle_ChangeInputMode::OnDespawn_Implementation()
+void UEventHandle_ChangeInputMode::OnDespawn_Implementation(bool bRecovery)
 {
 }
 

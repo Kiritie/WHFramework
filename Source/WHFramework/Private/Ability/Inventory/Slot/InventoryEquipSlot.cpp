@@ -22,9 +22,9 @@ void UInventoryEquipSlot::OnSpawn_Implementation(const TArray<FParameter>& InPar
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void UInventoryEquipSlot::OnDespawn_Implementation()
+void UInventoryEquipSlot::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 }
 
 bool UInventoryEquipSlot::CheckSlot(FAbilityItem& InItem) const

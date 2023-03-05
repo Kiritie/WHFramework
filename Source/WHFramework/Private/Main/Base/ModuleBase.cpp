@@ -62,7 +62,7 @@ void AModuleBase::OnUnPause_Implementation()
 
 void AModuleBase::OnTermination_Implementation()
 {
-	OnTermination_Internal();
+	
 }
 
 void AModuleBase::Run_Implementation()
@@ -92,6 +92,16 @@ void AModuleBase::UnPause_Implementation()
 		ModuleState = EModuleState::Running;
 		Execute_OnStateChanged(this, ModuleState);
 		Execute_OnUnPause(this);
+	}
+}
+
+void AModuleBase::Termination_Implementation()
+{
+	if(ModuleState != EModuleState::Terminated)
+	{
+		ModuleState = EModuleState::Terminated;
+		Execute_OnStateChanged(this, ModuleState);
+		Execute_OnTermination(this);
 	}
 }
 

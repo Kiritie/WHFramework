@@ -51,9 +51,9 @@ void AAbilitySkillRemoteBase::OnSpawn_Implementation(const TArray<FParameter>& I
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AAbilitySkillRemoteBase::OnDespawn_Implementation()
+void AAbilitySkillRemoteBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	Execute_SetHitAble(this, false);
 	Execute_ClearHitTargets(this);

@@ -120,6 +120,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void StopDoCameraTransform();
 
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	static void AddCameraMovementInput(FVector InDirection, float InValue);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	static void AddCameraRotationInput(float InYaw, float InPitch);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
+	static void AddCameraDistanceInput(float InValue);
+
 public:
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
 	static FVector GetCurrentCameraLocation();

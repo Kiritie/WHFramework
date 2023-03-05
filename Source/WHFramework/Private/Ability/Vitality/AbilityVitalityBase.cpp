@@ -79,9 +79,9 @@ void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InPa
 	FSM->SwitchDefaultState();
 }
 
-void AAbilityVitalityBase::OnDespawn_Implementation()
+void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	FSM->SwitchState(nullptr);
 
@@ -99,7 +99,6 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			SetActorLocation(SaveData.SpawnLocation);
 			SetActorRotation(SaveData.SpawnRotation);
-			break;
 		}
 		case EPhase::Lesser:
 		case EPhase::Final:

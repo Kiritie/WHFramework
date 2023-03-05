@@ -26,6 +26,11 @@ AWebRequestModule::AWebRequestModule()
 	WebInterfaceMap = TMap<TSubclassOf<UWebInterfaceBase>, UWebInterfaceBase*>();
 }
 
+AWebRequestModule::~AWebRequestModule()
+{
+	TERMINATION_MODULE(AWebRequestModule)
+}
+
 #if WITH_EDITOR
 void AWebRequestModule::OnGenerate_Implementation()
 {

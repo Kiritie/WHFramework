@@ -22,9 +22,9 @@ void AAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AAbilityItemBase::OnDespawn_Implementation()
+void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 }
 
 void AAbilityItemBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)

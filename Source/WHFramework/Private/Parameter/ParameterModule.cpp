@@ -16,6 +16,11 @@ AParameterModule::AParameterModule()
 	ModuleName = FName("ParameterModule");
 }
 
+AParameterModule::~AParameterModule()
+{
+	TERMINATION_MODULE(AParameterModule)
+}
+
 #if WITH_EDITOR
 void AParameterModule::OnGenerate_Implementation()
 {

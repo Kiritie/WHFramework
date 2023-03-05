@@ -215,6 +215,30 @@ void UCameraModuleBPLibrary::StopDoCameraTransform()
 	}
 }
 
+void UCameraModuleBPLibrary::AddCameraMovementInput(FVector InDirection, float InValue)
+{
+	if(ACameraModule* CameraModule = ACameraModule::Get())
+	{
+		CameraModule->AddCameraMovementInput(InDirection, InValue);
+	}
+}
+
+void UCameraModuleBPLibrary::AddCameraRotationInput(float InYaw, float InPitch)
+{
+	if(ACameraModule* CameraModule = ACameraModule::Get())
+	{
+		CameraModule->AddCameraRotationInput(InYaw, InPitch);
+	}
+}
+
+void UCameraModuleBPLibrary::AddCameraDistanceInput(float InValue)
+{
+	if(ACameraModule* CameraModule = ACameraModule::Get())
+	{
+		CameraModule->AddCameraDistanceInput(InValue);
+	}
+}
+
 FVector UCameraModuleBPLibrary::GetCurrentCameraLocation()
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())

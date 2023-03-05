@@ -23,9 +23,9 @@ void AAbilitySkillBase::OnSpawn_Implementation(const TArray<FParameter>& InParam
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AAbilitySkillBase::OnDespawn_Implementation()
+void AAbilitySkillBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
 }

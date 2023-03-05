@@ -24,6 +24,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AObjectPoolModule();
 
+	~AObjectPoolModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -111,8 +113,8 @@ public:
 	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
-	void DespawnObject(UObject* InObject);
-	
+	void DespawnObject(UObject* InObject, bool bRecovery = true);
+
 	template<class T>
 	void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{

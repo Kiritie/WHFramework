@@ -21,6 +21,11 @@ AInputModule::AInputModule()
 	ModuleName = FName("InputModule");
 }
 
+AInputModule::~AInputModule()
+{
+	TERMINATION_MODULE(AInputModule)
+}
+
 #if WITH_EDITOR
 void AInputModule::OnGenerate_Implementation()
 {
@@ -61,6 +66,11 @@ void AInputModule::OnPause_Implementation()
 void AInputModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AInputModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AInputModule::UpdateInputMode()

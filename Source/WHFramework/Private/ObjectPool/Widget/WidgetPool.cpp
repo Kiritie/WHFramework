@@ -11,14 +11,20 @@ UWidgetPool::UWidgetPool()
 {
 }
 
-UObject* UWidgetPool::SpawnImpl()
+UObject* UWidgetPool::SpawnImpl(UObject* InObject)
 {
-	UObject* Object = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
-	Object->AddToRoot();
-	return Object;
+	if(!InObject)
+	{
+		InObject = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
+	}
+	else if(InObject->IsRooted())
+	{
+		InObject->RemoveFromRoot();
+	}
+	return InObject;
 }
 
-void UWidgetPool::DespawnImpl(UObject* InObject)
+void UWidgetPool::DespawnImpl(UObject* InObject, bool bRecovery)
 {
-	Super::DespawnImpl(InObject);
+	Super::DespawnImpl(InObject, bRecovery);
 }

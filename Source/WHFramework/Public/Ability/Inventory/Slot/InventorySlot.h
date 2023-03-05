@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Ability/AbilityModuleTypes.h"
 #include "Global/Base/WHObject.h"
 #include "InventorySlot.generated.h"
 
@@ -53,7 +54,7 @@ public:
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void OnItemPreChange(FAbilityItem& InNewItem);

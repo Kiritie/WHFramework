@@ -35,6 +35,11 @@ AProcedureModule::AProcedureModule()
 	CurrentProcedure = nullptr;
 }
 
+AProcedureModule::~AProcedureModule()
+{
+	TERMINATION_MODULE(AProcedureModule)
+}
+
 #if WITH_EDITOR
 void AProcedureModule::OnGenerate_Implementation()
 {

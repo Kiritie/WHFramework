@@ -20,6 +20,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AEventModule();
 
+	~AEventModule();
+
 protected:
 	TMap<TSubclassOf<UEventHandleBase>, FEventHandleInfo> EventHandleInfos;
 
@@ -41,6 +43,8 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Event

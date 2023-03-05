@@ -26,6 +26,8 @@ class WHFRAMEWORK_API ALatentActionModule : public AModuleBase
 public:
 	ALatentActionModule();
 	
+	~ALatentActionModule();
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -44,6 +46,8 @@ public:
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Translation

@@ -38,9 +38,9 @@ void AVoxelAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	Super::OnSpawn_Implementation(InParams);
 }
 
-void AVoxelAuxiliary::OnDespawn_Implementation()
+void AVoxelAuxiliary::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation();
+	Super::OnDespawn_Implementation(bRecovery);
 
 	VoxelItem = FVoxelItem::Empty;
 }

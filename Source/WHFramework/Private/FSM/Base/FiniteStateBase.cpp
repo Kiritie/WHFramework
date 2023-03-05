@@ -27,7 +27,7 @@ void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 	
 }
 
-void UFiniteStateBase::OnDespawn_Implementation()
+void UFiniteStateBase::OnDespawn_Implementation(bool bRecovery)
 {
 	StateIndex = 0;
 	FSM = nullptr;

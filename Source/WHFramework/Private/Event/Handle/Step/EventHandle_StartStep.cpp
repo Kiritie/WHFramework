@@ -9,7 +9,7 @@ UEventHandle_StartStep::UEventHandle_StartStep()
 	RootStepIndex = -1;
 }
 
-void UEventHandle_StartStep::OnDespawn_Implementation()
+void UEventHandle_StartStep::OnDespawn_Implementation(bool bRecovery)
 {
 	RootStepIndex = -1;
 }

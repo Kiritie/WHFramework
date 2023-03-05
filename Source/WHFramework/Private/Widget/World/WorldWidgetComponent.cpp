@@ -50,7 +50,10 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	DestroyWorldWidget();
+	if(UGlobalBPLibrary::IsPlaying())
+	{
+		DestroyWorldWidget();
+	}
 }
 
 void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -209,12 +212,12 @@ void UWorldWidgetComponent::CreateWorldWidget()
 		{
 			case EWidgetSpace::World:
 			{
-				SetWorldWidgetClass(WorldWidgetClass, true);
+				SetWorldWidget(CreateWidget(GetWorld(), WidgetClass));
 				break;
 			}
 			case EWidgetSpace::Screen:
 			{
-				WorldWidget = UWidgetModuleBPLibrary::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), FVector::ZeroVector, this, &WidgetParams, WorldWidgetClass);
+				SetWorldWidget(UWidgetModuleBPLibrary::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), FVector::ZeroVector, this, &WidgetParams, WorldWidgetClass));
 				break;
 			}
 		}
@@ -229,12 +232,12 @@ void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery)
 		{
 			case EWidgetSpace::World:
 			{
-				SetWorldWidgetClass(nullptr, true);
+				SetWidgetClass(nullptr);
 				break;
 			}
 			case EWidgetSpace::Screen:
 			{
-				WorldWidget->Destroy(bRecovery);
+				UWidgetModuleBPLibrary::DestroyWorldWidget(WorldWidget, bRecovery);
 				WorldWidget = nullptr;
 				break;
 			}
@@ -253,6 +256,7 @@ void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 		}
 		case EWidgetSpace::Screen:
 		{
+			WorldWidget = Cast<UWorldWidgetBase>(InWidget);
 			break;
 		}
 	}
@@ -279,8 +283,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidge
 						{
 							if(WidgetClass)
 							{
-								UUserWidget* NewWidget = CreateWidget(GetWorld(), WidgetClass);
-								SetWidget(NewWidget);
+								SetWidget(CreateWidget(GetWorld(), WidgetClass));
 							}
 							else
 							{

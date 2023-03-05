@@ -9,7 +9,7 @@ UEventHandle_EnterFiniteState::UEventHandle_EnterFiniteState()
 	State = nullptr;
 }
 
-void UEventHandle_EnterFiniteState::OnDespawn_Implementation()
+void UEventHandle_EnterFiniteState::OnDespawn_Implementation(bool bRecovery)
 {
 	State = nullptr;
 	FSM = nullptr;

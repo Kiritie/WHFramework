@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WHFramework.h"
+#include "Camera/CameraModuleTypes.h"
 
 #include "Procedure/ProcedureModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
@@ -156,8 +157,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	AActor* OperationTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
 	bool bTrackTarget;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bTrackTarget == true"), Category = "Operation Target")
+	ETrackTargetMode TrackTargetMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	ACameraPawnBase* CameraViewPawn;
@@ -202,6 +206,10 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable)
 	void ResetCameraView();
+	/**
+	* 设置操作目标
+	*/
+	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureListItem

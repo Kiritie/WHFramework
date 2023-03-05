@@ -22,7 +22,7 @@ public:
 	UWebInterfaceBase();
 
 public:
-	virtual void OnDespawn_Implementation() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)

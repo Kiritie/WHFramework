@@ -15,11 +15,11 @@ UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, co
 	return nullptr;
 }
 
-void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject)
+void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject, bool bRecovery)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
 	{
-		ObjectPoolModule->DespawnObject(InObject);
+		ObjectPoolModule->DespawnObject(InObject, bRecovery);
 	}
 }
 

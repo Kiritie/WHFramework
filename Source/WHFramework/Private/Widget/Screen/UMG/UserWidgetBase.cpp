@@ -54,7 +54,7 @@ void UUserWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	
 }
 
-void UUserWidgetBase::OnDespawn_Implementation()
+void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
 	
 }
@@ -213,18 +213,7 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 
-	if(bRecovery)
-	{
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
-	}
-	else
-	{
-		if(IsRooted())
-		{
-			RemoveFromRoot();
-		}
-		ConditionalBeginDestroy();
-	}
+	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
 }
 
 void UUserWidgetBase::OnStateChanged_Implementation(EScreenWidgetState InWidgetState)

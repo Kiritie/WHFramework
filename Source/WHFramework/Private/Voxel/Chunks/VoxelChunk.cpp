@@ -40,11 +40,9 @@ AVoxelChunk::AVoxelChunk()
 	TransMesh->OnComponentBeginOverlap.AddDynamic(this, &AVoxelChunk::OnBeginOverlap);
 	TransMesh->OnComponentEndOverlap.AddDynamic(this, &AVoxelChunk::OnEndOverlap);
 
+	State = EVoxelChunkState::None;
 	Batch = -1;
-	Module = nullptr;
 	Index = FVector();
-	bGenerated = false;
-	bActorsGenerated = false;
 	VoxelMap = TMap<FIndex, FVoxelItem>();
 	Neighbors = TMap<EDirection, AVoxelChunk*>();
 	DIRECTION_ITERATOR(Iter, Neighbors.Add(Iter); )
@@ -58,6 +56,10 @@ void AVoxelChunk::BeginPlay()
 
 void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
+	if(State != EVoxelChunkState::Spawned) return;
+	
+	State = EVoxelChunkState::Builded;
+	
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	for(auto& Iter : SaveData.VoxelDatas)
 	{
@@ -111,10 +113,13 @@ void AVoxelChunk::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor*
 
 void AVoxelChunk::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
+	State = EVoxelChunkState::Spawned;
 }
 
-void AVoxelChunk::OnDespawn_Implementation()
+void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
+	State = EVoxelChunkState::None;
+
 	for(auto& Iter : VoxelMap)
 	{
 		DestroyAuxiliary(Iter.Key);
@@ -124,11 +129,9 @@ void AVoxelChunk::OnDespawn_Implementation()
 
 	BreakNeighbors();
 
-	Module = nullptr;
+	State = EVoxelChunkState::None;
 	Index = FIndex::ZeroIndex;
 	Batch = -1;
-	bGenerated = false;
-	bActorsGenerated = false;
 
 	SolidMesh->ClearData();
 	SemiMesh->ClearData();
@@ -151,9 +154,8 @@ void AVoxelChunk::SetActorVisible_Implementation(bool bNewVisible)
 	TransMesh->SetCollisionEnabled(bNewVisible);
 }
 
-void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBatch)
+void AVoxelChunk::Initialize(FIndex InIndex, int32 InBatch)
 {
-	Module = InModule;
 	Index = InIndex;
 	Batch = InBatch;
 	UpdateNeighbors();
@@ -161,6 +163,8 @@ void AVoxelChunk::Initialize(AVoxelModule* InModule, FIndex InIndex, int32 InBat
 
 void AVoxelChunk::Generate(EPhase InPhase)
 {
+	if(!IsBuilded()) return;
+
 	if(!Execute_IsVisible(this))
 	{
 		Execute_SetActorVisible(this, true);
@@ -179,12 +183,12 @@ void AVoxelChunk::Generate(EPhase InPhase)
 		}
 		case EPhase::Lesser:
 		{
-			if(bGenerated)
+			if(IsGenerated())
 			{
 				BuildMesh();
 			}
 			CreateMesh();
-			if(!bGenerated)
+			if(!IsGenerated())
 			{
 				for(auto& Iter : VoxelMap)
 				{
@@ -195,15 +199,15 @@ void AVoxelChunk::Generate(EPhase InPhase)
 		}
 		case EPhase::Final:
 		{
-			if(!bGenerated)
-			{
-				SpawnActors();
-			}
+			SpawnActors();
 			break;
 		}
 	}
-
-	bGenerated = true;
+	
+	if(State == EVoxelChunkState::Builded)
+	{
+		State = EVoxelChunkState::Generated;
+	}
 }
 
 void AVoxelChunk::CreateMesh()
@@ -215,6 +219,8 @@ void AVoxelChunk::CreateMesh()
 
 void AVoxelChunk::BuildMap(int32 InStage)
 {
+	if(State != EVoxelChunkState::Spawned) return;
+	
 	const auto& worldData = AVoxelModule::Get()->GetWorldData();
 	switch (InStage)
 	{
@@ -245,6 +251,8 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		}
 		case 1:
 		{
+			State = EVoxelChunkState::Builded;
+			
 			const FRandomStream& randomStream = worldData.RandomStream;
 			const TMap<FIndex, FVoxelItem> voxelMap = VoxelMap;
 			for(auto iter : voxelMap)
@@ -320,21 +328,26 @@ void AVoxelChunk::BuildMesh()
 
 void AVoxelChunk::SpawnActors()
 {
+	if(State == EVoxelChunkState::Finally) return;
+
 	auto& worldData = AVoxelModule::Get()->GetWorldData();
 	if(worldData.IsExistChunkData(Index))
 	{
+		State = EVoxelChunkState::Finally;
 		LoadActors(worldData.GetChunkData(Index));
 	}
-	else if(!bActorsGenerated && Module->IsChunkGenerated(Index, true))
+	else
 	{
+		for(auto Iter : AVoxelModule::Get()->GetVerticalChunks(Index))
+		{
+			Iter->State = EVoxelChunkState::Finally;
+		}
 		GenerateActors();
 	}
 }
 
 void AVoxelChunk::LoadActors(FSaveData* InSaveData)
 {
-	bActorsGenerated = true;
-
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	for(int32 i = 0; i < SaveData.PickUpDatas.Num(); i++)
 	{
@@ -344,10 +357,6 @@ void AVoxelChunk::LoadActors(FSaveData* InSaveData)
 
 void AVoxelChunk::GenerateActors()
 {
-	for(auto Iter : Module->GetVerticalChunks(Index))
-	{
-		Iter->bActorsGenerated = true;
-	}
 }
 
 void AVoxelChunk::DestroyActors()
@@ -355,6 +364,7 @@ void AVoxelChunk::DestroyActors()
 	while(PickUps.Num() > 0)
 	{
 		UObjectPoolModuleBPLibrary::DespawnObject(PickUps[0]);
+		PickUps.RemoveAt(0);
 	}
 	PickUps.Empty();
 }
@@ -395,7 +405,7 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPh
 void AVoxelChunk::UpdateNeighbors()
 {
 	DIRECTION_ITERATOR(Direction,
-		Neighbors[Direction] = Module->FindChunkByIndex(Index + UMathBPLibrary::DirectionToIndex(Direction));
+		Neighbors[Direction] = AVoxelModule::Get()->FindChunkByIndex(Index + UMathBPLibrary::DirectionToIndex(Direction));
 		if(Neighbors[Direction])
 		{
 			Neighbors[Direction]->Neighbors[UMathBPLibrary::InvertDirection((EDirection)Direction)] = this;
@@ -734,7 +744,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 	if(bSuccess && bGenerate)
 	{
 		Generate(EPhase::Lesser);
-		GenerateNeighbors(InIndex);
+		GenerateNeighbors(InIndex, EPhase::Lesser);
 	}
 
 	return bSuccess;
@@ -791,7 +801,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	{
 		if(!GetNeighbor(EDirection::Up))
 		{
-			Module->SpawnChunk(Index + UMathBPLibrary::DirectionToIndex(EDirection::Up), !bGenerate);
+			AVoxelModule::Get()->SpawnChunk(Index + UMathBPLibrary::DirectionToIndex(EDirection::Up), !bGenerate);
 		}
 		if(GetNeighbor(EDirection::Up))
 		{
@@ -862,18 +872,25 @@ void AVoxelChunk::AddSceneActor(AActor* InActor)
 {
 	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) == this) return;
 
-	if(ISceneActorInterface::Execute_GetContainer(InActor))
+	if(State == EVoxelChunkState::None)
 	{
-		ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
+		UObjectPoolModuleBPLibrary::DespawnObject(InActor);
 	}
-
-	ISceneActorInterface::Execute_SetContainer(InActor, this);
-
-	InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-
-	if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
+	else
 	{
-	 	PickUps.Add(PickUp);
+		if(ISceneActorInterface::Execute_GetContainer(InActor))
+		{
+			ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
+		}
+
+		ISceneActorInterface::Execute_SetContainer(InActor, this);
+
+		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+
+		if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InActor))
+		{
+			PickUps.Add(PickUp);
+		}
 	}
 }
 

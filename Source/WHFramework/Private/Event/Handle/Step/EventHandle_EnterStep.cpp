@@ -9,7 +9,7 @@ UEventHandle_EnterStep::UEventHandle_EnterStep()
 	Step = nullptr;
 }
 
-void UEventHandle_EnterStep::OnDespawn_Implementation()
+void UEventHandle_EnterStep::OnDespawn_Implementation(bool bRecovery)
 {
 	Step = nullptr;
 }

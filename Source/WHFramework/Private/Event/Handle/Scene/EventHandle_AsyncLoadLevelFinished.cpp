@@ -10,7 +10,7 @@ UEventHandle_AsyncLoadLevelFinished::UEventHandle_AsyncLoadLevelFinished()
 	LevelPath = NAME_None;
 }
 
-void UEventHandle_AsyncLoadLevelFinished::OnDespawn_Implementation()
+void UEventHandle_AsyncLoadLevelFinished::OnDespawn_Implementation(bool bRecovery)
 {
 }
 

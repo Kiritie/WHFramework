@@ -21,6 +21,11 @@ ASaveGameModule::ASaveGameModule()
 	GeneralSaveGame = UGeneralSaveGame::StaticClass();
 }
 
+ASaveGameModule::~ASaveGameModule()
+{
+	TERMINATION_MODULE(ASaveGameModule)
+}
+
 #if WITH_EDITOR
 void ASaveGameModule::OnGenerate_Implementation()
 {

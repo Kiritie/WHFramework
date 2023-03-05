@@ -12,7 +12,7 @@ void UWHObject::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 	
 }
 
-void UWHObject::OnDespawn_Implementation()
+void UWHObject::OnDespawn_Implementation(bool bRecovery)
 {
 	
 }

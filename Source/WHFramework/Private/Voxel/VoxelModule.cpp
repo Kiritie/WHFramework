@@ -57,6 +57,7 @@ AVoxelModule::AVoxelModule()
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
+	WorldBasicData = FVoxelWorldBasicSaveData();
 
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
@@ -86,7 +87,13 @@ AVoxelModule::AVoxelModule()
 	ChunkMeshBuildQueue = TArray<FIndex>();
 	ChunkDataSaveQueue = TArray<FIndex>();
 
-	WorldBasicData = FVoxelWorldBasicSaveData();
+	VoxelClasses.Add(UVoxel::StaticClass());
+	VoxelClasses.Add(UVoxelEmpty::StaticClass());
+	VoxelClasses.Add(UVoxelUnknown::StaticClass());
+	VoxelClasses.Add(UVoxelDoor::StaticClass());
+	VoxelClasses.Add(UVoxelPlant::StaticClass());
+	VoxelClasses.Add(UVoxelTorch::StaticClass());
+	VoxelClasses.Add(UVoxelWater::StaticClass());
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid.M_Voxels_Solid'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid_Unlit.M_Voxels_Solid_Unlit'"));
@@ -106,6 +113,11 @@ AVoxelModule::AVoxelModule()
 	{
 		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
 	}
+}
+
+AVoxelModule::~AVoxelModule()
+{
+	TERMINATION_MODULE(AVoxelModule)
 }
 
 #if WITH_EDITOR
@@ -136,13 +148,10 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxel>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelEmpty>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelUnknown>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelDoor>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelPlant>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelTorch>();
-		UReferencePoolModuleBPLibrary::CreateReference<UVoxelWater>();
+		for(auto Iter : VoxelClasses)
+		{
+			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
+		}
 	}
 	else if(InPhase == EPhase::Final)
 	{
@@ -707,7 +716,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		ChunkMap.Add(InIndex, Chunk);
 
 		Chunk->SetActorLocationAndRotation(InIndex.ToVector() * WorldData->GetChunkLength(), FRotator::ZeroRotator);
-		Chunk->Initialize(this, InIndex, ChunkSpawnBatch);
+		Chunk->Initialize(InIndex, ChunkSpawnBatch);
 		Chunk->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 
 		if(bAddToQueue)

@@ -15,6 +15,11 @@ AReferencePoolModule::AReferencePoolModule()
 	ReferencePools = TMap<TSubclassOf<UObject>, UReferencePool*>();
 }
 
+AReferencePoolModule::~AReferencePoolModule()
+{
+	TERMINATION_MODULE(AReferencePoolModule)
+}
+
 #if WITH_EDITOR
 void AReferencePoolModule::OnGenerate_Implementation()
 {
@@ -55,6 +60,7 @@ void AReferencePoolModule::OnUnPause_Implementation()
 void AReferencePoolModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
+
 	ClearAllReference();
 }
 

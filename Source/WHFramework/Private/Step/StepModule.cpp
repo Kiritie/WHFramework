@@ -42,6 +42,11 @@ AStepModule::AStepModule()
 	GlobalStepCompleteType = EStepCompleteType::None;
 }
 
+AStepModule::~AStepModule()
+{
+	TERMINATION_MODULE(AStepModule)
+}
+
 #if WITH_EDITOR
 void AStepModule::OnGenerate_Implementation()
 {

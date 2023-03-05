@@ -11,7 +11,8 @@ enum class EModuleState : uint8
 {
 	None,
 	Running,
-	Paused
+	Paused,
+	Terminated
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
@@ -76,6 +77,11 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void UnPause();
+	/**
+	* 结束
+	*/
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Termination();
 	
 public:
 	/**

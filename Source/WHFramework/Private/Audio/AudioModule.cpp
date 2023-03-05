@@ -19,6 +19,11 @@ AAudioModule::AAudioModule()
 	ModuleName = FName("AudioModule");
 }
 
+AAudioModule::~AAudioModule()
+{
+	TERMINATION_MODULE(AAudioModule)
+}
+
 #if WITH_EDITOR
 void AAudioModule::OnGenerate_Implementation()
 {
@@ -54,6 +59,11 @@ void AAudioModule::OnPause_Implementation()
 void AAudioModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void AAudioModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)

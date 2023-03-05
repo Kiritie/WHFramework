@@ -92,6 +92,11 @@ ACameraModule::ACameraModule()
 	TargetCameraDistance = 0.f;
 }
 
+ACameraModule::~ACameraModule()
+{
+	TERMINATION_MODULE(ACameraModule)
+}
+
 #if WITH_EDITOR
 void ACameraModule::OnGenerate_Implementation()
 {
@@ -241,6 +246,11 @@ void ACameraModule::OnPause_Implementation()
 void ACameraModule::OnUnPause_Implementation()
 {
 	Super::OnUnPause_Implementation();
+}
+
+void ACameraModule::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
 }
 
 ACameraPawnBase* ACameraModule::GetCurrentCamera() const

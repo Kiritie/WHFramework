@@ -23,6 +23,8 @@ public:
 	// ParamSets default values for this actor's properties
 	AParameterModule();
 
+	~AParameterModule();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

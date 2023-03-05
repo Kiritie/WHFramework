@@ -8,7 +8,7 @@ UWebRequestHandleBase::UWebRequestHandleBase()
 	bSucceeded = false;
 }
 
-void UWebRequestHandleBase::OnDespawn_Implementation()
+void UWebRequestHandleBase::OnDespawn_Implementation(bool bRecovery)
 {
 	bSucceeded = false;
 }

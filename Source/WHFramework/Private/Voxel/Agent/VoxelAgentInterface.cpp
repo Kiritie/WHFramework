@@ -2,6 +2,7 @@
 
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
+#include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
