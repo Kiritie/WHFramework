@@ -163,6 +163,14 @@ void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 	}
 }
 
+void AObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
+{
+	for(auto Iter : InObjects)
+	{
+		DespawnObject(Iter, bRecovery);
+	}
+}
+
 void AObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;

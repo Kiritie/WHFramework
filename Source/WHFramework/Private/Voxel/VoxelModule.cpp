@@ -136,8 +136,8 @@ void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Open, TEXT("EVoxelInteractAction"));
-	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Close, TEXT("EVoxelInteractAction"));
+	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Open, TEXT("/Script/WHFramework.EVoxelInteractAction"));
+	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Close, TEXT("/Script/WHFramework.EVoxelInteractAction"));
 }
 
 void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)

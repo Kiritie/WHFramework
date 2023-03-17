@@ -37,16 +37,16 @@ struct WHFRAMEWORK_API FDataTableRowBase : public FTableRowBase
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadOnly)
 	FName ID;
 
-	FORCEINLINE FDataTableRowBase()
+	FDataTableRowBase()
 	{
 		ID = NAME_None;
 	}
 
 public:
-	FORCEINLINE bool IsValid() const
+	virtual bool IsValid() const
 	{
 		return !ID.IsNone();
 	}

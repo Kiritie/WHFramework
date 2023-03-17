@@ -23,6 +23,14 @@ void UObjectPoolModuleBPLibrary::DespawnObject(UObject* InObject, bool bRecovery
 	}
 }
 
+void UObjectPoolModuleBPLibrary::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
+{
+	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())
+	{
+		ObjectPoolModule->DespawnObjects(InObjects, bRecovery);
+	}
+}
+
 void UObjectPoolModuleBPLibrary::ClearObject(TSubclassOf<UObject> InType)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())

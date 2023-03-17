@@ -115,6 +115,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject, bool bRecovery = true);
 
+	UFUNCTION(BlueprintCallable)
+	void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
+
 	template<class T>
 	void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{

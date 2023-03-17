@@ -45,6 +45,18 @@ public:
 	static void DespawnObject(UObject* InObject, bool bRecovery = true);
 
 	template<class T>
+	static void DespawnObjects(TArray<T*> InObjects, bool bRecovery = true)
+	{
+		for(auto Iter : InObjects)
+		{
+			DespawnObject(Iter, bRecovery);
+		}
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleBPLibrary")
+	static void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
+
+	template<class T>
 	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())

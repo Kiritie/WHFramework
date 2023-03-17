@@ -340,7 +340,7 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 
-	bool IsValid() const
+	virtual bool IsValid() const override
 	{
 		return AbilityHandle.IsValid();
 	}

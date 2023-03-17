@@ -129,7 +129,6 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 
 	BreakNeighbors();
 
-	State = EVoxelChunkState::None;
 	Index = FIndex::ZeroIndex;
 	Batch = -1;
 
@@ -361,11 +360,7 @@ void AVoxelChunk::GenerateActors()
 
 void AVoxelChunk::DestroyActors()
 {
-	while(PickUps.Num() > 0)
-	{
-		UObjectPoolModuleBPLibrary::DespawnObject(PickUps[0]);
-		PickUps.RemoveAt(0);
-	}
+	UObjectPoolModuleBPLibrary::DespawnObjects(PickUps);
 	PickUps.Empty();
 }
 

@@ -93,7 +93,7 @@ void AAbilityModule::RemoveCustomInteractAction(int32 InInteractAction)
 
 FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 {
-	FString EnumName = TEXT("EInteractAction");
+	FString EnumName = TEXT("/Script/WHFramwork.EInteractAction");
 	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
 	{
 		EnumName = CustomInteractActionMap[(EInteractAction)InInteractAction];
