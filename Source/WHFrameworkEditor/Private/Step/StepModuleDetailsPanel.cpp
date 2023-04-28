@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "StepModuleDetailsPanel.h"
+#include "Step/StepModuleDetailsPanel.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Layout/SWrapBox.h"

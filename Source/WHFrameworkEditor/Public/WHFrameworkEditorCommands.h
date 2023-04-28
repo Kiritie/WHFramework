@@ -22,4 +22,6 @@ public:
 	TSharedPtr< FUICommandInfo > OpenProcedureEditorWindow;
 
 	TSharedPtr< FUICommandInfo > OpenStepEditorWindow;
+
+	TSharedPtr< FUICommandInfo > OpenTaskEditorWindow;
 };

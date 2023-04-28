@@ -96,6 +96,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Enum
 	/*
+	* 获取枚举值显示名称
+	* @param InEnumName 枚举名称
+	*/
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static int32 GetEnumItemNum(const FString& InEnumName);
+	
+	/*
 	 * 获取枚举值变量名称
 	 * @param InEnumName 枚举名称
 	 * @param InEnumValue 枚举值

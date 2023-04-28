@@ -680,8 +680,8 @@ FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 			//ListView->SetSelection(ProcedureListItems[FMath::Min(SelectedProcedureListItem->GetProcedureIndex(),ProcedureListItems.Num() - 1)]);
 
 			ProcedureModule->Modify();
-			UpdateListView();
 		}
+		UpdateListView();
 	}
 
 	return FReply::Handled();

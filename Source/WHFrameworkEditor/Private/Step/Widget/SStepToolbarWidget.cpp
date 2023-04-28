@@ -38,7 +38,10 @@ void SStepToolbarWidget::Construct(const FArguments& InArgs)
 		ToolBarBuilder_Editor.AddToolBarButton(
 			FUIAction(
 				FExecuteAction::CreateRaw(this, &SStepToolbarWidget::OnPreviewModeToggled),
-				FCanExecuteAction(),
+				FCanExecuteAction::CreateLambda([]() -> bool
+				{
+					return UGlobalBPLibrary::IsPlaying();
+				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})

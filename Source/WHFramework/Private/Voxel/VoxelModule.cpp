@@ -303,11 +303,11 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 			SetWorldMode(EVoxelWorldMode::None);
 			SetWorldState(EVoxelWorldState::None);
 
-			for(auto iter : ChunkMap)
+			for(auto Iter : ChunkMap)
 			{
-				if(iter.Value)
+				if(Iter.Value)
 				{
-					UObjectPoolModuleBPLibrary::DespawnObject(iter.Value);
+					UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
 				}
 			}
 			ChunkMap.Empty();

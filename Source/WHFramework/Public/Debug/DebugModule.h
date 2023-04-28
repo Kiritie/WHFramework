@@ -4,6 +4,7 @@
 
 #include "WHFramework.h"
 #include "Main/Base/ModuleBase.h"
+#include "DebugModuleBPLibrary.h"
 
 #include "DebugModule.generated.h"
 
@@ -40,4 +41,15 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation() override;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState);
+
+protected:
+	UPROPERTY(EditAnywhere)
+	TMap<EDebugCategory, FDebugCategoryState> DebugCategoryStates;
 };

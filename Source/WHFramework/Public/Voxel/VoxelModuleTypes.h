@@ -551,7 +551,7 @@ public:
 public:
 	static FVoxelWorldSaveData Empty;
 	
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 WorldSeed;
 
 	UPROPERTY(Transient)

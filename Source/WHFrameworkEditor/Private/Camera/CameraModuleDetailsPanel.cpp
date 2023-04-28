@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "CameraModuleDetailsPanel.h"
+#include "Camera/CameraModuleDetailsPanel.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Layout/SWrapBox.h"
@@ -67,7 +67,7 @@ FReply FCameraModuleDetailsPanel::OnClickCopyCameraParamsButton()
 
 			FPlatformApplicationMisc::ClipboardCopy(*CameraParams.ToString());
 			
-			WHLog(WH_Camera, Log, TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance);
+			WHLog(FString::Printf(TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance), EDebugCategory::Camera);
 		}
 	}
 	return FReply::Handled();

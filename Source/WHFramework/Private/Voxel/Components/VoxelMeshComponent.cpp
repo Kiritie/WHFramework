@@ -136,7 +136,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 	}
 }
 
-void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollider /*= true*/)
+void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasCollider /*= true*/)
 {
 	if (HasData())
 	{
@@ -166,7 +166,7 @@ void UVoxelMeshComponent::CreateMesh(int InSectionIndex /*= 0*/, bool bHasCollid
 	}
 }
 
-void UVoxelMeshComponent::ClearMesh(int InSectionIndex /*= 0*/)
+void UVoxelMeshComponent::ClearMesh(int32 InSectionIndex /*= 0*/)
 {
 	if (GetNumSections() > InSectionIndex)
 	{
@@ -247,7 +247,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 	BuildFace(InVoxelItem, vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
-void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal)
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
 {
 	const int32 verNum = Vertices.Num();
 	const UVoxelData& voxelData = InVoxelItem.GetVoxelData();

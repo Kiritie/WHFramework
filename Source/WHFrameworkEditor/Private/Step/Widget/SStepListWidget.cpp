@@ -989,8 +989,8 @@ FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 
 				StepModule->Modify();
 			}
-			UpdateTreeView();
 		}
+		UpdateTreeView();
 	}
 
 	return FReply::Handled();

@@ -8,10 +8,10 @@
 
 class UFactory;
 
-class FAssetTypeActions_FiniteStateBlueprint : public FAssetTypeActions_Blueprint
+class FProcedureBlueprintActions : public FAssetTypeActions_Blueprint
 {
 public:
-	FAssetTypeActions_FiniteStateBlueprint(EAssetTypeCategories::Type InAssetCategory);
+	FProcedureBlueprintActions(EAssetTypeCategories::Type InAssetCategory);
 
 private:
 	EAssetTypeCategories::Type AssetCategory;

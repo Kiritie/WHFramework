@@ -8,10 +8,10 @@
 
 class UFactory;
 
-class FAssetTypeActions_StepBlueprint : public FAssetTypeActions_Blueprint
+class FTaskBlueprintActions : public FAssetTypeActions_Blueprint
 {
 public:
-	FAssetTypeActions_StepBlueprint(EAssetTypeCategories::Type InAssetCategory);
+	FTaskBlueprintActions(EAssetTypeCategories::Type InAssetCategory);
 
 private:
 	EAssetTypeCategories::Type AssetCategory;

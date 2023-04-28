@@ -319,13 +319,13 @@ FActiveGameplayEffectHandle UAbilitySystemComponentBase::BP_ApplyGameplayEffectT
 {
 	if (Target == nullptr)
 	{
-		WHLog(WH_Ability, Log, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString());
+		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDebugCategory::Ability, EDebugVerbosity::Error);
 		return FActiveGameplayEffectHandle();
 	}
 
 	if (GameplayEffectClass == nullptr)
 	{
-		WHLog(WH_Ability, Error, TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString());
+		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDebugCategory::Ability, EDebugVerbosity::Error);
 		return FActiveGameplayEffectHandle();
 	}
 
@@ -363,10 +363,10 @@ float UAbilitySystemComponentBase::PlayMontageForMesh(UGameplayAbility* InAnimat
 
 			if (NewAnimMontage->HasRootMotion() && AnimInstance->GetOwningActor())
 			{
-				UE_LOG(LogRootMotion, Log, TEXT("UAbilitySystemComponent::PlayMontage %s, Role: %s")
+				WHLog(FString::Printf(TEXT("UAbilitySystemComponent::PlayMontage %s, Role: %s")
 					, *GetNameSafe(NewAnimMontage)
 					, *UEnum::GetValueAsString(TEXT("Engine.ENetRole"), AnimInstance->GetOwningActor()->GetLocalRole())
-					);
+					), EDebugCategory::Ability);
 			}
 
 			AnimMontageInfo.LocalMontageInfo.AnimMontage = NewAnimMontage;
@@ -775,8 +775,8 @@ void UAbilitySystemComponentBase::AnimMontage_UpdateReplicatedDataForMesh(FGamep
 			int32 NextSectionID = AnimInstance->Montage_GetNextSectionID(AnimMontageInfo.LocalMontageInfo.AnimMontage, CurrentSectionID);
 			if (NextSectionID >= (256 - 1))
 			{
-				WHLog(WH_Ability, Error, TEXT("AnimMontage_UpdateReplicatedData. NextSectionID = %d.  RepAnimMontageInfo.Position: %.2f, CurrentSectionID: %d. LocalAnimMontageInfo.AnimMontage %s"),
-					NextSectionID, OutRepAnimMontageInfo.RepMontageInfo.Position, CurrentSectionID, *GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage));
+				WHLog(FString::Printf(TEXT("AnimMontage_UpdateReplicatedData. NextSectionID = %d.  RepAnimMontageInfo.Position: %.2f, CurrentSectionID: %d. LocalAnimMontageInfo.AnimMontage %s"),
+					NextSectionID, OutRepAnimMontageInfo.RepMontageInfo.Position, CurrentSectionID, *GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage)), EDebugCategory::Ability, EDebugVerbosity::Error);
 				ensure(NextSectionID < (256 - 1));
 			}
 			OutRepAnimMontageInfo.RepMontageInfo.NextSectionID = uint8(NextSectionID + 1);
@@ -826,16 +826,16 @@ void UAbilitySystemComponentBase::OnRep_ReplicatedAnimMontageForMesh()
 			bool DebugMontage = (CVar && CVar->GetValueOnGameThread() == 1);
 			if (DebugMontage)
 			{
-				WHLog(WH_Ability, Log, TEXT("\n\nOnRep_ReplicatedAnimMontage, %s"), *GetNameSafe(this));
-				WHLog(WH_Ability, Log, TEXT("\tAnimMontage: %s\n\tPlayRate: %f\n\tPosition: %f\n\tBlendTime: %f\n\tNextSectionID: %d\n\tIsStopped: %d"),
+				WHLog(FString::Printf(TEXT("\n\nOnRep_ReplicatedAnimMontage, %s"), *GetNameSafe(this)), EDebugCategory::Ability);
+				WHLog(FString::Printf(TEXT("\tAnimMontage: %s\n\tPlayRate: %f\n\tPosition: %f\n\tBlendTime: %f\n\tNextSectionID: %d\n\tIsStopped: %d"),
 					*GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage),
 					NewRepMontageInfoForMesh.RepMontageInfo.PlayRate,
 					NewRepMontageInfoForMesh.RepMontageInfo.Position,
 					NewRepMontageInfoForMesh.RepMontageInfo.BlendTime,
 					NewRepMontageInfoForMesh.RepMontageInfo.NextSectionID,
-					NewRepMontageInfoForMesh.RepMontageInfo.IsStopped);
-				WHLog(WH_Ability, Log, TEXT("\tLocalAnimMontageInfo.AnimMontage: %s\n\tPosition: %f"),
-					*GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage), AnimInstance->Montage_GetPosition(AnimMontageInfo.LocalMontageInfo.AnimMontage));
+					NewRepMontageInfoForMesh.RepMontageInfo.IsStopped), EDebugCategory::Ability);
+				WHLog(FString::Printf(TEXT("\tLocalAnimMontageInfo.AnimMontage: %s\n\tPosition: %f"),
+					*GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage), AnimInstance->Montage_GetPosition(AnimMontageInfo.LocalMontageInfo.AnimMontage)), EDebugCategory::Ability);
 			}
 
 			if (NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage)
@@ -848,7 +848,7 @@ void UAbilitySystemComponentBase::OnRep_ReplicatedAnimMontageForMesh()
 
 				if (AnimMontageInfo.LocalMontageInfo.AnimMontage == nullptr)
 				{
-					WHLog(WH_Ability, Warning, TEXT("OnRep_ReplicatedAnimMontage: PlayMontageSimulated failed. Name: %s, AnimMontage: %s"), *GetNameSafe(this), *GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage));
+					WHLog(FString::Printf(TEXT("OnRep_ReplicatedAnimMontage: PlayMontageSimulated failed. Name: %s, AnimMontage: %s"), *GetNameSafe(this), *GetNameSafe(NewRepMontageInfoForMesh.RepMontageInfo.AnimMontage)), EDebugCategory::Ability, EDebugVerbosity::Warning);
 					return;
 				}
 

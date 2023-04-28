@@ -18,7 +18,6 @@ class WHFRAMEWORK_API UNetworkModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-public:
 	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleBPLibrary")
 	static bool IsNetworkLocalMode();
 

@@ -17,7 +17,7 @@ class URootStepBase;
 /**
  * 步骤基类
  */
-UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
+UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default))
 class WHFRAMEWORK_API UStepBase : public UWHObject
 {
 	GENERATED_BODY()
@@ -490,7 +490,7 @@ public:
 
 		OnExecuteDelegate.Broadcast();
 
-		WHLog(WH_Step, Log, TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString());
+		WHLog(FString::Printf(TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString()), EDebugCategory::Step);
 	}
 
 	void TryComplete(float DeltaSeconds)

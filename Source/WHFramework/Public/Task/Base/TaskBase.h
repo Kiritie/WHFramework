@@ -1,0 +1,393 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "WHFramework.h"
+
+#include "Task/TaskModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
+#include "Global/GlobalTypes.h"
+#include "Global/Base/WHObject.h"
+#include "Math/MathTypes.h"
+
+#include "TaskBase.generated.h"
+
+class ACameraPawnBase;
+class URootTaskBase;
+/**
+ * 任务基类
+ */
+UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default))
+class WHFRAMEWORK_API UTaskBase : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	UTaskBase();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Task
+public:
+#if WITH_EDITOR
+	/**
+	 * 任务构建
+	 */
+	virtual void OnGenerate();
+	/**
+	 * 任务取消构建
+	 */
+	virtual void OnUnGenerate();
+	/**
+	 * 任务复制
+	 */
+	virtual void OnDuplicate(UTaskBase* InNewTask);
+#endif
+
+public:
+	/**
+	* 任务状态改变
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
+	void K2_OnStateChanged(ETaskState InTaskState);
+	virtual void OnStateChanged(ETaskState InTaskState);
+	/**
+	 * 任务初始化
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize();
+	virtual void OnInitialize();
+	/**
+	 * 任务还原
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRestore")
+	void K2_OnRestore();
+	virtual void OnRestore();
+	/**
+	 * 任务进入
+	 * @param InLastTask 上一个任务
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
+	void K2_OnEnter(UTaskBase* InLastTask);
+	virtual void OnEnter(UTaskBase* InLastTask);
+	/**
+	 * 任务帧刷新
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	virtual void OnRefresh();
+	/**
+	* 任务指引
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
+	void K2_OnGuide();
+	virtual void OnGuide();
+	/**
+	 * 任务执行
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExecute")
+	void K2_OnExecute();
+	virtual void OnExecute();
+	/**
+	 * 任务完成
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnComplete")
+	void K2_OnComplete(ETaskExecuteResult InTaskExecuteResult);
+	virtual void OnComplete(ETaskExecuteResult InTaskExecuteResult);
+	/**
+	 * 任务离开
+	 */
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
+	void K2_OnLeave();
+	virtual void OnLeave();
+
+public:
+	/**
+	* 还原任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Restore();
+	/**
+	* 进入任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Enter();
+	/**
+	* 进入任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Refresh();
+	/**
+	* 指引任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Guide();
+	/**
+	* 执行任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Execute();
+	/**
+	 * 完成任务
+	 */
+	UFUNCTION(BlueprintCallable)
+	void Complete(ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
+	/**
+	* 离开任务
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Leave();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Name/Description
+public:
+	/// 任务名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FName TaskName;
+	/// 任务显示名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FText TaskDisplayName;
+	/// 任务描述
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
+	FText TaskDescription;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Index/Type/State
+public:
+	/// 是否为开始任务
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	bool bFirstTask;
+	/// 任务索引
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	int32 TaskIndex;
+	/// 任务层级
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	int32 TaskHierarchy;
+	/// 任务类型
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	ETaskType TaskType;
+	/// 任务状态
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	ETaskState TaskState;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnTaskStateChanged OnTaskStateChanged;
+
+public:
+	/**
+	* 获取任务类型
+	*/
+	UFUNCTION(BlueprintPure)
+	ETaskType GetTaskType() const { return TaskType; }
+	/**
+	* 获取任务状态
+	*/
+	UFUNCTION(BlueprintPure)
+	ETaskState GetTaskState() const { return TaskState; }
+	/**
+	* 是否已进入
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsEntered() const;
+	/**
+	* 是否已完成
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCompleted(bool bCheckSubs = false) const;
+	/**
+	* 能否跳过
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool IsSkipAble() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Execute/Guide
+public:
+	/// 任务执行条件
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskExecuteResult TaskExecuteCondition;
+	/// 任务执行结果
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskExecuteResult TaskExecuteResult;
+	/// 任务执行方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskExecuteType TaskExecuteType;
+	/// 自动执行任务时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoExecuteTaskTime;
+	/// 任务完成方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskCompleteType TaskCompleteType;
+	/// 自动完成任务时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoCompleteTaskTime;
+	/// 任务离开方式
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskLeaveType TaskLeaveType;
+	/// 自动离开任务时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	float AutoLeaveTaskTime;
+	/// 任务指引类型 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	ETaskGuideType TaskGuideType;
+	/// 任务指引间隔时间 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	float TaskGuideIntervalTime;
+
+protected:
+	FTimerHandle StartGuideTimerHandle;
+	
+public:
+	/**
+	* 检测任务执行条件
+	*/
+	UFUNCTION(BlueprintPure)
+	bool CheckTaskCondition(UTaskBase* InTask) const;
+	
+	UFUNCTION(BlueprintPure)
+	ETaskExecuteType GetTaskExecuteType() const;
+
+	UFUNCTION(BlueprintPure)
+	ETaskLeaveType GetTaskLeaveType() const;
+
+	UFUNCTION(BlueprintPure)
+	ETaskCompleteType GetTaskCompleteType() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ParentTask
+public:
+	/// 根任务
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentTask")
+	URootTaskBase* RootTask;
+	/// 父任务 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentTask")
+	UTaskBase* ParentTask;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsParentOf(UTaskBase* InTask) const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// SubTask
+public:
+	/// 是否合并子任务
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
+	bool bMergeSubTask;
+	/// 当前子任务索引
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
+	int32 CurrentSubTaskIndex;
+	/// 子任务
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
+	TArray<UTaskBase*> SubTasks;
+public:
+	/**
+	* 是否有子任务
+	* @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubTask）
+	*/
+	UFUNCTION(BlueprintPure)
+	bool HasSubTask(bool bIgnoreMerge = true) const;
+	/**
+	 * 获取当前子任务
+	 */
+	UFUNCTION(BlueprintPure)
+	UTaskBase* GetCurrentSubTask() const;
+	/**
+	 * 是否是子任务
+	 */
+	UFUNCTION(BlueprintPure)
+	bool IsSubOf(UTaskBase* InTask) const;
+	/**
+	* 是否已完成所有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubCompleted() const;
+	/**
+	* 是否已成功执行有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubExecuteSucceed() const;
+
+protected:
+	FTimerHandle AutoExecuteTimerHandle;
+	FTimerHandle AutoLeaveTimerHandle;
+	FTimerHandle AutoCompleteTimerHandle;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// TaskListItem
+public:
+	UPROPERTY()
+	FTaskListItemStates TaskListItemStates;
+public:
+	/**
+	* 构建任务列表项
+	*/
+	virtual void GenerateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem);
+	/**
+	* 更新任务列表项
+	*/
+	virtual void UpdateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem);
+
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* InProperty) const override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+};
+
+/**
+ * 任务列表项
+ */ 
+struct FTaskListItem : public TSharedFromThis<FTaskListItem>
+{
+public:
+	FTaskListItem()
+	{
+		Task = nullptr;
+		ParentListItem = nullptr; 
+		SubListItems = TArray<TSharedPtr<FTaskListItem>>();
+	}
+
+	UTaskBase* Task;
+
+	TSharedPtr<FTaskListItem> ParentListItem;
+
+	TArray<TSharedPtr<FTaskListItem>> SubListItems;
+
+public:
+	FTaskListItemStates& GetStates() const
+	{
+		return Task->TaskListItemStates;
+	}
+
+	int32& GetTaskIndex() const
+	{
+		return Task->TaskIndex;
+	}
+
+	UTaskBase* GetParentTask() const
+	{
+		return Task->ParentTask;
+	}
+	
+	TArray<UTaskBase*>& GetSubTasks()const
+	{
+		return Task->SubTasks;
+	}
+	
+	void GetSubTaskNum(int32& OutNum) const
+	{
+		OutNum += SubListItems.Num();
+		for(auto Iter : SubListItems)
+		{
+			Iter->GetSubTaskNum(OutNum);
+		}
+	}
+
+	TArray<UTaskBase*>& GetParentSubTasks() const
+	{
+		return ParentListItem->GetSubTasks();
+	}
+	
+	TArray<TSharedPtr<FTaskListItem>>& GetParentSubListItems() const
+	{
+		return ParentListItem->SubListItems;
+	}
+};

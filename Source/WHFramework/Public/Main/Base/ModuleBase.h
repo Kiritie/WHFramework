@@ -9,7 +9,7 @@
 #include "Main/MainModuleTypes.h"
 #include "ModuleBase.generated.h"
 
-UCLASS()
+UCLASS(hidecategories = (Rendering, Collision, Physics))
 class WHFRAMEWORK_API AModuleBase : public AWHActor, public IModule
 {
 	GENERATED_BODY()

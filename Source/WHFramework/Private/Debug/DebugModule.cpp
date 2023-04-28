@@ -2,7 +2,7 @@
 
 
 #include "Debug/DebugModule.h"
-		
+
 IMPLEMENTATION_MODULE(ADebugModule)
 
 // Sets default values
@@ -10,6 +10,11 @@ ADebugModule::ADebugModule()
 {
 	ModuleName = FName("DebugModule");
 
+	DebugCategoryStates = TMap<EDebugCategory, FDebugCategoryState>();
+	for(int32 i = 0; i < UGlobalBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EDebugCategory")); i++)
+	{
+		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
+	}
 }
 
 ADebugModule::~ADebugModule()
@@ -57,4 +62,21 @@ void ADebugModule::OnUnPause_Implementation()
 void ADebugModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
+}
+
+FDebugCategoryState ADebugModule::GetDebugCategoryState(EDebugCategory InCategory) const
+{
+	if(DebugCategoryStates.Contains(InCategory))
+	{
+		return DebugCategoryStates[InCategory];
+	}
+	return FDebugCategoryState();
+}
+
+void ADebugModule::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
+{
+	if(DebugCategoryStates.Contains(InCategory))
+	{
+		DebugCategoryStates[InCategory] = InState;
+	}
 }

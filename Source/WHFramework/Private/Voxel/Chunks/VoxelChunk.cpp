@@ -177,7 +177,10 @@ void AVoxelChunk::Generate(EPhase InPhase)
 			{
 				Iter.Value.OnGenerate();
 			}
-			SpawnActors();
+			GetWorldTimerManager().SetTimerForNextTick([this]()
+			{
+				SpawnActors();
+			});
 			break;
 		}
 		case EPhase::Lesser:

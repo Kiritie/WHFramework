@@ -4,6 +4,7 @@
 
 #include "Ability/Inventory/Inventory.h"
 #include "Ability/Inventory/Slot/InventorySlot.h"
+#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 
 UInventorySkillSlot::UInventorySkillSlot()
 {

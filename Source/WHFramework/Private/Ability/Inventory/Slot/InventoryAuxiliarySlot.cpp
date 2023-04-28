@@ -2,6 +2,7 @@
 
 #include "Ability/Inventory/Slot/InventoryAuxiliarySlot.h"
 #include "Ability/Inventory/Inventory.h"
+#include "Ability/Inventory/InventoryAgentInterface.h"
 #include "Ability/Inventory/Slot/InventorySlot.h"
 
 UInventoryAuxiliarySlot::UInventoryAuxiliarySlot()

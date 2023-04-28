@@ -33,6 +33,21 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
+void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+{
+	AAbilityCharacterBase* SourceCharacter = Cast<AAbilityCharacterBase>(SourceActor);
+	
+	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
+
+	if (DamageValue > 0.f)
+	{
+		if (TargetVitality && !TargetVitality->IsDead())
+		{
+			TargetVitality->HandleDamage(DamageType, DamageValue, false, false, HitResult, SourceTags, SourceActor);
+		}
+	}
+}
+
 UAbilityItemDataBase& FAbilityItemData::GetItemData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
@@ -75,21 +90,6 @@ void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResul
 		NewData->TargetActorArray.Append(TargetActors);
 		// 将目标数据加入列表
 		TargetData.Add(NewData);
-	}
-}
-
-void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
-{
-	AAbilityCharacterBase* SourceCharacter = Cast<AAbilityCharacterBase>(SourceActor);
-	
-	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
-
-	if (DamageValue > 0.f)
-	{
-		if (TargetVitality && !TargetVitality->IsDead())
-		{
-			TargetVitality->HandleDamage(DamageType, DamageValue, false, false, HitResult, SourceTags, SourceActor);
-		}
 	}
 }
 

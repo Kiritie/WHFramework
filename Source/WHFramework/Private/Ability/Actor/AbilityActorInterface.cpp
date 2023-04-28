@@ -11,8 +11,11 @@ void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActo
 	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
 	UAttributeSetBase* AttributeSet = GetAttributeSet();
 
+	InOwnerActor = InOwnerActor ? InOwnerActor : Cast<AActor>(this);
 	if(AbilitySystemComponent->HasBeenInitialized())
-	AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor ? InOwnerActor : Cast<AActor>(this), InAvatarActor ? InAvatarActor : Cast<AActor>(this));
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor, InOwnerActor);
+	}
 	RefreshAttributes();
 
 	for(auto Iter : AttributeSet->GetAllAttributes())

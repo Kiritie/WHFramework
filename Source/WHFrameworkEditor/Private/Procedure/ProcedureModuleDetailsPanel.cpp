@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "ProcedureModuleDetailsPanel.h"
+#include "Procedure/ProcedureModuleDetailsPanel.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Layout/SWrapBox.h"

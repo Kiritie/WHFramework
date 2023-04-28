@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "ProcedureDetailsPanel.h"
+#include "Procedure/ProcedureDetailsPanel.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Layout/SWrapBox.h"
@@ -12,6 +12,7 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "DetailCategoryBuilder.h"
+#include "IDetailGroup.h"
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
@@ -26,38 +27,45 @@ TSharedRef<IDetailCustomization> FProcedureDetailsPanel::MakeInstance() { return
 void FProcedureDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuilder)
 {
 	SelectedObjectsList = DetailLayoutBuilder.GetSelectedObjects();
-
+	
 	IDetailCategoryBuilder& OperationTargetCategory = DetailLayoutBuilder.EditCategory(FName("Operation Target"));
-
+	
 	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, OperationTarget)));
 	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, bTrackTarget)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, TrackTargetMode)));
 
-	TSharedRef<SWrapBox> CameraViewActionBox = SNew(SWrapBox).UseAllottedWidth(true);
-	CameraViewActionBox->AddSlot()
-	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Get Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FProcedureDetailsPanel::OnClickGetCameraViewButton))
-		]
+	TSharedRef<IPropertyHandle> ModuleClassesProperty = DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewPawn));
 
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Paste Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FProcedureDetailsPanel::OnClickPasteCameraViewButton))
-		]
-	];
+	IDetailGroup& CameraViewGroup = OperationTargetCategory.AddGroup(FName("Camera View"), FText::FromString(TEXT("Camera View")), false, false);
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewPawn)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewMode)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewSpace)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewEaseType)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewDuration)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewOffset)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewYaw)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewPitch)));
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewDistance)));
 
-	OperationTargetCategory.AddCustomRow(FText::GetEmpty())
-		.ValueContent()
+	CameraViewGroup.AddWidgetRow()
+		.WholeRowContent()
 		[
-			CameraViewActionBox
+			SNew(SWrapBox)
+			.UseAllottedWidth(true)
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Get Camera View")))
+				.OnClicked_Raw(this, &FProcedureDetailsPanel::OnClickGetCameraViewButton)
+			]
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Paste Camera View")))
+				.OnClicked_Raw(this, &FProcedureDetailsPanel::OnClickPasteCameraViewButton)
+			]
 		];
+
 }
 
 FReply FProcedureDetailsPanel::OnClickGetCameraViewButton()

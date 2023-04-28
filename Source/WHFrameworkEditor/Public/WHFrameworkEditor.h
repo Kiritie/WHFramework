@@ -7,6 +7,7 @@
 
 #include "Modules/ModuleManager.h"
 
+class STaskEditorWidget;
 class SStepEditorWidget;
 class SProcedureEditorWidget;
 class FToolBarBuilder;
@@ -64,4 +65,14 @@ private:
 
 private:
 	TSharedPtr<SStepEditorWidget> StepEditorWidget;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// TaskEditor
+private:
+	void OnClickedTaskEditorButton();
+	
+	TSharedRef<class SDockTab> OnSpawnTaskEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
+
+private:
+	TSharedPtr<STaskEditorWidget> TaskEditorWidget;
 };

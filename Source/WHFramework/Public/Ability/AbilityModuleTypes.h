@@ -204,7 +204,7 @@ public:
 /**
  * 伤害处理类
  */
-UCLASS(Blueprintable, meta = (ShowWorldContextPin))
+UCLASS(Blueprintable)
 class WHFRAMEWORK_API UDamageHandle : public UWHObject
 {
 	GENERATED_BODY()
@@ -293,7 +293,7 @@ public:
 		CooldownRemaining = 0.f;
 	}
 
-	FORCEINLINE bool IsCooldownning()
+	FORCEINLINE bool IsCooldownning() const
 	{
 		return CooldownRemaining > 0.f;
 	}
@@ -948,10 +948,10 @@ public:
 	}
 
 public:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId ID;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;
 		
 	UPROPERTY(BlueprintReadWrite)

@@ -133,7 +133,7 @@ bool UWidgetInventorySlotBase::IsEmpty() const
 
 bool UWidgetInventorySlotBase::IsCooldowning() const
 {
-	if(OwnerSlot) return OwnerSlot->IsMatched() && OwnerSlot->GetAbilityInfo().CooldownRemaining > 0.f;
+	if(OwnerSlot) return OwnerSlot->IsMatched() && OwnerSlot->GetAbilityInfo().IsCooldownning();
 	return false;
 }
 

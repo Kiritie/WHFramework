@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AssetTypeActions_StepBlueprint.h"
+#include "Step/StepBlueprintActions.h"
+
 #include "Misc/MessageDialog.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Step/StepBlueprintFactory.h"
@@ -10,13 +11,13 @@
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"
 
-FAssetTypeActions_StepBlueprint::FAssetTypeActions_StepBlueprint(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
+FStepBlueprintActions::FStepBlueprintActions(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
 
-FText FAssetTypeActions_StepBlueprint::GetName() const { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_StepBlueprint", "Step Blueprint"); }
+FText FStepBlueprintActions::GetName() const { return NSLOCTEXT("AssetTypeActions", "StepBlueprintActions", "Step Blueprint"); }
 
-FColor FAssetTypeActions_StepBlueprint::GetTypeColor() const { return FColor(0, 96, 128); }
+FColor FStepBlueprintActions::GetTypeColor() const { return FColor(0, 96, 128); }
 
-void FAssetTypeActions_StepBlueprint::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
+void FStepBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
 {
 	EToolkitMode::Type Mode = EditWithinLevelEditor.IsValid() ? EToolkitMode::WorldCentric : EToolkitMode::Standalone;
 
@@ -48,7 +49,7 @@ void FAssetTypeActions_StepBlueprint::OpenAssetEditor(const TArray<UObject*>& In
 	}
 }
 
-bool FAssetTypeActions_StepBlueprint::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
+bool FStepBlueprintActions::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
 {
 	return FBlueprintEditorUtils::IsDataOnlyBlueprint(Blueprint)
 		&& !FBlueprintEditorUtils::IsLevelScriptBlueprint(Blueprint)
@@ -57,9 +58,9 @@ bool FAssetTypeActions_StepBlueprint::ShouldUseDataOnlyEditor(const UBlueprint* 
 		&& !Blueprint->bIsNewlyCreated;
 }
 
-UClass* FAssetTypeActions_StepBlueprint::GetSupportedClass() const { return UStepBlueprint::StaticClass(); }
+UClass* FStepBlueprintActions::GetSupportedClass() const { return UStepBlueprint::StaticClass(); }
 
-UFactory* FAssetTypeActions_StepBlueprint::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
+UFactory* FStepBlueprintActions::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
 {
 	UStepBlueprintFactory* StepBlueprintFactory = NewObject<UStepBlueprintFactory>();
 	StepBlueprintFactory->ParentClass = TSubclassOf<UStepBase>(*InBlueprint->GeneratedClass);

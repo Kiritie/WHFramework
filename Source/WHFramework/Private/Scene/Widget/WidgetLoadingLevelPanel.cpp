@@ -5,6 +5,7 @@
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Scene/SceneModuleBPLibrary.h"
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
@@ -58,6 +59,6 @@ void UWidgetLoadingLevelPanel::OnRefresh_Implementation()
 		{
 			TextBlock_Progress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
 		}
-		UE_LOG(LogTemp, Log, TEXT("Load level progress: %f"), CurrentProgress);
+		WHLog(FString::Printf(TEXT("Load level progress: %f"), CurrentProgress));
 	}
 }

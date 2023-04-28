@@ -146,7 +146,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
-	return SpawnPickUp(SaveData.Item, SaveData.Location);
+	return SpawnPickUp(SaveData.Item, SaveData.Location, InContainer);
 }
 
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)

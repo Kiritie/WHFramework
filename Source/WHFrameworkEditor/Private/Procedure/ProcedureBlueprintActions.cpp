@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AssetTypeActions_ProcedureBlueprint.h"
+#include "Procedure/ProcedureBlueprintActions.h"
+
 #include "Misc/MessageDialog.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Procedure/ProcedureBlueprintFactory.h"
@@ -10,13 +11,13 @@
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"
 
-FAssetTypeActions_ProcedureBlueprint::FAssetTypeActions_ProcedureBlueprint(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
+FProcedureBlueprintActions::FProcedureBlueprintActions(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
 
-FText FAssetTypeActions_ProcedureBlueprint::GetName() const { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_ProcedureBlueprint", "Procedure Blueprint"); }
+FText FProcedureBlueprintActions::GetName() const { return NSLOCTEXT("AssetTypeActions", "ProcedureBlueprintActions", "Procedure Blueprint"); }
 
-FColor FAssetTypeActions_ProcedureBlueprint::GetTypeColor() const { return FColor(0, 96, 128); }
+FColor FProcedureBlueprintActions::GetTypeColor() const { return FColor(0, 96, 128); }
 
-void FAssetTypeActions_ProcedureBlueprint::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
+void FProcedureBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
 {
 	EToolkitMode::Type Mode = EditWithinLevelEditor.IsValid() ? EToolkitMode::WorldCentric : EToolkitMode::Standalone;
 
@@ -48,7 +49,7 @@ void FAssetTypeActions_ProcedureBlueprint::OpenAssetEditor(const TArray<UObject*
 	}
 }
 
-bool FAssetTypeActions_ProcedureBlueprint::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
+bool FProcedureBlueprintActions::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
 {
 	return FBlueprintEditorUtils::IsDataOnlyBlueprint(Blueprint)
 		&& !FBlueprintEditorUtils::IsLevelScriptBlueprint(Blueprint)
@@ -57,9 +58,9 @@ bool FAssetTypeActions_ProcedureBlueprint::ShouldUseDataOnlyEditor(const UBluepr
 		&& !Blueprint->bIsNewlyCreated;
 }
 
-UClass* FAssetTypeActions_ProcedureBlueprint::GetSupportedClass() const { return UProcedureBlueprint::StaticClass(); }
+UClass* FProcedureBlueprintActions::GetSupportedClass() const { return UProcedureBlueprint::StaticClass(); }
 
-UFactory* FAssetTypeActions_ProcedureBlueprint::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
+UFactory* FProcedureBlueprintActions::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
 {
 	UProcedureBlueprintFactory* ProcedureBlueprintFactory = NewObject<UProcedureBlueprintFactory>();
 	ProcedureBlueprintFactory->ParentClass = TSubclassOf<UProcedureBase>(*InBlueprint->GeneratedClass);

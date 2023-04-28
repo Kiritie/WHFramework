@@ -166,7 +166,7 @@ public:
 		if(!UserWidgetClassMap.Contains(InWidgetName))
 		{
 			ensureEditor(true);
-			WHLog(WH_Widget, Warning, TEXT("Failed to create user widget. Module does not contain this type: %s"), *InWidgetName.ToString());
+			WHLog(FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InWidgetName.ToString()), EDebugCategory::Widget, EDebugVerbosity::Warning);
 			return nullptr;
 		}
 		
@@ -618,7 +618,7 @@ public:
 		if(!WorldWidgetClassMap.Contains(InWidgetName))
 		{
 			ensureEditor(false);
-			WHLog(WH_Widget, Warning, TEXT("Failed to create world widget. Module does not contain this type: %s"), *InWidgetName.ToString());
+			WHLog(FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InWidgetName.ToString()), EDebugCategory::Widget, EDebugVerbosity::Warning);
 			return nullptr;
 		}
 		

@@ -11,7 +11,7 @@
 /**
  * 
  */
-UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
+UCLASS(Blueprintable, hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
 class WHFRAMEWORK_API UWHObject : public UObject, public IObjectPoolInterface, public IReferencePoolInterface
 {
 	GENERATED_BODY()

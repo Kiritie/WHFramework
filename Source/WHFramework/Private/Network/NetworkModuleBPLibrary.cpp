@@ -3,6 +3,7 @@
 
 #include "Network/NetworkModuleBPLibrary.h"
 
+#include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
@@ -114,7 +115,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFunc(AActor* InActor, FName InFu
 	{
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, nullptr))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -131,7 +132,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncOneParam(AActor* InActor, FN
 	{
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &InParam))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -154,7 +155,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncTwoParam(AActor* InActor, FN
 		
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -178,7 +179,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncThreeParam(AActor* InActor, 
 		
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -203,7 +204,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncFourParam(AActor* InActor, F
 
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -229,7 +230,7 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncFiveParam(AActor* InActor, F
 		
 		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(WH_Network, Log, TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName());
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())

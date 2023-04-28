@@ -3,6 +3,9 @@
 #include "WHFramework.h"
 #include "DebugModuleBPLibrary.h"
 
+// 默认
+DEFINE_LOG_CATEGORY_STATIC(WH_Default, Log, All);
+
 // 编辑器
 DEFINE_LOG_CATEGORY_STATIC(WH_Editor, Log, All);
 
@@ -23,9 +26,6 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Camera, Log, All);
 
 // 角色
 DEFINE_LOG_CATEGORY_STATIC(WH_Character, Log, All);
-
-// 调试
-DEFINE_LOG_CATEGORY_STATIC(WH_Debug, Log, All);
 
 // 事件
 DEFINE_LOG_CATEGORY_STATIC(WH_Event, Log, All);
@@ -66,6 +66,9 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Scene, Log, All);
 // 步骤
 DEFINE_LOG_CATEGORY_STATIC(WH_Step, Log, All);
 
+// 任务
+DEFINE_LOG_CATEGORY_STATIC(WH_Task, Log, All);
+
 // 体素
 DEFINE_LOG_CATEGORY_STATIC(WH_Voxel, Log, All);
 
@@ -86,11 +89,11 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 		FString Expr = #InExpression;\
 		FString File = __FILE__;\
 		int32 Line = __LINE__;\
-		WHLog(LogTemp, Error, TEXT("WHFramework CRASH"));\
-		WHLog(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
+		WH_LOG(LogTemp, Error, TEXT("WHFramework CRASH"));\
+		WH_LOG(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
 		if(InFormat != TEXT("")) \
 		{ \
-			WHLog(LogTemp, Error, InFormat, ##__VA_ARGS__); \
+			WH_LOG(LogTemp, Error, InFormat, ##__VA_ARGS__); \
 		} \
 	} \
 	return false; \
@@ -106,19 +109,34 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 #endif
 
 // 打印
-#define WHLog(CategoryName, Verbosity, Format, ...) \
+#define WH_LOG(CategoryName, Verbosity, Format, ...) \
 { \
 	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
 }
 
 /*
- * 输出调试信息到游戏窗口
+ * 打印日志
  * @param Message 消息内容
+ * @param Category 调试类别
+ * @param Verbosity 调试级别
+ */
+FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log)
+{
+	UDebugModuleBPLibrary::LogMessage(Message, Category, Verbosity);
+}
+
+/*
+ * 输出调试信息
+ * @param Message 调试内容
+ * @param Mode 调试模式
+ * @param Category 调试类别
+ * @param Verbosity 调试级别
  * @param DisplayColor 显示颜色
  * @param Duration 持续时间
+ * @param Key 调试ID
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, EDebugMode DebugMode = EDebugMode::Screen, int32 Key = -1, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
 {
-	UDebugModuleBPLibrary::DebugMessage(Message, DisplayColor, Duration, DebugMode, Key, bNewerOnTop);
+	UDebugModuleBPLibrary::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
 }

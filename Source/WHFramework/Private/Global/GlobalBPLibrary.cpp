@@ -94,6 +94,15 @@ ETraceTypeQuery UGlobalBPLibrary::GetGameTraceChannel(ECollisionChannel InGameTr
 	return UEngineTypes::ConvertToTraceType(InGameTraceType);
 }
 
+int32 UGlobalBPLibrary::GetEnumItemNum(const FString& InEnumName)
+{
+	if(UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	{
+		return EnumPtr->NumEnums();
+	}
+	return 0;
+}
+
 FString UGlobalBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
 	if(UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
@@ -162,7 +171,7 @@ void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, FParameterMap In
 		}
 		else
 		{
-			WHLog(LogTemp,Error,TEXT("%s : Not Found Property : %s"),*InObject->GetName(),*PropName);
+			WHLog(FString::Printf(TEXT("%s : Not Found Property : %s"),*InObject->GetName(),*PropName), EDebugCategory::Default, EDebugVerbosity::Error);
 		}
 	}
 }

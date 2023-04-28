@@ -238,10 +238,10 @@ void USceneModuleBPLibrary::RemovePhysicsVolumeByName(FName InName)
 	}
 }
 
-void USceneModuleBPLibrary::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, AActor* InOwnerActor , USceneComponent* InSceneComp)
+void USceneModuleBPLibrary::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange, AActor* InOwnerActor , USceneComponent* InSceneComp)
 {
 	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
-		SceneModule->SpawnWorldText(InText, InTextColor, InTextStyle, InLocation, InOwnerActor, InSceneComp);
+		SceneModule->SpawnWorldText(InText, InTextColor, InTextStyle, InLocation, InOffsetRange, InOwnerActor, InSceneComp);
 	}
 }

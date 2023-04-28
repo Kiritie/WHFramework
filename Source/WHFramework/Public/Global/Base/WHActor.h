@@ -58,7 +58,7 @@ protected:
 /**
  * 
  */
-UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking))
 class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface, public IReferencePoolInterface
 {
 	GENERATED_BODY()

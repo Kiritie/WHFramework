@@ -28,6 +28,7 @@
 #include "SaveGame/SaveGameModule.h"
 #include "Scene/SceneModule.h"
 #include "Step/StepModule.h"
+#include "Task/TaskModule.h"
 #include "Voxel/VoxelModule.h"
 #include "Widget/WidgetModule.h"
 
@@ -59,6 +60,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(ASaveGameModule::StaticClass());
 	ModuleClasses.Add(ASceneModule::StaticClass());
 	ModuleClasses.Add(AStepModule::StaticClass());
+	ModuleClasses.Add(ATaskModule::StaticClass());
 	ModuleClasses.Add(AVoxelModule::StaticClass());
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());

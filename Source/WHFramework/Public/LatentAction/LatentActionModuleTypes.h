@@ -118,10 +118,6 @@ class WHFRAMEWORK_API FMoveActorToAction : public FPendingLatentAction
 	                	Target->SetActorScale3D(TargetScale);
 	                }
 	            }
-            	
-				// #if WITH_EDITOR
-				// WH_LOG(LogTemp,Log,TEXT("插值变换结束."));
-				// #endif
             }
     		
     		// 如果插值目标存在

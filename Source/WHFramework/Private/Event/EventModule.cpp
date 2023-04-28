@@ -207,7 +207,7 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass
 			{
 				if (EventHandle->Filter(Iter1.Key, Iter2) && UGlobalBPLibrary::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
-					WHLog(WH_Event, Log, TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName());
+					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDebugCategory::Event);
 				}
 			}
 		}

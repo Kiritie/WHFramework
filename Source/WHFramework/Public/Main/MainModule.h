@@ -11,6 +11,10 @@
 UCLASS()
 class WHFRAMEWORK_API AMainModule : public AModuleBase
 {
+#if WITH_EDITOR
+	friend class FMainModuleDetailsPanel;
+#endif
+	
 	GENERATED_BODY()
 	
 	GENERATED_MAIN_MODULE(AMainModule)
@@ -46,10 +50,10 @@ public:
 	/// Modules
 public:	
 #if WITH_EDITOR
-	UFUNCTION(CallInEditor, BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent)
 	void GenerateModules();
     
-	UFUNCTION(CallInEditor, BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent)
 	void DestroyModules();
 #endif
 

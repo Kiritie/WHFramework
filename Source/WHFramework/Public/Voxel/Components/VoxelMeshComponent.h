@@ -50,16 +50,16 @@ public:
 	
 	void CreateVoxel(const FVoxelItem& InVoxelItem);
 
-	void CreateMesh(int InSectionIndex = 0, bool bHasCollider = true);
+	void CreateMesh(int32 InSectionIndex = 0, bool bHasCollider = true);
 
-	void ClearMesh(int InSectionIndex = 0);
+	void ClearMesh(int32 InSectionIndex = 0);
 
 	void ClearData();
 
 private:
 	void BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing);
 
-	void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int InFaceIndex, FVector InNormal);
+	void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal);
 
 public:
 	bool HasData() const;

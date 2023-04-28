@@ -125,7 +125,7 @@ void ALatentActionModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoi
 				}
 				else
 				{
-					WHLog(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WHLog(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"), EDebugCategory::Default, EDebugVerbosity::Warning);
 				}
 			}
 			else if (MoveAction == EMoveActorAction::Stop)
@@ -184,7 +184,7 @@ void ALatentActionModule::RotatorActorTo(AActor* InActor, FRotator InRotator, fl
 				}
 				else
 				{
-					WHLog(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDebugCategory::Default, EDebugVerbosity::Warning);
 				}
 			}
 			
@@ -240,7 +240,7 @@ void ALatentActionModule::ScaleActorTo(AActor* InActor, FVector InScale, float A
 				}
 				else
 				{
-					WHLog(LogTemp, Warning, TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"));
+					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDebugCategory::Default, EDebugVerbosity::Warning);
 				}
 			}
 			

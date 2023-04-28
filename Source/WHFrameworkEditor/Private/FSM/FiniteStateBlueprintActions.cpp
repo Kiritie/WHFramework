@@ -1,22 +1,23 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AssetTypeActions_FiniteStateBlueprint.h"
+#include "FSM/FFiniteStateBlueprintActions.h"
+
 #include "Misc/MessageDialog.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "FSM/FiniteStateBlueprintFactory.h"
-#include "FSM/FinteStateEditor.h"
+#include "FSM/FiniteStateEditor.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "FSM/Base/FiniteStateBlueprint.h"
 
 #define LOCTEXT_NAMESPACE "AssetTypeActions"
 
-FAssetTypeActions_FiniteStateBlueprint::FAssetTypeActions_FiniteStateBlueprint(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
+FFiniteStateBlueprintActions::FFiniteStateBlueprintActions(EAssetTypeCategories::Type InAssetCategory) { AssetCategory = InAssetCategory; }
 
-FText FAssetTypeActions_FiniteStateBlueprint::GetName() const { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_FiniteStateBlueprint", "FiniteState Blueprint"); }
+FText FFiniteStateBlueprintActions::GetName() const { return NSLOCTEXT("AssetTypeActions", "FiniteStateBlueprintActions", "FiniteState Blueprint"); }
 
-FColor FAssetTypeActions_FiniteStateBlueprint::GetTypeColor() const { return FColor(0, 96, 128); }
+FColor FFiniteStateBlueprintActions::GetTypeColor() const { return FColor(0, 96, 128); }
 
-void FAssetTypeActions_FiniteStateBlueprint::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
+void FFiniteStateBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
 {
 	EToolkitMode::Type Mode = EditWithinLevelEditor.IsValid() ? EToolkitMode::WorldCentric : EToolkitMode::Standalone;
 
@@ -48,7 +49,7 @@ void FAssetTypeActions_FiniteStateBlueprint::OpenAssetEditor(const TArray<UObjec
 	}
 }
 
-bool FAssetTypeActions_FiniteStateBlueprint::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
+bool FFiniteStateBlueprintActions::ShouldUseDataOnlyEditor(const UBlueprint* Blueprint) const
 {
 	return FBlueprintEditorUtils::IsDataOnlyBlueprint(Blueprint)
 		&& !FBlueprintEditorUtils::IsLevelScriptBlueprint(Blueprint)
@@ -57,9 +58,9 @@ bool FAssetTypeActions_FiniteStateBlueprint::ShouldUseDataOnlyEditor(const UBlue
 		&& !Blueprint->bIsNewlyCreated;
 }
 
-UClass* FAssetTypeActions_FiniteStateBlueprint::GetSupportedClass() const { return UFiniteStateBlueprint::StaticClass(); }
+UClass* FFiniteStateBlueprintActions::GetSupportedClass() const { return UFiniteStateBlueprint::StaticClass(); }
 
-UFactory* FAssetTypeActions_FiniteStateBlueprint::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
+UFactory* FFiniteStateBlueprintActions::GetFactoryForBlueprintType(UBlueprint* InBlueprint) const
 {
 	UFiniteStateBlueprintFactory* FiniteStateBlueprintFactory = NewObject<UFiniteStateBlueprintFactory>();
 	FiniteStateBlueprintFactory->ParentClass = TSubclassOf<UFiniteStateBase>(*InBlueprint->GeneratedClass);

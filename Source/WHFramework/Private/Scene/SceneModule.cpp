@@ -206,10 +206,10 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-			UE_LOG(LogTemp, Warning, TEXT("Start load level: %s"), *LoadPackagePath);
+			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDebugCategory::Scene);
 			if(Result == EAsyncLoadingResult::Failed)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Load level failed!"));
+				WHLog(TEXT("Load level failed!"));
 			}
 			else if(Result == EAsyncLoadingResult::Succeeded)
 			{
@@ -254,7 +254,7 @@ void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevel
 			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()), FParameter::MakeBoolean(true) };
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Start unload level: %s"), *LoadPackagePath);
+		WHLog(TEXT("Start unload level: ") + LoadPackagePath);
 		if(InFinishDelayTime > 0.f)
 		{
 			FTimerHandle TimerHandle;
@@ -287,7 +287,7 @@ float ASceneModule::GetAsyncUnloadLevelProgress(FName InLevelPath) const
 
 void ASceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Load level Succeeded!"));
+	WHLog(TEXT("Load level Succeeded!"));
 
 	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingLevelPanel>();
 
@@ -300,7 +300,7 @@ void ASceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 
 void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Unload level Succeeded!"));
+	WHLog(TEXT("Unload level Succeeded!"));
 
 	UWidgetModuleBPLibrary::CloseUserWidget<UWidgetLoadingLevelPanel>();
 	
@@ -486,9 +486,13 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 	}
 }
 
-void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, AActor* InOwnerActor, USceneComponent* InSceneComp)
+void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange, AActor* InOwnerActor, USceneComponent* InSceneComp)
 {
 	TArray<FParameter> Parameters = { FParameter::MakeString(InText), FParameter::MakeColor(InTextColor), FParameter::MakeInteger((int32)InTextStyle) };
+	if(InOffsetRange != FVector::ZeroVector)
+	{
+		InLocation = InLocation + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
+	}
 	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(InOwnerActor, InLocation, InSceneComp, &Parameters);
 }
 
