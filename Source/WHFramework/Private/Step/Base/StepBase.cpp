@@ -18,7 +18,7 @@
 
 UStepBase::UStepBase()
 {
-	StepName = FName("StepBase");
+	StepGUID = FGuid::NewGuid().ToString();
 	StepDisplayName = FText::FromString(TEXT("Step Base"));
 	StepDescription = FText::GetEmpty();
 
@@ -93,7 +93,7 @@ void UStepBase::OnUnGenerate()
 
 void UStepBase::OnDuplicate(UStepBase* InNewStep)
 {
-	InNewStep->StepName = StepName;
+	InNewStep->StepGUID = FGuid::NewGuid().ToString();
 	InNewStep->StepDisplayName = StepDisplayName;
 	InNewStep->StepDescription = StepDescription;
 	InNewStep->StepIndex = StepIndex;

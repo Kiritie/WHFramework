@@ -748,6 +748,8 @@ FReply SStepListWidget::OnNewStepItemButtonClicked()
 	const auto Item = MakeShared<FStepListItem>();
 	Item->Step = NewStep;
 
+	StepModule->GetStepMap().Add(NewStep->StepGUID, NewStep);
+
 	if(SelectedStepListItems.Num() > 0)
 	{
 		if(SelectedStepListItems[0]->Step->GetStepType() == EStepType::Standalone)
@@ -796,6 +798,8 @@ FReply SStepListWidget::OnInsertStepItemButtonClicked()
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
 
+		StepModule->GetStepMap().Add(NewStep->StepGUID, NewStep);
+
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
 			SelectedStepListItems[0]->GetParentSubSteps().Insert(NewStep, SelectedStepListItems[0]->Step->StepIndex);
@@ -829,6 +833,8 @@ FReply SStepListWidget::OnAppendStepItemButtonClicked()
 		const auto Item = MakeShared<FStepListItem>();
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
+
+		StepModule->GetStepMap().Add(NewStep->StepGUID, NewStep);
 
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
@@ -867,6 +873,8 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 
 	const auto Item = MakeShared<FStepListItem>();
 	Item->Step = CopiedStep;
+
+	StepModule->GetStepMap().Add(CopiedStep->StepGUID, CopiedStep);
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -917,6 +925,8 @@ FReply SStepListWidget::OnDuplicateStepItemButtonClicked()
 		const auto Item = MakeShared<FStepListItem>();
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
+
+		StepModule->GetStepMap().Add(NewStep->StepGUID, NewStep);
 
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
@@ -970,6 +980,8 @@ FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 	{
 		for(auto Iter : SelectedStepListItems)
 		{
+			StepModule->GetStepMap().Remove(Iter->Step->StepGUID);
+
 			if(Iter->GetParentStep())
 			{
 				Iter->GetParentSubSteps()[Iter->GetStepIndex()]->OnUnGenerate();

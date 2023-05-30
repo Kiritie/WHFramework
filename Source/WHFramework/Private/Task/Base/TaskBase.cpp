@@ -18,7 +18,7 @@
 
 UTaskBase::UTaskBase()
 {
-	TaskName = FName("TaskBase");
+	TaskGUID = FGuid::NewGuid().ToString();
 	TaskDisplayName = FText::FromString(TEXT("Task Base"));
 	TaskDescription = FText::GetEmpty();
 
@@ -28,7 +28,7 @@ UTaskBase::UTaskBase()
 	TaskType = ETaskType::Default;
 	TaskState = ETaskState::None;
 
-	TaskExecuteCondition = ETaskExecuteResult::None;
+	TaskEnterType = ETaskEnterType::Automatic;
 	TaskExecuteResult = ETaskExecuteResult::None;
 
 	TaskExecuteType = ETaskExecuteType::Automatic;
@@ -40,6 +40,8 @@ UTaskBase::UTaskBase()
 	TaskCompleteType = ETaskCompleteType::Procedure;
 	AutoCompleteTaskTime = 0.f;
 	TaskGuideType = ETaskGuideType::None;
+	
+	bTaskSkipAble = false;
 
 	CurrentSubTaskIndex = -1;
 
@@ -76,16 +78,17 @@ void UTaskBase::OnUnGenerate()
 
 void UTaskBase::OnDuplicate(UTaskBase* InNewTask)
 {
-	InNewTask->TaskName = TaskName;
+	InNewTask->TaskGUID = FGuid::NewGuid().ToString();
 	InNewTask->TaskDisplayName = TaskDisplayName;
 	InNewTask->TaskDescription = TaskDescription;
 	InNewTask->TaskIndex = TaskIndex;
 	InNewTask->TaskHierarchy = TaskHierarchy;
-	InNewTask->TaskExecuteCondition = TaskExecuteCondition;
+	InNewTask->TaskEnterType = TaskEnterType;
 	InNewTask->TaskExecuteType = TaskExecuteType;
 	InNewTask->AutoExecuteTaskTime = AutoExecuteTaskTime;
 	InNewTask->TaskCompleteType = TaskCompleteType;
 	InNewTask->AutoCompleteTaskTime = AutoCompleteTaskTime;
+	InNewTask->bTaskSkipAble = bTaskSkipAble;
 	InNewTask->TaskLeaveType = TaskLeaveType;
 	InNewTask->AutoLeaveTaskTime = AutoLeaveTaskTime;
 	InNewTask->TaskGuideType = TaskGuideType;
@@ -203,14 +206,10 @@ void UTaskBase::OnRefresh()
 				UTaskBase* SubTask = SubTasks[Index];
 				if(SubTask)
 				{
-					if(SubTask->CheckTaskCondition(GetCurrentSubTask()))
+					FString FailedStr;
+					if(SubTask->TaskEnterType == ETaskEnterType::Automatic && SubTask->CheckTaskCondition(FailedStr))
 					{
 						SubTask->Enter();
-					}
-					else
-					{
-						SubTask->Complete(ETaskExecuteResult::Skipped);
-						CurrentSubTaskIndex++;
 					}
 				}
 			}
@@ -252,7 +251,7 @@ void UTaskBase::OnExecute()
 
 	if(TaskState != ETaskState::Completed)
 	{
-		switch(GetTaskCompleteType())
+		switch(TaskCompleteType)
 		{
 			case ETaskCompleteType::Automatic:
 			{
@@ -293,7 +292,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
 
-	if(GetTaskLeaveType() == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
+	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
 		if(TaskExecuteResult != ETaskExecuteResult::Skipped && AutoLeaveTaskTime > 0.f)
 		{
@@ -341,59 +340,19 @@ bool UTaskBase::IsCompleted(bool bCheckSubs) const
 	return (TaskState == ETaskState::Completed || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
 }
 
-bool UTaskBase::IsSkipAble_Implementation() const
+bool UTaskBase::CheckTaskCondition_Implementation(FString& OutInfo) const
 {
 	return true;
 }
 
-bool UTaskBase::CheckTaskCondition(UTaskBase* InTask) const
+bool UTaskBase::CheckTaskSkipAble_Implementation(FString& OutInfo) const
 {
-	return TaskExecuteCondition == ETaskExecuteResult::None || !InTask || InTask->TaskExecuteResult == TaskExecuteCondition;
+	return bTaskSkipAble;
 }
 
-ETaskExecuteType UTaskBase::GetTaskExecuteType() const
+float UTaskBase::CheckTaskProgress_Implementation(FString& OutInfo) const
 {
-	if(!HasSubTask(false))
-	{
-		if(ATaskModule* TaskModule = ATaskModule::Get())
-		{
-			if(TaskModule->GetGlobalTaskExecuteType() != ETaskExecuteType::None)
-			{
-				return TaskModule->GetGlobalTaskExecuteType();
-			}
-		}
-	}
-	return TaskExecuteType;
-}
-
-ETaskLeaveType UTaskBase::GetTaskLeaveType() const
-{
-	if(!HasSubTask(false))
-	{
-		if(ATaskModule* TaskModule = ATaskModule::Get())
-		{
-			if(TaskModule->GetGlobalTaskLeaveType() != ETaskLeaveType::None)
-			{
-				return TaskModule->GetGlobalTaskLeaveType();
-			}
-		}
-	}
-	return TaskLeaveType;
-}
-
-ETaskCompleteType UTaskBase::GetTaskCompleteType() const
-{
-	if(!HasSubTask(false))
-	{
-		if(ATaskModule* TaskModule = ATaskModule::Get())
-		{
-			if(TaskModule->GetGlobalTaskCompleteType() != ETaskCompleteType::None)
-			{
-				return TaskModule->GetGlobalTaskCompleteType();
-			}
-		}
-	}
-	return TaskCompleteType;
+	return 0.f;
 }
 
 bool UTaskBase::IsParentOf(UTaskBase* InTask) const
@@ -439,6 +398,16 @@ void UTaskBase::Complete(ETaskExecuteResult InTaskExecuteResult)
 void UTaskBase::Leave()
 {
 	UTaskModuleBPLibrary::LeaveTask(this);
+}
+
+FText UTaskBase::GetTaskDisplayName(bool bContainCompleteState) const
+{
+	FString StateStr;
+	if(bContainCompleteState)
+	{
+		CheckTaskProgress(StateStr);
+	}
+	return FText::FromString(TaskDisplayName.ToString() + (!StateStr.IsEmpty() ? FString::Printf(TEXT("(%s)"), *StateStr) : TEXT("")));
 }
 
 bool UTaskBase::HasSubTask(bool bIgnoreMerge) const

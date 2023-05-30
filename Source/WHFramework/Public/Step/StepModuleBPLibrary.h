@@ -26,6 +26,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "StepModuleBPLibrary")
 	static URootStepBase* GetCurrentRootStep();
 
+	UFUNCTION(BlueprintPure, Category = "StepModuleBPLibrary")
+	static UStepBase* GetStepByGUID(const FString& InStepGUID);
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "StepModuleBPLibrary")
 	static void StartStep(int32 InRootStepIndex = -1, bool bSkipSteps = false);

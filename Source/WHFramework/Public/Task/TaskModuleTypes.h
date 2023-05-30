@@ -30,8 +30,15 @@ enum class ETaskExecuteType : uint8
 {
 	None,
 	Automatic,
-	Procedure,
-	MouseClick
+	Procedure
+};
+
+UENUM(BlueprintType)
+enum class ETaskEnterType : uint8
+{
+	None,
+	Automatic,
+	Procedure
 };
 
 UENUM(BlueprintType)

@@ -26,13 +26,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "TaskModuleBPLibrary")
 	static URootTaskBase* GetCurrentRootTask();
 
+	UFUNCTION(BlueprintPure, Category = "TaskModuleBPLibrary")
+	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
+
 public:
-	UFUNCTION(BlueprintCallable, Category = "TaskModuleBPLibrary")
-	static void StartTask(int32 InRootTaskIndex = -1, bool bSkipTasks = false);
-
-	UFUNCTION(BlueprintCallable, Category = "TaskModuleBPLibrary")
-	static void EndTask(bool bRestoreTasks = false);
-
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleBPLibrary")
 	static void RestoreTask(UTaskBase* InTask);
 

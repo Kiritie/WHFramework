@@ -256,6 +256,7 @@ void AStepModule::RestoreStep(UStepBase* InStep)
 
 void AStepModule::EnterStep(UStepBase* InStep)
 {
+	
 	if(InStep->ParentStep && !InStep->ParentStep->IsEntered())
 	{
 		InStep->ParentStep->CurrentSubStepIndex = InStep->StepIndex - 1;

@@ -140,9 +140,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description
 public:
-	/// 任务名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FName TaskName;
+	/// 任务GUID
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FString TaskGUID;
 	/// 任务显示名称
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FText TaskDisplayName;
@@ -150,6 +150,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
 	FText TaskDescription;
 
+public:
+	UFUNCTION(BlueprintPure)
+	FText GetTaskDisplayName(bool bContainCompleteState = false) const;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Index/Type/State
 public:
@@ -193,18 +197,13 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
-	/**
-	* 能否跳过
-	*/
-	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
-	bool IsSkipAble() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
 public:
-	/// 任务执行条件
+	/// 任务进入方式
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
-	ETaskExecuteResult TaskExecuteCondition;
+	ETaskEnterType TaskEnterType;
 	/// 任务执行结果
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	ETaskExecuteResult TaskExecuteResult;
@@ -220,6 +219,9 @@ public:
 	/// 自动完成任务时间
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
 	float AutoCompleteTaskTime;
+	/// 能否跳过任务
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
+	bool bTaskSkipAble;
 	/// 任务离开方式
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	ETaskLeaveType TaskLeaveType;
@@ -238,19 +240,20 @@ protected:
 	
 public:
 	/**
-	* 检测任务执行条件
+	* 检测任务先决条件
 	*/
-	UFUNCTION(BlueprintPure)
-	bool CheckTaskCondition(UTaskBase* InTask) const;
-	
-	UFUNCTION(BlueprintPure)
-	ETaskExecuteType GetTaskExecuteType() const;
-
-	UFUNCTION(BlueprintPure)
-	ETaskLeaveType GetTaskLeaveType() const;
-
-	UFUNCTION(BlueprintPure)
-	ETaskCompleteType GetTaskCompleteType() const;
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool CheckTaskCondition(FString& OutInfo) const;
+	/**
+	* 检测任务能否跳过
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool CheckTaskSkipAble(FString& OutInfo) const;
+	/**
+	* 检测任务完成进度
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	float CheckTaskProgress(FString& OutInfo) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ParentTask

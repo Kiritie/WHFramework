@@ -10,7 +10,6 @@
 
 URootStepBase::URootStepBase()
 {
-	StepName = FName("RootStepBase");
 	StepDisplayName = FText::FromString(TEXT("Root Step Base"));
 
 	StepType = EStepType::Root;

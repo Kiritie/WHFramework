@@ -2,6 +2,9 @@
 
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
+#include "Event/EventModuleBPLibrary.h"
+#include "Event/Handle/Voxel/EventHandle_DestroyVoxel.h"
+#include "Event/Handle/Voxel/EventHandle_GenerateVoxel.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -29,7 +32,11 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	FHitResult HitResult;
 	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, IgnoreActors, HitResult))
 	{
-		return Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this);
+		if(Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this))
+		{
+			UEventModuleBPLibrary::BroadcastEvent<UEventHandle_GenerateVoxel>(EEventNetType::Single, Cast<UObject>(this), { FParameter::MakePointer(&VoxelItem) });
+			return true;
+		}
 	}
 	return false;
 }
@@ -37,6 +44,11 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	AVoxelChunk* Chunk = InVoxelHitResult.GetChunk();
-	const FVoxelItem& VoxelItem = InVoxelHitResult.VoxelItem;
-	return Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this);
+	FVoxelItem VoxelItem = InVoxelHitResult.VoxelItem;
+	if(Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this))
+	{
+		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_DestroyVoxel>(EEventNetType::Single, Cast<UObject>(this), { FParameter::MakePointer(&VoxelItem) });
+		return true;
+	}
+	return false;
 }

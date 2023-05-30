@@ -5,6 +5,7 @@
 #include "WHFramework.h"
 
 #include "TaskModuleTypes.h"
+#include "Base/TaskBase.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "TaskModule.generated.h"
@@ -15,15 +16,6 @@ class URootTaskBase;
 /**
  * 
  */
-
-UENUM(BlueprintType)
-enum class ETaskModuleState : uint8
-{
-	None,
-	Running,
-	Paused,
-	Ended
-};
 
 UCLASS()
 class WHFRAMEWORK_API ATaskModule : public AModuleBase
@@ -62,28 +54,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskModule
 protected:
-	/// 自动开始初始任务
+	/// 自动进入初始任务
 	UPROPERTY(EditAnywhere, Category = "TaskModule")
-	bool bAutoStartFirst;
-	
-	/// 任务模块状态
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule")
-	ETaskModuleState TaskModuleState;
+	bool bAutoEnterFirst;
 
 public:
-	/**
-	* 获取任务模块状态
-	*/
-	UFUNCTION(BlueprintPure)
-	ETaskModuleState GetTaskModuleState() const { return TaskModuleState; }
-
-public:
-	UFUNCTION(BlueprintCallable)
-	void StartTask(int32 InRootTaskIndex = -1, bool bSkipTasks = false);
-
-	UFUNCTION(BlueprintCallable)
-	void EndTask(bool bRestoreTasks = false);
-
 	UFUNCTION(BlueprintCallable)
 	void RestoreTask(UTaskBase* InTask);
 
@@ -126,26 +101,20 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Root Task
 protected:
-	/// 当前根任务索引
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Root Tasks")
-	int32 CurrentRootTaskIndex;
 	/// 根任务
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Root Tasks")
 	TArray<URootTaskBase*> RootTasks;
 
 public:
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentRootTaskIndex() const { return CurrentRootTaskIndex; }
-
 	/**
 	* 获取当前根任务
 	*/
 	UFUNCTION(BlueprintPure)
 	URootTaskBase* GetCurrentRootTask() const
 	{
-		if(RootTasks.IsValidIndex(CurrentRootTaskIndex))
+		if(CurrentTask)
 		{
-			return RootTasks[CurrentRootTaskIndex];
+			return CurrentTask->RootTask;
 		}
 		return nullptr;
 	}
@@ -163,6 +132,10 @@ protected:
 	/// 当前任务 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "TaskModule|Task Stats")
 	UTaskBase* CurrentTask;
+	
+	/// 任务Map
+	UPROPERTY(VisibleAnywhere, Transient, Category = "TaskModule|Task Stats")
+	TMap<FString, UTaskBase*> TaskMap;
 
 public:
 	/**
@@ -180,36 +153,14 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UTaskBase* GetCurrentTask() const { return CurrentTask; }
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Global Options
-protected:
-	/// 任务执行方式
-	UPROPERTY(EditAnywhere, Category = "TaskModule|Global Options")
-	ETaskExecuteType GlobalTaskExecuteType;
-	/// 任务完成方式
-	UPROPERTY(EditAnywhere, Category = "TaskModule|Global Options")
-	ETaskCompleteType GlobalTaskCompleteType;
-	/// 任务离开方式
-	UPROPERTY(EditAnywhere, Category = "TaskModule|Global Options")
-	ETaskLeaveType GlobalTaskLeaveType;
-
-public:
+	/**
+	* 获取任务Map
+	*/
 	UFUNCTION(BlueprintPure)
-	ETaskExecuteType GetGlobalTaskExecuteType() const { return GlobalTaskExecuteType; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetGlobalTaskExecuteType(ETaskExecuteType InGlobalTaskExecuteType);
-
+	TMap<FString, UTaskBase*>& GetTaskMap() { return TaskMap; }
+	/**
+	* 通过GUID获取任务
+	*/
 	UFUNCTION(BlueprintPure)
-	ETaskCompleteType GetGlobalTaskCompleteType() const { return GlobalTaskCompleteType; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetGlobalTaskCompleteType(ETaskCompleteType InGlobalTaskCompleteType);
-
-	UFUNCTION(BlueprintPure)
-	ETaskLeaveType GetGlobalTaskLeaveType() const { return GlobalTaskLeaveType; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetGlobalTaskLeaveType(ETaskLeaveType InGlobalTaskLeaveType);
+	UTaskBase* GetTaskByGUID(const FString& InTaskGUID) const { return *TaskMap.Find(InTaskGUID); }
 };

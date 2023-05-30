@@ -13,8 +13,6 @@
 #include "Character/CharacterModuleTypes.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
-#include "Event/Handle/Task/EventHandle_EndTask.h"
-#include "Event/Handle/Task/EventHandle_StartTask.h"
 #include "Network/NetworkModuleBPLibrary.h"
 #include "Task/TaskModuleBPLibrary.h"
 #include "Task/TaskModuleNetworkComponent.h"
@@ -28,18 +26,13 @@ ATaskModule::ATaskModule()
 {
 	ModuleName = FName("TaskModule");
 
-	bAutoStartFirst = false;
+	bAutoEnterFirst = false;
 
-	CurrentRootTaskIndex = -1;
 	RootTasks = TArray<URootTaskBase*>();
 
 	FirstTask = nullptr;
 	CurrentTask = nullptr;
-	TaskModuleState = ETaskModuleState::None;
-
-	GlobalTaskExecuteType = ETaskExecuteType::None;
-	GlobalTaskLeaveType = ETaskLeaveType::None;
-	GlobalTaskCompleteType = ETaskCompleteType::None;
+	TaskMap = TMap<FString, UTaskBase*>();
 }
 
 ATaskModule::~ATaskModule()
@@ -82,9 +75,9 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final && bAutoStartFirst)
+	if(InPhase == EPhase::Final && bAutoEnterFirst)
 	{
-		StartTask(-1, true);
+		EnterTask(FirstTask);
 	}
 }
 
@@ -92,38 +85,35 @@ void ATaskModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if(TaskModuleState == ETaskModuleState::Running)
+	if(CurrentTask)
 	{
-		if(CurrentTask)
+		if(!CurrentTask->IsA<URootTaskBase>())
 		{
-			if(!CurrentTask->IsA<URootTaskBase>())
+			if(CurrentTask->GetTaskState() != ETaskState::Leaved)
 			{
-				if(CurrentTask->GetTaskState() != ETaskState::Leaved)
+				CurrentTask->Refresh();
+			}
+			else if(CurrentTask->ParentTask)
+			{
+				if(CurrentTask->ParentTask->GetTaskState() != ETaskState::Leaved)
 				{
-					CurrentTask->Refresh();
+					CurrentTask->ParentTask->Refresh();
 				}
-				else if(CurrentTask->ParentTask)
+				else if(CurrentTask->ParentTask->IsA<URootTaskBase>() && RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
 				{
-					if(CurrentTask->ParentTask->GetTaskState() != ETaskState::Leaved)
-					{
-						CurrentTask->ParentTask->Refresh();
-					}
-					else if(CurrentTask->ParentTask->IsA<URootTaskBase>())
-					{
-						StartTask(CurrentTask->ParentTask->TaskIndex + 1, false);
-					}
+					EnterTask(RootTasks[CurrentTask->ParentTask->TaskIndex + 1]);
 				}
 			}
-			else
+		}
+		else
+		{
+			if(CurrentTask->GetTaskState() != ETaskState::Leaved)
 			{
-				if(CurrentTask->GetTaskState() != ETaskState::Leaved)
-				{
-					CurrentTask->Refresh();
-				}
-				else
-				{
-					StartTask(CurrentTask->TaskIndex + 1, false);
-				}
+				CurrentTask->Refresh();
+			}
+			else if(RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
+			{
+				EnterTask(RootTasks[CurrentTask->ParentTask->TaskIndex + 1]);
 			}
 		}
 	}
@@ -142,108 +132,6 @@ void ATaskModule::OnUnPause_Implementation()
 void ATaskModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
-
-	EndTask();
-}
-
-void ATaskModule::StartTask(int32 InRootTaskIndex, bool bSkipTasks)
-{
-	InRootTaskIndex = InRootTaskIndex != -1 ? InRootTaskIndex : FirstTask && FirstTask->IsA<URootTaskBase>() ? FirstTask->TaskIndex : -1;
-	if(InRootTaskIndex != -1)
-	{
-		if(RootTasks.IsValidIndex(InRootTaskIndex))
-		{
-			if(TaskModuleState != ETaskModuleState::Running)
-			{
-				TaskModuleState = ETaskModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeInteger(InRootTaskIndex)});
-			}
-
-            for(int32 i = CurrentRootTaskIndex; i <= InRootTaskIndex; i++)
-            {
-            	if(RootTasks.IsValidIndex(i) && RootTasks[i])
-            	{
-            		if(i == InRootTaskIndex)
-            		{
-            			RootTasks[i]->Enter();
-            		}
-            		else if(bSkipTasks)
-            		{
-            			RootTasks[i]->Complete(ETaskExecuteResult::Skipped);
-            		}
-            	}
-            }
-            CurrentRootTaskIndex = InRootTaskIndex;
-		}
-	}
-	else if(FirstTask)
-	{
-		InRootTaskIndex = FirstTask->RootTask->TaskIndex;
-		
-		if(RootTasks.IsValidIndex(InRootTaskIndex))
-		{
-			if(TaskModuleState != ETaskModuleState::Running)
-			{
-				TaskModuleState = ETaskModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeInteger(InRootTaskIndex)});
-			}
-		
-			if(bSkipTasks)
-			{
-				for(int32 i = CurrentRootTaskIndex; i <= InRootTaskIndex; i++)
-				{
-					if(RootTasks.IsValidIndex(i) && RootTasks[i])
-					{
-						if(i == InRootTaskIndex)
-						{
-							RootTasks[i]->Enter();
-							RootTasks[i]->Execute();
-							for(int32 j = 0; j < FirstTask->TaskIndex; j++)
-							{
-								FirstTask->ParentTask->SubTasks[j]->Complete(ETaskExecuteResult::Skipped);
-							}
-						}
-						else
-						{
-							RootTasks[i]->Complete(ETaskExecuteResult::Skipped);
-						}
-					}
-				}
-			}
-			FirstTask->Enter();
-		
-			CurrentRootTaskIndex = InRootTaskIndex;
-		}
-	}
-}
-
-void ATaskModule::EndTask(bool bRestoreTasks)
-{
-	if(TaskModuleState == ETaskModuleState::Running)
-	{
-		TaskModuleState = ETaskModuleState::Ended;
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_EndTask>(EEventNetType::Single, this);
-	}
-
-	for(int32 i = CurrentRootTaskIndex; i >= 0; i--)
-	{
-		if(RootTasks.IsValidIndex(i) && RootTasks[i])
-		{
-			if(i == CurrentRootTaskIndex)
-			{
-				RootTasks[i]->Complete(ETaskExecuteResult::Skipped);
-			}
-			if(bRestoreTasks)
-			{
-				RootTasks[i]->Restore();
-			}
-		}
-	}
-	if(bRestoreTasks)
-	{
-		CurrentRootTaskIndex = -1;
-		CurrentTask = nullptr;
-	}
 }
 
 void ATaskModule::RestoreTask(UTaskBase* InTask)
@@ -256,6 +144,8 @@ void ATaskModule::RestoreTask(UTaskBase* InTask)
 
 void ATaskModule::EnterTask(UTaskBase* InTask)
 {
+	if(!InTask || InTask->TaskEnterType == ETaskEnterType::None) return;
+	
 	if(InTask->ParentTask && !InTask->ParentTask->IsEntered())
 	{
 		InTask->ParentTask->CurrentSubTaskIndex = InTask->TaskIndex - 1;
@@ -269,11 +159,6 @@ void ATaskModule::EnterTask(UTaskBase* InTask)
 			CurrentTask->Leave();
 		}
 		InTask->OnEnter(CurrentTask);
-
-		if(InTask->IsA<URootTaskBase>())
-		{
-			CurrentRootTaskIndex = InTask->TaskIndex;
-		}
 
 		CurrentTask = InTask;
 	}
@@ -309,7 +194,10 @@ void ATaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 	
 	if(!InTask->IsCompleted())
 	{
-		InTask->OnComplete(InTaskExecuteResult);
+		GetWorldTimerManager().SetTimerForNextTick([=]()
+		{
+			InTask->OnComplete(InTaskExecuteResult);
+		});
 	}
 	for(auto Iter : InTask->SubTasks)
 	{
@@ -328,13 +216,6 @@ void ATaskModule::LeaveTask(UTaskBase* InTask)
 	if(InTask->GetTaskState() != ETaskState::Leaved)
 	{
 		InTask->OnLeave();
-		if(InTask->IsA<URootTaskBase>())
-		{
-			if(InTask->TaskIndex == RootTasks.Num() - 1)
-			{
-				EndTask();
-			}
-		}
 	}
 }
 
@@ -398,39 +279,3 @@ void ATaskModule::SetRootTaskItem(int32 InIndex, URootTaskBase* InRootTask)
 	}
 }
 #endif
-
-void ATaskModule::SetGlobalTaskExecuteType(ETaskExecuteType InGlobalTaskExecuteType)
-{
-	if(GlobalTaskExecuteType != InGlobalTaskExecuteType)
-	{
-		GlobalTaskExecuteType = InGlobalTaskExecuteType;
-		if(CurrentTask && CurrentTask->GetTaskExecuteType() == ETaskExecuteType::Automatic && CurrentTask->GetTaskState() == ETaskState::Entered)
-		{
-			CurrentTask->Execute();
-		}
-	}
-}
-
-void ATaskModule::SetGlobalTaskCompleteType(ETaskCompleteType InGlobalTaskCompleteType)
-{
-	if(GlobalTaskCompleteType != InGlobalTaskCompleteType)
-	{
-		GlobalTaskCompleteType = InGlobalTaskCompleteType;
-		if(CurrentTask && CurrentTask->GetTaskCompleteType() == ETaskCompleteType::Automatic && CurrentTask->GetTaskState() == ETaskState::Executing)
-		{
-			CurrentTask->Complete();
-		}
-	}
-}
-
-void ATaskModule::SetGlobalTaskLeaveType(ETaskLeaveType InGlobalTaskLeaveType)
-{
-	if(GlobalTaskLeaveType != InGlobalTaskLeaveType)
-	{
-		GlobalTaskLeaveType = InGlobalTaskLeaveType;
-		if(CurrentTask && CurrentTask->GetTaskLeaveType() == ETaskLeaveType::Automatic && CurrentTask->GetTaskState() == ETaskState::Completed)
-		{
-			CurrentTask->Leave();
-		}
-	}
-}

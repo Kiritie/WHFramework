@@ -10,7 +10,6 @@
 
 URootTaskBase::URootTaskBase()
 {
-	TaskName = FName("RootTaskBase");
 	TaskDisplayName = FText::FromString(TEXT("Root Task Base"));
 
 	TaskType = ETaskType::Root;

@@ -4,24 +4,27 @@
 
 #include "WHFramework.h"
 #include "Event/Handle/EventHandleBase.h"
+#include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
+#include "Voxel/VoxelModuleTypes.h"
 
-#include "EventHandle_EndTask.generated.h"
+#include "EventHandle_GenerateVoxel.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_EndTask : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_GenerateVoxel : public UEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_EndTask();
-	
-public:
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	UEventHandle_GenerateVoxel();
 
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FVoxelItem VoxelItem;
+	
 public:
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 };

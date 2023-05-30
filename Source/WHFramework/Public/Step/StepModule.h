@@ -163,6 +163,10 @@ protected:
 	/// 当前步骤 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "StepModule|Step Stats")
 	UStepBase* CurrentStep;
+	
+	/// 步骤Map
+	UPROPERTY(VisibleAnywhere, Transient, Category = "StepModule|Step Stats")
+	TMap<FString, UStepBase*> StepMap;
 
 public:
 	/**
@@ -180,6 +184,16 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UStepBase* GetCurrentStep() const { return CurrentStep; }
+	/**
+	* 获取步骤Map
+	*/
+	UFUNCTION(BlueprintPure)
+	TMap<FString, UStepBase*>& GetStepMap() { return StepMap; }
+	/**
+	* 通过GUID获取步骤
+	*/
+	UFUNCTION(BlueprintPure)
+	UStepBase* GetStepByGUID(const FString& InStepGUID) const { return *StepMap.Find(InStepGUID); }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Global Options

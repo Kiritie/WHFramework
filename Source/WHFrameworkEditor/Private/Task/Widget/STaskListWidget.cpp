@@ -748,6 +748,8 @@ FReply STaskListWidget::OnNewTaskItemButtonClicked()
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = NewTask;
 
+	TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+
 	if(SelectedTaskListItems.Num() > 0)
 	{
 		if(SelectedTaskListItems[0]->Task->GetTaskType() == ETaskType::Standalone)
@@ -796,6 +798,8 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
 
+		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
 			SelectedTaskListItems[0]->GetParentSubTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
@@ -829,6 +833,8 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 		const auto Item = MakeShared<FTaskListItem>();
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
+
+		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -867,6 +873,8 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = CopiedTask;
+
+	TaskModule->GetTaskMap().Add(CopiedTask->TaskGUID, CopiedTask);
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -917,6 +925,8 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 		const auto Item = MakeShared<FTaskListItem>();
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
+
+		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -970,6 +980,8 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 	{
 		for(auto Iter : SelectedTaskListItems)
 		{
+			TaskModule->GetTaskMap().Remove(Iter->Task->TaskGUID);
+
 			if(Iter->GetParentTask())
 			{
 				Iter->GetParentSubTasks()[Iter->GetTaskIndex()]->OnUnGenerate();

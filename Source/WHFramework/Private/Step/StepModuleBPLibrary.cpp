@@ -28,6 +28,15 @@ URootStepBase* UStepModuleBPLibrary::GetCurrentRootStep()
 	return nullptr;
 }
 
+UStepBase* UStepModuleBPLibrary::GetStepByGUID(const FString& InStepGUID)
+{
+	if(AStepModule* StepModule = AStepModule::Get())
+	{
+		return StepModule->GetStepByGUID(InStepGUID);
+	}
+	return nullptr;
+}
+
 void UStepModuleBPLibrary::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
 	if(AStepModule* StepModule = AStepModule::Get())

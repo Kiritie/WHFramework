@@ -141,8 +141,8 @@ public:
 	/// Name/Description
 public:
 	/// 步骤名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FName StepName;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Name/Description")
+	FString StepGUID;
 	/// 步骤显示名称
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
 	FText StepDisplayName;

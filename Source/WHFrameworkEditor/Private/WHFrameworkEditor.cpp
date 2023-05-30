@@ -14,7 +14,7 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_BeginPlay.h"
 #include "Event/Handle/Global/EventHandle_EndPlay.h"
-#include "FSM/FFiniteStateBlueprintActions.h"
+#include "FSM/FiniteStateBlueprintActions.h"
 #include "FSM/FSMComponentDetailsPanel.h"
 #include "Global/GlobalTypes.h"
 #include "Kismet/GameplayStatics.h"

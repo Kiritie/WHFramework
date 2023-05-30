@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "FSM/FFiniteStateBlueprintActions.h"
+#include "FSM/FiniteStateBlueprintActions.h"
 
 #include "Misc/MessageDialog.h"
 #include "Kismet2/BlueprintEditorUtils.h"

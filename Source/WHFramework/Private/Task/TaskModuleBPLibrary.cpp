@@ -28,20 +28,13 @@ URootTaskBase* UTaskModuleBPLibrary::GetCurrentRootTask()
 	return nullptr;
 }
 
-void UTaskModuleBPLibrary::StartTask(int32 InRootTaskIndex, bool bSkipTasks)
+UTaskBase* UTaskModuleBPLibrary::GetTaskByGUID(const FString& InTaskGUID)
 {
 	if(ATaskModule* TaskModule = ATaskModule::Get())
 	{
-		TaskModule->StartTask(InRootTaskIndex, bSkipTasks);
+		return TaskModule->GetTaskByGUID(InTaskGUID);
 	}
-}
-
-void UTaskModuleBPLibrary::EndTask(bool bRestoreTasks)
-{
-	if(ATaskModule* TaskModule = ATaskModule::Get())
-	{
-		TaskModule->EndTask(bRestoreTasks);
-	}
+	return nullptr;
 }
 
 void UTaskModuleBPLibrary::RestoreTask(UTaskBase* InTask)
