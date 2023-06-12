@@ -4,6 +4,7 @@
 
 #include "WHFramework.h"
 #include "UObject/UObjectGlobals.h"
+#include "Main/MainModuleBPLibrary.h"
 
 #define GENERATED_MAIN_MODULE(ModuleClass) \
 protected: \

@@ -4,7 +4,6 @@
 
 #include "WHFramework.h"
 
-#include "MainModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 
 #include "MainModuleBPLibrary.generated.h"

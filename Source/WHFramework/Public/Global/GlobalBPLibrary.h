@@ -11,7 +11,7 @@
 #include "Parameter/ParameterModuleTypes.h"
 #include "Dom/JsonObject.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Main/MainModule.h"
 
 #include "GlobalBPLibrary.generated.h"
 
@@ -249,7 +249,7 @@ public:
 	template<class T>
 	static T* GetGameInstance()
 	{
-		return Cast<T>(UGameplayStatics::GetGameInstance(UMainModuleBPLibrary::GetMainModule()));
+		return Cast<T>(UGameplayStatics::GetGameInstance(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameInstance", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
@@ -257,7 +257,7 @@ public:
 	template<class T>
 	static T* GetGameMode()
 	{
-		return Cast<T>(UGameplayStatics::GetGameMode(UMainModuleBPLibrary::GetMainModule()));
+		return Cast<T>(UGameplayStatics::GetGameMode(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
@@ -265,7 +265,7 @@ public:
 	template<class T>
 	static T* GetGameState()
 	{
-		return Cast<T>(UGameplayStatics::GetGameState(UMainModuleBPLibrary::GetMainModule()));
+		return Cast<T>(UGameplayStatics::GetGameState(AMainModule::Get()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
@@ -273,7 +273,7 @@ public:
 	template<class T>
 	static T* GetPlayerController(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerController(UMainModuleBPLibrary::GetMainModule(), InPlayerIndex));
+		return Cast<T>(UGameplayStatics::GetPlayerController(AMainModule::Get(), InPlayerIndex));
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
@@ -282,7 +282,7 @@ public:
 	template<class T>
 	static T* GetPlayerControllerByID(int32 InPlayerID = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(UMainModuleBPLibrary::GetMainModule(), InPlayerID));
+		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHPlayerController* GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerID = 0);
