@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Base/ModuleNetworkComponent.h"
 #include "Base/ModuleBase.h"
 

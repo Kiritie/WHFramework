@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Components/ArrowComponent.h"
 #include "Media/MediaPlayer/MediaPlayerBase.h"

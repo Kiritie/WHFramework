@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "ParameterModuleTypes.h"
 #include "UObject/Interface.h"

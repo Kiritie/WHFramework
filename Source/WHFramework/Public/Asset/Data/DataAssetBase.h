@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Engine/DataAsset.h"
 #include "Dom/JsonObject.h"
 #include "DataAssetBase.generated.h"

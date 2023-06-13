@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Task/Base/TaskBase.h"
 #include "RootTaskBase.generated.h"

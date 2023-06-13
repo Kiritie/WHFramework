@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "GameplayCueManager.h"
 #include "AbilityCueManager.generated.h"
 

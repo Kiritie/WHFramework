@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "json.h"
 
 #include "ParameterModuleTypes.generated.h"

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "InputModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"

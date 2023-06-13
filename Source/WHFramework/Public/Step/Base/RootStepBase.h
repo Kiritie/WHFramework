@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Step/Base/StepBase.h"
 #include "RootStepBase.generated.h"

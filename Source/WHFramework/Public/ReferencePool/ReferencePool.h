@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "UObject/NoExportTypes.h"
 #include "ReferencePool.generated.h"
 

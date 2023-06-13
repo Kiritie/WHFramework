@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "AudioModuleTypes.h"
 
 #include "Main/Base/ModuleNetworkComponent.h"

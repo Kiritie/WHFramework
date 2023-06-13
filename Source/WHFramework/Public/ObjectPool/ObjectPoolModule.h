@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "ObjectPool.h"
 #include "ObjectPoolInterface.h"

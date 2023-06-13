@@ -11,7 +11,7 @@
 #include "Parameter/ParameterModuleTypes.h"
 #include "Dom/JsonObject.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Main/MainModule.h"
+#include "Main/MainModuleBPLibrary.h"
 
 #include "GlobalBPLibrary.generated.h"
 
@@ -75,12 +75,12 @@ public:
 	 * 暂停游戏
 	 */
 	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
-	static void PauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	static void PauseGame(EPauseMode PauseMode = EPauseMode::Default);
 	/*
 	 * 取消暂停游戏
 	 */
 	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
-	static void UnPauseGame(EPauseGameMode PauseGameMode = EPauseGameMode::Default);
+	static void UnPauseGame(EPauseMode PauseMode = EPauseMode::Default);
 	/*
 	 * 退出游戏
 	 */
@@ -236,20 +236,18 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static UWorld* GetCurrentWorld()
+	static UObject* GetWorldContext(bool bInEditor = false);
+
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static UWorld* GetCurrentWorld(bool bInEditor = false)
 	{
-		UWorld* CurrentWorld = nullptr;
-		if (UGameEngine* GameEngine = Cast<UGameEngine>(GEngine))
-		{
-			CurrentWorld = GameEngine->GetGameWorld();
-		}
-		return CurrentWorld;
+		return GetWorldFromObjectExisted(GetWorldContext(bInEditor));
 	}
 
 	template<class T>
 	static T* GetGameInstance()
 	{
-		return Cast<T>(UGameplayStatics::GetGameInstance(AMainModule::Get()));
+		return Cast<T>(UGameplayStatics::GetGameInstance(GetWorldContext()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameInstance", DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
@@ -257,7 +255,7 @@ public:
 	template<class T>
 	static T* GetGameMode()
 	{
-		return Cast<T>(UGameplayStatics::GetGameMode(AMainModule::Get()));
+		return Cast<T>(UGameplayStatics::GetGameMode(GetWorldContext()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
@@ -265,7 +263,7 @@ public:
 	template<class T>
 	static T* GetGameState()
 	{
-		return Cast<T>(UGameplayStatics::GetGameState(AMainModule::Get()));
+		return Cast<T>(UGameplayStatics::GetGameState(GetWorldContext()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
@@ -273,7 +271,7 @@ public:
 	template<class T>
 	static T* GetPlayerController(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerController(AMainModule::Get(), InPlayerIndex));
+		return Cast<T>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex));
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
@@ -282,7 +280,7 @@ public:
 	template<class T>
 	static T* GetPlayerControllerByID(int32 InPlayerID = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
+		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(GetWorldContext(), InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static AWHPlayerController* GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerID = 0);

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "BaseWidgetInterface.h"
 
 #include "Input/InputModuleTypes.h"

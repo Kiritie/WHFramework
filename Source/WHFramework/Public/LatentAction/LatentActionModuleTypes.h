@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "LatentActions.h"
 #include "UObject/WeakObjectPtr.h"

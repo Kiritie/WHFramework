@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "VoxelModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Math/MathTypes.h"

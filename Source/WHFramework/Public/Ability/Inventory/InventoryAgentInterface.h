@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "UObject/Interface.h"
 #include "InventoryAgentInterface.generated.h"

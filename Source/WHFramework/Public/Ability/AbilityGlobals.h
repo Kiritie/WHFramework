@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilityGlobals.generated.h"
 

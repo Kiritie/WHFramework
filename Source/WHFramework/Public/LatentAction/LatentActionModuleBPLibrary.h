@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "LatentActionModule.h"
 #include "Engine/TargetPoint.h"

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Components/SceneComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Parameter/ParameterModuleTypes.h"

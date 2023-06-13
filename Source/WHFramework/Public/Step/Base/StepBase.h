@@ -2,13 +2,12 @@
 
 #pragma once
 
-#include "WHFramework.h"
-
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Global/GlobalTypes.h"
 #include "Global/Base/WHObject.h"
 #include "Math/MathTypes.h"
+#include "Camera/CameraModuleTypes.h"
 
 #include "StepBase.generated.h"
 

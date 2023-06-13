@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "EventModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "CameraModuleTypes.h"
 #include "Main/Base/ModuleBase.h"

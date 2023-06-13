@@ -7,18 +7,18 @@ UEventHandle_UnPauseGame::UEventHandle_UnPauseGame()
 {
 	EventType = EEventType::Multicast;
 
-	PauseGameMode = EPauseGameMode::Default;
+	PauseMode = EPauseMode::Default;
 }
 
 void UEventHandle_UnPauseGame::OnDespawn_Implementation(bool bRecovery)
 {
-	PauseGameMode = EPauseGameMode::Default;
+	PauseMode = EPauseMode::Default;
 }
 
 void UEventHandle_UnPauseGame::Fill_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		PauseGameMode = (EPauseGameMode)InParams[0].GetIntegerValue();
+		PauseMode = (EPauseMode)InParams[0].GetIntegerValue();
 	}
 }

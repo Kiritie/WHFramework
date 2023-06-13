@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 #include "WidgetLoadingLevelPanel.generated.h"
 

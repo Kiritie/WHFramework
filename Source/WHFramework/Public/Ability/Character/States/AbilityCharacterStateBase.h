@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "UObject/Object.h"
 #include "AbilityCharacterStateBase.generated.h"

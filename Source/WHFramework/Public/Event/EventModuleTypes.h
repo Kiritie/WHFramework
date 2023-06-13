@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "EventModuleTypes.generated.h"

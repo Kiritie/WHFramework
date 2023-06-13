@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "AbilityVitalityStateBase.h"
 #include "UObject/Object.h"
 #include "AbilityVitalityState_Default.generated.h"

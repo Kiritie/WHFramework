@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "SceneModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 

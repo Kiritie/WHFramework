@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Math/MathTypes.h"
 
 class AVoxelModule;

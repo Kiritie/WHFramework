@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Blueprint/UserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"

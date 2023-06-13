@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "SaveGameModuleTypes.h"
 #include "Base/SaveDataInterface.h"

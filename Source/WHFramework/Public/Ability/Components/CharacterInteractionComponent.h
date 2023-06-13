@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "InteractionComponent.h"
 #include "CharacterInteractionComponent.generated.h"

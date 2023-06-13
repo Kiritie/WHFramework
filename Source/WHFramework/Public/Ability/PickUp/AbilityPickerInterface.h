@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "UObject/Interface.h"
 #include "AbilityPickerInterface.generated.h"
 

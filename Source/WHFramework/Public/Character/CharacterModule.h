@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "CharacterModuleTypes.h"
 #include "Base/CharacterInterface.h"

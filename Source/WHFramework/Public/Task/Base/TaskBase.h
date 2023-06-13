@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Task/TaskModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"

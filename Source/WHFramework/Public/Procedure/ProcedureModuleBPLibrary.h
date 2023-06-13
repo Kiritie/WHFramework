@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "ProcedureModule.h"
 #include "ProcedureModuleTypes.h"
 

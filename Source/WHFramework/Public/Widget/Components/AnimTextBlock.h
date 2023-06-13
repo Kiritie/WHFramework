@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "UObject/ObjectMacros.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/SlateColor.h"

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Global/GlobalTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
@@ -21,7 +20,7 @@ public:
 	UEventHandle_UnPauseGame();
 	
 public:
-	EPauseGameMode PauseGameMode;
+	EPauseMode PauseMode;
 
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;

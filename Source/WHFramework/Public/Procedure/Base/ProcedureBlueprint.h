@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "UObject/ObjectMacros.h"
 #include "Engine/Blueprint.h"
 #include "ProcedureBlueprint.generated.h"

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "UObject/UObjectGlobals.h"
 #include "Main/MainModuleBPLibrary.h"
 
@@ -11,8 +10,7 @@ protected: \
 	static ModuleClass* Instance; \
 	static ModuleClass* InstanceEditor; \
 public: \
-	static ModuleClass* Get(bool bInEditor = false); \
-	static void Termination(ModuleClass* InModule);
+	static ModuleClass* Get(bool bInEditor = false);
 
 #define GENERATED_MODULE(ModuleClass) \
 protected: \

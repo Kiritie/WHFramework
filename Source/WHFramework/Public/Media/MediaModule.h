@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "MediaModuleTypes.h"
 #include "Main/Base/ModuleBase.h"

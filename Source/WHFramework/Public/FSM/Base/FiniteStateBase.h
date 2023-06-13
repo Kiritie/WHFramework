@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Global/Base/WHObject.h"
 
 #include "FiniteStateBase.generated.h"

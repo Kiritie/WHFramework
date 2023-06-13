@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "WHFramework.h"
+#include "Global/Base/WHActor.h"
 #include "UObject/Interface.h"
 #include "Module.generated.h"
 

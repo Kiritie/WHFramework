@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include "WHFramework.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Parameter/ParameterModuleTypes.h"
 

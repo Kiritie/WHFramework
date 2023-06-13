@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "WHFramework.h"
+#include "CameraModuleTypes.generated.h"
 
 UENUM(BlueprintType)
 enum class ECameraCollisionMode : uint8
@@ -27,4 +27,42 @@ enum class ETrackTargetSpace : uint8
 {
 	Local,
 	World
+};
+
+USTRUCT(BlueprintType)
+struct FCameraParams
+{
+	GENERATED_BODY()
+
+public:
+	FCameraParams()
+	{
+		CameraLocation = FVector::ZeroVector;
+		CameraRotation = FRotator::ZeroRotator;
+		CameraDistance = 0.f;
+	}
+
+	FCameraParams(const FString& InParams)
+	{
+		TArray<FString> ParamsArr;
+		InParams.ParseIntoArray(ParamsArr, TEXT("|"));
+		CameraLocation.InitFromString(ParamsArr[0]);
+		CameraRotation.InitFromString(ParamsArr[1]);
+		CameraDistance = FCString::Atof(*ParamsArr[2]);
+	}
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector CameraLocation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FRotator CameraRotation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float CameraDistance;
+
+public:
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("%s|%s|%f"), *CameraLocation.ToString(), *CameraRotation.ToString(), CameraDistance);
+	}
 };

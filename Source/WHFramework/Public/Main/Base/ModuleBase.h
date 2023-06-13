@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 
 #include "Main/Base/Module.h"
 #include "Global/Base/WHActor.h"

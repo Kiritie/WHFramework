@@ -20,73 +20,73 @@
 
 bool UGlobalBPLibrary::IsPaused()
 {
-	return UGameplayStatics::IsGamePaused(AMainModule::Get());
+	return UGameplayStatics::IsGamePaused(GetWorldContext());
 }
 
 void UGlobalBPLibrary::SetPaused(bool bPaused)
 {
-	UGameplayStatics::SetGamePaused(AMainModule::Get(), bPaused);
+	UGameplayStatics::SetGamePaused(GetWorldContext(), bPaused);
 }
 
 float UGlobalBPLibrary::GetTimeScale()
 {
-	return UGameplayStatics::GetGlobalTimeDilation(AMainModule::Get());
+	return UGameplayStatics::GetGlobalTimeDilation(GetWorldContext());
 }
 
 void UGlobalBPLibrary::SetTimeScale(float TimeScale)
 {
-	return UGameplayStatics::SetGlobalTimeDilation(AMainModule::Get(), TimeScale);
+	return UGameplayStatics::SetGlobalTimeDilation(GetWorldContext(), TimeScale);
 }
 
-void UGlobalBPLibrary::PauseGame(EPauseGameMode PauseGameMode)
+void UGlobalBPLibrary::PauseGame(EPauseMode PauseMode)
 {
-	switch(PauseGameMode)
+	switch(PauseMode)
 	{
-		case EPauseGameMode::Default:
+		case EPauseMode::Default:
 		{
 			SetPaused(true);
 			break;
 		}
-		case EPauseGameMode::OnlyTime:
+		case EPauseMode::OnlyTime:
 		{
 			SetTimeScale(0.f);
 			break;
 		}
-		case EPauseGameMode::OnlyModules:
+		case EPauseMode::OnlyModules:
 		{
 			UMainModuleBPLibrary::PauseAllModule();
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseGameMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseMode) } );
 }
 
-void UGlobalBPLibrary::UnPauseGame(EPauseGameMode PauseGameMode)
+void UGlobalBPLibrary::UnPauseGame(EPauseMode PauseMode)
 {
-	switch(PauseGameMode)
+	switch(PauseMode)
 	{
-		case EPauseGameMode::Default:
+		case EPauseMode::Default:
 		{
 			SetPaused(false);
 			break;
 		}
-		case EPauseGameMode::OnlyTime:
+		case EPauseMode::OnlyTime:
 		{
 			SetTimeScale(1.f);
 			break;
 		}
-		case EPauseGameMode::OnlyModules:
+		case EPauseMode::OnlyModules:
 		{
 			UMainModuleBPLibrary::UnPauseAllModule();
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseGameMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseMode) } );
 }
 
 void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
 {
-	UKismetSystemLibrary::QuitGame(AMainModule::Get(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
+	UKismetSystemLibrary::QuitGame(GetWorldContext(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
 
 ETraceTypeQuery UGlobalBPLibrary::GetGameTraceChannel(ECollisionChannel InGameTraceType)
@@ -332,34 +332,39 @@ bool UGlobalBPLibrary::IsImplementedInBlueprint(const UFunction* Func)
 	return Func && ensure(Func->GetOuter()) && Func->GetOuter()->IsA(UBlueprintGeneratedClass::StaticClass());
 }
 
+UObject* UGlobalBPLibrary::GetWorldContext(bool bInEditor)
+{
+	return AMainModule::Get(bInEditor);
+}
+
 UWHGameInstance* UGlobalBPLibrary::GetGameInstance(TSubclassOf<UWHGameInstance> InClass)
 {
-	return Cast<UWHGameInstance>(UGameplayStatics::GetGameInstance(AMainModule::Get()));
+	return Cast<UWHGameInstance>(UGameplayStatics::GetGameInstance(GetWorldContext()));
 }
 
 AWHGameMode* UGlobalBPLibrary::GetGameMode(TSubclassOf<AWHGameMode> InClass)
 {
-	return Cast<AWHGameMode>(UGameplayStatics::GetGameMode(AMainModule::Get()));
+	return Cast<AWHGameMode>(UGameplayStatics::GetGameMode(GetWorldContext()));
 }
 
 AWHGameState* UGlobalBPLibrary::GetGameState(TSubclassOf<AWHGameState> InClass)
 {
-	return Cast<AWHGameState>(UGameplayStatics::GetGameState(AMainModule::Get()));
+	return Cast<AWHGameState>(UGameplayStatics::GetGameState(GetWorldContext()));
 }
 
 AWHPlayerController* UGlobalBPLibrary::GetPlayerController(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerIndex)
 {
-	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(AMainModule::Get(), InPlayerIndex));
+	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex));
 }
 
 AWHPlayerController* UGlobalBPLibrary::GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerID)
 {
-	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerControllerFromID(AMainModule::Get(), InPlayerID));
+	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerControllerFromID(GetWorldContext(), InPlayerID));
 }
 
 AWHPlayerController* UGlobalBPLibrary::GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass)
 {
-	if(UWorld* World = GetWorldFromObjectExisted(AMainModule::Get()))
+	if(UWorld* World = GetWorldFromObjectExisted(GetWorldContext()))
 	{
 		for(auto Iter = World->GetPlayerControllerIterator(); Iter; ++Iter)
 		{

@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "GameFramework/Actor.h"
 #include "Global/Base/WHActor.h"
 #include "Scene/Actor/SceneActorInterface.h"

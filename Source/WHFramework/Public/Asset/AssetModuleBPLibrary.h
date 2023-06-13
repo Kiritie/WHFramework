@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "AssetModule.h"
 #include "AssetModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"

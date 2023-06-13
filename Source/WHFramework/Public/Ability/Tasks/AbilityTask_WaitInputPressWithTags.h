@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Abilities/Tasks/AbilityTask.h"
 #include "AbilityTask_WaitInputPressWithTags.generated.h"
 

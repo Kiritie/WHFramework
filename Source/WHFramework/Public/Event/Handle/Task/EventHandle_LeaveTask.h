@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "WHFramework.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "EventHandle_LeaveTask.generated.h"
 
