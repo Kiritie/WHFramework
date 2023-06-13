@@ -2,7 +2,7 @@
 
 #pragma once
 
-
+#include "Components/ActorComponent.h"
 #include "ModuleNetworkComponent.generated.h"
 
 /**

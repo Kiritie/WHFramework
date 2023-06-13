@@ -3,6 +3,7 @@
 #pragma once
 
 #include "SaveGameModuleTypes.h"
+#include "Global/GlobalTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Main/MainModule.h"

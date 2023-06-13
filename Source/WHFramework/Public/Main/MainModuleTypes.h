@@ -3,6 +3,7 @@
 #pragma once
 
 #include "UObject/UObjectGlobals.h"
+#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModuleBPLibrary.h"
 
 #define GENERATED_MAIN_MODULE(ModuleClass) \
