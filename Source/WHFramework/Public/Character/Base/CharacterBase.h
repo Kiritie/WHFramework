@@ -87,7 +87,7 @@ public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Chunk
+	/// Voxel
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FPrimaryAssetId GenerateVoxelID;

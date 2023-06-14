@@ -27,14 +27,14 @@ ASaveGameModule::~ASaveGameModule()
 }
 
 #if WITH_EDITOR
-void ASaveGameModule::OnGenerate_Implementation()
+void ASaveGameModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ASaveGameModule::OnDestroy_Implementation()
+void ASaveGameModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "EventModuleNetworkComponent.generated.h"
@@ -13,7 +13,7 @@ class UEventHandleBase;
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UEventModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UEventModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

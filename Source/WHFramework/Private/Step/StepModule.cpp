@@ -48,14 +48,14 @@ AStepModule::~AStepModule()
 }
 
 #if WITH_EDITOR
-void AStepModule::OnGenerate_Implementation()
+void AStepModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AStepModule::OnDestroy_Implementation()
+void AStepModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 
 	ClearAllStep();
 }

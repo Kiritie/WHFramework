@@ -22,14 +22,14 @@ AObjectPoolModule::~AObjectPoolModule()
 }
 
 #if WITH_EDITOR
-void AObjectPoolModule::OnGenerate_Implementation()
+void AObjectPoolModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AObjectPoolModule::OnDestroy_Implementation()
+void AObjectPoolModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

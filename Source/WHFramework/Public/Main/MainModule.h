@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Base/ModuleNetworkComponent.h"
+#include "Base/ModuleNetworkComponentBase.h"
 #include "Base/ModuleBase.h"
 
 #include "MainModule.generated.h"
@@ -28,9 +28,9 @@ public:
 	/// Module
 public:
 #if WITH_EDITOR
-	virtual void OnGenerate_Implementation() override;
+	virtual void OnGenerate() override;
 
-	virtual void OnDestroy_Implementation() override;
+	virtual void OnDestroy() override;
 #endif
 	
 	virtual void OnInitialize_Implementation() override;
@@ -49,11 +49,9 @@ public:
 	/// Modules
 public:	
 #if WITH_EDITOR
-	UFUNCTION(BlueprintNativeEvent)
-	void GenerateModules();
+	virtual void GenerateModules();
     
-	UFUNCTION(BlueprintNativeEvent)
-	void DestroyModules();
+	virtual void DestroyModules();
 #endif
 
 	UFUNCTION(BlueprintNativeEvent)
@@ -68,9 +66,9 @@ protected:
 	TArray<TSubclassOf<AModuleBase>> ModuleClasses;
 	/// 模块列表
 	UPROPERTY(EditAnywhere, Replicated)
-	TArray<TScriptInterface<IModule>> ModuleRefs;
+	TArray<AModuleBase*> ModuleRefs;
 	UPROPERTY()
-	TMap<FName, TScriptInterface<IModule>> ModuleMap;
+	TMap<FName, AModuleBase*> ModuleMap;
 
 public:
 	/**
@@ -81,7 +79,7 @@ public:
 	{
 		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
 		{
-			Module->Execute_Run(Module);
+			Module->Run();
 		}
 	}
 	/**
@@ -89,9 +87,9 @@ public:
 	*/
 	static void RunModuleByName(const FName InModuleName)
 	{
-		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
 		{
-			Module->Execute_Run(Module.GetObject());
+			Module->Run();
 		}
 	}
 	/**
@@ -102,7 +100,7 @@ public:
 	{
 		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
 		{
-			Module->Execute_Pause(Module);
+			Module->Pause();
 		}
 	}
 	/**
@@ -110,9 +108,9 @@ public:
 	*/
 	static void PauseModuleByName(const FName InModuleName)
 	{
-		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
 		{
-			Module->Execute_Pause(Module.GetObject());
+			Module->Pause();
 		}
 	}
 	/**
@@ -123,7 +121,7 @@ public:
 	{
 		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
 		{
-			Module->Execute_UnPause(Module);
+			Module->UnPause();
 		}
 	}
 	/**
@@ -131,9 +129,9 @@ public:
 	*/
 	static void UnPauseModuleByName(const FName InModuleName)
 	{
-		if(TScriptInterface<IModule> Module = GetModuleByName<UObject>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
 		{
-			Module->Execute_UnPause(Module.GetObject());
+			Module->UnPause();
 		}
 	}
 
@@ -141,14 +139,14 @@ public:
 	/**
 	* 获取所有模块
 	*/
-	static TArray<TScriptInterface<IModule>> GetAllModule(bool bInEditor = false)
+	static TArray<AModuleBase*> GetAllModule(bool bInEditor = false)
 	{
 		AMainModule* MainModule = Get(bInEditor);
 		if(MainModule && MainModule->IsValidLowLevel())
 		{
 			return MainModule->ModuleRefs;
 		}
-		return TArray<TScriptInterface<IModule>>();
+		return TArray<AModuleBase*>();
 	}
 	/**
 	 * 通过类型获取模块
@@ -156,7 +154,7 @@ public:
 	template<class T>
 	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InModuleClass = T::StaticClass())
 	{
-		const FName ModuleName = IModule::Execute_GetModuleName(InModuleClass.GetDefaultObject());
+		const FName ModuleName = InModuleClass.GetDefaultObject()->GetModuleName();
 		return GetModuleByName<T>(ModuleName, bInEditor);
 	}
 	/**
@@ -170,7 +168,7 @@ public:
 		{
 			if(MainModule->ModuleMap.Contains(InModuleName))
 			{
-				return Cast<T>(MainModule->ModuleMap[InModuleName].GetObject());
+				return Cast<T>(MainModule->ModuleMap[InModuleName]);
 			}
 		}
 		return nullptr;
@@ -184,7 +182,7 @@ public:
 		return Cast<T>(GetModuleNetworkComponentByClass(InModuleNetworkComponentClass, bInEditor));
 	}
 	
-	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor = false);
+	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor = false);
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

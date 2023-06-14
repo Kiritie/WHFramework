@@ -21,14 +21,14 @@ AFSMModule::~AFSMModule()
 }
 
 #if WITH_EDITOR
-void AFSMModule::OnGenerate_Implementation()
+void AFSMModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AFSMModule::OnDestroy_Implementation()
+void AFSMModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

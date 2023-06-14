@@ -26,9 +26,9 @@ void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			MainModule->Execute_OnPreparatory(MainModule, InPhase);
 		}
-		else if(MainModule->Execute_IsAutoRunModule(MainModule))
+		else if(MainModule->IsAutoRunModule())
 		{
-			MainModule->Execute_Run(MainModule);
+			MainModule->Run();
 		}
 	}
 }
@@ -37,7 +37,7 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		if(MainModule->Execute_GetModuleState(MainModule) == EModuleState::Running)
+		if(MainModule->GetModuleState() == EModuleState::Running)
 		{
 			MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
 		}

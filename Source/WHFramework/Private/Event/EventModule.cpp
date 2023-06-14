@@ -31,14 +31,14 @@ AEventModule::~AEventModule()
 }
 
 #if WITH_EDITOR
-void AEventModule::OnGenerate_Implementation()
+void AEventModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AEventModule::OnDestroy_Implementation()
+void AEventModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

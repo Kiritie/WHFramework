@@ -9,7 +9,7 @@
 #include "WHPlayerController.generated.h"
 
 class IWHPlayerInterface;
-class UModuleNetworkComponent;
+class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerPawnChanged, class APawn*, InPlayerPawn);
 
@@ -66,7 +66,7 @@ protected:
 
 private:
 	UPROPERTY(Transient)
-	TMap<TSubclassOf<UModuleNetworkComponent>, UModuleNetworkComponent*> ModuleNetCompMap;
+	TMap<TSubclassOf<UModuleNetworkComponentBase>, UModuleNetworkComponentBase*> ModuleNetCompMap;
 	
 public:
 	template<class T>

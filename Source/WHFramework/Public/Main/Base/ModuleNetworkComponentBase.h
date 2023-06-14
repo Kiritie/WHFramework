@@ -3,16 +3,16 @@
 #pragma once
 
 #include "Components/ActorComponent.h"
-#include "ModuleNetworkComponent.generated.h"
+#include "ModuleNetworkComponentBase.generated.h"
 
 /**
  * 
  */
 UCLASS(meta = (BlueprintSpawnableComponent))
-class WHFRAMEWORK_API UModuleNetworkComponent : public UActorComponent
+class WHFRAMEWORK_API UModuleNetworkComponentBase : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	UModuleNetworkComponent();
+	UModuleNetworkComponentBase();
 };

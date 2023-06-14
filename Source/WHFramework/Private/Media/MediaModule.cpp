@@ -22,14 +22,14 @@ AMediaModule::~AMediaModule()
 }
 
 #if WITH_EDITOR
-void AMediaModule::OnGenerate_Implementation()
+void AMediaModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AMediaModule::OnDestroy_Implementation()
+void AMediaModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

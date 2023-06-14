@@ -19,14 +19,14 @@ AAIModule::~AAIModule()
 }
 
 #if WITH_EDITOR
-void AAIModule::OnGenerate_Implementation()
+void AAIModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AAIModule::OnDestroy_Implementation()
+void AAIModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

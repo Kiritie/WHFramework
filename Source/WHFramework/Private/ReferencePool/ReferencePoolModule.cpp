@@ -21,14 +21,14 @@ AReferencePoolModule::~AReferencePoolModule()
 }
 
 #if WITH_EDITOR
-void AReferencePoolModule::OnGenerate_Implementation()
+void AReferencePoolModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AReferencePoolModule::OnDestroy_Implementation()
+void AReferencePoolModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

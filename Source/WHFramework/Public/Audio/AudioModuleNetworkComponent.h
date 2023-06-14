@@ -4,7 +4,7 @@
 
 #include "AudioModuleTypes.h"
 
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "AudioModuleNetworkComponent.generated.h"
 
@@ -12,7 +12,7 @@
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UAudioModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UAudioModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

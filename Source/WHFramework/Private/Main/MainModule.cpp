@@ -65,9 +65,9 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AWebRequestModule::StaticClass());
 	ModuleClasses.Add(AWidgetModule::StaticClass());
 	
-	ModuleRefs = TArray<TScriptInterface<IModule>>();
+	ModuleRefs = TArray<AModuleBase*>();
 
-	ModuleMap = TMap<FName, TScriptInterface<IModule>>();
+	ModuleMap = TMap<FName, AModuleBase*>();
 }
 
 AMainModule::~AMainModule()
@@ -76,14 +76,14 @@ AMainModule::~AMainModule()
 }
 
 #if WITH_EDITOR
-void AMainModule::OnGenerate_Implementation()
+void AMainModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AMainModule::OnDestroy_Implementation()
+void AMainModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 
@@ -93,9 +93,9 @@ void AMainModule::OnInitialize_Implementation()
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i].GetObject());
+			ModuleRefs[i]->Execute_OnInitialize(ModuleRefs[i]);
 		}
 	}
 }
@@ -106,15 +106,15 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
 			if(InPhase != EPhase::Final)
 			{
-				ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i].GetObject(), InPhase);
+				ModuleRefs[i]->Execute_OnPreparatory(ModuleRefs[i], InPhase);
 			}
-			else if(ModuleRefs[i]->Execute_IsAutoRunModule(ModuleRefs[i].GetObject()))
+			else if(ModuleRefs[i]->IsAutoRunModule())
 			{
-				ModuleRefs[i]->Execute_Run(ModuleRefs[i].GetObject());
+				ModuleRefs[i]->Run();
 			}
 		}
 	}
@@ -126,9 +126,9 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel() && ModuleRefs[i]->Execute_GetModuleState(ModuleRefs[i].GetObject()) == EModuleState::Running)
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel() && ModuleRefs[i]->GetModuleState() == EModuleState::Running)
 		{
-			ModuleRefs[i]->Execute_OnRefresh(ModuleRefs[i].GetObject(), DeltaSeconds);
+			ModuleRefs[i]->Execute_OnRefresh(ModuleRefs[i], DeltaSeconds);
 		}
 	}
 }
@@ -149,50 +149,49 @@ void AMainModule::OnTermination_Implementation()
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_Termination(ModuleRefs[i].GetObject());
+			ModuleRefs[i]->Termination();
 		}
 	}
 	ModuleMap.Empty();
 }
 
 #if WITH_EDITOR
-void AMainModule::GenerateModules_Implementation()
+void AMainModule::GenerateModules()
 {
+	ModuleMap.Empty();
+
 	// 获取场景模块
 	TArray<AActor*> ChildActors;
 	GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
-		if(const IModule* Module = Cast<IModule>(Iter))
+		if(auto Module = Cast<AModuleBase>(Iter))
 		{
-			const FName Name = Module->Execute_GetModuleName(Iter);
+			const FName Name = Module->GetModuleName();
 			Iter->SetActorLabel(Name.ToString());
-			ModuleRefs.AddUnique(Iter);
-			ModuleMap.Emplace(Name, Iter);
+			ModuleRefs.AddUnique(Module);
+			ModuleMap.Emplace(Name, Module);
 		}
 	}
 
 	// 移除废弃模块
-	TArray<TScriptInterface<IModule>> RemoveList;
+	TArray<AModuleBase*> RemoveList;
 	for(auto Iter : ModuleRefs)
 	{
-		if(!Iter.GetObject() || !ModuleClasses.Contains(Iter.GetObject()->GetClass()))
+		if(!Iter || !ModuleClasses.Contains(Iter->GetClass()))
 		{
 			RemoveList.AddUnique(Iter);
-			if(AActor* Actor = Cast<AActor>(Iter.GetObject()))
-			{
-				Actor->Destroy();
-			}
+			Iter->Destroy();
 		}
 	}
 	for(auto Iter : RemoveList)
 	{
 		ModuleRefs.Remove(Iter);
-		if(ModuleMap.Contains(Iter->Execute_GetModuleName(Iter.GetObject())))
+		if(ModuleMap.Contains(Iter->GetModuleName()))
 		{
-			ModuleMap.Remove(Iter->Execute_GetModuleName(Iter.GetObject()));
+			ModuleMap.Remove(Iter->GetModuleName());
 		}
 	}
 
@@ -204,10 +203,11 @@ void AMainModule::GenerateModules_Implementation()
 		bool IsNeedSpawn = true;
 		for(auto Iter : ModuleRefs)
 		{
-			if(Iter.GetObject() && Iter.GetObject()->IsA(ModuleClasses[i]))
+			if(Iter && Iter->IsA(ModuleClasses[i]))
 			{
-				Iter->Execute_OnGenerate(Iter.GetObject());
-				ModuleMap.Emplace(Iter->Execute_GetModuleName(Iter.GetObject()), Iter.GetObject());
+				Iter->OnGenerate();
+				const FName Name = Iter->GetModuleName();
+				ModuleMap.Emplace(Name, Iter);
 				IsNeedSpawn = false;
 				break;
 			}
@@ -220,10 +220,10 @@ void AMainModule::GenerateModules_Implementation()
 
 		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(ModuleClasses[i], ActorSpawnParameters))
 		{
-			const FName Name = Module->Execute_GetModuleName(Module);
+			const FName Name = Module->GetModuleName();
 			Module->SetActorLabel(Name.ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
-			Module->Execute_OnGenerate(Module);
+			Module->OnGenerate();
 			ModuleRefs.AddUnique(Module);
 			ModuleMap.Emplace(Name, Module);
 		}
@@ -232,14 +232,14 @@ void AMainModule::GenerateModules_Implementation()
 	Modify();
 }
 
-void AMainModule::DestroyModules_Implementation()
+void AMainModule::DestroyModules()
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_OnDestroy(ModuleRefs[i].GetObject());
-			if(AActor* Actor = Cast<AActor>(ModuleRefs[i].GetObject()))
+			ModuleRefs[i]->OnDestroy();
+			if(AActor* Actor = Cast<AActor>(ModuleRefs[i]))
 			{
 				Actor->Destroy();
 			}
@@ -255,9 +255,9 @@ void AMainModule::PauseModules_Implementation()
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_Pause(ModuleRefs[i].GetObject());
+			ModuleRefs[i]->Pause();
 		}
 	}
 }
@@ -266,14 +266,14 @@ void AMainModule::UnPauseModules_Implementation()
 {
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
-		if(ModuleRefs[i] && ModuleRefs[i].GetObject()->IsValidLowLevel())
+		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Execute_UnPause(ModuleRefs[i].GetObject());
+			ModuleRefs[i]->UnPause();
 		}
 	}
 }
 
-UModuleNetworkComponent* AMainModule::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor)
+UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor)
 {
 	if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 	{

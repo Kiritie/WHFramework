@@ -20,14 +20,14 @@ ALatentActionModule::~ALatentActionModule()
 }
 
 #if WITH_EDITOR
-void ALatentActionModule::OnGenerate_Implementation()
+void ALatentActionModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ALatentActionModule::OnDestroy_Implementation()
+void ALatentActionModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

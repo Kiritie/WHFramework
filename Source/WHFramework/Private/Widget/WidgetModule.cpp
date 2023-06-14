@@ -44,14 +44,14 @@ AWidgetModule::~AWidgetModule()
 }
 
 #if WITH_EDITOR
-void AWidgetModule::OnGenerate_Implementation()
+void AWidgetModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AWidgetModule::OnDestroy_Implementation()
+void AWidgetModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

@@ -26,9 +26,9 @@ public:
 	/// Module
 public:
 #if WITH_EDITOR
-	virtual void OnGenerate_Implementation() override;
+	virtual void OnGenerate() override;
 
-	virtual void OnDestroy_Implementation() override;
+	virtual void OnDestroy() override;
 #endif
 
 	virtual void OnInitialize_Implementation() override;

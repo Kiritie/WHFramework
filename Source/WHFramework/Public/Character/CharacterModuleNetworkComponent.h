@@ -4,7 +4,7 @@
 
 
 #include "CharacterModuleTypes.h"
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "CharacterModuleNetworkComponent.generated.h"
 
@@ -12,7 +12,7 @@
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UCharacterModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UCharacterModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

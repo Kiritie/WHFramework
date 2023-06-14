@@ -4,7 +4,7 @@
 
 
 #include "AIModuleTypes.h"
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "AIModuleNetworkComponent.generated.h"
 
@@ -12,7 +12,7 @@
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UAIModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UAIModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

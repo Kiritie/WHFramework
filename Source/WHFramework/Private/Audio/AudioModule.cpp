@@ -25,14 +25,14 @@ AAudioModule::~AAudioModule()
 }
 
 #if WITH_EDITOR
-void AAudioModule::OnGenerate_Implementation()
+void AAudioModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AAudioModule::OnDestroy_Implementation()
+void AAudioModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

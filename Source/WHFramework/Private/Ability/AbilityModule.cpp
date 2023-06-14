@@ -37,14 +37,14 @@ AAbilityModule::~AAbilityModule()
 }
 
 #if WITH_EDITOR
-void AAbilityModule::OnGenerate_Implementation()
+void AAbilityModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AAbilityModule::OnDestroy_Implementation()
+void AAbilityModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

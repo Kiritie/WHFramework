@@ -27,14 +27,14 @@ AInputModule::~AInputModule()
 }
 
 #if WITH_EDITOR
-void AInputModule::OnGenerate_Implementation()
+void AInputModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AInputModule::OnDestroy_Implementation()
+void AInputModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 
@@ -78,7 +78,7 @@ void AInputModule::UpdateInputMode()
 	EInputMode TmpInputMode = EInputMode::None;
 	for (auto Iter : AMainModule::GetAllModule())
 	{
-		if(IInputManager* InputManager = Cast<IInputManager>(Iter.GetObject()))
+		if(IInputManager* InputManager = Cast<IInputManager>(Iter))
 		{
 			if ((int32)InputManager->GetNativeInputMode() > (int32)TmpInputMode)
 			{

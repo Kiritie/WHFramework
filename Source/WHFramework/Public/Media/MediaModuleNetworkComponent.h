@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "MediaModuleNetworkComponent.generated.h"
 
@@ -12,7 +12,7 @@ class AMediaPlayerBase;
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UMediaModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UMediaModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

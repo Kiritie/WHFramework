@@ -32,14 +32,14 @@ AWebRequestModule::~AWebRequestModule()
 }
 
 #if WITH_EDITOR
-void AWebRequestModule::OnGenerate_Implementation()
+void AWebRequestModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AWebRequestModule::OnDestroy_Implementation()
+void AWebRequestModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

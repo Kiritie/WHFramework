@@ -121,14 +121,14 @@ AVoxelModule::~AVoxelModule()
 }
 
 #if WITH_EDITOR
-void AVoxelModule::OnGenerate_Implementation()
+void AVoxelModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AVoxelModule::OnDestroy_Implementation()
+void AVoxelModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

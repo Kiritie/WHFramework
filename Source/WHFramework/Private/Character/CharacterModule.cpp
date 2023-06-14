@@ -28,15 +28,15 @@ ACharacterModule::~ACharacterModule()
 }
 
 #if WITH_EDITOR
-void ACharacterModule::OnGenerate_Implementation()
+void ACharacterModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 
 }
 
-void ACharacterModule::OnDestroy_Implementation()
+void ACharacterModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 
 }
 #endif

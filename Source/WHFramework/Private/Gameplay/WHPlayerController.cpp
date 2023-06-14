@@ -28,7 +28,7 @@ AWHPlayerController::AWHPlayerController()
 	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(FName("WidgetInteractionComp"));
 	WidgetInteractionComp->SetupAttachment(RootComponent);
 
-	ModuleNetCompMap = TMap<TSubclassOf<UModuleNetworkComponent>, UModuleNetworkComponent*>();
+	ModuleNetCompMap = TMap<TSubclassOf<UModuleNetworkComponentBase>, UModuleNetworkComponentBase*>();
 	
 	AudioModuleNetComp = CreateDefaultSubobject<UAudioModuleNetworkComponent>(FName("AudioModuleNetComp"));
 	ModuleNetCompMap.Add(UAudioModuleNetworkComponent::StaticClass(), AudioModuleNetComp);
@@ -123,7 +123,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	if(InPawn->Implements<UWHPlayerInterface>() && !InPawn->IsA<ACameraPawnBase>())
+	if(InPawn->Implements<UWHPlayerInterface>())
 	{
 		SetPlayerPawn(InPawn);
 	}

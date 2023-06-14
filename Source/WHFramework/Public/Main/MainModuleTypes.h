@@ -6,6 +6,15 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModuleBPLibrary.h"
 
+UENUM(BlueprintType)
+enum class EModuleState : uint8
+{
+	None,
+	Running,
+	Paused,
+	Terminated
+};
+
 #define GENERATED_MAIN_MODULE(ModuleClass) \
 protected: \
 	static ModuleClass* Instance; \

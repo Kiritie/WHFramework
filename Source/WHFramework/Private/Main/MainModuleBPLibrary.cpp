@@ -58,7 +58,7 @@ void UMainModuleBPLibrary::PauseMainModule()
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->Execute_Pause(MainModule);
+		MainModule->Pause();
 	}
 }
 
@@ -66,7 +66,7 @@ void UMainModuleBPLibrary::UnPauseMainModule()
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->Execute_UnPause(MainModule);
+		MainModule->UnPause();
 	}
 }
 
@@ -91,7 +91,7 @@ AMainModule* UMainModuleBPLibrary::GetMainModule(bool bInEditor)
 	return AMainModule::Get(bInEditor);
 }
 
-TArray<TScriptInterface<IModule>> UMainModuleBPLibrary::GetAllModule(bool bInEditor)
+TArray<AModuleBase*> UMainModuleBPLibrary::GetAllModule(bool bInEditor)
 {
 	return AMainModule::GetAllModule(bInEditor);
 }
@@ -101,12 +101,12 @@ AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InM
 	return AMainModule::GetModuleByClass(bInEditor, InModuleClass);
 }
 
-TScriptInterface<IModule> UMainModuleBPLibrary::GetModuleByName(const FName InModuleName, bool bInEditor)
+AModuleBase* UMainModuleBPLibrary::GetModuleByName(const FName InModuleName, bool bInEditor)
 {
-	return AMainModule::GetModuleByName<UObject>(InModuleName, bInEditor);
+	return AMainModule::GetModuleByName<AModuleBase>(InModuleName, bInEditor);
 }
 
-UModuleNetworkComponent* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor)
+UModuleNetworkComponentBase* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor)
 {
-	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponent>(bInEditor, InModuleNetworkComponentClass);
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(bInEditor, InModuleNetworkComponentClass);
 }

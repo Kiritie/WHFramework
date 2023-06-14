@@ -31,7 +31,7 @@ ACameraModule::ACameraModule()
 		
 	bCameraControlAble = false;
 
-	bCameraMoveAble = false;
+	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
 	bReverseCameraPanMove = true;
 	bClampCameraMove = false;
@@ -98,10 +98,41 @@ ACameraModule::~ACameraModule()
 }
 
 #if WITH_EDITOR
-void ACameraModule::OnGenerate_Implementation()
+void ACameraModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 
+	// 获取场景Camera
+	TArray<AActor*> ChildActors;
+	GetAttachedActors(ChildActors);
+	for(auto Iter : ChildActors)
+	{
+		if(auto Camera = Cast<ACameraPawnBase>(Iter))
+		{
+			Cameras.AddUnique(Camera);
+		}
+	}
+
+	// 移除废弃Camera
+	TArray<ACameraPawnBase*> RemoveList;
+	for(auto Iter : Cameras)
+	{
+		if(!Iter || !CameraClasses.Contains(Iter->GetClass()))
+		{
+			RemoveList.AddUnique(Iter);
+		}
+	}
+	for(auto Iter : RemoveList)
+	{
+		Cameras.Remove(Iter);
+		if(DefaultCamera == Iter)
+		{
+			DefaultCamera = nullptr;
+		}
+		Iter->Destroy();
+	}
+
+	// 生成新的Camera
 	for(auto Class : CameraClasses)
 	{
 		if(!Class) continue;
@@ -111,7 +142,6 @@ void ACameraModule::OnGenerate_Implementation()
 		{
 			if(Camera && Camera->IsA(Class))
 			{
-				Camera->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 				bNeedSpawn = false;
 				break;
 			}
@@ -127,11 +157,13 @@ void ACameraModule::OnGenerate_Implementation()
 			}
 		}
 	}
+
+	Modify();
 }
 
-void ACameraModule::OnDestroy_Implementation()
+void ACameraModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 
 	for(const auto Camera : Cameras)
 	{

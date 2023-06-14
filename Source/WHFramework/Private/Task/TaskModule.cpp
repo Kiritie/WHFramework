@@ -41,14 +41,14 @@ ATaskModule::~ATaskModule()
 }
 
 #if WITH_EDITOR
-void ATaskModule::OnGenerate_Implementation()
+void ATaskModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ATaskModule::OnDestroy_Implementation()
+void ATaskModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 
 	ClearAllTask();
 }

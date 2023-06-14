@@ -7,8 +7,7 @@
 
 #include "MainModuleBPLibrary.generated.h"
 
-class UModuleNetworkComponent;
-class IModule;
+class UModuleNetworkComponentBase;
 class AMainModule;
 class AModuleBase;
 /**
@@ -55,14 +54,14 @@ public:
 	static AMainModule* GetMainModule(bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static TArray<TScriptInterface<IModule>> GetAllModule(bool bInEditor = false);
+	static TArray<AModuleBase*> GetAllModule(bool bInEditor = false);
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
 	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static TScriptInterface<IModule> GetModuleByName(const FName InModuleName, bool bInEditor = false);
+	static AModuleBase* GetModuleByName(const FName InModuleName, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
-	static UModuleNetworkComponent* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponent> InModuleNetworkComponentClass, bool bInEditor = false);
+	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor = false);
 };

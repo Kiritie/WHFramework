@@ -41,14 +41,14 @@ AProcedureModule::~AProcedureModule()
 }
 
 #if WITH_EDITOR
-void AProcedureModule::OnGenerate_Implementation()
+void AProcedureModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AProcedureModule::OnDestroy_Implementation()
+void AProcedureModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 
 	ClearAllProcedure();
 }

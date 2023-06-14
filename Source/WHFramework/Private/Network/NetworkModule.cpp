@@ -27,14 +27,14 @@ ANetworkModule::~ANetworkModule()
 }
 
 #if WITH_EDITOR
-void ANetworkModule::OnGenerate_Implementation()
+void ANetworkModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ANetworkModule::OnDestroy_Implementation()
+void ANetworkModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

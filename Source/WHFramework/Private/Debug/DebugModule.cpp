@@ -23,14 +23,14 @@ ADebugModule::~ADebugModule()
 }
 
 #if WITH_EDITOR
-void ADebugModule::OnGenerate_Implementation()
+void ADebugModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ADebugModule::OnDestroy_Implementation()
+void ADebugModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

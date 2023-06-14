@@ -72,14 +72,14 @@ ASceneModule::~ASceneModule()
 }
 
 #if WITH_EDITOR
-void ASceneModule::OnGenerate_Implementation()
+void ASceneModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void ASceneModule::OnDestroy_Implementation()
+void ASceneModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

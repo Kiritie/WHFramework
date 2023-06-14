@@ -5,10 +5,11 @@
 #include "Camera/CameraModuleTypes.h"
 #include "GameFramework/Pawn.h"
 #include "Gameplay/WHPlayerInterface.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraPawnBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API ACameraPawnBase : public APawn, public IWHPlayerInterface
+class WHFRAMEWORK_API ACameraPawnBase : public APawn, public IWHPlayerInterface, public IVoxelAgentInterface
 {
 	GENERATED_BODY()
 
@@ -54,4 +55,22 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Chunk
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FPrimaryAssetId GenerateVoxelID;
+
+public:
+	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
+
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
+
+public:
+	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+
+	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 };

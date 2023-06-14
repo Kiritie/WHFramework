@@ -58,3 +58,13 @@ void ACameraPawnBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollis
 		Execute_GetCameraBoom(this)->bDoCollisionTest = CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::SightOnly;
 	}
 }
+
+bool ACameraPawnBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
+}
+
+bool ACameraPawnBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
+}

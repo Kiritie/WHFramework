@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "Main/Base/ModuleNetworkComponent.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "ProcedureModuleNetworkComponent.generated.h"
 
@@ -11,7 +11,7 @@
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UProcedureModuleNetworkComponent : public UModuleNetworkComponent
+class WHFRAMEWORK_API UProcedureModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 

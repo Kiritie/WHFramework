@@ -19,14 +19,14 @@ AAssetModule::~AAssetModule()
 }
 
 #if WITH_EDITOR
-void AAssetModule::OnGenerate_Implementation()
+void AAssetModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AAssetModule::OnDestroy_Implementation()
+void AAssetModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 

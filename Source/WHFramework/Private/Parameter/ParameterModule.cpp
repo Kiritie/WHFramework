@@ -22,14 +22,14 @@ AParameterModule::~AParameterModule()
 }
 
 #if WITH_EDITOR
-void AParameterModule::OnGenerate_Implementation()
+void AParameterModule::OnGenerate()
 {
-	Super::OnGenerate_Implementation();
+	Super::OnGenerate();
 }
 
-void AParameterModule::OnDestroy_Implementation()
+void AParameterModule::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 #endif
 
