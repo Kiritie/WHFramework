@@ -159,9 +159,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 
 		if(bAutoGenerate)
 		{
-			static FVoxelWorldSaveData SaveData;
-			SaveData = FVoxelWorldSaveData(WorldBasicData);
-			LoadSaveData(&SaveData, EPhase::Primary);
+			LoadSaveData(NewData(true), EPhase::Primary);
 		}
 	}
 }
@@ -230,11 +228,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			SetWorldMode(EVoxelWorldMode::Preview);
 
-			if(!WorldData)
-			{
-				WorldData = new FVoxelWorldSaveData();
-			}
-
+			WorldData = NewData();
 			WorldData->BlockSize = SaveData.BlockSize;
 			WorldData->ChunkSize = SaveData.ChunkSize;
 			WorldData->ChunkHeightRange = SaveData.ChunkHeightRange;
@@ -347,6 +341,13 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 			break;
 		}
 	}
+}
+
+FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData) const
+{
+	static FVoxelWorldSaveData* NewWorldData;
+	NewWorldData = !bInheritBasicData ? new FVoxelWorldSaveData() : new FVoxelWorldSaveData(WorldBasicData);
+	return NewWorldData;
 }
 
 void AVoxelModule::GenerateWorld()

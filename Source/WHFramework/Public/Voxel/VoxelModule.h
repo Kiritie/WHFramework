@@ -118,6 +118,8 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
+	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false) const;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 protected:
