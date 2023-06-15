@@ -191,6 +191,7 @@ void AVoxelModule::OnTermination_Implementation()
 	StopChunkTasks(ChunkMapLoadTasks);
 	StopChunkTasks(ChunkMapBuildTasks);
 	StopChunkTasks(ChunkMeshBuildTasks);
+	StopChunkTasks(ChunkDataSaveTasks);
 }
 
 void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
@@ -315,6 +316,7 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 			StopChunkTasks(ChunkMapLoadTasks);
 			StopChunkTasks(ChunkMapBuildTasks);
 			StopChunkTasks(ChunkMeshBuildTasks);
+			StopChunkTasks(ChunkDataSaveTasks);
 
 			ChunkSpawnBatch = 0;
 			LastGenerateIndex = Index_Empty;
@@ -796,18 +798,19 @@ FVector AVoxelModule::VoxelIndexToLocation(FIndex InIndex)
 
 int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
 {
-	int32 tmpNum = 0;
-	for(auto Iter = ChunkMap.CreateConstIterator(); Iter; ++Iter)
+	if(bNeedGenerated)
 	{
-		if(AVoxelChunk* Chunk = Iter->Value)
+		int32 ReturnValue = 0;
+		for(auto Iter = ChunkMap.CreateConstIterator(); Iter; ++Iter)
 		{
-			if(!bNeedGenerated || Chunk->IsGenerated())
+			if(Iter->Value->IsGenerated())
 			{
-				tmpNum++;
+				ReturnValue++;
 			}
 		}
+		return ReturnValue;
 	}
-	return tmpNum;
+	return ChunkMap.Num();
 }
 
 float AVoxelModule::GetWorldLength() const
