@@ -180,74 +180,56 @@ EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 	return EVoxelType::Empty;
 }
 
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	const auto& worldData = GetWorldData();
-	const float& chunkLength = worldData.GetChunkLength();
-	const FVector chunkLocation = ChunkIndexToLocation(InChunkIndex);
-	FVector rayStart = FVector(worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.RandomStream.FRandRange(0.f, chunkLength), worldData.GetWorldHeight(true));
-	rayStart.X = chunkLocation.X + ((int32)(rayStart.X / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
-	rayStart.Y = chunkLocation.Y + ((int32)(rayStart.Y / worldData.BlockSize) + 0.5f) * worldData.BlockSize;
-	const FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0.f);
-	return ChunkTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
-}
-
-bool UVoxelModuleBPLibrary::ChunkTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	FHitResult VoxelHitResult;
-	return UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true) &&
-		!VoxelTraceSingle(OutHitResult.Location, OutHitResult.Location, InRadius * 0.95f, InHalfHeight * 0.95f, {}, VoxelHitResult);
-}
-
-bool UVoxelModuleBPLibrary::VoxelTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	const FVector size = InVoxelItem.GetRange() * GetWorldData().BlockSize * 0.5f;
-	const FVector location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), location + size, location + size, size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
-}
-
-bool UVoxelModuleBPLibrary::VoxelTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	return UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
-}
-
 bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
-	FHitResult hitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		OutHitResult = FVoxelHitResult(hitResult);
-		return OutHitResult.IsValid();
+		return VoxelModule->VoxelRaycastSinge(InRayStart, InRayEnd, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
 
 bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
-	FHitResult hitResult;
-	const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController();
-	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceType(), InIgnoreActors, hitResult))
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		OutHitResult = FVoxelHitResult(hitResult);
-		return OutHitResult.IsValid();
+		return VoxelModule->VoxelRaycastSinge(InDistance, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
 
-ECollisionChannel UVoxelModuleBPLibrary::GetChunkTraceType()
+bool UVoxelModuleBPLibrary::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		return VoxelModule->GetChunkTraceType();
+		return VoxelModule->VoxelItemTraceSingle(InVoxelItem, InIgnoreActors, OutHitResult);
 	}
-	return ECollisionChannel::ECC_MAX;
+	return false;
 }
 
-ECollisionChannel UVoxelModuleBPLibrary::GetVoxelTraceType()
+bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		return VoxelModule->GetVoxelTraceType();
+		return VoxelModule->VoxelAgentTraceSingle(InChunkIndex, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
 	}
-	return ECollisionChannel::ECC_MAX;
+	return false;
+}
+
+bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FVector InLocation, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->VoxelAgentTraceSingle(InLocation, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+	}
+	return false;
+}
+
+bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->VoxelAgentTraceSingle(InRayStart, InRayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
+	}
+	return false;
 }
