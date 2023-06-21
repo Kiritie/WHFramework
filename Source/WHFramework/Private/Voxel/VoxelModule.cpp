@@ -775,6 +775,60 @@ FVoxelItem& AVoxelModule::FindVoxelByLocation(FVector InLocation)
 	return FVoxelItem::Empty;
 }
 
+EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
+{
+	const FRandomStream& randomStream = WorldData->RandomStream;
+
+	const int32 worldHeight = WorldData->GetWorldHeight();
+	const FVector2D worldLocation = FVector2D(InIndex.X, InIndex.Y);
+
+	const int32 plainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainPlainScale, WorldData->WorldSeed, true) * worldHeight;
+	const int32 mountainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainMountainScale, WorldData->WorldSeed, true) * worldHeight;
+
+	const int32 baseHeight = FMath::Max(plainHeight, mountainHeight) + WorldData->TerrainBaseHeight * worldHeight;
+
+	if(InIndex.Z < baseHeight)
+	{
+		if(InIndex.Z <= WorldData->TerrainBedrockVoxelHeight * worldHeight)
+		{
+			return EVoxelType::Bedrock; //Bedrock
+		}
+		else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainStoneVoxelScale, WorldData->WorldSeed, true) * worldHeight)
+		{
+			return EVoxelType::Stone; //Stone
+		}
+		return EVoxelType::Dirt; //Dirt
+	}
+	else
+	{
+		const int32 waterHeight = WorldData->TerrainWaterVoxelHeight * worldHeight;
+		if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainSandVoxelScale, WorldData->WorldSeed, true) * worldHeight)
+		{
+			return EVoxelType::Sand; //Sand
+		}
+		else if(InIndex.Z <= waterHeight)
+		{
+			return EVoxelType::Water; //Water
+		}
+		else if(InIndex.Z == baseHeight)
+		{
+			return EVoxelType::Grass; //Grass
+		}
+		else if(InIndex.Z == baseHeight + 1 && InIndex.Z != waterHeight + 1)
+		{
+			if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainTreeVoxelScale, WorldData->WorldSeed, true) * worldHeight)
+			{
+				return randomStream.FRand() < 0.7f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
+			}
+			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainPlantVoxelScale, WorldData->WorldSeed, true) * worldHeight)
+			{
+				return randomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)randomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
+			}
+		}
+	}
+	return EVoxelType::Empty; //Empty
+}
+
 FIndex AVoxelModule::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
 	InLocation /= WorldData->GetChunkLength();
@@ -795,6 +849,91 @@ FIndex AVoxelModule::LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ)
 FVector AVoxelModule::VoxelIndexToLocation(FIndex InIndex)
 {
 	return InIndex.ToVector() * WorldData->BlockSize;
+}
+
+ECollisionChannel AVoxelModule::GetChunkTraceType() const
+{
+	return ECollisionChannel::ECC_MAX;
+}
+
+ECollisionChannel AVoxelModule::GetVoxelTraceType() const
+{
+	return ECollisionChannel::ECC_MAX;
+}
+
+bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+{
+	FHitResult hitResult;
+	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, hitResult, true))
+	{
+		OutHitResult = FVoxelHitResult(hitResult);
+		return OutHitResult.IsValid();
+	}
+	return false;
+}
+
+bool AVoxelModule::VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+{
+	FHitResult hitResult;
+	const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController();
+	if(PlayerController && PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceType(), InIgnoreActors, hitResult))
+	{
+		OutHitResult = FVoxelHitResult(hitResult);
+		return OutHitResult.IsValid();
+	}
+	return false;
+}
+
+bool AVoxelModule::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	const FVector size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
+	const FVector location = InVoxelItem.GetLocation();
+	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), location + size, location + size, size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+}
+
+bool AVoxelModule::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+{
+	const float chunkRadius = WorldData->GetChunkLength() * 0.5f;
+	const FVector chunkLocation = ChunkIndexToLocation(InChunkIndex);
+	return VoxelAgentTraceSingle(chunkLocation + chunkRadius, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+}
+
+bool AVoxelModule::VoxelAgentTraceSingle(FVector InLocation, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+{
+	const float chunkRadius = WorldData->GetChunkLength() * 0.5f;
+	DON(i, InMaxCount,
+		FVector rayStart = FVector((bFromCenter && i == 0) ? 0.f : WorldData->RandomStream.FRandRange(-chunkRadius, chunkRadius),
+			(bFromCenter && i == 0) ? 0.f : WorldData->RandomStream.FRandRange(-chunkRadius, chunkRadius), WorldData->GetWorldHeight(true));
+		rayStart.X = InLocation.X + (bSnapToBlock ? ((int32)(rayStart.X / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize : rayStart.X);
+		rayStart.Y = InLocation.Y + (bSnapToBlock ? ((int32)(rayStart.Y / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize : rayStart.Y);
+		const FVector rayEnd = FVector(rayStart.X, rayStart.Y, 0.f);
+		FHitResult hitResult;
+		if(VoxelAgentTraceSingle(rayStart, rayEnd, InRadius, InHalfHeight, InIgnoreActors, hitResult))
+		{
+			OutHitResult = hitResult;
+			return true;
+		}
+	)
+	return false;
+}
+
+bool AVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+{
+	FHitResult hitResult1;
+	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, hitResult1, true))
+	{
+		FHitResult hitResult2;
+		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), hitResult1.Location, hitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, hitResult2, true))
+		{
+			FVoxelItem& voxelItem = FindVoxelByLocation(hitResult1.Location);
+			if(!voxelItem.IsValid())
+			{
+				OutHitResult = hitResult1;
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 int32 AVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
@@ -853,68 +992,4 @@ TArray<AVoxelChunk*> AVoxelModule::GetVerticalChunks(FIndex InIndex)
 		}
 	}
 	return ReturnValue;
-}
-
-ECollisionChannel AVoxelModule::GetChunkTraceType() const
-{
-	return ECollisionChannel::ECC_MAX;
-}
-
-ECollisionChannel AVoxelModule::GetVoxelTraceType() const
-{
-	return ECollisionChannel::ECC_MAX;
-}
-
-EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex)
-{
-	const FRandomStream& randomStream = WorldData->RandomStream;
-
-	const int32 worldHeight = WorldData->GetWorldHeight();
-	const FVector2D worldLocation = FVector2D(InIndex.X, InIndex.Y);
-
-	const int32 plainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainPlainScale, WorldData->WorldSeed, true) * worldHeight;
-	const int32 mountainHeight = UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainMountainScale, WorldData->WorldSeed, true) * worldHeight;
-
-	const int32 baseHeight = FMath::Max(plainHeight, mountainHeight) + WorldData->TerrainBaseHeight * worldHeight;
-
-	if(InIndex.Z < baseHeight)
-	{
-		if(InIndex.Z <= WorldData->TerrainBedrockVoxelHeight * worldHeight)
-		{
-			return EVoxelType::Bedrock; //Bedrock
-		}
-		else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainStoneVoxelScale, WorldData->WorldSeed, true) * worldHeight)
-		{
-			return EVoxelType::Stone; //Stone
-		}
-		return EVoxelType::Dirt; //Dirt
-	}
-	else
-	{
-		const int32 waterHeight = WorldData->TerrainWaterVoxelHeight * worldHeight;
-		if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainSandVoxelScale, WorldData->WorldSeed, true) * worldHeight)
-		{
-			return EVoxelType::Sand; //Sand
-		}
-		else if(InIndex.Z <= waterHeight)
-		{
-			return EVoxelType::Water; //Water
-		}
-		else if(InIndex.Z == baseHeight)
-		{
-			return EVoxelType::Grass; //Grass
-		}
-		else if(InIndex.Z == baseHeight + 1 && InIndex.Z != waterHeight + 1)
-		{
-			if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainTreeVoxelScale, WorldData->WorldSeed, true) * worldHeight)
-			{
-				return randomStream.FRand() < 0.7f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
-			}
-			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(worldLocation, WorldData->TerrainPlantVoxelScale, WorldData->WorldSeed, true) * worldHeight)
-			{
-				return randomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)randomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
-			}
-		}
-	}
-	return EVoxelType::Empty; //Empty
 }

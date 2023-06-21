@@ -30,7 +30,7 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 		IgnoreActors.Add(VoxelItem.Auxiliary);
 	}
 	FHitResult HitResult;
-	if(!UVoxelModuleBPLibrary::VoxelTraceSingle(VoxelItem, IgnoreActors, HitResult))
+	if(!UVoxelModuleBPLibrary::VoxelItemTraceSingle(VoxelItem, IgnoreActors, HitResult))
 	{
 		if(Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this))
 		{
