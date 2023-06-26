@@ -16,8 +16,11 @@ class WHFRAMEWORK_API UInputModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
-	// Touch
+	// InputStates
 public:
+	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
+	static void ResetInputStates();
+
 	UFUNCTION(BlueprintPure, Category = "InputModuleBPLibrary")
 	static int32 GetTouchPressedCount();
 

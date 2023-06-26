@@ -364,15 +364,12 @@ AWHPlayerController* UGlobalBPLibrary::GetPlayerControllerByID(TSubclassOf<AWHPl
 
 AWHPlayerController* UGlobalBPLibrary::GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass)
 {
-	if(UWorld* World = GetWorldFromObjectExisted(GetWorldContext()))
+	for(auto Iter = GetCurrentWorld()->GetPlayerControllerIterator(); Iter; ++Iter)
 	{
-		for(auto Iter = World->GetPlayerControllerIterator(); Iter; ++Iter)
+		AWHPlayerController* PlayerController = Cast<AWHPlayerController>(Iter->Get());
+		if(PlayerController && PlayerController->IsLocalController())
 		{
-			AWHPlayerController* PlayerController = Cast<AWHPlayerController>(Iter->Get());
-			if(PlayerController && PlayerController->IsLocalController())
-			{
-				return PlayerController;
-			}
+			return PlayerController;
 		}
 	}
 	return nullptr;
@@ -382,7 +379,7 @@ APawn* UGlobalBPLibrary::GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlaye
 {
 	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
-		return PlayerController->GetPlayerPawn();
+		return PlayerController->GetPawn();
 	}
 	return nullptr;
 }
@@ -391,7 +388,7 @@ APawn* UGlobalBPLibrary::GetPlayerPawnByID(TSubclassOf<APawn> InClass, int32 InP
 {
 	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 	{
-		return PlayerController->GetPlayerPawn();
+		return PlayerController->GetPawn();
 	}
 	return nullptr;
 }
@@ -400,7 +397,7 @@ APawn* UGlobalBPLibrary::GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 	{
-		return PlayerController->GetPlayerPawn();
+		return PlayerController->GetPawn();
 	}
 	return nullptr;
 }

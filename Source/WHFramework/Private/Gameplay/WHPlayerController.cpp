@@ -95,11 +95,6 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 }
 
-void AWHPlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-}
-
 void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);

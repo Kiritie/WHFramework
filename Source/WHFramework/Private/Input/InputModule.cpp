@@ -395,6 +395,11 @@ void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 	}
 }
 
+void AInputModule::ResetInputStates_Implementation()
+{
+	TouchPressedCount = 0;
+}
+
 AWHPlayerController* AInputModule::GetPlayerController()
 {
 	if(!PlayerController)

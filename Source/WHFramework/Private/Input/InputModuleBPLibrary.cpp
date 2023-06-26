@@ -16,6 +16,14 @@ int32 UInputModuleBPLibrary::GetTouchPressedCount()
 	return 0;
 }
 
+void UInputModuleBPLibrary::ResetInputStates()
+{
+	if(AInputModule* InputModule = AInputModule::Get())
+	{
+		InputModule->ResetInputStates();
+	}
+}
+
 EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 {
 	if(AInputModule* InputModule = AInputModule::Get())

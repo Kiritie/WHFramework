@@ -43,18 +43,18 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Mappings
+	// InputMappings
 protected:
-	UPROPERTY(EditAnywhere, Category = "Mappings")
+	UPROPERTY(EditAnywhere, Category = "InputMappings|Key")
 	TArray<FInputKeyMapping> KeyMappings;
 
-	UPROPERTY(EditAnywhere, Category = "Mappings")
+	UPROPERTY(EditAnywhere, Category = "InputMappings|Action")
 	TArray<FInputActionMapping> ActionMappings;
 
-	UPROPERTY(EditAnywhere, Category = "Mappings")
+	UPROPERTY(EditAnywhere, Category = "InputMappings|Axis")
 	TArray<FInputAxisMapping> AxisMappings;
 
-	UPROPERTY(EditAnywhere, Category = "Mappings")
+	UPROPERTY(EditAnywhere, Category = "InputMappings|Touch")
 	TArray<FInputTouchMapping> TouchMappings;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -99,6 +99,10 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Touch
 protected:
+	UPROPERTY(EditAnywhere, Category = "InputSetup|Touch")
+	float TouchInputRate;
+
+protected:
 	UFUNCTION()
 	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
@@ -114,11 +118,10 @@ protected:
 	UFUNCTION()
 	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// InputStates
 protected:
-	UPROPERTY(EditAnywhere, Category = "Touch")
-	float TouchInputRate;
-
-	UPROPERTY(VisibleAnywhere, Category = "Touch")
+	UPROPERTY(VisibleAnywhere, Category = "InputStates|Touch")
 	int32 TouchPressedCount;
 
 	FVector2D TouchLocationPrevious;
@@ -128,13 +131,16 @@ protected:
 	FTimerHandle TouchReleaseTimerHandle3;
 
 public:
+	UFUNCTION(BlueprintNativeEvent)
+	void ResetInputStates();
+
 	UFUNCTION(BlueprintPure)
 	int32 GetTouchPressedCount() const { return TouchPressedCount; }
 
 	//////////////////////////////////////////////////////////////////////////
 	// PlayerController
 protected:
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 	
 public:
@@ -144,10 +150,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 protected:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "InputMode")
 	EInputMode NativeInputMode;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "InputMode")
 	EInputMode GlobalInputMode;
 	
 public:

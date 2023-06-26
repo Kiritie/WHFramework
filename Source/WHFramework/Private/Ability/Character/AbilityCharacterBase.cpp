@@ -87,18 +87,6 @@ void AAbilityCharacterBase::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-// Called when the game starts or when spawned
-void AAbilityCharacterBase::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::Final);
-	}
-}
-
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
@@ -190,22 +178,9 @@ void AAbilityCharacterBase::BindASCInput()
 	}
 }
 
-void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	if(!InFiniteState)
-	{
-		RefreshState();
-	}
-}
-
-void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
-{
-	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
-
-	if(IsActive(true))
-	{
-		RefreshState();
-	}
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 void AAbilityCharacterBase::RefreshState()
@@ -226,13 +201,22 @@ void AAbilityCharacterBase::RefreshState()
 	}
 }
 
-// Called every frame
-void AAbilityCharacterBase::Tick(float DeltaSeconds)
+void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
 {
-	Super::Tick(DeltaSeconds);
+	if(!InFiniteState)
+	{
+		RefreshState();
+	}
+}
 
-	if (!IsDead()) return;
+void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+{
+	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
+	if(IsActive(true))
+	{
+		RefreshState();
+	}
 }
 
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
@@ -387,11 +371,6 @@ void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
 void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 {
 
-}
-
-void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
-{
-	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() const

@@ -298,7 +298,7 @@ public:
 	{
 		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 		{
-			return PlayerController->GetPlayerPawn<T>();
+			return PlayerController->GetPawn<T>();
 		}
 		return nullptr;
 	}
@@ -310,7 +310,7 @@ public:
 	{
 		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 		{
-			return PlayerController->GetPlayerPawn<T>();
+			return PlayerController->GetPawn<T>();
 		}
 		return nullptr;
 	}
@@ -322,7 +322,7 @@ public:
 	{
 		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 		{
-			return PlayerController->GetPlayerPawn<T>();
+			return PlayerController->GetPawn<T>();
 		}
 		return nullptr;
 	}

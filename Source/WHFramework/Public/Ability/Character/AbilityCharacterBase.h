@@ -57,9 +57,6 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
-
-protected:
 	// stats
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName RaceID;
@@ -101,8 +98,13 @@ protected:
 	float DefaultAirControl;
 
 protected:
-	virtual void BeginPlay() override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	virtual void BindASCInput();
+
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
+
+protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
@@ -115,19 +117,13 @@ protected:
 
 	virtual void ResetData();
 
-	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
-
-	virtual void BindASCInput();
+	virtual void RefreshState();
 
 	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
 
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
-	virtual void RefreshState();
-
 public:
-	virtual void Tick(float DeltaSeconds) override;
-
 	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;
@@ -166,8 +162,6 @@ public:
 	virtual void OnSelectItem(const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
-
-	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 public:
 	UFUNCTION(BlueprintCallable)
