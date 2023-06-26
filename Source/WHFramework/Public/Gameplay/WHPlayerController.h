@@ -37,6 +37,9 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
 protected:
@@ -93,7 +96,7 @@ protected:
 	virtual void OnUnPossess() override;
 
 public:
-	virtual void Tick(float DeltaTime) override;
+	virtual void Tick(float DeltaSeconds) override;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Raycast
@@ -101,71 +104,16 @@ public:
 	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Input
-protected:
-	virtual void TurnCam(float InRate);
-
-	virtual void LookUpCam(float InRate);
-	
-	virtual void PanHCam(float InRate);
-
-	virtual void PanVCam(float InRate);
-
-	virtual void ZoomCam(float InRate);
-
-	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
-
-	virtual void TouchPressedImpl();
-
-	virtual void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
-
-	virtual void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
-
-	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
-
-	virtual void StartInteract(FKey InKey);
-
-	virtual void EndInteract(FKey InKey);
-
-protected:
-	UPROPERTY(EditAnywhere, Category = "Input")
-	float TouchInputRate;
-
-	UPROPERTY(VisibleAnywhere, Category = "Input")
-	int32 TouchPressedCount;
-
-public:
-	UFUNCTION(BlueprintPure)
-	int32 GetTouchPressedCount() const { return TouchPressedCount; }
-
-private:
-	FVector2D TouchLocationPrevious;
-	float TouchPinchValuePrevious;
-	FTimerHandle TouchReleaseTimerHandle1;
-	FTimerHandle TouchReleaseTimerHandle2;
-	FTimerHandle TouchReleaseTimerHandle3;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Player
-public:
-	virtual void TurnPlayer(float InValue);
-	
-	virtual void MoveHPlayer(float InValue);
-
-	virtual void MoveVPlayer(float InValue);
-
-	virtual void MoveForwardPlayer(float InValue);
-
-	virtual void MoveRightPlayer(float InValue);
-
-	virtual void MoveUpPlayer(float InValue);
-
 protected:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Player")
 	APawn* PlayerPawn;
 
-	UPROPERTY(BlueprintAssignable)
+	UPROPERTY(BlueprintAssignable, Category = "Player")
 	FOnPlayerPawnChanged OnPlayerPawnChanged;
+
+protected:
+	virtual void SetPlayerPawn(APawn* InPlayerPawn);
 
 public:
 	template<class T>
@@ -178,7 +126,4 @@ public:
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
 
 	FOnPlayerPawnChanged& GetOnPlayerPawnChanged() { return OnPlayerPawnChanged; }
-
-protected:
-	virtual void SetPlayerPawn(APawn* InPlayerPawn);
 };

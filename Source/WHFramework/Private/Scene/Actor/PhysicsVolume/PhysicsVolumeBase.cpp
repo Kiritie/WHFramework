@@ -13,16 +13,55 @@ APhysicsVolumeBase::APhysicsVolumeBase()
 	VolumeName = NAME_None;
 }
 
+void APhysicsVolumeBase::OnInitialize_Implementation()
+{
+	
+}
+
+void APhysicsVolumeBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	
+}
+
+void APhysicsVolumeBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void APhysicsVolumeBase::OnTermination_Implementation()
+{
+	
+}
+
 void APhysicsVolumeBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
+}
+
+void APhysicsVolumeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
 }
 
 void APhysicsVolumeBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
 }
 
 void APhysicsVolumeBase::Initialize(const FPhysicsVolumeData& InPhysicsVolumeData)

@@ -33,22 +33,56 @@ ACameraPawnBase::ACameraPawnBase()
 	CameraCollisionMode = ECameraCollisionMode::None;
 }
 
+void ACameraPawnBase::OnInitialize_Implementation()
+{
+	SetCameraCollisionMode(CameraCollisionMode);
+}
+
+void ACameraPawnBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	
+}
+
+void ACameraPawnBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void ACameraPawnBase::OnTermination_Implementation()
+{
+	
+}
+
 void ACameraPawnBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SetCameraCollisionMode(CameraCollisionMode);
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
 }
 
-void ACameraPawnBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void ACameraPawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
 }
 
-void ACameraPawnBase::Tick(float DeltaTime) 
+void ACameraPawnBase::Tick(float DeltaSeconds) 
 {
-	Super::Tick(DeltaTime);
-}
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}	
 
 void ACameraPawnBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
 {

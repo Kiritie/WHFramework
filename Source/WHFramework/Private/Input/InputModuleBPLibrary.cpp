@@ -7,6 +7,15 @@
 #include "Input/InputModule.h"
 #include "Main/MainModule.h"
 
+int32 UInputModuleBPLibrary::GetTouchPressedCount()
+{
+	if(AInputModule* InputModule = AInputModule::Get())
+	{
+		return InputModule->GetTouchPressedCount();
+	}
+	return 0;
+}
+
 EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 {
 	if(AInputModule* InputModule = AInputModule::Get())
@@ -69,141 +78,5 @@ void UInputModuleBPLibrary::BindInputTouch(const EInputEvent KeyEvent, const FIn
 		FInputTouchBinding TB(KeyEvent);
 		TB.TouchDelegate.BindDelegate(const_cast<UObject*>(Delegate.GetUObject()), Delegate.GetFunctionName());
 		PlayerController->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
-	}
-}
-
-bool UInputModuleBPLibrary::IsInputKeyDown(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->IsInputKeyDown(Key);
-	}
-	return false;
-}
-
-bool UInputModuleBPLibrary::WasInputKeyJustPressed(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->WasInputKeyJustPressed(Key);
-	}
-	return false;
-}
-
-bool UInputModuleBPLibrary::WasInputKeyJustReleased(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->WasInputKeyJustReleased(Key);
-	}
-	return false;
-}
-
-float UInputModuleBPLibrary::GetInputAnalogKeyState(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->GetInputAnalogKeyState(Key);
-	}
-	return 0.f;
-}
-
-FVector UInputModuleBPLibrary::GetInputVectorKeyState(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->GetInputVectorKeyState(Key);
-	}
-	return FVector::ZeroVector;
-}
-
-void UInputModuleBPLibrary::GetInputTouchState(ETouchIndex::Type FingerIndex, float& LocationX, float& LocationY, bool& bIsCurrentlyPressed)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->GetInputTouchState(FingerIndex, LocationX, LocationY, bIsCurrentlyPressed);
-	}
-}
-
-void UInputModuleBPLibrary::GetInputMotionState(FVector& Tilt, FVector& RotationRate, FVector& Gravity, FVector& Acceleration)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->GetInputMotionState(Tilt, RotationRate, Gravity, Acceleration);
-	}
-}
-
-bool UInputModuleBPLibrary::GetShowMouseCursor()
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->ShouldShowMouseCursor();
-	}
-	return false;
-}
-
-void UInputModuleBPLibrary::SetShowMouseCursor(bool bShow)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->SetShowMouseCursor(bShow);
-	}
-}
-
-bool UInputModuleBPLibrary::GetMousePosition(float& LocationX, float& LocationY)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->GetMousePosition(LocationX, LocationY);
-	}
-	return false;
-}
-
-void UInputModuleBPLibrary::SetMouseLocation(const int X, const int Y)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->SetMouseLocation(X, Y);
-	}
-}
-
-float UInputModuleBPLibrary::GetInputKeyTimeDown(FKey Key)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->GetInputKeyTimeDown(Key);
-	}
-	return false;
-}
-
-void UInputModuleBPLibrary::GetInputMouseDelta(float& DeltaX, float& DeltaY)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->GetInputMouseDelta(DeltaX, DeltaY);
-	}
-}
-
-void UInputModuleBPLibrary::GetInputAnalogStickState(EControllerAnalogStick::Type WhichStick, float& StickX, float& StickY)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->GetInputAnalogStickState(WhichStick, StickX, StickY);
-	}
-}
-
-void UInputModuleBPLibrary::ActivateTouchInterface(UTouchInterface* NewTouchInterface)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->ActivateTouchInterface(NewTouchInterface);
-	}
-}
-
-void UInputModuleBPLibrary::SetVirtualJoystickVisibility(bool bVisible)
-{
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->SetVirtualJoystickVisibility(bVisible);
 	}
 }

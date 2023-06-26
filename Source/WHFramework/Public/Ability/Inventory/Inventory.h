@@ -61,11 +61,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Data
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
 	virtual FSaveData* ToData() override;
 
-	virtual void UnloadData(EPhase InPhase) override;
+	virtual void UnloadData(EPhase InPhase = EPhase::Final) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actions

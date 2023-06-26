@@ -62,11 +62,55 @@ ACharacterBase::ACharacterBase()
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
+void ACharacterBase::OnInitialize_Implementation()
+{
+	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
+}
+
+void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+}
+
+void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
+}
+
+void ACharacterBase::OnTermination_Implementation()
+{
+	IWHActorInterface::OnTermination_Implementation();
+}
+
 void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
+}
 
-	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
+void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
+}
+
+void ACharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
 }
 
 void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)

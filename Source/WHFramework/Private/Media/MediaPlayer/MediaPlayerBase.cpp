@@ -19,16 +19,6 @@ AMediaPlayerBase::AMediaPlayerBase()
 	Container = nullptr;
 }
 
-void AMediaPlayerBase::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-void AMediaPlayerBase::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-}
-
 void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bMulticast)
 {
 	if(bMulticast)

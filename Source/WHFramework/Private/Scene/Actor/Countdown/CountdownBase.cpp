@@ -64,16 +64,16 @@ ACountdownBase::ACountdownBase()
 	bReplicates = true;
 }
 
-void ACountdownBase::BeginPlay()
+void ACountdownBase::OnInitialize_Implementation()
 {
-	Super::BeginPlay();
+	Super::OnInitialize_Implementation();
 
 	ServerSetTotalCountdownTime(TotalCountdownTime);
 }
 
-void ACountdownBase::Tick(float DeltaSeconds)
+void ACountdownBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	Super::Tick(DeltaSeconds);
+	Super::OnRefresh_Implementation(DeltaSeconds);
 
 	if (CountdownTime > 0.f)
 	{

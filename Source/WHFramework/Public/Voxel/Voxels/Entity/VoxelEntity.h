@@ -33,10 +33,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
 public:
 	virtual void Initialize(FPrimaryAssetId InVoxelID);
 

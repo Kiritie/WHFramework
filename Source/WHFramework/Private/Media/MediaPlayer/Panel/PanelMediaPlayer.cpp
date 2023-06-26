@@ -45,9 +45,9 @@ APanelMediaPlayer::APanelMediaPlayer()
 	}
 }
 
-void APanelMediaPlayer::BeginPlay()
+void APanelMediaPlayer::OnInitialize_Implementation()
 {
-	Super::BeginPlay();
+	Super::OnInitialize_Implementation();
 
 	PanelMediaPlayer->OnEndReached.AddDynamic(this, &APanelMediaPlayer::PanelMediaOnEndReached);
 }

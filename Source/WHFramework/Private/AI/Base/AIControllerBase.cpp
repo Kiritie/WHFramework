@@ -37,6 +37,59 @@ AAIControllerBase::AAIControllerBase()
 	PerceptionComponent->ConfigureSense(*damageSenseConfig);
 }
 
+void AAIControllerBase::OnInitialize_Implementation()
+{
+	IWHActorInterface::OnInitialize_Implementation();
+}
+
+void AAIControllerBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+}
+
+void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
+	
+	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
+
+	if(!OwnerCharacter) return;
+
+	if(IsRunningBehaviorTree())
+	{
+		if(BlackboardAsset)
+		{
+			BlackboardAsset->Refresh();
+		}
+	}
+}
+
+void AAIControllerBase::OnTermination_Implementation()
+{
+	IWHActorInterface::OnTermination_Implementation();
+}
+
+void AAIControllerBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
+}
+
+void AAIControllerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
+}
+
 void AAIControllerBase::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -79,20 +132,13 @@ void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Sti
 	}
 }
 
-void AAIControllerBase::Tick(float DeltaTime)
+void AAIControllerBase::Tick(float DeltaSeconds)
 {
-	Super::Tick(DeltaTime);
-	
-	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
+	Super::Tick(DeltaSeconds);
 
-	if(!OwnerCharacter) return;
-
-	if(IsRunningBehaviorTree())
+	if(Execute_IsDefaultLifecycle(this))
 	{
-		if(BlackboardAsset)
-		{
-			BlackboardAsset->Refresh();
-		}
+		Execute_OnRefresh(this, DeltaSeconds);
 	}
 }
 

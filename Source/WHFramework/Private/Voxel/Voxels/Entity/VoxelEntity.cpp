@@ -25,13 +25,6 @@ AVoxelEntity::AVoxelEntity()
 	Auxiliary = nullptr;
 }
 
-// Called when the game starts or when spawned
-void AVoxelEntity::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
 void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
 {
 	VoxelID = InVoxelID;

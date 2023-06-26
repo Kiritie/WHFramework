@@ -60,11 +60,6 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void AAbilityVitalityBase::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
@@ -143,14 +138,6 @@ void AAbilityVitalityBase::ResetData()
 
 void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
 {
-}
-
-// Called every frame
-void AAbilityVitalityBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	if(IsDead()) return;
 }
 
 void AAbilityVitalityBase::Serialize(FArchive& Ar)

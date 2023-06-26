@@ -46,7 +46,7 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
 	virtual FSaveData* ToData() override;
 

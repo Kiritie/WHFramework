@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AIController.h"
+#include "Global/Base/WHActor.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "AIControllerBase.generated.h"
 
@@ -16,12 +17,26 @@ DECLARE_DELEGATE_TwoParams(FAIPerceptionUpdated, ACharacterBase*, bool)
 /**
  */
 UCLASS()
-class WHFRAMEWORK_API AAIControllerBase : public AAIController
+class WHFRAMEWORK_API AAIControllerBase : public AAIController, public IWHActorInterface
 {
 	GENERATED_BODY()
 
 public:
     AAIControllerBase();
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
@@ -31,6 +46,10 @@ protected:
 	UAIBlackboardBase* BlackboardAsset;
 
 protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
 	virtual void OnPossess(APawn* InPawn) override;
 
 	virtual void OnUnPossess() override;
@@ -39,7 +58,7 @@ protected:
 	virtual void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
 public:
-	virtual void Tick(float DeltaTime) override;
+	virtual void Tick(float DeltaSeconds) override;
 	
 	virtual void InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset);
 

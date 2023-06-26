@@ -49,11 +49,6 @@ AVoxelChunk::AVoxelChunk()
 	PickUps = TArray<AAbilityPickUpBase*>();
 }
 
-void AVoxelChunk::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
 void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	if(State != EVoxelChunkState::Spawned) return;

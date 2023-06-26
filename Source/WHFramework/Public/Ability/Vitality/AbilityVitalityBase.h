@@ -75,16 +75,13 @@ protected:
 	FPrimaryAssetId GenerateVoxelID;
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-	
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 	
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
 	virtual FSaveData* ToData() override;
 	
@@ -93,8 +90,6 @@ protected:
 	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
 
 public:
-	virtual void Tick(float DeltaTime) override;
-
 	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;

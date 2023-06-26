@@ -30,9 +30,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FVoxelItem VoxelItem;
 
-protected:
-	virtual void BeginPlay() override;
-
 public:	
 	virtual void Initialize(FVoxelItem InVoxelItem);
 

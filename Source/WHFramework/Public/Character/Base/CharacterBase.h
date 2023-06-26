@@ -18,17 +18,35 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
 public:
 	ACharacterBase();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 public:
+	virtual void Tick(float DeltaSeconds) override;
+	
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;

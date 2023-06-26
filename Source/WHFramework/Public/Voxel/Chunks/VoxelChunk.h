@@ -30,10 +30,7 @@ public:
 	AVoxelChunk();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
 	virtual FSaveData* ToData() override;
 

@@ -5,18 +5,33 @@
 
 #include "PhysicsVolumeTypes.h"
 #include "GameFramework/PhysicsVolume.h"
+#include "Global/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 
 #include "PhysicsVolumeBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public IObjectPoolInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	APhysicsVolumeBase();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
     /// Physics Volume
@@ -29,6 +44,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	virtual void Tick(float DeltaSeconds) override;

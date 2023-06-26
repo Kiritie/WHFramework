@@ -36,6 +36,140 @@ enum class EMouseButton : uint8
 	Right
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputKeyMapping
+{
+	GENERATED_BODY()
+
+public:
+	FInputKeyMapping()
+	{
+		Key = FKey();
+		Event = EInputEvent::IE_MAX;
+		TargetActor = nullptr;
+		FuncName = NAME_None;
+	}
+
+	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
+		: Key(InKey),
+		  Event(InEvent),
+		  TargetActor(InTargetActor),
+		  FuncName(InFuncName)
+	{
+	}
+	
+public:
+	UPROPERTY(EditAnywhere)
+	FKey Key;
+
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<EInputEvent> Event;
+
+	UPROPERTY(EditAnywhere)
+	AActor* TargetActor;
+
+	UPROPERTY(EditAnywhere)
+	FName FuncName;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputActionMapping
+{
+	GENERATED_BODY()
+
+public:
+	FInputActionMapping()
+	{
+		ActionName = NAME_None;
+		Event = EInputEvent::IE_MAX;
+		TargetActor = nullptr;
+		FuncName = NAME_None;
+	}
+
+	FInputActionMapping(const FName& InActionName, EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
+		: ActionName(InActionName),
+		  Event(InEvent),
+		  TargetActor(InTargetActor),
+		  FuncName(InFuncName)
+	{
+	}
+
+public:
+	UPROPERTY(EditAnywhere)
+	FName ActionName;
+
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<EInputEvent> Event;
+
+	UPROPERTY(EditAnywhere)
+	AActor* TargetActor;
+
+	UPROPERTY(EditAnywhere)
+	FName FuncName;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputAxisMapping
+{
+	GENERATED_BODY()
+
+public:
+	FInputAxisMapping()
+	{
+		AxisName = NAME_None;
+		TargetActor = nullptr;
+		FuncName = NAME_None;
+	}
+
+	FInputAxisMapping(const FName& InAxisName, AActor* InTargetActor, const FName& InFuncName)
+		: AxisName(InAxisName),
+		  TargetActor(InTargetActor),
+		  FuncName(InFuncName)
+	{
+	}
+
+public:
+	UPROPERTY(EditAnywhere)
+	FName AxisName;
+
+	UPROPERTY(EditAnywhere)
+	AActor* TargetActor;
+
+	UPROPERTY(EditAnywhere)
+	FName FuncName;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputTouchMapping
+{
+	GENERATED_BODY()
+
+public:
+	FInputTouchMapping()
+	{
+		Event = EInputEvent::IE_MAX;
+		TargetActor = nullptr;
+		FuncName = NAME_None;
+	}
+
+	FInputTouchMapping(EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
+		: Event(InEvent),
+		  TargetActor(InTargetActor),
+		  FuncName(InFuncName)
+	{
+	}
+
+public:
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<EInputEvent> Event;
+
+	UPROPERTY(EditAnywhere)
+	AActor* TargetActor;
+
+	UPROPERTY(EditAnywhere)
+	FName FuncName;
+};
+
 struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
 {
 	FInputModeNone()

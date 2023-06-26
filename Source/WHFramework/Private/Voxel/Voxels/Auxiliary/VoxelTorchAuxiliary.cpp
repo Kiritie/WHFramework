@@ -23,12 +23,6 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 	EffectComponent->SetupAttachment(LightComponent);
 }
 
-void AVoxelTorchAuxiliary::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
 void AVoxelTorchAuxiliary::Initialize(FVoxelItem InVoxelItem)
 {
 	Super::Initialize(InVoxelItem);

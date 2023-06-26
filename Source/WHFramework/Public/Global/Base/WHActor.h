@@ -4,6 +4,7 @@
 
 
 #include "GameFramework/Actor.h"
+#include "Global/GlobalTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"

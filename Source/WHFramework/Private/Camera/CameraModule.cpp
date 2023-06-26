@@ -9,6 +9,7 @@
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Global/GlobalBPLibrary.h"
+#include "Input/InputModuleBPLibrary.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
@@ -297,14 +298,11 @@ ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> In
 
 UCameraComponent* ACameraModule::GetCurrentCameraComp()
 {
-	if(GetPlayerController())
+	if(APawn* Pawn = GetPlayerController()->GetPawn())
 	{
-		if(APawn* Pawn = GetPlayerController()->GetPawn())
+		if(Pawn->Implements<UWHPlayerInterface>())
 		{
-			if(Pawn->Implements<UWHPlayerInterface>())
-			{
-				return IWHPlayerInterface::Execute_GetCameraComp(Pawn);
-			}
+			return IWHPlayerInterface::Execute_GetCameraComp(Pawn);
 		}
 	}
 	return nullptr;
@@ -312,14 +310,11 @@ UCameraComponent* ACameraModule::GetCurrentCameraComp()
 
 USpringArmComponent* ACameraModule::GetCurrentCameraBoom()
 {
-	if(GetPlayerController())
+	if(APawn* Pawn = GetPlayerController()->GetPawn())
 	{
-		if(APawn* Pawn = GetPlayerController()->GetPawn())
+		if(Pawn->Implements<UWHPlayerInterface>())
 		{
-			if(Pawn->Implements<UWHPlayerInterface>())
-			{
-				return IWHPlayerInterface::Execute_GetCameraBoom(Pawn);
-			}
+			return IWHPlayerInterface::Execute_GetCameraBoom(Pawn);
 		}
 	}
 	return nullptr;
@@ -644,47 +639,27 @@ void ACameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 
 bool ACameraModule::IsControllingMove()
 {
-	if(GetPlayerController())
-	{
-		return !CameraPanMoveKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraPanMoveKey) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || GetPlayerController()->GetTouchPressedCount() == 2;
-	}
-	return false;
+	return !CameraPanMoveKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraPanMoveKey) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || UInputModuleBPLibrary::GetTouchPressedCount() == 2;
 }
 
 bool ACameraModule::IsControllingRotate()
 {
-	if(GetPlayerController())
-	{
-		return !CameraRotateKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraRotateKey) || GetPlayerController()->GetTouchPressedCount() == 1;
-	}
-	return false;
+	return !CameraRotateKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraRotateKey) || UInputModuleBPLibrary::GetTouchPressedCount() == 1;
 }
 
 bool ACameraModule::IsControllingZoom()
 {
-	if(GetPlayerController())
-	{
-		return GetPlayerController()->GetInputAxisValue(FName("ZoomCam")) != 0.f || GetPlayerController()->GetInputAxisValue(FName("PinchGesture")) != 0.f;
-	}
-	return false;
+	return GetPlayerController()->GetInputAxisValue(FName("ZoomCam")) != 0.f || GetPlayerController()->GetInputAxisValue(FName("PinchGesture")) != 0.f;
 }
 
 FVector ACameraModule::GetRealCameraLocation()
 {
-	if(GetPlayerController())
-	{
-		return GetPlayerController()->PlayerCameraManager->GetCameraLocation();
-	}
-	return FVector::ZeroVector;
+	return GetPlayerController()->PlayerCameraManager->GetCameraLocation();
 }
 
 FRotator ACameraModule::GetRealCameraRotation()
 {
-	if(GetPlayerController())
-	{
-		return GetPlayerController()->PlayerCameraManager->GetCameraRotation();
-	}
-	return FRotator::ZeroRotator;
+	return GetPlayerController()->PlayerCameraManager->GetCameraRotation();
 }
 
 AWHPlayerController* ACameraModule::GetPlayerController()

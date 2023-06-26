@@ -35,24 +35,6 @@ ARoamCameraPawn::ARoamCameraPawn()
 	MovementComponent->UpdatedComponent = Sphere;
 }
 
-void ARoamCameraPawn::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
-void ARoamCameraPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-}
-
-// Called every frame
-void ARoamCameraPawn::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
 void ARoamCameraPawn::MoveForward_Implementation(float InValue)
 {
 	const FVector Direction = GetControlRotation().Vector();

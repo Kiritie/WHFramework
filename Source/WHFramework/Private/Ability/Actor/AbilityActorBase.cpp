@@ -21,11 +21,6 @@ AAbilityActorBase::AAbilityActorBase()
 	Container = nullptr;
 }
 
-void AAbilityActorBase::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
@@ -36,11 +31,6 @@ void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParam
 void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-}
-
-void AAbilityActorBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
 }
 
 void AAbilityActorBase::Serialize(FArchive& Ar)

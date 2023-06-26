@@ -16,11 +16,10 @@ class WHFRAMEWORK_API ACountdownBase : public AWHActor
 public:	
 	ACountdownBase();
 
-protected:
-	virtual void BeginPlay() override;
-
 public:
-	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 public:
 	UPROPERTY(BlueprintReadWrite)

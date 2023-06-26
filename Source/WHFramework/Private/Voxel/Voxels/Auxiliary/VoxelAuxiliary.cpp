@@ -17,12 +17,6 @@ AVoxelAuxiliary::AVoxelAuxiliary()
 	VoxelItem = FVoxelItem::Empty;
 }
 
-void AVoxelAuxiliary::BeginPlay()
-{
-	Super::BeginPlay();
-
-}
-
 void AVoxelAuxiliary::Initialize(FVoxelItem InVoxelItem)
 {
 	VoxelItem = InVoxelItem;

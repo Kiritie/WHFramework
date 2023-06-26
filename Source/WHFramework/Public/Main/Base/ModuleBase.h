@@ -29,9 +29,6 @@ public:
 
 	virtual void OnTermination_Implementation() override;
 
-protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:

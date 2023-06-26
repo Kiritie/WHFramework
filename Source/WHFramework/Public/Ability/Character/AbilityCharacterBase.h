@@ -45,6 +45,20 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 public:
 	AAbilityCharacterBase();
 	
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
 protected:
 	// stats
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
@@ -95,7 +109,7 @@ protected:
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
 	virtual FSaveData* ToData() override;
 
@@ -112,7 +126,7 @@ protected:
 	virtual void RefreshState();
 
 public:
-	virtual void Tick(float DeltaTime) override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	virtual bool HasArchive() const override { return true; }
 

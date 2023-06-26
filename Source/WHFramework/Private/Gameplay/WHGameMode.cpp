@@ -56,7 +56,10 @@ void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
-	Execute_OnInitialize(this);
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+	}
 }
 
 void AWHGameMode::InitGameState()
@@ -94,21 +97,30 @@ void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Execute_OnPreparatory(this, EPhase::Primary);
-	Execute_OnPreparatory(this, EPhase::Lesser);
-	Execute_OnPreparatory(this, EPhase::Final);
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnPreparatory(this, EPhase::Primary);
+		Execute_OnPreparatory(this, EPhase::Lesser);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
 }
 
 void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	Execute_OnTermination(this);
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this);
+	}
 }
 
 void AWHGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	Execute_OnRefresh(this, DeltaSeconds);
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
 }

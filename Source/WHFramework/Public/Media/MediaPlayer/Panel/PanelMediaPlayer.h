@@ -21,8 +21,8 @@ class WHFRAMEWORK_API APanelMediaPlayer : public AMediaPlayerBase
 public:
 	APanelMediaPlayer();
 
-protected:
-	virtual void BeginPlay() override;
+public:
+	virtual void OnInitialize_Implementation() override;
 
 public:
 	virtual void PlayMovieImpl_Implementation(const FName InMovieName) override;

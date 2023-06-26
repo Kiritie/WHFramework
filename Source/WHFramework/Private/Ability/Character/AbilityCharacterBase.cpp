@@ -64,13 +64,39 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	AutoPossessAI = EAutoPossessAI::Disabled;
 }
 
+void AAbilityCharacterBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	DefaultGravityScale = GetCharacterMovement()->GravityScale;
+	DefaultAirControl = GetCharacterMovement()->AirControl;
+}
+
+void AAbilityCharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+}
+
+void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+}
+
+void AAbilityCharacterBase::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+}
+
 // Called when the game starts or when spawned
 void AAbilityCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	DefaultGravityScale = GetCharacterMovement()->GravityScale;
-	DefaultAirControl = GetCharacterMovement()->AirControl;
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::Final);
+	}
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -201,9 +227,9 @@ void AAbilityCharacterBase::RefreshState()
 }
 
 // Called every frame
-void AAbilityCharacterBase::Tick(float DeltaTime)
+void AAbilityCharacterBase::Tick(float DeltaSeconds)
 {
-	Super::Tick(DeltaTime);
+	Super::Tick(DeltaSeconds);
 
 	if (!IsDead()) return;
 

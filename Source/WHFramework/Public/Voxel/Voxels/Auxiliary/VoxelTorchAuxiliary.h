@@ -25,9 +25,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UParticleSystemComponent* EffectComponent;
 
-protected:
-	virtual void BeginPlay() override;
-
 public:	
 	virtual void Initialize(FVoxelItem InVoxelItem) override;
 
