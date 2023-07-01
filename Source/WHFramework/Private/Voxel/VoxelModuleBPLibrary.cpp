@@ -54,24 +54,6 @@ FVoxelWorldBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
 	return FVoxelWorldBasicSaveData();
 }
 
-float UVoxelModuleBPLibrary::GetWorldLength()
-{
-	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
-	{
-		return VoxelModule->GetWorldLength();
-	}
-	return 0.f;
-}
-
-bool UVoxelModuleBPLibrary::IsBasicGenerated()
-{
-	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
-	{
-		return VoxelModule->IsBasicGenerated();
-	}
-	return false;
-}
-
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())

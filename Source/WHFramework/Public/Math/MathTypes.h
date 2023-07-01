@@ -147,7 +147,7 @@ public:
 
 	FORCEINLINE float DistanceTo(const FIndex& Index, bool bIgnoreZ = false, bool bFromCenter = false) const
 	{
-		const FVector VectorA = ToVector() + (bFromCenter ? FVector::UpVector * 0.5f : FVector::ZeroVector);
+		const FVector VectorA = ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
 		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
 		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
 	}

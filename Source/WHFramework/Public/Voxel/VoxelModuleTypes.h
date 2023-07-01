@@ -435,20 +435,20 @@ struct WHFRAMEWORK_API FVoxelWorldBasicSaveData : public FSaveData
 public:
 	FORCEINLINE FVoxelWorldBasicSaveData()
 	{
-		BlockSize = 80;
-		ChunkSize = 16;
+		BlockSize = 80.f;
+		ChunkSize = FVector(16.f);
 		
-		ChunkHeightRange = 3;
+		WorldSize = FVector(0.f, 0.f, 3.f);
 
-		TerrainBaseHeight = 0.1f;
-		TerrainPlainScale = FVector(0.005f, 0.005f, 0.2f);
-		TerrainMountainScale = FVector(0.03f, 0.03f, 0.25f);
-		TerrainStoneVoxelScale = FVector(0.05f, 0.05f, 0.18f);
-		TerrainSandVoxelScale = FVector(0.04f, 0.04f, 0.21f);
-		TerrainPlantVoxelScale = FVector(0.5f, 0.5f, 0.3f);
-		TerrainTreeVoxelScale = FVector(0.8f, 0.8f, 0.23f);
-		TerrainBedrockVoxelHeight = 0.02f;
-		TerrainWaterVoxelHeight = 0.25f;
+		BaseHeight = 0.1f;
+		PlainScale = FVector(0.005f, 0.005f, 0.2f);
+		MountainScale = FVector(0.03f, 0.03f, 0.25f);
+		StoneScale = FVector(0.05f, 0.05f, 0.18f);
+		SandScale = FVector(0.04f, 0.04f, 0.21f);
+		PlantScale = FVector(0.5f, 0.5f, 0.3f);
+		TreeScale = FVector(0.8f, 0.8f, 0.23f);
+		BedrockHeight = 0.02f;
+		WaterHeight = 0.25f;
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
 
@@ -458,40 +458,40 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 BlockSize;
+	float BlockSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 ChunkSize;
+	FVector ChunkSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 ChunkHeightRange;
+	FVector WorldSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float TerrainBaseHeight;
+	float BaseHeight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float TerrainBedrockVoxelHeight;
+	float BedrockHeight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float TerrainWaterVoxelHeight;
+	float WaterHeight;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainPlainScale;
+	FVector PlainScale;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainMountainScale;
+	FVector MountainScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainStoneVoxelScale;
+	FVector StoneScale;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainSandVoxelScale;
+	FVector SandScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainPlantVoxelScale;
+	FVector PlantScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TerrainTreeVoxelScale;
+	FVector TreeScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FVoxelChunkMaterial> ChunkMaterials;
@@ -503,14 +503,14 @@ public:
 	float SecondsOfDay;
 
 public:
-	FORCEINLINE float GetChunkLength() const
+	FORCEINLINE FVector GetChunkRealSize() const
 	{
 		return ChunkSize * BlockSize;
 	}
 
-	FORCEINLINE int32 GetWorldHeight(bool bLength = false) const
+	FORCEINLINE FVector GetWorldRealSize() const
 	{
-		return ChunkSize * ChunkHeightRange * (bLength ? BlockSize : 1.f);
+		return WorldSize * ChunkSize * BlockSize;
 	}
 
 	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency InTransparency) const

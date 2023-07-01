@@ -120,7 +120,7 @@ protected:
 
 protected:
 	virtual void GenerateWorld();
-
+	
 	virtual void GenerateVoxels();
 
 public:
@@ -204,27 +204,16 @@ public:
 
 	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
+public:
+	bool UpdateChunkQueues(bool bFromAgent = true, bool bForceStop = false);
+
+	void StopChunkQueues();
+
 protected:
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc)
-	{
-		const int32 tmpNum = FMath::Min(InSpeed, InQueue.Num());
-		DON(i, tmpNum,
-			InFunc(InQueue[i]);
-		)
-		InQueue.RemoveAt(0, tmpNum);
-		return InQueue.Num() > 0;
-	}
-	
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage)
-	{
-		const int32 tmpNum = FMath::Min(InSpeed, InQueue.Num());
-		DON(i, tmpNum,
-			InFunc(InQueue[i], InStage);
-		)
-		InQueue.RemoveAt(0, tmpNum);
-		return InQueue.Num() > 0;
-	}
-	
+	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc);
+
+	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage);
+
 	template<class T>
 	bool UpdateChunkTasks(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
 	{
@@ -279,19 +268,13 @@ protected:
 	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkSpawnRange;
+	FVector2D ChunkSpawnRange;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkBasicSpawnRange;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkSpawnDistance;
+	FVector2D ChunkSpawnDistance;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkSpawnSpeed;
-				
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkDestroyDistance;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkDestroySpeed;
@@ -319,8 +302,6 @@ protected:
 
 	FIndex LastGenerateIndex;
 
-	FIndex LastStayChunkIndex;
-
 	TArray<FIndex> ChunkSpawnQueue;
 
 	TArray<FIndex> ChunkMapLoadQueue;
@@ -347,10 +328,6 @@ protected:
 
 public:
 	int32 GetChunkNum(bool bNeedGenerated = false) const;
-
-	float GetWorldLength() const;
-
-	bool IsBasicGenerated() const;
 
 	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
 	

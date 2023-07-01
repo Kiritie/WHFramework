@@ -42,10 +42,10 @@ protected:
 	class UPawnMovementComponent* MovementComponent;
 
 protected:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	FName CameraName;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	ECameraCollisionMode CameraCollisionMode;
 
 protected:
@@ -71,9 +71,9 @@ public:
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Chunk
+	/// Voxel
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	FPrimaryAssetId GenerateVoxelID;
 
 public:

@@ -101,10 +101,7 @@ void AModuleBase::Termination_Implementation()
 	{
 		ModuleState = EModuleState::Terminated;
 		OnStateChanged(ModuleState);
-		if(Execute_IsDefaultLifecycle(this))
-	{
 		Execute_OnTermination(this);
-	}
 	}
 }
 

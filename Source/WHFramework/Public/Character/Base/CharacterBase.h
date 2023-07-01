@@ -58,7 +58,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "CharacterStats")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName Name;
 public:
 	virtual FName GetNameC() const override { return Name; }
