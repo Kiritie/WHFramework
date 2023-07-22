@@ -408,30 +408,30 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 	return FCrc::MemCrc_DEPRECATED(&InPoint, sizeof(InPoint));
 }
 
-#define INDEX_ITERATOR(Iter, Range, bFromCenter, Expression) \
+#define ITER_INDEX(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
-	if(Range != FVector::OneVector) \
+	if(Range == FVector::OneVector && !bFromCenter) \
 	{ \
-		for(Iter.X = bFromCenter ? -Range.X : 0; Iter.X < Range.X; Iter.X++) \
+		Expression \
+	} \
+	else \
+	{ \
+		for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
 		{ \
-			for(Iter.Y = bFromCenter ? -Range.Y : 0; Iter.Y < Range.Y; Iter.Y++) \
+			for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
 			{ \
-				for(Iter.Z = bFromCenter ? -Range.Z : 0; Iter.Z < Range.Z; Iter.Z++) \
+				for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
 				{ \
 					Expression \
 				} \
 			} \
 		} \
-	} \
-	else \
-	{ \
-		Expression \
 	}
 
-#define DIRECTION_ITERATOR(Iter, Expression) \
+#define ITER_DIRECTION(Iter, Expression) \
 	EDirection Iter; \
-	for(int32 _i = 0; _i < 6; _i++) \
+	for(int32 _Index = 0; _Index < 6; _Index++) \
 	{ \
-		Iter = (EDirection)_i; \
+		Iter = (EDirection)_Index; \
 		Expression \
 	}

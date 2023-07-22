@@ -44,6 +44,18 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
+FReply UUserWidgetBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(UInputModuleBPLibrary::OnWidgetInputKeyDown(InGeometry, InKeyEvent).NativeReply.IsEventHandled()) return FReply::Handled();
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+FReply UUserWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if(UInputModuleBPLibrary::OnWidgetInputMouseButtonDown(InGeometry, InMouseEvent).NativeReply.IsEventHandled()) return FReply::Handled();
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	
@@ -309,19 +321,23 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 			SetVisibility(ESlateVisibility::Collapsed);
 			break;
 		}
-		if(ParentName != NAME_None)
+		case EWidgetCloseType::Remove:
 		{
-			if(GetParent())
+			if(ParentName != NAME_None)
 			{
-				GetParent()->RemoveChild(this);
+				if(GetParent())
+				{
+					GetParent()->RemoveChild(this);
+				}
 			}
-		}
-		else
-		{
-			if(IsInViewport())
+			else
 			{
-				RemoveFromParent();
+				if(IsInViewport())
+				{
+					RemoveFromParent();
+				}
 			}
+			break;
 		}
 	}
 		

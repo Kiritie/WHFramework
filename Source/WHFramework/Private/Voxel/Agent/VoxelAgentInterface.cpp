@@ -34,7 +34,7 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	{
 		if(Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this))
 		{
-			UEventModuleBPLibrary::BroadcastEvent<UEventHandle_GenerateVoxel>(EEventNetType::Single, Cast<UObject>(this), { FParameter::MakePointer(&VoxelItem) });
+			UEventModuleBPLibrary::BroadcastEvent<UEventHandle_GenerateVoxel>(EEventNetType::Single, Cast<UObject>(this), { &VoxelItem });
 			return true;
 		}
 	}
@@ -47,7 +47,7 @@ bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 	FVoxelItem VoxelItem = InVoxelHitResult.VoxelItem;
 	if(Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this))
 	{
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_DestroyVoxel>(EEventNetType::Single, Cast<UObject>(this), { FParameter::MakePointer(&VoxelItem) });
+		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_DestroyVoxel>(EEventNetType::Single, Cast<UObject>(this), { &VoxelItem });
 		return true;
 	}
 	return false;

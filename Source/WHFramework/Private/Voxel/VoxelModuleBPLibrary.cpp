@@ -171,11 +171,11 @@ bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayE
 	return false;
 }
 
-bool UVoxelModuleBPLibrary::VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
+bool UVoxelModuleBPLibrary::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		return VoxelModule->VoxelRaycastSinge(InDistance, InIgnoreActors, OutHitResult);
+		return VoxelModule->VoxelRaycastSinge(InRaycastType, InDistance, InIgnoreActors, OutHitResult);
 	}
 	return false;
 }
@@ -198,11 +198,11 @@ bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FIndex InChunkIndex, float InR
 	return false;
 }
 
-bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FVector InLocation, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+bool UVoxelModuleBPLibrary::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
-		return VoxelModule->VoxelAgentTraceSingle(InLocation, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+		return VoxelModule->VoxelAgentTraceSingle(InLocation, InRange, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
 	}
 	return false;
 }

@@ -19,6 +19,7 @@ class ACharacterBase;
 class UWorldTimerComponent;
 class USceneCaptureComponent2D;
 class UWorldWeatherComponent;
+class AVoxelEntityPreview;
 
 /**
  * 体素模块
@@ -36,7 +37,6 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterfa
 	GENERATED_MODULE(AVoxelModule)
 
 public:	
-	// Sets default values for this actor's properties
 	AVoxelModule();
 
 	~AVoxelModule();
@@ -97,6 +97,8 @@ protected:
 
 	void SetWorldState(EVoxelWorldState InWorldState);
 
+	virtual void OnWorldModeChanged();
+
 	virtual void OnWorldStateChanged();
 
 protected:
@@ -121,8 +123,6 @@ protected:
 protected:
 	virtual void GenerateWorld();
 	
-	virtual void GenerateVoxels();
-
 public:
 	virtual void LoadChunkMap(FIndex InIndex);
 
@@ -168,24 +168,24 @@ protected:
 	virtual bool RemoveFromDestroyQueue(FIndex InIndex);
 
 public:
-	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex);
+	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex) const;
 
-	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation);
+	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation) const;
 	
 	virtual FVoxelItem& FindVoxelByIndex(FIndex InIndex);
 
 	virtual FVoxelItem& FindVoxelByLocation(FVector InLocation);
 
 public:
-	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex);
+	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex) const;
 
-	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
+	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
 
-	virtual FVector ChunkIndexToLocation(FIndex InIndex);
+	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;
 
-	virtual FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
+	virtual FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false) const;
 
-	virtual FVector VoxelIndexToLocation(FIndex InIndex);
+	virtual FVector VoxelIndexToLocation(FIndex InIndex) const;
 
 public:
 	virtual ECollisionChannel GetChunkTraceType() const;
@@ -194,13 +194,13 @@ public:
 
 	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
-	virtual bool VoxelRaycastSinge(float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
+	virtual bool VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 	virtual bool VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
 	virtual bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
 
-	virtual bool VoxelAgentTraceSingle(FVector InLocation, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
+	virtual bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
 
 	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
@@ -210,39 +210,41 @@ public:
 	void StopChunkQueues();
 
 protected:
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc);
+	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc) const;
 
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage);
+	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage) const;
+
+	bool UpdateChunkQueue(TArray<TArray<FIndex>>& InQueue, int32 InSpeed, TFunction<bool(TArray<FIndex>& _InQueue, int32 _InSpeed, int32 _InIndex)> InFunc) const;
 
 	template<class T>
-	bool UpdateChunkTasks(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
+	bool UpdateChunkQueue(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
 	{
 		if(InTasks.Num() == 0 && InQueue.Num() > 0)
 		{
-			TArray<FIndex> tmpQueue = InQueue;
-			DON(i, FMath::CeilToInt((float)tmpQueue.Num() / InSpeed),
+			TArray<FIndex> Queue = InQueue;
+			DON_WITHINDEX(FMath::CeilToInt((float)Queue.Num() / InSpeed), i,
 				TArray<FIndex> tmpArr;
-				DON(j, FMath::Min(InSpeed, tmpQueue.Num() - i * InSpeed),
-					tmpArr.Add(tmpQueue[i * InSpeed + j]);
+				DON_WITHINDEX(FMath::Min(InSpeed, Queue.Num() - i * InSpeed), j,
+					tmpArr.Add(Queue[i * InSpeed + j]);
 				)
-				const auto tmpTask = new FAsyncTask<T>(this, tmpArr);
-				InTasks.Add(tmpTask);
-				tmpTask->StartBackgroundTask();
+				const auto Task = new FAsyncTask<T>(this, tmpArr);
+				InTasks.Add(Task);
+				Task->StartBackgroundTask();
 			)
 		}
 		else if(InTasks.Num() > 0)
 		{
-			for(auto task = InTasks.CreateConstIterator(); task; ++task)
+			for(auto Iter = InTasks.CreateConstIterator(); Iter; ++Iter)
 			{
-				auto tmpTask = *task;
-				if(tmpTask->IsDone())
+				auto Task = *Iter;
+				if(Task->IsDone())
 				{
-					for(auto index : tmpTask->GetTask().GetChunkQueue())
+					for(auto index : Task->GetTask().GetChunkQueue())
 					{
 						InQueue.Remove(index);
 					}
-					InTasks.Remove(tmpTask);
-					delete tmpTask;
+					InTasks.Remove(Task);
+					delete Task;
 				}
 			}
 		}
@@ -252,10 +254,10 @@ protected:
 	template<class T>
 	void StopChunkTasks(TArray<FAsyncTask<T>*>& InTasks)
 	{
-		for(auto iter : InTasks)
+		for(auto Iter : InTasks)
 		{
-			iter->EnsureCompletion();
-			delete iter;
+			Iter->EnsureCompletion();
+			delete Iter;
 		}
 		InTasks.Empty();
 	}
@@ -268,10 +270,7 @@ protected:
 	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	FVector2D ChunkSpawnRange;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	FVector2D ChunkSpawnDistance;
+	float ChunkSpawnDistance;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int32 ChunkSpawnSpeed;
@@ -297,6 +296,9 @@ protected:
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
+	UPROPERTY()
+	TArray<AVoxelEntityPreview*> PreviewVoxels;
+
 protected:
 	int32 ChunkSpawnBatch;
 
@@ -306,9 +308,7 @@ protected:
 
 	TArray<FIndex> ChunkMapLoadQueue;
 
-	TArray<FIndex> ChunkMapBuildQueue;
-
-	TArray<FIndex> ChunkMapBuildQueue1;
+	TArray<TArray<FIndex>> ChunkMapBuildQueue;
 
 	TArray<FIndex> ChunkMeshBuildQueue;
 
@@ -327,9 +327,13 @@ protected:
 	TArray<FAsyncTask<AsyncTask_SaveChunkData>*> ChunkDataSaveTasks;
 
 public:
+	bool IsBasicGenerated() const;
+	
+	FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
+
 	int32 GetChunkNum(bool bNeedGenerated = false) const;
 
-	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
+	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false) const;
 	
-	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex);
+	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex) const;
 };

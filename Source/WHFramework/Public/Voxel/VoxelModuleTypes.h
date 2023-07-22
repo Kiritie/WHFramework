@@ -26,6 +26,13 @@ enum class EVoxelActionType : uint8
 };
 
 UENUM(BlueprintType)
+enum class EVoxelRaycastType : uint8
+{
+	FromAimPoint,
+	FromMousePosition
+};
+
+UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
 	None,
@@ -436,9 +443,11 @@ public:
 	FORCEINLINE FVoxelWorldBasicSaveData()
 	{
 		BlockSize = 80.f;
+		
 		ChunkSize = FVector(16.f);
 		
-		WorldSize = FVector(0.f, 0.f, 3.f);
+		WorldSize = FVector(-1.f, -1.f, 3.f);
+		WorldRange = FVector2D(7.f, 7.f);
 
 		BaseHeight = 0.1f;
 		PlainScale = FVector(0.005f, 0.005f, 0.2f);
@@ -465,6 +474,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector WorldSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector2D WorldRange;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float BaseHeight;
@@ -508,9 +520,14 @@ public:
 		return ChunkSize * BlockSize;
 	}
 
+	FORCEINLINE FVector GetWorldSize() const
+	{
+		return FVector(WorldSize.X != -1.f ? WorldSize.X : WorldRange.X * 2.f, WorldSize.Y != -1.f ? WorldSize.Y : WorldRange.Y * 2.f, WorldSize.Z);
+	}
+
 	FORCEINLINE FVector GetWorldRealSize() const
 	{
-		return WorldSize * ChunkSize * BlockSize;
+		return GetWorldSize() * ChunkSize * BlockSize;
 	}
 
 	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency InTransparency) const
@@ -568,4 +585,54 @@ public:
 	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) { return nullptr; }
 
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FDefaultVoxelWorldSaveData : public FVoxelWorldSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FDefaultVoxelWorldSaveData()
+	{
+		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
+	}
+	
+	FORCEINLINE FDefaultVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
+	{
+		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	TMap<FVector, FVoxelChunkSaveData> ChunkDatas;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+		for(auto Iter : ChunkDatas)
+		{
+			Iter.Value.MakeSaved();
+		}
+	}
+	
+	virtual bool IsExistChunkData(FIndex InChunkIndex) const override
+	{
+		return ChunkDatas.Contains(InChunkIndex.ToVector());
+	}
+
+	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) override
+	{
+		if (ChunkDatas.Contains(InChunkIndex.ToVector()))
+		{
+			return &ChunkDatas[InChunkIndex.ToVector()];
+		}
+		return nullptr;
+	}
+
+	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) override
+	{
+		ChunkDatas.Emplace(InChunkIndex.ToVector(), InChunkData->CastRef<FVoxelChunkSaveData>());
+	}
 };

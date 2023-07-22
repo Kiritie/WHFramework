@@ -204,7 +204,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	AActor* OperationTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
 	bool bTrackTarget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
@@ -216,10 +216,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	EStepCameraViewSpace CameraViewSpace;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
 	EEaseType CameraViewEaseType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
 	float CameraViewDuration;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")

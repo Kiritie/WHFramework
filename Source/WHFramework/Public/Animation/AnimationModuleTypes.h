@@ -5,7 +5,7 @@
 
 #include "LatentActions.h"
 #include "UObject/WeakObjectPtr.h"
-#include "LatentActionModuleTypes.generated.h"
+#include "AnimationModuleTypes.generated.h"
 
 //////////  MoveActorToLatentAction ///////////////
 

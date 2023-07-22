@@ -93,6 +93,27 @@ public:
 		}
 	}
 	/**
+	 * 通过类型重置模块
+	 */
+	template<class T>
+	static void ResetModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	{
+		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		{
+			Module->Reset();
+		}
+	}
+	/**
+	* 通过名称重置模块
+	*/
+	static void ResetModuleByName(const FName InModuleName)
+	{
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
+		{
+			Module->Reset();
+		}
+	}
+	/**
 	 * 通过类型暂停模块
 	 */
 	template<class T>

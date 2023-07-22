@@ -49,24 +49,24 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// CameraModule
+	/// Camera
 protected:
-	UPROPERTY(EditAnywhere, Category = "CameraModule")
+	UPROPERTY(EditAnywhere, Category = "Camera")
 	TArray<TSubclassOf<ACameraPawnBase>> CameraClasses;
 	
-	UPROPERTY(EditAnywhere, Category = "CameraModule")
+	UPROPERTY(EditAnywhere, Category = "Camera")
 	TArray<ACameraPawnBase*> Cameras;
 	
-	UPROPERTY(EditAnywhere, Category = "CameraModule")
+	UPROPERTY(EditAnywhere, Category = "Camera")
 	ACameraPawnBase* DefaultCamera;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "DefaultCamera != nullptr"), Category = "CameraModule")
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
 	bool DefaultInstantSwitch;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraModule")
+	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	ACameraPawnBase* CurrentCamera;
 
-private:			
+private:
 	UPROPERTY(Transient)
 	TMap<FName, ACameraPawnBase*> CameraMap;
 
@@ -77,10 +77,8 @@ public:
 		return Cast<T>(CurrentCamera);
 	}
 	
-	ACameraPawnBase* GetCurrentCamera() const;
-
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const;
+	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
 	UCameraComponent* GetCurrentCameraComp();
@@ -131,7 +129,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bCameraMoveAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraMoveAble == true"), Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bCameraMoveControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
@@ -140,11 +138,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bClampCameraMove;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bClampCameraMove == true"), Category = "CameraControl|Move")
-	FBox CameraMoveRange;
-
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
-	FKey CameraPanMoveKey;
+	FBox CameraMoveRange;
 	
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
@@ -156,14 +151,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	bool bCameraRotateAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	bool bCameraRotateControlAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraRotateAble == true"), Category = "CameraControl|Rotate")
-	bool bReverseCameraPitch;
-
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
-	FKey CameraRotateKey;
+	bool bReverseCameraPitch;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
 	float CameraTurnRate;
@@ -187,14 +179,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bCameraZoomAble;
 
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bCameraZoomAble == true"), Category = "CameraControl|Zoom")
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bCameraZoomControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
-	bool bUseNormalizedZoom;
-
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
-	FKey CameraZoomKey;
+	bool bNormalizeCameraZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float CameraZoomRate;
@@ -203,13 +192,13 @@ protected:
 	float CameraZoomSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	float InitCameraDistance;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MinCameraDistance;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MaxCameraDistance;
-
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
-	float InitCameraDistance;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Stats
@@ -232,9 +221,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
 	float TargetCameraDistance;
 
-	UPROPERTY(Transient)
-	AWHPlayerController* PlayerController;
-	
 private:
 	float CameraDoMoveTime;
 	float CameraDoMoveDuration;
@@ -255,7 +241,12 @@ private:
 	float TrackPitchOffset;
 	float TrackDistance;
 	bool TrackAllowControl;
+	bool bIsControllingMove;
+	bool bIsControllingRotate;
+	bool bIsControllingZoom;
 	ETrackTargetMode TrackTargetMode;
+	UPROPERTY(Transient)
+	AWHPlayerController* PlayerController;
 
 protected:
 	virtual void DoTrackTarget(bool bInstant = false);
@@ -354,10 +345,10 @@ public:
 	void SetCameraMoveControlAble(bool bInCameraMoveControlAble) { bCameraMoveControlAble = bInCameraMoveControlAble; }
 
 	UFUNCTION(BlueprintPure)
-	FKey GetCameraPanMoveKey() const { return CameraPanMoveKey; }
-
-	UFUNCTION(BlueprintPure)
 	bool IsReverseCameraPanMove() const { return bReverseCameraPanMove; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetReverseCameraPanMove(bool bInReverseCameraPanMove) { bReverseCameraPanMove = bInReverseCameraPanMove; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }
@@ -385,9 +376,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsReverseCameraPitch() const { return bReverseCameraPitch; }
-
-	UFUNCTION(BlueprintPure)
-	FKey GetCameraRotateKey() const { return CameraRotateKey; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraTurnRate() const { return CameraTurnRate; }
@@ -438,9 +426,6 @@ public:
 	void SetCameraZoomControlAble(bool bInCameraZoomControlAble) { bCameraZoomControlAble = bInCameraZoomControlAble; }
 
 	UFUNCTION(BlueprintPure)
-	FKey GetCameraZoomKey() const { return CameraZoomKey; }
-
-	UFUNCTION(BlueprintPure)
 	float GetCameraZoomRate() const { return CameraZoomRate; }
 
 	UFUNCTION(BlueprintCallable)
@@ -487,12 +472,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	float GetTargetCameraDistance() const { return TargetCameraDistance; }
-	
-	UFUNCTION(BlueprintPure)
-	FVector GetRealCameraLocation();
-
-	UFUNCTION(BlueprintPure)
-	FRotator GetRealCameraRotation();
 
 protected:
 	AWHPlayerController* GetPlayerController();

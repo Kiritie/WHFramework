@@ -26,22 +26,22 @@ public:
 	void ServerPlaySoundAtLocationMulticast(USoundBase* InSound, FVector InLocation, float InVolume);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerPlaySingleSound2DMulticast(USoundBase* InSound, FName InFlag, float InVolume);
+	void ServerPlaySingleSound2DMulticast(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerPlaySingleSoundAtLocationMulticast(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume);
+	void ServerPlaySingleSoundAtLocationMulticast(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerStopSingleSoundMulticast(FName InFlag);
+	void ServerStopSingleSoundMulticast(const FSingleSoundHandle& InHandle);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetSingleSoundPausedMulticast(FName InFlag, bool bPaused);
+	void ServerSetSingleSoundPausedMulticast(const FSingleSoundHandle& InHandle, bool bPaused);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerSetGlobalSoundVolumeMulticast(float InVolume);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetBGMSoundVolumeMulticast(float InVolume);
+	void ServerSetBackgroundSoundVolumeMulticast(float InVolume);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerSetEnvironmentSoundVolumeMulticast(float InVolume);

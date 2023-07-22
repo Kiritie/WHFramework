@@ -3,13 +3,12 @@
 #pragma once
 
 
-#include "Character/CharacterModuleTypes.h"
-#include "UObject/Interface.h"
+#include "Camera/Base/CameraPawnInterface.h"
 #include "WHPlayerInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWHPlayerInterface : public UInterface
+class UWHPlayerInterface : public UCameraPawnInterface
 {
 	GENERATED_BODY()
 };
@@ -17,7 +16,7 @@ class UWHPlayerInterface : public UInterface
 /**
 * 
 */
-class WHFRAMEWORK_API IWHPlayerInterface
+class WHFRAMEWORK_API IWHPlayerInterface : public ICameraPawnInterface
 {
 	GENERATED_BODY()
 
@@ -40,11 +39,4 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void MoveUp(float InValue);
-
-public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	class UCameraComponent* GetCameraComp();
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	class USpringArmComponent* GetCameraBoom();
 };

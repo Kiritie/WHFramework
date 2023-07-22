@@ -251,7 +251,7 @@ void UInventorySlot::UseItem(int32 InCount /*= -1*/)
 	{
 		case EAbilityItemType::Prop:
 		{
-			DON(i, InCount,
+			DON(InCount,
 				if(ActiveItem())
 				{
 					auto tmpItem = FAbilityItem(Item, 1);

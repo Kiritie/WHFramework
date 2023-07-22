@@ -144,39 +144,104 @@ public:
 		ObjectValue = nullptr;
 		PointerValue = nullptr;
 	}
+	
+	FParameter(int32 InIntegerValue)
+	{
+		*this = MakeInteger(InIntegerValue);
+	}
+	
+	FParameter(float InFloatValue)
+	{
+		*this = MakeFloat(InFloatValue);
+	}
+	
+	FParameter(double InFloatValue)
+	{
+		*this = MakeFloat(InFloatValue);
+	}
+	
+	FParameter(FString InStringValue)
+	{
+		*this = MakeString(InStringValue);
+	}
+	
+	FParameter(bool InBooleanValue)
+	{
+		*this = MakeBoolean(InBooleanValue);
+	}
+	
+	FParameter(FVector InVectorValue)
+	{
+		*this = MakeVector(InVectorValue);
+	}
+		
+	FParameter(FVector2D InVectorValue)
+	{
+		*this = MakeVector(InVectorValue);
+	}
+
+	FParameter(FRotator InRotatorValue)
+	{
+		*this = MakeRotator(InRotatorValue);
+	}
+	
+	FParameter(FColor InColorValue)
+	{
+		*this = MakeColor(InColorValue);
+	}
+		
+	FParameter(FLinearColor InColorValue)
+	{
+		*this = MakeColor(InColorValue);
+	}
+
+	FParameter(UClass* InClassValue)
+	{
+		*this = MakeClass(InClassValue);
+	}
+	
+	FParameter(UObject* InObjectValue)
+	{
+		*this = MakeObject(InObjectValue);
+	}
+	
+	FParameter(void* InPointerValue)
+	{
+		*this = MakePointer(InPointerValue);
+	}
 
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EParameterType ParameterType;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Integer"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Integer"))
 	int32 IntegerValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Float"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Float"))
 	float FloatValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::String"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::String"))
 	FString StringValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (MultiLine = "true", EditCondition = "ParameterType == EParameterType::Text"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Text", MultiLine = "true"))
 	FText TextValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Boolean"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Boolean"))
 	bool BooleanValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Vector"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Vector"))
 	FVector VectorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Rotator"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Rotator"))
 	FRotator RotatorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Rotator"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Color"))
 	FColor ColorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Class"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Class"))
 	UClass* ClassValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditCondition = "ParameterType == EParameterType::Object"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Object"))
 	UObject* ObjectValue;
 
 	void* PointerValue;
@@ -184,23 +249,23 @@ protected:
 public:
 	EParameterType GetParameterType() const { return ParameterType; }
 
-	void SetParameterType(EParameterType InParameterType) { this->ParameterType = InParameterType; }
+	void SetParameterType(EParameterType InParameterType) { ParameterType = InParameterType; }
 
 	int32 GetIntegerValue() const { return IntegerValue; }
 
-	void SetIntegerValue(int32 InIntegerValue) { this->IntegerValue = InIntegerValue; }
+	void SetIntegerValue(int32 InIntegerValue) { IntegerValue = InIntegerValue; }
 
 	float GetFloatValue() const { return FloatValue; }
 
-	void SetFloatValue(float InFloatValue) { this->FloatValue = InFloatValue; }
+	void SetFloatValue(float InFloatValue) { FloatValue = InFloatValue; }
 
 	FString GetStringValue() const { return StringValue; }
 
-	void SetStringValue(const FString& InStringValue) { this->StringValue = InStringValue; }
+	void SetStringValue(const FString& InStringValue) { StringValue = InStringValue; }
 
 	FText GetTextValue() const { return TextValue; }
 
-	void SetTextValue(const FText InTextValue) { this->TextValue = InTextValue; }
+	void SetTextValue(const FText InTextValue) { TextValue = InTextValue; }
 
 	bool GetBooleanValue() const { return BooleanValue; }
 
@@ -208,26 +273,30 @@ public:
 
 	FVector GetVectorValue() const { return VectorValue; }
 
-	void SetVectorValue(const FVector& InVectorValue) { this->VectorValue = InVectorValue; }
+	void SetVectorValue(const FVector2D& InVectorValue) { VectorValue = FVector(InVectorValue.X, InVectorValue.Y, 0.f); }
+
+	void SetVectorValue(const FVector& InVectorValue) { VectorValue = InVectorValue; }
 
 	FRotator GetRotatorValue() const { return RotatorValue; }
 
-	void SetRotatorValue(const FRotator& InRotatorValue) { this->RotatorValue = InRotatorValue; }
+	void SetRotatorValue(const FRotator& InRotatorValue) { RotatorValue = InRotatorValue; }
 
 	FColor GetColorValue() const { return ColorValue; }
 
-	void SetColorValue(const FColor& InColorValue) { this->ColorValue = InColorValue; }
+	void SetColorValue(const FColor& InColorValue) { ColorValue = InColorValue; }
+
+	void SetColorValue(const FLinearColor& InColorValue) { ColorValue = InColorValue.ToFColorSRGB(); }
 
 	UClass* GetClassValue() const { return ClassValue; }
 
-	void SetClassValue(UClass* InClassValue) { this->ClassValue = InClassValue; }
+	void SetClassValue(UClass* InClassValue) { ClassValue = InClassValue; }
 
 	UObject* GetObjectValue() const { return ObjectValue; }
 
 	template<class T>
 	T* GetObjectValue() const { return Cast<T>(ObjectValue); }
 
-	void SetObjectValue(UObject* InObjectValue) { this->ObjectValue = InObjectValue; }
+	void SetObjectValue(UObject* InObjectValue) { ObjectValue = InObjectValue; }
 
 	void* GetPointerValue() const { return PointerValue; }
 
@@ -237,7 +306,7 @@ public:
 	template<class T>
 	T& GetPointerValueRef() const { return *GetPointerValue<T>(); }
 
-	void SetPointerValue(void* InPointerValue) { this->PointerValue = InPointerValue; }
+	void SetPointerValue(void* InPointerValue) { PointerValue = InPointerValue; }
 
 public:
 	static FParameter MakeInteger(int32 InValue)
@@ -288,6 +357,14 @@ public:
 		return Parameter;
 	}
 
+	static FParameter MakeVector(const FVector2D& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Vector;
+		Parameter.SetVectorValue(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakeRotator(const FRotator& InValue)
 	{
 		FParameter Parameter = FParameter();
@@ -297,6 +374,14 @@ public:
 	}
 
 	static FParameter MakeColor(const FColor& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Color;
+		Parameter.SetColorValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeColor(const FLinearColor& InValue)
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Color;

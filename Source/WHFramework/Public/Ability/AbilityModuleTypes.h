@@ -818,10 +818,10 @@ struct WHFRAMEWORK_API FRaceItem : public FAbilityItem
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
 	int32 MinCount;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
 	int32 MaxCount;
 
 	FORCEINLINE FRaceItem()

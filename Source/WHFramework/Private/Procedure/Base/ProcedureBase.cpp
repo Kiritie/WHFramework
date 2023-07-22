@@ -3,6 +3,7 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
+#include "Camera/CameraModule.h"
 #include "Camera/CameraModuleBPLibrary.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
@@ -125,7 +126,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {this});
 }
 
 void UProcedureBase::OnRefresh()
@@ -159,7 +160,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {this});
 }
 
 void UProcedureBase::Guide()
@@ -190,17 +191,17 @@ void UProcedureBase::GetCameraView()
 {
 	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
 	else
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch;
+		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch;
 	}
-	CameraViewDistance = UCameraModuleBPLibrary::GetCurrentCameraDistance();
+	CameraViewDistance = UCameraModuleBPLibrary::GetCameraDistance();
 
 	Modify();
 }

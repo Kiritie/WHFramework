@@ -58,7 +58,7 @@ protected:
 /**
  * 
  */
-UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking))
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking, Physics))
 class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface, public IReferencePoolInterface
 {
 	GENERATED_BODY()
@@ -89,6 +89,9 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ReferencePool
+public:
 	virtual void OnReset_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////

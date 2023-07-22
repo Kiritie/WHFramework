@@ -27,22 +27,22 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// SingleSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume = 1.0f, bool bMulticast = false);
+	static FSingleSoundHandle PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	static FSingleSoundHandle PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSound2DWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f);
+	static FSingleSoundHandle PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f);
+	static FSingleSoundHandle PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void StopSingleSound(FName InFlag, bool bMulticast = false);
+	static void StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetSingleSoundPaused(FName InFlag, bool bPaused, bool bMulticast = false);
+	static void SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
@@ -50,9 +50,9 @@ public:
 	static void SetGlobalSoundVolume(float InVolume, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// BGMSound
+	/// BackgroundSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetBGMSoundVolume(float InVolume, bool bMulticast = false);
+	static void SetBackgroundSoundVolume(float InVolume, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EnvironmentSound

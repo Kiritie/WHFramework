@@ -3,20 +3,12 @@
 
 #include "Camera/CameraModuleBPLibrary.h"
 
+#include "Camera/CameraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraModule.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
-
-ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetCurrentCamera();
-	}
-	return nullptr;
-}
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass)
 {
@@ -27,22 +19,31 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPaw
 	return nullptr;
 }
 
-UCameraComponent* UCameraModuleBPLibrary::GetCurrentCameraComp()
+FVector UCameraModuleBPLibrary::GetCameraLocation(bool bReal)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return CameraModule->GetCurrentCameraComp();
+		return bReal ? CameraModule->GetCurrentCameraComp()->GetComponentLocation() : CameraModule->GetCurrentCameraLocation();
 	}
-	return nullptr;
+	return FVector::ZeroVector;
 }
 
-USpringArmComponent* UCameraModuleBPLibrary::GetCurrentCameraBoom()
+FRotator UCameraModuleBPLibrary::GetCameraRotation(bool bReal)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return CameraModule->GetCurrentCameraBoom();
+		return bReal ? CameraModule->GetCurrentCameraComp()->GetComponentRotation() : CameraModule->GetCurrentCameraRotation();
 	}
-	return nullptr;
+	return FRotator::ZeroRotator;
+}
+
+float UCameraModuleBPLibrary::GetCameraDistance(bool bReal)
+{
+	if(ACameraModule* CameraModule = ACameraModule::Get())
+	{
+		return bReal ? 0.f : CameraModule->GetCurrentCameraDistance();
+	}
+	return 0.f;
 }
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
@@ -237,77 +238,6 @@ void UCameraModuleBPLibrary::AddCameraDistanceInput(float InValue)
 	{
 		CameraModule->AddCameraDistanceInput(InValue);
 	}
-}
-
-FVector UCameraModuleBPLibrary::GetCurrentCameraLocation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetCurrentCameraLocation();
-	}
-	return FVector::ZeroVector;
-}
-
-FRotator UCameraModuleBPLibrary::GetCurrentCameraRotation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetCurrentCameraRotation();
-	}
-	return FRotator::ZeroRotator;
-}
-float UCameraModuleBPLibrary::GetCurrentCameraDistance()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetCurrentCameraDistance();
-	}
-	return 0.f;
-}
-
-FVector UCameraModuleBPLibrary::GetTargetCameraLocation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetTargetCameraLocation();
-	}
-	return FVector::ZeroVector;
-}
-
-FRotator UCameraModuleBPLibrary::GetTargetCameraRotation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetTargetCameraRotation();
-	}
-	return FRotator::ZeroRotator;
-}
-
-float UCameraModuleBPLibrary::GetTargetCameraDistance()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetTargetCameraDistance();
-	}
-	return 0.f;
-}
-
-FVector UCameraModuleBPLibrary::GetRealCameraLocation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetRealCameraLocation();
-	}
-	return FVector::ZeroVector;
-}
-
-FRotator UCameraModuleBPLibrary::GetRealCameraRotation()
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		return CameraModule->GetRealCameraRotation();
-	}
-	return FRotator::ZeroRotator;
 }
 
 void UCameraModuleBPLibrary::SetViewTargetWithBlend(AActor* NewViewTarget, float BlendTime, EViewTargetBlendFunction BlendFunc, float BlendExp, bool bLockOutgoing)

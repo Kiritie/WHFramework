@@ -87,10 +87,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoSize;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoSize == false"))
 	FVector2D WidgetDrawSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -99,13 +99,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetRefreshType WidgetRefreshType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 	
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoVisibility;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "bWidgetAutoVisibility == true"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoVisibility == true"))
 	float WidgetShowDistance;
 
 	UPROPERTY(EditDefaultsOnly)

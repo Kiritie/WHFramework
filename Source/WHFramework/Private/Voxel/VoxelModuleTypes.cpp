@@ -37,13 +37,13 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData) : FVoxelI
 FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveData)
 {
 	RefreshData();
-	TArray<FString> data;
-	InSaveData.VoxelData.ParseIntoArray(data, TEXT(";"));
-	if(data.Num() >= 3)
+	TArray<FString> DataStrs;
+	InSaveData.VoxelData.ParseIntoArray(DataStrs, TEXT(";"));
+	if(DataStrs.Num() >= 3)
 	{
-		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*data[0]));
-		Index = FIndex(data[1]);
-		Angle = (ERightAngle)FCString::Atoi(*data[2]);
+		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
+		Index = FIndex(DataStrs[1]);
+		Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
 	}
 	Owner = nullptr;
 	Auxiliary = nullptr;
@@ -99,7 +99,7 @@ FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
 {
 	if(!bRefresh)
 	{
-		static FVoxelSaveData VoxelSaveData;	
+		static FVoxelSaveData VoxelSaveData;
 		VoxelSaveData = FVoxelSaveData(*this);
 		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), GetVoxelType(), *Index.ToString(), Angle);
 		return VoxelSaveData;
@@ -126,12 +126,12 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 {
 	if(Owner)
 	{
-		TArray<FVoxelItem> parts;
+		TArray<FVoxelItem> Parts;
 		for(auto Iter : GetVoxelData().PartDatas)
 		{
-			parts.Add(Owner->GetVoxelItem(Index + Iter.Key));
+			Parts.Add(Owner->GetVoxelItem(Index + Iter.Key));
 		}
-		return parts;
+		return Parts;
 	}
 	return TArray<FVoxelItem>();
 }

@@ -26,27 +26,27 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter(TSubclassOf<AChar
 	return nullptr;
 }
 
-void UCharacterModuleBPLibrary::SwitchCharacter(ACharacterBase* InCharacter)
+void UCharacterModuleBPLibrary::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		CharacterModule->SwitchCharacter(InCharacter);
+		CharacterModule->SwitchCharacter(InCharacter, bResetCamera, bInstant);
 	}
 }
 
-void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
+void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera, bool bInstant)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		CharacterModule->SwitchCharacterByClass(InCharacterClass);
+		CharacterModule->SwitchCharacterByClass(InCharacterClass, bResetCamera, bInstant);
 	}
 }
 
-void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InCharacterName)
+void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InCharacterName, bool bResetCamera, bool bInstant)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		CharacterModule->SwitchCharacterByName(InCharacterName);
+		CharacterModule->SwitchCharacterByName(InCharacterName, bResetCamera, bInstant);
 	}
 }
 

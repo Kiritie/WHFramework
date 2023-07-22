@@ -202,7 +202,7 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 	{
 		if(bCreateLoadingWidget)
 		{
-			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()), FParameter::MakeBoolean(false) };
+			TArray<FParameter> Parameters { InLevelPath.ToString(), false };
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
@@ -251,7 +251,7 @@ void ASceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevel
 		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
 		if(bCreateLoadingWidget)
 		{
-			TArray<FParameter> Parameters { FParameter::MakeString(InLevelPath.ToString()), FParameter::MakeBoolean(true) };
+			TArray<FParameter> Parameters { InLevelPath.ToString(), true };
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		WHLog(TEXT("Start unload level: ") + LoadPackagePath);
@@ -295,7 +295,7 @@ void ASceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 	{
 		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakeString(InLevelPath.ToString()) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { InLevelPath.ToString() });
 }
 
 void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
@@ -308,7 +308,7 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	{
 		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakeString(InLevelPath.ToString()) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { InLevelPath.ToString() });
 }
 
 bool ASceneModule::HasSceneActor(FGuid InID, bool bEnsured) const
@@ -488,7 +488,7 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 
 void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange, AActor* InOwnerActor, USceneComponent* InSceneComp)
 {
-	TArray<FParameter> Parameters = { FParameter::MakeString(InText), FParameter::MakeColor(InTextColor), FParameter::MakeInteger((int32)InTextStyle) };
+	TArray<FParameter> Parameters = { InText, InTextColor, (int32)InTextStyle };
 	if(InOffsetRange != FVector::ZeroVector)
 	{
 		InLocation = InLocation + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));

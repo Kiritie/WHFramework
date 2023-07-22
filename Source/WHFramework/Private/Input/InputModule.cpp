@@ -23,6 +23,10 @@ IMPLEMENTATION_MODULE(AInputModule)
 AInputModule::AInputModule()
 {
 	ModuleName = FName("InputModule");
+	
+	KeyShortcuts.Add(FName("CameraPanMoveKey"), FInputKeyShortcut(FKey("MiddleMouseButton")));
+	KeyShortcuts.Add(FName("CameraRotateKey"), FInputKeyShortcut());
+	KeyShortcuts.Add(FName("CameraZoomKey"), FInputKeyShortcut());
 
 	AxisMappings.Add(FInputAxisMapping(FName("TurnCamera"), this, FName("TurnCamera")));
 	AxisMappings.Add(FInputAxisMapping(FName("LookUpCamera"), this, FName("LookUpCamera")));
@@ -108,6 +112,13 @@ void AInputModule::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
+void AInputModule::OnReset_Implementation()
+{
+	Super::OnReset_Implementation();
+
+	TouchPressedCount = 0;
+}
+
 void AInputModule::OnPause_Implementation()
 {
 	Super::OnPause_Implementation();
@@ -123,11 +134,30 @@ void AInputModule::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
+FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const
+{
+	if(KeyShortcuts.Contains(InName))
+	{
+		return KeyShortcuts[InName];
+	}
+	return FInputKeyShortcut();
+}
+
+FEventReply AInputModule::OnWidgetInputKeyDown_Implementation(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	return FEventReply(false);
+}
+
+FEventReply AInputModule::OnWidgetInputMouseButtonDown_Implementation(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return FEventReply(false);
+}
+
 void AInputModule::TurnCamera(float InRate)
 {
-	if(InRate == 0.f) return;
+	if(InRate == 0.f || ACameraModule::Get()->IsControllingMove()) return;
 
-	if(!ACameraModule::Get()->GetCameraRotateKey().IsValid() || GetPlayerController()->IsInputKeyDown(ACameraModule::Get()->GetCameraRotateKey()))
+	if(!GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraRotate")).Key))
 	{
 		ACameraModule::Get()->AddCameraRotationInput(InRate, 0.f);
 	}
@@ -135,9 +165,9 @@ void AInputModule::TurnCamera(float InRate)
 
 void AInputModule::LookUpCamera(float InRate)
 {
-	if(InRate == 0.f) return;
+	if(InRate == 0.f || GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key)) return;
 
-	if(!ACameraModule::Get()->GetCameraRotateKey().IsValid() || GetPlayerController()->IsInputKeyDown(ACameraModule::Get()->GetCameraRotateKey()))
+	if(!GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraRotate")).Key))
 	{
 		ACameraModule::Get()->AddCameraRotationInput(0.f, ACameraModule::Get()->IsReverseCameraPitch() ? -InRate : InRate);
 	}
@@ -147,7 +177,7 @@ void AInputModule::PanHCamera(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(!ACameraModule::Get()->GetCameraPanMoveKey().IsValid() || GetPlayerController()->IsInputKeyDown(ACameraModule::Get()->GetCameraPanMoveKey()))
+	if(!GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
@@ -159,7 +189,7 @@ void AInputModule::PanVCamera(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(!ACameraModule::Get()->GetCameraPanMoveKey().IsValid() || GetPlayerController()->IsInputKeyDown(ACameraModule::Get()->GetCameraPanMoveKey()))
+	if(!GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
@@ -171,7 +201,7 @@ void AInputModule::ZoomCamera(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(!ACameraModule::Get()->GetCameraZoomKey().IsValid() || GetPlayerController()->IsInputKeyDown(ACameraModule::Get()->GetCameraZoomKey()))
+	if(!GetKeyShortcutByName(FName("CameraZoom")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraZoom")).Key))
 	{
 		ACameraModule::Get()->AddCameraDistanceInput(-InRate);
 	}
@@ -395,11 +425,6 @@ void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 	}
 }
 
-void AInputModule::ResetInputStates_Implementation()
-{
-	TouchPressedCount = 0;
-}
-
 AWHPlayerController* AInputModule::GetPlayerController()
 {
 	if(!PlayerController)
@@ -464,6 +489,6 @@ void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
 			}
 			default: break;
 		}
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { FParameter::MakePointer(&GlobalInputMode) });
+		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { &GlobalInputMode });
 	}
 }

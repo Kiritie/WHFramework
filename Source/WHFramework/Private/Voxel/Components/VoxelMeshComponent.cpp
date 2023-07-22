@@ -99,7 +99,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 		}
 		case EVoxelMeshType::Cube:
 		{
-			DIRECTION_ITERATOR(Iter,
+			ITER_DIRECTION(Iter,
 				if (!GetOwnerChunk() || !GetOwnerChunk()->CheckVoxelAdjacent(InVoxelItem.Index, Iter))
 				{
 					BuildFace(InVoxelItem, Iter);
@@ -118,7 +118,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 		const FVector range = voxelData.GetRange();
 		Transparency = voxelData.Transparency;
 		CenterOffset = FVector(0.f, 0.f, -range.Z * 0.5f + 0.5f);
-		INDEX_ITERATOR(partIndex, range, false,
+		ITER_INDEX(partIndex, range, false,
 			UVoxelData& partData = voxelData.GetPartData(partIndex);
 			if(partData.IsValid())
 			{

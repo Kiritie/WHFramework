@@ -16,11 +16,23 @@ class WHFRAMEWORK_API UInputModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputStates
+	// InputShortcuts
+public:
+	UFUNCTION(BlueprintPure, Category = "InputModuleBPLibrary")
+	static FInputKeyShortcut GetKeyShortcutByName(const FName InName);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// WidgetInputs
 public:
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void ResetInputStates();
+	static FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
 
+	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
+	static FEventReply OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent);
+
+	//////////////////////////////////////////////////////////////////////////
+	// InputStates
+public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleBPLibrary")
 	static int32 GetTouchPressedCount();
 
@@ -37,7 +49,7 @@ public:
 	static void UpdateGlobalInputMode();
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputBind
+	// InputBinds
 public:
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
 	static void BindInputKey(const FKey Key, const EInputEvent KeyEvent, const FInputActionHandlerDynamicSignature& Delegate);

@@ -20,6 +20,11 @@ class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidget
 public:
 	UUserWidgetBase(const FObjectInitializer& ObjectInitializer);
 
+public:
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetTickAble;
@@ -138,19 +143,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
 	FAnchors WidgetAnchors;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
 	bool bWidgetAutoSize;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
 	FVector2D WidgetDrawSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
 	FVector2D WidgetAlignment;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -162,7 +167,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetOpenFinishType WidgetOpenFinishType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
 	float WidgetOpenFinishTime;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -171,13 +176,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetCloseFinishType WidgetCloseFinishType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
 	float WidgetCloseFinishTime;
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetRefreshType WidgetRefreshType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 
 	UPROPERTY(VisibleAnywhere)

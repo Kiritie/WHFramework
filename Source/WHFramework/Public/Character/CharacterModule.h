@@ -53,6 +53,12 @@ protected:
 	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
 	ACharacterBase* DefaultCharacter;
 
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCharacter != nullptr"), Category = "Character")
+	bool DefaultResetCamera;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCharacter != nullptr"), Category = "Character")
+	bool DefaultInstantSwitch;
+
 	UPROPERTY(VisibleAnywhere, Replicated, Category = "Character")
 	ACharacterBase* CurrentCharacter;
 
@@ -73,19 +79,19 @@ public:
 	ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacter(ACharacterBase* InCharacter);
+	void SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
-	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
 	{
-		SwitchCharacterByClass(InCharacterClass);
+		SwitchCharacterByClass(InCharacterClass, bResetCamera);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByName(FName InCharacterName);
+	void SwitchCharacterByName(FName InCharacterName, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
 	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())

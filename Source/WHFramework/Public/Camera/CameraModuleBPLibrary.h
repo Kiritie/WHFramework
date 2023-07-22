@@ -26,16 +26,17 @@ public:
 		return Cast<T>(GetCurrentCamera());
 	}
 
-	static ACameraPawnBase* GetCurrentCamera();
-
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass);
-	
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static UCameraComponent* GetCurrentCameraComp();
+	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass = nullptr);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static USpringArmComponent* GetCurrentCameraBoom();
+	static FVector GetCameraLocation(bool bReal = false);
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static FRotator GetCameraRotation(bool bReal = false);
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
+	static float GetCameraDistance(bool bReal = false);
 
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
@@ -127,31 +128,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void AddCameraDistanceInput(float InValue);
-
-public:
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FVector GetCurrentCameraLocation();
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FRotator GetCurrentCameraRotation();
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static float GetCurrentCameraDistance();
-	
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FVector GetTargetCameraLocation();
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FRotator GetTargetCameraRotation();
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static float GetTargetCameraDistance();
-	
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FVector GetRealCameraLocation();
-
-	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static FRotator GetRealCameraRotation();
 
 public:
 	/**

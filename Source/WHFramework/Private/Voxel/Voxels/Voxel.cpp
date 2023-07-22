@@ -13,6 +13,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Math/MathBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -81,7 +82,10 @@ FSaveData* UVoxel::ToData()
 
 void UVoxel::RefreshData()
 {
-	GetItem().RefreshData(this);
+	if(Owner)
+	{
+		Owner->GetVoxelItem(Index).RefreshData(this);
+	}
 }
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -104,7 +108,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
 			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Angle) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, Owner);
 		}
-		if(!Owner->CheckVoxelAdjacent(Index, EDirection::Up))
+		if(Owner && !Owner->CheckVoxelAdjacent(Index, EDirection::Up))
 		{
 			Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Angle), FVoxelItem::Empty, true, InAgent);
 		}
@@ -179,6 +183,9 @@ UVoxelData& UVoxel::GetData() const
 
 FVoxelItem& UVoxel::GetItem()
 {
-	if(Owner) return Owner->GetVoxelItem(Index);
-	return ToSaveDataRef<FVoxelItem>(true);
+	if(Owner)
+	{
+		return Owner->GetVoxelItem(Index);
+	}
+	return ToSaveDataRef<FVoxelItem>();
 }

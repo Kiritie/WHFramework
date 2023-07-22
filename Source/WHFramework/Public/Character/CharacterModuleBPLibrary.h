@@ -31,19 +31,19 @@ public:
 	static ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass);
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void SwitchCharacter(ACharacterBase* InCharacter);
+	static void SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
-	static void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	static void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
 	{
-		SwitchCharacterByClass(InCharacterClass);
+		SwitchCharacterByClass(InCharacterClass, bResetCamera, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass);
+	static void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleBPLibrary")
-	static void SwitchCharacterByName(FName InCharacterName);
+	static void SwitchCharacterByName(FName InCharacterName, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
 	static bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())

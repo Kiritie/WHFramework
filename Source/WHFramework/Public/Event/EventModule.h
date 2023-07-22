@@ -21,9 +21,6 @@ public:
 
 	~AEventModule();
 
-protected:
-	TMap<TSubclassOf<UEventHandleBase>, FEventHandleInfo> EventHandleInfos;
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
 public:
@@ -47,6 +44,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Event
+protected:
+	TMap<TSubclassOf<UEventHandleBase>, FEventHandleInfo> EventHandleInfos;
+
 public:
 	template<class T>
 	void SubscribeEvent(UObject* InOwner, const FName InFuncName)

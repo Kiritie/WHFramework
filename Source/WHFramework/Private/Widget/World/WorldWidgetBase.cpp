@@ -165,7 +165,7 @@ void UWorldWidgetBase::Refresh_Implementation()
 
 void UWorldWidgetBase::RefreshVisibility_Implementation()
 {
-	const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetRealCameraLocation()) < WidgetShowDistance);
+	const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetCameraLocation()) < WidgetShowDistance);
 	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 

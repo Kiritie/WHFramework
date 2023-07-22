@@ -16,7 +16,7 @@ void UAudioModuleNetworkComponent::ServerPlaySound2DMulticast_Implementation(USo
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->PlaySound2D(InSound, InVolume, true);
+		AudioModule->MultiPlaySound2D(InSound, InVolume);
 	}
 }
 
@@ -25,43 +25,43 @@ void UAudioModuleNetworkComponent::ServerPlaySoundAtLocationMulticast_Implementa
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->PlaySoundAtLocation(InSound, InLocation, InVolume, true);
+		AudioModule->MultiPlaySoundAtLocation(InSound, InLocation, InVolume);
 	}
 }
 
-bool UAudioModuleNetworkComponent::ServerPlaySingleSound2DMulticast_Validate(USoundBase* InSound, FName InFlag, float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerPlaySingleSound2DMulticast_Implementation(USoundBase* InSound, FName InFlag, float InVolume)
+bool UAudioModuleNetworkComponent::ServerPlaySingleSound2DMulticast_Validate(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume) { return true; }
+void UAudioModuleNetworkComponent::ServerPlaySingleSound2DMulticast_Implementation(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->PlaySingleSound2D(InSound, InFlag, InVolume, true);
+		AudioModule->MultiPlaySingleSound2D(InHandle, InSound, InVolume);
 	}
 }
 
-bool UAudioModuleNetworkComponent::ServerPlaySingleSoundAtLocationMulticast_Validate(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerPlaySingleSoundAtLocationMulticast_Implementation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume)
+bool UAudioModuleNetworkComponent::ServerPlaySingleSoundAtLocationMulticast_Validate(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume) { return true; }
+void UAudioModuleNetworkComponent::ServerPlaySingleSoundAtLocationMulticast_Implementation(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->PlaySingleSoundAtLocation(InSound, InFlag, InLocation, InVolume, true);
+		AudioModule->MultiPlaySingleSoundAtLocation(InHandle, InSound, InLocation, InVolume);
 	}
 }
 
-bool UAudioModuleNetworkComponent::ServerStopSingleSoundMulticast_Validate(FName InFlag) { return true; }
-void UAudioModuleNetworkComponent::ServerStopSingleSoundMulticast_Implementation(FName InFlag)
+bool UAudioModuleNetworkComponent::ServerStopSingleSoundMulticast_Validate(const FSingleSoundHandle& InHandle) { return true; }
+void UAudioModuleNetworkComponent::ServerStopSingleSoundMulticast_Implementation(const FSingleSoundHandle& InHandle)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->StopSingleSound(InFlag, true);
+		AudioModule->MultiStopSingleSound(InHandle);
 	}
 }
 
-bool UAudioModuleNetworkComponent::ServerSetSingleSoundPausedMulticast_Validate(FName InFlag, bool bPaused) { return true; }
-void UAudioModuleNetworkComponent::ServerSetSingleSoundPausedMulticast_Implementation(FName InFlag, bool bPaused)
+bool UAudioModuleNetworkComponent::ServerSetSingleSoundPausedMulticast_Validate(const FSingleSoundHandle& InHandle, bool bPaused) { return true; }
+void UAudioModuleNetworkComponent::ServerSetSingleSoundPausedMulticast_Implementation(const FSingleSoundHandle& InHandle, bool bPaused)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetSingleSoundPaused(InFlag, bPaused, true);
+		AudioModule->MultiSetSingleSoundPaused(InHandle, bPaused);
 	}
 }
 
@@ -70,16 +70,16 @@ void UAudioModuleNetworkComponent::ServerSetGlobalSoundVolumeMulticast_Implement
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetGlobalSoundVolume(InVolume, true);
+		AudioModule->MultiSetGlobalSoundVolume(InVolume);
 	}
 }
 
-bool UAudioModuleNetworkComponent::ServerSetBGMSoundVolumeMulticast_Validate(float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerSetBGMSoundVolumeMulticast_Implementation(float InVolume)
+bool UAudioModuleNetworkComponent::ServerSetBackgroundSoundVolumeMulticast_Validate(float InVolume) { return true; }
+void UAudioModuleNetworkComponent::ServerSetBackgroundSoundVolumeMulticast_Implementation(float InVolume)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetBGMSoundVolume(InVolume, true);
+		AudioModule->MultiSetBackgroundSoundVolume(InVolume);
 	}
 }
 
@@ -88,7 +88,7 @@ void UAudioModuleNetworkComponent::ServerSetEnvironmentSoundVolumeMulticast_Impl
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetEnvironmentSoundVolume(InVolume, true);
+		AudioModule->MultiSetEnvironmentSoundVolume(InVolume);
 	}
 }
 
@@ -97,6 +97,6 @@ void UAudioModuleNetworkComponent::ServerSetEffectSoundVolumeMulticast_Implement
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetEffectSoundVolume(InVolume, true);
+		AudioModule->MultiSetEffectSoundVolume(InVolume);
 	}
 }

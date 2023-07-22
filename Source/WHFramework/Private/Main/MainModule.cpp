@@ -16,7 +16,7 @@
 #include "FSM/FSMModule.h"
 #include "Global/GlobalBPLibrary.h"
 #include "Input/InputModule.h"
-#include "LatentAction/LatentActionModule.h"
+#include "Animation/AnimationModule.h"
 #include "Media/MediaModule.h"
 #include "Network/NetworkModule.h"
 #include "ReferencePool/ReferencePoolModule.h"
@@ -42,6 +42,7 @@ AMainModule::AMainModule()
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAbilityModule::StaticClass());
 	ModuleClasses.Add(AAIModule::StaticClass());
+	ModuleClasses.Add(AAnimationModule::StaticClass());
 	ModuleClasses.Add(AAssetModule::StaticClass());
 	ModuleClasses.Add(AAudioModule::StaticClass());
 	ModuleClasses.Add(ACharacterModule::StaticClass());
@@ -50,7 +51,6 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AEventModule::StaticClass());
 	ModuleClasses.Add(AFSMModule::StaticClass());
 	ModuleClasses.Add(AInputModule::StaticClass());
-	ModuleClasses.Add(ALatentActionModule::StaticClass());
 	ModuleClasses.Add(AMediaModule::StaticClass());
 	ModuleClasses.Add(ANetworkModule::StaticClass());
 	ModuleClasses.Add(AObjectPoolModule::StaticClass());
@@ -162,36 +162,35 @@ void AMainModule::GenerateModules()
 {
 	ModuleMap.Empty();
 
+	// 移除废弃模块
+	for(int32 i = ModuleRefs.Num() - 1; i >= 0; --i)
+	{
+		if(!ModuleRefs[i] || !ModuleClasses.Contains(ModuleRefs[i]->GetClass()))
+		{
+			if(ModuleRefs[i])
+			{
+				ModuleRefs[i]->Destroy();
+			}
+			ModuleRefs.RemoveAt(i);
+		}
+	}
+
 	// 获取场景模块
 	TArray<AActor*> ChildActors;
 	GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
-		if(auto Module = Cast<AModuleBase>(Iter))
+		auto Module = Cast<AModuleBase>(Iter);
+		if(ModuleClasses.Contains(Module->GetClass()))
 		{
 			const FName Name = Module->GetModuleName();
 			Iter->SetActorLabel(Name.ToString());
 			ModuleRefs.AddUnique(Module);
 			ModuleMap.Emplace(Name, Module);
 		}
-	}
-
-	// 移除废弃模块
-	TArray<AModuleBase*> RemoveList;
-	for(auto Iter : ModuleRefs)
-	{
-		if(!Iter || !ModuleClasses.Contains(Iter->GetClass()))
+		else
 		{
-			RemoveList.AddUnique(Iter);
-			Iter->Destroy();
-		}
-	}
-	for(auto Iter : RemoveList)
-	{
-		ModuleRefs.Remove(Iter);
-		if(ModuleMap.Contains(Iter->GetModuleName()))
-		{
-			ModuleMap.Remove(Iter->GetModuleName());
+			Module->Destroy();
 		}
 	}
 

@@ -39,8 +39,44 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 	}
 };
 
-#define DON(Index, Count, Expression) \
+//////////////////////////////////////////////////////////////////////////
+// MACROS
+#define DON(Count, Expression) \
+for(int32 _Index = 0; _Index < Count; _Index++) \
+{ \
+	Expression \
+}
+
+#define DON_WITHINDEX(Count, Index, Expression) \
 for(int32 Index = 0; Index < Count; Index++) \
 { \
 	Expression \
+}
+
+#define ITER_ARRAY(Array, Item, Expression) \
+for(auto& Item : Array) \
+{ \
+	Expression \
+}
+
+#define ITER_ARRAY_WITHINDEX(Array, Index, Item, Expression) \
+int32 Index = 0; \
+for(auto& Item : Array) \
+{ \
+	Expression \
+	Index++; \
+}
+
+#define ITER_MAP(Map, Item, Expression) \
+for(auto& Item : Map) \
+{ \
+	Expression \
+}
+
+#define ITER_MAP_WITHINDEX(Map, Index, Item, Expression) \
+int32 Index = 0; \
+for(auto& Item : Map) \
+{ \
+	Expression \
+	Index++; \
 }

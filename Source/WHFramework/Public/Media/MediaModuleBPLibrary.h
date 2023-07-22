@@ -10,6 +10,7 @@
 #include "MediaModuleBPLibrary.generated.h"
 
 class AMediaModule;
+class AMediaPlayerBase;
 /**
  * 
  */
@@ -29,7 +30,7 @@ public:
 	static void RemoveMediaPlayerFromListByName(const FName InMediaPlayerName);
 
 	UFUNCTION(BlueprintPure, Category = "NetworkModuleBPLibrary")
-	static class AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName);
+	static AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName);
 	
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
 	static void PlayMediaPlayerMovie(const FName InMediaPlayerName, const FName InMovieName, bool bMulticast = false);

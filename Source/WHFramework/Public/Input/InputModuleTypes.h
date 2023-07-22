@@ -37,6 +37,43 @@ enum class EMouseButton : uint8
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputKeyShortcut
+{
+	GENERATED_BODY()
+
+public:
+	FInputKeyShortcut()
+	{
+		Key = FKey();
+		Auxs = TArray<FKey>();
+	}
+
+	FInputKeyShortcut(const FKey& InKey)
+		: Key(InKey),
+		  Auxs({})
+	{
+	}
+
+	FInputKeyShortcut(const FKey& InKey, const TArray<FKey>& InAuxs)
+		: Key(InKey),
+		  Auxs(InAuxs)
+	{
+	}
+
+	bool IsValid() const
+	{
+		return Key.IsValid();
+	}
+	
+public:
+	UPROPERTY(EditAnywhere)
+	FKey Key;
+
+	UPROPERTY(EditAnywhere)
+	TArray<FKey> Auxs;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInputKeyMapping
 {
 	GENERATED_BODY()

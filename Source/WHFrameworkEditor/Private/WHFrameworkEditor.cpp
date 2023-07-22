@@ -303,12 +303,12 @@ void FWHFrameworkEditorModule::RegisterAssetTypeAction(class IAssetTools& AssetT
 
 void FWHFrameworkEditorModule::OnBeginPIE(bool bIsSimulating)
 {
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_BeginPlay::StaticClass(), EEventNetType::Single, nullptr, { FParameter::MakeBoolean(bIsSimulating) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_BeginPlay::StaticClass(), EEventNetType::Single, nullptr, { bIsSimulating });
 }
 
 void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
 {
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndPlay::StaticClass(), EEventNetType::Single, nullptr, { FParameter::MakeBoolean(bIsSimulating) });
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndPlay::StaticClass(), EEventNetType::Single, nullptr, { bIsSimulating });
 }
 
 void FWHFrameworkEditorModule::OnClickedProcedureEditorButton()

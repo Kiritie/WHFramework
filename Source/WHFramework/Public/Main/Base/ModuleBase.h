@@ -9,7 +9,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
-UCLASS(hidecategories = (Rendering, Collision, Physics))
+UCLASS()
 class WHFRAMEWORK_API AModuleBase : public AWHActor
 {
 	GENERATED_BODY()
@@ -17,17 +17,6 @@ class WHFRAMEWORK_API AModuleBase : public AWHActor
 public:	
 	// ParamSets default values for this actor's properties
 	AModuleBase();
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// WHActor
-public:
-	virtual void OnInitialize_Implementation() override;
-
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
-
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
-
-	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -42,11 +31,16 @@ public:
 	*/
 	virtual void OnDestroy();
 #endif
-	/**
-	* 当状态改变
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnStateChanged(EModuleState InModuleState);
+	
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
+	virtual void OnReset_Implementation() override;
 	/**
 	* 当暂停
 	*/
@@ -57,6 +51,11 @@ public:
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	void OnUnPause();
+	/**
+	* 当状态改变
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void OnStateChanged(EModuleState InModuleState);
 
 public:
 	/**
@@ -64,6 +63,11 @@ public:
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	void Run();
+	/**
+	* 重置
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void Reset();
 	/**
 	* 暂停
 	*/

@@ -2,30 +2,25 @@
 
 #pragma once
 
-
 #include "Main/Base/ModuleBase.h"
-
-#include "LatentAction/LatentActionModuleTypes.h"
-
-#include "LatentActionModule.generated.h"
+#include "Animation/AnimationModuleTypes.h"
+#include "AnimationModule.generated.h"
 
 class ATargetPoint;
-
-
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API ALatentActionModule : public AModuleBase
+class WHFRAMEWORK_API AAnimationModule : public AModuleBase
 {
 	GENERATED_BODY()
 		
-	GENERATED_MODULE(ALatentActionModule)
+	GENERATED_MODULE(AAnimationModule)
 
 public:
-	ALatentActionModule();
+	AAnimationModule();
 	
-	~ALatentActionModule();
+	~AAnimationModule();
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Module

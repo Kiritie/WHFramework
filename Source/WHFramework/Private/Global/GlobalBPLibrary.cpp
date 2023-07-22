@@ -58,7 +58,7 @@ void UGlobalBPLibrary::PauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { (int32)PauseMode } );
 }
 
 void UGlobalBPLibrary::UnPauseGame(EPauseMode PauseMode)
@@ -81,7 +81,7 @@ void UGlobalBPLibrary::UnPauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { FParameter::MakeInteger((int32)PauseMode) } );
+	UEventModuleBPLibrary::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { (int32)PauseMode } );
 }
 
 void UGlobalBPLibrary::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
@@ -150,80 +150,68 @@ void UGlobalBPLibrary::LoadObjectDataFromMemory(UObject* InObject, const TArray<
 	}
 }
 
-void UGlobalBPLibrary::SerializeExposedParam(UObject* InObject, FParameterMap InParam, bool bParamHavePropertyType)
+void UGlobalBPLibrary::ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject)
 {
-	for(auto pair: InParam.GetMap())
-	{
-		FString LeftS,PropName;
-		if(bParamHavePropertyType)
-		{
-			pair.Key.Split("> ",&LeftS,&PropName);
-		}
-		else
-		{
-			PropName = pair.Key;
-		}	
-		FProperty* FoundProperty = FindFProperty<FProperty>(InObject->GetClass(), *PropName);
-		if(FoundProperty)
-		{
-			void* Value = FoundProperty->ContainerPtrToValuePtr<void*>(InObject);
-			FoundProperty->ImportText_Direct(*pair.Value, Value, InObject, PPF_None);
-		}
-		else
-		{
-			WHLog(FString::Printf(TEXT("%s : Not Found Property : %s"),*InObject->GetName(),*PropName), EDebugCategory::Default, EDebugVerbosity::Error);
-		}
-	}
+    for(auto Iter: InJsonObject->Values)
+    {
+        FString TempStr, PropertyName, PropertyType;
+        Iter.Key.Split("> ",&TempStr,& PropertyName);
+        TempStr.Split("<",&TempStr,&PropertyType);
+        if(FProperty* Property = FindFProperty<FProperty>(InObject->GetClass(), * PropertyName))
+        {
+            if(Property->IsA<FObjectProperty>())
+            {
+                if(UObject* Object = CastField<FObjectProperty>(Property)->GetObjectPropertyValue(Property->ContainerPtrToValuePtr<UObject*>(InObject)))
+                {
+                    ImportExposedProperties(Object, Iter.Value->AsObject());
+                }
+            }
+            else
+            {
+                void* Value = Property->ContainerPtrToValuePtr<void*>(InObject);
+                Property->ImportText_Direct(*Iter.Value->AsString(), Value, InObject, PPF_None);
+            }
+        }
+    }
 }
 
-void UGlobalBPLibrary::ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType)
+void UGlobalBPLibrary::ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject)
 {
-	if(InClass)
-	{
-		TArray<FString> NewProps;
-		TArray<FString> DiffProps;
-		const FString PropClassNameSuffix = "Property",ReplaceTo = "";
-		for (TFieldIterator<FProperty> PropertyIt(InClass, EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
-		{
-			FProperty* Property = *PropertyIt;
-			const bool bIsDelegate = Property->IsA<FMulticastDelegateProperty>();
-			const bool bFlag = Property->HasAllPropertyFlags(CPF_ExposeOnSpawn);
-			const bool bIsExposedToSpawn = bFlag;
-			const bool bIsSettableExternally = !Property->HasAnyPropertyFlags(CPF_DisableEditOnInstance);
-			if(	bIsExposedToSpawn &&
-				!Property->HasAnyPropertyFlags(CPF_Parm) && 
-				bIsSettableExternally &&
-				Property->HasAllPropertyFlags(CPF_BlueprintVisible) &&
-				!bIsDelegate )
-			{
-				FString PropertyName = Property->GetFName().ToString();
-				if(PropertyName != "Param" && PropertyName != "Instigator")
-				{
-					if(bDisplayPropertyType)
-					{
-						PropertyName = "<" + Property->GetClass()->GetName().Replace(*PropClassNameSuffix,*ReplaceTo) + "> " + PropertyName;
-					}
-					NewProps.Add(PropertyName);
-					if(!OutParams.Contains(PropertyName))
-					{
-						FString Temp;
-						void* Value = Property->ContainerPtrToValuePtr<void*>(InClass->GetDefaultObject());
-						Property->ExportTextItem_Direct(Temp, Value, nullptr, nullptr, PPF_None);
-						OutParams.Add(PropertyName,Temp);
-					}
-				}
-			}
-		}
-		for(auto pair:OutParams.GetMap())
-		{
-			if(!NewProps.Contains(pair.Key))
-				DiffProps.Add(pair.Key);
-		}
-		for(auto diffPropName : DiffProps)
-		{
-			OutParams.Remove(diffPropName);
-		}
-	}
+    const FString PropClassNameSuffix = "Property",ReplaceTo = "";
+    for (TFieldIterator<FProperty> PropertyIt(InObject->GetClass(), EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
+    {
+        FProperty* Property = *PropertyIt;
+        const bool bFlag = Property->HasAllPropertyFlags(CPF_ExposeOnSpawn) && !Property->HasAnyPropertyFlags(CPF_Parm) && !Property->HasAnyPropertyFlags(CPF_DisableEditOnInstance) && Property->HasAllPropertyFlags(CPF_BlueprintVisible);
+        const bool bIsDelegate = Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>();
+        if(	bFlag && !bIsDelegate )
+        {
+            FString PropertyName = Property->GetFName().ToString();
+            //添加属性类型
+            PropertyName = "<" + Property->GetClass()->GetName().Replace(*PropClassNameSuffix, *ReplaceTo) + "> " + PropertyName;
+            if(!InJsonObject->HasField(PropertyName))
+            {
+                if(Property->IsA<FObjectProperty>())
+                {
+                    if(UObject* Object = CastField<FObjectProperty>(Property)->GetObjectPropertyValue(Property->ContainerPtrToValuePtr<UObject*>(InObject)))
+                    {
+                        if(!Object->IsA<AActor>())
+                        {
+                            TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+                            ExportExposedProperties(Object, JsonObject);
+                            InJsonObject->SetObjectField(PropertyName, JsonObject);
+                        }
+                    }
+                }
+                else
+                {
+                    FString Temp;
+                    const void* Value = Property->ContainerPtrToValuePtr<void*>(InObject);
+                    Property->ExportTextItem_Direct(Temp, Value, nullptr, nullptr, PPF_None);
+                    InJsonObject->SetStringField(PropertyName,Temp);
+                }
+            }
+        }
+    }
 }
 
 bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult)

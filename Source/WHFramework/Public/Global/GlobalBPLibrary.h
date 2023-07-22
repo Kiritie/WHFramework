@@ -147,19 +147,15 @@ public:
 	/*
 	* 解析目标对象带有 ExposeOnSpawn 标签的参数
 	* @param InObject 目标对象
-	* @param InParams 符合导出格式的参数键值对
-	* @param bParamHavePropertyType Param的key是否含有属性类的前缀表示：<int> <Array>...
+	* @param InJsonObject 符合导出格式的参数Json
 	*/
-	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void SerializeExposedParam(UObject* InObject, FParameterMap InParams, bool bParamHavePropertyType = true);
+	static void ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject);
 	/*
 	* 导出目标类带有 ExposeOnSpawn 标签的参数
-	* @param InClass = nullptr 目标类
-	* @param OutParams 导出参数的存放键值对
-	* @param bDisplayPropertyType Param的key是否显示属性类的前缀表示：<int> <Array>...
+	* @param InObject = 目标对象
+	* @param InJsonObject 导出参数的存放Json
 	*/
-	UFUNCTION(BlueprintCallable,Category = "GlobalBPLibrary")
-	static void ExportExposedParam(UClass* InClass, FParameterMap& OutParams, bool bDisplayPropertyType = true);
+	static void ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex

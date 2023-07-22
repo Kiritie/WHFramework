@@ -203,7 +203,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -334,7 +334,7 @@ void UStepBase::OnExecute()
 		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget);
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -382,7 +382,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -408,7 +408,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -442,17 +442,17 @@ void UStepBase::GetCameraView()
 {
 	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
 	else
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCurrentCameraLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCurrentCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCurrentCameraRotation().Pitch;
+		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation();
+		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch;
 	}
-	CameraViewDistance = UCameraModuleBPLibrary::GetCurrentCameraDistance();
+	CameraViewDistance = UCameraModuleBPLibrary::GetCameraDistance();
 
 	Modify();
 }

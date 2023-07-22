@@ -18,6 +18,18 @@ AModuleBase::AModuleBase()
 	ModuleState = EModuleState::None;
 }
 
+#if WITH_EDITOR
+void AModuleBase::OnGenerate()
+{
+	
+}
+
+void AModuleBase::OnDestroy()
+{
+	
+}
+#endif
+
 void AModuleBase::OnInitialize_Implementation()
 {
 	
@@ -38,21 +50,9 @@ void AModuleBase::OnTermination_Implementation()
 	
 }
 
-#if WITH_EDITOR
-void AModuleBase::OnGenerate()
+void AModuleBase::OnReset_Implementation()
 {
 	
-}
-
-void AModuleBase::OnDestroy()
-{
-	
-}
-#endif
-
-void AModuleBase::OnStateChanged_Implementation(EModuleState InModuleState)
-{
-	OnModuleStateChanged.Broadcast(InModuleState);
 }
 
 void AModuleBase::OnPause_Implementation()
@@ -65,6 +65,11 @@ void AModuleBase::OnUnPause_Implementation()
 	
 }
 
+void AModuleBase::OnStateChanged_Implementation(EModuleState InModuleState)
+{
+	OnModuleStateChanged.Broadcast(InModuleState);
+}
+
 void AModuleBase::Run_Implementation()
 {
 	if(ModuleState == EModuleState::None)
@@ -73,6 +78,12 @@ void AModuleBase::Run_Implementation()
 		OnStateChanged(ModuleState);
 		Execute_OnPreparatory(this, EPhase::Final);
 	}
+}
+
+void AModuleBase::Reset_Implementation()
+{
+	Super::Reset();
+	OnReset();
 }
 
 void AModuleBase::Pause_Implementation()

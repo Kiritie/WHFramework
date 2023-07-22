@@ -142,7 +142,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Appearance)
 	ETextAnimType AnimType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "AnimType != ETextAnimType::None"), Category=Appearance)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "AnimType != ETextAnimType::None"), Category=Appearance)
 	float AnimTime;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Appearance)

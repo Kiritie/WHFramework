@@ -55,7 +55,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	K2_OnEnter(InLastFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this), FParameter::MakeObject(FSM)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
 }
 
 void UFiniteStateBase::OnRefresh()
@@ -78,7 +78,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	K2_OnLeave(InNextFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this), FParameter::MakeObject(FSM)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
 }
 
 void UFiniteStateBase::OnTermination()

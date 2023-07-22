@@ -9,11 +9,13 @@
 #include "Components/AudioComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Audio/AudioModuleBPLibrary.h"
+#include "Camera/CameraComponent.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterAnim.h"
 #include "Character/Base/CharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
@@ -29,19 +31,30 @@ ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
 
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96);
+	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
 	GetCapsuleComponent()->CanCharacterStepUpOn = ECanBeCharacterBase::ECB_No;
 
-	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -90), FRotator(0, -90, 0));
+	GetMesh()->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -90.f), FRotator(0.f, -90.f, 0.f));
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetMesh()->SetCastShadow(false);
 
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0, 360, 0);
-	GetCharacterMovement()->JumpZVelocity = 420;
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 360.f, 0.f);
+	GetCharacterMovement()->JumpZVelocity = 420.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
+
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->TargetArmLength = 200.f;
+	CameraBoom->SocketOffset = FVector(0.f, 30.f, 40.f);
+	CameraBoom->bUsePawnControlRotation = true;
+
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(FName("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->SetRelativeLocationAndRotation(FVector(0.f, 0.f, 0.f), FRotator(0.f, 0.f, 0.f));
+	FollowCamera->bUsePawnControlRotation = false;
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -156,6 +169,34 @@ void ACharacterBase::SpawnDefaultController()
 	DefaultController = Controller;
 }
 
+void ACharacterBase::Turn_Implementation(float InValue)
+{
+}
+
+void ACharacterBase::MoveForward_Implementation(float InValue)
+{
+	const FRotator Rotation = GetControlRotation();
+	const FRotator YawRotation = FRotator(0, Rotation.Yaw, 0);
+	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	AddMovementInput(Direction, InValue);
+}
+
+void ACharacterBase::MoveRight_Implementation(float InValue)
+{
+	const FRotator Rotation = GetControlRotation();
+	const FRotator YawRotation(0, Rotation.Yaw, 0);
+	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	AddMovementInput(Direction, InValue);
+}
+
+void ACharacterBase::MoveUp_Implementation(float InValue)
+{
+	const FRotator Rotation = GetControlRotation();
+	const FRotator YawRotation(0, Rotation.Yaw, 0);
+	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	AddMovementInput(FVector(Direction.X * 0.2f, Direction.Y * 0.2f, 0.5f * InValue), 1.f);
+}
+
 void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
 {
 	bVisible = bNewVisible;
@@ -183,12 +224,12 @@ bool ACharacterBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	UAudioModuleBPLibrary::PlaySingleSoundAtLocation(InSound, Name, GetActorLocation(), InVolume, bMulticast);
+	SoundHandle = UAudioModuleBPLibrary::PlaySingleSoundAtLocation(InSound, GetActorLocation(), InVolume, bMulticast);
 }
 
 void ACharacterBase::StopSound(bool bMulticast)
 {
-	UAudioModuleBPLibrary::StopSingleSound(Name, bMulticast);
+	UAudioModuleBPLibrary::StopSingleSound(SoundHandle, bMulticast);
 }
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)

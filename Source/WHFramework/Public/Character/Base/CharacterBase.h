@@ -7,6 +7,7 @@
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
+#include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -18,7 +19,7 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
@@ -64,6 +65,29 @@ public:
 	virtual FName GetNameC() const override { return Name; }
 
 	virtual void SetNameC(FName InName) override { Name = InName; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Player
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USpringArmComponent* CameraBoom;
+
+protected:
+	virtual void Turn_Implementation(float InValue) override;
+
+	virtual void MoveForward_Implementation(float InValue) override;
+
+	virtual void MoveRight_Implementation(float InValue) override;
+
+	virtual void MoveUp_Implementation(float InValue) override;
+
+public:
+	virtual UCameraComponent* GetCameraComp_Implementation() override { return FollowCamera; }
+
+	virtual USpringArmComponent* GetCameraBoom_Implementation() override { return CameraBoom; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
@@ -124,6 +148,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FSingleSoundHandle SoundHandle;
 public:
 	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	

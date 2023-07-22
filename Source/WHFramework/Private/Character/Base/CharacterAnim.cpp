@@ -3,6 +3,7 @@
 
 #include "Character/Base/CharacterAnim.h"
 
+#include "Character/Base/CharacterBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Global/GlobalBPLibrary.h"
@@ -36,7 +37,7 @@ void UCharacterAnim::NativeUpdateAnimation(float DeltaSeconds)
 
 	ACharacterBase* Character = Cast<ACharacterBase>(TryGetPawnOwner());
 
-	if(!Character || !Character->GetAssetID().IsValid() || !UGlobalBPLibrary::IsPlaying()) return;
+	if(!Character || !UGlobalBPLibrary::IsPlaying()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	

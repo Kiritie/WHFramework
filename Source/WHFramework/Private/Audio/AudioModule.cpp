@@ -110,141 +110,191 @@ void AAudioModule::MultiPlaySoundAtLocation_Implementation(USoundBase* InSound, 
 	PlaySoundAtLocation(InSound, InLocation, InVolume, false);
 }
 
-void AAudioModule::PlaySingleSound2D(USoundBase* InSound, FName InFlag, float InVolume, bool bMulticast)
+FSingleSoundHandle AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
+	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiPlaySingleSound2D(InSound, InFlag, InVolume);
+			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
 		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
 		{
-			AudioModuleNetworkComponent->ServerPlaySingleSound2DMulticast(InSound, InFlag, InVolume);
+			AudioModuleNetworkComponent->ServerPlaySingleSound2DMulticast(Handle, InSound, InVolume);
 		}
-		return;
+		return Handle;
 	}
-	NativePlaySingleSound(InFlag, UGameplayStatics::SpawnSound2D(this, InSound, InVolume));
+	PlaySingleSound2DImpl(Handle, InSound, InVolume);
+	return Handle;
 }
 
-void AAudioModule::MultiPlaySingleSound2D_Implementation(USoundBase* InSound, FName InFlag, float InVolume)
+FSingleSoundHandle AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume, bool bMulticast)
 {
-	PlaySingleSound2D(InSound, InFlag, InVolume, false);
-}
-
-void AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume, bool bMulticast)
-{
+	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiPlaySingleSoundAtLocation(InSound, InFlag, InLocation, InVolume);
+			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
 		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
 		{
-			AudioModuleNetworkComponent->ServerPlaySingleSoundAtLocationMulticast(InSound, InFlag, InLocation, InVolume);
+			AudioModuleNetworkComponent->ServerPlaySingleSound2DMulticast(Handle, InSound, InVolume);
 		}
-		return;
+		return Handle;
 	}
-	NativePlaySingleSound(InFlag, UGameplayStatics::SpawnSoundAtLocation(this, InSound, InLocation, FRotator::ZeroRotator, InVolume));
-}
-
-void AAudioModule::MultiPlaySingleSoundAtLocation_Implementation(USoundBase* InSound, FName InFlag, FVector InLocation, float InVolume)
-{
-	PlaySingleSoundAtLocation(InSound, InFlag, InLocation, InVolume, false);
-}
-
-void AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume)
-{
-	if(UAudioComponent* AudioComponent = UGameplayStatics::SpawnSound2D(this, InSound, InVolume))
+	if(UAudioComponent* AudioComponent = PlaySingleSound2DImpl(Handle, InSound, InVolume))
 	{
 		AudioComponent->OnAudioFinished.Add(InOnSoundPlayFinish);
-		NativePlaySingleSound(InFlag, AudioComponent);
 	}
+	return Handle;
 }
 
-void AAudioModule::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, FName InFlag, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume)
+void AAudioModule::MultiPlaySingleSound2D_Implementation(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume)
 {
-	if(UAudioComponent* AudioComponent = UGameplayStatics::SpawnSoundAtLocation(this, InSound, InLocation, FRotator::ZeroRotator, InVolume))
+	PlaySingleSound2DImpl(InHandle, InSound, InVolume);
+}
+
+FSingleSoundHandle AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
+{
+	const FSingleSoundHandle Handle(SingleSoundHandle++);
+	if(bMulticast)
+	{
+		if(HasAuthority())
+		{
+			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
+		}
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		{
+			AudioModuleNetworkComponent->ServerPlaySingleSoundAtLocationMulticast(Handle, InSound, InLocation, InVolume);
+		}
+		return Handle;
+	}
+	PlaySingleSoundAtLocationImpl(Handle, InSound, InLocation, InVolume);
+	return Handle;
+}
+
+FSingleSoundHandle AAudioModule::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume, bool bMulticast)
+{
+	const FSingleSoundHandle Handle(SingleSoundHandle++);
+	if(bMulticast)
+	{
+		if(HasAuthority())
+		{
+			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
+		}
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		{
+			AudioModuleNetworkComponent->ServerPlaySingleSoundAtLocationMulticast(Handle, InSound, InLocation, InVolume);
+		}
+		return Handle;
+	}
+	if(UAudioComponent* AudioComponent = PlaySingleSoundAtLocationImpl(Handle, InSound, InLocation, InVolume))
 	{
 		AudioComponent->OnAudioFinished.Add(InOnSoundPlayFinish);
-		NativePlaySingleSound(InFlag, AudioComponent);
 	}
+	return Handle;
 }
 
-void AAudioModule::StopSingleSound(FName InFlag, bool bMulticast)
+void AAudioModule::MultiPlaySingleSoundAtLocation_Implementation(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume)
+{
+	PlaySingleSoundAtLocationImpl(InHandle, InSound, InLocation, InVolume);
+}
+
+void AAudioModule::StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiStopSingleSound(InFlag);
+			MultiStopSingleSound(InHandle);
 		}
 		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
 		{
-			AudioModuleNetworkComponent->ServerStopSingleSoundMulticast(InFlag);
+			AudioModuleNetworkComponent->ServerStopSingleSoundMulticast(InHandle);
 		}
 		return;
 	}
-	NativeStopSingleSound(InFlag);
+	StopSingleSoundImpl(InHandle);
 }
 
-void AAudioModule::MultiStopSingleSound_Implementation(FName InFlag)
+void AAudioModule::MultiStopSingleSound_Implementation(const FSingleSoundHandle& InHandle)
 {
-	StopSingleSound(InFlag, false);
+	StopSingleSoundImpl(InHandle);
 }
 
-void AAudioModule::SetSingleSoundPaused(FName InFlag, bool bPaused, bool bMulticast)
+void AAudioModule::SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiSetSingleSoundPaused(InFlag, bPaused);
+			MultiSetSingleSoundPaused(InHandle, bPaused);
 		}
 		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
 		{
-			AudioModuleNetworkComponent->ServerSetSingleSoundPausedMulticast(InFlag, bPaused);
+			AudioModuleNetworkComponent->ServerSetSingleSoundPausedMulticast(InHandle, bPaused);
 		}
 		return;
 	}
-	NativeSetSingleSoundPaused(InFlag, bPaused);
+	SetSingleSoundPausedImpl(InHandle, bPaused);
 }
 
-void AAudioModule::MultiSetSingleSoundPaused_Implementation(FName InFlag, bool bPaused)
+void AAudioModule::MultiSetSingleSoundPaused_Implementation(const FSingleSoundHandle& InHandle, bool bPaused)
 {
-	SetSingleSoundPaused(InFlag, bPaused);
+	SetSingleSoundPausedImpl(InHandle, bPaused);
 }
 
-void AAudioModule::NativePlaySingleSound(FName InFlag, UAudioComponent* InAudioComponent)
+UAudioComponent* AAudioModule::PlaySingleSound2DImpl(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume)
 {
-	NativeStopSingleSound(InFlag);
-	if(InAudioComponent)
+	StopSingleSoundImpl(InHandle);
+	if(!AudioComponents.Contains(InHandle))
 	{
-		InAudioComponent->Play();
-		AudioComponents.Add(InFlag, InAudioComponent);
-	}
-}
-
-void AAudioModule::NativeStopSingleSound(FName InFlag)
-{
-	if(AudioComponents.Contains(InFlag))
-	{
-		if(IsValid(AudioComponents[InFlag]))
+		UAudioComponent* AudioComponent = UGameplayStatics::SpawnSound2D(this, InSound, InVolume);
+		if(AudioComponent)
 		{
-			AudioComponents[InFlag]->Stop();
+			AudioComponent->Play();
 		}
-		AudioComponents.Remove(InFlag);
+		AudioComponents.Add(InHandle, AudioComponent);
+	}
+	return AudioComponents[InHandle];
+}
+
+UAudioComponent* AAudioModule::PlaySingleSoundAtLocationImpl(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume)
+{
+	StopSingleSoundImpl(InHandle);
+	if(!AudioComponents.Contains(InHandle))
+	{
+		UAudioComponent* AudioComponent = UGameplayStatics::SpawnSoundAtLocation(this, InSound, InLocation, FRotator::ZeroRotator, InVolume);
+		if(AudioComponent)
+		{
+			AudioComponent->Play();
+		}
+		AudioComponents.Add(InHandle, AudioComponent);
+	}
+	return AudioComponents[InHandle];
+}
+
+void AAudioModule::StopSingleSoundImpl(const FSingleSoundHandle& InHandle)
+{
+	if(AudioComponents.Contains(InHandle))
+	{
+		if(IsValid(AudioComponents[InHandle]))
+		{
+			AudioComponents[InHandle]->Stop();
+		}
+		AudioComponents.Remove(InHandle);
 	}
 }
 
-void AAudioModule::NativeSetSingleSoundPaused(FName InFlag, bool bPaused)
+void AAudioModule::SetSingleSoundPausedImpl(const FSingleSoundHandle& InHandle, bool bPaused)
 {
-	if(AudioComponents.Contains(InFlag))
+	if(AudioComponents.Contains(InHandle))
 	{
-		if(IsValid(AudioComponents[InFlag]))
+		if(IsValid(AudioComponents[InHandle]))
 		{
-			AudioComponents[InFlag]->SetPaused(bPaused);
+			AudioComponents[InHandle]->SetPaused(bPaused);
 		}
 	}
 }
@@ -263,7 +313,7 @@ void AAudioModule::SetGlobalSoundVolume(float InVolume, bool bMulticast)
 		}
 		return;
 	}
-	NativeSetSoundVolume(GlobalSoundMix, GlobalSoundClass, InVolume);
+	SetSoundVolumeImpl(GlobalSoundMix, GlobalSoundClass, InVolume);
 }
 
 void AAudioModule::MultiSetGlobalSoundVolume_Implementation(float InVolume)
@@ -271,26 +321,26 @@ void AAudioModule::MultiSetGlobalSoundVolume_Implementation(float InVolume)
 	SetGlobalSoundVolume(InVolume, false);
 }
 
-void AAudioModule::SetBGMSoundVolume(float InVolume, bool bMulticast)
+void AAudioModule::SetBackgroundSoundVolume(float InVolume, bool bMulticast)
 {
 	if(bMulticast)
 	{
 		if(HasAuthority())
 		{
-			MultiSetBGMSoundVolume(InVolume);
+			MultiSetBackgroundSoundVolume(InVolume);
 		}
 		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
 		{
-			AudioModuleNetworkComponent->ServerSetBGMSoundVolumeMulticast(InVolume);
+			AudioModuleNetworkComponent->ServerSetBackgroundSoundVolumeMulticast(InVolume);
 		}
 		return;
 	}
-	NativeSetSoundVolume(BGMSoundMix, BGMSoundClass, InVolume);
+	SetSoundVolumeImpl(BackgroundSoundMix, BackgroundSoundClass, InVolume);
 }
 
-void AAudioModule::MultiSetBGMSoundVolume_Implementation(float InVolume)
+void AAudioModule::MultiSetBackgroundSoundVolume_Implementation(float InVolume)
 {
-	SetBGMSoundVolume(InVolume, false);
+	SetBackgroundSoundVolume(InVolume, false);
 }
 
 void AAudioModule::SetEnvironmentSoundVolume(float InVolume, bool bMulticast)
@@ -307,7 +357,7 @@ void AAudioModule::SetEnvironmentSoundVolume(float InVolume, bool bMulticast)
 		}
 		return;
 	}
-	NativeSetSoundVolume(EnvironmentSoundMix, EnvironmentSoundClass, InVolume);
+	SetSoundVolumeImpl(EnvironmentSoundMix, EnvironmentSoundClass, InVolume);
 }
 
 void AAudioModule::MultiSetEnvironmentSoundVolume_Implementation(float InVolume)
@@ -329,7 +379,7 @@ void AAudioModule::SetEffectSoundVolume(float InVolume, bool bMulticast)
 		}
 		return;
 	}
-	NativeSetSoundVolume(EffectSoundMix, EffectSoundClass, InVolume);
+	SetSoundVolumeImpl(EffectSoundMix, EffectSoundClass, InVolume);
 }
 
 void AAudioModule::MultiSetEffectSoundVolume_Implementation(float InVolume)
@@ -337,7 +387,7 @@ void AAudioModule::MultiSetEffectSoundVolume_Implementation(float InVolume)
 	SetEffectSoundVolume(InVolume, false);
 }
 
-void AAudioModule::NativeSetSoundVolume(USoundMix* InSoundMix, USoundClass* InSoundClass, float InVolume)
+void AAudioModule::SetSoundVolumeImpl(USoundMix* InSoundMix, USoundClass* InSoundClass, float InVolume)
 {
 	if(InSoundMix && InSoundClass)
 	{
@@ -350,4 +400,5 @@ void AAudioModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(AAudioModule, SingleSoundHandle);
 }

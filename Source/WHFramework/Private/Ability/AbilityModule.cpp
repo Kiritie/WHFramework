@@ -152,7 +152,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneCon
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ FParameter::MakePointer(&SaveData.ID) }, SaveData.GetCharacterData().Class))
+	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ID }, SaveData.GetCharacterData().Class))
 	{
 		Character->LoadSaveData(InSaveData, EPhase::Primary, true);
 		Character->SpawnDefaultController();
@@ -168,7 +168,7 @@ AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISc
 AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ FParameter::MakePointer(&SaveData.ID) }, SaveData.GetVitalityData().Class))
+	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ID }, SaveData.GetVitalityData().Class))
 	{
 		Vitality->LoadSaveData(InSaveData, EPhase::Primary, true);
 		if(InContainer)

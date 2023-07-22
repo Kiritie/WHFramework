@@ -101,6 +101,8 @@ public:
 public:
 	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
+	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
 protected:

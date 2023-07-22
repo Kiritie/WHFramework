@@ -156,7 +156,7 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeInteger(InRootStepIndex)});
+				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
 			}
 
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
@@ -185,7 +185,7 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {FParameter::MakeInteger(InRootStepIndex)});
+				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
 			}
 		
 			if(bSkipSteps)

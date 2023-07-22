@@ -16,12 +16,31 @@ int32 UInputModuleBPLibrary::GetTouchPressedCount()
 	return 0;
 }
 
-void UInputModuleBPLibrary::ResetInputStates()
+FInputKeyShortcut UInputModuleBPLibrary::GetKeyShortcutByName(const FName InName)
 {
 	if(AInputModule* InputModule = AInputModule::Get())
 	{
-		InputModule->ResetInputStates();
+		return InputModule->GetKeyShortcutByName(InName);
 	}
+	return FInputKeyShortcut();
+}
+
+FEventReply UInputModuleBPLibrary::OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(AInputModule* InputModule = AInputModule::Get())
+	{
+		return InputModule->OnWidgetInputKeyDown(InGeometry, InKeyEvent);
+	}
+	return FEventReply(false);
+}
+
+FEventReply UInputModuleBPLibrary::OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if(AInputModule* InputModule = AInputModule::Get())
+	{
+		return InputModule->OnWidgetInputMouseButtonDown(InGeometry, InMouseEvent);
+	}
+	return FEventReply(false);
 }
 
 EInputMode UInputModuleBPLibrary::GetGlobalInputMode()

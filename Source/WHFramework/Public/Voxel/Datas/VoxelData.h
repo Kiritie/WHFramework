@@ -30,13 +30,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelPartType PartType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Main"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "PartType == EVoxelPartType::Main"))
 	TMap<FIndex, UVoxelData*> PartDatas;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Part"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "PartType == EVoxelPartType::Part"))
 	FIndex PartIndex;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PartType == EVoxelPartType::Part"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "PartType == EVoxelPartType::Part"))
 	UVoxelData* MainData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -48,10 +48,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector MeshOffset;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "MeshType == EVoxelMeshType::Custom"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "MeshType == EVoxelMeshType::Custom"))
 	TArray<FVector> MeshVertices;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "MeshType == EVoxelMeshType::Custom"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "MeshType == EVoxelMeshType::Custom"))
 	TArray<FVector> MeshNormals;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

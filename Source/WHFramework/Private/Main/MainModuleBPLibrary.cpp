@@ -22,6 +22,22 @@ void UMainModuleBPLibrary::RunModuleByName(const FName InModuleName)
 	}
 }
 
+void UMainModuleBPLibrary::ResetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->ResetModuleByClass(InModuleClass);
+	}
+}
+
+void UMainModuleBPLibrary::ResetModuleByName(const FName InModuleName)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->ResetModuleByName(InModuleName);
+	}
+}
+
 void UMainModuleBPLibrary::PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
 {
 	if(AMainModule* MainModule = GetMainModule())

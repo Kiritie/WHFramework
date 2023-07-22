@@ -6,6 +6,7 @@
 #include "InputManager.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
+#include "Components/SlateWrapperTypes.h"
 
 #include "InputModule.generated.h"
 
@@ -36,11 +37,23 @@ public:
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
+	virtual void OnReset_Implementation() override;
+
 	virtual void OnPause_Implementation() override;
 
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	// InputShortcuts
+protected:
+	UPROPERTY(EditAnywhere, Category = "InputShortcuts|Key")
+	TMap<FName, FInputKeyShortcut> KeyShortcuts;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FInputKeyShortcut GetKeyShortcutByName(const FName InName) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMappings
@@ -58,7 +71,16 @@ protected:
 	TArray<FInputTouchMapping> TouchMappings;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Camera
+	/// WidgetInputs
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	FEventReply OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// CameraInputs
 protected:
 	UFUNCTION()
 	virtual void TurnCamera(float InRate);
@@ -76,7 +98,7 @@ protected:
 	virtual void ZoomCamera(float InRate);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Player
+	/// PlayerInputs
 protected:
 	UFUNCTION()
 	virtual void TurnPlayer(float InValue);
@@ -97,7 +119,7 @@ protected:
 	virtual void MoveUpPlayer(float InValue);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Touch
+	/// TouchInputs
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputSetup|Touch")
 	float TouchInputRate;
@@ -131,9 +153,6 @@ protected:
 	FTimerHandle TouchReleaseTimerHandle3;
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void ResetInputStates();
-
 	UFUNCTION(BlueprintPure)
 	int32 GetTouchPressedCount() const { return TouchPressedCount; }
 
@@ -143,7 +162,7 @@ protected:
 	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 	
-public:
+protected:
 	UFUNCTION(BlueprintPure)
 	AWHPlayerController* GetPlayerController();
 

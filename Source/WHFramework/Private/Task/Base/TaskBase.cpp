@@ -168,7 +168,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubTask)
 	{
@@ -247,7 +247,7 @@ void UTaskBase::OnExecute()
 
 	K2_OnExecute();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(TaskState != ETaskState::Completed)
 	{
@@ -290,7 +290,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	
 	K2_OnComplete(InTaskExecuteResult);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
@@ -316,7 +316,7 @@ void UTaskBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveTask::StaticClass(), EEventNetType::Single, this, {FParameter::MakeObject(this)});
+	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubTask)
 	{

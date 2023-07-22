@@ -19,6 +19,8 @@ ACharacterModule::ACharacterModule()
 	Characters = TArray<ACharacterBase*>();
 	CharacterMap = TMap<FName, ACharacterBase*>();
 	DefaultCharacter = nullptr;
+	DefaultInstantSwitch = false;
+	DefaultResetCamera = true;
 	CurrentCharacter = nullptr;
 }
 
@@ -60,7 +62,7 @@ void ACharacterModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Final && DefaultCharacter)
 	{
-		SwitchCharacter(DefaultCharacter);
+		SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
 	}
 }
 
@@ -108,7 +110,7 @@ void ACharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 	}
 }
 
-void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
+void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
 	if(!CurrentCharacter || CurrentCharacter != InCharacter)
 	{
@@ -118,7 +120,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 			{
 				UCameraModuleBPLibrary::SwitchCamera(nullptr);
 				PlayerController->Possess(InCharacter);
-				UCameraModuleBPLibrary::SetCameraRotationAndDistance(InCharacter->GetActorRotation().Yaw, -1, -1);
+				UCameraModuleBPLibrary::SetCameraRotationAndDistance(bResetCamera ? InCharacter->GetActorRotation().Yaw : -1, -1, -1, bInstant);
 				if(CurrentCharacter && CurrentCharacter->GetDefaultController())
 				{
 					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
@@ -138,14 +140,14 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter)
 	}
 }
 
-void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
+void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByClass(InCharacterClass));
+	SwitchCharacter(GetCharacterByClass(InCharacterClass), bResetCamera, bInstant);
 }
 
-void ACharacterModule::SwitchCharacterByName(FName InCharacterName)
+void ACharacterModule::SwitchCharacterByName(FName InCharacterName, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByName(InCharacterName));
+	SwitchCharacter(GetCharacterByName(InCharacterName), bResetCamera, bInstant);
 }
 
 bool ACharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const

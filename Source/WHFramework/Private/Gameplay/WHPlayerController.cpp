@@ -122,13 +122,30 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 
 bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
 {
-	int32 viewportSizeX, viewportSizeY;
-	FVector sightPos, rayDirection;
-	GetViewportSize(viewportSizeX, viewportSizeY);
-	if(DeprojectScreenPositionToWorld(viewportSizeX * 0.5f, viewportSizeY * 0.5f, sightPos, rayDirection))
+	int32 ViewportSizeX, ViewportSizeY;
+	FVector SightPos, RayDirection;
+	GetViewportSize(ViewportSizeX, ViewportSizeY);
+	if(DeprojectScreenPositionToWorld(ViewportSizeX * 0.5f, ViewportSizeY * 0.5f, SightPos, RayDirection))
 	{
 		const FVector rayStart = PlayerCameraManager->GetCameraLocation();
-		const FVector rayEnd = rayStart + rayDirection * InRayDistance;
+		const FVector rayEnd = rayStart + RayDirection * InRayDistance;
+		TArray<AActor*> ignoreActors = InIgnoreActors;
+		ignoreActors.AddUnique(GetPawn());
+		ignoreActors.AddUnique(GetPlayerPawn());
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	}
+	return false;
+}
+
+bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
+{
+	float MousePosX, MousePosY;
+	FVector SightPos, RayDirection;
+	GetMousePosition(MousePosX, MousePosY);
+	if(DeprojectScreenPositionToWorld(MousePosX, MousePosY, SightPos, RayDirection))
+	{
+		const FVector rayStart = PlayerCameraManager->GetCameraLocation();
+		const FVector rayEnd = rayStart + RayDirection * InRayDistance;
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());

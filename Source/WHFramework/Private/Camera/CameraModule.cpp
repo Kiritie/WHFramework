@@ -34,17 +34,15 @@ ACameraModule::ACameraModule()
 
 	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
-	bReverseCameraPanMove = true;
+	bReverseCameraPanMove = false;
 	bClampCameraMove = false;
 	CameraMoveRange = FBox(EForceInit::ForceInitToZero);
-	CameraPanMoveKey = FKey("MiddleMouseButton");
 	CameraMoveRate = 300.f;
 	CameraMoveSpeed = 5.f;
 
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
 	bReverseCameraPitch = false;
-	CameraRotateKey = FKey();
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
 	CameraRotateSpeed = 5.f;
@@ -54,8 +52,7 @@ ACameraModule::ACameraModule()
 
 	bCameraZoomAble = true;
 	bCameraZoomControlAble = true;
-	bUseNormalizedZoom = false;
-	CameraZoomKey = FKey();
+	bNormalizeCameraZoom = false;
 	CameraZoomRate = 150.f;
 	CameraZoomSpeed = 5.f;
 	MinCameraDistance = 0.f;
@@ -261,7 +258,7 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			}
 			else
 			{
-				GetCurrentCameraBoom()->TargetArmLength = CameraZoomSpeed == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCurrentCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaSeconds, bUseNormalizedZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(GetCurrentCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
+				GetCurrentCameraBoom()->TargetArmLength = CameraZoomSpeed == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCurrentCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaSeconds, bNormalizeCameraZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(GetCurrentCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
 			}
 		}
 		else if(CameraDoZoomDuration != 0.f)
@@ -286,11 +283,6 @@ void ACameraModule::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-ACameraPawnBase* ACameraModule::GetCurrentCamera() const
-{
-	return CurrentCamera;
-}
-
 ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const
 {
 	return CurrentCamera;
@@ -300,7 +292,7 @@ UCameraComponent* ACameraModule::GetCurrentCameraComp()
 {
 	if(APawn* Pawn = GetPlayerController()->GetPawn())
 	{
-		if(Pawn->Implements<UWHPlayerInterface>())
+		if(Pawn->Implements<UCameraPawnInterface>())
 		{
 			return IWHPlayerInterface::Execute_GetCameraComp(Pawn);
 		}
@@ -348,10 +340,10 @@ void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 			{
 				GetPlayerController()->Possess(InCamera);
 			}
+			CurrentCamera = InCamera;
 			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
 			SetCameraDistance(InCamera->Execute_GetCameraBoom(InCamera)->TargetArmLength, bInstant);
-			CurrentCamera = InCamera;
 		}
 		else if(CurrentCamera)
 		{
@@ -507,8 +499,7 @@ void ACameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 {
 	if(!GetPlayerController()) return;
 	
-	const FRotator CurrentRot = GetPlayerController()->GetControlRotation();
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentRot.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentRot.Yaw : InYaw, CurrentRot.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(bInstant)
 	{
 		CurrentCameraRotation = TargetCameraRotation;
@@ -521,8 +512,7 @@ void ACameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuratio
 {
 	if(!GetPlayerController()) return;
 	
-	const FRotator CurrentRot = GetPlayerController()->GetControlRotation();
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentRot.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentRot.Yaw : InYaw, CurrentRot.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(InDuration > 0.f)
 	{
 		CameraDoRotateTime = 0.f;
@@ -620,12 +610,24 @@ void ACameraModule::AddCameraRotationInput(float InYaw, float InPitch)
 {
 	if(!bCameraRotateAble || !bCameraRotateControlAble) return;
 
+	bIsControllingRotate = true;
+	GetWorldTimerManager().SetTimerForNextTick([this]()
+	{
+		bIsControllingRotate = false;
+	});
+
 	SetCameraRotation(TargetCameraRotation.Yaw + InYaw * CameraTurnRate * GetWorld()->GetDeltaSeconds(), TargetCameraRotation.Pitch + InPitch * CameraLookUpRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void ACameraModule::AddCameraDistanceInput(float InValue)
 {
 	if(!bCameraZoomAble || !bCameraZoomControlAble) return;
+
+	bIsControllingZoom = true;
+	GetWorldTimerManager().SetTimerForNextTick([this]()
+	{
+		bIsControllingZoom = false;
+	});
 
 	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * GetWorld()->GetDeltaSeconds(), false);
 }
@@ -634,32 +636,28 @@ void ACameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
 	if(!bCameraMoveAble || !bCameraMoveControlAble) return;
 
+	bIsControllingMove = true;
+	GetWorldTimerManager().SetTimerForNextTick([this]()
+	{
+		bIsControllingMove = false;
+	});
+
 	SetCameraLocation(TargetCameraLocation + InDirection * CameraMoveRate * InValue * GetWorld()->GetDeltaSeconds(), false);
 }
 
 bool ACameraModule::IsControllingMove()
 {
-	return !CameraPanMoveKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraPanMoveKey) || GetInputAxisValue(FName("MoveForward")) != 0.f || GetInputAxisValue(FName("MoveRight")) != 0.f || GetInputAxisValue(FName("MoveUp")) != 0.f || UInputModuleBPLibrary::GetTouchPressedCount() == 2;
+	return !UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).Key) || bIsControllingMove;
 }
 
 bool ACameraModule::IsControllingRotate()
 {
-	return !CameraRotateKey.IsValid() || GetPlayerController()->IsInputKeyDown(CameraRotateKey) || UInputModuleBPLibrary::GetTouchPressedCount() == 1;
+	return !UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).Key) || UInputModuleBPLibrary::GetTouchPressedCount() == 1 || bIsControllingRotate;
 }
 
 bool ACameraModule::IsControllingZoom()
 {
-	return GetPlayerController()->GetInputAxisValue(FName("ZoomCam")) != 0.f || GetPlayerController()->GetInputAxisValue(FName("PinchGesture")) != 0.f;
-}
-
-FVector ACameraModule::GetRealCameraLocation()
-{
-	return GetPlayerController()->PlayerCameraManager->GetCameraLocation();
-}
-
-FRotator ACameraModule::GetRealCameraRotation()
-{
-	return GetPlayerController()->PlayerCameraManager->GetCameraRotation();
+	return bIsControllingZoom;
 }
 
 AWHPlayerController* ACameraModule::GetPlayerController()
