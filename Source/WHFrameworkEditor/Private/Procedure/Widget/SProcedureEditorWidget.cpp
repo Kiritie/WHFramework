@@ -12,10 +12,12 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"
-#include "Procedure/Widget/SProcedureDetailWidget.h"
+#include "Procedure/Widget/SProcedureDetailsWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 #include "Procedure/Widget/SProcedureStatusWidget.h"
 #include "Procedure/Widget/SProcedureToolbarWidget.h"
+
+#define LOCTEXT_NAMESPACE "ProcedureEditorWidget"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -26,7 +28,7 @@ SProcedureEditorWidget::SProcedureEditorWidget()
 
 	bPreviewMode = false;
 	bShowListPanel = true;
-	bShowDetailPanel = true;
+	bShowDetailsPanel = true;
 	bShowStatusPanel = true;
 
 	ProcedureModule = nullptr;
@@ -34,14 +36,14 @@ SProcedureEditorWidget::SProcedureEditorWidget()
 
 void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ProcedureModule = AProcedureModule::Get(!UGlobalBPLibrary::IsPlaying());
 
 	if(ProcedureModule)
 	{
 		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowListPanel"), bShowListPanel, GProcedureEditorIni);
-		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowDetailPanel"), bShowDetailPanel, GProcedureEditorIni);
+		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowDetailsPanel"), bShowDetailsPanel, GProcedureEditorIni);
 		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowStatusPanel"), bShowStatusPanel, GProcedureEditorIni);
 
 		SAssignNew(ListWidget, SProcedureListWidget)
@@ -49,11 +51,11 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 			.Visibility_Lambda([this](){ return bShowListPanel ? EVisibility::Visible : EVisibility::Collapsed; });
 		AddChild(ListWidget);
 
-		SAssignNew(DetailWidget, SProcedureDetailWidget)
+		SAssignNew(DetailsWidget, SProcedureDetailsWidget)
 			.ProcedureModule(ProcedureModule)
 			.ListWidget(ListWidget)
-			.Visibility_Lambda([this](){ return bShowDetailPanel ? EVisibility::Visible : EVisibility::Collapsed; });
-		AddChild(DetailWidget);
+			.Visibility_Lambda([this](){ return bShowDetailsPanel ? EVisibility::Visible : EVisibility::Collapsed; });
+		AddChild(DetailsWidget);
 
 		SAssignNew(StatusWidget, SProcedureStatusWidget)
 			.ListWidget(ListWidget)
@@ -65,76 +67,124 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 			.ListWidget(ListWidget);
 		AddChild(ToolbarWidget);
 
+		const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ProcedureEditor_Layout")
+		->AddArea
+		(
+			FTabManager::NewPrimaryArea()
+			->SetOrientation(Orient_Vertical)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(true)
+				->SetSizeCoefficient(0.2f)
+				->AddTab("Toolbar", ETabState::OpenedTab)
+			)
+			->Split
+			(
+				// Main application area
+				FTabManager::NewSplitter()
+				->SetOrientation(Orient_Horizontal)
+				->SetSizeCoefficient(1.f)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetHideTabWell(false)
+					->SetSizeCoefficient(0.35f)
+					->AddTab("List", ETabState::OpenedTab)
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetHideTabWell(false)
+					->SetSizeCoefficient(0.3f)
+					->AddTab("", ETabState::OpenedTab)
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetHideTabWell(false)
+					->SetSizeCoefficient(0.35f)
+					->AddTab("Details", ETabState::OpenedTab)
+				)
+			)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(true)
+				->SetSizeCoefficient(0.1f)
+				->AddTab("Status", ETabState::OpenedTab)
+			)
+		);
+
+		auto RegisterTrackedTabSpawner = [this](const FName& TabId, const FOnSpawnTab& OnSpawnTab) -> FTabSpawnerEntry&
+		{
+			return TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateLambda([this, OnSpawnTab](const FSpawnTabArgs& Args) -> TSharedRef<SDockTab>
+			{
+				TSharedRef<SDockTab> SpawnedTab = OnSpawnTab.Execute(Args);
+				OnTabSpawned(Args.GetTabId().TabType, SpawnedTab);
+				return SpawnedTab;
+			}));
+		};
+
+        const TSharedRef<SDockTab> NomadTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
+		TabManager = FGlobalTabmanager::Get()->NewTabManager(NomadTab);
+		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &SProcedureEditorWidget::HandleTabManagerPersistLayout));
+
+		RegisterTrackedTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &SProcedureEditorWidget::SpawnToolbarWidgetTab))
+			.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Toolbar"));
+
+		RegisterTrackedTabSpawner("List", FOnSpawnTab::CreateSP(this, &SProcedureEditorWidget::SpawnListWidgetTab))
+			.SetDisplayName(LOCTEXT("ListTab", "List"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+		RegisterTrackedTabSpawner("Details", FOnSpawnTab::CreateSP(this, &SProcedureEditorWidget::SpawnDetailsWidgetTab))
+			.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+		RegisterTrackedTabSpawner("Status", FOnSpawnTab::CreateSP(this, &SProcedureEditorWidget::SpawnStatusWidgetTab))
+			.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+
+		if (GIsEditor)
+		{
+			//Layout = FLayoutSaveRestore::LoadFromConfig(GEditorLayoutIni, Layout);
+		}
+
+		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
+		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("WindowMenuLabel", "Window"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &SProcedureEditorWidget::HandlePullDownWindowMenu),
+			"Window"
+		);
+		
+		const TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
+		TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuWidget);
+
 		ChildSlot
 		[
-			SNew(SVerticalBox)
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.AutoHeight()
+			SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+			.BorderBackgroundColor(FLinearColor::Gray) // Darken the outer border
 			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.FillWidth(1)
-				.Padding(1)
+				SNew(SVerticalBox)
+		
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 				[
-					ToolbarWidget.ToSharedRef()
+					MenuWidget
 				]
-			]
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.FillHeight(1)
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.AutoWidth()
+				
+				+ SVerticalBox::Slot()
+				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 				[
-					ListWidget.ToSharedRef()
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.FillWidth(1)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.AutoWidth()
-				[
-					DetailWidget.ToSharedRef()
-				]
-			]
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.AutoHeight()
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.FillWidth(1)
-				[
-					StatusWidget.ToSharedRef()
+					TabManager->RestoreFrom(Layout, nullptr).ToSharedRef()
 				]
 			]
 		];
-
+		
 		SetIsPreviewMode(UGlobalBPLibrary::IsPlaying());
 	}
 	else
@@ -164,7 +214,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 
 void SProcedureEditorWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 
 	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SProcedureEditorWidget::OnBeginPIE);
 
@@ -177,7 +227,7 @@ void SProcedureEditorWidget::OnCreate()
 
 void SProcedureEditorWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SProcedureEditorWidget::OnRefresh()
@@ -189,11 +239,11 @@ void SProcedureEditorWidget::OnRefresh()
 		{
 			ListWidget->ProcedureModule = ProcedureModule;
 		}
-		if(DetailWidget)
+		if(DetailsWidget)
 		{
-			DetailWidget->ProcedureModule = ProcedureModule;
+			DetailsWidget->ProcedureModule = ProcedureModule;
 		}
-		SEditorSlateWidgetBase::OnRefresh();
+		SEditorWidgetBase::OnRefresh();
 	}
 	else
 	{
@@ -203,7 +253,7 @@ void SProcedureEditorWidget::OnRefresh()
 
 void SProcedureEditorWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 
 	if(OnBeginPIEHandle.IsValid())
 	{
@@ -252,6 +302,82 @@ void SProcedureEditorWidget::OnBlueprintCompiled()
 	Refresh();
 }
 
+void SProcedureEditorWidget::OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab)
+{
+	TWeakPtr<SDockTab>* const ExistingTab = SpawnedTabs.Find(TabIdentifier);
+	if (!ExistingTab)
+	{
+		SpawnedTabs.Add(TabIdentifier, SpawnedTab);
+	}
+	else
+	{
+		check(!ExistingTab->IsValid());
+		*ExistingTab = SpawnedTab;
+	}
+}
+
+void SProcedureEditorWidget::HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave)
+{
+	if (FUnrealEdMisc::Get().IsSavingLayoutOnClosedAllowed())
+	{
+		FLayoutSaveRestore::SaveToConfig(GEditorLayoutIni, LayoutToSave);
+	}
+}
+
+TSharedRef<SDockTab> SProcedureEditorWidget::SpawnToolbarWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ToolbarTab", "Toolbar"))
+		.ShouldAutosize(true)
+		[
+			ToolbarWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> SProcedureEditorWidget::SpawnListWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ListTab", "List"))
+		.ShouldAutosize(false)
+		[
+			ListWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> SProcedureEditorWidget::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("DetailsTab", "Details"))
+		.ShouldAutosize(false)
+		[
+			DetailsWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> SProcedureEditorWidget::SpawnStatusWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("StatusTab", "Status"))
+		.ShouldAutosize(true)
+		[
+			StatusWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+void SProcedureEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)
+{
+	if (!TabManager.IsValid())
+	{
+		return;
+	}
+
+	TabManager->PopulateLocalTabSpawnerMenu(MenuBuilder);
+}
+
 void SProcedureEditorWidget::TogglePreviewMode()
 {
 	SetIsPreviewMode(!bPreviewMode);
@@ -268,3 +394,5 @@ void SProcedureEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+#undef LOCTEXT_NAMESPACE

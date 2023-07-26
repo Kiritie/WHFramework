@@ -37,7 +37,7 @@ void FProcedureBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjec
 
 			if(bLetOpen)
 			{
-				TSharedRef<FProcedureEditor> NewEditor(new FProcedureEditor());
+				TSharedRef<FProcedureBlueprintEditor> NewEditor(new FProcedureBlueprintEditor());
 
 				TArray<UBlueprint*> Blueprints;
 				Blueprints.Add(Blueprint);

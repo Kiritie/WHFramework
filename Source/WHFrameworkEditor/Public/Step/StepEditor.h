@@ -6,12 +6,12 @@
 #include "Editor/Kismet/Public/BlueprintEditor.h"
 
 //////////////////////////////////////////////////////////////////////////
-// FStepEditor
+// FStepBlueprintEditor
 
 /**
  * Gameplay abilities asset editor (extends Blueprint editor)
  */
-class FStepEditor : public FBlueprintEditor
+class FStepBlueprintEditor : public FBlueprintEditor
 {
 public:
 	/**
@@ -34,9 +34,9 @@ private:
 	void EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint);
 
 public:
-	FStepEditor();
+	FStepBlueprintEditor();
 
-	virtual ~FStepEditor();
+	virtual ~FStepBlueprintEditor();
 
 public:
 	// IToolkit interface

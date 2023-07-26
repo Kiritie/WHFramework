@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 #include "SlateOptMacros.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModule.h"
@@ -9,17 +9,17 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-SEditorSlateWidgetBase::SEditorSlateWidgetBase()
+SEditorWidgetBase::SEditorWidgetBase()
 {
 	WidgetName = NAME_None;
 	WidgetType = EEditorWidgetType::Main;
-	ChildWidgets = TArray<TSharedPtr<SEditorSlateWidgetBase>>();
-	ChildWidgetMap = TMap<FName, TSharedPtr<SEditorSlateWidgetBase>>();
+	ChildWidgets = TArray<TSharedPtr<SEditorWidgetBase>>();
+	ChildWidgetMap = TMap<FName, TSharedPtr<SEditorWidgetBase>>();
 }
 
-void SEditorSlateWidgetBase::Construct(const FArguments& InArgs)
+void SEditorWidgetBase::Construct(const FArguments& InArgs)
 {
-	GWorld->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateRaw(this, &SEditorSlateWidgetBase::OnCreate));
+	GWorld->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateRaw(this, &SEditorWidgetBase::OnCreate));
 	/*
 	ChildSlot
 	[
@@ -28,15 +28,15 @@ void SEditorSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-void SEditorSlateWidgetBase::OnWindowActivated()
+void SEditorWidgetBase::OnWindowActivated()
 {
 }
 
-void SEditorSlateWidgetBase::OnWindowDeactivated()
+void SEditorWidgetBase::OnWindowDeactivated()
 {
 }
 
-void SEditorSlateWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
+void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 {
 	OnDestroy();
 	if(OnWindowActivatedHandle.IsValid())
@@ -53,24 +53,24 @@ void SEditorSlateWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWi
 	}
 }
 
-void SEditorSlateWidgetBase::OnCreate()
+void SEditorWidgetBase::OnCreate()
 {
 	if(WidgetType == EEditorWidgetType::Main)
 	{
 		if(GetOwnerWindow().IsValid())
 		{
-			OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowActivated);
-			OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowDeactivated);
-			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorSlateWidgetBase::OnWindowClosed);
+			OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowActivated);
+			OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowDeactivated);
+			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
 		}
 	}
 }
 
-void SEditorSlateWidgetBase::OnReset()
+void SEditorWidgetBase::OnReset()
 {
 }
 
-void SEditorSlateWidgetBase::OnRefresh()
+void SEditorWidgetBase::OnRefresh()
 {
 	for(auto Iter : ChildWidgets)
 	{
@@ -78,7 +78,7 @@ void SEditorSlateWidgetBase::OnRefresh()
 	}
 }
 
-void SEditorSlateWidgetBase::OnDestroy()
+void SEditorWidgetBase::OnDestroy()
 {
 	for(auto Iter : ChildWidgets)
 	{
@@ -87,17 +87,17 @@ void SEditorSlateWidgetBase::OnDestroy()
 	ChildWidgets.Empty();
 }
 
-void SEditorSlateWidgetBase::Reset()
+void SEditorWidgetBase::Reset()
 {
 	OnReset();
 }
 
-void SEditorSlateWidgetBase::Refresh()
+void SEditorWidgetBase::Refresh()
 {
 	OnRefresh();
 }
 
-void SEditorSlateWidgetBase::Destroy()
+void SEditorWidgetBase::Destroy()
 {
 	switch(WidgetType)
 	{
@@ -116,7 +116,7 @@ void SEditorSlateWidgetBase::Destroy()
 	}
 }
 
-void SEditorSlateWidgetBase::AddChild(const TSharedPtr<SEditorSlateWidgetBase>& InChildWidget)
+void SEditorWidgetBase::AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget)
 {
 	if(!ChildWidgets.Contains(InChildWidget))
 	{
@@ -126,7 +126,7 @@ void SEditorSlateWidgetBase::AddChild(const TSharedPtr<SEditorSlateWidgetBase>& 
 	}
 }
 
-void SEditorSlateWidgetBase::RemoveChild(const TSharedPtr<SEditorSlateWidgetBase>& InChildWidget)
+void SEditorWidgetBase::RemoveChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget)
 {
 	if(ChildWidgets.Contains(InChildWidget))
 	{
@@ -136,7 +136,7 @@ void SEditorSlateWidgetBase::RemoveChild(const TSharedPtr<SEditorSlateWidgetBase
 	}
 }
 
-void SEditorSlateWidgetBase::RemoveAllChild()
+void SEditorWidgetBase::RemoveAllChild()
 {
 	for(auto Iter : ChildWidgets)
 	{
@@ -146,7 +146,16 @@ void SEditorSlateWidgetBase::RemoveAllChild()
 	ChildWidgetMap.Empty();
 }
 
-TSharedPtr<SWindow> SEditorSlateWidgetBase::GetOwnerWindow()
+TSharedPtr<SEditorWidgetBase> SEditorWidgetBase::GetChild(int32 InIndex) const
+{
+	if(ChildWidgets.IsValidIndex(InIndex))
+	{
+		return ChildWidgets[InIndex];
+	}
+	return nullptr;
+}
+
+TSharedPtr<SWindow> SEditorWidgetBase::GetOwnerWindow()
 {
 	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
 }

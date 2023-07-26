@@ -73,7 +73,7 @@ void SCreateBlueprintAssetDialog::Construct(const FArguments& InArgs)
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-	SEditorWindowWidgetBase::Construct(SEditorWindowWidgetBase::FArguments()
+	SEditorWindowBase::Construct(SEditorWindowBase::FArguments()
 		.WindowArgs(SWindow::FArguments()
 		[
 			SNew(SVerticalBox)

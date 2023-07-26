@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Procedure/Widget/Window/SCreateProcedureBlueprintDialog.h"
+#include "Procedure/Widget/Window/SCreateProcedureBlueprintWindow.h"
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
@@ -15,7 +15,7 @@
 /////////////////////////////////////////////////
 // select folder dialog
 //////////////////////////////////////////////////
-SCreateProcedureBlueprintDialog::SCreateProcedureBlueprintDialog()
+SCreateProcedureBlueprintWindow::SCreateProcedureBlueprintWindow()
 {
 	BlueprintFactory = nullptr;
 	UserResponse = EAppReturnType::Cancel;
@@ -24,7 +24,7 @@ SCreateProcedureBlueprintDialog::SCreateProcedureBlueprintDialog()
 	WindowSize = FVector2D(450, 450);
 }
 
-void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
+void SCreateProcedureBlueprintWindow::Construct(const FArguments& InArgs)
 {
 	AssetPath = InArgs._DefaultAssetPath/*FText::FromString(FPackageName::GetLongPackagePath(InArgs._DefaultAssetPath.ToString()))*/;
 
@@ -37,12 +37,12 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 
 	FPathPickerConfig PathPickerConfig;
 	PathPickerConfig.DefaultPath = AssetPath.ToString();
-	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateProcedureBlueprintDialog::OnPathChange);
+	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateProcedureBlueprintWindow::OnPathChange);
 	PathPickerConfig.bAddDefaultPath = true;
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-	SEditorWindowWidgetBase::Construct(SEditorWindowWidgetBase::FArguments()
+	SEditorWindowBase::Construct(SEditorWindowBase::FArguments()
 		.WindowArgs(SWindow::FArguments()
 		[
 			SNew(SVerticalBox)
@@ -98,7 +98,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 						.Text_Lambda([this](){ return FText::FromString(AssetName); })
 						.IsReadOnly(false)
 						.RevertTextOnEscape(true)
-						.OnTextChanged(this, &SCreateProcedureBlueprintDialog::SetAssetName)
+						.OnTextChanged(this, &SCreateProcedureBlueprintWindow::SetAssetName)
 					]
 				]
 			]
@@ -118,7 +118,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("OK", "OK"))
-					.OnClicked(this, &SCreateProcedureBlueprintDialog::OnButtonClick, EAppReturnType::Ok)
+					.OnClicked(this, &SCreateProcedureBlueprintWindow::OnButtonClick, EAppReturnType::Ok)
 				]
 				+ SUniformGridPanel::Slot(1, 0)
 				[
@@ -126,7 +126,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
-					.OnClicked(this, &SCreateProcedureBlueprintDialog::OnButtonClick, EAppReturnType::Cancel)
+					.OnClicked(this, &SCreateProcedureBlueprintWindow::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
 		])
@@ -135,7 +135,7 @@ void SCreateProcedureBlueprintDialog::Construct(const FArguments& InArgs)
 	OnPathChange(AssetPath.ToString());
 }
 
-void SCreateProcedureBlueprintDialog::OnPathChange(const FString& NewPath)
+void SCreateProcedureBlueprintWindow::OnPathChange(const FString& NewPath)
 {
 	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
 
@@ -144,7 +144,7 @@ void SCreateProcedureBlueprintDialog::OnPathChange(const FString& NewPath)
 	AssetTools->CreateUniqueAssetName(NewPath / BlueprintFactory->GetDefaultNewAssetName(), FString(), PackageName, AssetName);
 }
 
-FReply SCreateProcedureBlueprintDialog::OnButtonClick(EAppReturnType::Type ButtonID)
+FReply SCreateProcedureBlueprintWindow::OnButtonClick(EAppReturnType::Type ButtonID)
 {
 	UserResponse = ButtonID;
 
@@ -153,29 +153,29 @@ FReply SCreateProcedureBlueprintDialog::OnButtonClick(EAppReturnType::Type Butto
 	return FReply::Handled();
 }
 
-void SCreateProcedureBlueprintDialog::SetAssetName(const FText& InText)
+void SCreateProcedureBlueprintWindow::SetAssetName(const FText& InText)
 {
 	AssetName = InText.ToString();
 }
 
 
-EAppReturnType::Type SCreateProcedureBlueprintDialog::ShowModal()
+EAppReturnType::Type SCreateProcedureBlueprintWindow::ShowModal()
 {
 	GEditor->EditorAddModalWindow(SharedThis(this));
 	return UserResponse;
 }
 
-FString SCreateProcedureBlueprintDialog::GetAssetPath()
+FString SCreateProcedureBlueprintWindow::GetAssetPath()
 {
 	return AssetPath.ToString();
 }
 
-FString SCreateProcedureBlueprintDialog::GetAssetName()
+FString SCreateProcedureBlueprintWindow::GetAssetName()
 {
 	return AssetName;
 }
 
-FString SCreateProcedureBlueprintDialog::GetPackageName()
+FString SCreateProcedureBlueprintWindow::GetPackageName()
 {
 	return PackageName;
 }

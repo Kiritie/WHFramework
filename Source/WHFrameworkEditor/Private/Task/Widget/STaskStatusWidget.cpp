@@ -15,7 +15,7 @@ STaskStatusWidget::STaskStatusWidget()
 
 void STaskStatusWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ListWidget = InArgs._ListWidget;
 
@@ -70,22 +70,22 @@ void STaskStatusWidget::Construct(const FArguments& InArgs)
 
 void STaskStatusWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void STaskStatusWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void STaskStatusWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
 void STaskStatusWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

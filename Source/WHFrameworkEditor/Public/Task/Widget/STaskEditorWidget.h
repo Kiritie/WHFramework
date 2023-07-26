@@ -3,12 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API STaskEditorWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API STaskEditorWidget : public SEditorWidgetBase
 {
 public:
 	STaskEditorWidget();
@@ -35,6 +35,20 @@ protected:
 	void OnMapOpened(const FString& Filename, bool bAsTemplate);
 
 	void OnBlueprintCompiled();
+	
+	void OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab);
+
+	void HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave);
+
+	TSharedRef<SDockTab> SpawnToolbarWidgetTab(const FSpawnTabArgs& Args);
+	
+	TSharedRef<SDockTab> SpawnListWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnStatusWidgetTab(const FSpawnTabArgs& Args);
+	
+	void HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
@@ -48,6 +62,9 @@ public:
 	/// Refs
 public:
 	class ATaskModule* TaskModule;
+	
+	TSharedPtr<FTabManager> TabManager;
+	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
@@ -56,7 +73,7 @@ protected:
 
 	TSharedPtr<class STaskListWidget> ListWidget;
 
-	TSharedPtr<class STaskDetailWidget> DetailWidget;
+	TSharedPtr<class STaskDetailsWidget> DetailsWidget;
 
 	TSharedPtr<class STaskStatusWidget> StatusWidget;
 

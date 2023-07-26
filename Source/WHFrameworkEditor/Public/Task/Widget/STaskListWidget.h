@@ -7,7 +7,7 @@
 #include "WHFrameworkEditorStyle.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskBase.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 class UTaskBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectTaskListItemsDelegate, TArray<TSharedPtr<FTaskListItem>>)
@@ -15,7 +15,7 @@ DECLARE_DELEGATE_OneParam(FOnSelectTaskListItemsDelegate, TArray<TSharedPtr<FTas
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API STaskListWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API STaskListWidget : public SEditorWidgetBase
 {
 public:
 	STaskListWidget();

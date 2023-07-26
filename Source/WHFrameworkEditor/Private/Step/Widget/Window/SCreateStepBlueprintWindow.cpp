@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Step/Widget/Window/SCreateStepBlueprintDialog.h"
+#include "Step/Widget/Window/SCreateStepBlueprintWindow.h"
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
@@ -16,7 +16,7 @@
 /////////////////////////////////////////////////
 // select folder dialog
 //////////////////////////////////////////////////
-SCreateStepBlueprintDialog::SCreateStepBlueprintDialog()
+SCreateStepBlueprintWindow::SCreateStepBlueprintWindow()
 {
 	BlueprintFactory = nullptr;
 	UserResponse = EAppReturnType::Cancel;
@@ -25,7 +25,7 @@ SCreateStepBlueprintDialog::SCreateStepBlueprintDialog()
 	WindowSize = FVector2D(450, 450);
 }
 
-void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
+void SCreateStepBlueprintWindow::Construct(const FArguments& InArgs)
 {
 	AssetPath = InArgs._DefaultAssetPath/*FText::FromString(FPackageName::GetLongPackagePath(InArgs._DefaultAssetPath.ToString()))*/;
 
@@ -38,12 +38,12 @@ void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
 
 	FPathPickerConfig PathPickerConfig;
 	PathPickerConfig.DefaultPath = AssetPath.ToString();
-	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateStepBlueprintDialog::OnPathChange);
+	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateStepBlueprintWindow::OnPathChange);
 	PathPickerConfig.bAddDefaultPath = true;
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-	SEditorWindowWidgetBase::Construct(SEditorWindowWidgetBase::FArguments()
+	SEditorWindowBase::Construct(SEditorWindowBase::FArguments()
 		.WindowArgs(SWindow::FArguments()
 		[
 			SNew(SVerticalBox)
@@ -99,7 +99,7 @@ void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
 						.Text_Lambda([this](){ return FText::FromString(AssetName); })
 						.IsReadOnly(false)
 						.RevertTextOnEscape(true)
-						.OnTextChanged(this, &SCreateStepBlueprintDialog::SetAssetName)
+						.OnTextChanged(this, &SCreateStepBlueprintWindow::SetAssetName)
 					]
 				]
 			]
@@ -119,7 +119,7 @@ void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("OK", "OK"))
-					.OnClicked(this, &SCreateStepBlueprintDialog::OnButtonClick, EAppReturnType::Ok)
+					.OnClicked(this, &SCreateStepBlueprintWindow::OnButtonClick, EAppReturnType::Ok)
 				]
 				+ SUniformGridPanel::Slot(1, 0)
 				[
@@ -127,7 +127,7 @@ void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
-					.OnClicked(this, &SCreateStepBlueprintDialog::OnButtonClick, EAppReturnType::Cancel)
+					.OnClicked(this, &SCreateStepBlueprintWindow::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
 		])
@@ -136,7 +136,7 @@ void SCreateStepBlueprintDialog::Construct(const FArguments& InArgs)
 	OnPathChange(AssetPath.ToString());
 }
 
-void SCreateStepBlueprintDialog::OnPathChange(const FString& NewPath)
+void SCreateStepBlueprintWindow::OnPathChange(const FString& NewPath)
 {
 	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
 
@@ -145,7 +145,7 @@ void SCreateStepBlueprintDialog::OnPathChange(const FString& NewPath)
 	AssetTools->CreateUniqueAssetName(NewPath / BlueprintFactory->GetDefaultNewAssetName(), FString(), PackageName, AssetName);
 }
 
-FReply SCreateStepBlueprintDialog::OnButtonClick(EAppReturnType::Type ButtonID)
+FReply SCreateStepBlueprintWindow::OnButtonClick(EAppReturnType::Type ButtonID)
 {
 	UserResponse = ButtonID;
 
@@ -154,29 +154,29 @@ FReply SCreateStepBlueprintDialog::OnButtonClick(EAppReturnType::Type ButtonID)
 	return FReply::Handled();
 }
 
-void SCreateStepBlueprintDialog::SetAssetName(const FText& InText)
+void SCreateStepBlueprintWindow::SetAssetName(const FText& InText)
 {
 	AssetName = InText.ToString();
 }
 
 
-EAppReturnType::Type SCreateStepBlueprintDialog::ShowModal()
+EAppReturnType::Type SCreateStepBlueprintWindow::ShowModal()
 {
 	GEditor->EditorAddModalWindow(SharedThis(this));
 	return UserResponse;
 }
 
-FString SCreateStepBlueprintDialog::GetAssetPath()
+FString SCreateStepBlueprintWindow::GetAssetPath()
 {
 	return AssetPath.ToString();
 }
 
-FString SCreateStepBlueprintDialog::GetAssetName()
+FString SCreateStepBlueprintWindow::GetAssetName()
 {
 	return AssetName;
 }
 
-FString SCreateStepBlueprintDialog::GetPackageName()
+FString SCreateStepBlueprintWindow::GetPackageName()
 {
 	return PackageName;
 }

@@ -34,7 +34,7 @@ SProcedureListWidget::SProcedureListWidget()
 
 void SProcedureListWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ProcedureModule = InArgs._ProcedureModule;
 
@@ -108,30 +108,13 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 					SNew(SHorizontalBox)
 
 					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)
-					.HAlign(HAlign_Center)
-					.Padding(5.f, 2.f, 5.f, 2.f)
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Procedure List")))
-					]
-				]
-
-				+ SVerticalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.AutoHeight()
-				[
-					SNew(SHorizontalBox)
-
-					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Center)
 					.HAlign(HAlign_Fill)
 					.Padding(2.f, 0, 0, 0)
 					.AutoWidth()
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Class: ")))
+						.Text(FText::FromString(TEXT(" Class: ")))
 						.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 					]
 
@@ -321,17 +304,17 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 
 void SProcedureListWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SProcedureListWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SProcedureListWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 
 	ProcedureClassFilter->ProcedureModule = ProcedureModule;
 
@@ -342,7 +325,7 @@ void SProcedureListWidget::OnRefresh()
 
 void SProcedureListWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass)

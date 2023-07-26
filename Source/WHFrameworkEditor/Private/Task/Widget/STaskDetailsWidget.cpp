@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Task/Widget/STaskDetailWidget.h"
+#include "Task/Widget/STaskDetailsWidget.h"
 
 #include "ISinglePropertyView.h"
 #include "SlateOptMacros.h"
@@ -11,23 +11,23 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-STaskDetailWidget::STaskDetailWidget()
+STaskDetailsWidget::STaskDetailsWidget()
 {
-	WidgetName = FName("TaskDetailWidget");
+	WidgetName = FName("TaskDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
 	TaskModule = nullptr;
 }
 
-void STaskDetailWidget::Construct(const FArguments& InArgs)
+void STaskDetailsWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ListWidget = InArgs._ListWidget;
 	TaskModule = InArgs._TaskModule;
 
 	if(!TaskModule || !TaskModule->IsValidLowLevel() || !ListWidget) return;
 
-	ListWidget->OnSelectTaskListItemsDelegate.BindRaw(this, &STaskDetailWidget::OnSelectTaskListItem);
+	ListWidget->OnSelectTaskListItemsDelegate.BindRaw(this, &STaskDetailsWidget::OnSelectTaskListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -54,24 +54,6 @@ void STaskDetailWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				.VAlign(VAlign_Fill)
 				.HAlign(HAlign_Fill)
-				.AutoHeight()
-				[
-					SNew(SHorizontalBox)
-
-					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)
-					.HAlign(HAlign_Center)
-					.AutoWidth()
-					.Padding(5.f, 2.f, 5.f, 2.f)
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Detail Panel")))
-					]
-				]
-
-				+ SVerticalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
 				.FillHeight(1)
 				[
 					SNew(SVerticalBox)
@@ -90,27 +72,27 @@ void STaskDetailWidget::Construct(const FArguments& InArgs)
 	UpdateDetailsView();
 }
 
-void STaskDetailWidget::OnCreate()
+void STaskDetailsWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
-void STaskDetailWidget::OnReset()
+void STaskDetailsWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
-void STaskDetailWidget::OnRefresh()
+void STaskDetailsWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
-void STaskDetailWidget::OnDestroy()
+void STaskDetailsWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
-void STaskDetailWidget::UpdateDetailsView()
+void STaskDetailsWidget::UpdateDetailsView()
 {
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -130,7 +112,7 @@ void STaskDetailWidget::UpdateDetailsView()
 	}
 }
 
-void STaskDetailWidget::OnSelectTaskListItem(TArray<TSharedPtr<FTaskListItem>> TaskListItem)
+void STaskDetailsWidget::OnSelectTaskListItem(TArray<TSharedPtr<FTaskListItem>> TaskListItem)
 {
 	SelectedTaskListItems = TaskListItem;
 

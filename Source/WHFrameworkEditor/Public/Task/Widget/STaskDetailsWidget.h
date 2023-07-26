@@ -4,24 +4,24 @@
 
 #include "CoreMinimal.h"
 
-#include "Step/Base/StepBase.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Task/Base/TaskBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
-class SStepListWidget;
-class AStepModule;
+class STaskListWidget;
+class ATaskModule;
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SStepDetailWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API STaskDetailsWidget : public SEditorWidgetBase
 {
 public:
-	SStepDetailWidget();
+	STaskDetailsWidget();
 	
-	SLATE_BEGIN_ARGS(SStepDetailWidget) {}
+	SLATE_BEGIN_ARGS(STaskDetailsWidget) {}
 
-		SLATE_ARGUMENT(AStepModule*, StepModule)
+		SLATE_ARGUMENT(ATaskModule*, TaskModule)
 
-		SLATE_ARGUMENT(TSharedPtr<SStepListWidget>, ListWidget)
+		SLATE_ARGUMENT(TSharedPtr<STaskListWidget>, ListWidget)
 
 	SLATE_END_ARGS()
 
@@ -39,14 +39,14 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TArray<TSharedPtr<FStepListItem>> SelectedStepListItems;
+	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	AStepModule* StepModule;
+	ATaskModule* TaskModule;
 
-	TSharedPtr<SStepListWidget> ListWidget;
+	TSharedPtr<STaskListWidget> ListWidget;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
@@ -56,5 +56,5 @@ public:
 private:
 	void UpdateDetailsView();
 
-	void OnSelectStepListItem(TArray<TSharedPtr<FStepListItem>> StepListItem);
+	void OnSelectTaskListItem(TArray<TSharedPtr<FTaskListItem>> TaskListItem);
 };

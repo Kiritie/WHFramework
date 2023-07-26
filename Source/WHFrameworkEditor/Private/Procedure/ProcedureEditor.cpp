@@ -18,24 +18,24 @@
 /////////////////////////////////////////////////////
 // FProcedureEditor
 
-FProcedureEditor::FProcedureEditor()
+FProcedureBlueprintEditor::FProcedureBlueprintEditor()
 {
 	// todo: Do we need to register a callback for when properties are changed?
 }
 
-FProcedureEditor::~FProcedureEditor()
+FProcedureBlueprintEditor::~FProcedureBlueprintEditor()
 {
 	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
 }
 
-void FProcedureEditor::InitProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FProcedureBlueprintEditor::InitProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
 {
 	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
 
 	for(auto Blueprint : InBlueprints) { EnsureProcedureBlueprintIsUpToDate(Blueprint); }
 }
 
-void FProcedureEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
+void FProcedureBlueprintEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
 {
 	#if WITH_EDITORONLY_DATA
 	for(UEdGraph* Graph : Blueprint->UbergraphPages)
@@ -57,11 +57,11 @@ void FProcedureEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
 // 	return GetToolkitFName();
 // }
 
-FName FProcedureEditor::GetToolkitFName() const { return FName("ProcedureEditor"); }
+FName FProcedureBlueprintEditor::GetToolkitFName() const { return FName("ProcedureEditor"); }
 
-FText FProcedureEditor::GetBaseToolkitName() const { return LOCTEXT("ProcedureEditorAppLabel", "Procedure Editor"); }
+FText FProcedureBlueprintEditor::GetBaseToolkitName() const { return LOCTEXT("ProcedureEditorAppLabel", "Procedure Editor"); }
 
-FText FProcedureEditor::GetToolkitName() const
+FText FProcedureBlueprintEditor::GetToolkitName() const
 {
 	const TArray<UObject*>& EditingObjs = GetEditingObjects();
 
@@ -78,7 +78,7 @@ FText FProcedureEditor::GetToolkitName() const
 	return FText::Format(LOCTEXT("ProcedureToolkitName", "{ObjectName}{DirtyState}"), Args);
 }
 
-FText FProcedureEditor::GetToolkitToolTipText() const
+FText FProcedureBlueprintEditor::GetToolkitToolTipText() const
 {
 	const UObject* EditingObject = GetEditingObject();
 
@@ -87,18 +87,18 @@ FText FProcedureEditor::GetToolkitToolTipText() const
 	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
 }
 
-FString FProcedureEditor::GetWorldCentricTabPrefix() const { return TEXT("ProcedureEditor"); }
+FString FProcedureBlueprintEditor::GetWorldCentricTabPrefix() const { return TEXT("ProcedureEditor"); }
 
-FLinearColor FProcedureEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
+FLinearColor FProcedureBlueprintEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
 
-UBlueprint* FProcedureEditor::GetBlueprintObj() const
+UBlueprint* FProcedureBlueprintEditor::GetBlueprintObj() const
 {
 	const TArray<UObject*>& EditingObjs = GetEditingObjects();
 	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UProcedureBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
 	return nullptr;
 }
 
-FString FProcedureEditor::GetDocumentationLink() const
+FString FProcedureBlueprintEditor::GetDocumentationLink() const
 {
 	return FBlueprintEditor::GetDocumentationLink(); // todo: point this at the correct documentation
 }

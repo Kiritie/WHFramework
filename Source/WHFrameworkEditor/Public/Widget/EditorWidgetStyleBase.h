@@ -6,37 +6,37 @@
 #include "Styling/SlateWidgetStyle.h"
 #include "Styling/SlateWidgetStyleContainerBase.h"
 
-#include "EditorSlateWidgetStyleBase.generated.h"
+#include "EditorWidgetStyleBase.generated.h"
 
 /**
  * 
  */
 USTRUCT()
-struct WHFRAMEWORKEDITOR_API FEditorSlateWidgetStyle : public FSlateWidgetStyle
+struct WHFRAMEWORKEDITOR_API FEditorWidgetStyle : public FSlateWidgetStyle
 {
 	GENERATED_USTRUCT_BODY()
 
-	FEditorSlateWidgetStyle();
-	virtual ~FEditorSlateWidgetStyle();
+	FEditorWidgetStyle();
+	virtual ~FEditorWidgetStyle();
 
 	// FSlateWidgetStyle
 	virtual void GetResources(TArray<const FSlateBrush*>& OutBrushes) const override;
 	static const FName TypeName;
 	virtual const FName GetTypeName() const override { return TypeName; };
-	static const FEditorSlateWidgetStyle& GetDefault();
+	static const FEditorWidgetStyle& GetDefault();
 };
 
 /**
  */
 UCLASS(hidecategories=Object, MinimalAPI)
-class UEditorSlateWidgetStyleBase : public USlateWidgetStyleContainerBase
+class UEditorWidgetStyleBase : public USlateWidgetStyleContainerBase
 {
 	GENERATED_BODY()
 
 public:
 	/** The actual data describing the widget appearance. */
 	UPROPERTY(Category=Appearance, EditAnywhere, meta=(ShowOnlyInnerProperties))
-	FEditorSlateWidgetStyle WidgetStyle;
+	FEditorWidgetStyle WidgetStyle;
 
 	virtual const struct FSlateWidgetStyle* const GetStyle() const override
 	{

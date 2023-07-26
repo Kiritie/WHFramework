@@ -21,7 +21,7 @@ SProcedureToolbarWidget::SProcedureToolbarWidget()
 
 void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	MainWidget = InArgs._MainWidget;
 	ListWidget = InArgs._ListWidget;
@@ -55,66 +55,6 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 		#endif
 	}
 	ToolBarBuilder_Editor.EndSection();
-
-	FToolBarBuilder ToolBarBuilder_View(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
-
-	ToolBarBuilder_View.BeginSection("View");
-	{
-		#if WITH_SLATE_DEBUGGING
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowListPanel = !MainWidget->bShowListPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowListPanel"), MainWidget->bShowListPanel, GProcedureEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowListPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Procedure List")),
-			FText::FromString(TEXT("Show/Hide Procedure List")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowDetailPanel = !MainWidget->bShowDetailPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowDetailPanel"), MainWidget->bShowDetailPanel, GProcedureEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowDetailPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Detail Panel")),
-			FText::FromString(TEXT("Show/Hide Detail Panel")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowStatusPanel = !MainWidget->bShowStatusPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bShowStatusPanel"), MainWidget->bShowStatusPanel, GProcedureEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowStatusPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Status Panel")),
-			FText::FromString(TEXT("Show/Hide Status Panel")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		#endif
-	}
-	ToolBarBuilder_View.EndSection();
 
 	FToolBarBuilder ToolBarBuilder_List(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
 
@@ -202,15 +142,6 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Center)
 				.HAlign(HAlign_Left)
 				.AutoWidth()
-				.Padding(FMargin(5.f, 0.f))
-				[
-					ToolBarBuilder_View.MakeWidget()
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
 				.Padding(5.f, 0.f, 0.f, 0.f)
 				[
 					SNew(STextBlock)
@@ -248,22 +179,22 @@ void SProcedureToolbarWidget::OnEditModeToggled()
 
 void SProcedureToolbarWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SProcedureToolbarWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SProcedureToolbarWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
 void SProcedureToolbarWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

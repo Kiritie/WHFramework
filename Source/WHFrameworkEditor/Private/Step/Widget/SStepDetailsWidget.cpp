@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Step/Widget/SStepDetailWidget.h"
+#include "Step/Widget/SStepDetailsWidget.h"
 
 #include "ISinglePropertyView.h"
 #include "SlateOptMacros.h"
@@ -11,23 +11,23 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-SStepDetailWidget::SStepDetailWidget()
+SStepDetailsWidget::SStepDetailsWidget()
 {
-	WidgetName = FName("StepDetailWidget");
+	WidgetName = FName("StepDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
 	StepModule = nullptr;
 }
 
-void SStepDetailWidget::Construct(const FArguments& InArgs)
+void SStepDetailsWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ListWidget = InArgs._ListWidget;
 	StepModule = InArgs._StepModule;
 
 	if(!StepModule || !StepModule->IsValidLowLevel() || !ListWidget) return;
 
-	ListWidget->OnSelectStepListItemsDelegate.BindRaw(this, &SStepDetailWidget::OnSelectStepListItem);
+	ListWidget->OnSelectStepListItemsDelegate.BindRaw(this, &SStepDetailsWidget::OnSelectStepListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -54,24 +54,6 @@ void SStepDetailWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				.VAlign(VAlign_Fill)
 				.HAlign(HAlign_Fill)
-				.AutoHeight()
-				[
-					SNew(SHorizontalBox)
-
-					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)
-					.HAlign(HAlign_Center)
-					.AutoWidth()
-					.Padding(5.f, 2.f, 5.f, 2.f)
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Detail Panel")))
-					]
-				]
-
-				+ SVerticalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
 				.FillHeight(1)
 				[
 					SNew(SVerticalBox)
@@ -90,27 +72,27 @@ void SStepDetailWidget::Construct(const FArguments& InArgs)
 	UpdateDetailsView();
 }
 
-void SStepDetailWidget::OnCreate()
+void SStepDetailsWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
-void SStepDetailWidget::OnReset()
+void SStepDetailsWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
-void SStepDetailWidget::OnRefresh()
+void SStepDetailsWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
-void SStepDetailWidget::OnDestroy()
+void SStepDetailsWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
-void SStepDetailWidget::UpdateDetailsView()
+void SStepDetailsWidget::UpdateDetailsView()
 {
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -130,7 +112,7 @@ void SStepDetailWidget::UpdateDetailsView()
 	}
 }
 
-void SStepDetailWidget::OnSelectStepListItem(TArray<TSharedPtr<FStepListItem>> StepListItem)
+void SStepDetailsWidget::OnSelectStepListItem(TArray<TSharedPtr<FStepListItem>> StepListItem)
 {
 	SelectedStepListItems = StepListItem;
 
