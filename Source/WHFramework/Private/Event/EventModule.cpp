@@ -201,7 +201,8 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass
 			UEventHandleBase* EventHandle;
 		} Params{InSender, EventHandle};
 
-		for (auto Iter1 : EventHandleInfos[InEventHandleClass].EventHandleFuncMap)
+		auto TmpEventHandleInfos = EventHandleInfos;
+		for (auto Iter1 : TmpEventHandleInfos[InEventHandleClass].EventHandleFuncMap)
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{

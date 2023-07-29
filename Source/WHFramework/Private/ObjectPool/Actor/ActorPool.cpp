@@ -9,7 +9,7 @@ UActorPool::UActorPool()
 {
 }
 
-UObject* UActorPool::SpawnImpl(UObject* InObject)
+UObject* UActorPool::OnSpawn(UObject* InObject)
 {
 	if(!InObject)
 	{
@@ -20,7 +20,7 @@ UObject* UActorPool::SpawnImpl(UObject* InObject)
 	return InObject;
 }
 
-void UActorPool::DespawnImpl(UObject* InObject, bool bRecovery)
+void UActorPool::OnDespawn(UObject* InObject, bool bRecovery)
 {
 	if(!bRecovery)
 	{

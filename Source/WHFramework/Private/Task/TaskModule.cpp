@@ -194,10 +194,7 @@ void ATaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 	
 	if(!InTask->IsCompleted())
 	{
-		GetWorldTimerManager().SetTimerForNextTick([=]()
-		{
-			InTask->OnComplete(InTaskExecuteResult);
-		});
+		InTask->OnComplete(InTaskExecuteResult);
 	}
 	for(auto Iter : InTask->SubTasks)
 	{

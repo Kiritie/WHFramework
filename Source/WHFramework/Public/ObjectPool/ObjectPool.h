@@ -42,18 +42,21 @@ public:
 	* 生成对象
 	*/
 	UObject* Spawn(const TArray<FParameter>& InParams);
-	virtual UObject* SpawnImpl(UObject* InObject);
 	/**
 	* 回收对象
 	* @param InObject 对象
 	* @param bRecovery 是否回收
 	*/
 	void Despawn(UObject* InObject, bool bRecovery);
-	virtual void DespawnImpl(UObject* InObject, bool bRecovery);
 	/**
 	* 清理对象
 	*/
 	void Clear();
+
+protected:
+	virtual UObject* OnSpawn(UObject* InObject);
+
+	virtual void OnDespawn(UObject* InObject, bool bRecovery);
 
 public:
 	UFUNCTION(BlueprintPure)

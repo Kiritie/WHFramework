@@ -19,7 +19,7 @@ public:
 	UWidgetPool();
 
 public:
-	virtual UObject* SpawnImpl(UObject* InObject) override;
+	virtual UObject* OnSpawn(UObject* InObject) override;
 
-	virtual void DespawnImpl(UObject* InObject, bool bRecovery) override;
+	virtual void OnDespawn(UObject* InObject, bool bRecovery) override;
 };

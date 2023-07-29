@@ -11,7 +11,7 @@ UWidgetPool::UWidgetPool()
 {
 }
 
-UObject* UWidgetPool::SpawnImpl(UObject* InObject)
+UObject* UWidgetPool::OnSpawn(UObject* InObject)
 {
 	if(!InObject)
 	{
@@ -24,7 +24,7 @@ UObject* UWidgetPool::SpawnImpl(UObject* InObject)
 	return InObject;
 }
 
-void UWidgetPool::DespawnImpl(UObject* InObject, bool bRecovery)
+void UWidgetPool::OnDespawn(UObject* InObject, bool bRecovery)
 {
-	Super::DespawnImpl(InObject, bRecovery);
+	Super::OnDespawn(InObject, bRecovery);
 }

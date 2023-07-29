@@ -83,7 +83,7 @@ void AModuleBase::Run_Implementation()
 void AModuleBase::Reset_Implementation()
 {
 	Super::Reset();
-	OnReset();
+	Execute_OnReset(this);
 }
 
 void AModuleBase::Pause_Implementation()

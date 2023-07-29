@@ -24,9 +24,9 @@ AInputModule::AInputModule()
 {
 	ModuleName = FName("InputModule");
 	
-	KeyShortcuts.Add(FName("CameraPanMoveKey"), FInputKeyShortcut(FKey("MiddleMouseButton")));
-	KeyShortcuts.Add(FName("CameraRotateKey"), FInputKeyShortcut());
-	KeyShortcuts.Add(FName("CameraZoomKey"), FInputKeyShortcut());
+	KeyShortcuts.Add(FName("CameraPanMove"), FInputKeyShortcut(FKey("MiddleMouseButton")));
+	KeyShortcuts.Add(FName("CameraRotate"), FInputKeyShortcut());
+	KeyShortcuts.Add(FName("CameraZoom"), FInputKeyShortcut());
 
 	AxisMappings.Add(FInputAxisMapping(FName("TurnCamera"), this, FName("TurnCamera")));
 	AxisMappings.Add(FInputAxisMapping(FName("LookUpCamera"), this, FName("LookUpCamera")));
@@ -75,33 +75,35 @@ void AInputModule::OnInitialize_Implementation()
 void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
-	
-	for(auto Iter : KeyMappings)
-	{
-		FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Event);
-		KB.KeyDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-		GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
-	}
-	for(auto Iter : ActionMappings)
-	{
-		FInputActionBinding AB(Iter.ActionName, Iter.Event);
-		AB.ActionDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-		GetPlayerController()->InputComponent->AddActionBinding(AB);
-	}
-	for(auto Iter : AxisMappings)
-	{
-		FInputAxisBinding AB(Iter.AxisName);
-		AB.AxisDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-		GetPlayerController()->InputComponent->AxisBindings.Emplace(MoveTemp(AB));
-	}
-	for(auto Iter : TouchMappings)
-	{
-		FInputTouchBinding TB(Iter.Event);
-		TB.TouchDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-		GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
-	}
 
-	if(InPhase == EPhase::Final)
+	if(InPhase == EPhase::Primary)
+	{
+		for(auto Iter : KeyMappings)
+		{
+			FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Event);
+			KB.KeyDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
+			GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
+		}
+		for(auto Iter : ActionMappings)
+		{
+			FInputActionBinding AB(Iter.ActionName, Iter.Event);
+			AB.ActionDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
+			GetPlayerController()->InputComponent->AddActionBinding(AB);
+		}
+		for(auto Iter : AxisMappings)
+		{
+			FInputAxisBinding AB(Iter.AxisName);
+			AB.AxisDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
+			GetPlayerController()->InputComponent->AxisBindings.Emplace(MoveTemp(AB));
+		}
+		for(auto Iter : TouchMappings)
+		{
+			FInputTouchBinding TB(Iter.Event);
+			TB.TouchDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
+			GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
+		}
+	}
+	else if(InPhase == EPhase::Final)
 	{
 		UpdateInputMode();
 	}

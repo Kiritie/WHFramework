@@ -223,7 +223,7 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(!AttributeSet) return;
+	if(!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
 
 	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
 	{

@@ -153,14 +153,7 @@ void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 	{
 		ObjectPool = GetPool(InType);
 	}
-	if(ModuleState != EModuleState::Terminated)
-	{
-		ObjectPool->Despawn(InObject, bRecovery);
-	}
-	else
-	{
-		ObjectPool->DespawnImpl(InObject, false);
-	}
+	ObjectPool->Despawn(InObject, bRecovery);
 }
 
 void AObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)

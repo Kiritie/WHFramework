@@ -164,7 +164,12 @@ public:
 	{
 		*this = MakeString(InStringValue);
 	}
-	
+		
+	FParameter(FText InTextValue)
+	{
+		*this = MakeText(InTextValue);
+	}
+
 	FParameter(bool InBooleanValue)
 	{
 		*this = MakeBoolean(InBooleanValue);

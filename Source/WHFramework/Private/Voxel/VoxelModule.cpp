@@ -390,7 +390,7 @@ void AVoxelModule::GenerateWorld()
 		SetWorldState(EVoxelWorldState::Generating);
 	}
 	// Save chunk data
-	else if(UpdateChunkQueue(ChunkDataSaveQueue, ChunkDataSaveTasks, ChunkDataSaveSpeed))
+	else if(UpdateChunkQueue(ChunkDataSaveQueue, ChunkDataSaveSpeed, [this](FIndex Index){ SaveChunkData(Index); }))
 	{
 		SetWorldState(EVoxelWorldState::SavingData);
 	}
@@ -814,7 +814,7 @@ bool AVoxelModule::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, fl
 {
 	const FVector ChunkRadius = WorldData->GetChunkRealSize() * 0.5f;
 	const FVector ChunkLocation = ChunkIndexToLocation(InChunkIndex);
-	return VoxelAgentTraceSingle(ChunkLocation + ChunkRadius, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+	return VoxelAgentTraceSingle(ChunkLocation + ChunkRadius, FVector2D(ChunkRadius.X, ChunkRadius.Y), InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
 }
 
 bool AVoxelModule::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)

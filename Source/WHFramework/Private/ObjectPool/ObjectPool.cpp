@@ -24,18 +24,46 @@ UObject* UObjectPool::Spawn(const TArray<FParameter>& InParams)
 	if(Count > 0)
 	{
 		Queue.Dequeue(Object);
-		SpawnImpl(Object);
+		OnSpawn(Object);
 		Count--;
 	}
 	else
 	{
-		Object = SpawnImpl(nullptr);
+		Object = OnSpawn(nullptr);
 	}
 	IObjectPoolInterface::Execute_OnSpawn(Object, InParams);
 	return Object;
 }
 
-UObject* UObjectPool::SpawnImpl(UObject* InObject)
+void UObjectPool::Despawn(UObject* InObject, bool bRecovery)
+{
+	IObjectPoolInterface::Execute_OnDespawn(InObject, bRecovery);
+	if(bRecovery && Count < Limit)
+	{
+		OnDespawn(InObject, true);
+		Queue.Enqueue(InObject);
+		Count++;
+	}
+	else
+	{
+		OnDespawn(InObject, false);
+	}
+}
+
+void UObjectPool::Clear()
+{
+	UObject* Object;
+	while(Queue.Dequeue(Object))
+	{
+		if(Object)
+		{
+			OnDespawn(Object, false);
+		}
+	}
+	Queue.Empty();
+}
+
+UObject* UObjectPool::OnSpawn(UObject* InObject)
 {
 	if(!InObject)
 	{
@@ -48,22 +76,7 @@ UObject* UObjectPool::SpawnImpl(UObject* InObject)
 	return InObject;
 }
 
-void UObjectPool::Despawn(UObject* InObject, bool bRecovery)
-{
-	IObjectPoolInterface::Execute_OnDespawn(InObject, bRecovery);
-	if(bRecovery && Count < Limit)
-	{
-		DespawnImpl(InObject, true);
-		Queue.Enqueue(InObject);
-		Count++;
-	}
-	else
-	{
-		DespawnImpl(InObject, false);
-	}
-}
-
-void UObjectPool::DespawnImpl(UObject* InObject, bool bRecovery)
+void UObjectPool::OnDespawn(UObject* InObject, bool bRecovery)
 {
 	if(!bRecovery)
 	{
@@ -79,17 +92,4 @@ void UObjectPool::DespawnImpl(UObject* InObject, bool bRecovery)
 			InObject->AddToRoot();
 		}
 	}
-}
-
-void UObjectPool::Clear()
-{
-	UObject* Object;
-	while(Queue.Dequeue(Object))
-	{
-		if(Object)
-		{
-			DespawnImpl(Object, false);
-		}
-	}
-	Queue.Empty();
 }
