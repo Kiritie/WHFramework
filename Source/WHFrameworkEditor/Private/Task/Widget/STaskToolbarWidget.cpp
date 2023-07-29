@@ -135,17 +135,6 @@ void STaskToolbarWidget::Construct(const FArguments& InArgs)
 				.Padding(5.f, 0.f, 0.f, 0.f)
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("View:")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(5.f, 0.f, 0.f, 0.f)
-				[
-					SNew(STextBlock)
 					.Text(FText::FromString(TEXT("List:")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]

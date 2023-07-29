@@ -14,7 +14,7 @@ void UAIBlackboardBase::PostLoad()
 
 	// BLACKBOARD_VALUE_GENERATE_BOOL(IsLostTarget);
 	// BLACKBOARD_VALUE_GENERATE_VECTOR(TargetLocation);
-	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, ADWCharacter);
+	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, ACharacterBase);
 }
 
 void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, ACharacterBase* InCharacter)

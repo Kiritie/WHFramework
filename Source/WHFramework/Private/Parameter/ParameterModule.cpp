@@ -77,10 +77,9 @@ void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AParameterModule::ToData()
 {
-	static FParameterSaveData SaveData;
-	SaveData = FParameterSaveData();
+	FParameterSaveData SaveData;
 	SaveData.Parameters = Parameters;
-	return &SaveData;
+	return LocalData(SaveData);
 }
 
 bool AParameterModule::HasParameter(FName InName, bool bEnsured) const

@@ -67,8 +67,7 @@ void UVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UVoxel::ToData()
 {
-	static FVoxelItem SaveData;
-	SaveData = FVoxelItem();
+	FVoxelItem SaveData;
 
 	SaveData.ID = ID;
 	SaveData.Index = Index;
@@ -77,7 +76,7 @@ FSaveData* UVoxel::ToData()
 	SaveData.Auxiliary = Auxiliary;
 	SaveData.bGenerated = bGenerated;
 
-	return &SaveData;
+	return LocalData(SaveData);
 }
 
 void UVoxel::RefreshData()
@@ -187,5 +186,5 @@ FVoxelItem& UVoxel::GetItem()
 	{
 		return Owner->GetVoxelItem(Index);
 	}
-	return ToSaveDataRef<FVoxelItem>();
+	return GetSaveDataRef<FVoxelItem>();
 }

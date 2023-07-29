@@ -70,14 +70,14 @@ AVoxelModule::AVoxelModule()
 
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
-	ChunkSpawnDistance = 2.f;
+	ChunkSpawnDistance = 2;
 	ChunkSpawnSpeed = 100;
 	ChunkDestroySpeed = 10;
 	ChunkGenerateSpeed = 1;
 	ChunkMapLoadSpeed = 100;
 	ChunkMapBuildSpeed = 100;
 	ChunkMeshBuildSpeed = 100;
-	ChunkDataSaveSpeed = 50;
+	ChunkDataSaveSpeed = 100;
 
 	ChunkSpawnBatch = 0;
 	LastGenerateIndex = Index_Empty;
@@ -233,23 +233,8 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			SetWorldMode(EVoxelWorldMode::Preview);
 
-			WorldData = NewData();
-			WorldData->BlockSize = SaveData.BlockSize;
-			WorldData->ChunkSize = SaveData.ChunkSize;
-			WorldData->WorldSize = SaveData.WorldSize;
-			WorldData->WorldRange = SaveData.WorldRange;
-			WorldData->BaseHeight = SaveData.BaseHeight;
-			WorldData->PlainScale = SaveData.PlainScale;
-			WorldData->MountainScale = SaveData.MountainScale;
-			WorldData->StoneScale = SaveData.StoneScale;
-			WorldData->SandScale = SaveData.SandScale;
-			WorldData->PlantScale = SaveData.PlantScale;
-			WorldData->TreeScale = SaveData.TreeScale;
-			WorldData->BedrockHeight = SaveData.BedrockHeight;
-			WorldData->WaterHeight = SaveData.WaterHeight;
-			WorldData->ChunkMaterials = SaveData.ChunkMaterials;
-
-			WorldData->WorldSeed = SaveData.WorldSeed;
+			*WorldData = SaveData;
+			
 			if(WorldData->WorldSeed == 0)
 			{
 				WorldData->WorldSeed = FMath::Rand();
@@ -308,7 +293,7 @@ FSaveData* AVoxelModule::ToData()
 {
 	for(auto Iter : ChunkMap)
 	{
-		WorldData->SetChunkData(Iter.Key, Iter.Value->ToSaveData<FVoxelChunkSaveData>());
+		WorldData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
 	}
 	WorldData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();
 	WorldData->SecondsOfDay = USceneModuleBPLibrary::GetWorldTimer()->GetSecondsOfDay();
@@ -355,7 +340,7 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData) const
+FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData)
 {
 	static FDefaultVoxelWorldSaveData* NewWorldData;
 	NewWorldData = !bInheritBasicData ? new FDefaultVoxelWorldSaveData() : new FDefaultVoxelWorldSaveData(WorldBasicData);
@@ -375,7 +360,9 @@ void AVoxelModule::GenerateWorld()
 		SetWorldState(EVoxelWorldState::LoadingMap);
 	}
 	// Build chunk map
-	else if(UpdateChunkQueue(ChunkMapBuildQueue, ChunkMapBuildSpeed, [this](TArray<FIndex>& InQueue, int32 InSpeed, int32 InIndex){ return InIndex == 0 ? UpdateChunkQueue(InQueue, ChunkMapBuildTasks, InSpeed) : UpdateChunkQueue(InQueue, InSpeed, [this](FIndex InIndex, int32 InStage){ BuildChunkMap(InIndex, InStage); }, InIndex); }))
+	else if(UpdateChunkQueue(ChunkMapBuildQueue, ChunkMapBuildSpeed, [this](TArray<FIndex>& InQueue, int32 InSpeed, int32 InIndex){
+		return InIndex == 0 ? UpdateChunkQueue(InQueue, ChunkMapBuildTasks, InSpeed) : UpdateChunkQueue(InQueue, InSpeed, [this](FIndex InIndex, int32 InStage){
+			BuildChunkMap(InIndex, InStage); }, InIndex); }))
 	{
 		SetWorldState(EVoxelWorldState::BuildingMap);
 	}
@@ -434,7 +421,7 @@ void AVoxelModule::SaveChunkData(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
 	{
-		WorldData->SetChunkData(InIndex, Chunk->ToSaveData<FVoxelChunkSaveData>());
+		WorldData->SetChunkData(InIndex, Chunk->GetSaveData<FVoxelChunkSaveData>(true));
 	}
 }
 
@@ -589,7 +576,7 @@ bool AVoxelModule::AddToDestroyQueue(FIndex InIndex)
 	if(!ChunkMap.Contains(InIndex) || ChunkDestroyQueue.Contains(InIndex)) return false;
 	
 	RemoveFromMapLoadQueue(InIndex);
-	ITER_ARRAY_WITHINDEX(ChunkMapBuildQueue, i, Item, RemoveFromMapBuildQueue(InIndex, i);)
+	DON_WITHINDEX(ChunkMapBuildQueue.Num(), i, RemoveFromMapBuildQueue(InIndex, i);)
 	RemoveFromMeshBuildQueue(InIndex);
 	RemoveFromDataSaveQueue(InIndex);
 	RemoveFromGenerateQueue(InIndex);
@@ -637,7 +624,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 			}
 			else
 			{
-				ITER_ARRAY_WITHINDEX(ChunkMapBuildQueue, i, Item, AddToMapBuildQueue(InIndex, i);)
+				DON_WITHINDEX(ChunkMapBuildQueue.Num(), i, AddToMapBuildQueue(InIndex, i);)
 			}
 			AddToMeshBuildQueue(InIndex);
 			AddToGenerateQueue(InIndex);

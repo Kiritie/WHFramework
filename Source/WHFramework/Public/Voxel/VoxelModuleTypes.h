@@ -289,7 +289,7 @@ public:
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
-	FVoxelSaveData& ToSaveData(bool bRefresh = false) const;
+	FVoxelSaveData ToSaveData(bool bRefresh = false) const;
 
 	FVoxelItem& GetMain() const;
 
@@ -624,11 +624,7 @@ public:
 
 	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) override
 	{
-		if (ChunkDatas.Contains(InChunkIndex.ToVector()))
-		{
-			return &ChunkDatas[InChunkIndex.ToVector()];
-		}
-		return nullptr;
+		return ChunkDatas.Find(InChunkIndex.ToVector());
 	}
 
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) override

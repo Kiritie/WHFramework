@@ -92,19 +92,18 @@ bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 
 void FVoxelItem::RefreshData(UVoxel* InVoxel)
 {
-	*this = (InVoxel ? *InVoxel : GetVoxel()).ToSaveDataRef<FVoxelItem>(true);
+	*this = (InVoxel ? *InVoxel : GetVoxel()).GetSaveDataRef<FVoxelItem>(true);
 }
 
-FVoxelSaveData& FVoxelItem::ToSaveData(bool bRefresh) const
+FVoxelSaveData FVoxelItem::ToSaveData(bool bRefresh) const
 {
 	if(!bRefresh)
 	{
-		static FVoxelSaveData VoxelSaveData;
-		VoxelSaveData = FVoxelSaveData(*this);
+		FVoxelSaveData VoxelSaveData = FVoxelSaveData(*this);
 		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), GetVoxelType(), *Index.ToString(), Angle);
 		return VoxelSaveData;
 	}
-	return GetVoxel().ToSaveDataRef<FVoxelItem>(true).ToSaveData(false);
+	return GetVoxel().GetSaveDataRef<FVoxelItem>().ToSaveData(false);
 }
 
 FVoxelItem& FVoxelItem::GetMain() const

@@ -5,10 +5,6 @@
 
 UStepEditorSettings::UStepEditorSettings()
 {
-	bShowListPanel = true;
-	bShowDetailPanel = true;
-	bShowStatusPanel = true;
-
 	bDefaultIsMultiMode = true;
 	bDefaultIsEditMode = false;
 }

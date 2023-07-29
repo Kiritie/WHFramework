@@ -115,20 +115,19 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityVitalityBase::ToData()
 {
-	static FVitalitySaveData SaveData;
-	SaveData = FVitalitySaveData();
+	FVitalitySaveData SaveData;
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->ToSaveDataRef<FInventorySaveData>();
+	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 
-	return &SaveData;
+	return LocalData(SaveData);
 }
 
 void AAbilityVitalityBase::ResetData()

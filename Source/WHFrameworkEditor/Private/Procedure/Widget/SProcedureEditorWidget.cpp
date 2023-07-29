@@ -89,21 +89,14 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 				(
 					FTabManager::NewStack()
 					->SetHideTabWell(false)
-					->SetSizeCoefficient(0.35f)
+					->SetSizeCoefficient(0.5f)
 					->AddTab("List", ETabState::OpenedTab)
 				)
 				->Split
 				(
 					FTabManager::NewStack()
 					->SetHideTabWell(false)
-					->SetSizeCoefficient(0.3f)
-					->AddTab("", ETabState::OpenedTab)
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetHideTabWell(false)
-					->SetSizeCoefficient(0.35f)
+					->SetSizeCoefficient(0.5f)
 					->AddTab("Details", ETabState::OpenedTab)
 				)
 			)

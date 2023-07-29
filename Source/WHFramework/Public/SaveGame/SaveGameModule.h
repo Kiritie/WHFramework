@@ -114,7 +114,7 @@ public:
 	template<class T>
 	FSaveGameInfo GetSaveGameInfo(bool bFromGeneralData = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
 	{
-		return GetSaveGameInfo(InSaveGameClass);
+		return GetSaveGameInfo(InSaveGameClass, bFromGeneralData);
 	}
 
 	UFUNCTION(BlueprintPure)

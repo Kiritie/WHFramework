@@ -30,7 +30,7 @@ ACameraModule::ACameraModule()
 	CameraMap = TMap<FName, ACameraPawnBase*>();
 	CurrentCamera = nullptr;
 		
-	bCameraControlAble = false;
+	bCameraControlAble = true;
 
 	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
@@ -647,12 +647,12 @@ void ACameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 
 bool ACameraModule::IsControllingMove()
 {
-	return !UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).Key) || bIsControllingMove;
+	return UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraPanMove")).Key) || bIsControllingMove;
 }
 
 bool ACameraModule::IsControllingRotate()
 {
-	return !UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).Key) || UInputModuleBPLibrary::GetTouchPressedCount() == 1 || bIsControllingRotate;
+	return UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).IsValid() && GetPlayerController()->IsInputKeyDown(UInputModuleBPLibrary::GetKeyShortcutByName(FName("CameraRotate")).Key) || UInputModuleBPLibrary::GetTouchPressedCount() == 1 || bIsControllingRotate;
 }
 
 bool ACameraModule::IsControllingZoom()
