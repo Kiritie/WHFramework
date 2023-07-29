@@ -8,7 +8,7 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraPawnBase.generated.h"
 
-UCLASS()
+UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API ACameraPawnBase : public APawn, public IWHPlayerInterface, public IVoxelAgentInterface, public IWHActorInterface
 {
 	GENERATED_BODY()

@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 
-class SEditorWindowWidgetBase : public SWindow
+class SEditorWindowBase : public SWindow
 {
 public:
-	SEditorWindowWidgetBase();
+	SEditorWindowBase();
 
-	SLATE_BEGIN_ARGS(SEditorWindowWidgetBase)
+	SLATE_BEGIN_ARGS(SEditorWindowBase)
 			: _WindowArgs() { }
 
 		SLATE_ARGUMENT(SWindow::FArguments, WindowArgs)

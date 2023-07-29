@@ -18,24 +18,24 @@
 /////////////////////////////////////////////////////
 // FStepEditor
 
-FStepEditor::FStepEditor()
+FStepBlueprintEditor::FStepBlueprintEditor()
 {
 	// todo: Do we need to register a callback for when properties are changed?
 }
 
-FStepEditor::~FStepEditor()
+FStepBlueprintEditor::~FStepBlueprintEditor()
 {
 	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
 }
 
-void FStepEditor::InitStepEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FStepBlueprintEditor::InitStepEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
 {
 	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
 
 	for(auto Blueprint : InBlueprints) { EnsureStepBlueprintIsUpToDate(Blueprint); }
 }
 
-void FStepEditor::EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint)
+void FStepBlueprintEditor::EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint)
 {
 	#if WITH_EDITORONLY_DATA
 	for(UEdGraph* Graph : Blueprint->UbergraphPages)
@@ -57,11 +57,11 @@ void FStepEditor::EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint)
 // 	return GetToolkitFName();
 // }
 
-FName FStepEditor::GetToolkitFName() const { return FName("StepEditor"); }
+FName FStepBlueprintEditor::GetToolkitFName() const { return FName("StepEditor"); }
 
-FText FStepEditor::GetBaseToolkitName() const { return LOCTEXT("StepEditorAppLabel", "Step Editor"); }
+FText FStepBlueprintEditor::GetBaseToolkitName() const { return LOCTEXT("StepEditorAppLabel", "Step Editor"); }
 
-FText FStepEditor::GetToolkitName() const
+FText FStepBlueprintEditor::GetToolkitName() const
 {
 	const TArray<UObject*>& EditingObjs = GetEditingObjects();
 
@@ -78,7 +78,7 @@ FText FStepEditor::GetToolkitName() const
 	return FText::Format(LOCTEXT("StepToolkitName", "{ObjectName}{DirtyState}"), Args);
 }
 
-FText FStepEditor::GetToolkitToolTipText() const
+FText FStepBlueprintEditor::GetToolkitToolTipText() const
 {
 	const UObject* EditingObject = GetEditingObject();
 
@@ -87,18 +87,18 @@ FText FStepEditor::GetToolkitToolTipText() const
 	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
 }
 
-FString FStepEditor::GetWorldCentricTabPrefix() const { return TEXT("StepEditor"); }
+FString FStepBlueprintEditor::GetWorldCentricTabPrefix() const { return TEXT("StepEditor"); }
 
-FLinearColor FStepEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
+FLinearColor FStepBlueprintEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
 
-UBlueprint* FStepEditor::GetBlueprintObj() const
+UBlueprint* FStepBlueprintEditor::GetBlueprintObj() const
 {
 	const TArray<UObject*>& EditingObjs = GetEditingObjects();
 	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UStepBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
 	return nullptr;
 }
 
-FString FStepEditor::GetDocumentationLink() const
+FString FStepBlueprintEditor::GetDocumentationLink() const
 {
 	return FBlueprintEditor::GetDocumentationLink(); // todo: point this at the correct documentation
 }

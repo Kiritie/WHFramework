@@ -15,7 +15,7 @@ SProcedureStatusWidget::SProcedureStatusWidget()
 
 void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ListWidget = InArgs._ListWidget;
 
@@ -42,7 +42,7 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("List:  ")))
+					.Text(FText::FromString(TEXT("  List:  ")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]
 
@@ -70,22 +70,22 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 
 void SProcedureStatusWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SProcedureStatusWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SProcedureStatusWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
 void SProcedureStatusWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

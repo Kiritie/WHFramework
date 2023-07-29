@@ -3,12 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureEditorWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API SProcedureEditorWidget : public SEditorWidgetBase
 {
 public:
 	SProcedureEditorWidget();
@@ -36,27 +36,44 @@ protected:
 
 	void OnBlueprintCompiled();
 	
+	void OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab);
+
+	void HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave);
+
+	TSharedRef<SDockTab> SpawnToolbarWidgetTab(const FSpawnTabArgs& Args);
+	
+	TSharedRef<SDockTab> SpawnListWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnStatusWidgetTab(const FSpawnTabArgs& Args);
+	
+	void HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
 	bool bPreviewMode;
 	bool bShowListPanel;
-	bool bShowDetailPanel;
+	bool bShowDetailsPanel;
 	bool bShowStatusPanel;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
 	class AProcedureModule* ProcedureModule;
+	
+	TSharedPtr<FTabManager> TabManager;
+	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
 	TSharedPtr<class SProcedureToolbarWidget> ToolbarWidget;
-
+	
 	TSharedPtr<class SProcedureListWidget> ListWidget;
 
-	TSharedPtr<class SProcedureDetailWidget> DetailWidget;
+	TSharedPtr<class SProcedureDetailsWidget> DetailsWidget;
 
 	TSharedPtr<class SProcedureStatusWidget> StatusWidget;
 

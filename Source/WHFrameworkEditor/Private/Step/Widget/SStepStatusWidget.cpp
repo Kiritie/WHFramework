@@ -15,7 +15,7 @@ SStepStatusWidget::SStepStatusWidget()
 
 void SStepStatusWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	ListWidget = InArgs._ListWidget;
 
@@ -42,7 +42,7 @@ void SStepStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("List:  ")))
+					.Text(FText::FromString(TEXT("  List:  ")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]
 
@@ -70,22 +70,22 @@ void SStepStatusWidget::Construct(const FArguments& InArgs)
 
 void SStepStatusWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SStepStatusWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SStepStatusWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
 void SStepStatusWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

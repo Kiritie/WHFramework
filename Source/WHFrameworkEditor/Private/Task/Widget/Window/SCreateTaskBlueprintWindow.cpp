@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Task/Widget/Window/SCreateTaskBlueprintDialog.h"
+#include "Task/Widget/Window/SCreateTaskBlueprintWindow.h"
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
@@ -16,7 +16,7 @@
 /////////////////////////////////////////////////
 // select folder dialog
 //////////////////////////////////////////////////
-SCreateTaskBlueprintDialog::SCreateTaskBlueprintDialog()
+SCreateTaskBlueprintWindow::SCreateTaskBlueprintWindow()
 {
 	BlueprintFactory = nullptr;
 	UserResponse = EAppReturnType::Cancel;
@@ -25,7 +25,7 @@ SCreateTaskBlueprintDialog::SCreateTaskBlueprintDialog()
 	WindowSize = FVector2D(450, 450);
 }
 
-void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
+void SCreateTaskBlueprintWindow::Construct(const FArguments& InArgs)
 {
 	AssetPath = InArgs._DefaultAssetPath/*FText::FromString(FPackageName::GetLongPackagePath(InArgs._DefaultAssetPath.ToString()))*/;
 
@@ -38,12 +38,12 @@ void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
 
 	FPathPickerConfig PathPickerConfig;
 	PathPickerConfig.DefaultPath = AssetPath.ToString();
-	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateTaskBlueprintDialog::OnPathChange);
+	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateTaskBlueprintWindow::OnPathChange);
 	PathPickerConfig.bAddDefaultPath = true;
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-	SEditorWindowWidgetBase::Construct(SEditorWindowWidgetBase::FArguments()
+	SEditorWindowBase::Construct(SEditorWindowBase::FArguments()
 		.WindowArgs(SWindow::FArguments()
 		[
 			SNew(SVerticalBox)
@@ -99,7 +99,7 @@ void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
 						.Text_Lambda([this](){ return FText::FromString(AssetName); })
 						.IsReadOnly(false)
 						.RevertTextOnEscape(true)
-						.OnTextChanged(this, &SCreateTaskBlueprintDialog::SetAssetName)
+						.OnTextChanged(this, &SCreateTaskBlueprintWindow::SetAssetName)
 					]
 				]
 			]
@@ -119,7 +119,7 @@ void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("OK", "OK"))
-					.OnClicked(this, &SCreateTaskBlueprintDialog::OnButtonClick, EAppReturnType::Ok)
+					.OnClicked(this, &SCreateTaskBlueprintWindow::OnButtonClick, EAppReturnType::Ok)
 				]
 				+ SUniformGridPanel::Slot(1, 0)
 				[
@@ -127,7 +127,7 @@ void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
-					.OnClicked(this, &SCreateTaskBlueprintDialog::OnButtonClick, EAppReturnType::Cancel)
+					.OnClicked(this, &SCreateTaskBlueprintWindow::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
 		])
@@ -136,7 +136,7 @@ void SCreateTaskBlueprintDialog::Construct(const FArguments& InArgs)
 	OnPathChange(AssetPath.ToString());
 }
 
-void SCreateTaskBlueprintDialog::OnPathChange(const FString& NewPath)
+void SCreateTaskBlueprintWindow::OnPathChange(const FString& NewPath)
 {
 	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
 
@@ -145,7 +145,7 @@ void SCreateTaskBlueprintDialog::OnPathChange(const FString& NewPath)
 	AssetTools->CreateUniqueAssetName(NewPath / BlueprintFactory->GetDefaultNewAssetName(), FString(), PackageName, AssetName);
 }
 
-FReply SCreateTaskBlueprintDialog::OnButtonClick(EAppReturnType::Type ButtonID)
+FReply SCreateTaskBlueprintWindow::OnButtonClick(EAppReturnType::Type ButtonID)
 {
 	UserResponse = ButtonID;
 
@@ -154,29 +154,29 @@ FReply SCreateTaskBlueprintDialog::OnButtonClick(EAppReturnType::Type ButtonID)
 	return FReply::Handled();
 }
 
-void SCreateTaskBlueprintDialog::SetAssetName(const FText& InText)
+void SCreateTaskBlueprintWindow::SetAssetName(const FText& InText)
 {
 	AssetName = InText.ToString();
 }
 
 
-EAppReturnType::Type SCreateTaskBlueprintDialog::ShowModal()
+EAppReturnType::Type SCreateTaskBlueprintWindow::ShowModal()
 {
 	GEditor->EditorAddModalWindow(SharedThis(this));
 	return UserResponse;
 }
 
-FString SCreateTaskBlueprintDialog::GetAssetPath()
+FString SCreateTaskBlueprintWindow::GetAssetPath()
 {
 	return AssetPath.ToString();
 }
 
-FString SCreateTaskBlueprintDialog::GetAssetName()
+FString SCreateTaskBlueprintWindow::GetAssetName()
 {
 	return AssetName;
 }
 
-FString SCreateTaskBlueprintDialog::GetPackageName()
+FString SCreateTaskBlueprintWindow::GetPackageName()
 {
 	return PackageName;
 }

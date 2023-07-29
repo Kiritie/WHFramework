@@ -139,20 +139,19 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityCharacterBase::ToData()
 {
-	static FCharacterSaveData SaveData;
-	SaveData = FCharacterSaveData();
+	FCharacterSaveData SaveData;
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->ToSaveDataRef<FInventorySaveData>();
+	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 
-	return &SaveData;
+	return LocalData(SaveData);
 }
 
 void AAbilityCharacterBase::ResetData()

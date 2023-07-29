@@ -35,7 +35,7 @@ SStepListWidget::SStepListWidget()
 
 void SStepListWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	StepModule = InArgs._StepModule;
 
@@ -112,30 +112,13 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 					SNew(SHorizontalBox)
 
 					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)
-					.HAlign(HAlign_Center)
-					.Padding(5.f, 2.f, 5.f, 2.f)
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Step List")))
-					]
-				]
-
-				+ SVerticalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.AutoHeight()
-				[
-					SNew(SHorizontalBox)
-
-					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Center)
 					.HAlign(HAlign_Fill)
 					.Padding(2.f, 0, 0, 0)
 					.AutoWidth()
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Class: ")))
+						.Text(FText::FromString(TEXT(" Class: ")))
 						.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 					]
 
@@ -390,17 +373,17 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 
 void SStepListWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SStepListWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SStepListWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 
 	UpdateTreeView(true);
 	UpdateSelection();
@@ -409,7 +392,7 @@ void SStepListWidget::OnRefresh()
 
 void SStepListWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 UStepBase* SStepListWidget::GenerateStep(TSubclassOf<UStepBase> InStepClass)

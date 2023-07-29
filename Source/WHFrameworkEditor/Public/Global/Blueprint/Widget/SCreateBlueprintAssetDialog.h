@@ -6,7 +6,7 @@
 #include "ClassViewerFilter.h"
 #include "ClassViewerModule.h"
 #include "Step/StepEditorTypes.h"
-#include "Widget/Window/SEditorWindowWidgetBase.h"
+#include "Widget/Window/SEditorWindowBase.h"
 
 class UBlueprintFactoryBase;
 
@@ -34,7 +34,7 @@ private:
 	}
 };
 
-class SCreateBlueprintAssetDialog : public SEditorWindowWidgetBase
+class SCreateBlueprintAssetDialog : public SEditorWindowBase
 {
 public:
 	SCreateBlueprintAssetDialog();

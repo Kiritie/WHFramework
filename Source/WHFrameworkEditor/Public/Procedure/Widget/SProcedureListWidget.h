@@ -7,7 +7,7 @@
 #include "WHFrameworkEditorStyle.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
@@ -15,7 +15,7 @@ DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureListWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API SProcedureListWidget : public SEditorWidgetBase
 {
 public:
 	SProcedureListWidget();

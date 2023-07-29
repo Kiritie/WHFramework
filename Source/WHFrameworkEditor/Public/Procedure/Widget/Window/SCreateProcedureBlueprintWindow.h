@@ -3,16 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Window/SEditorWindowWidgetBase.h"
+#include "Widget/Window/SEditorWindowBase.h"
 
 class UFactory;
 
-class SCreateTaskBlueprintDialog : public SEditorWindowWidgetBase
+class SCreateProcedureBlueprintWindow : public SEditorWindowBase
 {
 public:
-	SCreateTaskBlueprintDialog();
+	SCreateProcedureBlueprintWindow();
 
-	SLATE_BEGIN_ARGS(SCreateTaskBlueprintDialog) { }
+	SLATE_BEGIN_ARGS(SCreateProcedureBlueprintWindow) { }
 
 		SLATE_ARGUMENT(FText, DefaultAssetPath)
 		SLATE_ARGUMENT(UFactory*, BlueprintFactory)

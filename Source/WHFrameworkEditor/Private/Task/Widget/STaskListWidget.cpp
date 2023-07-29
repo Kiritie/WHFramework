@@ -35,7 +35,7 @@ STaskListWidget::STaskListWidget()
 
 void STaskListWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	TaskModule = InArgs._TaskModule;
 
@@ -112,30 +112,13 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 					SNew(SHorizontalBox)
 
 					+ SHorizontalBox::Slot()
-					.VAlign(VAlign_Fill)
-					.HAlign(HAlign_Center)
-					.Padding(5.f, 2.f, 5.f, 2.f)
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Task List")))
-					]
-				]
-
-				+ SVerticalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.AutoHeight()
-				[
-					SNew(SHorizontalBox)
-
-					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Center)
 					.HAlign(HAlign_Fill)
 					.Padding(2.f, 0, 0, 0)
 					.AutoWidth()
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Class: ")))
+						.Text(FText::FromString(TEXT(" Class: ")))
 						.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 					]
 
@@ -390,17 +373,17 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 
 void STaskListWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void STaskListWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void STaskListWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 
 	UpdateTreeView(true);
 	UpdateSelection();
@@ -409,7 +392,7 @@ void STaskListWidget::OnRefresh()
 
 void STaskListWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InTaskClass)

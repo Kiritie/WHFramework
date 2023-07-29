@@ -5,19 +5,19 @@
 #include "CoreMinimal.h"
 
 #include "Procedure/Base/ProcedureBase.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 class SProcedureListWidget;
 class AProcedureModule;
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureDetailWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API SProcedureDetailsWidget : public SEditorWidgetBase
 {
 public:
-	SProcedureDetailWidget();
+	SProcedureDetailsWidget();
 	
-	SLATE_BEGIN_ARGS(SProcedureDetailWidget) {}
+	SLATE_BEGIN_ARGS(SProcedureDetailsWidget) {}
 
 		SLATE_ARGUMENT(AProcedureModule*, ProcedureModule)
 

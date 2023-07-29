@@ -7,7 +7,7 @@
 #include "WHFrameworkEditorStyle.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepBase.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 class UStepBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectStepListItemsDelegate, TArray<TSharedPtr<FStepListItem>>)
@@ -15,7 +15,7 @@ DECLARE_DELEGATE_OneParam(FOnSelectStepListItemsDelegate, TArray<TSharedPtr<FSte
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SStepListWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API SStepListWidget : public SEditorWidgetBase
 {
 public:
 	SStepListWidget();

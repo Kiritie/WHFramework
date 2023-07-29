@@ -17,15 +17,6 @@ public:
 	UStepEditorSettings();
 
 public:
-	UPROPERTY(Config, EditAnywhere, Category = "View")
-	bool bShowListPanel;
-
-	UPROPERTY(Config, EditAnywhere, Category = "View")
-	bool bShowDetailPanel;
-
-	UPROPERTY(Config, EditAnywhere, Category = "View")
-	bool bShowStatusPanel;
-
 	UPROPERTY(Config, EditAnywhere, Category = "List")
 	bool bDefaultIsMultiMode;
 

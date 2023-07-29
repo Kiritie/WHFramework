@@ -212,12 +212,25 @@ void FWHFrameworkEditorModule::RegisterMenus()
 	// Owner will be used for cleanup in call to UToolMenus::UnregisterOwner
 	FToolMenuOwnerScoped OwnerScoped(this);
 
-	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
+	UToolMenu* WindowMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
 	{
-		FToolMenuSection& Section = Menu->FindOrAddSection("WHFramework");
-		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow, PluginCommands);
-		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
-		Section.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenTaskEditorWindow, PluginCommands);
+		FToolMenuSection& Section1 = WindowMenu->FindOrAddSection("Level Editor");
+		{
+			Section1.AddSubMenu(
+				"WHFramework",
+				LOCTEXT("WHFramework", "WHFramework"),
+				LOCTEXT("WHFramework_ToolTip", "WHFramework"),
+				FNewToolMenuDelegate::CreateLambda([this](UToolMenu* InNewToolMenu)
+				{
+					FToolMenuSection& Section2 = InNewToolMenu->FindOrAddSection("WHFramework");
+					Section2.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow, PluginCommands);
+					Section2.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenStepEditorWindow, PluginCommands);
+					Section2.AddMenuEntryWithCommandList(FWHFrameworkEditorCommands::Get().OpenTaskEditorWindow, PluginCommands);
+				}),
+				false,
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Persona.AssetActions.CreateAnimAsset")
+			);
+		}
 	}
 
 	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
@@ -242,7 +255,7 @@ void FWHFrameworkEditorModule::RegisterSettings()
 	{
 		GProcedureEditorIni = GConfig->GetDestIniFilename(TEXT("ProcedureEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
 
-		ISettingsSectionPtr SettingsSection1 = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Procedure Editor"), FText::FromString(TEXT("Procedure Editor")), FText::FromString(TEXT("Configure the procedure editor plugin")), GetMutableDefault<UProcedureEditorSettings>());
+		ISettingsSectionPtr SettingsSection1 = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Procedure Editor"), FText::FromString(TEXT("Procedure Editor")), FText::FromString(TEXT("Configure the procedure editor plugin")), GetMutableDefault<UProcedureEditorSettings>());
 
 		if(SettingsSection1.IsValid())
 		{
@@ -252,7 +265,7 @@ void FWHFrameworkEditorModule::RegisterSettings()
 		///-----------------
 		GStepEditorIni = GConfig->GetDestIniFilename(TEXT("StepEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
 
-		ISettingsSectionPtr SettingsSection2 = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Step Editor"), FText::FromString(TEXT("Step Editor")), FText::FromString(TEXT("Configure the Step editor plugin")), GetMutableDefault<UStepEditorSettings>());
+		ISettingsSectionPtr SettingsSection2 = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Step Editor"), FText::FromString(TEXT("Step Editor")), FText::FromString(TEXT("Configure the Step editor plugin")), GetMutableDefault<UStepEditorSettings>());
 
 		if(SettingsSection2.IsValid())
 		{
@@ -262,7 +275,7 @@ void FWHFrameworkEditorModule::RegisterSettings()
 		///-----------------
 		GTaskEditorIni = GConfig->GetDestIniFilename(TEXT("TaskEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
 
-		ISettingsSectionPtr SettingsSection3 = SettingsModule->RegisterSettings(FName("Project"), FName("Plugins"), FName("Task Editor"), FText::FromString(TEXT("Task Editor")), FText::FromString(TEXT("Configure the Task editor plugin")), GetMutableDefault<UTaskEditorSettings>());
+		ISettingsSectionPtr SettingsSection3 = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Task Editor"), FText::FromString(TEXT("Task Editor")), FText::FromString(TEXT("Configure the Task editor plugin")), GetMutableDefault<UTaskEditorSettings>());
 
 		if(SettingsSection3.IsValid())
 		{

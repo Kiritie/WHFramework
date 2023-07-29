@@ -6,12 +6,12 @@
 #include "Editor/Kismet/Public/BlueprintEditor.h"
 
 //////////////////////////////////////////////////////////////////////////
-// FTaskEditor
+// FTaskBlueprintEditor
 
 /**
  * Gameplay abilities asset editor (extends Blueprint editor)
  */
-class FTaskEditor : public FBlueprintEditor
+class FTaskBlueprintEditor : public FBlueprintEditor
 {
 public:
 	/**
@@ -34,9 +34,9 @@ private:
 	void EnsureTaskBlueprintIsUpToDate(UBlueprint* Blueprint);
 
 public:
-	FTaskEditor();
+	FTaskBlueprintEditor();
 
-	virtual ~FTaskEditor();
+	virtual ~FTaskBlueprintEditor();
 
 public:
 	// IToolkit interface

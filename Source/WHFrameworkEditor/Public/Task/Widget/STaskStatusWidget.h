@@ -3,12 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorSlateWidgetBase.h"
+#include "Widget/SEditorWidgetBase.h"
 
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API STaskStatusWidget : public SEditorSlateWidgetBase
+class WHFRAMEWORKEDITOR_API STaskStatusWidget : public SEditorWidgetBase
 {
 public:
 	STaskStatusWidget();

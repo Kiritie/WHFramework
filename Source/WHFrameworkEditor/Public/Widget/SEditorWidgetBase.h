@@ -15,12 +15,12 @@ enum class EEditorWidgetType : uint8
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SEditorSlateWidgetBase : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SEditorWidgetBase : public SCompoundWidget
 {
 public:
-	SEditorSlateWidgetBase();
+	SEditorWidgetBase();
 
-	SLATE_BEGIN_ARGS(SEditorSlateWidgetBase) {}
+	SLATE_BEGIN_ARGS(SEditorWidgetBase) {}
 
 	SLATE_END_ARGS()
 
@@ -55,40 +55,33 @@ public:
 	virtual void Destroy();
 
 public:
-	virtual void AddChild(const TSharedPtr<SEditorSlateWidgetBase>& InChildWidget);
+	virtual void AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget);
 
-	virtual void RemoveChild(const TSharedPtr<SEditorSlateWidgetBase>& InChildWidget);
+	virtual void RemoveChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget);
 
 	virtual void RemoveAllChild();
-
-	virtual TSharedPtr<SEditorSlateWidgetBase> GetChild(int32 InIndex) const
-	{
-		if(ChildWidgets.IsValidIndex(InIndex))
-		{
-			return ChildWidgets[InIndex];
-		}
-		return nullptr;
-	}
-
-	virtual TSharedPtr<SWindow> GetOwnerWindow();
 
 protected:
 	FName WidgetName;
 
 	EEditorWidgetType WidgetType;
 
-	TSharedPtr<SEditorSlateWidgetBase> ParentWidget;
+	TSharedPtr<SEditorWidgetBase> ParentWidget;
 
-	TArray<TSharedPtr<SEditorSlateWidgetBase>> ChildWidgets;
+	TArray<TSharedPtr<SEditorWidgetBase>> ChildWidgets;
 
-	TMap<FName, TSharedPtr<SEditorSlateWidgetBase>> ChildWidgetMap;
+	TMap<FName, TSharedPtr<SEditorWidgetBase>> ChildWidgetMap;
 
 public:
+	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;
+
+	TSharedPtr<SWindow> GetOwnerWindow();
+
 	FName GetWidgetName() const { return WidgetName; }
 
 	int32 GetChildNum() const { return ChildWidgets.Num(); }
 
-	TSharedPtr<SEditorSlateWidgetBase> GetParentWidgetN() const { return ParentWidget; }
+	TSharedPtr<SEditorWidgetBase> GetParentWidgetN() const { return ParentWidget; }
 
-	TArray<TSharedPtr<SEditorSlateWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
+	TArray<TSharedPtr<SEditorWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
 };

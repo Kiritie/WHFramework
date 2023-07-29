@@ -154,7 +154,7 @@ AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISc
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
 	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ID }, SaveData.GetCharacterData().Class))
 	{
-		Character->LoadSaveData(InSaveData, EPhase::Primary, true);
+		Character->LoadSaveData(InSaveData, EPhase::Primary);
 		Character->SpawnDefaultController();
 		if(InContainer)
 		{
@@ -170,7 +170,7 @@ AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, IScen
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ID }, SaveData.GetVitalityData().Class))
 	{
-		Vitality->LoadSaveData(InSaveData, EPhase::Primary, true);
+		Vitality->LoadSaveData(InSaveData, EPhase::Primary);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Vitality);

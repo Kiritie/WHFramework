@@ -37,7 +37,7 @@ void FTaskBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjects, T
 
 			if(bLetOpen)
 			{
-				TSharedRef<FTaskEditor> NewEditor(new FTaskEditor());
+				TSharedRef<FTaskBlueprintEditor> NewEditor(new FTaskBlueprintEditor());
 
 				TArray<UBlueprint*> Blueprints;
 				Blueprints.Add(Blueprint);

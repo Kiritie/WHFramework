@@ -8,6 +8,7 @@
 #include "Step/StepEditorSettings.h"
 #include "Step/Widget/SStepToolbarWidget.h"
 
+#include "Global/GlobalBPLibrary.h"
 #include "Step/Widget/SStepEditorWidget.h"
 #include "Step/Widget/SStepListWidget.h"
 
@@ -21,7 +22,7 @@ SStepToolbarWidget::SStepToolbarWidget()
 
 void SStepToolbarWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	MainWidget = InArgs._MainWidget;
 	ListWidget = InArgs._ListWidget;
@@ -55,66 +56,6 @@ void SStepToolbarWidget::Construct(const FArguments& InArgs)
 		#endif
 	}
 	ToolBarBuilder_Editor.EndSection();
-
-	FToolBarBuilder ToolBarBuilder_View(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
-
-	ToolBarBuilder_View.BeginSection("View");
-	{
-		#if WITH_SLATE_DEBUGGING
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowListPanel = !MainWidget->bShowListPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bShowListPanel"), MainWidget->bShowListPanel, GStepEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowListPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Step List")),
-			FText::FromString(TEXT("Show/Hide Step List")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowDetailPanel = !MainWidget->bShowDetailPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bShowDetailPanel"), MainWidget->bShowDetailPanel, GStepEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowDetailPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Detail Panel")),
-			FText::FromString(TEXT("Show/Hide Detail Panel")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolBarBuilder_View.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this](){
-					MainWidget->bShowStatusPanel = !MainWidget->bShowStatusPanel;
-					GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bShowStatusPanel"), MainWidget->bShowStatusPanel, GStepEditorIni);
-				}),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bShowStatusPanel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Status Panel")),
-			FText::FromString(TEXT("Show/Hide Status Panel")),
-			Icon,
-			EUserInterfaceActionType::ToggleButton
-		);
-		#endif
-	}
-	ToolBarBuilder_View.EndSection();
 
 	FToolBarBuilder ToolBarBuilder_List(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
 
@@ -194,26 +135,6 @@ void SStepToolbarWidget::Construct(const FArguments& InArgs)
 				.Padding(5.f, 0.f, 0.f, 0.f)
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("View:")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(FMargin(5.f, 0.f))
-				[
-					ToolBarBuilder_View.MakeWidget()
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(5.f, 0.f, 0.f, 0.f)
-				[
-					SNew(STextBlock)
 					.Text(FText::FromString(TEXT("List:")))
 					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
 				]
@@ -248,22 +169,22 @@ void SStepToolbarWidget::OnEditModeToggled()
 
 void SStepToolbarWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 }
 
 void SStepToolbarWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void SStepToolbarWidget::OnRefresh()
 {
-	SEditorSlateWidgetBase::OnRefresh();
+	SEditorWidgetBase::OnRefresh();
 }
 
 void SStepToolbarWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

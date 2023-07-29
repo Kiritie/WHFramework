@@ -118,7 +118,7 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase = EPhase::Final) override;
 
-	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false) const;
+	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false);
 
 protected:
 	virtual void GenerateWorld();

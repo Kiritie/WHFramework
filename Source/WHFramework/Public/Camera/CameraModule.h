@@ -138,7 +138,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bClampCameraMove;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bClampCameraMove == true"), Category = "CameraControl|Move")
 	FBox CameraMoveRange;
 	
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")

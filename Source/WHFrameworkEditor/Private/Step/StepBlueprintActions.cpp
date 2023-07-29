@@ -37,7 +37,7 @@ void FStepBlueprintActions::OpenAssetEditor(const TArray<UObject*>& InObjects, T
 
 			if(bLetOpen)
 			{
-				TSharedRef<FStepEditor> NewEditor(new FStepEditor());
+				TSharedRef<FStepBlueprintEditor> NewEditor(new FStepBlueprintEditor());
 
 				TArray<UBlueprint*> Blueprints;
 				Blueprints.Add(Blueprint);

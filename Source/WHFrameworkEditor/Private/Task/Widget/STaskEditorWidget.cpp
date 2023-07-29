@@ -12,10 +12,12 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleBPLibrary.h"
-#include "Task/Widget/STaskDetailWidget.h"
+#include "Task/Widget/STaskDetailsWidget.h"
 #include "Task/Widget/STaskListWidget.h"
 #include "Task/Widget/STaskStatusWidget.h"
 #include "Task/Widget/STaskToolbarWidget.h"
+
+#define LOCTEXT_NAMESPACE "TaskEditorWidget"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -34,7 +36,7 @@ STaskEditorWidget::STaskEditorWidget()
 
 void STaskEditorWidget::Construct(const FArguments& InArgs)
 {
-	SEditorSlateWidgetBase::Construct(SEditorSlateWidgetBase::FArguments());
+	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
 	TaskModule = ATaskModule::Get(!UGlobalBPLibrary::IsPlaying());
 
@@ -49,11 +51,11 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 			.Visibility_Lambda([this](){ return bShowListPanel ? EVisibility::Visible : EVisibility::Collapsed; });
 		AddChild(ListWidget);
 
-		SAssignNew(DetailWidget, STaskDetailWidget)
+		SAssignNew(DetailsWidget, STaskDetailsWidget)
 			.TaskModule(TaskModule)
 			.ListWidget(ListWidget)
 			.Visibility_Lambda([this](){ return bShowDetailPanel ? EVisibility::Visible : EVisibility::Collapsed; });
-		AddChild(DetailWidget);
+		AddChild(DetailsWidget);
 
 		SAssignNew(StatusWidget, STaskStatusWidget)
 			.ListWidget(ListWidget)
@@ -65,72 +67,113 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 			.ListWidget(ListWidget);
 		AddChild(ToolbarWidget);
 
+		const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("TaskEditor_Layout")
+		->AddArea
+		(
+			FTabManager::NewPrimaryArea()
+			->SetOrientation(Orient_Vertical)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(true)
+				->SetSizeCoefficient(0.2f)
+				->AddTab("Toolbar", ETabState::OpenedTab)
+			)
+			->Split
+			(
+				// Main application area
+				FTabManager::NewSplitter()
+				->SetOrientation(Orient_Horizontal)
+				->SetSizeCoefficient(1.f)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetHideTabWell(false)
+					->SetSizeCoefficient(0.5f)
+					->AddTab("List", ETabState::OpenedTab)
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetHideTabWell(false)
+					->SetSizeCoefficient(0.5f)
+					->AddTab("Details", ETabState::OpenedTab)
+				)
+			)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(true)
+				->SetSizeCoefficient(0.1f)
+				->AddTab("Status", ETabState::OpenedTab)
+			)
+		);
+
+		auto RegisterTrackedTabSpawner = [this](const FName& TabId, const FOnSpawnTab& OnSpawnTab) -> FTabSpawnerEntry&
+		{
+			return TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateLambda([this, OnSpawnTab](const FSpawnTabArgs& Args) -> TSharedRef<SDockTab>
+			{
+				TSharedRef<SDockTab> SpawnedTab = OnSpawnTab.Execute(Args);
+				OnTabSpawned(Args.GetTabId().TabType, SpawnedTab);
+				return SpawnedTab;
+			}));
+		};
+
+        const TSharedRef<SDockTab> NomadTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
+		TabManager = FGlobalTabmanager::Get()->NewTabManager(NomadTab);
+		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &STaskEditorWidget::HandleTabManagerPersistLayout));
+
+		RegisterTrackedTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &STaskEditorWidget::SpawnToolbarWidgetTab))
+			.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Toolbar"));
+
+		RegisterTrackedTabSpawner("List", FOnSpawnTab::CreateSP(this, &STaskEditorWidget::SpawnListWidgetTab))
+			.SetDisplayName(LOCTEXT("ListTab", "List"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+		RegisterTrackedTabSpawner("Details", FOnSpawnTab::CreateSP(this, &STaskEditorWidget::SpawnDetailsWidgetTab))
+			.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+		RegisterTrackedTabSpawner("Status", FOnSpawnTab::CreateSP(this, &STaskEditorWidget::SpawnStatusWidgetTab))
+			.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+
+		if (GIsEditor)
+		{
+			//Layout = FLayoutSaveRestore::LoadFromConfig(GEditorLayoutIni, Layout);
+		}
+
+		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
+		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("WindowMenuLabel", "Window"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &STaskEditorWidget::HandlePullDownWindowMenu),
+			"Window"
+		);
+		
+		const TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
+		TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuWidget);
+
 		ChildSlot
 		[
-			SNew(SVerticalBox)
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.AutoHeight()
+			SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+			.BorderBackgroundColor(FLinearColor::Gray) // Darken the outer border
 			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.FillWidth(1)
-				.Padding(1)
+				SNew(SVerticalBox)
+		
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 				[
-					ToolbarWidget.ToSharedRef()
+					MenuWidget
 				]
-			]
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.FillHeight(1)
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.AutoWidth()
+				
+				+ SVerticalBox::Slot()
+				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 				[
-					ListWidget.ToSharedRef()
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.FillWidth(1)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.AutoWidth()
-				[
-					DetailWidget.ToSharedRef()
-				]
-			]
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.AutoHeight()
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Fill)
-				.Padding(1)
-				.FillWidth(1)
-				[
-					StatusWidget.ToSharedRef()
+					TabManager->RestoreFrom(Layout, nullptr).ToSharedRef()
 				]
 			]
 		];
@@ -164,7 +207,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 
 void STaskEditorWidget::OnCreate()
 {
-	SEditorSlateWidgetBase::OnCreate();
+	SEditorWidgetBase::OnCreate();
 
 	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &STaskEditorWidget::OnBeginPIE);
 
@@ -178,7 +221,7 @@ void STaskEditorWidget::OnCreate()
 
 void STaskEditorWidget::OnReset()
 {
-	SEditorSlateWidgetBase::OnReset();
+	SEditorWidgetBase::OnReset();
 }
 
 void STaskEditorWidget::OnRefresh()
@@ -190,11 +233,11 @@ void STaskEditorWidget::OnRefresh()
 		{
 			ListWidget->TaskModule = TaskModule;
 		}
-		if(DetailWidget)
+		if(DetailsWidget)
 		{
-			DetailWidget->TaskModule = TaskModule;
+			DetailsWidget->TaskModule = TaskModule;
 		}
-		SEditorSlateWidgetBase::OnRefresh();
+		SEditorWidgetBase::OnRefresh();
 	}
 	else
 	{
@@ -204,7 +247,7 @@ void STaskEditorWidget::OnRefresh()
 
 void STaskEditorWidget::OnDestroy()
 {
-	SEditorSlateWidgetBase::OnDestroy();
+	SEditorWidgetBase::OnDestroy();
 
 	if(OnBeginPIEHandle.IsValid())
 	{
@@ -253,6 +296,82 @@ void STaskEditorWidget::OnBlueprintCompiled()
 	Refresh();
 }
 
+void STaskEditorWidget::OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab)
+{
+	TWeakPtr<SDockTab>* const ExistingTab = SpawnedTabs.Find(TabIdentifier);
+	if (!ExistingTab)
+	{
+		SpawnedTabs.Add(TabIdentifier, SpawnedTab);
+	}
+	else
+	{
+		check(!ExistingTab->IsValid());
+		*ExistingTab = SpawnedTab;
+	}
+}
+
+void STaskEditorWidget::HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave)
+{
+	if (FUnrealEdMisc::Get().IsSavingLayoutOnClosedAllowed())
+	{
+		FLayoutSaveRestore::SaveToConfig(GEditorLayoutIni, LayoutToSave);
+	}
+}
+
+TSharedRef<SDockTab> STaskEditorWidget::SpawnToolbarWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ToolbarTab", "Toolbar"))
+		.ShouldAutosize(true)
+		[
+			ToolbarWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> STaskEditorWidget::SpawnListWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ListTab", "List"))
+		.ShouldAutosize(false)
+		[
+			ListWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> STaskEditorWidget::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("DetailsTab", "Details"))
+		.ShouldAutosize(false)
+		[
+			DetailsWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> STaskEditorWidget::SpawnStatusWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("StatusTab", "Status"))
+		.ShouldAutosize(true)
+		[
+			StatusWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+void STaskEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)
+{
+	if (!TabManager.IsValid())
+	{
+		return;
+	}
+
+	TabManager->PopulateLocalTabSpawnerMenu(MenuBuilder);
+}
+
 void STaskEditorWidget::TogglePreviewMode()
 {
 	SetIsPreviewMode(!bPreviewMode);
@@ -269,3 +388,5 @@ void STaskEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+#undef LOCTEXT_NAMESPACE

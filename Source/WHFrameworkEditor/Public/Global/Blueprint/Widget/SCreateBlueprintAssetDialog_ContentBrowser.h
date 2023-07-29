@@ -7,7 +7,7 @@
 #include "ClassViewerModule.h"
 #include "Global/Blueprint/Factory/BlueprintFactoryBase.h"
 #include "Step/StepEditorTypes.h"
-#include "Widget/Window/SEditorWindowWidgetBase.h"
+#include "Widget/Window/SEditorWindowBase.h"
 
 class FBlueprintParentClassFilter_ContentBrowser : public IClassViewerFilter
 {

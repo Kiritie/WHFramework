@@ -179,7 +179,7 @@ void AInputModule::PanHCamera(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(!GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
+	if(GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
@@ -191,7 +191,7 @@ void AInputModule::PanVCamera(float InRate)
 {
 	if(InRate == 0.f) return;
 
-	if(!GetKeyShortcutByName(FName("CameraPanMove")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
+	if(GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);

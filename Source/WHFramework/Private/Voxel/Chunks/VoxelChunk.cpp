@@ -66,8 +66,7 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AVoxelChunk::ToData()
 {
-	static FVoxelChunkSaveData SaveData;
-	SaveData = FVoxelChunkSaveData();
+	FVoxelChunkSaveData SaveData;
 
 	SaveData.Index = Index;
 
@@ -78,10 +77,10 @@ FSaveData* AVoxelChunk::ToData()
 
 	for(auto& Iter : PickUps)
 	{
-		SaveData.PickUpDatas.Add(Iter->ToSaveDataRef<FPickUpSaveData>());
+		SaveData.PickUpDatas.Add(Iter->GetSaveDataRef<FPickUpSaveData>(true));
 	}
 
-	return &SaveData;
+	return LocalData(SaveData);
 }
 
 void AVoxelChunk::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
