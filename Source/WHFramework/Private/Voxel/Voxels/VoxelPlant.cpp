@@ -13,9 +13,9 @@ void UVoxelPlant::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UVoxelPlant::ToData()
+FSaveData* UVoxelPlant::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UVoxelPlant::OnGenerate(IVoxelAgentInterface* InAgent)

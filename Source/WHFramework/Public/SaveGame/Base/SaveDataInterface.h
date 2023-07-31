@@ -39,20 +39,9 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;
 
-	virtual FSaveData* ToData() = 0;
-
-	template<class T>
-	T* LocalData(const T& InSaveData)
-	{
-		if(!LocalSaveData) LocalSaveData = new T();
-		*static_cast<T*>(LocalSaveData) = InSaveData;
-		return static_cast<T*>(LocalSaveData);
-	}
+	virtual FSaveData* ToData(bool bRefresh) = 0;
 
 	virtual void UnloadData(EPhase InPhase) { }
 
 	virtual bool HasArchive() const { return false; }
-
-private:
-	FSaveData* LocalSaveData = nullptr;
 };

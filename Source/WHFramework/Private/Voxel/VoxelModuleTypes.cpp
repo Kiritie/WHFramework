@@ -97,7 +97,7 @@ void FVoxelItem::RefreshData(UVoxel* InVoxel)
 
 FVoxelSaveData FVoxelItem::ToSaveData(bool bRefresh) const
 {
-	if(!bRefresh)
+	// if(!bRefresh)
 	{
 		FVoxelSaveData VoxelSaveData = FVoxelSaveData(*this);
 		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), GetVoxelType(), *Index.ToString(), Angle);

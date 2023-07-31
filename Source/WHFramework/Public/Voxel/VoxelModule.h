@@ -7,10 +7,6 @@
 #include "Global/GlobalTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Voxel/AsyncTasks/AsyncTask_LoadChunkMap.h"
-#include "Voxel/AsyncTasks/AsyncTask_BuildChunkMap.h"
-#include "Voxel/AsyncTasks/AsyncTask_BuildChunkMesh.h"
-#include "AsyncTasks/AsyncTask_SaveChunkData.h"
 #include "VoxelModule.generated.h"
 
 class AVoxelChunk;
@@ -114,11 +110,11 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FSaveData* ToData(bool bRefresh) override;
 
 	virtual void UnloadData(EPhase InPhase = EPhase::Final) override;
 
-	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false);
+	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false) const;
 
 protected:
 	virtual void GenerateWorld();
@@ -132,40 +128,14 @@ public:
 	
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
 
-	virtual void SaveChunkData(FIndex InIndex);
-
 	virtual void GenerateChunk(FIndex InIndex);
 
 	virtual void DestroyChunk(FIndex InIndex);
 
 protected:
-	virtual bool AddToSpawnQueue(FIndex InIndex);
-
-	virtual bool RemoveFromSpawnQueue(FIndex InIndex);
-
-	virtual bool AddToMapLoadQueue(FIndex InIndex);
-
-	virtual bool RemoveFromMapLoadQueue(FIndex InIndex);
-
-	virtual bool AddToMapBuildQueue(FIndex InIndex, int32 InStage);
-
-	virtual bool RemoveFromMapBuildQueue(FIndex InIndex, int32 InStage);
-
-	virtual bool AddToMeshBuildQueue(FIndex InIndex);
-
-	virtual bool RemoveFromMeshBuildQueue(FIndex InIndex);
+	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 	
-	virtual bool AddToDataSaveQueue(FIndex InIndex);
-
-	virtual bool RemoveFromDataSaveQueue(FIndex InIndex);
-
-	virtual bool AddToGenerateQueue(FIndex InIndex);
-
-	virtual bool RemoveFromGenerateQueue(FIndex InIndex);
-
-	virtual bool AddToDestroyQueue(FIndex InIndex);
-	
-	virtual bool RemoveFromDestroyQueue(FIndex InIndex);
+	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 
 public:
 	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex) const;
@@ -205,62 +175,12 @@ public:
 	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
 public:
-	bool UpdateChunkQueues(bool bFromAgent = true, bool bForceStop = false);
+	void UpdateChunkQueues(bool bFromAgent = true, bool bForceStop = false);
 
 	void StopChunkQueues();
 
 protected:
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc) const;
-
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage) const;
-
-	bool UpdateChunkQueue(TArray<TArray<FIndex>>& InQueue, int32 InSpeed, TFunction<bool(TArray<FIndex>& _InQueue, int32 _InSpeed, int32 _InIndex)> InFunc) const;
-
-	template<class T>
-	bool UpdateChunkQueue(TArray<FIndex>& InQueue, TArray<FAsyncTask<T>*>& InTasks, int32 InSpeed)
-	{
-		if(InTasks.Num() == 0 && InQueue.Num() > 0)
-		{
-			TArray<FIndex> Queue = InQueue;
-			DON_WITHINDEX(FMath::CeilToInt((float)Queue.Num() / InSpeed), i,
-				TArray<FIndex> tmpArr;
-				DON_WITHINDEX(FMath::Min(InSpeed, Queue.Num() - i * InSpeed), j,
-					tmpArr.Add(Queue[i * InSpeed + j]);
-				)
-				const auto Task = new FAsyncTask<T>(this, tmpArr);
-				InTasks.Add(Task);
-				Task->StartBackgroundTask();
-			)
-		}
-		else if(InTasks.Num() > 0)
-		{
-			for(auto Iter = InTasks.CreateConstIterator(); Iter; ++Iter)
-			{
-				auto Task = *Iter;
-				if(Task->IsDone())
-				{
-					for(auto index : Task->GetTask().GetChunkQueue())
-					{
-						InQueue.Remove(index);
-					}
-					InTasks.Remove(Task);
-					delete Task;
-				}
-			}
-		}
-		return InQueue.Num() > 0 || InTasks.Num() > 0;
-	}
-
-	template<class T>
-	void StopChunkTasks(TArray<FAsyncTask<T>*>& InTasks)
-	{
-		for(auto Iter : InTasks)
-		{
-			Iter->EnsureCompletion();
-			delete Iter;
-		}
-		InTasks.Empty();
-	}
+	bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -273,58 +193,16 @@ protected:
 	float ChunkSpawnDistance;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkSpawnSpeed;
+	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
 
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkDestroySpeed;
-			
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkGenerateSpeed;
-							
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkMapLoadSpeed;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkMapBuildSpeed;
-					
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkMeshBuildSpeed;
-	
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int32 ChunkDataSaveSpeed;
-
-	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
-	UPROPERTY()
 	TArray<AVoxelEntityPreview*> PreviewVoxels;
 
 protected:
 	int32 ChunkSpawnBatch;
 
 	FIndex LastGenerateIndex;
-
-	TArray<FIndex> ChunkSpawnQueue;
-
-	TArray<FIndex> ChunkMapLoadQueue;
-
-	TArray<TArray<FIndex>> ChunkMapBuildQueue;
-
-	TArray<FIndex> ChunkMeshBuildQueue;
-
-	TArray<FIndex> ChunkGenerateQueue;
-	
-	TArray<FIndex> ChunkDataSaveQueue;
-
-	TArray<FIndex> ChunkDestroyQueue;
-		
-	TArray<FAsyncTask<AsyncTask_LoadChunkMap>*> ChunkMapLoadTasks;
-
-	TArray<FAsyncTask<AsyncTask_BuildChunkMap>*> ChunkMapBuildTasks;
-	
-	TArray<FAsyncTask<AsyncTask_BuildChunkMesh>*> ChunkMeshBuildTasks;
-		
-	TArray<FAsyncTask<AsyncTask_SaveChunkData>*> ChunkDataSaveTasks;
 
 public:
 	bool IsBasicGenerated() const;

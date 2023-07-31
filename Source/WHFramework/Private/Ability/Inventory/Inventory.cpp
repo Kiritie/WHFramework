@@ -96,9 +96,10 @@ void UInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}	
 }
 
-FSaveData* UInventory::ToData()
+FSaveData* UInventory::ToData(bool bRefresh)
 {
-	FInventorySaveData SaveData;
+	static FInventorySaveData SaveData;
+	SaveData = FInventorySaveData();
 
 	SaveData.SplitInfos = SplitInfos;
 	if(SelectedSlot)
@@ -110,7 +111,7 @@ FSaveData* UInventory::ToData()
 	{
 		SaveData.Items.Add(Slots[i]->GetItem());
 	}
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void UInventory::UnloadData(EPhase InPhase)

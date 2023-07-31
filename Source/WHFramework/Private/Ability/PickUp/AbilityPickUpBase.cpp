@@ -44,14 +44,15 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 }
 
-FSaveData* AAbilityPickUpBase::ToData()
+FSaveData* AAbilityPickUpBase::ToData(bool bRefresh)
 {
-	FPickUpSaveData SaveData;
+	static FPickUpSaveData SaveData;
+	SaveData = FPickUpSaveData();
 
 	SaveData.Item = Item;
 	SaveData.Location = GetActorLocation();
 
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void AAbilityPickUpBase::Initialize_Implementation(FAbilityItem InItem)

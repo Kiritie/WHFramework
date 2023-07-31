@@ -137,9 +137,10 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityCharacterBase::ToData()
+FSaveData* AAbilityCharacterBase::ToData(bool bRefresh)
 {
-	FCharacterSaveData SaveData;
+	static FCharacterSaveData SaveData;
+	SaveData = FCharacterSaveData();
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;
@@ -151,7 +152,7 @@ FSaveData* AAbilityCharacterBase::ToData()
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void AAbilityCharacterBase::ResetData()

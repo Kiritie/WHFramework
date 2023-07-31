@@ -48,7 +48,7 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FSaveData* ToData(bool bRefresh) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameter

@@ -16,9 +16,9 @@ void UVoxelWater::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UVoxelWater::ToData()
+FSaveData* UVoxelWater::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)

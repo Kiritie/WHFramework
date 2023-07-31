@@ -4,26 +4,26 @@
 
 #include "Math/MathTypes.h"
 
-class AVoxelModule;
 /**
  * 
  */
-class AsyncTask_LoadChunkMap : public FNonAbandonableTask
+class AsyncTask_ChunkQueue : public FNonAbandonableTask
 {
-	friend class FAsyncTask<AsyncTask_LoadChunkMap>;
+	friend class FAsyncTask<AsyncTask_ChunkQueue>;
 
 public:
-	AsyncTask_LoadChunkMap(AVoxelModule* InVoxelModule, TArray<FIndex> InChunkQueue);
+	AsyncTask_ChunkQueue(TArray<FIndex> InQueue, TFunction<void(FIndex, int32)> InFunc, int32 InStage);
 
 protected:
-	AVoxelModule* VoxelModule;
 	TArray<FIndex> ChunkQueue;
+	TFunction<void(FIndex, int32)> Func;
+	int32 Stage;
 
 public:
 	void DoWork();
 
 public:
-	TArray<FIndex> GetChunkQueue() const { return ChunkQueue; }
+	TArray<FIndex>& GetChunkQueue() { return ChunkQueue; }
 
 	FORCEINLINE TStatId GetStatId() const
 	{

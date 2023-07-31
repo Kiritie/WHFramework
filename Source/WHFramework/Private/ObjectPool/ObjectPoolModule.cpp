@@ -62,7 +62,7 @@ void AObjectPoolModule::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
 
-	ClearAllObject();
+	// ClearAllObject();
 }
 
 bool AObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const

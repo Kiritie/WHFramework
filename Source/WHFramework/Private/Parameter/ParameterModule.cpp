@@ -75,11 +75,13 @@ void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
 }
 
-FSaveData* AParameterModule::ToData()
+FSaveData* AParameterModule::ToData(bool bRefresh)
 {
-	FParameterSaveData SaveData;
+	static FParameterSaveData SaveData;
+	SaveData = FParameterSaveData();
+	
 	SaveData.Parameters = Parameters;
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 bool AParameterModule::HasParameter(FName InName, bool bEnsured) const

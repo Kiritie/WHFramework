@@ -65,9 +65,10 @@ void UVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	bGenerated = SaveData.bGenerated;
 }
 
-FSaveData* UVoxel::ToData()
+FSaveData* UVoxel::ToData(bool bRefresh)
 {
-	FVoxelItem SaveData;
+	static FVoxelItem SaveData;
+	SaveData = FVoxelItem();
 
 	SaveData.ID = ID;
 	SaveData.Index = Index;
@@ -76,41 +77,36 @@ FSaveData* UVoxel::ToData()
 	SaveData.Auxiliary = Auxiliary;
 	SaveData.bGenerated = bGenerated;
 
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void UVoxel::RefreshData()
 {
-	if(Owner)
-	{
-		Owner->GetVoxelItem(Index).RefreshData(this);
-	}
+	GetItem().RefreshData(this);
 }
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(InAgent)
+	if(!InAgent) return;
+	
+	if(GetData().PartType == EVoxelPartType::Main)
 	{
-		if(GetData().PartType == EVoxelPartType::Main)
-		{
-			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, GetLocation());
-		}
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, GetLocation());
 	}
 }
 
 void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
-	if(InAgent)
+	if(!InAgent) return;
+	
+	if(GetData().PartType == EVoxelPartType::Main)
 	{
-		if(GetData().PartType == EVoxelPartType::Main)
-		{
-			UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
-			UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Angle) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, Owner);
-		}
-		if(Owner && !Owner->CheckVoxelAdjacent(Index, EDirection::Up))
-		{
-			Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Angle), FVoxelItem::Empty, true, InAgent);
-		}
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
+		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Angle) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, Owner);
+	}
+	if(Owner && !Owner->CheckVoxelAdjacent(Index, EDirection::Up))
+	{
+		Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Angle), FVoxelItem::Empty, true, InAgent);
 	}
 }
 
@@ -168,11 +164,7 @@ bool UVoxel::IsUnknown() const
 
 FVector UVoxel::GetLocation(bool bWorldSpace) const
 {
-	if(Owner)
-	{
-		return Owner->IndexToLocation(Index, bWorldSpace);
-	}
-	return FVector::ZeroVector;
+	return Owner ? Owner->IndexToLocation(Index, bWorldSpace) : FVector::ZeroVector;
 }
 
 UVoxelData& UVoxel::GetData() const
@@ -182,9 +174,5 @@ UVoxelData& UVoxel::GetData() const
 
 FVoxelItem& UVoxel::GetItem()
 {
-	if(Owner)
-	{
-		return Owner->GetVoxelItem(Index);
-	}
-	return GetSaveDataRef<FVoxelItem>();
+	return Owner ? Owner->GetVoxelItem(Index) : GetSaveDataRef<FVoxelItem>();
 }

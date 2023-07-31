@@ -12,9 +12,9 @@ void UVitalityInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UVitalityInventory::ToData()
+FSaveData* UVitalityInventory::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UVitalityInventory::UnloadData(EPhase InPhase)

@@ -6,7 +6,6 @@
 
 void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 {
-	LocalSaveData = InSaveData;
 	LoadData(InSaveData, InPhase);
 	if (HasArchive())
 	{
@@ -16,15 +15,12 @@ void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)
 {
-	if (bRefresh)
-	{
-		LocalSaveData = ToData();
-	}
+	FSaveData* SaveData = ToData(bRefresh);
 	if (HasArchive())
 	{
-		UGlobalBPLibrary::SaveObjectDataToMemory(Cast<UObject>(this), LocalSaveData->GetDatas());
+		UGlobalBPLibrary::SaveObjectDataToMemory(Cast<UObject>(this), SaveData->GetDatas());
 	}
-	return LocalSaveData;
+	return SaveData;
 }
 
 void ISaveDataInterface::UnloadSaveData(EPhase InPhase)
@@ -34,5 +30,4 @@ void ISaveDataInterface::UnloadSaveData(EPhase InPhase)
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), TArray<uint8>());
 	}
-	LocalSaveData = nullptr;
 }

@@ -4,6 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
+#include "AsyncTasks/AsyncTask_ChunkQueue.h"
 #include "Math/MathTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -36,7 +37,7 @@ UENUM(BlueprintType)
 enum class EVoxelWorldMode : uint8
 {
 	None,
-	InGame,
+	Default,
 	Preview
 };
 
@@ -44,13 +45,12 @@ UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
-	Spawning,
-	Destroying,
-	Generating,
-	LoadingMap,
-	BuildingMap,
-	BuildingMesh,
-	SavingData
+	Spawn,
+	Destroy,
+	Generate,
+	MapLoad,
+	MapBuild,
+	MeshBuild
 };
 
 UENUM(BlueprintType)
@@ -630,5 +630,58 @@ public:
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) override
 	{
 		ChunkDatas.Emplace(InChunkIndex.ToVector(), InChunkData->CastRef<FVoxelChunkSaveData>());
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelChunkQueue
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere)
+	bool bAsync;
+
+	UPROPERTY(EditAnywhere)
+	int32 Speed;
+
+	TArray<FIndex> Queue;
+		
+	TArray<FAsyncTask<AsyncTask_ChunkQueue>*> Tasks;
+
+	FORCEINLINE FVoxelChunkQueue()
+	{
+		bAsync = false;
+		Speed = 100;
+		Queue = TArray<FIndex>();
+		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+	}
+
+	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
+	{
+		bAsync = bInAsync;
+		Speed = InSpeed;
+		Queue = TArray<FIndex>();
+		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelChunkQueues
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere)
+	TArray<FVoxelChunkQueue> Queues;
+
+	FORCEINLINE FVoxelChunkQueues()
+	{
+		Queues = TArray<FVoxelChunkQueue>();
+	}
+
+	FORCEINLINE FVoxelChunkQueues(const TArray<FVoxelChunkQueue>& InQueues)
+	{
+		Queues = InQueues;
 	}
 };

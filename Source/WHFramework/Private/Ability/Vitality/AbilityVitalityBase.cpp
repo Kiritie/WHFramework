@@ -113,9 +113,10 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityVitalityBase::ToData()
+FSaveData* AAbilityVitalityBase::ToData(bool bRefresh)
 {
-	FVitalitySaveData SaveData;
+	static FVitalitySaveData SaveData;
+	SaveData = FVitalitySaveData();
 
 	SaveData.ID = AssetID;
 	SaveData.Name = Name;
@@ -127,7 +128,7 @@ FSaveData* AAbilityVitalityBase::ToData()
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void AAbilityVitalityBase::ResetData()

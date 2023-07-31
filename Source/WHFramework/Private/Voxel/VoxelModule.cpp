@@ -71,25 +71,19 @@ AVoxelModule::AVoxelModule()
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
 	ChunkSpawnDistance = 2;
-	ChunkSpawnSpeed = 100;
-	ChunkDestroySpeed = 10;
-	ChunkGenerateSpeed = 1;
-	ChunkMapLoadSpeed = 100;
-	ChunkMapBuildSpeed = 100;
-	ChunkMeshBuildSpeed = 100;
-	ChunkDataSaveSpeed = 100;
+	ChunkQueues= 
+	{
+		{EVoxelWorldState::Spawn, TArray{FVoxelChunkQueue(false, 100)}},
+		{EVoxelWorldState::Destroy, TArray{FVoxelChunkQueue(false, 1)}},
+		{EVoxelWorldState::Generate, TArray{FVoxelChunkQueue(false, 1)}},
+		{EVoxelWorldState::MapLoad, TArray{FVoxelChunkQueue(true, 100)}},
+		{EVoxelWorldState::MapBuild, TArray{FVoxelChunkQueue(true, 100), FVoxelChunkQueue(true, 100)}},
+		{EVoxelWorldState::MeshBuild, TArray{FVoxelChunkQueue(true, 100)}},
+	};
 
 	ChunkSpawnBatch = 0;
 	LastGenerateIndex = Index_Empty;
 	ChunkMap = TMap<FIndex, AVoxelChunk*>();
-	ChunkSpawnQueue = TArray<FIndex>();
-	ChunkDestroyQueue = TArray<FIndex>();
-	ChunkGenerateQueue = TArray<FIndex>();
-	ChunkMapLoadQueue = TArray<FIndex>();
-	ChunkMapBuildQueue = TArray<TArray<FIndex>>();
-	ChunkMapBuildQueue.SetNum(2);
-	ChunkMeshBuildQueue = TArray<FIndex>();
-	ChunkDataSaveQueue = TArray<FIndex>();
 
 	VoxelClasses.Add(UVoxel::StaticClass());
 	VoxelClasses.Add(UVoxelEmpty::StaticClass());
@@ -233,6 +227,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			SetWorldMode(EVoxelWorldMode::Preview);
 
+			WorldData = NewData();
 			*WorldData = SaveData;
 			
 			if(WorldData->WorldSeed == 0)
@@ -278,7 +273,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 		case EPhase::Final:
 		{
-			SetWorldMode(EVoxelWorldMode::InGame);
+			SetWorldMode(EVoxelWorldMode::Default);
 
 			for(auto Iter : ChunkMap)
 			{
@@ -289,15 +284,18 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelModule::ToData()
+FSaveData* AVoxelModule::ToData(bool bRefresh)
 {
+	static FVoxelWorldSaveData* SaveData;
+	SaveData = NewData();
+	*SaveData = *WorldData;
 	for(auto Iter : ChunkMap)
 	{
-		WorldData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
+		SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
 	}
-	WorldData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();
-	WorldData->SecondsOfDay = USceneModuleBPLibrary::GetWorldTimer()->GetSecondsOfDay();
-	return WorldData;
+	SaveData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();
+	SaveData->SecondsOfDay = USceneModuleBPLibrary::GetWorldTimer()->GetSecondsOfDay();
+	return SaveData;
 }
 
 void AVoxelModule::UnloadData(EPhase InPhase)
@@ -340,7 +338,7 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData)
+FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData) const
 {
 	static FDefaultVoxelWorldSaveData* NewWorldData;
 	NewWorldData = !bInheritBasicData ? new FDefaultVoxelWorldSaveData() : new FDefaultVoxelWorldSaveData(WorldBasicData);
@@ -349,47 +347,37 @@ FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData)
 
 void AVoxelModule::GenerateWorld()
 {
+	UpdateChunkQueues();
+	
 	// Spawn chunk
-	if(UpdateChunkQueue(ChunkSpawnQueue, ChunkSpawnSpeed, [this](FIndex Index){ SpawnChunk(Index); }))
+	if(UpdateChunkQueue(EVoxelWorldState::Spawn, [this](FIndex Index, int32 Stage){ SpawnChunk(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::Spawning);
+		SetWorldState(EVoxelWorldState::Spawn);
 	}
 	// Load chunk map
-	else if(UpdateChunkQueue(ChunkMapLoadQueue, ChunkMapLoadTasks, ChunkMapLoadSpeed))
+	else if(UpdateChunkQueue(EVoxelWorldState::MapLoad, [this](FIndex Index, int32 Stage){ LoadChunkMap(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::LoadingMap);
+		SetWorldState(EVoxelWorldState::MapLoad);
 	}
 	// Build chunk map
-	else if(UpdateChunkQueue(ChunkMapBuildQueue, ChunkMapBuildSpeed, [this](TArray<FIndex>& InQueue, int32 InSpeed, int32 InIndex){
-		return InIndex == 0 ? UpdateChunkQueue(InQueue, ChunkMapBuildTasks, InSpeed) : UpdateChunkQueue(InQueue, InSpeed, [this](FIndex InIndex, int32 InStage){
-			BuildChunkMap(InIndex, InStage); }, InIndex); }))
+	else if(UpdateChunkQueue(EVoxelWorldState::MapBuild, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
 	{
-		SetWorldState(EVoxelWorldState::BuildingMap);
+		SetWorldState(EVoxelWorldState::MapBuild);
 	}
 	// Build chunk mesh
-	else if(UpdateChunkQueue(ChunkMeshBuildQueue, ChunkMeshBuildTasks, ChunkMeshBuildSpeed))
+	else if(UpdateChunkQueue(EVoxelWorldState::MeshBuild, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::BuildingMesh);
+		SetWorldState(EVoxelWorldState::MeshBuild);
 	}
 	// Generate chunk
-	else if(UpdateChunkQueue(ChunkGenerateQueue, ChunkGenerateSpeed, [this](FIndex Index){ GenerateChunk(Index); }))
+	else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::Generating);
-	}
-	// Save chunk data
-	else if(UpdateChunkQueue(ChunkDataSaveQueue, ChunkDataSaveSpeed, [this](FIndex Index){ SaveChunkData(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::SavingData);
+		SetWorldState(EVoxelWorldState::Generate);
 	}
 	// Destroy chunk
-	else if(UpdateChunkQueue(ChunkDestroyQueue, ChunkDestroySpeed, [this](FIndex Index){ DestroyChunk(Index); }))
+	if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::Destroying);
-	}
-	// Update queues
-	else if(!UpdateChunkQueues())
-	{
-		SetWorldState(EVoxelWorldState::None);
+		SetWorldState(EVoxelWorldState::Destroy);
 	}
 }
 
@@ -417,21 +405,13 @@ void AVoxelModule::BuildChunkMesh(FIndex InIndex)
 	}
 }
 
-void AVoxelModule::SaveChunkData(FIndex InIndex)
-{
-	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
-	{
-		WorldData->SetChunkData(InIndex, Chunk->GetSaveData<FVoxelChunkSaveData>(true));
-	}
-}
-
 void AVoxelModule::GenerateChunk(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
 	{
 		switch(WorldMode)
 		{
-			case EVoxelWorldMode::InGame:
+			case EVoxelWorldMode::Default:
 			{
 				Chunk->Generate(EPhase::Primary);
 				break;
@@ -455,151 +435,51 @@ void AVoxelModule::DestroyChunk(FIndex InIndex)
 	}
 }
 
-bool AVoxelModule::AddToSpawnQueue(FIndex InIndex)
+void AVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
-	if(ChunkMap.Contains(InIndex) || ChunkSpawnQueue.Contains(InIndex)) return false;
-
-	RemoveFromDestroyQueue(InIndex);
-
-	ChunkSpawnQueue.Add(InIndex);
-	return true;
+	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
+		if(!Item.Queue.Contains(InIndex))
+		{
+			Item.Queue.Add(InIndex);
+			switch(InState)
+			{
+				case EVoxelWorldState::Spawn:
+				{
+					RemoveFromChunkQueue(EVoxelWorldState::Destroy, InIndex);
+					break;
+				}
+				case EVoxelWorldState::Generate:
+				{
+					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
+						const float LengthA = LastGenerateIndex.DistanceTo(A, false, true);
+						const float LengthB = LastGenerateIndex.DistanceTo(B, false, true);
+						return LengthA < LengthB;
+					});
+					break;
+				}
+				case EVoxelWorldState::Destroy:
+				{
+					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
+						const float LengthA = LastGenerateIndex.DistanceTo(A, false, true);
+						const float LengthB = LastGenerateIndex.DistanceTo(B, false, true);
+						return LengthA > LengthB;
+					});
+					break;
+				}
+				default: break;
+			}
+		}
+	)
 }
 
-bool AVoxelModule::RemoveFromSpawnQueue(FIndex InIndex)
+void AVoxelModule::RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
-	if(ChunkSpawnQueue.Contains(InIndex))
-	{
-		ChunkSpawnQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToMapLoadQueue(FIndex InIndex)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkMapLoadQueue.Contains(InIndex)) return false;
-	
-	ChunkMapLoadQueue.Add(InIndex);
-	return true;
-}
-
-bool AVoxelModule::RemoveFromMapLoadQueue(FIndex InIndex)
-{
-	if(ChunkMapLoadQueue.Contains(InIndex))
-	{
-		ChunkMapLoadQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToMapBuildQueue(FIndex InIndex, int32 InStage)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkMapBuildQueue[InStage].Contains(InIndex)) return false;
-
-	ChunkMapBuildQueue[InStage].Add(InIndex);
-	return true;
-}
-
-bool AVoxelModule::RemoveFromMapBuildQueue(FIndex InIndex, int32 InStage)
-{
-	if(ChunkMapBuildQueue[InStage].Contains(InIndex))
-	{
-		ChunkMapBuildQueue[InStage].Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToMeshBuildQueue(FIndex InIndex)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkMeshBuildQueue.Contains(InIndex)) return false;
-	
-	ChunkMeshBuildQueue.Add(InIndex);
-	return true;
-}
-
-bool AVoxelModule::RemoveFromMeshBuildQueue(FIndex InIndex)
-{
-	if(ChunkMeshBuildQueue.Contains(InIndex))
-	{
-		ChunkMeshBuildQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToDataSaveQueue(FIndex InIndex)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkDataSaveQueue.Contains(InIndex)) return false;
-	
-	ChunkDataSaveQueue.Add(InIndex);
-	return true;
-}
-
-bool AVoxelModule::RemoveFromDataSaveQueue(FIndex InIndex)
-{
-	if(ChunkDataSaveQueue.Contains(InIndex))
-	{
-		ChunkDataSaveQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToGenerateQueue(FIndex InIndex)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkGenerateQueue.Contains(InIndex)) return false;
-
-	ChunkGenerateQueue.Add(InIndex);
-	ChunkGenerateQueue.Sort([this](const FIndex& A, const FIndex& B){
-		const float LengthA = LastGenerateIndex.DistanceTo(A, false, true);
-		const float LengthB = LastGenerateIndex.DistanceTo(B, false, true);
-		// if(IsChunkGenerated(A) != IsChunkGenerated(B)) return !IsChunkGenerated(A);
-		return LengthA < LengthB;
-	});
-	return true;
-}
-
-bool AVoxelModule::RemoveFromGenerateQueue(FIndex InIndex)
-{
-	if(ChunkGenerateQueue.Contains(InIndex))
-	{
-		ChunkGenerateQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
-}
-
-bool AVoxelModule::AddToDestroyQueue(FIndex InIndex)
-{
-	if(!ChunkMap.Contains(InIndex) || ChunkDestroyQueue.Contains(InIndex)) return false;
-	
-	RemoveFromMapLoadQueue(InIndex);
-	DON_WITHINDEX(ChunkMapBuildQueue.Num(), i, RemoveFromMapBuildQueue(InIndex, i);)
-	RemoveFromMeshBuildQueue(InIndex);
-	RemoveFromDataSaveQueue(InIndex);
-	RemoveFromGenerateQueue(InIndex);
-
-	AddToDataSaveQueue(InIndex);
-
-	ChunkDestroyQueue.Add(InIndex);
-	ChunkDestroyQueue.Sort([this](const FIndex& A, const FIndex& B){
-		const float LengthA = LastGenerateIndex.DistanceTo(A, false, true);
-		const float LengthB = LastGenerateIndex.DistanceTo(B, false, true);
-		return LengthA > LengthB;
-	});
-	return true;
-}
-
-bool AVoxelModule::RemoveFromDestroyQueue(FIndex InIndex)
-{
-	if(ChunkDestroyQueue.Contains(InIndex))
-	{
-		ChunkDestroyQueue.Remove(InIndex);
-		return true;
-	}
-	return false;
+	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
+		if(Item.Queue.Contains(InIndex))
+		{
+			Item.Queue.Remove(InIndex);
+		}
+	)
 }
 
 AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
@@ -620,20 +500,20 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		{
 			if(WorldData->IsExistChunkData(InIndex))
 			{
-				AddToMapLoadQueue(InIndex);
+				AddToChunkQueue(EVoxelWorldState::MapLoad, InIndex);
 			}
 			else
 			{
-				DON_WITHINDEX(ChunkMapBuildQueue.Num(), i, AddToMapBuildQueue(InIndex, i);)
+				AddToChunkQueue(EVoxelWorldState::MapBuild, InIndex);
 			}
-			AddToMeshBuildQueue(InIndex);
-			AddToGenerateQueue(InIndex);
-			for(auto Iter : Chunk->GetNeighbors())
+			AddToChunkQueue(EVoxelWorldState::MeshBuild, InIndex);
+			AddToChunkQueue(EVoxelWorldState::Generate, InIndex);
+			for(const auto Iter : Chunk->GetNeighbors())
 			{
 				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
 				{
-					AddToMeshBuildQueue(Iter.Value->GetIndex());
-					AddToGenerateQueue(Iter.Value->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::MeshBuild, Iter.Value->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::Generate, Iter.Value->GetIndex());
 				}
 			}
 		}
@@ -844,7 +724,7 @@ bool AVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, f
 	return false;
 }
 
-bool AVoxelModule::UpdateChunkQueues(bool bFromAgent, bool bForceStop)
+void AVoxelModule::UpdateChunkQueues(bool bFromAgent, bool bForceStop)
 {
 	if(bForceStop) StopChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
@@ -872,56 +752,75 @@ bool AVoxelModule::UpdateChunkQueues(bool bFromAgent, bool bForceStop)
 					{
 						DestroyQueue.Remove(Index);
 					}
-					AddToSpawnQueue(Index);
+					AddToChunkQueue(EVoxelWorldState::Spawn, Index);
 				}
 			}
 		}
-		ITER_ARRAY(DestroyQueue, Item, AddToDestroyQueue(Item););
+		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroy, Item););
 		LastGenerateIndex = GenerateIndex;
 		ChunkSpawnBatch++;
-		return true;
 	}
-	return false;
 }
 
 void AVoxelModule::StopChunkQueues()
 {
-	ChunkSpawnQueue.Empty();
-	ChunkMapLoadQueue.Empty();
-	ITER_ARRAY(ChunkMapBuildQueue, Item, Item.Empty();)
-	ChunkMeshBuildQueue.Empty();
-	ChunkGenerateQueue.Empty();
-	ChunkDataSaveQueue.Empty();
-	ChunkDestroyQueue.Empty();
-		
-	StopChunkTasks(ChunkMapLoadTasks);
-	StopChunkTasks(ChunkMapBuildTasks);
-	StopChunkTasks(ChunkMeshBuildTasks);
-	StopChunkTasks(ChunkDataSaveTasks);
+	ITER_MAP(ChunkQueues, Item1,
+		ITER_ARRAY(Item1.Value.Queues, Item2,
+			Item2.Queue.Empty();
+			ITER_ARRAY(Item2.Tasks, Item3,
+				Item3->EnsureCompletion();
+				delete Item3;
+			)
+			Item2.Tasks.Empty();
+		)
+	)
 }
 
-bool AVoxelModule::UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex)> InFunc) const
+bool AVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc)
 {
-	const int32 TmpNum = FMath::Min(InSpeed, InQueue.Num());
-	DON_WITHINDEX(TmpNum, i, InFunc(InQueue[i]); )
-	InQueue.RemoveAt(0, TmpNum);
-	return InQueue.Num() > 0;
-}
-
-bool AVoxelModule::UpdateChunkQueue(TArray<FIndex>& InQueue, int32 InSpeed, TFunction<void(FIndex, int32)> InFunc, int32 InStage) const
-{
-	const int32 TmpNum = FMath::Min(InSpeed, InQueue.Num());
-	DON_WITHINDEX(TmpNum, i, InFunc(InQueue[i], InStage); )
-	InQueue.RemoveAt(0, TmpNum);
-	return InQueue.Num() > 0;
-}
-
-bool AVoxelModule::UpdateChunkQueue(TArray<TArray<FIndex>>& InQueue, int32 InSpeed, TFunction<bool(TArray<FIndex>& _InQueue, int32 _InSpeed, int32 _InIndex)> InFunc) const
-{
-	ITER_ARRAY_WITHINDEX(InQueue, i, Item,
-		if(InFunc(Item, InSpeed, i))
+	ITER_ARRAY_WITHINDEX(ChunkQueues[InState].Queues, i, Item,
+		if(Item.bAsync)
 		{
-			return true;
+			if(Item.Tasks.Num() == 0 && Item.Queue.Num() > 0)
+			{
+				DON_WITHINDEX(FMath::CeilToInt((float)Item.Queue.Num() / Item.Speed), j,
+					TArray<FIndex> tmpQueue;
+					DON_WITHINDEX(FMath::Min(Item.Speed, Item.Queue.Num() - j * Item.Speed), k,
+						tmpQueue.Add(Item.Queue[j * Item.Speed + k]);
+					)
+					const auto Task = new FAsyncTask<AsyncTask_ChunkQueue>(tmpQueue, InFunc, i);
+					Item.Tasks.Add(Task);
+					Task->StartBackgroundTask();
+				)
+			}
+			else if(Item.Tasks.Num() > 0)
+			{
+				const auto tmpTasks = Item.Tasks;
+				ITER_ARRAY(tmpTasks, Task,
+					if(Task->IsDone())
+					{
+						ITER_ARRAY(Task->GetTask().GetChunkQueue(), Index,
+							Item.Queue.Remove(Index);
+						)
+						Item.Tasks.Remove(Task);
+						delete Task;
+					}
+				)
+			}
+			if(Item.Queue.Num() > 0 || Item.Tasks.Num() > 0)
+			{
+				return true;
+			}
+		}
+		else
+		{
+			const int32 tmpNum = FMath::Min(Item.Speed, Item.Queue.Num());
+			DON_WITHINDEX(tmpNum, j, InFunc(Item.Queue[j], i); )
+			Item.Queue.RemoveAt(0, tmpNum);
+			if(Item.Queue.Num() > 0)
+			{
+				return true;
+			}
 		}
 	)
 	return false;
@@ -930,7 +829,6 @@ bool AVoxelModule::UpdateChunkQueue(TArray<TArray<FIndex>>& InQueue, int32 InSpe
 bool AVoxelModule::IsBasicGenerated() const
 {
 	ITER_INDEX(Iter, FVector(FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5), FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5), WorldData->GetWorldSize().Z), true,
-		WHLog((Iter + LastGenerateIndex).ToString());
 		if(!IsChunkGenerated(Iter + LastGenerateIndex))
 		{
 			return false;

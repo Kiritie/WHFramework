@@ -45,9 +45,9 @@ void UVoxelDoor::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UVoxelDoor::ToData()
+FSaveData* UVoxelDoor::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UVoxelDoor::OnGenerate(IVoxelAgentInterface* InAgent)

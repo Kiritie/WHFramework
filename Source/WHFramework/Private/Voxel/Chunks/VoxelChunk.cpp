@@ -64,9 +64,10 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelChunk::ToData()
+FSaveData* AVoxelChunk::ToData(bool bRefresh)
 {
-	FVoxelChunkSaveData SaveData;
+	static FVoxelChunkSaveData SaveData;
+	SaveData = FVoxelChunkSaveData();
 
 	SaveData.Index = Index;
 
@@ -80,7 +81,7 @@ FSaveData* AVoxelChunk::ToData()
 		SaveData.PickUpDatas.Add(Iter->GetSaveDataRef<FPickUpSaveData>(true));
 	}
 
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 void AVoxelChunk::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
@@ -114,6 +115,8 @@ void AVoxelChunk::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
 	State = EVoxelChunkState::None;
+
+	AVoxelModule::Get()->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
 
 	for(auto& Iter : VoxelMap)
 	{

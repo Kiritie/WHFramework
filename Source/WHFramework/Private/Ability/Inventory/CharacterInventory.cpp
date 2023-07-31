@@ -13,9 +13,9 @@ void UCharacterInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UCharacterInventory::ToData()
+FSaveData* UCharacterInventory::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UCharacterInventory::UnloadData(EPhase InPhase)

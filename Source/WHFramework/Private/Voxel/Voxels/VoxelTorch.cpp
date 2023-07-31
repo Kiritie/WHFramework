@@ -40,9 +40,9 @@ void UVoxelTorch::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UVoxelTorch::ToData()
+FSaveData* UVoxelTorch::ToData(bool bRefresh)
 {
-	return Super::ToData();
+	return Super::ToData(bRefresh);
 }
 
 void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)

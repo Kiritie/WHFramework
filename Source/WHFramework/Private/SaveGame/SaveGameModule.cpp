@@ -92,9 +92,11 @@ void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* ASaveGameModule::ToData()
+FSaveData* ASaveGameModule::ToData(bool bRefresh)
 {
-	FGeneralSaveData SaveData;
+	static FGeneralSaveData SaveData;
+	SaveData = FGeneralSaveData();
+	
 	for(auto Iter1 : AllSaveGameInfo)
 	{
 		FSaveGameInfo SaveGameInfo;
@@ -112,7 +114,7 @@ FSaveData* ASaveGameModule::ToData()
 			SaveData.AllSaveGameInfo.Add(Iter1.Key, SaveGameInfo);
 		}
 	}
-	return LocalData(SaveData);
+	return &SaveData;
 }
 
 FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InSaveIndex) const
