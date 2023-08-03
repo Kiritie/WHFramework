@@ -7,14 +7,6 @@
 #include "StepModuleTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EStepType : uint8
-{
-	Root,
-	Default,
-	Standalone
-};
-
-UENUM(BlueprintType)
 enum class EStepState : uint8
 {
 	None,

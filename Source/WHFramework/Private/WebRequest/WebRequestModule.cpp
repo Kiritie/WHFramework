@@ -73,11 +73,14 @@ void AWebRequestModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AWebRequestModule::OnTermination_Implementation()
+void AWebRequestModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	ClearAllWebInterface();
+	if(InPhase == EPhase::Primary)
+	{
+		ClearAllWebInterface();
+	}
 }
 
 FString AWebRequestModule::GetServerURL() const

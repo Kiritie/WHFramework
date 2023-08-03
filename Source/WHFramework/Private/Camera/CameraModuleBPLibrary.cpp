@@ -23,7 +23,7 @@ FVector UCameraModuleBPLibrary::GetCameraLocation(bool bReal)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return bReal ? CameraModule->GetCurrentCameraComp()->GetComponentLocation() : CameraModule->GetCurrentCameraLocation();
+		return bReal ? CameraModule->GetCurrentCameraManager()->GetCameraLocation() : CameraModule->GetCurrentCameraLocation();
 	}
 	return FVector::ZeroVector;
 }
@@ -32,7 +32,7 @@ FRotator UCameraModuleBPLibrary::GetCameraRotation(bool bReal)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return bReal ? CameraModule->GetCurrentCameraComp()->GetComponentRotation() : CameraModule->GetCurrentCameraRotation();
+		return bReal ? CameraModule->GetCurrentCameraManager()->GetCameraRotation() : CameraModule->GetCurrentCameraRotation();
 	}
 	return FRotator::ZeroRotator;
 }

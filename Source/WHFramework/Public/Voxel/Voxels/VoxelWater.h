@@ -20,8 +20,8 @@ public:
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Defaults
-public:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
 

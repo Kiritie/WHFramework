@@ -19,7 +19,7 @@ UTaskBase* UTaskModuleBPLibrary::GetCurrentTask()
 	return nullptr;
 }
 
-URootTaskBase* UTaskModuleBPLibrary::GetCurrentRootTask()
+UTaskBase* UTaskModuleBPLibrary::GetCurrentRootTask()
 {
 	if(ATaskModule* TaskModule = ATaskModule::Get())
 	{

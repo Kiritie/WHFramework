@@ -68,11 +68,14 @@ void ASaveGameModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ASaveGameModule::OnTermination_Implementation()
+void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	SaveSaveGame<UGeneralSaveGame>(0, true);
+	if(InPhase == EPhase::Final)
+	{
+		SaveSaveGame<UGeneralSaveGame>(0, true);
+	}
 }
 
 void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

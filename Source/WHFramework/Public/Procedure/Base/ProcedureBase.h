@@ -37,10 +37,6 @@ public:
 	 * 流程取消构建
 	 */
 	virtual void OnUnGenerate();
-	/**
-	 * 流程复制
-	 */
-	virtual void OnDuplicate(UProcedureBase* InNewProcedure);
 #endif
 
 public:

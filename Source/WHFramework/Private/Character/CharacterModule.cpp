@@ -81,9 +81,9 @@ void ACharacterModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ACharacterModule::OnTermination_Implementation()
+void ACharacterModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void ACharacterModule::AddCharacterToList(ACharacterBase* InCharacter)

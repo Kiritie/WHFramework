@@ -16,7 +16,6 @@
 #include "Step/StepEditorTypes.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepBlueprint.h"
-#include "Step/Base/RootStepBase.h"
 #include "Step/Widget/SStepListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -63,7 +62,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 			.Thickness(FVector2D(9.0f, 9.0f));
 	}
 
-	SelectedStepClass = nullptr;
+	SelectedStepClass = UStepBase::StaticClass();
 
 	ClassViewerOptions.bShowBackgroundBorder = false;
 	ClassViewerOptions.bShowUnloadedBlueprints = true;
@@ -76,7 +75,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 	ClassViewerOptions.bAllowViewOptions = true;
 
 	StepClassFilter = MakeShareable(new FStepClassFilter);
-	StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
+	StepClassFilter->IncludeParentClass = UStepBase::StaticClass();
 	#if ENGINE_MAJOR_VERSION == 4
 	ClassViewerOptions.ClassFilter = StepClassFilter;
 	#else if ENGINE_MAJOR_VERSION == 5
@@ -154,7 +153,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(2.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Edit")))
-						.IsEnabled_Lambda([this](){ return SelectedStepClass && SelectedStepListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return SelectedStepClass != nullptr; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnEditStepItemButtonClicked)
 					]
@@ -175,10 +174,10 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
-						.Text(FText::FromString(TEXT("New")))
+						.Text(FText::FromString(TEXT("Add")))
 						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() <= 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
-						.OnClicked(this, &SStepListWidget::OnNewStepItemButtonClicked)
+						.OnClicked(this, &SStepListWidget::OnAddStepItemButtonClicked)
 					]
 
 					+ SHorizontalBox::Slot()
@@ -411,6 +410,7 @@ UStepBase* SStepListWidget::DuplicateStep(UStepBase* InStep)
 {
 	UStepBase* NewStep = DuplicateObject<UStepBase>(InStep, StepModule, NAME_None);
 
+	NewStep->StepGUID = FGuid::NewGuid().ToString();
 	NewStep->SubSteps.Empty();
 
 	// NewStep->StepName = *FString::Printf(TEXT("%s_Copy"), *NewStep->StepName.ToString());
@@ -457,15 +457,16 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewStep && OldStep)
 				{
-					OldStep->OnDuplicate(NewStep);
+					UGlobalBPLibrary::ExportPropertiesToObject(OldStep, NewStep);
 					if(OldStep->ParentStep)
 					{
 						OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;
 					}
-					else if(URootStepBase* NewRootStep = Cast<URootStepBase>(NewStep))
+					else
 					{
-						StepModule->SetRootStepItem(OldStep->StepIndex, NewRootStep);
+						StepModule->GetRootSteps().EmplaceAt(OldStep->StepIndex, NewStep);
 					}
+					StepModule->GetStepMap().Emplace(OldStep->StepGUID, NewStep);
 					OldStep->OnUnGenerate();
 					Refresh();
 				}
@@ -489,46 +490,16 @@ void SStepListWidget::ToggleEditMode()
 	SetIsEditMode(!bEditMode);
 }
 
-void SStepListWidget::SetIsEditMode(bool bInIsEditMode)
+void SStepListWidget::SetIsEditMode(bool bIsEditMode)
 {
-	bEditMode = bInIsEditMode;
+	bEditMode = bIsEditMode;
 	if(bEditMode)
 	{
-		if(SelectedStepListItems.Num() > 0)
-		{
-			SelectedStepClass = SelectedStepListItems[0]->Step->GetClass();
-			if(SelectedStepClass->IsChildOf<URootStepBase>())
-			{
-				StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
-				StepClassFilter->UnIncludeParentClass = nullptr;
-			}
-			else
-			{
-				StepClassFilter->IncludeParentClass = UStepBase::StaticClass();
-				StepClassFilter->UnIncludeParentClass = URootStepBase::StaticClass();
-			}
-		}
-		else
-		{
-			StepClassFilter->IncludeParentClass = nullptr;
-			StepClassFilter->UnIncludeParentClass = nullptr;
-			SelectedStepClass = nullptr;
-		}
+		SelectedStepClass = SelectedStepListItems.Num() > 0 ? SelectedStepListItems[0]->Step->GetClass() : nullptr;
 	}
-	else
+	else if(SelectedStepClass == nullptr)
 	{
-		if(SelectedStepListItems.Num() > 0)
-		{
-			StepClassFilter->IncludeParentClass = UStepBase::StaticClass();
-			StepClassFilter->UnIncludeParentClass = URootStepBase::StaticClass();
-			SelectedStepClass = UStepBase::StaticClass();
-		}
-		else
-		{
-			StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
-			StepClassFilter->UnIncludeParentClass = nullptr;
-			SelectedStepClass = URootStepBase::StaticClass();
-		}
+		SelectedStepClass = UStepBase::StaticClass();
 	}
 	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditMode"), bEditMode, GStepEditorIni);
 }
@@ -586,29 +557,11 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 
 void SStepListWidget::UpdateSelection()
 {
-	const TArray<TSharedPtr<FStepListItem>> SelectedItems = TreeView->GetSelectedItems();
-
-	if(SelectedItems.Num() > 0)
+	SelectedStepListItems = TreeView->GetSelectedItems();
+	
+	if(bEditMode)
 	{
-		SelectedStepListItems = SelectedItems;
-		SelectedStepClass = !bEditMode ? UStepBase::StaticClass() : SelectedStepListItems[0]->Step->GetClass();
-		if(SelectedStepClass->IsChildOf<URootStepBase>())
-		{
-			StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
-			StepClassFilter->UnIncludeParentClass = nullptr;
-		}
-		else
-		{
-			StepClassFilter->IncludeParentClass = UStepBase::StaticClass();
-			StepClassFilter->UnIncludeParentClass = URootStepBase::StaticClass();
-		}
-	}
-	else
-	{
-		SelectedStepClass = !bEditMode ? URootStepBase::StaticClass() : nullptr;
-		StepClassFilter->IncludeParentClass = URootStepBase::StaticClass();
-		StepClassFilter->UnIncludeParentClass = nullptr;
-		SelectedStepListItems.Empty();
+		SelectedStepClass = SelectedStepListItems.Num() > 0 ? SelectedStepListItems[0]->Step->GetClass() : nullptr;
 	}
 
 	if(OnSelectStepListItemsDelegate.IsBound())
@@ -722,7 +675,7 @@ FReply SStepListWidget::OnNewStepClassButtonClicked()
 	return FReply::Handled();
 }
 
-FReply SStepListWidget::OnNewStepItemButtonClicked()
+FReply SStepListWidget::OnAddStepItemButtonClicked()
 {
 	if(!StepModule) return FReply::Handled();
 
@@ -735,11 +688,6 @@ FReply SStepListWidget::OnNewStepItemButtonClicked()
 
 	if(SelectedStepListItems.Num() > 0)
 	{
-		if(SelectedStepListItems[0]->Step->GetStepType() == EStepType::Standalone)
-		{
-			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Cannot be added under a standalone Step!")));
-			return FReply::Handled();
-		}
 		Item->ParentListItem = SelectedStepListItems[0];
 
 		NewStep->StepIndex = SelectedStepListItems[0]->GetSubSteps().Num();
@@ -749,11 +697,11 @@ FReply SStepListWidget::OnNewStepItemButtonClicked()
 
 		SelectedStepListItems[0]->Step->Modify();
 	}
-	else if(URootStepBase* RootStep = Cast<URootStepBase>(NewStep))
+	else
 	{
 		NewStep->StepIndex = StepModule->GetRootSteps().Num();
 		NewStep->StepHierarchy = 0;
-		StepModule->GetRootSteps().Add(RootStep);
+		StepModule->GetRootSteps().Add(NewStep);
 		StepListItems.Add(Item);
 
 		StepModule->Modify();
@@ -790,7 +738,7 @@ FReply SStepListWidget::OnInsertStepItemButtonClicked()
 
 			SelectedStepListItems[0]->GetParentStep()->Modify();
 		}
-		else if(URootStepBase* NewRootStep = Cast<URootStepBase>(NewStep))
+		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
 			StepModule->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex);
@@ -826,7 +774,7 @@ FReply SStepListWidget::OnAppendStepItemButtonClicked()
 
 			SelectedStepListItems[0]->GetParentStep()->Modify();
 		}
-		else if(URootStepBase* NewRootStep = Cast<URootStepBase>(NewStep))
+		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
 			StepModule->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex + 1);
@@ -861,11 +809,6 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 
 	if(SelectedStepListItems.Num() > 0)
 	{
-		if(SelectedStepListItems[0]->Step->GetStepType() == EStepType::Standalone)
-		{
-			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Cannot be pasted under a standalone Step!")));
-			return FReply::Handled();
-		}
 		Item->ParentListItem = SelectedStepListItems[0];
 
 		CopiedStep->StepIndex = SelectedStepListItems[0]->GetSubSteps().Num();
@@ -875,11 +818,11 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 
 		SelectedStepListItems[0]->Step->Modify();
 	}
-	else if(URootStepBase* RootStep = Cast<URootStepBase>(CopiedStep))
+	else
 	{
 		CopiedStep->StepIndex = StepModule->GetRootSteps().Num();
 		CopiedStep->StepHierarchy = 0;
-		StepModule->GetRootSteps().Add(RootStep);
+		StepModule->GetRootSteps().Add(CopiedStep);
 		StepListItems.Add(Item);
 
 		StepModule->Modify();
@@ -918,7 +861,7 @@ FReply SStepListWidget::OnDuplicateStepItemButtonClicked()
 
 			SelectedStepListItems[0]->GetParentStep()->Modify();
 		}
-		else if(URootStepBase* NewRootStep = Cast<URootStepBase>(NewStep))
+		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
 			StepModule->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex + 1);

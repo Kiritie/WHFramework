@@ -106,9 +106,9 @@ void AProcedureModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AProcedureModule::OnTermination_Implementation()
+void AProcedureModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
@@ -187,14 +187,17 @@ void AProcedureModule::ClearAllProcedure()
 	{
 		if(Iter)
 		{
-			#if(WITH_EDITOR)
+#if(WITH_EDITOR)
 			Iter->OnUnGenerate();
-			#endif
+#else
 			Iter->ConditionalBeginDestroy();
+#endif
 		}
 	}
 	
 	Procedures.Empty();
+
+	ProcedureMap.Empty();
 
 	Modify();
 }
@@ -248,14 +251,6 @@ void AProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& Ou
 	{
 		Procedures[i]->ProcedureIndex = i;
 		Procedures[i]->UpdateListItem(OutProcedureListItems[i]);
-	}
-}
-
-void AProcedureModule::SetProcedureItem(int32 InIndex, UProcedureBase* InProcedure)
-{
-	if(Procedures.IsValidIndex(InIndex))
-	{
-		Procedures[InIndex] = InProcedure;
 	}
 }
 #endif

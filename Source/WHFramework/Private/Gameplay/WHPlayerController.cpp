@@ -69,7 +69,7 @@ void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHPlayerController::OnTermination_Implementation()
+void AWHPlayerController::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -91,7 +91,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 
@@ -99,10 +99,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	if(InPawn->Implements<UWHPlayerInterface>())
-	{
-		SetPlayerPawn(InPawn);
-	}
+	SetPlayerPawn(InPawn);
 }
 
 void AWHPlayerController::OnUnPossess()
@@ -156,6 +153,8 @@ bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, EC
 
 void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
 {
+	if(InPlayerPawn && !InPlayerPawn->Implements<UWHPlayerInterface>()) return;
+
 	if(PlayerPawn != InPlayerPawn)
 	{
 		PlayerPawn = InPlayerPawn;

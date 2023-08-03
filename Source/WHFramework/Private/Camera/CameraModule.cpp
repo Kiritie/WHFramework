@@ -278,9 +278,9 @@ void ACameraModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ACameraModule::OnTermination_Implementation()
+void ACameraModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const
@@ -310,6 +310,11 @@ USpringArmComponent* ACameraModule::GetCurrentCameraBoom()
 		}
 	}
 	return nullptr;
+}
+
+APlayerCameraManager* ACameraModule::GetCurrentCameraManager()
+{
+	return GetPlayerController()->PlayerCameraManager.Get();
 }
 
 ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)

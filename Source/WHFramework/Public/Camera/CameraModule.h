@@ -46,7 +46,7 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
@@ -85,6 +85,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	USpringArmComponent* GetCurrentCameraBoom();
+
+	UFUNCTION(BlueprintPure)
+	APlayerCameraManager* GetCurrentCameraManager();
 
 	template<class T>
 	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())

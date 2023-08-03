@@ -57,9 +57,9 @@ void AFSMModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AFSMModule::OnTermination_Implementation()
+void AFSMModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AFSMModule::RegisterFSM(UFSMComponent* InFSM)

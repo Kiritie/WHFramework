@@ -59,9 +59,9 @@ void ADebugModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ADebugModule::OnTermination_Implementation()
+void ADebugModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 FDebugCategoryState ADebugModule::GetDebugCategoryState(EDebugCategory InCategory) const

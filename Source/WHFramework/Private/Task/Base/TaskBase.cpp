@@ -14,7 +14,6 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleBPLibrary.h"
-#include "Task/Base/RootTaskBase.h"
 
 UTaskBase::UTaskBase()
 {
@@ -25,7 +24,6 @@ UTaskBase::UTaskBase()
 	bFirstTask = false;
 	TaskIndex = 0;
 	TaskHierarchy = 0;
-	TaskType = ETaskType::Default;
 	TaskState = ETaskState::None;
 
 	TaskEnterType = ETaskEnterType::Automatic;
@@ -73,31 +71,6 @@ void UTaskBase::OnUnGenerate()
 			}
 		}
 	}
-	ConditionalBeginDestroy();
-}
-
-void UTaskBase::OnDuplicate(UTaskBase* InNewTask)
-{
-	InNewTask->TaskGUID = FGuid::NewGuid().ToString();
-	InNewTask->TaskDisplayName = TaskDisplayName;
-	InNewTask->TaskDescription = TaskDescription;
-	InNewTask->TaskIndex = TaskIndex;
-	InNewTask->TaskHierarchy = TaskHierarchy;
-	InNewTask->TaskEnterType = TaskEnterType;
-	InNewTask->TaskExecuteType = TaskExecuteType;
-	InNewTask->AutoExecuteTaskTime = AutoExecuteTaskTime;
-	InNewTask->TaskCompleteType = TaskCompleteType;
-	InNewTask->AutoCompleteTaskTime = AutoCompleteTaskTime;
-	InNewTask->bTaskSkipAble = bTaskSkipAble;
-	InNewTask->TaskLeaveType = TaskLeaveType;
-	InNewTask->AutoLeaveTaskTime = AutoLeaveTaskTime;
-	InNewTask->TaskGuideType = TaskGuideType;
-	InNewTask->TaskGuideIntervalTime = TaskGuideIntervalTime;
-	InNewTask->RootTask = RootTask;
-	InNewTask->ParentTask = ParentTask;
-	InNewTask->bMergeSubTask = bMergeSubTask;
-	InNewTask->SubTasks = SubTasks;
-	InNewTask->TaskListItemStates = TaskListItemStates;
 }
 #endif
 
@@ -113,7 +86,7 @@ void UTaskBase::OnInitialize()
 	{
 		if(Iter)
 		{
-			Iter->RootTask = TaskType == ETaskType::Root ? Cast<URootTaskBase>(this) : RootTask;
+			Iter->RootTask = IsRootTask() ? this : RootTask;
 			Iter->ParentTask = this;
 			Iter->OnInitialize();
 		}
@@ -206,8 +179,7 @@ void UTaskBase::OnRefresh()
 				UTaskBase* SubTask = SubTasks[Index];
 				if(SubTask)
 				{
-					FString FailedStr;
-					if(SubTask->TaskEnterType == ETaskEnterType::Automatic && SubTask->CheckTaskCondition(FailedStr))
+					if(SubTask->TaskEnterType == ETaskEnterType::Automatic)
 					{
 						SubTask->Enter();
 					}
@@ -352,7 +324,21 @@ bool UTaskBase::CheckTaskSkipAble_Implementation(FString& OutInfo) const
 
 float UTaskBase::CheckTaskProgress_Implementation(FString& OutInfo) const
 {
-	return 0.f;
+	float Progress = 0.f;
+	if(HasSubTask())
+	{
+		int32 Num = 0;
+		for(auto Iter : SubTasks)
+		{
+			if(Iter->IsCompleted())
+			{
+				Num++;
+			}
+		}
+		Progress = (float)Num / SubTasks.Num();
+		OutInfo = FString::Printf(TEXT("%d/%d"), Num, SubTasks.Num());
+	}
+	return Progress;
 }
 
 bool UTaskBase::IsParentOf(UTaskBase* InTask) const
@@ -400,14 +386,60 @@ void UTaskBase::Leave()
 	UTaskModuleBPLibrary::LeaveTask(this);
 }
 
-FText UTaskBase::GetTaskDisplayName(bool bContainCompleteState) const
+void UTaskBase::Serialize(FArchive& Ar)
 {
-	FString StateStr;
-	if(bContainCompleteState)
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
 	{
-		CheckTaskProgress(StateStr);
+		if(Ar.IsLoading())
+		{
+			Ar << TaskState;
+			Ar << TaskExecuteResult;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << TaskState;
+			Ar << TaskExecuteResult;
+		}
 	}
-	return FText::FromString(TaskDisplayName.ToString() + (!StateStr.IsEmpty() ? FString::Printf(TEXT("(%s)"), *StateStr) : TEXT("")));
+}
+
+void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	switch(TaskState)
+	{
+		case ETaskState::Entered:
+		{
+			OnEnter(nullptr);
+			break;
+		}
+		case ETaskState::Executing:
+		{
+			OnExecute();
+			break;
+		}
+		case ETaskState::Completed:
+		{
+			OnComplete(TaskExecuteResult);
+			break;
+		}
+		case ETaskState::Leaved:
+		{
+			OnLeave();
+			break;
+		}
+		default: break;
+	}
+
+}
+
+FSaveData* UTaskBase::ToData(bool bRefresh)
+{
+	static FSaveData SaveData;
+	SaveData = FSaveData();
+
+	return &SaveData;
 }
 
 bool UTaskBase::HasSubTask(bool bIgnoreMerge) const
@@ -482,7 +514,7 @@ void UTaskBase::UpdateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
 		{
 			SubTasks[i]->TaskIndex = i;
 			SubTasks[i]->TaskHierarchy = TaskHierarchy + 1;
-			SubTasks[i]->RootTask = TaskType == ETaskType::Root ? Cast<URootTaskBase>(this) : RootTask;
+			SubTasks[i]->RootTask = IsRootTask() ? this : RootTask;
 			SubTasks[i]->ParentTask = this;
 			SubTasks[i]->UpdateListItem(OutTaskListItem->SubListItems[i]);
 		}

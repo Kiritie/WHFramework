@@ -44,11 +44,11 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AWHGameMode::OnTermination_Implementation()
+void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		MainModule->Execute_OnTermination(MainModule);
+		MainModule->Execute_OnTermination(MainModule, InPhase);
 	}
 }
 
@@ -111,7 +111,9 @@ void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Primary);
+		Execute_OnTermination(this, EPhase::Lesser);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

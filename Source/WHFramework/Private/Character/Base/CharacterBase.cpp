@@ -88,11 +88,20 @@ void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
 void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
+
+	if(AVoxelChunk* Chunk = UVoxelModuleBPLibrary::FindChunkByLocation(GetActorLocation()))
+	{
+		Chunk->AddSceneActor(this);
+	}
+	else if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
 }
 
-void ACharacterBase::OnTermination_Implementation()
+void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation();
+	IWHActorInterface::OnTermination_Implementation(InPhase);
 }
 
 void ACharacterBase::BeginPlay()
@@ -112,7 +121,7 @@ void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

@@ -8,16 +8,16 @@
 #include "Global/GlobalTypes.h"
 #include "Global/Base/WHObject.h"
 #include "Math/MathTypes.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "TaskBase.generated.h"
 
 class ACameraPawnBase;
-class URootTaskBase;
 /**
  * 任务基类
  */
 UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default))
-class WHFRAMEWORK_API UTaskBase : public UWHObject
+class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -36,10 +36,6 @@ public:
 	 * 任务取消构建
 	 */
 	virtual void OnUnGenerate();
-	/**
-	 * 任务复制
-	 */
-	virtual void OnDuplicate(UTaskBase* InNewTask);
 #endif
 
 public:
@@ -136,6 +132,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void Leave();
 
+protected:
+	virtual void Serialize(FArchive& Ar) override;
+
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData(bool bRefresh) override;
+
+	virtual bool HasArchive() const override { return true; }
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description
 public:
@@ -148,28 +153,21 @@ public:
 	/// 任务描述
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
 	FText TaskDescription;
-
-public:
-	UFUNCTION(BlueprintPure)
-	FText GetTaskDisplayName(bool bContainCompleteState = false) const;
 	
 	//////////////////////////////////////////////////////////////////////////
-	/// Index/Type/State
+	/// Index/State
 public:
 	/// 是否为开始任务
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/State")
 	bool bFirstTask;
 	/// 任务索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 TaskIndex;
 	/// 任务层级
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 TaskHierarchy;
-	/// 任务类型
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	ETaskType TaskType;
 	/// 任务状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	ETaskState TaskState;
 
 	UPROPERTY(BlueprintAssignable)
@@ -177,15 +175,15 @@ public:
 
 public:
 	/**
-	* 获取任务类型
-	*/
-	UFUNCTION(BlueprintPure)
-	ETaskType GetTaskType() const { return TaskType; }
-	/**
 	* 获取任务状态
 	*/
 	UFUNCTION(BlueprintPure)
 	ETaskState GetTaskState() const { return TaskState; }
+	/**
+	* 是否是根任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsRootTask() const { return TaskHierarchy == 0; }
 	/**
 	* 是否已进入
 	*/
@@ -259,7 +257,7 @@ public:
 public:
 	/// 根任务
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentTask")
-	URootTaskBase* RootTask;
+	UTaskBase* RootTask;
 	/// 父任务 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentTask")
 	UTaskBase* ParentTask;

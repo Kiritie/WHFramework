@@ -15,7 +15,7 @@
 
 #include "GlobalBPLibrary.generated.h"
 
-class ACharacterBase;
+class APawn;
 class AWHPlayerController;
 class AWHGameState;
 class AWHGameMode;
@@ -145,17 +145,27 @@ public:
 	static void LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
 
 	/*
-	* 解析目标对象带有 ExposeOnSpawn 标签的参数
+	* 导入目标对象暴露的参数
 	* @param InObject 目标对象
-	* @param InJsonObject 符合导出格式的参数Json
+	* @param InJsonObject 导入的Json对象
 	*/
 	static void ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject);
+	
 	/*
-	* 导出目标类带有 ExposeOnSpawn 标签的参数
+	* 导出目标对象暴露的参数
 	* @param InObject = 目标对象
-	* @param InJsonObject 导出参数的存放Json
+	* @param InJsonObject 导出的Json对象
+	* @param bExportSubObjects 是否导出子对象
 	*/
-	static void ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject);
+	static void ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject>& InJsonObject, bool bExportSubObjects = false);
+	
+	/*
+	* 导出源对象暴露的参数到目标对象
+	* @param InSourceObject 源对象
+	* @param InTargetObject 目标对象
+	* @param bExportSubObjects 是否导出子对象
+	*/
+	static void ExportPropertiesToObject(UObject* InSourceObject, UObject* InTargetObject, bool bExportSubObjects = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex
@@ -290,11 +300,47 @@ public:
 	static AWHPlayerController* GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
-	static T* GetPlayerPawn(int32 InPlayerIndex = 0)
+	static T* GetPossessedPawn(int32 InPlayerIndex = 0)
 	{
 		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 		{
 			return PlayerController->GetPawn<T>();
+		}
+		return nullptr;
+	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* GetPossessedPawn(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerIndex = 0);
+
+	template<class T>
+	static T* GetPossessedPawnByID(int32 InPlayerID = 0)
+	{
+		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
+		{
+			return PlayerController->GetPawn<T>();
+		}
+		return nullptr;
+	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* GetPossessedPawnByID(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerID = 0);
+
+	template<class T>
+	static T* GetLocalPossessedPawn()
+	{
+		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
+		{
+			return PlayerController->GetPawn<T>();
+		}
+		return nullptr;
+	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
+	static APawn* GetLocalPossessedPawn(TSubclassOf<APawn> InClass = nullptr);
+
+	template<class T>
+	static T* GetPlayerPawn(int32 InPlayerIndex = 0)
+	{
+		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
+		{
+			return PlayerController->GetPlayerPawn<T>();
 		}
 		return nullptr;
 	}
@@ -306,7 +352,7 @@ public:
 	{
 		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 		{
-			return PlayerController->GetPawn<T>();
+			return PlayerController->GetPlayerPawn<T>();
 		}
 		return nullptr;
 	}
@@ -318,46 +364,10 @@ public:
 	{
 		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 		{
-			return PlayerController->GetPawn<T>();
+			return PlayerController->GetPlayerPawn<T>();
 		}
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
 	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
-
-	template<class T>
-	static T* GetPlayerCharacter(int32 InPlayerIndex = 0)
-	{
-		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacterBase* GetPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerIndex = 0);
-
-	template<class T>
-	static T* GetPlayerCharacterByID(int32 InPlayerID = 0)
-	{
-		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacterBase* GetPlayerCharacterByID(TSubclassOf<ACharacterBase> InClass = nullptr, int32 InPlayerID = 0);
-
-	template<class T>
-	static T* GetLocalPlayerCharacter()
-	{
-		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "GlobalBPLibrary")
-	static ACharacterBase* GetLocalPlayerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr);
 };

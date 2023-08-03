@@ -3,7 +3,6 @@
 #pragma once
 
 #include "SaveGame/SaveGameModuleTypes.h"
-#include "Ability/AbilityModuleTypes.h"
 
 #include "SceneModuleTypes.generated.h"
 

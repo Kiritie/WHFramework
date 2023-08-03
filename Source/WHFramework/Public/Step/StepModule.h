@@ -9,7 +9,6 @@
 #include "StepModule.generated.h"
 
 class UStepBase;
-class URootStepBase;
 
 /**
  * 
@@ -56,7 +55,7 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// StepModule
@@ -112,59 +111,22 @@ public:
 	bool IsAllStepCompleted();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
-	#if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-
-	void UpdateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-
-	void SetRootStepItem(int32 InIndex, URootStepBase* InRootStep);
-	#endif
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Root Step
-protected:
-	/// 当前根步骤索引
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Steps")
-	int32 CurrentRootStepIndex;
-	/// 根步骤
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Root Steps")
-	TArray<URootStepBase*> RootSteps;
-
-public:
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentRootStepIndex() const { return CurrentRootStepIndex; }
-
-	/**
-	* 获取当前根步骤
-	*/
-	UFUNCTION(BlueprintPure)
-	URootStepBase* GetCurrentRootStep() const
-	{
-		if(RootSteps.IsValidIndex(CurrentRootStepIndex))
-		{
-			return RootSteps[CurrentRootStepIndex];
-		}
-		return nullptr;
-	}
-
-	UFUNCTION(BlueprintPure)
-	TArray<URootStepBase*>& GetRootSteps() { return RootSteps; }
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats
 protected:
 	/// 初始步骤 
 	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	UStepBase* FirstStep;
-	
 	/// 当前步骤 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "StepModule|Step Stats")
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	UStepBase* CurrentStep;
-	
+	/// 当前根步骤索引
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
+	int32 CurrentRootStepIndex;
+	/// 根步骤
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
+	TArray<UStepBase*> RootSteps;
 	/// 步骤Map
-	UPROPERTY(VisibleAnywhere, Transient, Category = "StepModule|Step Stats")
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	TMap<FString, UStepBase*> StepMap;
 
 public:
@@ -183,6 +145,23 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UStepBase* GetCurrentStep() const { return CurrentStep; }
+	/**
+	* 获取当前根步骤
+	*/
+	UFUNCTION(BlueprintPure)
+	UStepBase* GetCurrentRootStep() const
+	{
+		if(RootSteps.IsValidIndex(CurrentRootStepIndex))
+		{
+			return RootSteps[CurrentRootStepIndex];
+		}
+		return nullptr;
+	}
+	/**
+	* 获取根步骤列表
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<UStepBase*>& GetRootSteps() { return RootSteps; }
 	/**
 	* 获取步骤Map
 	*/
@@ -225,4 +204,13 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Editor
+public:
+	#if WITH_EDITOR
+	void GenerateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+
+	void UpdateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+	#endif
 };

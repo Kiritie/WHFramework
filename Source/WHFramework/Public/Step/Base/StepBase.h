@@ -12,7 +12,6 @@
 #include "StepBase.generated.h"
 
 class ACameraPawnBase;
-class URootStepBase;
 /**
  * 步骤基类
  */
@@ -36,10 +35,6 @@ public:
 	 * 步骤取消构建
 	 */
 	virtual void OnUnGenerate();
-	/**
-	 * 步骤复制
-	 */
-	virtual void OnDuplicate(UStepBase* InNewStep);
 #endif
 
 public:
@@ -150,22 +145,19 @@ public:
 	FText StepDescription;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Index/Type/State
+	/// Index/State
 public:
 	/// 是否为开始步骤
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/State")
 	bool bFirstStep;
 	/// 步骤索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 StepIndex;
 	/// 步骤层级
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 StepHierarchy;
-	/// 步骤类型
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
-	EStepType StepType;
 	/// 步骤状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	EStepState StepState;
 
 	UPROPERTY(BlueprintAssignable)
@@ -173,15 +165,15 @@ public:
 
 public:
 	/**
-	* 获取步骤类型
-	*/
-	UFUNCTION(BlueprintPure)
-	EStepType GetStepType() const { return StepType; }
-	/**
 	* 获取步骤状态
 	*/
 	UFUNCTION(BlueprintPure)
 	EStepState GetStepState() const { return StepState; }
+	/**
+	* 是否是根步骤
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsRootStep() const { return StepHierarchy == 0; }
 	/**
 	* 是否已进入
 	*/
@@ -309,7 +301,7 @@ public:
 public:
 	/// 根步骤
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
-	URootStepBase* RootStep;
+	UStepBase* RootStep;
 	/// 父步骤 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
 	UStepBase* ParentStep;

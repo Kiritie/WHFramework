@@ -63,9 +63,9 @@ void ANetworkModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ANetworkModule::OnTermination_Implementation()
+void ANetworkModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 FString ANetworkModule::GetServerURL() const

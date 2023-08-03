@@ -75,9 +75,9 @@ void AAssetModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AAssetModule::OnTermination_Implementation()
+void AAssetModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 bool AAssetModule::HasDataAsset(FName InDataAssetName) const

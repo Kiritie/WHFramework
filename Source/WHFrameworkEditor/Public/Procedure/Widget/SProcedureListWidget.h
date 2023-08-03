@@ -124,7 +124,7 @@ private:
 
 	FReply OnNewProcedureClassButtonClicked();
 
-	FReply OnNewProcedureItemButtonClicked();
+	FReply OnAddProcedureItemButtonClicked();
 
 	FReply OnInsertProcedureItemButtonClicked();
 

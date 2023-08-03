@@ -131,9 +131,9 @@ void AInputModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AInputModule::OnTermination_Implementation()
+void AInputModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const

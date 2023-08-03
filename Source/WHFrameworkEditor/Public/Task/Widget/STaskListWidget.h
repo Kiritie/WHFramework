@@ -134,7 +134,7 @@ private:
 
 	FReply OnNewTaskClassButtonClicked();
 
-	FReply OnNewTaskItemButtonClicked();
+	FReply OnAddTaskItemButtonClicked();
 
 	FReply OnInsertTaskItemButtonClicked();
 

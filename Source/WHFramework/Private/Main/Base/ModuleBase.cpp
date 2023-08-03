@@ -45,7 +45,7 @@ void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AModuleBase::OnTermination_Implementation()
+void AModuleBase::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -112,7 +112,7 @@ void AModuleBase::Termination_Implementation()
 	{
 		ModuleState = EModuleState::Terminated;
 		OnStateChanged(ModuleState);
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

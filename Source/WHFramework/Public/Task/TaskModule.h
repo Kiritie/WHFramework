@@ -10,14 +10,13 @@
 #include "TaskModule.generated.h"
 
 class UTaskBase;
-class URootTaskBase;
 
 /**
  * 
  */
 
 UCLASS()
-class WHFRAMEWORK_API ATaskModule : public AModuleBase
+class WHFRAMEWORK_API ATaskModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
 		
@@ -48,7 +47,16 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+protected:
+	virtual void Serialize(FArchive& Ar) override;
+
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData(bool bRefresh) override;
+
+	virtual bool HasArchive() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskModule
@@ -87,53 +95,19 @@ public:
 	bool IsAllTaskCompleted();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
-	#if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
-
-	void UpdateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
-
-	void SetRootTaskItem(int32 InIndex, URootTaskBase* InRootTask);
-	#endif
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Root Task
-protected:
-	/// 根任务
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Root Tasks")
-	TArray<URootTaskBase*> RootTasks;
-
-public:
-	/**
-	* 获取当前根任务
-	*/
-	UFUNCTION(BlueprintPure)
-	URootTaskBase* GetCurrentRootTask() const
-	{
-		if(CurrentTask)
-		{
-			return CurrentTask->RootTask;
-		}
-		return nullptr;
-	}
-
-	UFUNCTION(BlueprintPure)
-	TArray<URootTaskBase*>& GetRootTasks() { return RootTasks; }
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 protected:
 	/// 初始任务 
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	UTaskBase* FirstTask;
-	
 	/// 当前任务 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "TaskModule|Task Stats")
+	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	UTaskBase* CurrentTask;
-	
+	/// 根任务
+	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
+	TArray<UTaskBase*> RootTasks;
 	/// 任务Map
-	UPROPERTY(VisibleAnywhere, Transient, Category = "TaskModule|Task Stats")
+	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	TMap<FString, UTaskBase*> TaskMap;
 
 public:
@@ -153,6 +127,16 @@ public:
 	UFUNCTION(BlueprintPure)
 	UTaskBase* GetCurrentTask() const { return CurrentTask; }
 	/**
+	* 获取当前根任务
+	*/
+	UFUNCTION(BlueprintPure)
+	UTaskBase* GetCurrentRootTask() const;
+	/**
+	* 获取根任务列表
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<UTaskBase*>& GetRootTasks() { return RootTasks; }
+	/**
 	* 获取任务Map
 	*/
 	UFUNCTION(BlueprintPure)
@@ -162,4 +146,13 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UTaskBase* GetTaskByGUID(const FString& InTaskGUID) const { return *TaskMap.Find(InTaskGUID); }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Editor
+public:
+	#if WITH_EDITOR
+	void GenerateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+
+	void UpdateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+	#endif
 };

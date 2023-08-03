@@ -150,7 +150,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(2.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Edit")))
-						.IsEnabled_Lambda([this](){ return SelectedProcedureClass && SelectedProcedureListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return SelectedProcedureClass != nullptr; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnEditProcedureItemButtonClicked)
 					]
@@ -171,10 +171,10 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
-						.Text(FText::FromString(TEXT("New")))
+						.Text(FText::FromString(TEXT("Add")))
 						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedProcedureClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
-						.OnClicked(this, &SProcedureListWidget::OnNewProcedureItemButtonClicked)
+						.OnClicked(this, &SProcedureListWidget::OnAddProcedureItemButtonClicked)
 					]
 
 					+ SHorizontalBox::Slot()
@@ -388,8 +388,10 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewProcedure && OldProcedure)
 				{
-					OldProcedure->OnDuplicate(NewProcedure);
-					ProcedureModule->SetProcedureItem(OldProcedure->ProcedureIndex, NewProcedure);
+					UGlobalBPLibrary::ExportPropertiesToObject(OldProcedure, NewProcedure);
+					ProcedureModule->GetProcedures().EmplaceAt(OldProcedure->ProcedureIndex, NewProcedure);
+					ProcedureModule->GetProcedureMap().Remove(OldProcedure->GetClass());
+					ProcedureModule->GetProcedureMap().Add(OldProcedure->GetClass(), OldProcedure);
 					OldProcedure->OnUnGenerate();
 					Refresh();
 				}
@@ -413,25 +415,15 @@ void SProcedureListWidget::ToggleEditMode()
 	SetIsEditMode(!bEditMode);
 }
 
-void SProcedureListWidget::SetIsEditMode(bool bInIsEditMode)
+void SProcedureListWidget::SetIsEditMode(bool bIsEditMode)
 {
-	bEditMode = bInIsEditMode;
+	bEditMode = bIsEditMode;
 	if(bEditMode)
 	{
-		if(SelectedProcedureListItems.Num() > 0)
-		{
-			ProcedureClassFilter->IncludeParentClass = UProcedureBase::StaticClass();
-			SelectedProcedureClass = SelectedProcedureListItems[0]->Procedure->GetClass();
-		}
-		else
-		{
-			ProcedureClassFilter->IncludeParentClass = nullptr;
-			SelectedProcedureClass = nullptr;
-		}
+		SelectedProcedureClass = SelectedProcedureListItems.Num() > 0 ? SelectedProcedureListItems[0]->Procedure->GetClass() : nullptr;
 	}
 	else
 	{
-		ProcedureClassFilter->IncludeParentClass = UProcedureBase::StaticClass();
 		SelectedProcedureClass = nullptr;
 	}
 	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bEditMode"), bEditMode, GProcedureEditorIni);
@@ -481,20 +473,11 @@ void SProcedureListWidget::UpdateListView(bool bRegenerate)
 
 void SProcedureListWidget::UpdateSelection()
 {
-	const TArray<TSharedPtr<FProcedureListItem>> SelectedItems = ListView->GetSelectedItems();
-
-	if(SelectedItems.Num() > 0)
+	SelectedProcedureListItems = ListView->GetSelectedItems();
+	
+	if(bEditMode)
 	{
-		SelectedProcedureListItems = SelectedItems;
-		if(bEditMode)
-		{
-			SelectedProcedureClass = SelectedProcedureListItems[0]->Procedure->GetClass();
-		}
-	}
-	else
-	{
-		SelectedProcedureClass = nullptr;
-		SelectedProcedureListItems.Empty();
+		SelectedProcedureClass = SelectedProcedureListItems.Num() > 0 ? SelectedProcedureListItems[0]->Procedure->GetClass() : nullptr;
 	}
 
 	if(OnSelectProcedureListItemsDelegate.IsBound())
@@ -573,7 +556,7 @@ FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
 	return FReply::Handled();
 }
 
-FReply SProcedureListWidget::OnNewProcedureItemButtonClicked()
+FReply SProcedureListWidget::OnAddProcedureItemButtonClicked()
 {
 	if(!ProcedureModule) return FReply::Handled();
 
@@ -585,10 +568,11 @@ FReply SProcedureListWidget::OnNewProcedureItemButtonClicked()
 	NewProcedure->ProcedureIndex = ProcedureModule->GetProcedures().Num();
 	ProcedureModule->GetProcedures().Add(NewProcedure);
 	ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
-	SelectedProcedureClass = nullptr;
 	ProcedureListItems.Add(Item);
 
 	ProcedureModule->Modify();
+	
+	SelectedProcedureClass = nullptr;
 	
 	ListView->SetSelection(Item);
 	UpdateListView();
@@ -610,9 +594,10 @@ FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 		ProcedureModule->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex);
 		ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
 		ProcedureListItems.Insert(Item, SelectedProcedureListItems[0]->Procedure->ProcedureIndex);
-		SelectedProcedureClass = nullptr;
 
 		ProcedureModule->Modify();
+
+		SelectedProcedureClass = nullptr;
 
 		ListView->SetSelection(Item);
 		UpdateListView();
@@ -635,9 +620,10 @@ FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 		ProcedureModule->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex + 1);
 		ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
 		ProcedureListItems.Insert(Item, SelectedProcedureListItems[0]->Procedure->ProcedureIndex + 1);
-		SelectedProcedureClass = nullptr;
 
 		ProcedureModule->Modify();
+
+		SelectedProcedureClass = nullptr;
 
 		ListView->SetSelection(Item);
 		UpdateListView();

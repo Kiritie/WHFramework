@@ -1,6 +1,6 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
-#include "SaveGame/Parameter/ParameterSaveGame.h"
+#include "SaveGame/Module/ParameterSaveGame.h"
 
 #include "Camera/CameraModuleBPLibrary.h"
 #include "Global/GlobalBPLibrary.h"

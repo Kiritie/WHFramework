@@ -60,30 +60,6 @@ void UProcedureBase::OnUnGenerate()
 			}
 		}
 	}
-	ConditionalBeginDestroy();
-}
-
-void UProcedureBase::OnDuplicate(UProcedureBase* InNewProcedure)
-{
-	InNewProcedure->ProcedureName = ProcedureName;
-	InNewProcedure->ProcedureDisplayName = ProcedureDisplayName;
-	InNewProcedure->ProcedureDescription = ProcedureDescription;
-	InNewProcedure->ProcedureIndex = ProcedureIndex;
-	InNewProcedure->OperationTarget = OperationTarget;
-	InNewProcedure->bTrackTarget = bTrackTarget;
-	InNewProcedure->TrackTargetMode = TrackTargetMode;
-	InNewProcedure->CameraViewPawn = CameraViewPawn;
-	InNewProcedure->CameraViewMode = CameraViewMode;
-	InNewProcedure->CameraViewSpace = CameraViewSpace;
-	InNewProcedure->CameraViewEaseType = CameraViewEaseType;
-	InNewProcedure->CameraViewDuration = CameraViewDuration;
-	InNewProcedure->CameraViewOffset = CameraViewOffset;
-	InNewProcedure->CameraViewYaw = CameraViewYaw;
-	InNewProcedure->CameraViewPitch = CameraViewPitch;
-	InNewProcedure->CameraViewDistance = CameraViewDistance;
-	InNewProcedure->ProcedureGuideType = ProcedureGuideType;
-	InNewProcedure->ProcedureGuideIntervalTime = ProcedureGuideIntervalTime;
-	InNewProcedure->ProcedureListItemStates = ProcedureListItemStates;
 }
 #endif
 

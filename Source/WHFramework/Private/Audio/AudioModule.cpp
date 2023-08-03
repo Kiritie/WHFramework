@@ -61,9 +61,9 @@ void AAudioModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AAudioModule::OnTermination_Implementation()
+void AAudioModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)

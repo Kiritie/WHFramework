@@ -190,9 +190,9 @@ void ASceneModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ASceneModule::OnTermination_Implementation()
+void ASceneModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)

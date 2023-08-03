@@ -81,7 +81,7 @@ protected:
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
 	

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "json.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "ParameterModuleTypes.generated.h"
 
@@ -571,4 +572,20 @@ public:
 	void* GetPointerParameter(FName InName, bool bEnsured = true) const;
 
 	TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true) const;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FParameterSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FParameterSaveData()
+	{
+		Parameters = FParameters();
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FParameters Parameters;
 };

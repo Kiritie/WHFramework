@@ -27,7 +27,7 @@ public:
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }

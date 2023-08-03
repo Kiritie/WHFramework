@@ -29,7 +29,7 @@ void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHActor::OnTermination_Implementation()
+void AWHActor::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -108,7 +108,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Parameter/ParameterModuleTypes.h"
-
 #include "SaveGameModuleTypes.generated.h"
 
 class USaveGameBase;
@@ -73,22 +71,6 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	TMap<int32, USaveGameBase*> Array;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FParameterSaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FParameterSaveData()
-	{
-		Parameters = FParameters();
-	}
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	FParameters Parameters;
 };
 
 USTRUCT(BlueprintType)

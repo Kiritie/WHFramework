@@ -6,7 +6,7 @@
 
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
-#include "SaveGame/Parameter/ParameterSaveGame.h"
+#include "SaveGame/Module/ParameterSaveGame.h"
 		
 IMPLEMENTATION_MODULE(AParameterModule)
 
@@ -63,11 +63,14 @@ void AParameterModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AParameterModule::OnTermination_Implementation()
+void AParameterModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
+	if(InPhase == EPhase::Lesser)
+	{
+		USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
+	}
 }
 
 void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

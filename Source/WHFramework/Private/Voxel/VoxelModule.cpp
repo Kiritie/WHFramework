@@ -177,11 +177,14 @@ void AVoxelModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AVoxelModule::OnTermination_Implementation()
+void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	StopChunkQueues();
+	if(InPhase == EPhase::Primary)
+	{
+		StopChunkQueues();
+	}
 }
 
 void AVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
@@ -729,7 +732,7 @@ void AVoxelModule::UpdateChunkQueues(bool bFromAgent, bool bForceStop)
 	if(bForceStop) StopChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
 	FVector GenerateOffset = FVector::ZeroVector;
-	const auto VoxelAgent  = UGlobalBPLibrary::GetPlayerPawn<IVoxelAgentInterface>();
+	const auto VoxelAgent  = UGlobalBPLibrary::GetPossessedPawn<IVoxelAgentInterface>();
 	if(bFromAgent && VoxelAgent)
 	{
 		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetWorldLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetWorldLocation().Y : 0.f, 0.f);

@@ -6,11 +6,11 @@
 
 void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 {
-	LoadData(InSaveData, InPhase);
 	if (HasArchive())
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), InSaveData->GetDatas());
 	}
+	LoadData(InSaveData, InPhase);
 }
 
 FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)

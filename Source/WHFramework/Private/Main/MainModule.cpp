@@ -143,18 +143,28 @@ void AMainModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AMainModule::OnTermination_Implementation()
+void AMainModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
 		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
 		{
-			ModuleRefs[i]->Termination();
+			if(InPhase != EPhase::Final)
+			{
+				ModuleRefs[i]->Execute_OnTermination(ModuleRefs[i], InPhase);
+			}
+			else
+			{
+				ModuleRefs[i]->Termination();
+			}
 		}
 	}
-	ModuleMap.Empty();
+	if(InPhase == EPhase::Final)
+	{
+		ModuleMap.Empty();
+	}
 }
 
 #if WITH_EDITOR

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"

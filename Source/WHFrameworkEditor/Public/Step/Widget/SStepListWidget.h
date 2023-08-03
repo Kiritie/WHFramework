@@ -134,7 +134,7 @@ private:
 
 	FReply OnNewStepClassButtonClicked();
 
-	FReply OnNewStepItemButtonClicked();
+	FReply OnAddStepItemButtonClicked();
 
 	FReply OnInsertStepItemButtonClicked();
 

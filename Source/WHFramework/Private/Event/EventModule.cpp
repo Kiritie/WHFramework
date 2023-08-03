@@ -72,9 +72,9 @@ void AEventModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AEventModule::OnTermination_Implementation()
+void AEventModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)

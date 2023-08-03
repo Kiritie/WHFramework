@@ -11,7 +11,7 @@
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
-#include "../Inventory/InventoryAgentInterface.h"
+#include "Ability/Inventory/InventoryAgentInterface.h"
 
 #include "AbilityCharacterBase.generated.h"
 
@@ -54,7 +54,7 @@ public:
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
 	// stats
@@ -111,7 +111,7 @@ protected:
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase = EPhase::Final) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
 

@@ -28,7 +28,7 @@ void APhysicsVolumeBase::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void APhysicsVolumeBase::OnTermination_Implementation()
+void APhysicsVolumeBase::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -50,7 +50,7 @@ void APhysicsVolumeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

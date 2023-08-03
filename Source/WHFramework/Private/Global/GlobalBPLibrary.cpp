@@ -159,7 +159,7 @@ void UGlobalBPLibrary::ImportExposedProperties(UObject* InObject, TSharedPtr<FJs
         TempStr.Split("<",&TempStr,&PropertyType);
         if(FProperty* Property = FindFProperty<FProperty>(InObject->GetClass(), * PropertyName))
         {
-            if(Property->IsA<FObjectProperty>())
+            if(Property->IsA<FObjectProperty>() && Iter.Value->Type == EJson::Object)
             {
                 if(UObject* Object = CastField<FObjectProperty>(Property)->GetObjectPropertyValue(Property->ContainerPtrToValuePtr<UObject*>(InObject)))
                 {
@@ -175,13 +175,14 @@ void UGlobalBPLibrary::ImportExposedProperties(UObject* InObject, TSharedPtr<FJs
     }
 }
 
-void UGlobalBPLibrary::ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject)
+void UGlobalBPLibrary::ExportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject>& InJsonObject, bool bExportSubObjects)
 {
+	if(!InJsonObject) InJsonObject = MakeShared<FJsonObject>();
     const FString PropClassNameSuffix = "Property",ReplaceTo = "";
     for (TFieldIterator<FProperty> PropertyIt(InObject->GetClass(), EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
     {
         FProperty* Property = *PropertyIt;
-        const bool bFlag = Property->HasAllPropertyFlags(CPF_ExposeOnSpawn) && !Property->HasAnyPropertyFlags(CPF_Parm) && !Property->HasAnyPropertyFlags(CPF_DisableEditOnInstance) && Property->HasAllPropertyFlags(CPF_BlueprintVisible);
+        const bool bFlag = Property->HasAllPropertyFlags(CPF_ExposeOnSpawn) || Property->HasAllPropertyFlags(CPF_BlueprintVisible);
         const bool bIsDelegate = Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>();
         if(	bFlag && !bIsDelegate )
         {
@@ -190,16 +191,13 @@ void UGlobalBPLibrary::ExportExposedProperties(UObject* InObject, TSharedPtr<FJs
             PropertyName = "<" + Property->GetClass()->GetName().Replace(*PropClassNameSuffix, *ReplaceTo) + "> " + PropertyName;
             if(!InJsonObject->HasField(PropertyName))
             {
-                if(Property->IsA<FObjectProperty>())
+                if(Property->IsA<FObjectProperty>() && bExportSubObjects)
                 {
                     if(UObject* Object = CastField<FObjectProperty>(Property)->GetObjectPropertyValue(Property->ContainerPtrToValuePtr<UObject*>(InObject)))
                     {
-                        if(!Object->IsA<AActor>())
-                        {
-                            TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-                            ExportExposedProperties(Object, JsonObject);
-                            InJsonObject->SetObjectField(PropertyName, JsonObject);
-                        }
+                        TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+                        ExportExposedProperties(Object, JsonObject);
+                        InJsonObject->SetObjectField(PropertyName, JsonObject);
                     }
                 }
                 else
@@ -212,6 +210,13 @@ void UGlobalBPLibrary::ExportExposedProperties(UObject* InObject, TSharedPtr<FJs
             }
         }
     }
+}
+
+void UGlobalBPLibrary::ExportPropertiesToObject(UObject* InSourceObject, UObject* InTargetObject, bool bExportSubObjects)
+{
+	TSharedPtr<FJsonObject> JsonObject;
+	ExportExposedProperties(InSourceObject, JsonObject, bExportSubObjects);
+	ImportExposedProperties(InTargetObject, JsonObject);
 }
 
 bool UGlobalBPLibrary::RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult)
@@ -363,11 +368,38 @@ AWHPlayerController* UGlobalBPLibrary::GetLocalPlayerController(TSubclassOf<AWHP
 	return nullptr;
 }
 
-APawn* UGlobalBPLibrary::GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
+APawn* UGlobalBPLibrary::GetPossessedPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
 {
 	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
 		return PlayerController->GetPawn();
+	}
+	return nullptr;
+}
+
+APawn* UGlobalBPLibrary::GetPossessedPawnByID(TSubclassOf<APawn> InClass, int32 InPlayerID)
+{
+	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
+	{
+		return PlayerController->GetPawn();
+	}
+	return nullptr;
+}
+
+APawn* UGlobalBPLibrary::GetLocalPossessedPawn(TSubclassOf<APawn> InClass)
+{
+	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
+	{
+		return PlayerController->GetPawn();
+	}
+	return nullptr;
+}
+
+APawn* UGlobalBPLibrary::GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
+{
+	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
+	{
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }
@@ -376,7 +408,7 @@ APawn* UGlobalBPLibrary::GetPlayerPawnByID(TSubclassOf<APawn> InClass, int32 InP
 {
 	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 	{
-		return PlayerController->GetPawn();
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }
@@ -385,34 +417,7 @@ APawn* UGlobalBPLibrary::GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 	{
-		return PlayerController->GetPawn();
-	}
-	return nullptr;
-}
-
-ACharacterBase* UGlobalBPLibrary::GetPlayerCharacter(TSubclassOf<ACharacterBase> InClass, int32 InPlayerIndex)
-{
-	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-	{
-		return PlayerController->GetPlayerPawn<ACharacterBase>();
-	}
-	return nullptr;
-}
-
-ACharacterBase* UGlobalBPLibrary::GetPlayerCharacterByID(TSubclassOf<ACharacterBase> InClass, int32 InPlayerID)
-{
-	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-	{
-		return PlayerController->GetPlayerPawn<ACharacterBase>();
-	}
-	return nullptr;
-}
-
-ACharacterBase* UGlobalBPLibrary::GetLocalPlayerCharacter(TSubclassOf<ACharacterBase> InClass)
-{
-	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-	{
-		return PlayerController->GetPlayerPawn<ACharacterBase>();
+		return PlayerController->GetPlayerPawn();
 	}
 	return nullptr;
 }

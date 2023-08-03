@@ -55,9 +55,9 @@ void AAIModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AAIModule::OnTermination_Implementation()
+void AAIModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AAIModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

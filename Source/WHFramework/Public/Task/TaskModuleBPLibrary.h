@@ -8,7 +8,6 @@
 
 #include "TaskModuleBPLibrary.generated.h"
 
-class URootTaskBase;
 class UTaskBase;
 /**
  * 
@@ -23,7 +22,7 @@ public:
 	static UTaskBase* GetCurrentTask();
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleBPLibrary")
-	static URootTaskBase* GetCurrentRootTask();
+	static UTaskBase* GetCurrentRootTask();
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleBPLibrary")
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);

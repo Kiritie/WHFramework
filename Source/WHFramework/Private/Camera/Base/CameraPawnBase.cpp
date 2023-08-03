@@ -48,7 +48,7 @@ void ACameraPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void ACameraPawnBase::OnTermination_Implementation()
+void ACameraPawnBase::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -70,7 +70,7 @@ void ACameraPawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

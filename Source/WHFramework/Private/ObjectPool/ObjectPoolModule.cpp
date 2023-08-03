@@ -58,11 +58,9 @@ void AObjectPoolModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AObjectPoolModule::OnTermination_Implementation()
+void AObjectPoolModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
-
-	// ClearAllObject();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 bool AObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
@@ -123,7 +121,7 @@ bool AObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 
 UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
-	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
+	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass()) || ModuleState == EModuleState::Terminated) return nullptr;
 
 	UObjectPool* ObjectPool;
 	if(!HasPool(InType))
@@ -139,7 +137,7 @@ UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArra
 
 void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 {
-	if(!InObject) return;
+	if(!InObject || ModuleState == EModuleState::Terminated) return;
 
 	UClass* InType = InObject->GetClass();
 	if(!InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;

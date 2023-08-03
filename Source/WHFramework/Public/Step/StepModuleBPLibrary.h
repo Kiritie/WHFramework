@@ -8,7 +8,7 @@
 
 #include "StepModuleBPLibrary.generated.h"
 
-class URootStepBase;
+class UStepBase;
 class UStepBase;
 /**
  * 
@@ -23,7 +23,7 @@ public:
 	static UStepBase* GetCurrentStep();
 
 	UFUNCTION(BlueprintPure, Category = "StepModuleBPLibrary")
-	static URootStepBase* GetCurrentRootStep();
+	static UStepBase* GetCurrentRootStep();
 
 	UFUNCTION(BlueprintPure, Category = "StepModuleBPLibrary")
 	static UStepBase* GetStepByGUID(const FString& InStepGUID);

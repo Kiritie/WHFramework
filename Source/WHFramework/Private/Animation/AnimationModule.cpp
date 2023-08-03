@@ -56,9 +56,9 @@ void AAnimationModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AAnimationModule::OnTermination_Implementation()
+void AAnimationModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AAnimationModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)

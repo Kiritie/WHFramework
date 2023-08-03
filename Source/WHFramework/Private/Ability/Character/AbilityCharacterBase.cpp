@@ -82,9 +82,9 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void AAbilityCharacterBase::OnTermination_Implementation()
+void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -537,7 +537,7 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UGlobalBPLibrary::GetPlayerCharacter() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UGlobalBPLibrary::GetPlayerPawn() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
 
 	if (GetHealth() <= 0.f)
 	{

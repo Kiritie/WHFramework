@@ -7,7 +7,6 @@
 #include "Engine/TargetPoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Step/Base/StepBase.h"
-#include "Step/Base/RootStepBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Character/CharacterModuleBPLibrary.h"
 #include "Character/CharacterModuleTypes.h"
@@ -31,7 +30,7 @@ AStepModule::AStepModule()
 	bAutoStartFirst = false;
 
 	CurrentRootStepIndex = -1;
-	RootSteps = TArray<URootStepBase*>();
+	RootSteps = TArray<UStepBase*>();
 
 	FirstStep = nullptr;
 	CurrentStep = nullptr;
@@ -96,7 +95,7 @@ void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(CurrentStep)
 		{
-			if(!CurrentStep->IsA<URootStepBase>())
+			if(!CurrentStep->IsRootStep())
 			{
 				if(CurrentStep->GetStepState() != EStepState::Leaved)
 				{
@@ -108,7 +107,7 @@ void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
 					{
 						CurrentStep->ParentStep->Refresh();
 					}
-					else if(CurrentStep->ParentStep->IsA<URootStepBase>())
+					else if(CurrentStep->ParentStep->IsRootStep())
 					{
 						StartStep(CurrentStep->ParentStep->StepIndex + 1, false);
 					}
@@ -139,16 +138,19 @@ void AStepModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AStepModule::OnTermination_Implementation()
+void AStepModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	EndStep();
+	if(InPhase == EPhase::Primary)
+	{
+		EndStep();
+	}
 }
 
 void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
-	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA<URootStepBase>() ? FirstStep->StepIndex : -1;
+	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA<UStepBase>() ? FirstStep->StepIndex : -1;
 	if(InRootStepIndex != -1)
 	{
 		if(RootSteps.IsValidIndex(InRootStepIndex))
@@ -271,7 +273,7 @@ void AStepModule::EnterStep(UStepBase* InStep)
 		}
 		InStep->OnEnter(CurrentStep);
 
-		if(InStep->IsA<URootStepBase>())
+		if(InStep->IsA<UStepBase>())
 		{
 			CurrentRootStepIndex = InStep->StepIndex;
 		}
@@ -329,7 +331,7 @@ void AStepModule::LeaveStep(UStepBase* InStep)
 	if(InStep->GetStepState() != EStepState::Leaved)
 	{
 		InStep->OnLeave();
-		if(InStep->IsA<URootStepBase>())
+		if(InStep->IsA<UStepBase>())
 		{
 			if(InStep->StepIndex == RootSteps.Num() - 1)
 			{
@@ -345,14 +347,17 @@ void AStepModule::ClearAllStep()
 	{
 		if(Iter)
 		{
-			#if(WITH_EDITOR)
+#if(WITH_EDITOR)
 			Iter->OnUnGenerate();
-			#endif
+#else
 			Iter->ConditionalBeginDestroy();
+#endif
 		}
 	}
 	
 	RootSteps.Empty();
+
+	StepMap.Empty();
 
 	Modify();
 }
@@ -368,37 +373,6 @@ bool AStepModule::IsAllStepCompleted()
 	}
 	return true;
 }
-
-#if WITH_EDITOR
-void AStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
-{
-	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
-	for (int32 i = 0; i < RootSteps.Num(); i++)
-	{
-		auto Item = MakeShared<FStepListItem>();
-		RootSteps[i]->GenerateListItem(Item);
-		OutStepListItems.Add(Item);
-	}
-}
-
-void AStepModule::UpdateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
-{
-	for (int32 i = 0; i < RootSteps.Num(); i++)
-	{
-		RootSteps[i]->StepIndex = i;
-		RootSteps[i]->StepHierarchy = 0;
-		RootSteps[i]->UpdateListItem(OutStepListItems[i]);
-	}
-}
-
-void AStepModule::SetRootStepItem(int32 InIndex, URootStepBase* InRootStep)
-{
-	if(RootSteps.IsValidIndex(InIndex))
-	{
-		RootSteps[InIndex] = InRootStep;
-	}
-}
-#endif
 
 void AStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteType)
 {
@@ -435,3 +409,26 @@ void AStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
 		}
 	}
 }
+
+#if WITH_EDITOR
+void AStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+{
+	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
+	for (int32 i = 0; i < RootSteps.Num(); i++)
+	{
+		auto Item = MakeShared<FStepListItem>();
+		RootSteps[i]->GenerateListItem(Item);
+		OutStepListItems.Add(Item);
+	}
+}
+
+void AStepModule::UpdateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+{
+	for (int32 i = 0; i < RootSteps.Num(); i++)
+	{
+		RootSteps[i]->StepIndex = i;
+		RootSteps[i]->StepHierarchy = 0;
+		RootSteps[i]->UpdateListItem(OutStepListItems[i]);
+	}
+}
+#endif

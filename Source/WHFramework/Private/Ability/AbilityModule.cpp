@@ -73,9 +73,9 @@ void AAbilityModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AAbilityModule::OnTermination_Implementation()
+void AAbilityModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AAbilityModule::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)
@@ -93,7 +93,7 @@ void AAbilityModule::RemoveCustomInteractAction(int32 InInteractAction)
 
 FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 {
-	FString EnumName = TEXT("/Script/WHFramwork.EInteractAction");
+	FString EnumName = TEXT("/Script/WHFramework.EInteractAction");
 	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
 	{
 		EnumName = CustomInteractActionMap[(EInteractAction)InInteractAction];

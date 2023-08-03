@@ -174,13 +174,16 @@ void AWidgetModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AWidgetModule::OnTermination_Implementation()
+void AWidgetModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 
-	ClearAllUserWidget();
-	ClearAllSlateWidget();
-	ClearAllWorldWidget();
+	if(InPhase == EPhase::Primary)
+	{
+		ClearAllUserWidget();
+		ClearAllSlateWidget();
+		ClearAllWorldWidget();
+	}
 }
 
 bool AWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InWidgetClass) const

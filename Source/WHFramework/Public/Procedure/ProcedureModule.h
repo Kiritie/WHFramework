@@ -46,7 +46,7 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
@@ -95,7 +95,8 @@ protected:
 	/// 流程列表
 	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
 	TArray<UProcedureBase*> Procedures;
-	UPROPERTY()
+	/// 流程Map
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
 	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> ProcedureMap;
 
 public:
@@ -187,7 +188,9 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	TArray<UProcedureBase*>& GetProcedures() { return Procedures; }
-	
+	/**
+	* 获取流程Map
+	*/
 	UFUNCTION(BlueprintPure)
 	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>& GetProcedureMap() { return ProcedureMap; }
 
@@ -198,7 +201,5 @@ public:
 	void GenerateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
 	void UpdateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
-
-	void SetProcedureItem(int32 InIndex, UProcedureBase* InProcedure);
 	#endif
 };

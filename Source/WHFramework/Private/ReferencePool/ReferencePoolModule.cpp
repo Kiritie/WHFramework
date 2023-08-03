@@ -57,11 +57,9 @@ void AReferencePoolModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AReferencePoolModule::OnTermination_Implementation()
+void AReferencePoolModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
-
-	ClearAllReference();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AReferencePoolModule::ClearAllReference()

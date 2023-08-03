@@ -2,17 +2,8 @@
 
 #pragma once
 
-
-#include "UObject/NoExportTypes.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 #include "TaskModuleTypes.generated.h"
-
-UENUM(BlueprintType)
-enum class ETaskType : uint8
-{
-	Root,
-	Default,
-	Standalone
-};
 
 UENUM(BlueprintType)
 enum class ETaskState : uint8
@@ -115,3 +106,30 @@ public:
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskStateChanged, ETaskState, InTaskState);
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTaskSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FTaskSaveData()
+	{
+		TaskItemMap = TMap<FString, FSaveData>();
+	}
+
+public:
+	UPROPERTY()
+	TMap<FString, FSaveData> TaskItemMap;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		for(auto& Iter : TaskItemMap)
+		{
+			Iter.Value.MakeSaved();
+		}
+	}
+};

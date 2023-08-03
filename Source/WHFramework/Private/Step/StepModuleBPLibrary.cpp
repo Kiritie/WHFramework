@@ -19,7 +19,7 @@ UStepBase* UStepModuleBPLibrary::GetCurrentStep()
 	return nullptr;
 }
 
-URootStepBase* UStepModuleBPLibrary::GetCurrentRootStep()
+UStepBase* UStepModuleBPLibrary::GetCurrentRootStep()
 {
 	if(AStepModule* StepModule = AStepModule::Get())
 	{

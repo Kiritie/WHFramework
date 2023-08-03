@@ -16,7 +16,7 @@
 #include "Task/TaskEditorTypes.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskBlueprint.h"
-#include "Task/Base/RootTaskBase.h"
+#include "Task/Base/TaskBase.h"
 #include "Task/Widget/STaskListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -63,7 +63,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 			.Thickness(FVector2D(9.0f, 9.0f));
 	}
 
-	SelectedTaskClass = nullptr;
+	SelectedTaskClass = UTaskBase::StaticClass();;
 
 	ClassViewerOptions.bShowBackgroundBorder = false;
 	ClassViewerOptions.bShowUnloadedBlueprints = true;
@@ -76,7 +76,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 	ClassViewerOptions.bAllowViewOptions = true;
 
 	TaskClassFilter = MakeShareable(new FTaskClassFilter);
-	TaskClassFilter->IncludeParentClass = URootTaskBase::StaticClass();
+	TaskClassFilter->IncludeParentClass = UTaskBase::StaticClass();
 	#if ENGINE_MAJOR_VERSION == 4
 	ClassViewerOptions.ClassFilter = TaskClassFilter;
 	#else if ENGINE_MAJOR_VERSION == 5
@@ -154,7 +154,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(2.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Edit")))
-						.IsEnabled_Lambda([this](){ return SelectedTaskClass && SelectedTaskListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return SelectedTaskClass != nullptr; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnEditTaskItemButtonClicked)
 					]
@@ -175,10 +175,10 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						SNew(SButton)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
-						.Text(FText::FromString(TEXT("New")))
+						.Text(FText::FromString(TEXT("Add")))
 						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedTaskListItems.Num() <= 1 && SelectedTaskClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
-						.OnClicked(this, &STaskListWidget::OnNewTaskItemButtonClicked)
+						.OnClicked(this, &STaskListWidget::OnAddTaskItemButtonClicked)
 					]
 
 					+ SHorizontalBox::Slot()
@@ -411,6 +411,7 @@ UTaskBase* STaskListWidget::DuplicateTask(UTaskBase* InTask)
 {
 	UTaskBase* NewTask = DuplicateObject<UTaskBase>(InTask, TaskModule, NAME_None);
 
+	NewTask->TaskGUID = FGuid::NewGuid().ToString();
 	NewTask->SubTasks.Empty();
 
 	// NewTask->TaskName = *FString::Printf(TEXT("%s_Copy"), *NewTask->TaskName.ToString());
@@ -457,15 +458,16 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewTask && OldTask)
 				{
-					OldTask->OnDuplicate(NewTask);
+					UGlobalBPLibrary::ExportPropertiesToObject(OldTask, NewTask);
 					if(OldTask->ParentTask)
 					{
 						OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;
 					}
-					else if(URootTaskBase* NewRootTask = Cast<URootTaskBase>(NewTask))
+					else
 					{
-						TaskModule->SetRootTaskItem(OldTask->TaskIndex, NewRootTask);
+						TaskModule->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
 					}
+					TaskModule->GetTaskMap().Emplace(OldTask->TaskGUID, NewTask);
 					OldTask->OnUnGenerate();
 					Refresh();
 				}
@@ -481,7 +483,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 FText STaskListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedTaskListItems.Num() <= 1 ? (SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None")) : TEXT("Multiple Values"));
+	return FText::FromString(SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None"));
 }
 
 void STaskListWidget::ToggleEditMode()
@@ -489,46 +491,16 @@ void STaskListWidget::ToggleEditMode()
 	SetIsEditMode(!bEditMode);
 }
 
-void STaskListWidget::SetIsEditMode(bool bInIsEditMode)
+void STaskListWidget::SetIsEditMode(bool bIsEditMode)
 {
-	bEditMode = bInIsEditMode;
+	bEditMode = bIsEditMode;
 	if(bEditMode)
 	{
-		if(SelectedTaskListItems.Num() > 0)
-		{
-			SelectedTaskClass = SelectedTaskListItems[0]->Task->GetClass();
-			if(SelectedTaskClass->IsChildOf<URootTaskBase>())
-			{
-				TaskClassFilter->IncludeParentClass = URootTaskBase::StaticClass();
-				TaskClassFilter->UnIncludeParentClass = nullptr;
-			}
-			else
-			{
-				TaskClassFilter->IncludeParentClass = UTaskBase::StaticClass();
-				TaskClassFilter->UnIncludeParentClass = URootTaskBase::StaticClass();
-			}
-		}
-		else
-		{
-			TaskClassFilter->IncludeParentClass = nullptr;
-			TaskClassFilter->UnIncludeParentClass = nullptr;
-			SelectedTaskClass = nullptr;
-		}
+		SelectedTaskClass = SelectedTaskListItems.Num() > 0 ? SelectedTaskListItems[0]->Task->GetClass() : nullptr;
 	}
-	else
+	else if(SelectedTaskClass == nullptr)
 	{
-		if(SelectedTaskListItems.Num() > 0)
-		{
-			TaskClassFilter->IncludeParentClass = UTaskBase::StaticClass();
-			TaskClassFilter->UnIncludeParentClass = URootTaskBase::StaticClass();
-			SelectedTaskClass = UTaskBase::StaticClass();
-		}
-		else
-		{
-			TaskClassFilter->IncludeParentClass = URootTaskBase::StaticClass();
-			TaskClassFilter->UnIncludeParentClass = nullptr;
-			SelectedTaskClass = URootTaskBase::StaticClass();
-		}
+		SelectedTaskClass = UTaskBase::StaticClass();
 	}
 	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditMode"), bEditMode, GTaskEditorIni);
 }
@@ -586,29 +558,11 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 
 void STaskListWidget::UpdateSelection()
 {
-	const TArray<TSharedPtr<FTaskListItem>> SelectedItems = TreeView->GetSelectedItems();
-
-	if(SelectedItems.Num() > 0)
+	SelectedTaskListItems = TreeView->GetSelectedItems();
+	
+	if(bEditMode)
 	{
-		SelectedTaskListItems = SelectedItems;
-		SelectedTaskClass = !bEditMode ? UTaskBase::StaticClass() : SelectedTaskListItems[0]->Task->GetClass();
-		if(SelectedTaskClass->IsChildOf<URootTaskBase>())
-		{
-			TaskClassFilter->IncludeParentClass = URootTaskBase::StaticClass();
-			TaskClassFilter->UnIncludeParentClass = nullptr;
-		}
-		else
-		{
-			TaskClassFilter->IncludeParentClass = UTaskBase::StaticClass();
-			TaskClassFilter->UnIncludeParentClass = URootTaskBase::StaticClass();
-		}
-	}
-	else
-	{
-		SelectedTaskClass = !bEditMode ? URootTaskBase::StaticClass() : nullptr;
-		TaskClassFilter->IncludeParentClass = URootTaskBase::StaticClass();
-		TaskClassFilter->UnIncludeParentClass = nullptr;
-		SelectedTaskListItems.Empty();
+		SelectedTaskClass = SelectedTaskListItems.Num() > 0 ? SelectedTaskListItems[0]->Task->GetClass() : nullptr;
 	}
 
 	if(OnSelectTaskListItemsDelegate.IsBound())
@@ -722,7 +676,7 @@ FReply STaskListWidget::OnNewTaskClassButtonClicked()
 	return FReply::Handled();
 }
 
-FReply STaskListWidget::OnNewTaskItemButtonClicked()
+FReply STaskListWidget::OnAddTaskItemButtonClicked()
 {
 	if(!TaskModule) return FReply::Handled();
 
@@ -735,11 +689,6 @@ FReply STaskListWidget::OnNewTaskItemButtonClicked()
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
-		if(SelectedTaskListItems[0]->Task->GetTaskType() == ETaskType::Standalone)
-		{
-			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Cannot be added under a standalone task!")));
-			return FReply::Handled();
-		}
 		Item->ParentListItem = SelectedTaskListItems[0];
 
 		NewTask->TaskIndex = SelectedTaskListItems[0]->GetSubTasks().Num();
@@ -749,11 +698,11 @@ FReply STaskListWidget::OnNewTaskItemButtonClicked()
 
 		SelectedTaskListItems[0]->Task->Modify();
 	}
-	else if(URootTaskBase* RootTask = Cast<URootTaskBase>(NewTask))
+	else
 	{
 		NewTask->TaskIndex = TaskModule->GetRootTasks().Num();
 		NewTask->TaskHierarchy = 0;
-		TaskModule->GetRootTasks().Add(RootTask);
+		TaskModule->GetRootTasks().Add(NewTask);
 		TaskListItems.Add(Item);
 
 		TaskModule->Modify();
@@ -790,9 +739,9 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 
 			SelectedTaskListItems[0]->GetParentTask()->Modify();
 		}
-		else if(URootTaskBase* NewRootTask = Cast<URootTaskBase>(NewTask))
+		else
 		{
-			TaskModule->GetRootTasks().Insert(NewRootTask, SelectedTaskListItems[0]->Task->TaskIndex);
+			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex);
 
 			TaskModule->Modify();
@@ -826,9 +775,9 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 
 			SelectedTaskListItems[0]->GetParentTask()->Modify();
 		}
-		else if(URootTaskBase* NewRootTask = Cast<URootTaskBase>(NewTask))
+		else
 		{
-			TaskModule->GetRootTasks().Insert(NewRootTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
 			TaskModule->Modify();
@@ -861,11 +810,6 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
-		if(SelectedTaskListItems[0]->Task->GetTaskType() == ETaskType::Standalone)
-		{
-			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Cannot be pasted under a standalone task!")));
-			return FReply::Handled();
-		}
 		Item->ParentListItem = SelectedTaskListItems[0];
 
 		CopiedTask->TaskIndex = SelectedTaskListItems[0]->GetSubTasks().Num();
@@ -875,11 +819,11 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 
 		SelectedTaskListItems[0]->Task->Modify();
 	}
-	else if(URootTaskBase* RootTask = Cast<URootTaskBase>(CopiedTask))
+	else
 	{
 		CopiedTask->TaskIndex = TaskModule->GetRootTasks().Num();
 		CopiedTask->TaskHierarchy = 0;
-		TaskModule->GetRootTasks().Add(RootTask);
+		TaskModule->GetRootTasks().Add(CopiedTask);
 		TaskListItems.Add(Item);
 
 		TaskModule->Modify();
@@ -918,9 +862,9 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 
 			SelectedTaskListItems[0]->GetParentTask()->Modify();
 		}
-		else if(URootTaskBase* NewRootTask = Cast<URootTaskBase>(NewTask))
+		else
 		{
-			TaskModule->GetRootTasks().Insert(NewRootTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
 			TaskModule->Modify();

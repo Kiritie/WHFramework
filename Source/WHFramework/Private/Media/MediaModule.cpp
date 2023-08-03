@@ -58,9 +58,9 @@ void AMediaModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void AMediaModule::OnTermination_Implementation()
+void AMediaModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
 }
 
 void AMediaModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)

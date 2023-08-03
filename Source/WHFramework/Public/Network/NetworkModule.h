@@ -39,7 +39,7 @@ public:
 
 	virtual void OnUnPause_Implementation() override;
 
-	virtual void OnTermination_Implementation() override;
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
 	UPROPERTY(EditAnywhere)

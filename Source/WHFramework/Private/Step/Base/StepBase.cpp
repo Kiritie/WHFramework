@@ -14,7 +14,6 @@
 #include "Main/MainModuleBPLibrary.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleBPLibrary.h"
-#include "Step/Base/RootStepBase.h"
 
 UStepBase::UStepBase()
 {
@@ -25,7 +24,6 @@ UStepBase::UStepBase()
 	bFirstStep = false;
 	StepIndex = 0;
 	StepHierarchy = 0;
-	StepType = EStepType::Default;
 	StepState = EStepState::None;
 
 	OperationTarget = nullptr;
@@ -88,41 +86,6 @@ void UStepBase::OnUnGenerate()
 			}
 		}
 	}
-	ConditionalBeginDestroy();
-}
-
-void UStepBase::OnDuplicate(UStepBase* InNewStep)
-{
-	InNewStep->StepGUID = FGuid::NewGuid().ToString();
-	InNewStep->StepDisplayName = StepDisplayName;
-	InNewStep->StepDescription = StepDescription;
-	InNewStep->StepIndex = StepIndex;
-	InNewStep->StepHierarchy = StepHierarchy;
-	InNewStep->OperationTarget = OperationTarget;
-	InNewStep->bTrackTarget = bTrackTarget;
-	InNewStep->CameraViewPawn = CameraViewPawn;
-	InNewStep->CameraViewMode = CameraViewMode;
-	InNewStep->CameraViewSpace = CameraViewSpace;
-	InNewStep->CameraViewEaseType = CameraViewEaseType;
-	InNewStep->CameraViewDuration = CameraViewDuration;
-	InNewStep->CameraViewOffset = CameraViewOffset;
-	InNewStep->CameraViewYaw = CameraViewYaw;
-	InNewStep->CameraViewPitch = CameraViewPitch;
-	InNewStep->CameraViewDistance = CameraViewDistance;
-	InNewStep->StepExecuteCondition = StepExecuteCondition;
-	InNewStep->StepExecuteType = StepExecuteType;
-	InNewStep->AutoExecuteStepTime = AutoExecuteStepTime;
-	InNewStep->StepCompleteType = StepCompleteType;
-	InNewStep->AutoCompleteStepTime = AutoCompleteStepTime;
-	InNewStep->StepLeaveType = StepLeaveType;
-	InNewStep->AutoLeaveStepTime = AutoLeaveStepTime;
-	InNewStep->StepGuideType = StepGuideType;
-	InNewStep->StepGuideIntervalTime = StepGuideIntervalTime;
-	InNewStep->RootStep = RootStep;
-	InNewStep->ParentStep = ParentStep;
-	InNewStep->bMergeSubStep = bMergeSubStep;
-	InNewStep->SubSteps = SubSteps;
-	InNewStep->StepListItemStates = StepListItemStates;
 }
 #endif
 
@@ -138,7 +101,7 @@ void UStepBase::OnInitialize()
 	{
 		if(Iter)
 		{
-			Iter->RootStep = StepType == EStepType::Root ? Cast<URootStepBase>(this) : RootStep;
+			Iter->RootStep = IsRootStep() ? this : RootStep;
 			Iter->ParentStep = this;
 			Iter->OnInitialize();
 		}
@@ -714,7 +677,7 @@ void UStepBase::UpdateListItem(TSharedPtr<FStepListItem> OutStepListItem)
 		{
 			SubSteps[i]->StepIndex = i;
 			SubSteps[i]->StepHierarchy = StepHierarchy + 1;
-			SubSteps[i]->RootStep = StepType == EStepType::Root ? Cast<URootStepBase>(this) : RootStep;
+			SubSteps[i]->RootStep = IsRootStep() ? this : RootStep;
 			SubSteps[i]->ParentStep = this;
 			SubSteps[i]->UpdateListItem(OutStepListItem->SubListItems[i]);
 		}

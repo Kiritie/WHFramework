@@ -22,7 +22,7 @@ void AWHGameState::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHGameState::OnTermination_Implementation()
+void AWHGameState::OnTermination_Implementation(EPhase InPhase)
 {
 	
 }
@@ -44,7 +44,7 @@ void AWHGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

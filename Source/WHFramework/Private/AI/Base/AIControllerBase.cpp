@@ -64,9 +64,9 @@ void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AAIControllerBase::OnTermination_Implementation()
+void AAIControllerBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation();
+	IWHActorInterface::OnTermination_Implementation(InPhase);
 }
 
 void AAIControllerBase::BeginPlay()
@@ -86,7 +86,7 @@ void AAIControllerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this);
+		Execute_OnTermination(this, EPhase::Final);
 	}
 }
 

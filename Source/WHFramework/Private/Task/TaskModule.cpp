@@ -7,13 +7,14 @@
 #include "Engine/TargetPoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Task/Base/TaskBase.h"
-#include "Task/Base/RootTaskBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Character/CharacterModuleBPLibrary.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Network/NetworkModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/Module/TaskSaveGame.h"
 #include "Task/TaskModuleBPLibrary.h"
 #include "Task/TaskModuleNetworkComponent.h"
 #include "Scene/SceneModule.h"
@@ -28,7 +29,7 @@ ATaskModule::ATaskModule()
 
 	bAutoEnterFirst = false;
 
-	RootTasks = TArray<URootTaskBase*>();
+	RootTasks = TArray<UTaskBase*>();
 
 	FirstTask = nullptr;
 	CurrentTask = nullptr;
@@ -75,7 +76,11 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final && bAutoEnterFirst)
+	if(InPhase == EPhase::Lesser)
+	{
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UTaskSaveGame>(0, true)->GetSaveData());
+	}
+	else if(InPhase == EPhase::Final && bAutoEnterFirst && !CurrentTask)
 	{
 		EnterTask(FirstTask);
 	}
@@ -87,7 +92,7 @@ void ATaskModule::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(CurrentTask)
 	{
-		if(!CurrentTask->IsA<URootTaskBase>())
+		if(!CurrentTask->IsRootTask())
 		{
 			if(CurrentTask->GetTaskState() != ETaskState::Leaved)
 			{
@@ -99,7 +104,7 @@ void ATaskModule::OnRefresh_Implementation(float DeltaSeconds)
 				{
 					CurrentTask->ParentTask->Refresh();
 				}
-				else if(CurrentTask->ParentTask->IsA<URootTaskBase>() && RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
+				else if(CurrentTask->ParentTask->IsRootTask() && RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
 				{
 					EnterTask(RootTasks[CurrentTask->ParentTask->TaskIndex + 1]);
 				}
@@ -129,9 +134,56 @@ void ATaskModule::OnUnPause_Implementation()
 	Super::OnUnPause_Implementation();
 }
 
-void ATaskModule::OnTermination_Implementation()
+void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 {
-	Super::OnTermination_Implementation();
+	Super::OnTermination_Implementation(InPhase);
+
+	if(InPhase == EPhase::Lesser)
+	{
+		USaveGameModuleBPLibrary::SaveSaveGame<UTaskSaveGame>(0, true);
+	}
+}
+
+void ATaskModule::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << CurrentTask;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << CurrentTask;
+		}
+	}
+}
+
+void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	const auto& SaveData = InSaveData->CastRef<FTaskSaveData>();
+
+	for(auto Iter : SaveData.TaskItemMap)
+	{
+		if(TaskMap.Contains(Iter.Key))
+		{
+			TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
+		}
+	}
+}
+
+FSaveData* ATaskModule::ToData(bool bRefresh)
+{
+	static FTaskSaveData SaveData;
+	SaveData = FTaskSaveData();
+
+	for(auto Iter : TaskMap)
+	{
+		SaveData.TaskItemMap.Add(Iter.Key, Iter.Value->GetSaveDataRef<FSaveData>());
+	}
+	return &SaveData;
 }
 
 void ATaskModule::RestoreTask(UTaskBase* InTask)
@@ -145,6 +197,12 @@ void ATaskModule::RestoreTask(UTaskBase* InTask)
 void ATaskModule::EnterTask(UTaskBase* InTask)
 {
 	if(!InTask || InTask->TaskEnterType == ETaskEnterType::None) return;
+
+	FString FailedStr;
+	if(!InTask->CheckTaskCondition(FailedStr))
+	{
+		return;
+	}
 	
 	if(InTask->ParentTask && !InTask->ParentTask->IsEntered())
 	{
@@ -158,9 +216,9 @@ void ATaskModule::EnterTask(UTaskBase* InTask)
 		{
 			CurrentTask->Leave();
 		}
-		InTask->OnEnter(CurrentTask);
-
+		UTaskBase* LastTask = CurrentTask;
 		CurrentTask = InTask;
+		InTask->OnEnter(LastTask);
 	}
 }
 
@@ -191,7 +249,15 @@ void ATaskModule::ExecuteTask(UTaskBase* InTask)
 void ATaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
 {
 	if(!InTask) return;
-	
+
+	if(InTaskExecuteResult == ETaskExecuteResult::Skipped)
+	{
+		FString SkipInfo;
+		if(!InTask->CheckTaskSkipAble(SkipInfo))
+		{
+			return;
+		}
+	}
 	if(!InTask->IsCompleted())
 	{
 		InTask->OnComplete(InTaskExecuteResult);
@@ -222,14 +288,17 @@ void ATaskModule::ClearAllTask()
 	{
 		if(Iter)
 		{
-			#if(WITH_EDITOR)
+#if(WITH_EDITOR)
 			Iter->OnUnGenerate();
-			#endif
+#else
 			Iter->ConditionalBeginDestroy();
+#endif
 		}
 	}
 	
 	RootTasks.Empty();
+
+	TaskMap.Empty();
 
 	Modify();
 }
@@ -244,6 +313,15 @@ bool ATaskModule::IsAllTaskCompleted()
 		}
 	}
 	return true;
+}
+
+UTaskBase* ATaskModule::GetCurrentRootTask() const
+{
+	if(CurrentTask)
+	{
+		return CurrentTask->IsRootTask() ? CurrentTask : CurrentTask->RootTask;
+	}
+	return nullptr;
 }
 
 #if WITH_EDITOR
@@ -265,14 +343,6 @@ void ATaskModule::UpdateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListI
 		RootTasks[i]->TaskIndex = i;
 		RootTasks[i]->TaskHierarchy = 0;
 		RootTasks[i]->UpdateListItem(OutTaskListItems[i]);
-	}
-}
-
-void ATaskModule::SetRootTaskItem(int32 InIndex, URootTaskBase* InRootTask)
-{
-	if(RootTasks.IsValidIndex(InIndex))
-	{
-		RootTasks[InIndex] = InRootTask;
 	}
 }
 #endif
