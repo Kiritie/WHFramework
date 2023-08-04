@@ -46,14 +46,20 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 FReply UUserWidgetBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if(UInputModuleBPLibrary::OnWidgetInputKeyDown(InGeometry, InKeyEvent).NativeReply.IsEventHandled()) return FReply::Handled();
+	if(UInputModuleBPLibrary::OnWidgetInputKeyDown(InGeometry, InKeyEvent).NativeReply.IsEventHandled())
+	{
+		return FReply::Handled();
+	}
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
-FReply UUserWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UUserWidgetBase::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if(UInputModuleBPLibrary::OnWidgetInputMouseButtonDown(InGeometry, InMouseEvent).NativeReply.IsEventHandled()) return FReply::Handled();
-	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	if(UInputModuleBPLibrary::OnWidgetInputKeyUp(InGeometry, InKeyEvent).NativeReply.IsEventHandled())
+	{
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyUp(InGeometry, InKeyEvent);
 }
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)

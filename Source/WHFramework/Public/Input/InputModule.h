@@ -73,11 +73,11 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// WidgetInputs
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent)
 	FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	FEventReply OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent);
+	UFUNCTION(BlueprintNativeEvent)
+	FEventReply OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraInputs

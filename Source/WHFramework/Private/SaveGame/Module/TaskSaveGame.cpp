@@ -32,5 +32,5 @@ void UTaskSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	GetSaveDataRef<FTaskSaveData>() = ATaskModule::Get()->GetSaveDataRef<FTaskSaveData>(true);
+	SetSaveData(ATaskModule::Get()->GetSaveData(true));
 }

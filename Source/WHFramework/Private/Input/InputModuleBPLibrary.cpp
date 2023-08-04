@@ -34,11 +34,11 @@ FEventReply UInputModuleBPLibrary::OnWidgetInputKeyDown(const FGeometry& InGeome
 	return FEventReply(false);
 }
 
-FEventReply UInputModuleBPLibrary::OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FEventReply UInputModuleBPLibrary::OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	if(AInputModule* InputModule = AInputModule::Get())
 	{
-		return InputModule->OnWidgetInputMouseButtonDown(InGeometry, InMouseEvent);
+		return InputModule->OnWidgetInputKeyUp(InGeometry, InKeyEvent);
 	}
 	return FEventReply(false);
 }

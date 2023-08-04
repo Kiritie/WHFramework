@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Asset/AssetModuleTypes.h"
-#include "GameFramework/Actor.h"
+#include "Global/Base/WHActor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"

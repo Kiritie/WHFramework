@@ -14,6 +14,7 @@ IMPLEMENTATION_MODULE(AParameterModule)
 AParameterModule::AParameterModule()
 {
 	ModuleName = FName("ParameterModule");
+	ModuleSaveGame = UParameterSaveGame::StaticClass();
 }
 
 AParameterModule::~AParameterModule()
@@ -44,7 +45,7 @@ void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Lesser)
 	{
-		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UParameterSaveGame>(0, true)->GetSaveData());
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0, true)->GetSaveData());
 	}
 }
 
@@ -69,19 +70,19 @@ void AParameterModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Lesser)
 	{
-		USaveGameModuleBPLibrary::SaveSaveGame<UParameterSaveGame>(0, true);
+		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 	}
 }
 
 void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
+	Parameters = InSaveData->CastRef<FParameterModuleSaveData>().Parameters;
 }
 
 FSaveData* AParameterModule::ToData(bool bRefresh)
 {
-	static FParameterSaveData SaveData;
-	SaveData = FParameterSaveData();
+	static FParameterModuleSaveData SaveData;
+	SaveData = FParameterModuleSaveData();
 	
 	SaveData.Parameters = Parameters;
 	return &SaveData;

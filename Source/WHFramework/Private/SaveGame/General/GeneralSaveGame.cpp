@@ -31,6 +31,6 @@ void UGeneralSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UGeneralSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-	
-	GetSaveDataRef<FGeneralSaveData>() = ASaveGameModule::Get()->GetSaveDataRef<FGeneralSaveData>(true);
+
+	SetSaveData(ASaveGameModule::Get()->GetSaveData(true));
 }

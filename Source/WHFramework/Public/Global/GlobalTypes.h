@@ -23,10 +23,15 @@ enum class EPauseMode : uint8
 UENUM(BlueprintType)
 enum class EPhase : uint8
 {
-	Primary,
-	Lesser,
-	Final
+	None = 0,
+	Primary = 1 << 0,
+	Lesser = 1 << 1,
+	Final = 1 << 2,
+	All = Primary | Lesser | Final
 };
+
+#define PHASEC(A, B) \
+((uint8)A & (uint8)B) != 0
 
 /*
 * 数据保存档案

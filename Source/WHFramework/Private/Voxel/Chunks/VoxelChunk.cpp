@@ -166,42 +166,36 @@ void AVoxelChunk::Generate(EPhase InPhase)
 	{
 		Execute_SetActorVisible(this, true);
 	}
-	switch(InPhase)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		case EPhase::Primary:
+		CreateMesh();
+		for(auto& Iter : VoxelMap)
 		{
-			CreateMesh();
+			Iter.Value.OnGenerate();
+		}
+		GetWorldTimerManager().SetTimerForNextTick([this]()
+		{
+			SpawnActors();
+		});
+	}
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(IsGenerated())
+		{
+			BuildMesh();
+		}
+		CreateMesh();
+		if(!IsGenerated())
+		{
 			for(auto& Iter : VoxelMap)
 			{
 				Iter.Value.OnGenerate();
 			}
-			GetWorldTimerManager().SetTimerForNextTick([this]()
-			{
-				SpawnActors();
-			});
-			break;
 		}
-		case EPhase::Lesser:
-		{
-			if(IsGenerated())
-			{
-				BuildMesh();
-			}
-			CreateMesh();
-			if(!IsGenerated())
-			{
-				for(auto& Iter : VoxelMap)
-				{
-					Iter.Value.OnGenerate();
-				}
-			}
-			break;
-		}
-		case EPhase::Final:
-		{
-			SpawnActors();
-			break;
-		}
+	}
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		SpawnActors();
 	}
 	
 	if(State == EVoxelChunkState::Builded)

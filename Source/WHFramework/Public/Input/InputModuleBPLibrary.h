@@ -28,7 +28,7 @@ public:
 	static FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static FEventReply OnWidgetInputMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent);
+	static FEventReply OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputStates

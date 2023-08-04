@@ -81,10 +81,10 @@ struct WHFRAMEWORK_API FGeneralSaveData : public FSaveData
 public:
 	FORCEINLINE FGeneralSaveData()
 	{
-		AllSaveGameInfo = TMap<FName, FSaveGameInfo>();
+		SaveGameInfos = TMap<FName, FSaveGameInfo>();
 	}
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	TMap<FName, FSaveGameInfo> AllSaveGameInfo;
+	TMap<FName, FSaveGameInfo> SaveGameInfos;
 };

@@ -37,6 +37,7 @@ void USaveGameBase::OnReset_Implementation()
 
 void USaveGameBase::OnRefresh_Implementation()
 {
+	
 }
 
 void USaveGameBase::OnDestroy_Implementation()

@@ -8,13 +8,13 @@
 // Sets default values
 AModuleBase::AModuleBase()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
 
 	bAutoRunModule = true;
 	ModuleName = NAME_None;
+	ModuleSaveGame = nullptr;
 	ModuleState = EModuleState::None;
 }
 

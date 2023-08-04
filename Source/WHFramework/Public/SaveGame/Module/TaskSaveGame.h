@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FTaskSaveData TaskSaveData;
+	FTaskModuleSaveData TaskSaveData;
 
 public:
 	virtual FSaveData* GetSaveData() override { return &TaskSaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { TaskSaveData = InSaveData->CastRef<FTaskSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { TaskSaveData = InSaveData->CastRef<FTaskModuleSaveData>(); }
 };

@@ -107,14 +107,14 @@ public:
 	}
 	FVoxelWorldSaveData& GetWorldData() const;
 
+	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InWorldData = nullptr) const;
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
 
 	virtual void UnloadData(EPhase InPhase) override;
-
-	virtual FVoxelWorldSaveData* NewData(bool bInheritBasicData = false) const;
 
 protected:
 	virtual void GenerateWorld();

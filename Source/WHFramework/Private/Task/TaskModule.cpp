@@ -26,6 +26,7 @@ IMPLEMENTATION_MODULE(ATaskModule)
 ATaskModule::ATaskModule()
 {
 	ModuleName = FName("TaskModule");
+	ModuleSaveGame = UTaskSaveGame::StaticClass();
 
 	bAutoEnterFirst = false;
 
@@ -78,7 +79,7 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Lesser)
 	{
-		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame<UTaskSaveGame>(0, true)->GetSaveData());
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0, true)->GetSaveData());
 	}
 	else if(InPhase == EPhase::Final && bAutoEnterFirst && !CurrentTask)
 	{
@@ -140,7 +141,7 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Lesser)
 	{
-		USaveGameModuleBPLibrary::SaveSaveGame<UTaskSaveGame>(0, true);
+		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 	}
 }
 
@@ -163,7 +164,7 @@ void ATaskModule::Serialize(FArchive& Ar)
 
 void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FTaskSaveData>();
+	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
 	for(auto Iter : SaveData.TaskItemMap)
 	{
@@ -176,8 +177,8 @@ void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* ATaskModule::ToData(bool bRefresh)
 {
-	static FTaskSaveData SaveData;
-	SaveData = FTaskSaveData();
+	static FTaskModuleSaveData SaveData;
+	SaveData = FTaskModuleSaveData();
 
 	for(auto Iter : TaskMap)
 	{

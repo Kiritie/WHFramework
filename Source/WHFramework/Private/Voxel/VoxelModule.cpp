@@ -41,6 +41,8 @@
 #include "Global/GlobalTypes.h"
 #include "Global/GlobalTypes.h"
 #include "Math/MathTypes.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/Module/VoxelSaveGame.h"
 
 IMPLEMENTATION_MODULE(AVoxelModule)
 
@@ -48,6 +50,7 @@ IMPLEMENTATION_MODULE(AVoxelModule)
 AVoxelModule::AVoxelModule()
 {
 	ModuleName = FName("VoxelModule");
+	ModuleSaveGame = UVoxelSaveGame::StaticClass();
 
 	VoxelsCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
 	VoxelsCapture->SetupAttachment(RootComponent);
@@ -66,7 +69,7 @@ AVoxelModule::AVoxelModule()
 	WorldState = EVoxelWorldState::None;
 	WorldBasicData = FVoxelWorldBasicSaveData();
 
-	WorldData = AVoxelModule::NewData(true);
+	WorldData = AVoxelModule::NewWorldData();
 
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
@@ -155,7 +158,14 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoGenerate)
 		{
-			LoadSaveData(NewData(true), EPhase::Primary);
+			if(ModuleSaveGame)
+			{
+				LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0, true)->GetSaveData(), EPhase::All);
+			}
+			else
+			{
+				LoadSaveData(NewWorldData(), EPhase::All);
+			}
 		}
 	}
 }
@@ -184,6 +194,10 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	if(InPhase == EPhase::Primary)
 	{
 		StopChunkQueues();
+	}
+	else if(InPhase == EPhase::Lesser)
+	{
+		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 	}
 }
 
@@ -220,69 +234,71 @@ FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
 	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
 }
 
+FVoxelWorldSaveData* AVoxelModule::NewWorldData(FSaveData* InWorldData) const
+{
+	static FVoxelModuleSaveData* NewWorldData;
+	NewWorldData = new FVoxelModuleSaveData();
+	*NewWorldData = !InWorldData ? FVoxelModuleSaveData(WorldBasicData) : InWorldData->CastRef<FVoxelModuleSaveData>();
+	return NewWorldData;
+}
+
 void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
 
-	switch(InPhase)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		case EPhase::Primary:
+		SetWorldMode(EVoxelWorldMode::Preview);
+
+		WorldData = NewWorldData(InSaveData);
+		
+		if(WorldData->WorldSeed == 0)
 		{
-			SetWorldMode(EVoxelWorldMode::Preview);
-
-			WorldData = NewData();
-			*WorldData = SaveData;
-			
-			if(WorldData->WorldSeed == 0)
-			{
-				WorldData->WorldSeed = FMath::Rand();
-			}
-			WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-
-			VoxelsCapture->OrthoWidth = WorldData->BlockSize * 4.f;
-			
-			int32 ItemIndex = 0;
-			ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)), Item,
-				if(Item->IsUnknown() || Item->PartType != EVoxelPartType::Main) continue;
-				AVoxelEntityPreview* VoxelEntity;
-				if(PreviewVoxels.IsValidIndex(ItemIndex))
-				{
-					VoxelEntity = PreviewVoxels[ItemIndex];
-				}
-				else
-				{
-					VoxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntityPreview>();
-					VoxelsCapture->ShowOnlyActors.Add(VoxelEntity);
-					PreviewVoxels.EmplaceAt(ItemIndex, VoxelEntity);
-				}
-				if(VoxelEntity)
-				{
-					VoxelEntity->Initialize(Item->GetPrimaryAssetId());
-					VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-					VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
-					VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
-					Item->InitIconMat(VoxelsCapture->TextureTarget, 8, ItemIndex);
-				}
-				ItemIndex++;
-			)
+			WorldData->WorldSeed = FMath::Rand();
 		}
-		case EPhase::Lesser:
-		{
-			WorldData->TimeSeconds = SaveData.TimeSeconds;
-			WorldData->SecondsOfDay = SaveData.SecondsOfDay;
-			USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
-			USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
-			break;
-		}
-		case EPhase::Final:
-		{
-			SetWorldMode(EVoxelWorldMode::Default);
+		WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
 
-			for(auto Iter : ChunkMap)
+		VoxelsCapture->OrthoWidth = WorldData->BlockSize * 4.f;
+		
+		int32 ItemIndex = 0;
+		ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)), Item,
+			if(Item->IsUnknown() || Item->PartType != EVoxelPartType::Main) continue;
+			AVoxelEntityPreview* VoxelEntity;
+			if(PreviewVoxels.IsValidIndex(ItemIndex))
 			{
-				Iter.Value->Generate(EPhase::Final);
+				VoxelEntity = PreviewVoxels[ItemIndex];
 			}
-			break;
+			else
+			{
+				VoxelEntity = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelEntityPreview>();
+				VoxelsCapture->ShowOnlyActors.Add(VoxelEntity);
+				PreviewVoxels.EmplaceAt(ItemIndex, VoxelEntity);
+			}
+			if(VoxelEntity)
+			{
+				VoxelEntity->Initialize(Item->GetPrimaryAssetId());
+				VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
+				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
+				Item->InitIconMat(VoxelsCapture->TextureTarget, 8, ItemIndex);
+			}
+			ItemIndex++;
+		)
+	}
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		WorldData->TimeSeconds = SaveData.TimeSeconds;
+		WorldData->SecondsOfDay = SaveData.SecondsOfDay;
+		USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
+		USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
+	}
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		SetWorldMode(EVoxelWorldMode::Default);
+
+		for(auto Iter : ChunkMap)
+		{
+			Iter.Value->Generate(EPhase::Final);
 		}
 	}
 }
@@ -290,8 +306,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 FSaveData* AVoxelModule::ToData(bool bRefresh)
 {
 	static FVoxelWorldSaveData* SaveData;
-	SaveData = NewData();
-	*SaveData = *WorldData;
+	SaveData = NewWorldData(WorldData);
 	for(auto Iter : ChunkMap)
 	{
 		SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
@@ -303,49 +318,36 @@ FSaveData* AVoxelModule::ToData(bool bRefresh)
 
 void AVoxelModule::UnloadData(EPhase InPhase)
 {
-	switch(InPhase)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		case EPhase::Primary:
+		SetWorldMode(EVoxelWorldMode::None);
+		SetWorldState(EVoxelWorldState::None);
+
+		for(auto Iter : ChunkMap)
 		{
-			SetWorldMode(EVoxelWorldMode::None);
-			SetWorldState(EVoxelWorldState::None);
-
-			for(auto Iter : ChunkMap)
-			{
-				UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
-			}
-			ChunkMap.Empty();
-
-			ChunkSpawnBatch = 0;
-			LastGenerateIndex = Index_Empty;
-
-			StopChunkQueues();
-
-			WorldData = NewData(true);
-			break;
+			UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
 		}
-		case EPhase::Lesser:
-		case EPhase::Final:
-		{
-			SetWorldMode(EVoxelWorldMode::Preview);
+		ChunkMap.Empty();
 
-			for(auto Iter : ChunkMap)
+		ChunkSpawnBatch = 0;
+		LastGenerateIndex = Index_Empty;
+
+		StopChunkQueues();
+
+		WorldData = NewWorldData();
+	}
+	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	{
+		SetWorldMode(EVoxelWorldMode::Preview);
+
+		for(auto Iter : ChunkMap)
+		{
+			if(Iter.Value->IsGenerated())
 			{
-				if(Iter.Value->IsGenerated())
-				{
-					Iter.Value->DestroyActors();
-				}
+				Iter.Value->DestroyActors();
 			}
-			break;
 		}
 	}
-}
-
-FVoxelWorldSaveData* AVoxelModule::NewData(bool bInheritBasicData) const
-{
-	static FDefaultVoxelWorldSaveData* NewWorldData;
-	NewWorldData = !bInheritBasicData ? new FDefaultVoxelWorldSaveData() : new FDefaultVoxelWorldSaveData(WorldBasicData);
-	return NewWorldData;
 }
 
 void AVoxelModule::GenerateWorld()

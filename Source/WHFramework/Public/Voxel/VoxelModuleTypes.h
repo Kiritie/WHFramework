@@ -588,17 +588,17 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FDefaultVoxelWorldSaveData : public FVoxelWorldSaveData
+struct WHFRAMEWORK_API FVoxelModuleSaveData : public FVoxelWorldSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FDefaultVoxelWorldSaveData()
+	FORCEINLINE FVoxelModuleSaveData()
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}
 	
-	FORCEINLINE FDefaultVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
+	FORCEINLINE FVoxelModuleSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}

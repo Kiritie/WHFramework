@@ -32,5 +32,5 @@ void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	GetSaveDataRef<FParameterSaveData>() = AParameterModule::Get()->GetSaveDataRef<FParameterSaveData>(true);
+	SetSaveData(AParameterModule::Get()->GetSaveData(true));
 }

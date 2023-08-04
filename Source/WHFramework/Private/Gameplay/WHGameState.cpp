@@ -34,7 +34,7 @@ void AWHGameState::BeginPlay()
 	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::Final);
+		Execute_OnPreparatory(this, EPhase::None);
 	}
 }
 
@@ -44,7 +44,7 @@ void AWHGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::Final);
+		Execute_OnTermination(this, EPhase::None);
 	}
 }
 

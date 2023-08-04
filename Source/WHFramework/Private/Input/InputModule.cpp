@@ -150,7 +150,7 @@ FEventReply AInputModule::OnWidgetInputKeyDown_Implementation(const FGeometry& I
 	return FEventReply(false);
 }
 
-FEventReply AInputModule::OnWidgetInputMouseButtonDown_Implementation(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FEventReply AInputModule::OnWidgetInputKeyUp_Implementation(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	return FEventReply(false);
 }

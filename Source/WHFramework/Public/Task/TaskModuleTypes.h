@@ -15,6 +15,8 @@ enum class ETaskState : uint8
 	Leaved
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskStateChanged, ETaskState, InTaskState);
+
 UENUM(BlueprintType)
 enum class ETaskExecuteType : uint8
 {
@@ -105,15 +107,13 @@ public:
 	}
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskStateChanged, ETaskState, InTaskState);
-
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FTaskSaveData : public FSaveData
+struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FTaskSaveData()
+	FORCEINLINE FTaskModuleSaveData()
 	{
 		TaskItemMap = TMap<FString, FSaveData>();
 	}

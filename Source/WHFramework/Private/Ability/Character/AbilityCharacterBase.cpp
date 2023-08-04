@@ -112,27 +112,22 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
 
-	switch(InPhase)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		case EPhase::Primary:
-		{
-			SetActorLocation(SaveData.SpawnLocation);
-			SetActorRotation(SaveData.SpawnRotation);
-		}
-		case EPhase::Lesser:
-		case EPhase::Final:
-		{
-			SetNameV(SaveData.Name);
-			SetRaceID(SaveData.RaceID);
-			SetLevelV(SaveData.Level);
-		
-			Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+		SetActorLocation(SaveData.SpawnLocation);
+		SetActorRotation(SaveData.SpawnRotation);
+	}
+	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	{
+		SetNameV(SaveData.Name);
+		SetRaceID(SaveData.RaceID);
+		SetLevelV(SaveData.Level);
+	
+		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
-			if(!SaveData.IsSaved())
-			{
-				ResetData();
-			}
-			break;
+		if(!SaveData.IsSaved())
+		{
+			ResetData();
 		}
 	}
 }

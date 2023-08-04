@@ -2,21 +2,21 @@
 
 #pragma once
 
-#include "Parameter/ParameterModuleTypes.h"
+#include "Voxel/VoxelModuleTypes.h"
 #include "SaveGame/Base/SaveGameBase.h"
 
-#include "ParameterSaveGame.generated.h"
+#include "VoxelSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UParameterSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UVoxelSaveGame : public USaveGameBase
 {
 	GENERATED_BODY()
 
 public:
-	UParameterSaveGame();
+	UVoxelSaveGame();
 	
 public:
 	virtual void OnCreate_Implementation(int32 InSaveIndex) override;
@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FParameterModuleSaveData ParameterSaveData;
+	FVoxelModuleSaveData VoxelSaveData;
 
 public:
-	virtual FSaveData* GetSaveData() override { return &ParameterSaveData; }
+	virtual FSaveData* GetSaveData() override { return &VoxelSaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { ParameterSaveData = InSaveData->CastRef<FParameterModuleSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { VoxelSaveData = InSaveData->CastRef<FVoxelModuleSaveData>(); }
 };

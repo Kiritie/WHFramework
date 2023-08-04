@@ -65,11 +65,8 @@ public:
 	void SetUserIndex(int32 InUserIndex) { UserIndex = InUserIndex; }
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SaveData")
-	TSubclassOf<UGeneralSaveGame> GeneralSaveGame;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SaveData")
-	TMap<FName, FSaveGameInfo> AllSaveGameInfo;
+	TMap<FName, FSaveGameInfo> SaveGameInfos;
 
 public:
 	UFUNCTION(BlueprintPure)
