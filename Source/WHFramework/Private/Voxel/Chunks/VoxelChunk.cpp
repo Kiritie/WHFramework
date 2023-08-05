@@ -354,6 +354,10 @@ void AVoxelChunk::GenerateActors()
 
 void AVoxelChunk::DestroyActors()
 {
+	if(State != EVoxelChunkState::Finally) return;
+
+	State = EVoxelChunkState::Generated;
+	
 	UObjectPoolModuleBPLibrary::DespawnObjects(PickUps);
 	PickUps.Empty();
 }

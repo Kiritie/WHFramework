@@ -109,13 +109,13 @@ public:
 	void SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
 
 	template<class T>
-	FSaveGameInfo GetSaveGameInfo(bool bFromGeneralData = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
 	{
-		return GetSaveGameInfo(InSaveGameClass, bFromGeneralData);
+		return GetSaveGameInfo(InSaveGameClass);
 	}
 
 	UFUNCTION(BlueprintPure)
-	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData = false) const;
+	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass) const;
 
 	template<class T>
 	T* GetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const

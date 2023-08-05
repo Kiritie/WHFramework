@@ -109,6 +109,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Player")
 	APawn* PlayerPawn;
 
+public:
 	UPROPERTY(BlueprintAssignable, Category = "Player")
 	FOnPlayerPawnChanged OnPlayerPawnChanged;
 
@@ -124,6 +125,4 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
-
-	FOnPlayerPawnChanged& GetOnPlayerPawnChanged() { return OnPlayerPawnChanged; }
 };

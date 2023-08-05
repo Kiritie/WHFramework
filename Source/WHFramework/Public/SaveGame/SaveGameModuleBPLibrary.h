@@ -66,13 +66,13 @@ public:
 	static void SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
 
 	template<class T>
-	static FSaveGameInfo GetSaveGameInfo(bool bFromGeneralData = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	static FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
 	{
 		return GetSaveGameInfo(InSaveGameClass);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "SaveGameModuleBPLibrary")
-	static FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData = false);
+	static FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass);
 
 	template<class T>
 	static T* GetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())

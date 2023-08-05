@@ -117,7 +117,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
-	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	if(PHASEC(InPhase, EPhase::All))
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);

@@ -91,12 +91,12 @@ protected:
 	/// 模块名称
 	UPROPERTY(EditDefaultsOnly)
 	FName ModuleName;
-	/// 模块存档
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<USaveGameBase> ModuleSaveGame;
 	/// 模块状态
 	UPROPERTY(VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
+	/// 模块存档
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<USaveGameBase> ModuleSaveGame;
 
 public:
 	UPROPERTY(BlueprintAssignable)

@@ -154,7 +154,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
 		}
 	}
-	else if(InPhase == EPhase::Final)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(bAutoGenerate)
 		{
@@ -195,9 +195,12 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		StopChunkQueues();
 	}
-	else if(InPhase == EPhase::Lesser)
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+		if(bAutoGenerate)
+		{
+			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+		}
 	}
 }
 
@@ -285,12 +288,10 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			ItemIndex++;
 		)
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
+	if(PHASEC(InPhase, EPhase::Primary) || PHASEC(InPhase, EPhase::Lesser))
 	{
-		WorldData->TimeSeconds = SaveData.TimeSeconds;
-		WorldData->SecondsOfDay = SaveData.SecondsOfDay;
-		USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(WorldData->SecondsOfDay);
-		USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(WorldData->TimeSeconds);
+		USceneModuleBPLibrary::GetWorldTimer()->InitializeTimer(SaveData.SecondsOfDay);
+		USceneModuleBPLibrary::GetWorldTimer()->SetCurrentTime(SaveData.TimeSeconds);
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{

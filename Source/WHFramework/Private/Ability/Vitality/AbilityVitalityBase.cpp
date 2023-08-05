@@ -22,10 +22,8 @@
 #include "Ability/Inventory/VitalityInventory.h"
 #include "Ability/AbilityModuleBPLibrary.h"
 
-// Sets default values
 AAbilityVitalityBase::AAbilityVitalityBase()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
@@ -93,7 +91,7 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
-	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	if(PHASEC(InPhase, EPhase::All))
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);

@@ -64,7 +64,7 @@ void AWidgetModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		for(auto Iter : UserWidgetClasses)
 		{
@@ -178,7 +178,7 @@ void AWidgetModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		ClearAllUserWidget();
 		ClearAllSlateWidget();

@@ -67,11 +67,11 @@ void USaveGameModuleBPLibrary::SetActiveSaveIndex(TSubclassOf<USaveGameBase> InS
 	}
 }
 
-FSaveGameInfo USaveGameModuleBPLibrary::GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData)
+FSaveGameInfo USaveGameModuleBPLibrary::GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass)
 {
 	if(ASaveGameModule* SaveGameModule = ASaveGameModule::Get())
 	{
-		return SaveGameModule->GetSaveGameInfo(InSaveGameClass, bFromGeneralData);
+		return SaveGameModule->GetSaveGameInfo(InSaveGameClass);
 	}
 	return FSaveGameInfo();
 }
