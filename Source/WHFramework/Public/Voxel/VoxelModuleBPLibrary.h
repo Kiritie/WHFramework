@@ -55,6 +55,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVector VoxelIndexToLocation(FIndex InIndex);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static int32 VoxelIndexToNumber(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FIndex NumberToVoxelIndex(int32 InNumber);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")

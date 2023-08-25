@@ -79,16 +79,16 @@ void AMediaModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
 	}
 }
 
-void AMediaModule::RemoveMediaPlayerFromListByName(const FName InMediaPlayerName)
+void AMediaModule::RemoveMediaPlayerFromListByName(const FName InName)
 {
-	RemoveMediaPlayerFromList(GetMediaPlayerByName(InMediaPlayerName));
+	RemoveMediaPlayerFromList(GetMediaPlayerByName(InName));
 }
 
-AMediaPlayerBase* AMediaModule::GetMediaPlayerByName(const FName InMediaPlayerName) const
+AMediaPlayerBase* AMediaModule::GetMediaPlayerByName(const FName InName) const
 {
 	for (auto Iter : MediaPlayers)
 	{
-		if(Iter->GetPlayerName() == InMediaPlayerName)
+		if(Iter->GetPlayerName() == InName)
 		{
 			return Iter;
 		}
@@ -96,25 +96,25 @@ AMediaPlayerBase* AMediaModule::GetMediaPlayerByName(const FName InMediaPlayerNa
 	return nullptr;
 }
 
-void AMediaModule::PlayMediaPlayerMovie(const FName InMediaPlayerName, const FName InMovieName, bool bMulticast)
+void AMediaModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast)
 {
-	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InMediaPlayerName))
+	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
 		MediaPlayer->PlayMovie(InMovieName, bMulticast);
 	}
 }
 
-void AMediaModule::PlayMovieWithDelegate(const FName InMediaPlayerName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast)
+void AMediaModule::PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
 {
-	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InMediaPlayerName))
+	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->PlayMovieWithDelegate(InMovieName, InOnMoviePlayFinishedDelegate, bMulticast);
+		MediaPlayer->PlayMovieWithDelegate(InMovieName, InOnPlayFinished, bMulticast);
 	}
 }
 
-void AMediaModule::StopMediaPlayerMovie(const FName InMediaPlayerName, bool bSkip, bool bMulticast)
+void AMediaModule::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast)
 {
-	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InMediaPlayerName))
+	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
 		MediaPlayer->StopMovie(bSkip, bMulticast);
 	}

@@ -45,7 +45,7 @@ void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0, true)->GetSaveData());
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 	}
 }
 

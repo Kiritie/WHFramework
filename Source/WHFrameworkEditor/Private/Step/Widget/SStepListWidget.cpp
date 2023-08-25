@@ -394,9 +394,9 @@ void SStepListWidget::OnDestroy()
 	SEditorWidgetBase::OnDestroy();
 }
 
-UStepBase* SStepListWidget::GenerateStep(TSubclassOf<UStepBase> InStepClass)
+UStepBase* SStepListWidget::GenerateStep(TSubclassOf<UStepBase> InClass)
 {
-	UStepBase* NewStep = NewObject<UStepBase>(StepModule, InStepClass, NAME_None);
+	UStepBase* NewStep = NewObject<UStepBase>(StepModule, InClass, NAME_None);
 
 	// NewStep->StepName = *CurrentStepClass->GetName().Replace(TEXT("Step_"), TEXT(""));
 	// NewStep->StepDisplayName = FText::FromName(NewStep->StepName);

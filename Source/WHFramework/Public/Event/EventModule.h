@@ -55,7 +55,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+	void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
 	template<class T>
 	void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
@@ -64,32 +64,32 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeAllEvent();
 
 	template<class T>
-	void BroadcastEvent(EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr)
+	void BroadcastEvent(EEventNetType InNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr)
 	{
-		BroadcastEvent(T::StaticClass(), InEventNetType, InSender, InParams ? *InParams : TArray<FParameter>());
+		BroadcastEvent(T::StaticClass(), InNetType, InSender, InParams ? *InParams : TArray<FParameter>());
 	}
 
 	template<class T>
-	void BroadcastEvent(EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
+	void BroadcastEvent(EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 	{
-		BroadcastEvent(T::StaticClass(), InEventNetType, InSender, InParams);
+		BroadcastEvent(T::StaticClass(), InNetType, InSender, InParams);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams);
+	void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams);
+	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams);
 
 protected:
 	UFUNCTION()
-	void ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams);
+	void ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Event Manager

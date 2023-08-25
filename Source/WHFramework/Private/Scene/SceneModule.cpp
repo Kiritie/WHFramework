@@ -488,12 +488,11 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 
 void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange, AActor* InOwnerActor, USceneComponent* InSceneComp)
 {
-	TArray<FParameter> Parameters = { InText, InTextColor, (int32)InTextStyle };
 	if(InOffsetRange != FVector::ZeroVector)
 	{
 		InLocation = InLocation + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(InOwnerActor, InLocation, InSceneComp, &Parameters);
+	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(InOwnerActor, { InText, InTextColor, (int32)InTextStyle }, InLocation, InSceneComp);
 }
 
 FLinearColor ASceneModule::GetOutlineColor() const

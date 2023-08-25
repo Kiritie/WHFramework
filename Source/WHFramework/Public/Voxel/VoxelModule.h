@@ -25,6 +25,7 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterfa
 {
 	GENERATED_BODY()
 
+	friend class AVoxelChunk;
 	friend class AsyncTask_BuildChunkMap;
 	friend class AsyncTask_BuildChunkMesh;
 	friend class AsyncTask_LoadChunkMap;
@@ -107,7 +108,7 @@ public:
 	}
 	FVoxelWorldSaveData& GetWorldData() const;
 
-	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InWorldData = nullptr) const;
+	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
@@ -138,6 +139,9 @@ protected:
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 
 public:
+	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
+
+public:
 	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex) const;
 
 	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation) const;
@@ -157,6 +161,10 @@ public:
 
 	virtual FVector VoxelIndexToLocation(FIndex InIndex) const;
 
+	virtual int32 VoxelIndexToNumber(FIndex InIndex) const;
+
+	virtual FIndex NumberToVoxelIndex(int32 InNumber) const;
+
 public:
 	virtual ECollisionChannel GetChunkTraceType() const;
 	
@@ -175,9 +183,9 @@ public:
 	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
 public:
-	void UpdateChunkQueues(bool bFromAgent = true, bool bForceStop = false);
+	void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
 
-	void StopChunkQueues();
+	void DestroyChunkQueues();
 
 protected:
 	bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
@@ -185,15 +193,15 @@ protected:
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TSubclassOf<AVoxelChunk> ChunkSpawnClass;
-	
-	UPROPERTY(EditAnywhere, Category = "Voxel")
-	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float ChunkSpawnDistance;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
+	
+	UPROPERTY(EditAnywhere, Category = "Voxel")
+	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
@@ -202,7 +210,7 @@ protected:
 protected:
 	int32 ChunkSpawnBatch;
 
-	FIndex LastGenerateIndex;
+	FIndex ChunkGenerateIndex;
 
 public:
 	bool IsBasicGenerated() const;

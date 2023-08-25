@@ -6,67 +6,67 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
-void UMainModuleBPLibrary::RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+void UMainModuleBPLibrary::RunModuleByClass(TSubclassOf<AModuleBase> InClass)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->RunModuleByClass(InModuleClass);
+		MainModule->RunModuleByClass(InClass);
 	}
 }
 
-void UMainModuleBPLibrary::RunModuleByName(const FName InModuleName)
+void UMainModuleBPLibrary::RunModuleByName(const FName InName)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->RunModuleByName(InModuleName);
+		MainModule->RunModuleByName(InName);
 	}
 }
 
-void UMainModuleBPLibrary::ResetModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+void UMainModuleBPLibrary::ResetModuleByClass(TSubclassOf<AModuleBase> InClass)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->ResetModuleByClass(InModuleClass);
+		MainModule->ResetModuleByClass(InClass);
 	}
 }
 
-void UMainModuleBPLibrary::ResetModuleByName(const FName InModuleName)
+void UMainModuleBPLibrary::ResetModuleByName(const FName InName)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->ResetModuleByName(InModuleName);
+		MainModule->ResetModuleByName(InName);
 	}
 }
 
-void UMainModuleBPLibrary::PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+void UMainModuleBPLibrary::PauseModuleByClass(TSubclassOf<AModuleBase> InClass)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->PauseModuleByClass(InModuleClass);
+		MainModule->PauseModuleByClass(InClass);
 	}
 }
 
-void UMainModuleBPLibrary::PauseModuleByName(const FName InModuleName)
+void UMainModuleBPLibrary::PauseModuleByName(const FName InName)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->PauseModuleByName(InModuleName);
+		MainModule->PauseModuleByName(InName);
 	}
 }
 
-void UMainModuleBPLibrary::UnPauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass)
+void UMainModuleBPLibrary::UnPauseModuleByClass(TSubclassOf<AModuleBase> InClass)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->UnPauseModuleByClass(InModuleClass);
+		MainModule->UnPauseModuleByClass(InClass);
 	}
 }
 
-void UMainModuleBPLibrary::UnPauseModuleByName(const FName InModuleName)
+void UMainModuleBPLibrary::UnPauseModuleByName(const FName InName)
 {
 	if(AMainModule* MainModule = GetMainModule())
 	{
-		MainModule->UnPauseModuleByName(InModuleName);
+		MainModule->UnPauseModuleByName(InName);
 	}
 }
 
@@ -112,14 +112,14 @@ TArray<AModuleBase*> UMainModuleBPLibrary::GetAllModule(bool bInEditor)
 	return AMainModule::GetAllModule(bInEditor);
 }
 
-AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor)
+AModuleBase* UMainModuleBPLibrary::GetModuleByClass(TSubclassOf<AModuleBase> InClass, bool bInEditor)
 {
-	return AMainModule::GetModuleByClass(bInEditor, InModuleClass);
+	return AMainModule::GetModuleByClass(bInEditor, InClass);
 }
 
-AModuleBase* UMainModuleBPLibrary::GetModuleByName(const FName InModuleName, bool bInEditor)
+AModuleBase* UMainModuleBPLibrary::GetModuleByName(const FName InName, bool bInEditor)
 {
-	return AMainModule::GetModuleByName<AModuleBase>(InModuleName, bInEditor);
+	return AMainModule::GetModuleByName<AModuleBase>(InName, bInEditor);
 }
 
 UModuleNetworkComponentBase* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor)

@@ -63,7 +63,7 @@ public:
 	void SwitchFSMGroupStateByIndex(const FName InFSMGroup, int32 InStateIndex);
 
 	template<class T>
-	void SwitchFSMGroupStateByClass(const FName InFSMGroup) { SwitchFSMGroupStateByClass(T::StaticClass()); }
+	void SwitchFSMGroupStateByClass(const FName InFSMGroup) { SwitchFSMGroupStateByClass(InFSMGroup, T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchFSMGroupStateByClass(const FName InFSMGroup, TSubclassOf<UFiniteStateBase> InStateClass);

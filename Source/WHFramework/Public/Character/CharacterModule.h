@@ -75,47 +75,47 @@ public:
 
 	ACharacterBase* GetCurrentCharacter() const;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"))
-	ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const;
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
-	void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		SwitchCharacterByClass(InCharacterClass, bResetCamera);
+		SwitchCharacterByClass(InClass, bResetCamera);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera = true, bool bInstant = false);
+	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByName(FName InCharacterName, bool bResetCamera = true, bool bInstant = false);
+	void SwitchCharacterByName(FName InName, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
-	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		return HasCharacterByClass(InCharacterClass);
+		return HasCharacterByClass(InClass);
 	}
 
 	UFUNCTION(BlueprintPure)
-	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const;
+	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const;
 
 	UFUNCTION(BlueprintPure)
-	bool HasCharacterByName(FName InCharacterName) const;
+	bool HasCharacterByName(FName InName) const;
 
 	template<class T>
-	T* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass = T::StaticClass())
+	T* GetCharacterByClass(TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		return GetCharacterByClass(InCharacterClass);
+		return GetCharacterByClass(InClass);
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCharacterClass"))
-	ACharacterBase* GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	ACharacterBase* GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const;
 
 	UFUNCTION(BlueprintPure)
-	ACharacterBase* GetCharacterByName(FName InCharacterName) const;
+	ACharacterBase* GetCharacterByName(FName InName) const;
 
 public:
 	UFUNCTION(BlueprintCallable)

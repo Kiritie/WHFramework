@@ -17,7 +17,7 @@ class WHFRAMEWORK_API ISaveDataInterface
 	GENERATED_BODY()
 
 public:
-	void LoadSaveData(FSaveData* InSaveData, EPhase InPhase = EPhase::Lesser);
+	void LoadSaveData(FSaveData* InSaveData, EPhase InPhase = EPhase::All);
 
 	FSaveData* GetSaveData(bool bRefresh = false);
 
@@ -33,7 +33,7 @@ public:
 		return *GetSaveData<T>(bRefresh);
 	}
 
-	void UnloadSaveData(EPhase InPhase = EPhase::Lesser);
+	void UnloadSaveData(EPhase InPhase = EPhase::All);
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;

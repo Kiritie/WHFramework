@@ -18,31 +18,14 @@ void UVoxelTorch::OnReset_Implementation()
 	bOn = true;
 }
 
-void UVoxelTorch::Serialize(FArchive& Ar)
+void UVoxelTorch::LoadData(const FString& InData)
 {
-	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << bOn;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << bOn;
-		}
-	}
+	bOn = (bool)FCString::Atoi(*InData);
 }
 
-void UVoxelTorch::LoadData(FSaveData* InSaveData, EPhase InPhase)
+FString UVoxelTorch::ToData()
 {
-	Super::LoadData(InSaveData, InPhase);
-}
-
-FSaveData* UVoxelTorch::ToData(bool bRefresh)
-{
-	return Super::ToData(bRefresh);
+	return FString::FromInt(bOn);
 }
 
 void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -80,13 +63,13 @@ void UVoxelTorch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelTorch::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelTorch::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	switch (InActionType)
 	{
 		case EVoxelActionType::Action1:
 		{
-			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
+			return Super::OnAgentAction(InAgent, InActionType, InHitResult);
 		}
 		case EVoxelActionType::Action2:
 		{

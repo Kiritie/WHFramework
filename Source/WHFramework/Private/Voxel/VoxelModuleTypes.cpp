@@ -34,16 +34,26 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData) : FVoxelI
 	}
 }
 
-FVoxelItem::FVoxelItem(const FVoxelSaveData& InSaveData) : FAbilityItem(InSaveData)
+FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	RefreshData();
 	TArray<FString> DataStrs;
-	InSaveData.VoxelData.ParseIntoArray(DataStrs, TEXT(";"));
-	if(DataStrs.Num() >= 3)
+	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
+	if(DataStrs.IsValidIndex(0))
 	{
 		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
-		Index = FIndex(DataStrs[1]);
+	}
+	if(DataStrs.IsValidIndex(1))
+	{
+		Index = UVoxelModuleBPLibrary::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
+	}
+	if(DataStrs.IsValidIndex(2))
+	{
 		Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
+	}
+	if(DataStrs.IsValidIndex(3))
+	{
+		Data = *DataStrs[3];
 	}
 	Owner = nullptr;
 	Auxiliary = nullptr;
@@ -57,7 +67,7 @@ void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 	bGenerated = true;
 	if(Owner)
 	{
-		Auxiliary = Owner->SpawnAuxiliary(Index);
+		Owner->SpawnAuxiliary(*this);
 	}
 	GetVoxel().OnGenerate(InAgent);
 }
@@ -69,10 +79,26 @@ void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 	GetVoxel().OnDestroy(InAgent);
 	if(Owner)
 	{
-		Owner->DestroyAuxiliary(Index);
-		Auxiliary = nullptr;
+		Owner->DestroyAuxiliary(*this);
 	}
 	bGenerated = false;
+}
+
+void FVoxelItem::RefreshData(UVoxel* InVoxel)
+{
+	if(!InVoxel)
+	{
+		Data = GetVoxel().ToData();
+	}
+	else if(Owner)
+	{
+		Owner->GetVoxelItem(Index).Data = InVoxel->ToData();
+	}
+}
+
+FString FVoxelItem::ToSaveData(bool bRefresh) const
+{
+	return FString::Printf(TEXT("%d;%d;%d;%s"), (int32)GetVoxelType(), UVoxelModuleBPLibrary::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
 }
 
 bool FVoxelItem::IsValid(bool bNeedNotNull) const
@@ -88,22 +114,6 @@ bool FVoxelItem::IsUnknown() const
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
 	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
-}
-
-void FVoxelItem::RefreshData(UVoxel* InVoxel)
-{
-	*this = (InVoxel ? *InVoxel : GetVoxel()).GetSaveDataRef<FVoxelItem>(true);
-}
-
-FVoxelSaveData FVoxelItem::ToSaveData(bool bRefresh) const
-{
-	// if(!bRefresh)
-	{
-		FVoxelSaveData VoxelSaveData = FVoxelSaveData(*this);
-		VoxelSaveData.VoxelData = FString::Printf(TEXT("%d;%s;%d"), GetVoxelType(), *Index.ToString(), Angle);
-		return VoxelSaveData;
-	}
-	return GetVoxel().GetSaveDataRef<FVoxelItem>().ToSaveData(false);
 }
 
 FVoxelItem& FVoxelItem::GetMain() const

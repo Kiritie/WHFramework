@@ -20,28 +20,28 @@ class WHFRAMEWORK_API UMainModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void RunModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+	static void RunModuleByClass(TSubclassOf<AModuleBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void RunModuleByName(const FName InModuleName);
+	static void RunModuleByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void ResetModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+	static void ResetModuleByClass(TSubclassOf<AModuleBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void ResetModuleByName(const FName InModuleName);
+	static void ResetModuleByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void PauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+	static void PauseModuleByClass(TSubclassOf<AModuleBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void PauseModuleByName(const FName InModuleName);
+	static void PauseModuleByName(const FName InName);
 		
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void UnPauseModuleByClass(TSubclassOf<AModuleBase> InModuleClass);
+	static void UnPauseModuleByClass(TSubclassOf<AModuleBase> InClass);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
-	static void UnPauseModuleByName(const FName InModuleName);
+	static void UnPauseModuleByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "MainModuleBPLibrary")
 	static void PauseMainModule();
@@ -62,12 +62,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
 	static TArray<AModuleBase*> GetAllModule(bool bInEditor = false);
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
-	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InModuleClass, bool bInEditor = false);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleBPLibrary")
+	static AModuleBase* GetModuleByClass(TSubclassOf<AModuleBase> InClass, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleBPLibrary")
-	static AModuleBase* GetModuleByName(const FName InModuleName, bool bInEditor = false);
+	static AModuleBase* GetModuleByName(const FName InName, bool bInEditor = false);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InModuleClass"), Category = "MainModuleBPLibrary")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleBPLibrary")
 	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor = false);
 };

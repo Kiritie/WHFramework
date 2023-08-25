@@ -14,9 +14,9 @@ USaveGameBase::USaveGameBase()
 	bLoaded = false;
 }
 
-void USaveGameBase::OnCreate_Implementation(int32 InSaveIndex)
+void USaveGameBase::OnCreate_Implementation(int32 InIndex)
 {
-	SaveIndex = InSaveIndex;
+	SaveIndex = InIndex;
 }
 
 void USaveGameBase::OnSave_Implementation()
@@ -41,10 +41,6 @@ void USaveGameBase::OnRefresh_Implementation()
 }
 
 void USaveGameBase::OnDestroy_Implementation()
-{
-}
-
-void USaveGameBase::OnActiveChange_Implementation(bool bActive)
 {
 }
 
@@ -80,5 +76,5 @@ bool USaveGameBase::Destroy()
 
 bool USaveGameBase::IsActived() const
 {
-	return USaveGameModuleBPLibrary::GetActiveSaveIndex(GetClass()) == SaveIndex;
+	return USaveGameModuleBPLibrary::GetSaveGameInfo(GetClass()).ActiveIndex == SaveIndex;
 }

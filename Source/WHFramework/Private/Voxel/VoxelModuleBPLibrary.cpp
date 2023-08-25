@@ -90,6 +90,24 @@ FVector UVoxelModuleBPLibrary::VoxelIndexToLocation(FIndex InIndex)
 	return FVector::ZeroVector;
 }
 
+int32 UVoxelModuleBPLibrary::VoxelIndexToNumber(FIndex InIndex)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->VoxelIndexToNumber(InIndex);
+	}
+	return 0;
+}
+
+FIndex UVoxelModuleBPLibrary::NumberToVoxelIndex(int32 InNumber)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->NumberToVoxelIndex(InNumber);
+	}
+	return FIndex::ZeroIndex;
+}
+
 AVoxelChunk* UVoxelModuleBPLibrary::FindChunkByIndex(FIndex InIndex)
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
@@ -138,7 +156,7 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 	{
 		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : UVoxel::StaticClass();
 		UVoxel& voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true, tmpClass);
-		voxel.SetID(InVoxelID);
+		voxel.SetItem(InVoxelID);
 		return voxel;
 	}
 	return UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true);
@@ -149,7 +167,8 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 	if(InVoxelItem.IsEmpty()) return UVoxel::GetEmpty();
 	if(InVoxelItem.IsUnknown()) return UVoxel::GetUnknown();
 	UVoxel& voxel = GetVoxel(InVoxelItem.ID);
-	voxel.LoadSaveData(&const_cast<FVoxelItem&>(InVoxelItem), EPhase::Primary);
+	voxel.SetItem(InVoxelItem);
+	voxel.LoadData(InVoxelItem.Data);
 	return voxel;
 }
 

@@ -17,16 +17,12 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Voxels/VoxelWater.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
 UVoxel::UVoxel()
 {
-	ID = FPrimaryAssetId();
-	Index = FIndex::ZeroIndex;
-	Angle = ERightAngle::RA_0;
-	Owner = nullptr;
-	Auxiliary = nullptr;
-	bGenerated = false;
+	
 }
 
 UVoxel& UVoxel::GetEmpty()
@@ -41,57 +37,31 @@ UVoxel& UVoxel::GetUnknown()
 
 void UVoxel::OnReset_Implementation()
 {
-	ID = FPrimaryAssetId();
-	Index = FIndex::ZeroIndex;
-	Angle = ERightAngle::RA_0;
-	Owner = nullptr;
-	Auxiliary = nullptr;
-	bGenerated = false;
+	Item = FVoxelItem();
 }
 
-void UVoxel::Serialize(FArchive& Ar)
+void UVoxel::LoadData(const FString& InData)
 {
-	Super::Serialize(Ar);
+	
 }
 
-void UVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
+FString UVoxel::ToData()
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
-	ID = SaveData.ID;
-	Index = SaveData.Index;
-	Angle = SaveData.Angle;
-	Owner = SaveData.Owner;
-	Auxiliary = SaveData.Auxiliary;
-	bGenerated = SaveData.bGenerated;
-}
-
-FSaveData* UVoxel::ToData(bool bRefresh)
-{
-	static FVoxelItem SaveData;
-	SaveData = FVoxelItem();
-
-	SaveData.ID = ID;
-	SaveData.Index = Index;
-	SaveData.Angle = Angle;
-	SaveData.Owner = Owner;
-	SaveData.Auxiliary = Auxiliary;
-	SaveData.bGenerated = bGenerated;
-
-	return &SaveData;
+	return TEXT("");
 }
 
 void UVoxel::RefreshData()
 {
-	GetItem().RefreshData(this);
+	Item.RefreshData(this);
 }
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(!InAgent) return;
+	if(InAgent) return;
 	
-	if(GetData().PartType == EVoxelPartType::Main)
+	if(GetData().bMainPart)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GenerateSound, GetLocation());
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
 	}
 }
 
@@ -99,14 +69,26 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(!InAgent) return;
 	
-	if(GetData().PartType == EVoxelPartType::Main)
+	if(GetData().bMainPart)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().DestroySound, GetLocation());
-		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(ID, 1), GetLocation() + GetData().GetRange(Angle) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, Owner);
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
+		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, GetOwner());
 	}
-	if(Owner && !Owner->CheckVoxelAdjacent(Index, EDirection::Up))
+	if(GetOwner())
 	{
-		Owner->SetVoxelComplex(UMathBPLibrary::GetAdjacentIndex(Index, EDirection::Up, Angle), FVoxelItem::Empty, true, InAgent);
+		TMap<FIndex, FVoxelItem> VoxelItems;
+		ITER_ARRAY({ EVoxelType::Water }, WaterType,
+			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
+			{
+				VoxelItems.Emplace(GetIndex(), UVoxelModuleBPLibrary::VoxelTypeToAssetID(WaterType));
+				break;
+			}
+		)
+		if(GetOwner()->HasVoxel(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(GetIndex(), EDirection::Up))
+		{
+			VoxelItems.Emplace(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
+		}
+		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
 	}
 }
 
@@ -130,7 +112,7 @@ void UVoxel::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& I
 	
 }
 
-bool UVoxel::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxel::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	switch (InActionType)
 	{
@@ -160,19 +142,4 @@ bool UVoxel::IsEmpty() const
 bool UVoxel::IsUnknown() const
 {
 	return &UVoxel::GetUnknown() == this;
-}
-
-FVector UVoxel::GetLocation(bool bWorldSpace) const
-{
-	return Owner ? Owner->IndexToLocation(Index, bWorldSpace) : FVector::ZeroVector;
-}
-
-UVoxelData& UVoxel::GetData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID);
-}
-
-FVoxelItem& UVoxel::GetItem()
-{
-	return Owner ? Owner->GetVoxelItem(Index) : GetSaveDataRef<FVoxelItem>();
 }

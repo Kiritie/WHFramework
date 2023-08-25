@@ -5,8 +5,6 @@
 #include "Voxel.h"
 #include "VoxelWater.generated.h"
 
-class AVoxelChunk;
-
 /**
  * ����ˮ
  */
@@ -19,14 +17,12 @@ public:
 	UVoxelWater();
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Defaults
-protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	// Voxel
+public:
+	virtual void LoadData(const FString& InData) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FString ToData() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	// Events
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
 
@@ -40,5 +36,5 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
+	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
 };

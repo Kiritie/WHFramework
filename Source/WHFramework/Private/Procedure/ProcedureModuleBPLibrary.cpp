@@ -9,7 +9,7 @@
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Procedure/Base/ProcedureBase.h"
 
-UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
@@ -18,38 +18,38 @@ UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProc
 	return nullptr;
 }
 
-bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InProcedureIndex)
+bool UProcedureModuleBPLibrary::HasProcedureByIndex(int32 InIndex)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		return ProcedureModule->HasProcedureByIndex(InProcedureIndex);
+		return ProcedureModule->HasProcedureByIndex(InIndex);
 	}
 	return false;
 }
 
-UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		return ProcedureModule->GetProcedureByIndex(InProcedureIndex, InProcedureClass);
+		return ProcedureModule->GetProcedureByIndex(InIndex, InClass);
 	}
 	return nullptr;
 }
 
-bool UProcedureModuleBPLibrary::HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+bool UProcedureModuleBPLibrary::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		return ProcedureModule->HasProcedureByClass(InProcedureClass);
+		return ProcedureModule->HasProcedureByClass(InClass);
 	}
 	return false;
 }
 
-UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* UProcedureModuleBPLibrary::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		return ProcedureModule->GetProcedureByClass(InProcedureClass);
+		return ProcedureModule->GetProcedureByClass(InClass);
 	}
 	return nullptr;
 }
@@ -63,11 +63,11 @@ bool UProcedureModuleBPLibrary::IsCurrentProcedure(UProcedureBase* InProcedure)
 	return false;
 }
 
-bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InProcedureIndex)
+bool UProcedureModuleBPLibrary::IsCurrentProcedureIndex(int32 InIndex)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		return ProcedureModule->IsCurrentProcedureIndex(InProcedureIndex);
+		return ProcedureModule->IsCurrentProcedureIndex(InIndex);
 	}
 	return false;
 }
@@ -80,19 +80,19 @@ void UProcedureModuleBPLibrary::SwitchProcedure(UProcedureBase* InProcedure)
 	}
 }
 
-void UProcedureModuleBPLibrary::SwitchProcedureByIndex(int32 InProcedureIndex)
+void UProcedureModuleBPLibrary::SwitchProcedureByIndex(int32 InIndex)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		ProcedureModule->SwitchProcedureByIndex(InProcedureIndex);
+		ProcedureModule->SwitchProcedureByIndex(InIndex);
 	}
 }
 
-void UProcedureModuleBPLibrary::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+void UProcedureModuleBPLibrary::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
 	if(AProcedureModule* ProcedureModule = AProcedureModule::Get())
 	{
-		ProcedureModule->SwitchProcedureByClass(InProcedureClass);
+		ProcedureModule->SwitchProcedureByClass(InClass);
 	}
 }
 

@@ -53,16 +53,6 @@ enum class EVoxelWorldState : uint8
 	MeshBuild
 };
 
-UENUM(BlueprintType)
-enum class EVoxelChunkState : uint8
-{
-	None,
-	Spawned,
-	Builded,
-	Generated,
-	Finally
-};
-
 /**
  * ????????
  */
@@ -123,16 +113,6 @@ enum class EVoxelType : uint8
  * ????
  */
 UENUM(BlueprintType)
-enum class EVoxelPartType : uint8
-{
-	Main,
-	Part
-};
-
-/**
- * ????
- */
-UENUM(BlueprintType)
 enum class EVoxelMeshType : uint8
 {
 	Cube,
@@ -151,6 +131,26 @@ enum class EVoxelTransparency : uint8
 	SemiTransparent,
 	// ???
 	Transparent
+};
+
+/**
+ * 像素声音类型
+ */
+UENUM(BlueprintType)
+enum class EVoxelSoundType : uint8
+{
+	// 生成
+	Generate,
+	// 销毁
+	Destroy,
+	// 脚步
+	Footstep,
+	// 交互1
+	Interact1,
+	// 交互1
+	Interact2,
+	// 交互3
+	Interact3,
 };
 
 /**
@@ -197,27 +197,6 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelSaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	FString VoxelData;
-
-public:
-	FVoxelSaveData()
-	{
-		VoxelData = TEXT("");
-	}
-		
-	FVoxelSaveData(const FSaveData& InSaveData) : FSaveData(InSaveData)
-	{
-		VoxelData = TEXT("");
-	}
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 {
 	GENERATED_BODY()
@@ -233,6 +212,9 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	ERightAngle Angle;
 
+	UPROPERTY(BlueprintReadWrite)
+	FString Data;
+
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Owner;
 
@@ -247,6 +229,7 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;
@@ -256,15 +239,17 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;
 	}
 	
-	FVoxelItem(const FVoxelItem& InVoxelItem, int InCount) : FAbilityItem(InVoxelItem, InCount)
+	FVoxelItem(const FVoxelItem& InVoxelItem, int32 InCount) : FAbilityItem(InVoxelItem, InCount)
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
 		bGenerated = false;
@@ -274,7 +259,7 @@ public:
 
 	FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData = false);
 
-	FVoxelItem(const FVoxelSaveData& InSaveData);
+	FVoxelItem(const FString& InSaveData);
 
 public:
 	void OnGenerate(IVoxelAgentInterface* InAgent = nullptr);
@@ -283,13 +268,14 @@ public:
 
 	void RefreshData(UVoxel* InVoxel = nullptr);
 
+	FString ToSaveData(bool bRefresh = false) const;
+
+public:
 	bool IsValid(bool bNeedNotNull = false) const override;
 
 	bool IsUnknown() const;
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
-
-	FVoxelSaveData ToSaveData(bool bRefresh = false) const;
 
 	FVoxelItem& GetMain() const;
 
@@ -321,6 +307,7 @@ public:
 
 	UVoxelData& GetVoxelData(bool bLogWarning = true) const;
 
+public:
 	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
 	{
 		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level) && (A.Index == B.Index);
@@ -407,26 +394,30 @@ public:
 	FIndex Index;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TArray<FVoxelSaveData> VoxelDatas;
+	FString VoxelDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	bool bBuilded;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	bool bGenerated;
+
 	FORCEINLINE FVoxelChunkSaveData()
 	{
 		Index = FIndex::ZeroIndex;
-		VoxelDatas = TArray<FVoxelSaveData>();
+		VoxelDatas = TEXT("");
 		PickUpDatas = TArray<FPickUpSaveData>();
+		bBuilded = false;
+		bGenerated = false;
 	}
 
 public:
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
-		for(auto& Iter : VoxelDatas)
-		{
-			Iter.MakeSaved();
-		}
 		for(auto& Iter : PickUpDatas)
 		{
 			Iter.MakeSaved();
@@ -575,6 +566,24 @@ public:
 	
 public:
 	virtual bool IsExistChunkData(FIndex InChunkIndex) const { return false; }
+	
+	virtual bool IsBuildChunkData(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return ChunkData->bBuilded;
+		}
+		return false;
+	}
+	
+	virtual bool IsGenerateChunkData(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return ChunkData->bGenerated;
+		}
+		return false;
+	}
 
 	template<class T>
 	T* GetChunkData(FIndex InChunkIndex)

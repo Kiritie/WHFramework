@@ -22,7 +22,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(int32 InSaveIndex);
+	void OnCreate(int32 InIndex);
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnSave();
@@ -42,18 +42,15 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnActiveChange(bool bActive);
-
 public:
 	UFUNCTION(BlueprintCallable)
 	bool Save(bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
-	bool Load(EPhase InPhase = EPhase::Lesser);
+	bool Load(EPhase InPhase = EPhase::All);
 
 	UFUNCTION(BlueprintCallable)
-	bool Unload(EPhase InPhase = EPhase::Lesser);
+	bool Unload(EPhase InPhase = EPhase::All);
 
 	UFUNCTION(BlueprintCallable)
 	bool Reset();
@@ -85,7 +82,7 @@ public:
 	int32 GetSaveIndex() const { return SaveIndex; }
 	
 	UFUNCTION(BlueprintCallable)
-	void SetSaveIndex(int32 InSaveIndex) { this->SaveIndex = InSaveIndex; }
+	void SetSaveIndex(int32 InIndex) { this->SaveIndex = InIndex; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsSaved() const { return bSaved; }

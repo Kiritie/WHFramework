@@ -80,7 +80,9 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 
 	RaceID = NAME_None;
 	Level = 0;
-} 
+
+	Inventory->UnloadSaveData(EPhase::Primary);
+}
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {

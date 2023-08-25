@@ -73,11 +73,11 @@ private:
 	
 public:
 	template<class T>
-	T* GetModuleNetCompByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	T* GetModuleNetCompByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(ModuleNetCompMap.Contains(InModuleClass))
+		if(ModuleNetCompMap.Contains(InClass))
 		{
-			return Cast<T>(ModuleNetCompMap[InModuleClass]);
+			return Cast<T>(ModuleNetCompMap[InClass]);
 		}
 		return nullptr;
 	}

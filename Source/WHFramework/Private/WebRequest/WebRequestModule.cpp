@@ -91,32 +91,32 @@ FString AWebRequestModule::GetServerURL() const
 	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
 }
 
-bool AWebRequestModule::HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+bool AWebRequestModule::HasWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(!InWebInterfaceClass) return false;
+	if(!InClass) return false;
 
-	return WebInterfaceMap.Contains(InWebInterfaceClass);
+	return WebInterfaceMap.Contains(InClass);
 }
 
-UWebInterfaceBase* AWebRequestModule::GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+UWebInterfaceBase* AWebRequestModule::GetWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(!InWebInterfaceClass) return nullptr;
+	if(!InClass) return nullptr;
 
-	if(HasWebInterface(InWebInterfaceClass))
+	if(HasWebInterface(InClass))
 	{
-		return WebInterfaceMap[InWebInterfaceClass];
+		return WebInterfaceMap[InClass];
 	}
 	return nullptr;
 }
 
-UWebInterfaceBase* AWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+UWebInterfaceBase* AWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(!InWebInterfaceClass) return nullptr;
+	if(!InClass) return nullptr;
 
-	if(!HasWebInterface(InWebInterfaceClass))
+	if(!HasWebInterface(InClass))
 	{
-		UWebInterfaceBase* WebInterface = UObjectPoolModuleBPLibrary::SpawnObject<UWebInterfaceBase>(nullptr, InWebInterfaceClass);
-		WebInterfaceMap.Add(InWebInterfaceClass, WebInterface);
+		UWebInterfaceBase* WebInterface = UObjectPoolModuleBPLibrary::SpawnObject<UWebInterfaceBase>(nullptr, InClass);
+		WebInterfaceMap.Add(InClass, WebInterface);
 		
 		WHLog(FString::Printf(TEXT("Succeeded to creating the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
 		
@@ -125,15 +125,15 @@ UWebInterfaceBase* AWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfa
 	return nullptr;
 }
 
-bool AWebRequestModule::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
+bool AWebRequestModule::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	if(!InWebInterfaceClass) return false;
+	if(!InClass) return false;
 
-	if(UWebInterfaceBase* WebInterface = HasWebInterface(InWebInterfaceClass) ? GetWebInterface(InWebInterfaceClass) : CreateWebInterface(InWebInterfaceClass))
+	if(UWebInterfaceBase* WebInterface = HasWebInterface(InClass) ? GetWebInterface(InClass) : CreateWebInterface(InClass))
 	{
-		if(!WebInterface->GetOnWebRequestComplete().Contains(InOnWebRequestComplete))
+		if(!WebInterface->GetOnWebRequestComplete().Contains(InOnRequestComplete))
 		{
-			WebInterface->GetOnWebRequestComplete().Add(InOnWebRequestComplete);
+			WebInterface->GetOnWebRequestComplete().Add(InOnRequestComplete);
 			
 			WHLog(FString::Printf(TEXT("Succeeded to register the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
 			
@@ -143,15 +143,15 @@ bool AWebRequestModule::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWe
 	return false;
 }
 
-bool AWebRequestModule::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete)
+bool AWebRequestModule::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	if(!InWebInterfaceClass) return false;
+	if(!InClass) return false;
 
-	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
+	if(UWebInterfaceBase* WebInterface = GetWebInterface(InClass))
 	{
-		if(WebInterface->GetOnWebRequestComplete().Contains(InOnWebRequestComplete))
+		if(WebInterface->GetOnWebRequestComplete().Contains(InOnRequestComplete))
 		{
-			WebInterface->GetOnWebRequestComplete().Remove(InOnWebRequestComplete);
+			WebInterface->GetOnWebRequestComplete().Remove(InOnRequestComplete);
 
 			WHLog(FString::Printf(TEXT("Succeeded to un register the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
 
@@ -161,11 +161,11 @@ bool AWebRequestModule::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> In
 	return false;
 }
 
-bool AWebRequestModule::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+bool AWebRequestModule::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(!InWebInterfaceClass) return false;
+	if(!InClass) return false;
 
-	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
+	if(UWebInterfaceBase* WebInterface = GetWebInterface(InClass))
 	{
 		WebInterface->GetOnWebRequestComplete().Clear();
 
@@ -176,13 +176,13 @@ bool AWebRequestModule::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase>
 	return false;
 }
 
-bool AWebRequestModule::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass)
+bool AWebRequestModule::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(!InWebInterfaceClass) return nullptr;
+	if(!InClass) return nullptr;
 
-	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
+	if(UWebInterfaceBase* WebInterface = GetWebInterface(InClass))
 	{
-		WebInterfaceMap.Remove(InWebInterfaceClass);
+		WebInterfaceMap.Remove(InClass);
 		UObjectPoolModuleBPLibrary::DespawnObject(WebInterface);
 
 		WHLog(FString::Printf(TEXT("Succeeded to clear the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
@@ -201,11 +201,11 @@ void AWebRequestModule::ClearAllWebInterface()
 	WebInterfaceMap.Empty();
 }
 
-bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(!InWebInterfaceClass) return false;
+	if(!InClass) return false;
 
-	if(UWebInterfaceBase* WebInterface = GetWebInterface(InWebInterfaceClass))
+	if(UWebInterfaceBase* WebInterface = GetWebInterface(InClass))
 	{
 		const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
@@ -260,9 +260,9 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInter
 	return false;
 }
 
-bool AWebRequestModule::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+bool AWebRequestModule::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return SendWebRequest(InWebInterfaceClass, InMethod, InHeadMap, InContent);
+	return SendWebRequest(InClass, InMethod, InHeadMap, InContent);
 }
 
 void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent)

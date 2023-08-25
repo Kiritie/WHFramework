@@ -140,27 +140,27 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 	}
 }
 
-void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera, bool bInstant)
+void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByClass(InCharacterClass), bResetCamera, bInstant);
+	SwitchCharacter(GetCharacterByClass(InClass), bResetCamera, bInstant);
 }
 
-void ACharacterModule::SwitchCharacterByName(FName InCharacterName, bool bResetCamera, bool bInstant)
+void ACharacterModule::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByName(InCharacterName), bResetCamera, bInstant);
+	SwitchCharacter(GetCharacterByName(InName), bResetCamera, bInstant);
 }
 
-bool ACharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const
+bool ACharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
-	if(!InCharacterClass) return nullptr;
+	if(!InClass) return nullptr;
 	
-	const FName CharacterName = InCharacterClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
 	return HasCharacterByName(CharacterName);
 }
 
-bool ACharacterModule::HasCharacterByName(FName InCharacterName) const
+bool ACharacterModule::HasCharacterByName(FName InName) const
 {
-	return CharacterMap.Contains(InCharacterName);
+	return CharacterMap.Contains(InName);
 }
 
 ACharacterBase* ACharacterModule::GetCurrentCharacter() const
@@ -168,24 +168,24 @@ ACharacterBase* ACharacterModule::GetCurrentCharacter() const
 	return CurrentCharacter;
 }
 
-ACharacterBase* ACharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass) const
+ACharacterBase* ACharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const
 {
 	return CurrentCharacter;
 }
 
-ACharacterBase* ACharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass) const
+ACharacterBase* ACharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
-	if(!InCharacterClass) return nullptr;
+	if(!InClass) return nullptr;
 	
-	const FName CharacterName = InCharacterClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
 	return GetCharacterByName(CharacterName);
 }
 
-ACharacterBase* ACharacterModule::GetCharacterByName(FName InCharacterName) const
+ACharacterBase* ACharacterModule::GetCharacterByName(FName InName) const
 {
 	for (auto Iter : Characters)
 	{
-		if(Iter->GetNameC() == InCharacterName)
+		if(Iter->GetNameC() == InName)
 		{
 			return Iter;
 		}

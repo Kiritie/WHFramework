@@ -19,7 +19,7 @@ public:
 	UVoxelSaveGame();
 	
 public:
-	virtual void OnCreate_Implementation(int32 InSaveIndex) override;
+	virtual void OnCreate_Implementation(int32 InIndex) override;
 	
 	virtual void OnLoad_Implementation(EPhase InPhase) override;
 	

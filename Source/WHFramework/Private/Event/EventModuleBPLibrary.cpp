@@ -9,19 +9,19 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
+void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{
-		EventModule->SubscribeEvent(InEventHandleClass, InOwner, InFuncName);
+		EventModule->SubscribeEvent(InClass, InOwner, InFuncName);
 	}
 }
 
-void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
+void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{
-		EventModule->UnsubscribeEvent(InEventHandleClass, InOwner, InFuncName);
+		EventModule->UnsubscribeEvent(InClass, InOwner, InFuncName);
 	}
 }
 
@@ -33,10 +33,10 @@ void UEventModuleBPLibrary::UnsubscribeAllEvent()
 	}
 }
 
-void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModuleBPLibrary::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{
-		EventModule->BroadcastEvent(InEventHandleClass, InEventNetType, InSender, InParams);
+		EventModule->BroadcastEvent(InClass, InNetType, InSender, InParams);
 	}
 }

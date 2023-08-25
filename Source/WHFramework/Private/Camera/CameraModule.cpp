@@ -283,7 +283,7 @@ void ACameraModule::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass) const
+ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass) const
 {
 	return CurrentCamera;
 }
@@ -317,19 +317,19 @@ APlayerCameraManager* ACameraModule::GetCurrentCameraManager()
 	return GetPlayerController()->PlayerCameraManager.Get();
 }
 
-ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
+ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass)
 {
-	if(!InCameraClass) return nullptr;
+	if(!InClass) return nullptr;
 	
-	const FName CameraName = InCameraClass.GetDefaultObject()->GetCameraName();
+	const FName CameraName = InClass.GetDefaultObject()->GetCameraName();
 	return GetCameraByName(CameraName);
 }
 
-ACameraPawnBase* ACameraModule::GetCameraByName(const FName InCameraName) const
+ACameraPawnBase* ACameraModule::GetCameraByName(const FName InName) const
 {
-	if(CameraMap.Contains(InCameraName))
+	if(CameraMap.Contains(InName))
 	{
-		return CameraMap[InCameraName];
+		return CameraMap[InName];
 	}
 	return nullptr;
 }
@@ -361,15 +361,15 @@ void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 	}
 }
 
-void ACameraModule::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant)
+void ACameraModule::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
 {
-	const FName CameraName = InCameraClass ? InCameraClass.GetDefaultObject()->GetCameraName() : NAME_None;
+	const FName CameraName = InClass ? InClass.GetDefaultObject()->GetCameraName() : NAME_None;
 	SwitchCameraByName(CameraName, bInstant);
 }
 
-void ACameraModule::SwitchCameraByName(const FName InCameraName, bool bInstant)
+void ACameraModule::SwitchCameraByName(const FName InName, bool bInstant)
 {
-	SwitchCamera(GetCameraByName(InCameraName), bInstant);
+	SwitchCamera(GetCameraByName(InName), bInstant);
 }
 
 void ACameraModule::DoTrackTarget(bool bInstant)
@@ -504,7 +504,7 @@ void ACameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 {
 	if(!GetPlayerController()) return;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(bInstant)
 	{
 		CurrentCameraRotation = TargetCameraRotation;
@@ -517,7 +517,7 @@ void ACameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuratio
 {
 	if(!GetPlayerController()) return;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(InDuration > 0.f)
 	{
 		CameraDoRotateTime = 0.f;

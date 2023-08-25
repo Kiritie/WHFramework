@@ -24,6 +24,15 @@ void UAudioModuleBPLibrary::PlaySoundAtLocation(USoundBase* InSound, FVector InL
 	}
 }
 
+FSingleSoundInfo UAudioModuleBPLibrary::GetSingleSoundInfo(const FSingleSoundHandle& InHandle)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		return AudioModule->GetSingleSoundInfo(InHandle);
+	}
+	return FSingleSoundInfo();
+}
+
 FSingleSoundHandle UAudioModuleBPLibrary::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())

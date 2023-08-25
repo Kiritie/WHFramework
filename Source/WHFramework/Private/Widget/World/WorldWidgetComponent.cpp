@@ -262,18 +262,18 @@ void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 	}
 }
 
-void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bRefresh)
+void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh)
 {
 	switch(Space)
 	{
 		case EWidgetSpace::World:
 		{
-			if(WidgetClass != InWidgetClass)
+			if(WidgetClass != InClass)
 			{
-				WidgetClass = InWidgetClass;
-				if(WorldWidgetClass != InWidgetClass)
+				WidgetClass = InClass;
+				if(WorldWidgetClass != InClass)
 				{
-					WorldWidgetClass = InWidgetClass;
+					WorldWidgetClass = InClass;
 				}
 				if(bRefresh)
 				{
@@ -297,9 +297,9 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidge
 		}
 		case EWidgetSpace::Screen:
 		{
-			if(WorldWidgetClass != InWidgetClass)
+			if(WorldWidgetClass != InClass)
 			{
-				WorldWidgetClass = InWidgetClass;
+				WorldWidgetClass = InClass;
 				if(bRefresh)
 				{
 					if(WorldWidgetClass)

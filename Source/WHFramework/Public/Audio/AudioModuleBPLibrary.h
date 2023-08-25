@@ -26,6 +26,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SingleSound
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static FSingleSoundInfo GetSingleSoundInfo(const FSingleSoundHandle& InHandle);
+
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
 	static FSingleSoundHandle PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
 

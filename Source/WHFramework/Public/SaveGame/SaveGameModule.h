@@ -70,67 +70,67 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	FString GetSaveSlotName(FName InSaveName, int32 InSaveIndex) const;
+	FString GetSaveSlotName(FName InSaveName, int32 InIndex) const;
 
 	template<class T>
-	bool HasSaveGame(int32 InSaveIndex = -1, bool bFindOnDisk = false, bool bNeedLoaded = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	bool HasSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
-		return HasSaveGame(InSaveGameClass, InSaveIndex);
+		return HasSaveGame(InClass, InIndex);
 	}
 
 	UFUNCTION(BlueprintPure)
-	bool HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bFindOnDisk = false, bool bNeedLoaded = false) const;
-	
+	bool HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1) const;
+		
 	template<class T>
-	int32 GetValidSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	FName GetSaveName(TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
-		return GetValidSaveIndex(InSaveGameClass);
+		return GetSaveName(InClass);
 	}
 
 	UFUNCTION(BlueprintPure)
-	int32 GetValidSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass) const;
+	FName GetSaveName(TSubclassOf<USaveGameBase> InClass) const;
 
 	template<class T>
-	int32 GetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	int32 GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
-		return GetActiveSaveIndex(InSaveGameClass);
+		return GetValidSaveIndex(InClass);
 	}
 
 	UFUNCTION(BlueprintPure)
-	int32 GetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass) const;
+	int32 GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass) const;
 
 	template<class T>
-	void SetActiveSaveIndex(int32 InSaveIndex, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	int32 GetActiveSaveIndex(TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
-		SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
-	}
-
-	UFUNCTION(BlueprintCallable)
-	void SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex);
-
-	template<class T>
-	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
-	{
-		return GetSaveGameInfo(InSaveGameClass);
+		return GetActiveSaveIndex(InClass);
 	}
 
 	UFUNCTION(BlueprintPure)
-	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass) const;
+	int32 GetActiveSaveIndex(TSubclassOf<USaveGameBase> InClass) const;
 
 	template<class T>
-	T* GetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
-		return Cast<T>(GetSaveGame(InSaveGameClass, InSaveIndex));
+		return GetSaveGameInfo(InClass);
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1) const;
+	UFUNCTION(BlueprintPure)
+	FSaveGameInfo GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass) const;
 
 	template<class T>
-	TArray<T*> GetSaveGames(TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass()) const
+	T* GetSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
+	{
+		return Cast<T>(GetSaveGame(InClass, InIndex));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	USaveGameBase* GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1) const;
+
+	template<class T>
+	TArray<T*> GetSaveGames(TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const
 	{
 		TArray<T*> SaveGames;
-		for(auto Iter : GetSaveGames(InSaveGameClass))
+		for(auto Iter : GetSaveGames(InClass))
 		{
 			SaveGames.Add(Cast<T>(Iter));
 		}
@@ -138,100 +138,100 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	TArray<USaveGameBase*> GetSaveGames(TSubclassOf<USaveGameBase> InSaveGameClass) const;
+	TArray<USaveGameBase*> GetSaveGames(TSubclassOf<USaveGameBase> InClass) const;
 
 	template<class T>
-	T* CreateSaveGame(int32 InSaveIndex = -1, bool bAutoLoad = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* CreateSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::None, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(CreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad));
+		return Cast<T>(CreateSaveGame(InClass, InIndex, InPhase));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bAutoLoad = false);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	USaveGameBase* CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::None);
 
 	template<class T>
-	T* GetOrCreateSaveGame(int32 InSaveIndex = -1, bool bAutoLoad = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* GetOrCreateSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetOrCreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad));
+		return Cast<T>(GetOrCreateSaveGame(InClass, InIndex));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bAutoLoad = false);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	USaveGameBase* GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1);
 
 	template<class T>
-	T* LoadOrCreateSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* LoadOrCreateSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::All, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(LoadOrCreateSaveGame(InSaveGameClass, InSaveIndex));
+		return Cast<T>(LoadOrCreateSaveGame(InClass, InIndex, InPhase));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	USaveGameBase* LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::All);
 
 	template<class T>
-	bool SaveSaveGame(int32 InSaveIndex = -1, bool bRefresh = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool SaveSaveGame(int32 InIndex = -1, bool bRefresh = false, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return SaveSaveGame(InSaveGameClass, InSaveIndex, bRefresh);
-	}
-
-	UFUNCTION(BlueprintCallable)
-	bool SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, bool bRefresh = false);
-
-	template<class T>
-	bool SaveSaveGames(bool bRefresh = false, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
-	{
-		return SaveSaveGames(InSaveGameClass, bRefresh);
+		return SaveSaveGame(InClass, InIndex, bRefresh);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool SaveSaveGames(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh = false);
+	bool SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, bool bRefresh = false);
+
+	template<class T>
+	bool SaveSaveGames(bool bRefresh = false, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
+	{
+		return SaveSaveGames(InClass, bRefresh);
+	}
+
+	UFUNCTION(BlueprintCallable)
+	bool SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable)
 	bool SaveAllSaveGame(bool bRefresh = false);
 
 	template<class T>
-	T* LoadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	T* LoadSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::All, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(LoadSaveGame(InSaveGameClass, InSaveIndex, InPhase));
+		return Cast<T>(LoadSaveGame(InClass, InIndex, InPhase));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InSaveGameClass"))
-	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	USaveGameBase* LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::All);
 
 	template<class T>
-	bool UnloadSaveGame(int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool UnloadSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::All, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return UnloadSaveGame(InSaveGameClass, InSaveIndex, InPhase);
+		return UnloadSaveGame(InClass, InIndex, InPhase);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1, EPhase InPhase = EPhase::Lesser);
+	bool UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::All);
 
 	template<class T>
-	bool ResetSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool ResetSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return ResetSaveGame(InSaveGameClass, InSaveIndex);
+		return ResetSaveGame(InClass, InIndex);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	bool ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1);
 
 	template<class T>
-	bool RefreshSaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool RefreshSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return RefreshSaveGame(InSaveGameClass, InSaveIndex);
+		return RefreshSaveGame(InClass, InIndex);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	bool RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1);
 
 	template<class T>
-	bool DestroySaveGame(int32 InSaveIndex = -1, TSubclassOf<USaveGameBase> InSaveGameClass = T::StaticClass())
+	bool DestroySaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return DestroySaveGame(InSaveGameClass, InSaveIndex);
+		return DestroySaveGame(InClass, InIndex);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex = -1);
+	bool DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1);
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

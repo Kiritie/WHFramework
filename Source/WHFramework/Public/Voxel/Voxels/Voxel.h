@@ -18,39 +18,33 @@ class UVoxelData;
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UVoxel : public UWHObject
 {
 private:
 	GENERATED_BODY()
 
 public:
 	UVoxel();
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Object
+public:
+	virtual void OnReset_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Statics
+	// Voxel
 public:
 	static UVoxel& GetEmpty();
 
 	static UVoxel& GetUnknown();
-	
-	//////////////////////////////////////////////////////////////////////////
-	// Defaults
+
 public:
-	virtual int32 GetLimit_Implementation() const override { return 10000; }
+	virtual void LoadData(const FString& InData);
 
-	virtual void OnReset_Implementation() override;
-
-protected:
-	virtual void Serialize(FArchive& Ar) override;
-
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
-
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FString ToData();
 
 	virtual void RefreshData();
 
-	//////////////////////////////////////////////////////////////////////////
-	// Events
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent);
 
@@ -64,28 +58,11 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult);
+	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult);
 
-	//////////////////////////////////////////////////////////////////////////
-	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere)
-	FPrimaryAssetId ID;
-
-	UPROPERTY(VisibleAnywhere)
-	FIndex Index;
-
-	UPROPERTY(VisibleAnywhere)
-	ERightAngle Angle;
-
-	UPROPERTY(VisibleAnywhere)
-	AVoxelChunk* Owner;
-
-	UPROPERTY(VisibleAnywhere)
-	AVoxelAuxiliary* Auxiliary;
-
-	UPROPERTY(VisibleAnywhere)
-	bool bGenerated;
+	FVoxelItem Item;
 
 public:
 	bool IsValid() const;
@@ -94,40 +71,40 @@ public:
 
 	bool IsUnknown() const;
 
-	bool IsGenerated() const { return bGenerated; }
+	bool IsGenerated() const { return Item.bGenerated; }
 
-	FPrimaryAssetId GetID() const { return ID; }
+	FVoxelItem& GetItem() { return Item; }
 
-	void SetID(FPrimaryAssetId InID) { ID = InID; }
+	void SetItem(const FVoxelItem& InItem) { Item = InItem; }
 
-	FIndex GetIndex() const { return Index; }
+	FPrimaryAssetId GetID() const { return Item.ID; }
 
-	FVector GetLocation(bool bWorldSpace = true) const;
+	FIndex GetIndex() const { return Item.Index; }
 
-	ERightAngle GetAngle() const { return Angle; }
+	ERightAngle GetAngle() const { return Item.Angle; }
+
+	FVector GetLocation(bool bWorldSpace = true) const { return Item.GetLocation(bWorldSpace); }
 
 	template<class T>
 	T* GetOwner() const
 	{
-		return Cast<T>(Owner);
+		return Cast<T>(Item.Owner);
 	}
-	AVoxelChunk* GetOwner() const { return Owner; }
+	AVoxelChunk* GetOwner() const { return Item.Owner; }
 
 	template<class T>
 	T* GetAuxiliary() const
 	{
-		return Cast<T>(Auxiliary);
+		return Cast<T>(Item.Auxiliary);
 	}
-	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
+	AVoxelAuxiliary* GetAuxiliary() const { return Item.Auxiliary; }
 
 	template<class T>
 	T& GetData() const
 	{
 		return static_cast<T&>(GetData());
 	}
-	UVoxelData& GetData() const;
-
-	FVoxelItem& GetItem();
+	UVoxelData& GetData() const { return Item.GetVoxelData(); }
 };
 
 UCLASS()

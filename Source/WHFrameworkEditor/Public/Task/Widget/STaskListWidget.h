@@ -75,7 +75,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Task
 private:
-	UTaskBase* GenerateTask(TSubclassOf<UTaskBase> InTaskClass);
+	UTaskBase* GenerateTask(TSubclassOf<UTaskBase> InClass);
 
 	UTaskBase* DuplicateTask(UTaskBase* InTask);
 

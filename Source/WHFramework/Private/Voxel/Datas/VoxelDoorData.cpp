@@ -22,9 +22,6 @@ UVoxelDoorData::UVoxelDoorData()
 	OpenedMeshScale = FVector(1.f, 0.1f, 1.f);
 	OpenedMeshOffset = FVector(0.f, 0.45f, 0.f);
 	OpenedMeshUVDatas = TArray<FVoxelMeshUVData>();
-
-	OpenSound = nullptr;
-	CloseSound = nullptr;
 }
 
 void UVoxelDoorData::GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const

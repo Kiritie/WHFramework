@@ -63,18 +63,24 @@ public:
 		SaveGames = TArray<USaveGameBase*>();
 	}
 
+	FORCEINLINE FSaveGameInfo(UClass* InClass, int32 InActiveIndex = -1)
+	{
+		ActiveIndex = InActiveIndex;
+		SaveGameClass = InClass;
+	}
+
 	UPROPERTY(BlueprintReadOnly)
 	int32 ActiveIndex;
 
 	UPROPERTY(BlueprintReadOnly)
-	TSubclassOf<USaveGameBase> SaveGameClass;
+	UClass* SaveGameClass;
 
 	UPROPERTY(BlueprintReadOnly, Transient)
 	TArray<USaveGameBase*> SaveGames;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSaveGameData
+struct WHFRAMEWORK_API FSaveGameData : public FSaveData
 {
 	GENERATED_BODY()
 
@@ -90,7 +96,7 @@ public:
 	int32 ActiveIndex;
 
 	UPROPERTY(BlueprintReadOnly)
-	TSubclassOf<USaveGameBase> SaveGameClass;
+	UClass* SaveGameClass;
 
 	UPROPERTY()
 	TArray<int32> SaveIndexs;
@@ -110,4 +116,15 @@ public:
 public:
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FSaveGameData> SaveGameDatas;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		for(auto& Iter : SaveGameDatas)
+		{
+			Iter.MakeSaved();
+		}
+	}
 };

@@ -173,7 +173,7 @@ public:
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetWidgetIndex(int32 InWidgetIndex) { WidgetIndex = InWidgetIndex; }
+	virtual void SetWidgetIndex(int32 InIndex) { WidgetIndex = InIndex; }
 
 	UFUNCTION(BlueprintPure)
 	UWorldWidgetComponent* GetWidgetComponent() const { return WidgetComponent; }
