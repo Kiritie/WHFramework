@@ -99,9 +99,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Raycast
 public:
-	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
-	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player

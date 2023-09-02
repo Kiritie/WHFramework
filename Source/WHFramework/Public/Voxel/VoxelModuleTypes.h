@@ -113,6 +113,18 @@ enum class EVoxelType : uint8
  * ????
  */
 UENUM(BlueprintType)
+enum class EVoxelTreePart : uint8
+{
+	None,
+	Root,
+	Bole,
+	Leaves
+};
+
+/**
+ * ????
+ */
+UENUM(BlueprintType)
 enum class EVoxelMeshType : uint8
 {
 	Cube,
@@ -260,6 +272,10 @@ public:
 	FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData = false);
 
 	FVoxelItem(const FString& InSaveData);
+
+	FVoxelItem(EVoxelType InVoxelType, const FString& InData);
+	
+	FVoxelItem(const FPrimaryAssetId& InID, const FString& InData);
 
 public:
 	void OnGenerate(IVoxelAgentInterface* InAgent = nullptr);

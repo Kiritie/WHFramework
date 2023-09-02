@@ -91,7 +91,7 @@ public:
 	// Trace
 public:
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static ETraceTypeQuery GetGameTraceChannel(ECollisionChannel InGameTraceType);
+	static ETraceTypeQuery GetGameTraceType(ECollisionChannel InTraceChannel);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Enum

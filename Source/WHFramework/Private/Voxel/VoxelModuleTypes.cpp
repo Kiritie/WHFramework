@@ -38,26 +38,26 @@ FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	RefreshData();
 	TArray<FString> DataStrs;
-	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
-	if(DataStrs.IsValidIndex(0))
-	{
-		ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
-	}
-	if(DataStrs.IsValidIndex(1))
-	{
-		Index = UVoxelModuleBPLibrary::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
-	}
-	if(DataStrs.IsValidIndex(2))
-	{
-		Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
-	}
-	if(DataStrs.IsValidIndex(3))
-	{
-		Data = *DataStrs[3];
-	}
+	InSaveData.ParseIntoArray(DataStrs, TEXT("|"));
+	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
+	Index = UVoxelModuleBPLibrary::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
+	Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
+	Data = *DataStrs[3];
 	Owner = nullptr;
 	Auxiliary = nullptr;
 	bGenerated = false;
+}
+
+FVoxelItem::FVoxelItem(EVoxelType InVoxelType, const FString& InData) : FVoxelItem()
+{
+	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType);
+	Data = InData;
+}
+
+FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, const FString& InData) : FVoxelItem()
+{
+	ID = InID;
+	Data = InData;
 }
 
 void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -98,7 +98,7 @@ void FVoxelItem::RefreshData(UVoxel* InVoxel)
 
 FString FVoxelItem::ToSaveData(bool bRefresh) const
 {
-	return FString::Printf(TEXT("%d;%d;%d;%s"), (int32)GetVoxelType(), UVoxelModuleBPLibrary::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
+	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleBPLibrary::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
 }
 
 bool FVoxelItem::IsValid(bool bNeedNotNull) const

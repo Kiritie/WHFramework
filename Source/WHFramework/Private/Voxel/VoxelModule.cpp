@@ -668,12 +668,12 @@ FIndex AVoxelModule::NumberToVoxelIndex(int32 InNumber) const
 	return FIndex(tmpNum3 % tmpNum1, tmpNum3 / tmpNum1, InNumber / tmpNum2);
 }
 
-ECollisionChannel AVoxelModule::GetChunkTraceType() const
+ECollisionChannel AVoxelModule::GetChunkTraceChannel() const
 {
 	return ECollisionChannel::ECC_MAX;
 }
 
-ECollisionChannel AVoxelModule::GetVoxelTraceType() const
+ECollisionChannel AVoxelModule::GetVoxelTraceChannel() const
 {
 	return ECollisionChannel::ECC_MAX;
 }
@@ -681,7 +681,7 @@ ECollisionChannel AVoxelModule::GetVoxelTraceType() const
 bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult HitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult, true))
+	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult, true))
 	{
 		OutHitResult = FVoxelHitResult(HitResult);
 		return OutHitResult.IsValid();
@@ -698,12 +698,12 @@ bool AVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDi
 		{
 			case EVoxelRaycastType::FromAimPoint:
 			{
-				PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceType(), InIgnoreActors, HitResult);
+				PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceChannel(), InIgnoreActors, HitResult);
 				break;
 			}
 			case EVoxelRaycastType::FromMousePosition:
 			{
-				PlayerController->RaycastSingleFromMousePosition(InDistance, GetVoxelTraceType(), InIgnoreActors, HitResult);
+				PlayerController->RaycastSingleFromMousePosition(InDistance, GetVoxelTraceChannel(), InIgnoreActors, HitResult);
 				break;
 			}
 		}
@@ -717,7 +717,7 @@ bool AVoxelModule::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TAr
 {
 	const FVector Size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
 	const FVector Location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }
 
 bool AVoxelModule::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
@@ -751,10 +751,10 @@ bool AVoxelModule::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, 
 bool AVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	FHitResult HitResult1;
-	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceChannel(GetChunkTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult1, true))
+	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceType(GetChunkTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult1, true))
 	{
 		FHitResult HitResult2;
-		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), HitResult1.Location, HitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, UGlobalBPLibrary::GetGameTraceChannel(GetVoxelTraceType()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult2, true))
+		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), HitResult1.Location, HitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult2, true))
 		{
 			FVoxelItem& VoxelItem = FindVoxelByLocation(HitResult1.Location);
 			if(!VoxelItem.IsValid())

@@ -117,7 +117,7 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
-bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
+bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
 {
 	int32 ViewportSizeX, ViewportSizeY;
 	FVector SightPos, RayDirection;
@@ -129,12 +129,12 @@ bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollis
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }
 
-bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
+bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const
 {
 	float MousePosX, MousePosY;
 	FVector SightPos, RayDirection;
@@ -146,7 +146,7 @@ bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, EC
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceChannel(InGameTraceType), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }

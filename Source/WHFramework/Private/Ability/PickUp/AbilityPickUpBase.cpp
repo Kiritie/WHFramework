@@ -3,29 +3,37 @@
 
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
+#include "Ability/AbilityModule.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/Components/FallingMovementComponent.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
-#include "Voxel/VoxelModuleTypes.h"
-#include "Voxel/Chunks/VoxelChunk.h"
 
 AAbilityPickUpBase::AAbilityPickUpBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
-	BoxComponent->SetBoxExtent(FVector(10, 10, 10));
+	BoxComponent->SetBoxExtent(FVector(10.f));
 	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
-	RotatingComponent->RotationRate = FRotator(0, 180, 0);
+	RotatingComponent->RotationRate = FRotator(0.f, 180.f, 0.f);
+
+	FallingComponent = CreateDefaultSubobject<UFallingMovementComponent>(TEXT("FallingComponent"));
 
 	Item = FAbilityItem::Empty;
-	Container = nullptr;
+}
+
+void AAbilityPickUpBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	FallingComponent->TraceChannel = UAbilityModuleBPLibrary::GetPickUpTraceChannel();
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -37,7 +45,6 @@ void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	Item = FAbilityItem::Empty;
-	Container = nullptr;
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)

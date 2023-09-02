@@ -89,6 +89,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
+	static ECollisionChannel GetChunkTraceChannel();
+	
+	static ECollisionChannel GetVoxelTraceChannel();
+
 	static bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 	static bool VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);

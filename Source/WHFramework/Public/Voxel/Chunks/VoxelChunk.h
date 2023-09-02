@@ -108,8 +108,19 @@ public:
 
 	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
 
+	template<class T>
+	T& GetVoxel(FIndex InIndex, bool bMainPart = false)
+	{
+		return static_cast<T&>(GetVoxel(InIndex, bMainPart));
+	}
+
 	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
+	template<class T>
+	T& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false)
+	{
+		return static_cast<T&>(GetVoxel(InX, InY, InZ, bMainPart));
+	}
 	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);

@@ -5,6 +5,8 @@
 #include "Voxel.h"
 #include "VoxelTree.generated.h"
 
+
+
 /**
  * ����ֲ��
  */
@@ -43,13 +45,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Tree
 public:
-	virtual void InitTree(bool bIsRoot);
+	virtual void InitTree(EVoxelTreePart InTreePart);
 	
 	virtual void BuildTree();
 
 protected:
 	UPROPERTY(VisibleAnywhere)
-	bool bRoot;
+	EVoxelTreePart TreePart;
 
 	UPROPERTY(VisibleAnywhere)
 	int32 TreeHeight;
@@ -62,26 +64,5 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool IsRoot() const { return bRoot; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetRoot(bool bInRoot) { bRoot = bInRoot; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetTreeHeight() const { return TreeHeight; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetTreeHeight(int32 InTreeHeight) { TreeHeight = InTreeHeight; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetLeavesHeight() const { return LeavesHeight; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetLeavesHeight(int32 InLeavesHeight) { LeavesHeight = InLeavesHeight; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetLeavesWidth() const { return LeavesWidth; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetLeavesWidth(int32 InLeavesWidth) { LeavesWidth = InLeavesWidth; }
+	EVoxelTreePart GetTreePart() const { return TreePart; }
 };

@@ -72,6 +72,15 @@ FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractActi
 	return FText::GetEmpty();
 }
 
+ECollisionChannel UAbilityModuleBPLibrary::GetPickUpTraceChannel()
+{
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
+	{
+		return AbilityModule->GetPickUpTraceChannel();
+	}
+	return ECollisionChannel::ECC_MAX;
+}
+
 AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())

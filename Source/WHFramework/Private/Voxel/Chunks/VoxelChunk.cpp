@@ -57,7 +57,7 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	TArray<FString> VoxelDatas;
-	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("/"));
 	for(auto& Iter : VoxelDatas)
 	{
 		const FVoxelItem VoxelItem = FVoxelItem(Iter);
@@ -77,7 +77,7 @@ FSaveData* AVoxelChunk::ToData(bool bRefresh)
 
 	for(auto& Iter : VoxelMap)
 	{
-		SaveData.VoxelDatas.Appendf(TEXT("|%s"), *Iter.Value.ToSaveData(bRefresh));
+		SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(bRefresh));
 	}
 
 	for(auto& Iter : PickUps)
@@ -245,7 +245,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 						if(!CheckVoxelNeighbors(VoxelIndex, VoxelType, TreeData.TreeRange, true, false, true))
 						{
 							auto& VoxelTree = VoxelItem.GetVoxel<UVoxelTree>();
-							VoxelTree.InitTree(true);
+							VoxelTree.InitTree(EVoxelTreePart::Root);
 							VoxelItem.Data = VoxelTree.ToData();
 							SetVoxelSample(VoxelIndex, VoxelItem);
 						}
@@ -253,7 +253,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 					}
 					default:
 					{
-						SetVoxelSample(VoxelIndex, VoxelItem);
+						SetVoxelSample(VoxelIndex, VoxelType);
 						break;
 					}
 					case EVoxelType::Empty: break;
@@ -273,7 +273,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 					case EVoxelType::Birch:
 					{
 						UVoxelTree& VoxelTree = Iter.Value.GetVoxel<UVoxelTree>();
-						if(VoxelTree.IsRoot())
+						if(VoxelTree.GetTreePart() == EVoxelTreePart::Root)
 						{
 							VoxelTree.BuildTree();
 						}
@@ -767,6 +767,7 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 
 bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
 {
+	bool bSuccess = false;
 	if(InVoxelItem.IsValid())
 	{
 		if(IsOnTheChunk(InIndex))
@@ -776,7 +777,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 			VoxelItem.Index = InIndex;
 			VoxelMap.Emplace(InIndex, VoxelItem);
 			if(bGenerate) VoxelMap[InIndex].OnGenerate(InAgent);
-			return true;
+			bSuccess = true;
 		}
 	}
 	else
@@ -786,10 +787,15 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 			FVoxelItem VoxelItem = VoxelMap[InIndex];
 			VoxelMap.Remove(InIndex);
 			if(bGenerate) VoxelItem.OnDestroy(InAgent);
-			return true;
+			bSuccess = true;
 		}
 	}
-	return false;
+	if(bSuccess && bGenerate)
+	{
+		Generate(EPhase::Lesser);
+		GenerateNeighbors(InIndex, EPhase::Lesser);
+	}
+	return bSuccess;
 }
 
 bool AVoxelChunk::SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
@@ -870,14 +876,9 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 					)
 					return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 				}
-				else if(SetVoxelSample(VoxelIndex, InVoxelItem, bGenerate, InAgent))
+				else
 				{
-					if(bGenerate)
-					{
-						Generate(EPhase::Lesser);
-						GenerateNeighbors(VoxelIndex, EPhase::Lesser);
-					}
-					return true;
+					return SetVoxelSample(VoxelIndex, InVoxelItem, bGenerate, InAgent);
 				}
 			}
 		}
@@ -891,13 +892,22 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 	TArray<EDirection> neighbors;
 	for(auto& Iter : InVoxelItems)
 	{
-		if(bFirstSample ? !SetVoxelSample(Iter.Key, Iter.Value, bGenerate, InAgent) :
-			!SetVoxelComplex(Iter.Key, Iter.Value, bGenerate, InAgent))
+		FVoxelItem VoxelItem = GetVoxelItem(Iter.Key);
+		if(bFirstSample ? !SetVoxelSample(Iter.Key, Iter.Value, false, InAgent) :
+			!SetVoxelComplex(Iter.Key, Iter.Value, false, InAgent))
 		{
 			bSuccess = false;
 		}
 		else if(bGenerate)
 		{
+			if(Iter.Value.IsValid())
+			{
+				GetVoxelItem(Iter.Key).OnGenerate(InAgent);
+			}
+			else
+			{
+				VoxelItem.OnDestroy(InAgent);
+			}
 			EDirection neighbor;
 			if(LocalIndexToNeighbor(Iter.Key, neighbor))
 			{

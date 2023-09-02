@@ -168,7 +168,10 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 	if(InVoxelItem.IsUnknown()) return UVoxel::GetUnknown();
 	UVoxel& voxel = GetVoxel(InVoxelItem.ID);
 	voxel.SetItem(InVoxelItem);
-	voxel.LoadData(InVoxelItem.Data);
+	if(!InVoxelItem.Data.IsEmpty())
+	{
+		voxel.LoadData(InVoxelItem.Data);
+	}
 	return voxel;
 }
 
@@ -179,6 +182,24 @@ EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 		return VoxelModule->GetNoiseVoxelType(InIndex);
 	}
 	return EVoxelType::Empty;
+}
+
+ECollisionChannel UVoxelModuleBPLibrary::GetChunkTraceChannel()
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->GetChunkTraceChannel();
+	}
+	return ECollisionChannel::ECC_MAX;
+}
+
+ECollisionChannel UVoxelModuleBPLibrary::GetVoxelTraceChannel()
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->GetVoxelTraceChannel();
+	}
+	return ECollisionChannel::ECC_MAX;
 }
 
 bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
