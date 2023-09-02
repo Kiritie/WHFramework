@@ -5,6 +5,24 @@
 #include "CoreMinimal.h"
 #include "Editor/Kismet/Public/BlueprintEditor.h"
 
+class FTaskEditorCommands : public TCommands<FTaskEditorCommands>
+{	  
+public:
+	FTaskEditorCommands()
+		: TCommands<FTaskEditorCommands>(TEXT("MWTaskEditorCommands"),    // Context name for fast lookup
+			NSLOCTEXT(
+			"Task", "TaskEditor", "TaskEditor Commands"),    // Localized context name for displaying
+			NAME_None,
+			FName("EditorStyle")    // Icon Style Set
+			)
+	{}
+
+	TSharedPtr<FUICommandInfo> Save;
+public:
+
+	virtual void RegisterCommands() override;
+};
+
 //////////////////////////////////////////////////////////////////////////
 // FTaskBlueprintEditor
 

@@ -3,6 +3,7 @@
 
 #include "Task/Widget/STaskEditorWidget.h"
 
+#include "LevelEditorActions.h"
 #include "Main/MainModule.h"
 #include "SlateOptMacros.h"
 #include "WHFrameworkEditor.h"
@@ -10,6 +11,7 @@
 #include "Global/GlobalBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModuleBPLibrary.h"
+#include "Task/TaskEditor.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleBPLibrary.h"
 #include "Task/Widget/STaskDetailsWidget.h"
@@ -146,6 +148,13 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("FileMenuLabel", "File"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &STaskEditorWidget::HandlePullDownFileMenu),
+			"File"
+		);
+		
+		MenuBarBuilder.AddPullDownMenu(
 			LOCTEXT("WindowMenuLabel", "Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateSP(this, &STaskEditorWidget::HandlePullDownWindowMenu),
@@ -205,6 +214,17 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 	}
 }
 
+void STaskEditorWidget::OnBindCommands()
+{
+	SEditorWidgetBase::OnBindCommands();
+
+	WidgetCommands->MapAction(
+		FTaskEditorCommands::Get().Save,
+		FExecuteAction::CreateSP(this, &STaskEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &STaskEditorWidget::CanSave)
+	);
+}
+
 void STaskEditorWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
@@ -218,6 +238,12 @@ void STaskEditorWidget::OnCreate()
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &STaskEditorWidget::OnBlueprintCompiled);
 }
 
+void STaskEditorWidget::OnSave()
+{
+	SEditorWidgetBase::OnSave();
+
+	FLevelEditorActionCallbacks::Save();
+}
 
 void STaskEditorWidget::OnReset()
 {
@@ -360,6 +386,11 @@ TSharedRef<SDockTab> STaskEditorWidget::SpawnStatusWidgetTab(const FSpawnTabArgs
 			StatusWidget.ToSharedRef()
 		];
 	return SpawnedTab;
+}
+
+void STaskEditorWidget::HandlePullDownFileMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.AddMenuEntry(FTaskEditorCommands::Get().Save);
 }
 
 void STaskEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)

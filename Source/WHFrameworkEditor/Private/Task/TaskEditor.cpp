@@ -14,9 +14,13 @@
 
 #define LOCTEXT_NAMESPACE "FTaskEditor"
 
+void FTaskEditorCommands::RegisterCommands()
+{
+	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+}
 
 /////////////////////////////////////////////////////
-// FTaskEditor
+// FTaskBlueprintEditor
 
 FTaskBlueprintEditor::FTaskBlueprintEditor()
 {
