@@ -5,25 +5,46 @@
 
 #include "GameFramework/PawnMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Math/MathBPLibrary.h"
+#include "Voxel/VoxelModule.h"
+#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Datas/VoxelData.h"
 
 UVoxelWater::UVoxelWater()
 {
 	
 }
 
-void UVoxelWater::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVoxelWater::LoadData(const FString& InData)
 {
-	Super::LoadData(InSaveData, InPhase);
+	Super::LoadData(InData);
 }
 
-FSaveData* UVoxelWater::ToData(bool bRefresh)
+FString UVoxelWater::ToData()
 {
-	return Super::ToData(bRefresh);
+	return Super::ToData();
 }
 
 void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	Super::OnGenerate(InAgent);
+	
+	if(!InAgent) return;
+	
+	if(GetOwner())
+	{
+		TMap<FIndex, FVoxelItem> VoxelItems;
+		ITER_DIRECTION(Iter, 
+			if(Iter != EDirection::Up)
+			{
+				if(!GetOwner()->CheckVoxelAdjacent(GetIndex(), Iter))
+				{
+					VoxelItems.Emplace(GetIndex() + UMathBPLibrary::DirectionToIndex(Iter), GetData().VoxelType);
+				}
+			}
+		)
+		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
+	}
 }
 
 void UVoxelWater::OnDestroy(IVoxelAgentInterface* InAgent)
@@ -51,7 +72,7 @@ void UVoxelWater::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelWater::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelWater::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	return false;
 }

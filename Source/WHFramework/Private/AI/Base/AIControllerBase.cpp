@@ -144,6 +144,8 @@ void AAIControllerBase::Tick(float DeltaSeconds)
 
 void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset)
 {
+	if(BehaviorTreeAsset) return;
+	
 	BehaviorTreeAsset = DuplicateObject<UBehaviorTree>(InBehaviorTreeAsset, this);
 	if(BehaviorTreeAsset)
 	{
@@ -157,7 +159,7 @@ void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset)
 
 bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 {
-	bool bSuccess = Super::RunBehaviorTree(BTAsset);
+	const bool bSuccess = Super::RunBehaviorTree(BTAsset);
 	if(BlackboardAsset)
 	{
 		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<ACharacterBase>());

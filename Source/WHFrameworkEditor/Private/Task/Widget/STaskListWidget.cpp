@@ -395,9 +395,9 @@ void STaskListWidget::OnDestroy()
 	SEditorWidgetBase::OnDestroy();
 }
 
-UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InTaskClass)
+UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InClass)
 {
-	UTaskBase* NewTask = NewObject<UTaskBase>(TaskModule, InTaskClass, NAME_None);
+	UTaskBase* NewTask = NewObject<UTaskBase>(TaskModule, InClass, NAME_None);
 
 	// NewTask->TaskName = *CurrentTaskClass->GetName().Replace(TEXT("Task_"), TEXT(""));
 	// NewTask->TaskDisplayName = FText::FromName(NewTask->TaskName);

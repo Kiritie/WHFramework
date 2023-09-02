@@ -26,8 +26,8 @@ public:
 		return Cast<T>(GetCurrentCamera());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
 	static FVector GetCameraLocation(bool bReal = false);
@@ -39,37 +39,37 @@ public:
 	static float GetCameraDistance(bool bReal = false);
 
 	template<class T>
-	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
+	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetCameraByClass(InCameraClass));
+		return Cast<T>(GetCameraByClass(InClass));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InCameraClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
+	static ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass);
 
 	template<class T>
-	static T* GetCameraByName(const FName InCameraName)
+	static T* GetCameraByName(const FName InName)
 	{
-		return Cast<T>(GetCameraByName(InCameraName));
+		return Cast<T>(GetCameraByName(InName));
 	}
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCameraByName(const FName InCameraName);
+	static ACameraPawnBase* GetCameraByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
 
 	template<class T>
-	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
+	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
 	{
-		SwitchCameraByClass(InCameraClass);
+		SwitchCameraByClass(InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant = false);
+	static void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void SwitchCameraByName(const FName InCameraName, bool bInstant = false);
+	static void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")

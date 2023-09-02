@@ -61,6 +61,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
+	virtual ECollisionChannel GetPickUpTraceChannel() const;
+
 	virtual AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
 	virtual AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);

@@ -25,7 +25,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
-	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
 	template<class T>
 	static void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
@@ -34,23 +34,23 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
-	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName);
+	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void UnsubscribeAllEvent();
 
 	template<class T>
-	static void BroadcastEvent(EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr)
+	static void BroadcastEvent(EEventNetType InNetType, UObject* InSender, const TArray<FParameter>* InParams = nullptr)
 	{
-		BroadcastEvent(T::StaticClass(), InEventNetType, InSender, InParams ? *InParams : TArray<FParameter>());
+		BroadcastEvent(T::StaticClass(), InNetType, InSender, InParams ? *InParams : TArray<FParameter>());
 	}
 
 	template<class T>
-	static void BroadcastEvent(EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
+	static void BroadcastEvent(EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 	{
-		BroadcastEvent(T::StaticClass(), InEventNetType, InSender, InParams);
+		BroadcastEvent(T::StaticClass(), InNetType, InSender, InParams);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "EventModuleBPLibrary")
-	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams);
+	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams);
 };

@@ -106,6 +106,8 @@ void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 	
 	RaceID = NAME_None;
 	Level = 0;
+
+	Inventory->UnloadSaveData(EPhase::Primary);
 }
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -117,7 +119,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetActorLocation(SaveData.SpawnLocation);
 		SetActorRotation(SaveData.SpawnRotation);
 	}
-	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	if(PHASEC(InPhase, EPhase::All))
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);

@@ -242,6 +242,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
+		default: break;
 	}
 
 	BuildFace(InVoxelItem, vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));

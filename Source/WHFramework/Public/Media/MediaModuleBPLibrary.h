@@ -27,17 +27,17 @@ public:
 	static void RemoveMediaPlayerFromList(class AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
-	static void RemoveMediaPlayerFromListByName(const FName InMediaPlayerName);
+	static void RemoveMediaPlayerFromListByName(const FName InName);
 
 	UFUNCTION(BlueprintPure, Category = "NetworkModuleBPLibrary")
-	static AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName);
+	static AMediaPlayerBase* GetMediaPlayerByName(const FName InName);
 	
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
-	static void PlayMediaPlayerMovie(const FName InMediaPlayerName, const FName InMovieName, bool bMulticast = false);
+	static void PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
-	static void PlayMediaPlayerMovieWithDelegate(const FName InMediaPlayerName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast = false);
+	static void PlayMediaPlayerMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable, Category = "NetworkModuleBPLibrary")
-	static void StopMediaPlayerMovie(const FName InMediaPlayerName, bool bSkip, bool bMulticast = false);
+	static void StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast = false);
 };

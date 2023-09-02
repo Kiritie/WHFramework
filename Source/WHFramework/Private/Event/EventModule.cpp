@@ -77,62 +77,62 @@ void AEventModule::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
+void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
-	if(!InEventHandleClass || !InOwner || InFuncName.IsNone()) return;
+	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
-	if(!EventHandleInfos.Contains(InEventHandleClass))
+	if(!EventHandleInfos.Contains(InClass))
 	{
-		EventHandleInfos.Add(InEventHandleClass, FEventHandleInfo(FEventHandleDelegate()));
+		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
 	}
 
-	if(!EventHandleInfos[InEventHandleClass].EventHandleDelegate.IsBoundToObject(this))
+	if(!EventHandleInfos[InClass].EventHandleDelegate.IsBoundToObject(this))
 	{
-		EventHandleInfos[InEventHandleClass].EventHandleDelegate.BindUFunction(this, FName("ExecuteEvent"));
+		EventHandleInfos[InClass].EventHandleDelegate.BindUFunction(this, FName("ExecuteEvent"));
 	}
 
-	switch (InEventHandleClass->GetDefaultObject<UEventHandleBase>()->EventType)
+	switch (InClass->GetDefaultObject<UEventHandleBase>()->EventType)
 	{
 		case EEventType::Single:
 		{
-			EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Empty();
+			EventHandleInfos[InClass].EventHandleFuncMap.Empty();
 		}
 		case EEventType::Multicast:
 		{
-			if(!EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Contains(InOwner))
+			if(!EventHandleInfos[InClass].EventHandleFuncMap.Contains(InOwner))
 			{
-				EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Add(InOwner, FEventHandleFuncs());
+				EventHandleInfos[InClass].EventHandleFuncMap.Add(InOwner, FEventHandleFuncs());
 			}
-			EventHandleInfos[InEventHandleClass].EventHandleFuncMap[InOwner].FuncNames.Add(InFuncName);
+			EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Add(InFuncName);
 			break;
 		}
 	}
 }
 
-void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InOwner, const FName InFuncName)
+void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
-	if(!InEventHandleClass || !InOwner || InFuncName.IsNone()) return;
+	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
-	if(!EventHandleInfos.Contains(InEventHandleClass))
+	if(!EventHandleInfos.Contains(InClass))
 	{
-		EventHandleInfos.Add(InEventHandleClass, FEventHandleInfo(FEventHandleDelegate()));
+		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
 	}
 	
-	if(EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Contains(InOwner))
+	if(EventHandleInfos[InClass].EventHandleFuncMap.Contains(InOwner))
 	{
-		if(EventHandleInfos[InEventHandleClass].EventHandleFuncMap[InOwner].FuncNames.Contains(InFuncName))
+		if(EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Contains(InFuncName))
 		{
-			EventHandleInfos[InEventHandleClass].EventHandleFuncMap[InOwner].FuncNames.Remove(InFuncName);
+			EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Remove(InFuncName);
 		}
-		if(EventHandleInfos[InEventHandleClass].EventHandleFuncMap[InOwner].FuncNames.Num() == 0)
+		if(EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Num() == 0)
 		{
-			EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Remove(InOwner);
+			EventHandleInfos[InClass].EventHandleFuncMap.Remove(InOwner);
 		}
 	}
 
-	if(EventHandleInfos[InEventHandleClass].EventHandleFuncMap.Num() == 0)
+	if(EventHandleInfos[InClass].EventHandleFuncMap.Num() == 0)
 	{
-		EventHandleInfos[InEventHandleClass].EventHandleDelegate.Unbind();
+		EventHandleInfos[InClass].EventHandleDelegate.Unbind();
 	}
 }
 
@@ -141,22 +141,22 @@ void AEventModule::UnsubscribeAllEvent()
 	EventHandleInfos.Empty();
 }
 
-void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, EEventNetType InEventNetType, UObject* InSender, const TArray<FParameter>& InParams)
+void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	if(!InEventHandleClass) return;
+	if(!InClass) return;
 
-	if(!EventHandleInfos.Contains(InEventHandleClass))
+	if(!EventHandleInfos.Contains(InClass))
 	{
-		EventHandleInfos.Add(InEventHandleClass, FEventHandleInfo(FEventHandleDelegate()));
+		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
 	}
 
-	switch(InEventNetType)
+	switch(InNetType)
 	{
 		case EEventNetType::Client:
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InEventHandleClass, InParams);
+				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InClass, InParams);
 				return;
 			}
 		}
@@ -164,7 +164,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InEventHandleClass, InParams);
+				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InClass, InParams);
 				return;
 			}
 		}
@@ -172,26 +172,26 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InEventHandleCla
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InEventHandleClass, InParams);
+				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InClass, InParams);
 				return;
 			}
 		}
 		default: break;
 	}
 	
-	EventHandleInfos[InEventHandleClass].EventHandleDelegate.ExecuteIfBound(InEventHandleClass, InSender, InParams);
+	EventHandleInfos[InClass].EventHandleDelegate.ExecuteIfBound(InClass, InSender, InParams);
 }
 
-void AEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams)
+void AEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	BroadcastEvent(InEventHandleClass, EEventNetType::Single, InSender, InParams);
+	BroadcastEvent(InClass, EEventNetType::Single, InSender, InParams);
 }
 
-void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass, UObject* InSender, const TArray<FParameter>& InParams)
+void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	if(!EventHandleInfos.Contains(InEventHandleClass)) return;
+	if(!EventHandleInfos.Contains(InClass)) return;
 	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(nullptr, InEventHandleClass))
+	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(nullptr, InClass))
 	{
 		EventHandle->Fill(InParams);
 		
@@ -202,7 +202,7 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InEventHandleClass
 		} Params{InSender, EventHandle};
 
 		auto TmpEventHandleInfos = EventHandleInfos;
-		for (auto Iter1 : TmpEventHandleInfos[InEventHandleClass].EventHandleFuncMap)
+		for (auto Iter1 : TmpEventHandleInfos[InClass].EventHandleFuncMap)
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{

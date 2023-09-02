@@ -36,9 +36,9 @@ void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bM
 	PlayMovieImpl(InMovieName);
 }
 
-void AMediaPlayerBase::PlayMovieWithDelegate_Implementation(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast)
+void AMediaPlayerBase::PlayMovieWithDelegate_Implementation(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
 {
-	OnMoviePlayFinishedSingleDelegate = InOnMoviePlayFinishedDelegate;
+	OnMoviePlayFinishedSingleDelegate = InOnPlayFinished;
 
 	PlayMovie(InMovieName, bMulticast);
 }

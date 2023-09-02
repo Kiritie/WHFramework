@@ -71,7 +71,7 @@ public:
 	void SetWorldWidget(UUserWidget* InWidget);
 
 	UFUNCTION(BlueprintCallable)
-	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InWidgetClass, bool bRefresh = false);
+	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh = false);
 
 public:
 	UFUNCTION(BlueprintCallable)

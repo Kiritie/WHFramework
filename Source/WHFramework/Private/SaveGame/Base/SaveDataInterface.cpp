@@ -6,7 +6,7 @@
 
 void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 {
-	if (HasArchive())
+	if (PHASEC(InPhase, EPhase::Final) && HasArchive())
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), InSaveData->GetDatas());
 	}
@@ -26,7 +26,7 @@ FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)
 void ISaveDataInterface::UnloadSaveData(EPhase InPhase)
 {
 	UnloadData(InPhase);
-	if (HasArchive())
+	if (PHASEC(InPhase, EPhase::Final) && HasArchive())
 	{
 		UGlobalBPLibrary::LoadObjectDataFromMemory(Cast<UObject>(this), TArray<uint8>());
 	}

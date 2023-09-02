@@ -29,9 +29,10 @@ void UWorldTimerComponent::BeginPlay()
 	UpdateTimer();
 }
 
-void UWorldTimerComponent::InitializeTimer(float InSecondsOfDay)
+void UWorldTimerComponent::InitializeTimer(float InSecondsOfDay, float InTimeSeconds)
 {
 	SecondsOfDay = InSecondsOfDay;
+	SetCurrentTime(InTimeSeconds);
 }
 
 void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)

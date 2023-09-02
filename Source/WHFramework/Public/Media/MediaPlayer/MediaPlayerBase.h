@@ -35,7 +35,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void PlayMovie(const FName InMovieName, bool bMulticast = false);
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlayMovieWithDelegate(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast = false);
+	void PlayMovieWithDelegate(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
 	UFUNCTION(NetMulticast, Reliable)
 	void MultiPlayMovie(const FName InMovieName);
 	UFUNCTION(BlueprintNativeEvent)

@@ -161,7 +161,7 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 			}
 		}
 	}
-	if(InPhase == EPhase::Final)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
 		ModuleMap.Empty();
 	}

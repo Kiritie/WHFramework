@@ -60,13 +60,13 @@ public:
 	void SwitchProcedure(UProcedureBase* InProcedure);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchProcedureByIndex(int32 InProcedureIndex);
+	void SwitchProcedureByIndex(int32 InIndex);
 
 	template<class T>
 	void SwitchProcedureByClass() { SwitchProcedureByClass(T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass);
+	void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchFirstProcedure();
@@ -101,52 +101,52 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool HasProcedureByIndex(int32 InProcedureIndex) const;
+	bool HasProcedureByIndex(int32 InIndex) const;
 
 	template<class T>
-	T* GetProcedureByIndex(int32 InProcedureIndex) const
+	T* GetProcedureByIndex(int32 InIndex) const
 	{
-		if(HasProcedureByIndex(InProcedureIndex))
+		if(HasProcedureByIndex(InIndex))
 		{
-			return Cast<T>(Procedures[InProcedureIndex]);
+			return Cast<T>(Procedures[InIndex]);
 		}
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureIndex"))
-	UProcedureBase* GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InIndex"))
+	UProcedureBase* GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass) const;
 	
 	template<class T>
-	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass()) const
 	{
-		if(!InProcedureClass) return false;
+		if(!InClass) return false;
 
-		return ProcedureMap.Contains(InProcedureClass);
+		return ProcedureMap.Contains(InClass);
 	}
 	
 	UFUNCTION(BlueprintPure)
-	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
+	bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass) const;
 
 	template<class T>
-	T* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass = T::StaticClass()) const
+	T* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass()) const
 	{
-		if(!InProcedureClass) return nullptr;
+		if(!InClass) return nullptr;
 
-		if(HasProcedureByClass<T>(InProcedureClass))
+		if(HasProcedureByClass<T>(InClass))
 		{
-			return Cast<T>(ProcedureMap[InProcedureClass]);
+			return Cast<T>(ProcedureMap[InClass]);
 		}
 		return nullptr;
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
-	UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass) const;
 		
 	UFUNCTION(BlueprintPure)
 	bool IsCurrentProcedure(UProcedureBase* InProcedure) const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsCurrentProcedureIndex(int32 InProcedureIndex) const;
+	bool IsCurrentProcedureIndex(int32 InIndex) const;
 
 	template<class T>
 	bool IsCurrentProcedureClass() const
@@ -155,11 +155,11 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+	bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass) const
 	{
-		if(!InProcedureClass) return false;
+		if(!InClass) return false;
 
-		return CurrentProcedure && CurrentProcedure->GetClass() == InProcedureClass;
+		return CurrentProcedure && CurrentProcedure->GetClass() == InClass;
 	}
 
 public:
@@ -181,8 +181,8 @@ public:
 	{
 		return Cast<T>(CurrentProcedure);
 	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InProcedureClass"))
-	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InProcedureClass = nullptr) const { return CurrentProcedure; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr) const { return CurrentProcedure; }
 	/**
 	* 获取流程列表
 	*/

@@ -23,31 +23,14 @@ void UVoxelDoor::OnReset_Implementation()
 	bOpened = false;
 }
 
-void UVoxelDoor::Serialize(FArchive& Ar)
+void UVoxelDoor::LoadData(const FString& InData)
 {
-	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << bOpened;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << bOpened;
-		}
-	}
+	bOpened = (bool)FCString::Atoi(*InData);
 }
 
-void UVoxelDoor::LoadData(FSaveData* InSaveData, EPhase InPhase)
+FString UVoxelDoor::ToData()
 {
-	Super::LoadData(InSaveData, InPhase);
-}
-
-FSaveData* UVoxelDoor::ToData(bool bRefresh)
-{
-	return Super::ToData(bRefresh);
+	return FString::FromInt(bOpened);
 }
 
 void UVoxelDoor::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -80,13 +63,13 @@ void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelDoor::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelDoor::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	switch (InActionType)
 	{
 		case EVoxelActionType::Action1:
 		{
-			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
+			return Super::OnAgentAction(InAgent, InActionType, InHitResult);
 		}
 		case EVoxelActionType::Action2:
 		{
@@ -108,14 +91,14 @@ void UVoxelDoor::Open()
 {
 	bOpened = true;
 	RefreshData();
-	if(GetData().PartType == EVoxelPartType::Main)
+	if(GetData().bMainPart)
 	{
 		for(auto Iter : GetItem().GetParts())
 		{
 			Iter.GetVoxel<UVoxelDoor>().Open();
 		}
-		Owner->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().OpenSound, GetLocation());
+		GetOwner()->Generate(EPhase::Lesser);
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
 	}
 }
 
@@ -123,13 +106,13 @@ void UVoxelDoor::Close()
 {
 	bOpened = false;
 	RefreshData();
-	if(GetData().PartType == EVoxelPartType::Main)
+	if(GetData().bMainPart)
 	{
 		for(auto Iter : GetItem().GetParts())
 		{ 
 			Iter.GetVoxel<UVoxelDoor>().Close();
 		}
-		Owner->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData<UVoxelDoorData>().CloseSound, GetLocation());
+		GetOwner()->Generate(EPhase::Lesser);
+		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());
 	}
 }

@@ -10,11 +10,11 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return CameraModule->GetCurrentCamera(InCameraClass);
+		return CameraModule->GetCurrentCamera(InClass);
 	}
 	return nullptr;
 }
@@ -46,20 +46,20 @@ float UCameraModuleBPLibrary::GetCameraDistance(bool bReal)
 	return 0.f;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return CameraModule->GetCameraByClass(InCameraClass);
+		return CameraModule->GetCameraByClass(InClass);
 	}
 	return nullptr;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InCameraName)
+ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InName)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		return CameraModule->GetCameraByName(InCameraName);
+		return CameraModule->GetCameraByName(InName);
 	}
 	return nullptr;
 }
@@ -72,19 +72,19 @@ void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInsta
 	}
 }
 
-void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant)
+void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		CameraModule->SwitchCameraByClass(InCameraClass, bInstant);
+		CameraModule->SwitchCameraByClass(InClass, bInstant);
 	}
 }
 
-void UCameraModuleBPLibrary::SwitchCameraByName(const FName InCameraName, bool bInstant)
+void UCameraModuleBPLibrary::SwitchCameraByName(const FName InName, bool bInstant)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		CameraModule->SwitchCameraByName(InCameraName, bInstant);
+		CameraModule->SwitchCameraByName(InName, bInstant);
 	}
 }
 

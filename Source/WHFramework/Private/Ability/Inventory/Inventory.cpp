@@ -78,7 +78,7 @@ void UInventory::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Lesser) || PHASEC(InPhase, EPhase::Final))
+	if(PHASEC(InPhase, EPhase::All))
 	{
 		for (int32 i = 0; i < Slots.Num(); i++)
 		{

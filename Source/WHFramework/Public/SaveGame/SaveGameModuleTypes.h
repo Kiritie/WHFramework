@@ -58,19 +58,48 @@ struct WHFRAMEWORK_API FSaveGameInfo
 public:
 	FORCEINLINE FSaveGameInfo()
 	{
-		Index = -1;
-		Class = nullptr;
-		Array = TMap<int32, USaveGameBase*>();
+		ActiveIndex = -1;
+		SaveGameClass = nullptr;
+		SaveGames = TArray<USaveGameBase*>();
+	}
+
+	FORCEINLINE FSaveGameInfo(UClass* InClass, int32 InActiveIndex = -1)
+	{
+		ActiveIndex = InActiveIndex;
+		SaveGameClass = InClass;
 	}
 
 	UPROPERTY(BlueprintReadOnly)
-	int32 Index;
+	int32 ActiveIndex;
 
 	UPROPERTY(BlueprintReadOnly)
-	TSubclassOf<USaveGameBase> Class;
+	UClass* SaveGameClass;
+
+	UPROPERTY(BlueprintReadOnly, Transient)
+	TArray<USaveGameBase*> SaveGames;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSaveGameData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FSaveGameData()
+	{
+		ActiveIndex = -1;
+		SaveGameClass = nullptr;
+		SaveIndexs = TArray<int32>();
+	}
 
 	UPROPERTY(BlueprintReadOnly)
-	TMap<int32, USaveGameBase*> Array;
+	int32 ActiveIndex;
+
+	UPROPERTY(BlueprintReadOnly)
+	UClass* SaveGameClass;
+
+	UPROPERTY()
+	TArray<int32> SaveIndexs;
 };
 
 USTRUCT(BlueprintType)
@@ -81,10 +110,21 @@ struct WHFRAMEWORK_API FGeneralSaveData : public FSaveData
 public:
 	FORCEINLINE FGeneralSaveData()
 	{
-		SaveGameInfos = TMap<FName, FSaveGameInfo>();
+		SaveGameDatas = TArray<FSaveGameData>();
 	}
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	TMap<FName, FSaveGameInfo> SaveGameInfos;
+	TArray<FSaveGameData> SaveGameDatas;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		for(auto& Iter : SaveGameDatas)
+		{
+			Iter.MakeSaved();
+		}
+	}
 };

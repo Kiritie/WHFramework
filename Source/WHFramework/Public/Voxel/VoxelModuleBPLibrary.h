@@ -55,6 +55,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static FVector VoxelIndexToLocation(FIndex InIndex);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static int32 VoxelIndexToNumber(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
+	static FIndex NumberToVoxelIndex(int32 InNumber);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
@@ -83,6 +89,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
+	static ECollisionChannel GetChunkTraceChannel();
+	
+	static ECollisionChannel GetVoxelTraceChannel();
+
 	static bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 	static bool VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);

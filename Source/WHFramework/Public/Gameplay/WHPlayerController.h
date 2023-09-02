@@ -73,11 +73,11 @@ private:
 	
 public:
 	template<class T>
-	T* GetModuleNetCompByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	T* GetModuleNetCompByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(ModuleNetCompMap.Contains(InModuleClass))
+		if(ModuleNetCompMap.Contains(InClass))
 		{
-			return Cast<T>(ModuleNetCompMap[InModuleClass]);
+			return Cast<T>(ModuleNetCompMap[InClass]);
 		}
 		return nullptr;
 	}
@@ -99,9 +99,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Raycast
 public:
-	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
-	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceType, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
@@ -109,6 +109,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Player")
 	APawn* PlayerPawn;
 
+public:
 	UPROPERTY(BlueprintAssignable, Category = "Player")
 	FOnPlayerPawnChanged OnPlayerPawnChanged;
 
@@ -124,6 +125,4 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	APawn* GetPlayerPawn() const { return PlayerPawn; }
-
-	FOnPlayerPawnChanged& GetOnPlayerPawnChanged() { return OnPlayerPawnChanged; }
 };

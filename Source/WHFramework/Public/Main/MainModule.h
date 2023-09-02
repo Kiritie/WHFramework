@@ -75,9 +75,9 @@ public:
 	 * 通过类型运行模块
 	 */
 	template<class T>
-	static void RunModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	static void RunModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		if(T* Module = GetModuleByClass<T>(false, InClass))
 		{
 			Module->Run();
 		}
@@ -85,9 +85,9 @@ public:
 	/**
 	* 通过名称运行模块
 	*/
-	static void RunModuleByName(const FName InModuleName)
+	static void RunModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
 		{
 			Module->Run();
 		}
@@ -96,9 +96,9 @@ public:
 	 * 通过类型重置模块
 	 */
 	template<class T>
-	static void ResetModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	static void ResetModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		if(T* Module = GetModuleByClass<T>(false, InClass))
 		{
 			Module->Reset();
 		}
@@ -106,9 +106,9 @@ public:
 	/**
 	* 通过名称重置模块
 	*/
-	static void ResetModuleByName(const FName InModuleName)
+	static void ResetModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
 		{
 			Module->Reset();
 		}
@@ -117,9 +117,9 @@ public:
 	 * 通过类型暂停模块
 	 */
 	template<class T>
-	static void PauseModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	static void PauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		if(T* Module = GetModuleByClass<T>(false, InClass))
 		{
 			Module->Pause();
 		}
@@ -127,9 +127,9 @@ public:
 	/**
 	* 通过名称暂停模块
 	*/
-	static void PauseModuleByName(const FName InModuleName)
+	static void PauseModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
 		{
 			Module->Pause();
 		}
@@ -138,9 +138,9 @@ public:
 	 * 通过类型取消暂停模块
 	 */
 	template<class T>
-	static void UnPauseModuleByClass(TSubclassOf<T> InModuleClass = T::StaticClass())
+	static void UnPauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InModuleClass))
+		if(T* Module = GetModuleByClass<T>(false, InClass))
 		{
 			Module->UnPause();
 		}
@@ -148,9 +148,9 @@ public:
 	/**
 	* 通过名称取消暂停模块
 	*/
-	static void UnPauseModuleByName(const FName InModuleName)
+	static void UnPauseModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InModuleName))
+		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
 		{
 			Module->UnPause();
 		}
@@ -173,23 +173,23 @@ public:
 	 * 通过类型获取模块
 	 */
 	template<class T>
-	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InModuleClass = T::StaticClass())
+	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
 	{
-		const FName ModuleName = InModuleClass.GetDefaultObject()->GetModuleName();
+		const FName ModuleName = InClass.GetDefaultObject()->GetModuleName();
 		return GetModuleByName<T>(ModuleName, bInEditor);
 	}
 	/**
 	* 通过名称获取模块
 	*/
 	template<class T>
-	static T* GetModuleByName(const FName InModuleName, bool bInEditor = false)
+	static T* GetModuleByName(const FName InName, bool bInEditor = false)
 	{
 		AMainModule* MainModule = Get(bInEditor);
 		if(MainModule && MainModule->IsValidLowLevel())
 		{
-			if(MainModule->ModuleMap.Contains(InModuleName))
+			if(MainModule->ModuleMap.Contains(InName))
 			{
-				return Cast<T>(MainModule->ModuleMap[InModuleName]);
+				return Cast<T>(MainModule->ModuleMap[InName]);
 			}
 		}
 		return nullptr;

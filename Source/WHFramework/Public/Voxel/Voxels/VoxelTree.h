@@ -3,22 +3,26 @@
 #pragma once
 
 #include "Voxel.h"
-#include "VoxelPlant.generated.h"
+#include "VoxelTree.generated.h"
+
+
 
 /**
  * ����ֲ��
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelPlant : public UVoxel
+class WHFRAMEWORK_API UVoxelTree : public UVoxel
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelPlant();
+	UVoxelTree();
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
+	virtual void OnReset_Implementation() override;
+	
 	virtual void LoadData(const FString& InData) override;
 
 	virtual FString ToData() override;
@@ -37,4 +41,28 @@ public:
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
 	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Tree
+public:
+	virtual void InitTree(EVoxelTreePart InTreePart);
+	
+	virtual void BuildTree();
+
+protected:
+	UPROPERTY(VisibleAnywhere)
+	EVoxelTreePart TreePart;
+
+	UPROPERTY(VisibleAnywhere)
+	int32 TreeHeight;
+
+	UPROPERTY(VisibleAnywhere)
+	int32 LeavesHeight;
+
+	UPROPERTY(VisibleAnywhere)
+	int32 LeavesWidth;
+
+public:
+	UFUNCTION(BlueprintPure)
+	EVoxelTreePart GetTreePart() const { return TreePart; }
 };

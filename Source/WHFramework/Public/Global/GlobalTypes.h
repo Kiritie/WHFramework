@@ -7,11 +7,13 @@
 
 #include "GlobalTypes.generated.h"
 
+//////////////////////////////////////////////////////////////////////////
+// Variables
 extern WHFRAMEWORK_API bool GIsPlaying;
 extern WHFRAMEWORK_API bool GIsSimulating;
 
-extern UObject* GetWorldContext(bool bInEditor = false);
-
+//////////////////////////////////////////////////////////////////////////
+// Types
 UENUM(BlueprintType)
 enum class EPauseMode : uint8
 {
@@ -27,15 +29,11 @@ enum class EPhase : uint8
 	Primary = 1 << 0,
 	Lesser = 1 << 1,
 	Final = 1 << 2,
+	PrimaryAndLesser = Primary | Lesser,
+	LesserAndFinal = Lesser | Final,
 	All = Primary | Lesser | Final
 };
 
-#define PHASEC(A, B) \
-((uint8)A & (uint8)B) != 0
-
-/*
-* 数据保存档案
-*/
 struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 {
 	FSaveDataArchive(FArchive& InInnerArchive) : FObjectAndNameAsStringProxyArchive(InInnerArchive, false)
@@ -45,7 +43,14 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 };
 
 //////////////////////////////////////////////////////////////////////////
+// Functions
+extern UObject* GetWorldContext(bool bInEditor = false);
+
+//////////////////////////////////////////////////////////////////////////
 // MACROS
+#define PHASEC(A, B) \
+((uint8)A & (uint8)B) != 0
+
 #define DON(Count, Expression) \
 for(int32 _Index = 0; _Index < Count; _Index++) \
 { \

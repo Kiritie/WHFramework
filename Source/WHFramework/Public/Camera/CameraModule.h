@@ -78,7 +78,7 @@ public:
 	}
 	
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InCameraClass = nullptr) const;
+	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
 	UCameraComponent* GetCurrentCameraComp();
@@ -90,37 +90,37 @@ public:
 	APlayerCameraManager* GetCurrentCameraManager();
 
 	template<class T>
-	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
+	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetCameraByClass(InCameraClass));
+		return Cast<T>(GetCameraByClass(InClass));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InCameraClass"))
-	ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass);
 
 	template<class T>
-	T* GetCameraByName(const FName InCameraName)
+	T* GetCameraByName(const FName InName)
 	{
-		return Cast<T>(GetCameraByName(InCameraName));
+		return Cast<T>(GetCameraByName(InName));
 	}
 
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* GetCameraByName(const FName InCameraName) const;
+	ACameraPawnBase* GetCameraByName(const FName InName) const;
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
 
 	template<class T>
-	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InCameraClass = T::StaticClass())
+	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
 	{
-		SwitchCameraByClass(InCameraClass, bInstant);
+		SwitchCameraByClass(InClass, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InCameraClass, bool bInstant = false);
+	void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByName(const FName InCameraName, bool bInstant = false);
+	void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control

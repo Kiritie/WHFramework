@@ -27,10 +27,4 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FVoxelMeshUVData> OpenedMeshUVDatas;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	USoundBase* OpenSound;
-						
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	USoundBase* CloseSound;
 };

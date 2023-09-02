@@ -8,14 +8,14 @@ UVoxelPlant::UVoxelPlant()
 	
 }
 
-void UVoxelPlant::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVoxelPlant::LoadData(const FString& InData)
 {
-	Super::LoadData(InSaveData, InPhase);
+	Super::LoadData(InData);
 }
 
-FSaveData* UVoxelPlant::ToData(bool bRefresh)
+FString UVoxelPlant::ToData()
 {
-	return Super::ToData(bRefresh);
+	return Super::ToData();
 }
 
 void UVoxelPlant::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -48,13 +48,13 @@ void UVoxelPlant::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelPlant::OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelPlant::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
 {
 	switch (InActionType)
 	{
 		case EVoxelActionType::Action1:
 		{
-			return Super::OnActionTrigger(InAgent, InActionType, InHitResult);
+			return Super::OnAgentAction(InAgent, InActionType, InHitResult);
 		}
 		default: break;
 	}

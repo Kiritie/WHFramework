@@ -53,6 +53,7 @@ EDirection UMathBPLibrary::InvertDirection(EDirection InDirection)
 			return EDirection::Down;
 		case EDirection::Down:
 			return EDirection::Up;
+		default: break;
 	}
 	return InDirection;
 }
@@ -73,6 +74,7 @@ EDirection UMathBPLibrary::RotateDirection(EDirection InDirection, ERightAngle I
 			return EDirection::Up;
 		case EDirection::Down:
 			return EDirection::Down;
+		default: break;
 	}
 	return InDirection;
 }
@@ -93,6 +95,7 @@ FVector UMathBPLibrary::DirectionToVector(EDirection InDirection, ERightAngle In
 			return FVector::UpVector;
 		case EDirection::Down:
 			return FVector::DownVector;
+		default: break;
 	}
 	return FVector::ZeroVector;
 }

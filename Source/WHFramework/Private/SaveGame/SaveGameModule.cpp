@@ -46,7 +46,7 @@ void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		LoadSaveData(LoadOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 	}
@@ -71,7 +71,7 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SaveSaveGame<UGeneralSaveGame>(0, true, ModuleSaveGame);
 	}
@@ -80,16 +80,15 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FGeneralSaveData>();
-	for(auto Iter1 : SaveData.SaveGameInfos)
+	for(auto Iter1 : SaveData.SaveGameDatas)
 	{
-		for(auto Iter2 : Iter1.Value.Array)
+		const FName SaveName = Iter1.SaveGameClass->GetDefaultObject<USaveGameBase>()->GetSaveName();
+		SaveGameInfos.Add(SaveName);
+		SaveGameInfos[SaveName].SaveGameClass = Iter1.SaveGameClass;
+		SaveGameInfos[SaveName].ActiveIndex = Iter1.ActiveIndex;
+		for(auto Iter2 : Iter1.SaveIndexs)
 		{
-			LoadSaveGame(Iter1.Value.Class, Iter2.Key);
-		}
-		if(SaveGameInfos.Contains(Iter1.Key))
-		{
-			SaveGameInfos[Iter1.Key].Class = Iter1.Value.Class;
-			SaveGameInfos[Iter1.Key].Index = Iter1.Value.Index;
+			LoadSaveGame(Iter1.SaveGameClass, Iter2, EPhase::None);
 		}
 	}
 }
@@ -101,225 +100,177 @@ FSaveData* ASaveGameModule::ToData(bool bRefresh)
 	
 	for(auto Iter1 : SaveGameInfos)
 	{
-		FSaveGameInfo SaveGameInfo;
-		for(auto Iter2 : Iter1.Value.Array)
+		FSaveGameData SaveGameData;
+		for(auto Iter2 : Iter1.Value.SaveGames)
 		{
-			if(Iter2.Value && Iter2.Value->IsSaved())
+			if(Iter2->IsSaved() && Iter2->SaveIndex != -1)
 			{
-				SaveGameInfo.Array.Add(Iter2.Key, Iter2.Value);
+				SaveGameData.SaveIndexs.Add(Iter2->SaveIndex);
 			}
 		}
-		if(!SaveGameInfo.Array.IsEmpty())
+		if(!SaveGameData.SaveIndexs.IsEmpty())
 		{
-			SaveGameInfo.Class = Iter1.Value.Class;
-			SaveGameInfo.Index = SaveGameInfo.Array.Contains(Iter1.Value.Index) ? Iter1.Value.Index : GetSaveGameInfo(Iter1.Value.Class, true).Index;
-			SaveData.SaveGameInfos.Add(Iter1.Key, SaveGameInfo);
+			SaveGameData.SaveGameClass = Iter1.Value.SaveGameClass;
+			SaveGameData.ActiveIndex = SaveGameData.SaveIndexs.Contains(Iter1.Value.ActiveIndex) ? Iter1.Value.ActiveIndex : -1;
+			SaveData.SaveGameDatas.Add(SaveGameData);
 		}
 	}
 	return &SaveData;
 }
 
-FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InSaveIndex) const
+FString ASaveGameModule::GetSaveSlotName(FName InSaveName, int32 InIndex) const
 {
-	return InSaveIndex > 0 ? FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InSaveIndex) : FString::Printf(TEXT("SaveGame_%s"), *InSaveName.ToString());
+	return InIndex != 0 ? FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex) : FString::Printf(TEXT("SaveGame_%s"), *InSaveName.ToString());
 }
 
-bool ASaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bFindOnDisk, bool bNeedLoaded) const
+bool ASaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(!bFindOnDisk)
+	for(auto Iter : GetSaveGames(InClass))
 	{
-		return SaveGameInfos.Contains(SaveName) && SaveGameInfos[SaveName].Array.Contains(InSaveIndex) && SaveGameInfos[SaveName].Array[InSaveIndex] && (!bNeedLoaded || SaveGameInfos[SaveName].Array[InSaveIndex]->IsLoaded());
-	}
-	else
-	{
-		return UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InSaveIndex), UserIndex);
-	}
-}
-
-int32 ASaveGameModule::GetValidSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass) const
-{
-	if(!InSaveGameClass) return -1;
-
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	int32 SaveIndex = 0;
-	if(SaveGameInfos.Contains(SaveName))
-	{
-		for(auto Iter : SaveGameInfos[SaveName].Array)
+		if(Iter->SaveIndex == InIndex)
 		{
-			if(Iter.Key != SaveIndex) break;
-			SaveIndex++;
+			return true;
 		}
+	}
+	const FName SaveName = GetSaveName(InClass);
+	return UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex);
+}
+
+FName ASaveGameModule::GetSaveName(TSubclassOf<USaveGameBase> InClass) const
+{
+	return InClass.GetDefaultObject()->GetSaveName();
+}
+
+int32 ASaveGameModule::GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass) const
+{
+	if(!InClass) return -1;
+
+	int32 SaveIndex = 0;
+	for(auto Iter : GetSaveGames(InClass))
+	{
+		if(Iter->SaveIndex != SaveIndex) break;
+		SaveIndex++;
 	}
 	return SaveIndex;
 }
 
-int32 ASaveGameModule::GetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass) const
+int32 ASaveGameModule::GetActiveSaveIndex(TSubclassOf<USaveGameBase> InClass) const
 {
-	if(!InSaveGameClass) return -1;
+	if(!InClass) return -1;
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
+	return GetSaveGameInfo(InClass).ActiveIndex;
+}
+
+FSaveGameInfo ASaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass) const
+{
+	if(!InClass) FSaveGameInfo();
+
+	const FName SaveName = GetSaveName(InClass);
 	if(SaveGameInfos.Contains(SaveName))
 	{
-		return SaveGameInfos[SaveName].Index;
+		return SaveGameInfos[SaveName];
 	}
-	return -1;
+	return FSaveGameInfo();
 }
 
-void ASaveGameModule::SetActiveSaveIndex(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
 {
-	if(!InSaveGameClass) return;
+	if(!InClass) return nullptr;
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(SaveGameInfos.Contains(SaveName))
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
+
+	for(auto Iter : GetSaveGames(InClass))
 	{
-		if(SaveGameInfos[SaveName].Index != InSaveIndex)
+		if(Iter->SaveIndex == InIndex)
 		{
-			if(HasSaveGame(InSaveGameClass))
-			{
-				GetSaveGame(InSaveGameClass)->OnActiveChange(false);
-			}
-			SaveGameInfos[SaveName].Index = InSaveIndex;
-			if(HasSaveGame(InSaveGameClass))
-			{
-				GetSaveGame(InSaveGameClass)->OnActiveChange(true);
-			}
+			return Iter;
 		}
-	}
-}
-
-FSaveGameInfo ASaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InSaveGameClass, bool bFromGeneralData) const
-{
-	if(!InSaveGameClass) FSaveGameInfo();
-
-	FSaveGameInfo SaveGameInfo;
-	
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(!bFromGeneralData)
-	{
-		if(SaveGameInfos.Contains(SaveName))
-		{
-			SaveGameInfo = SaveGameInfos[SaveName];
-		}
-	}
-	else
-	{
-		const auto& GeneralSaveData = GetSaveGame<UGeneralSaveGame>()->GetSaveDataRef<FGeneralSaveData>();
-		if(GeneralSaveData.SaveGameInfos.Contains(SaveName))
-		{
-			SaveGameInfo = GeneralSaveData.SaveGameInfos[SaveName];
-		}
-	}
-	return SaveGameInfo;
-}
-
-USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex) const
-{
-	if(!InSaveGameClass) return nullptr;
-
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
-
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
-	{
-		return SaveGameInfos[SaveName].Array[InSaveIndex];
 	}
 	return nullptr;
 }
 
-TArray<USaveGameBase*> ASaveGameModule::GetSaveGames(TSubclassOf<USaveGameBase> InSaveGameClass) const
+TArray<USaveGameBase*> ASaveGameModule::GetSaveGames(TSubclassOf<USaveGameBase> InClass) const
 {
-	if(!InSaveGameClass) return TArray<USaveGameBase*>();
+	if(!InClass) return TArray<USaveGameBase*>();
 
-	TArray<USaveGameBase*> SaveGames;
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(SaveGameInfos.Contains(SaveName))
-	{
-		SaveGameInfos[SaveName].Array.GenerateValueArray(SaveGames);
-	}
-	return SaveGames;
+	return GetSaveGameInfo(InClass).SaveGames;
 }
 
-USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
+USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(!InSaveGameClass) return nullptr;
+	if(!InClass) return nullptr;
 		
-	if(InSaveIndex == -1) InSaveIndex = GetValidSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetValidSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(!HasSaveGame(InSaveGameClass, InSaveIndex))
+	const FName SaveName = GetSaveName(InClass);
+	if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InClass)))
 	{
-		if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::CreateSaveGameObject(InSaveGameClass)))
+		if(!SaveGameInfos.Contains(SaveName))
 		{
-			if(!SaveGameInfos.Contains(SaveName)) SaveGameInfos.Add(SaveName);
-			SaveGameInfos[SaveName].Class = InSaveGameClass;
-			SaveGameInfos[SaveName].Array.Emplace(InSaveIndex, SaveGame);
-			SaveGame->OnCreate(InSaveIndex);
-			SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
-			if(bAutoLoad)
-			{
-				SaveGame->Load(EPhase::Primary);
-			}
-			return SaveGame;
+			SaveGameInfos.Add(SaveName, FSaveGameInfo(InClass));
 		}
+		SaveGameInfos[SaveName].SaveGames.Add(SaveGame);
+		UnloadSaveGame(InClass, -1, EPhase::Lesser);
+		SaveGame->OnCreate(InIndex);
+		SaveGameInfos[SaveName].ActiveIndex = InIndex;
+		if(InPhase != EPhase::None)
+		{
+			SaveGame->Load(InPhase);
+		}
+		return SaveGame;
 	}
 	return nullptr;
 }
 
-USaveGameBase* ASaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bAutoLoad)
+USaveGameBase* ASaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	return HasSaveGame(InSaveGameClass, InSaveIndex) ? GetSaveGame(InSaveGameClass, InSaveIndex) : CreateSaveGame(InSaveGameClass, InSaveIndex, bAutoLoad);
+	return HasSaveGame(InClass, InIndex) ? GetSaveGame(InClass, InIndex) : CreateSaveGame(InClass, InIndex, EPhase::None);
 }
 
-USaveGameBase* ASaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+USaveGameBase* ASaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::HasSaveGame(InSaveGameClass, InSaveIndex, true) ? USaveGameModuleBPLibrary::LoadSaveGame(InSaveGameClass, InSaveIndex, EPhase::Primary) : USaveGameModuleBPLibrary::CreateSaveGame(InSaveGameClass, InSaveIndex, true);
+	return USaveGameModuleBPLibrary::HasSaveGame(InClass, InIndex) ? USaveGameModuleBPLibrary::LoadSaveGame(InClass, InIndex, EPhase::Primary) : USaveGameModuleBPLibrary::CreateSaveGame(InClass, InIndex, InPhase);
 }
 
-bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, bool bRefresh)
+bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
+	const FName SaveName = GetSaveName(InClass);
+	if(USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex))
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
+		if(InIndex == GetActiveSaveIndex(InClass))
 		{
-			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
+			SaveGame->bSaved = true;
+			if(bRefresh)
 			{
-				SaveGame->bSaved = true;
-				if(bRefresh)
-				{
-					SaveGame->OnRefresh();
-				}
-				SaveGame->GetSaveData()->MakeSaved();
-				SaveGame->OnSave();
+				SaveGame->OnRefresh();
 			}
-			return UGameplayStatics::SaveGameToSlot(SaveGame, GetSaveSlotName(SaveName, SaveGame->GetSaveIndex()), UserIndex);
+			SaveGame->GetSaveData()->MakeSaved();
+			SaveGame->OnSave();
 		}
-		return true;
+		return UGameplayStatics::SaveGameToSlot(SaveGame, GetSaveSlotName(SaveName, SaveGame->GetSaveIndex()), UserIndex);
 	}
 	return false;
 }
 
-bool ASaveGameModule::SaveSaveGames(TSubclassOf<USaveGameBase> InSaveGameClass, bool bRefresh)
+bool ASaveGameModule::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh)
 {
+	if(!InClass) return false;
+	
 	bool bIsAllSaved = true;
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(SaveGameInfos.Contains(SaveName))
+	FSaveGameInfo SaveGameInfo = GetSaveGameInfo(InClass);
+	for(auto Iter : SaveGameInfo.SaveGames)
 	{
-		for(int32 i = 0; i < SaveGameInfos[SaveName].Array.Num(); i++)
+		if(Iter && !Iter->Save(bRefresh))
 		{
-			if(!SaveSaveGame<USaveGameBase>(i, bRefresh, InSaveGameClass))
-			{
-				bIsAllSaved = false;
-			}
+			bIsAllSaved = false;
 		}
 	}
 	return bIsAllSaved;
@@ -330,9 +281,9 @@ bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
 	bool bIsAllSaved = true;
 	for(auto Iter1 : SaveGameInfos)
 	{
-		for(auto Iter2 : Iter1.Value.Array)
+		for(auto Iter2 : Iter1.Value.SaveGames)
 		{
-			if(!Iter2.Value->Save(bRefresh))
+			if(Iter2 && !Iter2->Save(bRefresh))
 			{
 				bIsAllSaved = false;
 			}
@@ -341,130 +292,111 @@ bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
 	return bIsAllSaved;
 }
 
-USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, EPhase InPhase)
+USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(!InSaveGameClass) return nullptr;
+	if(!InClass) return nullptr;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(HasSaveGame(InSaveGameClass, InSaveIndex, false))
+	const FName SaveName = GetSaveName(InClass);
+	USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex);
+	if(!SaveGame)
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
+		SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSaveSlotName(SaveName, InIndex), UserIndex));
+		SaveGame->GetSaveData()->MakeSaved();
+		if(!SaveGameInfos.Contains(SaveName))
 		{
-			if(InPhase == EPhase::Primary || InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
-			{
-				SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
-				SaveGame->bLoaded = true;
-				SaveGame->OnLoad(InPhase);
-			}
-			return SaveGame;
+			SaveGameInfos.Add(SaveName, FSaveGameInfo(InClass));
 		}
+		SaveGameInfos[SaveName].SaveGames.Add(SaveGame);
 	}
-	else if(HasSaveGame(InSaveGameClass, InSaveIndex, true))
+	if(SaveGame)
 	{
-		if(USaveGameBase* SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSaveSlotName(SaveName, InSaveIndex), UserIndex)))
-		{
-			if(!SaveGameInfos.Contains(SaveName)) SaveGameInfos.Add(SaveName);
-			SaveGameInfos[SaveName].Array.Emplace(InSaveIndex, SaveGame);
-			SaveGame->GetSaveData()->MakeSaved();
-			if(InPhase == EPhase::Primary || InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
-			{
-				SetActiveSaveIndex(InSaveGameClass, InSaveIndex);
-				SaveGame->bLoaded = true;
-				SaveGame->OnLoad(InPhase);
-			}
-			return SaveGame;
-		}
+		UnloadSaveGame(InClass, -1, EPhase::Lesser);
+		SaveGameInfos[SaveName].ActiveIndex = InIndex;
+		SaveGame->bLoaded = true;
+		SaveGame->OnLoad(InPhase);
+		return SaveGame;
 	}
 	return nullptr;
 }
 
-bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex, EPhase InPhase)
+bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
+	const FName SaveName = GetSaveName(InClass);
+	if(USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex))
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
+		if(PHASEC(InPhase, EPhase::Primary))
 		{
-			if(InPhase == EPhase::Primary) SaveGameInfos[SaveName].Array.Emplace(InSaveIndex, nullptr);
-			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
-			{
-				SaveGame->bLoaded = false;
-				SaveGame->OnUnload(InPhase);
-				SetActiveSaveIndex(InSaveGameClass, -1);
-			}
+			SaveGameInfos[SaveName].ActiveIndex = -1;
+			SaveGame->bLoaded = false;
+		}
+
+		SaveGame->OnUnload(InPhase);
+
+		if(PHASEC(InPhase, EPhase::Final))
+		{
 			SaveGame->ConditionalBeginDestroy();
+
+			SaveGameInfos[SaveName].SaveGames.Remove(SaveGame);
+			if(SaveGameInfos[SaveName].SaveGames.IsEmpty()) SaveGameInfos.Remove(SaveName);
 		}
+		return true;
 	}
 	return false;
 }
 
-bool ASaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool ASaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
+	if(USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex))
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
-		{
-			SaveGame->OnReset();
-		}
+		SaveGame->OnReset();
 	}
 	return false;
 }
 
-bool ASaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool ASaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
+	if(USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex))
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
-		{
-			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
-			{
-				SaveGame->OnRefresh();
-			}
-		}
+		SaveGame->OnRefresh();
 	}
 	return false;
 }
 
-bool ASaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InSaveGameClass, int32 InSaveIndex)
+bool ASaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(!InSaveGameClass) return false;
+	if(!InClass) return false;
 
-	if(InSaveIndex == -1) InSaveIndex = GetActiveSaveIndex(InSaveGameClass);
+	if(InIndex == -1) InIndex = GetActiveSaveIndex(InClass);
 
-	const FName SaveName = InSaveGameClass.GetDefaultObject()->GetSaveName();
-	if(HasSaveGame(InSaveGameClass, InSaveIndex))
+	const FName SaveName = GetSaveName(InClass);
+	if(USaveGameBase* SaveGame = GetSaveGame(InClass, InIndex))
 	{
-		if(USaveGameBase* SaveGame = GetSaveGame(InSaveGameClass, InSaveIndex))
-		{
-			if(InSaveIndex == GetActiveSaveIndex(InSaveGameClass))
-			{
-				SaveGame->OnUnload(EPhase::Primary);
-				SetActiveSaveIndex(InSaveGameClass, -1);
-			}
-			SaveGame->OnDestroy();
-			SaveGame->ConditionalBeginDestroy();
-		}
+		SaveGameInfos[SaveName].ActiveIndex = -1;
+		
+		SaveGame->OnUnload(EPhase::All);
+		SaveGame->OnDestroy();
+		SaveGame->ConditionalBeginDestroy();
+		
+		SaveGameInfos[SaveName].SaveGames.Remove(SaveGame);
+		if(SaveGameInfos[SaveName].SaveGames.IsEmpty()) SaveGameInfos.Remove(SaveName);
 
-		SaveGameInfos[SaveName].Array.Remove(InSaveIndex);
-		if(SaveGameInfos[SaveName].Array.Num() == 0) SaveGameInfos.Remove(SaveName);
-
-		if(UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InSaveIndex), UserIndex))
+		if(UGameplayStatics::DoesSaveGameExist(GetSaveSlotName(SaveName, InIndex), UserIndex))
 		{
-			UGameplayStatics::DeleteGameInSlot(GetSaveSlotName(SaveName, InSaveIndex), UserIndex);
+			UGameplayStatics::DeleteGameInSlot(GetSaveSlotName(SaveName, InIndex), UserIndex);
 		}
 		return true;
 	}

@@ -60,10 +60,14 @@ public:
 	/// SingleSound
 protected:
 	UPROPERTY()
-	TMap<FSingleSoundHandle, UAudioComponent*> AudioComponents;
+	TMap<FSingleSoundHandle, FSingleSoundInfo> SingleSoundInfos;
 	
 	UPROPERTY(Replicated)
 	int32 SingleSoundHandle;
+	
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FSingleSoundInfo GetSingleSoundInfo(const FSingleSoundHandle& InHandle) const;
 	
 public:
 	UFUNCTION(BlueprintCallable)

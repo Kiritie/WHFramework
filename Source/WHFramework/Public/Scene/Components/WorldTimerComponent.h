@@ -49,7 +49,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void InitializeTimer(float InSecondsOfDay);
+	void InitializeTimer(float InSecondsOfDay, float InTimeSeconds = -1.f);
 
 	UFUNCTION(BlueprintCallable)
 	void UpdateTimer(float DeltaSeconds = 0.f);

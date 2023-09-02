@@ -110,6 +110,15 @@ void AAudioModule::MultiPlaySoundAtLocation_Implementation(USoundBase* InSound, 
 	PlaySoundAtLocation(InSound, InLocation, InVolume, false);
 }
 
+FSingleSoundInfo AAudioModule::GetSingleSoundInfo(const FSingleSoundHandle& InHandle) const
+{
+	if(SingleSoundInfos.Contains(InHandle))
+	{
+		SingleSoundInfos[InHandle];
+	}
+	return FSingleSoundInfo();
+}
+
 FSingleSoundHandle AAudioModule::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	const FSingleSoundHandle Handle(SingleSoundHandle++);
@@ -249,52 +258,52 @@ void AAudioModule::MultiSetSingleSoundPaused_Implementation(const FSingleSoundHa
 UAudioComponent* AAudioModule::PlaySingleSound2DImpl(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume)
 {
 	StopSingleSoundImpl(InHandle);
-	if(!AudioComponents.Contains(InHandle))
+	if(!SingleSoundInfos.Contains(InHandle))
 	{
 		UAudioComponent* AudioComponent = UGameplayStatics::SpawnSound2D(this, InSound, InVolume);
 		if(AudioComponent)
 		{
 			AudioComponent->Play();
 		}
-		AudioComponents.Add(InHandle, AudioComponent);
+		SingleSoundInfos.Add(InHandle, FSingleSoundInfo(AudioComponent, InSound));
 	}
-	return AudioComponents[InHandle];
+	return SingleSoundInfos[InHandle].Audio;
 }
 
 UAudioComponent* AAudioModule::PlaySingleSoundAtLocationImpl(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume)
 {
 	StopSingleSoundImpl(InHandle);
-	if(!AudioComponents.Contains(InHandle))
+	if(!SingleSoundInfos.Contains(InHandle))
 	{
 		UAudioComponent* AudioComponent = UGameplayStatics::SpawnSoundAtLocation(this, InSound, InLocation, FRotator::ZeroRotator, InVolume);
 		if(AudioComponent)
 		{
 			AudioComponent->Play();
 		}
-		AudioComponents.Add(InHandle, AudioComponent);
+		SingleSoundInfos.Add(InHandle, FSingleSoundInfo(AudioComponent, InSound));
 	}
-	return AudioComponents[InHandle];
+	return SingleSoundInfos[InHandle].Audio;
 }
 
 void AAudioModule::StopSingleSoundImpl(const FSingleSoundHandle& InHandle)
 {
-	if(AudioComponents.Contains(InHandle))
+	if(SingleSoundInfos.Contains(InHandle))
 	{
-		if(IsValid(AudioComponents[InHandle]))
+		if(SingleSoundInfos[InHandle].IsValid())
 		{
-			AudioComponents[InHandle]->Stop();
+			SingleSoundInfos[InHandle].Audio->Stop();
 		}
-		AudioComponents.Remove(InHandle);
+		SingleSoundInfos.Remove(InHandle);
 	}
 }
 
 void AAudioModule::SetSingleSoundPausedImpl(const FSingleSoundHandle& InHandle, bool bPaused)
 {
-	if(AudioComponents.Contains(InHandle))
+	if(SingleSoundInfos.Contains(InHandle))
 	{
-		if(IsValid(AudioComponents[InHandle]))
+		if(SingleSoundInfos[InHandle].IsValid())
 		{
-			AudioComponents[InHandle]->SetPaused(bPaused);
+			SingleSoundInfos[InHandle].Audio->SetPaused(bPaused);
 		}
 	}
 }

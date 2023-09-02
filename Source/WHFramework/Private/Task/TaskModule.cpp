@@ -77,11 +77,11 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Lesser)
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0, true)->GetSaveData());
+		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 	}
-	else if(InPhase == EPhase::Final && bAutoEnterFirst && !CurrentTask)
+	if(PHASEC(InPhase, EPhase::Final) && bAutoEnterFirst && !CurrentTask)
 	{
 		EnterTask(FirstTask);
 	}
@@ -139,7 +139,7 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 
-	if(InPhase == EPhase::Lesser)
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
 		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 	}

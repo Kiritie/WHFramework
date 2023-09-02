@@ -13,9 +13,9 @@ UTaskSaveGame::UTaskSaveGame()
 	SaveName = FName("Task");
 }
 
-void UTaskSaveGame::OnCreate_Implementation(int32 InSaveIndex)
+void UTaskSaveGame::OnCreate_Implementation(int32 InIndex)
 {
-	Super::OnCreate_Implementation(InSaveIndex);
+	Super::OnCreate_Implementation(InIndex);
 }
 
 void UTaskSaveGame::OnLoad_Implementation(EPhase InPhase)

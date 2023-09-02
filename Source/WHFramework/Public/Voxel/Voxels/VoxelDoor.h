@@ -5,8 +5,6 @@
 #include "Voxel.h"
 #include "VoxelDoor.generated.h"
 
-class AVoxelChunk;
-
 /**
  * ������
  */
@@ -19,21 +17,14 @@ public:
 	UVoxelDoor();
 
 	//////////////////////////////////////////////////////////////////////////
-	// Defaults
+	// Voxel
 public:
 	virtual void OnReset_Implementation() override;
+	
+	virtual void LoadData(const FString& InData) override;
 
-	virtual void Serialize(FArchive& Ar) override;
+	virtual FString ToData() override;
 
-protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
-
-	virtual FSaveData* ToData(bool bRefresh) override;
-
-	virtual bool HasArchive() const override { return true; }
-
-	//////////////////////////////////////////////////////////////////////////
-	// Events
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
 
@@ -47,8 +38,10 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
+	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	// Door
 public:
 	virtual void Toggle();
 
@@ -56,8 +49,6 @@ public:
 
 	virtual void Close();
 
-	//////////////////////////////////////////////////////////////////////////
-	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere)
 	bool bOpened;

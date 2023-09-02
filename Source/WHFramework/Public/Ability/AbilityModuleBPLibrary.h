@@ -73,6 +73,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
+	static ECollisionChannel GetPickUpTraceChannel();
+
 	static AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
 	static AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);

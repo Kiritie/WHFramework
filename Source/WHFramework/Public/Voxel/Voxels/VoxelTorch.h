@@ -5,8 +5,6 @@
 #include "Voxel.h"
 #include "VoxelTorch.generated.h"
 
-class AVoxelChunk;
-
 /**
  * ���ػ��
  */
@@ -19,21 +17,14 @@ public:
 	UVoxelTorch();
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Defaults
+	// Voxel
 public:
 	virtual void OnReset_Implementation() override;
-
-protected:
-	virtual void Serialize(FArchive& Ar) override;
 	
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FString& InData) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FString ToData() override;
 
-	virtual bool HasArchive() const override { return true; }
-
-	//////////////////////////////////////////////////////////////////////////
-	// Events
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
 
@@ -47,8 +38,10 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnActionTrigger(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
+	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	// Torch
 public:
 	virtual void Toggle();
 
@@ -56,8 +49,6 @@ public:
 
 	virtual void TakeOff();
 
-	//////////////////////////////////////////////////////////////////////////
-	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere)
 	bool bOn;

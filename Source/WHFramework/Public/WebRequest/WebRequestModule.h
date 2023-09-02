@@ -87,7 +87,7 @@ public:
 		return HasWebInterface(T::StaticClass());
 	}
 	UFUNCTION(BlueprintCallable)
-	bool HasWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+	bool HasWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
 
 	template<class T>
 	T* GetWebInterface()
@@ -95,7 +95,7 @@ public:
 		return Cast<T>(GetWebInterface(T::StaticClass()));
 	}
 	UFUNCTION(BlueprintCallable)
-	UWebInterfaceBase* GetWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+	UWebInterfaceBase* GetWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
 
 	template<class T>
 	T* CreateWebInterface()
@@ -103,23 +103,23 @@ public:
 		return Cast<T>(GetWebInterface(T::StaticClass()));
 	}
 	UFUNCTION(BlueprintCallable)
-	UWebInterfaceBase* CreateWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+	UWebInterfaceBase* CreateWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
 
 	template<class T>
-	bool RegisterWebInterface(const FOnWebRequestComplete& InOnWebRequestComplete)
+	bool RegisterWebInterface(const FOnWebRequestComplete& InOnRequestComplete)
 	{
-		return RegisterWebInterface(T::StaticClass(), InOnWebRequestComplete);
+		return RegisterWebInterface(T::StaticClass(), InOnRequestComplete);
 	}
 	UFUNCTION(BlueprintCallable)
-	bool RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete);
+	bool RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete);
 
 	template<class T>
-	bool UnRegisterWebInterface(const FOnWebRequestComplete& InOnWebRequestComplete)
+	bool UnRegisterWebInterface(const FOnWebRequestComplete& InOnRequestComplete)
 	{
-		return UnRegisterWebInterface(T::StaticClass(), InOnWebRequestComplete);
+		return UnRegisterWebInterface(T::StaticClass(), InOnRequestComplete);
 	}
 	UFUNCTION(BlueprintCallable)
-	bool UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, const FOnWebRequestComplete& InOnWebRequestComplete);
+	bool UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete);
 
 	template<class T>
 	bool UnRegisterAllWebInterface()
@@ -127,7 +127,7 @@ public:
 		return UnRegisterAllWebInterface(T::StaticClass());
 	}
 	UFUNCTION(BlueprintCallable)
-	bool UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+	bool UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
 
 	template<class T>
 	bool ClearWebInterface()
@@ -135,7 +135,7 @@ public:
 		return ClearWebInterface(T::StaticClass());
 	}
 	UFUNCTION(BlueprintCallable)
-	bool ClearWebInterface(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass);
+	bool ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllWebInterface();
@@ -147,10 +147,10 @@ public:
 		return SendWebRequest(T::StaticClass(), InMethod, InHeadMap, InContent);
 	}
 
-	bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
+	bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request"))
-	bool K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InWebInterfaceClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent);
+	bool K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent);
 
 protected:
 	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent);

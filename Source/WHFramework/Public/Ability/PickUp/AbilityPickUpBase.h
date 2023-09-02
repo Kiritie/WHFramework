@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Global/Base/WHActor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -15,6 +16,7 @@ class AVoxelChunk;
 class UBoxComponent;
 class UMeshComponent;
 class URotatingMovementComponent;
+class UFallingMovementComponent;
 
 /**
  * 可拾取项
@@ -27,16 +29,8 @@ class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public ISaveDataInte
 public:	
 	AAbilityPickUpBase();
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FAbilityItem Item;
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UBoxComponent* BoxComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	URotatingMovementComponent* RotatingComponent;
+public:
+	virtual void OnInitialize_Implementation() override;
 
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -59,6 +53,20 @@ protected:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnPickUp(const TScriptInterface<IAbilityPickerInterface>& InPicker);
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FAbilityItem Item;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	URotatingMovementComponent* RotatingComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UFallingMovementComponent* FallingComponent;
 
 public:
 	FAbilityItem& GetItem() { return Item; }

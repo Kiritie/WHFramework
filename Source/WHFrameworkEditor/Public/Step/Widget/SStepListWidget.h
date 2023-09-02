@@ -75,7 +75,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Step
 private:
-	UStepBase* GenerateStep(TSubclassOf<UStepBase> InStepClass);
+	UStepBase* GenerateStep(TSubclassOf<UStepBase> InClass);
 
 	UStepBase* DuplicateStep(UStepBase* InStep);
 

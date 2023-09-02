@@ -57,22 +57,22 @@ public:
 	void RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveMediaPlayerFromListByName(const FName InMediaPlayerName);
+	void RemoveMediaPlayerFromListByName(const FName InName);
 
 	UFUNCTION(BlueprintPure)
-	AMediaPlayerBase* GetMediaPlayerByName(const FName InMediaPlayerName) const;
+	AMediaPlayerBase* GetMediaPlayerByName(const FName InName) const;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Movie
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayMediaPlayerMovie(const FName InMediaPlayerName, const FName InMovieName, bool bMulticast = false);
+	void PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
-	void PlayMovieWithDelegate(const FName InMediaPlayerName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnMoviePlayFinishedDelegate, bool bMulticast = false);
+	void PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable)
-	void StopMediaPlayerMovie(const FName InMediaPlayerName, bool bSkip, bool bMulticast = false);
+	void StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast = false);
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

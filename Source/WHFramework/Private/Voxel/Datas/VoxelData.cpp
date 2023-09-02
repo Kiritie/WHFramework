@@ -12,7 +12,7 @@ UVoxelData::UVoxelData()
 	VoxelClass = nullptr;
 	AuxiliaryClass = nullptr;
 	Transparency = EVoxelTransparency::Solid;
-	PartType = EVoxelPartType::Main;
+	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
@@ -22,8 +22,53 @@ UVoxelData::UVoxelData()
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
 	MeshUVDatas.SetNum(6);
-	GenerateSound = nullptr;
-	DestroySound = nullptr;
+	Sounds = TMap<EVoxelSoundType, USoundBase*>();
+}
+
+bool UVoxelData::HasPartData(FIndex InIndex) const
+{
+	if(!bMainPart) return false;
+
+	if(InIndex == FIndex::ZeroIndex) return true;
+	if(MainData) return MainData->HasPartData(InIndex);
+	return PartDatas.Contains(InIndex);
+}
+
+UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
+{
+	if(!bMainPart) return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
+
+	if(InIndex == FIndex::ZeroIndex) return *this;
+	if(MainData) return MainData->GetPartData(InIndex);
+	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
+	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
+}
+
+FVector UVoxelData::GetRange(ERightAngle InAngle) const
+{
+	FVector Range = FVector::OneVector;
+	if(bMainPart && PartDatas.Num() > 0)
+	{
+		FVector PartRange;
+		for(auto Iter : PartDatas)
+		{
+			PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
+			PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
+			PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
+		}
+		Range += PartRange;
+	}
+	Range = UMathBPLibrary::RotatorVector(Range, InAngle, true, true);
+	return Range;
+}
+
+USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
+{
+	if(Sounds.Contains(InSoundType))
+	{
+		Sounds[InSoundType];
+	}
+	return nullptr;
 }
 
 void UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
@@ -53,43 +98,6 @@ void UVoxelData::GetUVData(const FVoxelItem& InVoxelItem, int32 InFaceIndex, FVe
 	const FVoxelMeshUVData& UVData = MeshUVDatas[InFaceIndex];
 	OutUVCorner = FVector2D(UVData.UVCorner.X * InUVSize.X, (1.f / InUVSize.Y - UVData.UVCorner.Y - UVData.UVSpan.Y) * InUVSize.Y);
 	OutUVSpan = FVector2D(UVData.UVSpan.X * InUVSize.X, UVData.UVSpan.Y * InUVSize.Y);
-}
-
-bool UVoxelData::HasPartData(FIndex InIndex) const
-{
-	if(PartType != EVoxelPartType::Main) return false;
-
-	if(InIndex == FIndex::ZeroIndex) return true;
-	if(MainData) return MainData->HasPartData(InIndex);
-	return PartDatas.Contains(InIndex);
-}
-
-UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
-{
-	if(PartType != EVoxelPartType::Main) return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
-
-	if(InIndex == FIndex::ZeroIndex) return *this;
-	if(MainData) return MainData->GetPartData(InIndex);
-	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
-	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
-}
-
-FVector UVoxelData::GetRange(ERightAngle InAngle) const
-{
-	FVector Range = FVector::OneVector;
-	if(PartType == EVoxelPartType::Main && PartDatas.Num() > 0)
-	{
-		FVector PartRange;
-		for(auto Iter : PartDatas)
-		{
-			PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
-			PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
-			PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
-		}
-		Range += PartRange;
-	}
-	Range = UMathBPLibrary::RotatorVector(Range, InAngle, true, true);
-	return Range;
 }
 
 bool UVoxelData::IsEmpty() const

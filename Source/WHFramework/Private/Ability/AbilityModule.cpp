@@ -101,6 +101,11 @@ FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 	return UGlobalBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
 }
 
+ECollisionChannel AAbilityModule::GetPickUpTraceChannel() const
+{
+	return ECollisionChannel::ECC_MAX;
+}
+
 AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
 	if(!InItem.IsValid()) return nullptr;
@@ -134,7 +139,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 	if(PickUp)
 	{
 		PickUp->Initialize(InItem);
-		PickUp->SetActorLocationAndRotation(InLocation, FRotator::ZeroRotator);
+		PickUp->SetActorLocationAndRotation(InLocation, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(PickUp);
@@ -154,7 +159,7 @@ AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISc
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
 	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ID }, SaveData.GetCharacterData().Class))
 	{
-		Character->LoadSaveData(InSaveData, EPhase::Primary);
+		Character->LoadSaveData(InSaveData);
 		Character->SpawnDefaultController();
 		if(InContainer)
 		{
@@ -170,7 +175,7 @@ AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, IScen
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ID }, SaveData.GetVitalityData().Class))
 	{
-		Vitality->LoadSaveData(InSaveData, EPhase::Primary);
+		Vitality->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Vitality);

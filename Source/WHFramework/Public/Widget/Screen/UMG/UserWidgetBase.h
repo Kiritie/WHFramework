@@ -112,8 +112,8 @@ public:
 		return Cast<T>(GetChild(InIndex));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InWidgetClass"))
-	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InWidgetClass) const
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InClass) const
 	{
 		return Cast<UUserWidgetBase>(GetChild(InIndex));
 	}

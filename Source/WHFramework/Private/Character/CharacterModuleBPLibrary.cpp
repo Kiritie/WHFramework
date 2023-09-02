@@ -17,11 +17,11 @@ ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter()
 	return nullptr;
 }
 
-ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter(TSubclassOf<ACharacterBase> InCharacterClass)
+ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		return CharacterModule->GetCurrentCharacter(InCharacterClass);
+		return CharacterModule->GetCurrentCharacter(InClass);
 	}
 	return nullptr;
 }
@@ -34,54 +34,54 @@ void UCharacterModuleBPLibrary::SwitchCharacter(ACharacterBase* InCharacter, boo
 	}
 }
 
-void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass, bool bResetCamera, bool bInstant)
+void UCharacterModuleBPLibrary::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		CharacterModule->SwitchCharacterByClass(InCharacterClass, bResetCamera, bInstant);
+		CharacterModule->SwitchCharacterByClass(InClass, bResetCamera, bInstant);
 	}
 }
 
-void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InCharacterName, bool bResetCamera, bool bInstant)
+void UCharacterModuleBPLibrary::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		CharacterModule->SwitchCharacterByName(InCharacterName, bResetCamera, bInstant);
+		CharacterModule->SwitchCharacterByName(InName, bResetCamera, bInstant);
 	}
 }
 
-bool UCharacterModuleBPLibrary::HasCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
+bool UCharacterModuleBPLibrary::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		return CharacterModule->HasCharacterByClass(InCharacterClass);
-	}
-	return false;
-}
-
-bool UCharacterModuleBPLibrary::HasCharacterByName(FName InCharacterName)
-{
-	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
-	{
-		return CharacterModule->HasCharacterByName(InCharacterName);
+		return CharacterModule->HasCharacterByClass(InClass);
 	}
 	return false;
 }
 
-ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByClass(TSubclassOf<ACharacterBase> InCharacterClass)
+bool UCharacterModuleBPLibrary::HasCharacterByName(FName InName)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		return CharacterModule->GetCharacterByClass(InCharacterClass);
+		return CharacterModule->HasCharacterByName(InName);
+	}
+	return false;
+}
+
+ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass)
+{
+	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
+	{
+		return CharacterModule->GetCharacterByClass(InClass);
 	}
 	return nullptr;
 }
 
-ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByName(FName InCharacterName)
+ACharacterBase* UCharacterModuleBPLibrary::GetCharacterByName(FName InName)
 {
 	if(ACharacterModule* CharacterModule = ACharacterModule::Get())
 	{
-		return CharacterModule->GetCharacterByName(InCharacterName);
+		return CharacterModule->GetCharacterByName(InName);
 	}
 	return nullptr;
 }

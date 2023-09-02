@@ -23,24 +23,24 @@ class WHFRAMEWORK_API UAssetModuleBPLibrary : public UBlueprintFunctionLibrary
 	/// DataAsset
 public:
 	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
-	static bool HasDataAsset(FName InDataAssetName);
+	static bool HasDataAsset(FName InName);
 
 	template<class T>
-	static T* GetDataAsset(FName InDataAssetName = NAME_None)
+	static T* GetDataAsset(FName InName = NAME_None)
 	{
 		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
-			return AssetModule->GetDataAsset<T>(InDataAssetName);
+			return AssetModule->GetDataAsset<T>(InName);
 		}
 		return nullptr;
 	}
 	
 	template<class T>
-	static T& GetDataAssetRef(FName InDataAssetName = NAME_None)
+	static T& GetDataAssetRef(FName InName = NAME_None)
 	{
 		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
-			return AssetModule->GetDataAssetRef<T>(InDataAssetName);
+			return AssetModule->GetDataAssetRef<T>(InName);
 		}
 		else
 		{
@@ -48,34 +48,34 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
-	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
 
 	template<class T>
-	static T* CreateDataAsset(FName InDataAssetName = NAME_None)
+	static T* CreateDataAsset(FName InName = NAME_None)
 	{
 		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
-			return AssetModule->CreateDataAsset<T>(InDataAssetName);
+			return AssetModule->CreateDataAsset<T>(InName);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InDataAssetClass"), Category = "AssetModuleBPLibrary")
-	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
 
 	template<class T>
-	static bool RemoveDataAsset(FName InDataAssetName = NAME_None)
+	static bool RemoveDataAsset(FName InName = NAME_None)
 	{
 		if(AAssetModule* AssetModule = AAssetModule::Get())
 		{
-			return AssetModule->RemoveDataAsset<T>(InDataAssetName);
+			return AssetModule->RemoveDataAsset<T>(InName);
 		}
 		return false;
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
-	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName = NAME_None);
+	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
 	static void RemoveAllDataAsset();

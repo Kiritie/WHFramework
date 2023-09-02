@@ -24,7 +24,9 @@ UCLASS()
 class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
-	
+
+	friend class AVoxelModule;
+
 public:	
 	// Sets default values for this actor's properties
 	AVoxelChunk();
@@ -57,7 +59,9 @@ public:
 public:
 	virtual void Initialize(FIndex InIndex, int32 InBatch);
 
-	virtual void Generate(EPhase InPhase = EPhase::Primary);
+	virtual void Generate(EPhase InPhase);
+
+	virtual void UnGenerate(EPhase InPhase);
 
 	virtual void CreateMesh();
 
@@ -69,7 +73,7 @@ public:
 
 	virtual void LoadActors(FSaveData* InSaveData);
 
-	virtual void GenerateActors();
+	virtual void CreateActors();
 
 	virtual void DestroyActors();
 
@@ -95,6 +99,8 @@ public:
 
 	virtual FIndex WorldIndexToLocal(FIndex InIndex) const;
 
+	virtual bool LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection) const;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
@@ -102,8 +108,19 @@ public:
 
 	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
 
+	template<class T>
+	T& GetVoxel(FIndex InIndex, bool bMainPart = false)
+	{
+		return static_cast<T&>(GetVoxel(InIndex, bMainPart));
+	}
+
 	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
+	template<class T>
+	T& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false)
+	{
+		return static_cast<T&>(GetVoxel(InX, InY, InZ, bMainPart));
+	}
 	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
@@ -115,7 +132,7 @@ public:
 
 	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection);
 
-	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false);
+	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false, bool bOnTheChunk = false);
 
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
@@ -124,6 +141,8 @@ public:
 	virtual bool SetVoxelComplex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
+
+	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// SceneContainer
@@ -135,10 +154,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
 public:
-	virtual AVoxelAuxiliary* SpawnAuxiliary(FIndex InIndex);
+	virtual AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
 
-	virtual void DestroyAuxiliary(FIndex InIndex);
-
+	virtual void DestroyAuxiliary(FVoxelItem& InVoxelItem);
+	
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
@@ -155,13 +174,16 @@ protected:
 	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	EVoxelChunkState State;
-
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	FIndex Index;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	int32 Batch;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bBuilded;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bGenerated;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TMap<EDirection, AVoxelChunk*> Neighbors;
@@ -176,11 +198,13 @@ public:
 
 	int32 GetBatch() const { return Batch; }
 
-	bool IsBuilded() const { return State == EVoxelChunkState::Builded || IsGenerated(); }
+	bool IsBuilded() const { return bBuilded; }
 
-	bool IsGenerated() const { return State == EVoxelChunkState::Generated || State == EVoxelChunkState::Finally; }
+	bool IsGenerated() const { return bGenerated; }
 	
 	AVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
+
+	AVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 

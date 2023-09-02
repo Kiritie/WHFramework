@@ -328,9 +328,9 @@ void SProcedureListWidget::OnDestroy()
 	SEditorWidgetBase::OnDestroy();
 }
 
-UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
+UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InClass)
 {
-	UProcedureBase* NewProcedure = NewObject<UProcedureBase>(ProcedureModule, InProcedureClass, NAME_None);
+	UProcedureBase* NewProcedure = NewObject<UProcedureBase>(ProcedureModule, InClass, NAME_None);
 
 	// NewProcedure->ProcedureName = *CurrentProcedureClass->GetName().Replace(TEXT("Procedure_"), TEXT(""));
 	// NewProcedure->ProcedureDisplayName = FText::FromName(NewProcedure->ProcedureName);

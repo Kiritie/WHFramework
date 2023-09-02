@@ -13,9 +13,9 @@ UVoxelSaveGame::UVoxelSaveGame()
 	SaveName = FName("Voxel");
 }
 
-void UVoxelSaveGame::OnCreate_Implementation(int32 InSaveIndex)
+void UVoxelSaveGame::OnCreate_Implementation(int32 InIndex)
 {
-	Super::OnCreate_Implementation(InSaveIndex);
+	Super::OnCreate_Implementation(InIndex);
 
 	VoxelSaveData = *AVoxelModule::Get()->NewWorldData();
 }

@@ -85,12 +85,12 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
 
+	ResetCameraView();
+
 	if(bTrackTarget)
 	{
 		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 	}
-
-	ResetCameraView();
 
 	switch(ProcedureGuideType)
 	{
@@ -131,7 +131,12 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 {
 	ProcedureState = EProcedureState::Leaved;
 	OnStateChanged(ProcedureState);
-	
+
+	if(bTrackTarget)
+	{
+		UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
+	}
+
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDebugMode::All, EDebugCategory::Procedure, EDebugVerbosity::Log, FColor::Orange, 5.f);
 
 	K2_OnLeave(InNextProcedure);
@@ -251,27 +256,24 @@ void UProcedureBase::ResetCameraView()
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
-	if(OperationTarget != InOperationTarget)
+	OperationTarget = InOperationTarget;
+	if(ProcedureState == EProcedureState::Entered)
 	{
-		OperationTarget = InOperationTarget;
 		if(OperationTarget)
 		{
-			if(bTrackTarget)
-			{
-				UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
-			}
 			if(bResetCameraView)
 			{
 				ResetCameraView();
 			}
-		}
-		else
-		{
 			if(bTrackTarget)
 			{
-				UCameraModuleBPLibrary::EndTrackTarget();
+				UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 			}
 		}
+	}
+	if(bTrackTarget)
+	{
+		UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
 	}
 }
 

@@ -63,7 +63,7 @@ void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		if(!FirstProcedure && Procedures.Num() > 0)
 		{
@@ -77,7 +77,7 @@ void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 			}
 		}
 	}
-	else if(InPhase == EPhase::Final && bAutoSwitchFirst && FirstProcedure)
+	if(PHASEC(InPhase, EPhase::Final) && bAutoSwitchFirst && FirstProcedure)
 	{
 		SwitchProcedure(FirstProcedure);
 	}
@@ -125,27 +125,27 @@ void AProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 	}
 }
 
-void AProcedureModule::SwitchProcedureByIndex(int32 InProcedureIndex)
+void AProcedureModule::SwitchProcedureByIndex(int32 InIndex)
 {
-	if(HasProcedureByIndex(InProcedureIndex))
+	if(HasProcedureByIndex(InIndex))
 	{
-		SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InProcedureIndex));
+		SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InIndex));
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InProcedureIndex), EDebugMode::All, EDebugCategory::Procedure, EDebugVerbosity::Warning, FColor::Red, 5.f);
+		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InIndex), EDebugMode::All, EDebugCategory::Procedure, EDebugVerbosity::Warning, FColor::Red, 5.f);
 	}
 }
 
-void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass)
+void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	if(HasProcedureByClass<UProcedureBase>(InProcedureClass))
+	if(HasProcedureByClass<UProcedureBase>(InClass))
 	{
-		SwitchProcedure(GetProcedureByClass<UProcedureBase>(InProcedureClass));
+		SwitchProcedure(GetProcedureByClass<UProcedureBase>(InClass));
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InProcedureClass ? *InProcedureClass->GetName() : TEXT("None")), EDebugMode::All, EDebugCategory::Procedure, EDebugVerbosity::Warning, FColor::Red, 5.f);
+		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InClass ? *InClass->GetName() : TEXT("None")), EDebugMode::All, EDebugCategory::Procedure, EDebugVerbosity::Warning, FColor::Red, 5.f);
 	}
 }
 
@@ -202,24 +202,24 @@ void AProcedureModule::ClearAllProcedure()
 	Modify();
 }
 
-bool AProcedureModule::HasProcedureByIndex(int32 InProcedureIndex) const
+bool AProcedureModule::HasProcedureByIndex(int32 InIndex) const
 {
-	return Procedures.IsValidIndex(InProcedureIndex);
+	return Procedures.IsValidIndex(InIndex);
 }
 
-UProcedureBase* AProcedureModule::GetProcedureByIndex(int32 InProcedureIndex, TSubclassOf<UProcedureBase> InProcedureClass) const
+UProcedureBase* AProcedureModule::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass) const
 {
-	return GetProcedureByIndex<UProcedureBase>(InProcedureIndex);
+	return GetProcedureByIndex<UProcedureBase>(InIndex);
 }
 
-bool AProcedureModule::HasProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+bool AProcedureModule::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
 {
-	return HasProcedureByClass<UProcedureBase>(InProcedureClass);
+	return HasProcedureByClass<UProcedureBase>(InClass);
 }
 
-UProcedureBase* AProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase> InProcedureClass) const
+UProcedureBase* AProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
 {
-	return GetProcedureByClass<UProcedureBase>(InProcedureClass);
+	return GetProcedureByClass<UProcedureBase>(InClass);
 }
 
 bool AProcedureModule::IsCurrentProcedure(UProcedureBase* InProcedure) const
@@ -227,9 +227,9 @@ bool AProcedureModule::IsCurrentProcedure(UProcedureBase* InProcedure) const
 	return InProcedure == CurrentProcedure;
 }
 
-bool AProcedureModule::IsCurrentProcedureIndex(int32 InProcedureIndex) const
+bool AProcedureModule::IsCurrentProcedureIndex(int32 InIndex) const
 {
-	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InProcedureIndex;
+	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InIndex;
 }
 
 #if WITH_EDITOR

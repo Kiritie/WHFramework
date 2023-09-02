@@ -13,9 +13,9 @@ UParameterSaveGame::UParameterSaveGame()
 	SaveName = FName("Parameter");
 }
 
-void UParameterSaveGame::OnCreate_Implementation(int32 InSaveIndex)
+void UParameterSaveGame::OnCreate_Implementation(int32 InIndex)
 {
-	Super::OnCreate_Implementation(InSaveIndex);
+	Super::OnCreate_Implementation(InIndex);
 }
 
 void UParameterSaveGame::OnLoad_Implementation(EPhase InPhase)

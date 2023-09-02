@@ -100,6 +100,7 @@ void AWHActor::BeginPlay()
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
+		Execute_OnInitialize(this);
 		Execute_OnPreparatory(this, EPhase::None);
 	}
 }

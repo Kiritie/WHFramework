@@ -73,7 +73,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 private:
-	UProcedureBase* GenerateProcedure(TSubclassOf<UProcedureBase> InProcedureClass);
+	UProcedureBase* GenerateProcedure(TSubclassOf<UProcedureBase> InClass);
 
 	UProcedureBase* DuplicateProcedure(UProcedureBase* InProcedure);
 

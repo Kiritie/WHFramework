@@ -76,7 +76,7 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		for(auto Iter : KeyMappings)
 		{
@@ -103,7 +103,7 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 			GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
 		}
 	}
-	else if(InPhase == EPhase::Final)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
 		UpdateInputMode();
 	}

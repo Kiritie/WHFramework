@@ -53,3 +53,33 @@ private:
 	UPROPERTY()
 	int32 Handle;
 };
+
+USTRUCT(BlueprintType)
+struct FSingleSoundInfo
+{
+	GENERATED_USTRUCT_BODY()
+
+	FSingleSoundInfo()
+	{
+		Sound = nullptr;
+		Audio = nullptr;
+	}
+
+	FSingleSoundInfo(UAudioComponent* InAudio, USoundBase* InSound)
+	{
+		Sound = InSound;
+		Audio = InAudio;
+	}
+
+	bool IsValid() const
+	{
+		return Audio != nullptr;
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	USoundBase* Sound;
+
+	UPROPERTY(BlueprintReadOnly)
+	UAudioComponent* Audio;
+};

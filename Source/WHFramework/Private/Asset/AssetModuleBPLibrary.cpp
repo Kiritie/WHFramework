@@ -7,38 +7,38 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 
-bool UAssetModuleBPLibrary::HasDataAsset(FName InDataAssetName)
+bool UAssetModuleBPLibrary::HasDataAsset(FName InName)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
-		return AssetModule->HasDataAsset(InDataAssetName);
+		return AssetModule->HasDataAsset(InName);
 	}
 	return false;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::GetDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+UDataAssetBase* UAssetModuleBPLibrary::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
-		return AssetModule->GetDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->GetDataAsset(InClass, InName);
 	}
 	return nullptr;
 }
 
-UDataAssetBase* UAssetModuleBPLibrary::CreateDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+UDataAssetBase* UAssetModuleBPLibrary::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
-		return AssetModule->CreateDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->CreateDataAsset(InClass, InName);
 	}
 	return nullptr;
 }
 
-bool UAssetModuleBPLibrary::RemoveDataAsset(TSubclassOf<UDataAssetBase> InDataAssetClass, FName InDataAssetName)
+bool UAssetModuleBPLibrary::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
-		return AssetModule->RemoveDataAsset(InDataAssetClass, InDataAssetName);
+		return AssetModule->RemoveDataAsset(InClass, InName);
 	}
 	return false;
 }
