@@ -27,7 +27,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetState = EScreenWidgetState::None;
 	InputMode = EInputMode::None;
-	OwnerActor = nullptr;
+	OwnerObject = nullptr;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;
 	TemporaryChild = nullptr;
@@ -44,14 +44,14 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-void SSlateWidgetBase::OnCreate(AActor* InOwner)
+void SSlateWidgetBase::OnCreate(UObject* InOwner)
 {
 	
 }
 
-void SSlateWidgetBase::OnInitialize(AActor* InOwner)
+void SSlateWidgetBase::OnInitialize(UObject* InOwner)
 {
-	OwnerActor = InOwner;
+	OwnerObject = InOwner;
 }
 
 void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
@@ -103,7 +103,7 @@ void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
-void SSlateWidgetBase::Initialize(AActor* InOwner)
+void SSlateWidgetBase::Initialize(UObject* InOwner)
 {
 }
 

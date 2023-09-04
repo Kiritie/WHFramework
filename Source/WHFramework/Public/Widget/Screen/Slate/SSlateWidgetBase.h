@@ -22,9 +22,9 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
-	virtual void OnCreate(AActor* InOwner = nullptr) override;
+	virtual void OnCreate(UObject* InOwner = nullptr) override;
 	
-	virtual void OnInitialize(AActor* InOwner = nullptr) override;
+	virtual void OnInitialize(UObject* InOwner = nullptr) override;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
@@ -39,7 +39,7 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
-	virtual void Initialize(AActor* InOwner) override;
+	virtual void Initialize(UObject* InOwner) override;
 
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
@@ -109,7 +109,7 @@ protected:
 
 	EScreenWidgetState WidgetState;
 
-	AActor* OwnerActor;
+	UObject* OwnerObject;
 	
 	IScreenWidgetInterface* LastTemporary;
 	
@@ -163,7 +163,7 @@ public:
 
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
-	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
+	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 

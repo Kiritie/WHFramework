@@ -132,6 +132,8 @@ public:
 
 	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection);
 
+	virtual bool CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection);
+
 	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false, bool bOnTheChunk = false);
 
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);

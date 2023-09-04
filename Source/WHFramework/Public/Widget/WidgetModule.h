@@ -145,7 +145,7 @@ public:
 	UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass) const;
 
 	template<class T>
-	T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass) return nullptr;
 		
@@ -155,10 +155,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner = nullptr);
+	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
 
 	template<class T>
-	T* CreateUserWidgetByName(FName InName, AActor* InOwner = nullptr)
+	T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr)
 	{
 		if(InName.IsNone()) return nullptr;
 		
@@ -187,10 +187,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	UUserWidgetBase* CreateUserWidgetByName(FName InName, AActor* InOwner = nullptr);
+	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
 
 	template<class T>
-	bool InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	bool InitializeUserWidget(UObject* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 
@@ -198,10 +198,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner = nullptr);
+	bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
 
 	UFUNCTION(BlueprintCallable)
-	bool InitializeUserWidgetByName(FName InName, AActor* InOwner)
+	bool InitializeUserWidgetByName(FName InName, UObject* InOwner)
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidgetByName<UUserWidgetBase>(InName))
 		{
@@ -391,7 +391,7 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateSlateWidget(AActor* InOwner)
+	TSharedPtr<T> CreateSlateWidget(UObject* InOwner)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = &SNew(T))
 		{
@@ -408,7 +408,7 @@ public:
 	}
 
 	template<class T>
-	bool InitializeSlateWidget(AActor* InOwner)
+	bool InitializeSlateWidget(UObject* InOwner)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(InOwner)))
 		{
@@ -591,7 +591,7 @@ public:
 	TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName) const;
 
 	template<class T>
-	T* CreateWorldWidget(AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidget(UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass) return nullptr;
 		
@@ -601,10 +601,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
-	T* CreateWorldWidgetByName(FName InName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
@@ -627,7 +627,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{

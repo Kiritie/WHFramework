@@ -46,6 +46,15 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	// Asset
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UMaterialInterface* ItemIconSourceMat;
+
+public:
+	UMaterialInterface* GetItemIconSourceMat() const { return ItemIconSourceMat; }
+
+	//////////////////////////////////////////////////////////////////////////
 	// Interact
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

@@ -658,15 +658,19 @@ bool AVoxelChunk::CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVec
 
 bool AVoxelChunk::CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection)
 {
-	const FVoxelItem& VoxelItem = GetVoxelItem(InIndex);
-	const FIndex AdjacentIndex = UMathBPLibrary::GetAdjacentIndex(InIndex, InDirection, VoxelItem.Angle);
+	return CheckVoxelAdjacent(GetVoxelItem(InIndex), InDirection);
+}
+
+bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection)
+{
+	const FIndex AdjacentIndex = UMathBPLibrary::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
 	
-	if(!VoxelItem.IsValid() || LocalIndexToWorld(AdjacentIndex).Z <= 0) return true;
+	if(!InVoxelItem.IsValid() || LocalIndexToWorld(AdjacentIndex).Z <= 0) return true;
 	
 	const FVoxelItem& AdjacentItem = GetVoxelItem(AdjacentIndex);
 	if(AdjacentItem.IsValid())
 	{
-		const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+		const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 		const UVoxelData& AdjacentData = AdjacentItem.GetVoxelData();
 		switch(VoxelData.Transparency)
 		{

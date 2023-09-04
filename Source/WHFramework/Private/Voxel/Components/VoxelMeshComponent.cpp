@@ -77,36 +77,31 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
 	const UVoxelData& voxelData = InVoxelItem.GetVoxelData();
-	switch(voxelData.MeshType)
+	if(voxelData.bCustomMesh)
 	{
-		case EVoxelMeshType::Custom:
+		TArray<FVector> meshVertices, meshNormals;
+		voxelData.GetMeshData(InVoxelItem, meshVertices, meshNormals);
+		for (int i = 0; i < meshVertices.Num(); i++)
 		{
-			TArray<FVector> meshVertices, meshNormals;
-			voxelData.GetMeshData(InVoxelItem, meshVertices, meshNormals);
-			for (int i = 0; i < meshVertices.Num(); i++)
+			if (i > 0 && (i + 1) % 4 == 0)
 			{
-				if (i > 0 && (i + 1) % 4 == 0)
+				FVector vertices[4];
+				for (int j = 0; j < 4; j++)
 				{
-					FVector vertices[4];
-					for (int j = 0; j < 4; j++)
-					{
-						vertices[j] = meshVertices[i - (3 - j)];
-					}
-					BuildFace(InVoxelItem, vertices, i / 4, meshNormals[i / 4]);
+					vertices[j] = meshVertices[i - (3 - j)];
 				}
+				BuildFace(InVoxelItem, vertices, i / 4, meshNormals[i / 4]);
 			}
-			break;
 		}
-		case EVoxelMeshType::Cube:
-		{
-			ITER_DIRECTION(Iter,
-				if (!GetOwnerChunk() || !GetOwnerChunk()->CheckVoxelAdjacent(InVoxelItem.Index, Iter))
-				{
-					BuildFace(InVoxelItem, Iter);
-				}
-			)
-			break;
-		}
+	}
+	else
+	{
+		ITER_DIRECTION(Iter,
+			if (!GetOwnerChunk() || !GetOwnerChunk()->CheckVoxelAdjacent(InVoxelItem, Iter))
+			{
+				BuildFace(InVoxelItem, Iter);
+			}
+		)
 	}
 }
 
@@ -136,12 +131,12 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 	}
 }
 
-void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasCollider /*= true*/)
+void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasCollision /*= true*/)
 {
 	if (HasData())
 	{
 		SetCollisionEnabled(true);
-		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollider);
+		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollision);
 		switch (MeshNature)
 		{
 			case EVoxelMeshNature::Chunk:

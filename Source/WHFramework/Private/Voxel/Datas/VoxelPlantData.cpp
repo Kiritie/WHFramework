@@ -11,7 +11,7 @@ UVoxelPlantData::UVoxelPlantData()
 	
 	Transparency = EVoxelTransparency::Transparent;
 
-	MeshType = EVoxelMeshType::Custom;
+	bCustomMesh = true;
 
 	MeshVertices = TArray<FVector>();
 	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));

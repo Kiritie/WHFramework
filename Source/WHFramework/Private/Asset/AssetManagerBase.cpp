@@ -3,29 +3,22 @@
 #include "Asset/AssetManagerBase.h"
 
 #include "AbilitySystemGlobals.h"
-#include "Ability/Item/AbilityItemDataBase.h"
 #include "Debug/DebugModuleTypes.h"
 
 UAssetManagerBase::UAssetManagerBase()
 {
-	PrimaryAssetMap = TMap<FPrimaryAssetId, UPrimaryAssetBase*>();
+	PrimaryAssetMap = TMap<FPrimaryAssetType, FPrimaryAssets>();
 }
 
 UAssetManagerBase& UAssetManagerBase::Get()
 {
-	UAssetManagerBase* This = Cast<UAssetManagerBase>(GEngine->AssetManager);
-
-	if(This)
+	if(UAssetManagerBase* Instance = Cast<UAssetManagerBase>(GEngine->AssetManager))
 	{
-		//UReferencePoolModuleBPLibrary::CreateReference<UAssetManagerBase>(This);
-		return *This;
+		return *Instance;
 	}
-	else
-	{
-		ensureEditor(true);
-		WHLog(FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDebugCategory::Asset, EDebugVerbosity::Warning);
-		return UReferencePoolModuleBPLibrary::GetReference<UAssetManagerBase>();
-	}
+	ensureEditor(true);
+	WHLog(FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDebugCategory::Asset, EDebugVerbosity::Warning);
+	return UReferencePoolModuleBPLibrary::GetReference<UAssetManagerBase>();
 }
 
 void UAssetManagerBase::StartInitialLoading()
@@ -42,27 +35,27 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimary
 
 UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
 {
-	UPrimaryAssetBase* LoadedItem;
+	UPrimaryAssetBase* LoadedAsset;
 
-	if(!PrimaryAssetMap.Contains(InPrimaryAssetId))
+	if(!PrimaryAssetMap.FindOrAdd(InPrimaryAssetId.PrimaryAssetType).Assets.Contains(InPrimaryAssetId))
 	{
-		FSoftObjectPath ItemPath = GetPrimaryAssetPath(InPrimaryAssetId);
-		LoadedItem = Cast<UPrimaryAssetBase>(ItemPath.TryLoad());
-		if(LoadedItem)
+		const FSoftObjectPath AssetPath = GetPrimaryAssetPath(InPrimaryAssetId);
+		LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
+		if(LoadedAsset)
 		{
-			PrimaryAssetMap.Add(InPrimaryAssetId, LoadedItem);
+			PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Add(InPrimaryAssetId, LoadedAsset);
 		}
 	}
 	else
 	{
-		LoadedItem = PrimaryAssetMap[InPrimaryAssetId];
+		LoadedAsset = PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets[InPrimaryAssetId];
 	}
 
-	if(bLogWarning && !LoadedItem)
+	if(bLogWarning && !LoadedAsset)
 	{
-		WHLog(FString::Printf(TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetId.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
 	}
-	return LoadedItem;
+	return LoadedAsset;
 }
 
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
@@ -72,34 +65,30 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<
 
 TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
 {
-	TArray<UPrimaryAssetBase*> LoadedItems;
-	
-	TArray<FSoftObjectPath> ItemPaths;
-	GetPrimaryAssetPathList(InPrimaryAssetType, ItemPaths);
-
-	if(!PrimaryAssetsMap.Contains(InPrimaryAssetType))
+	TArray<UPrimaryAssetBase*> LoadedAssets;
+	if(!PrimaryAssetMap.Contains(InPrimaryAssetType))
 	{
-		for(auto Iter : ItemPaths)
+		TArray<FSoftObjectPath> AssetPaths;
+		GetPrimaryAssetPathList(InPrimaryAssetType, AssetPaths);
+		TMap<FPrimaryAssetId, UPrimaryAssetBase*> LoadedAssetMap;
+		for(auto Iter : AssetPaths)
 		{
-			if(UPrimaryAssetBase* LoadedItem = Cast<UPrimaryAssetBase>(Iter.TryLoad()))
+			if(UPrimaryAssetBase* LoadedAsset = Cast<UPrimaryAssetBase>(Iter.TryLoad()))
 			{
-				LoadedItems.Add(LoadedItem);
-				PrimaryAssetMap.Emplace(LoadedItem->GetPrimaryAssetId(), LoadedItem);
+				LoadedAssets.Add(LoadedAsset);
+				LoadedAssetMap.Add(LoadedAsset->GetPrimaryAssetId(), LoadedAsset);
 			}
 		}
-		if(LoadedItems.Num() > 0)
-		{
-			PrimaryAssetsMap.Add(InPrimaryAssetType, FPrimaryAssets(LoadedItems));
-		}
+		PrimaryAssetMap.Add(InPrimaryAssetType, LoadedAssetMap);
 	}
 	else
 	{
-		LoadedItems = PrimaryAssetsMap[InPrimaryAssetType].Assets;
+		PrimaryAssetMap[InPrimaryAssetType].Assets.GenerateValueArray(LoadedAssets);
 	}
 
-	if(bLogWarning && LoadedItems.Num() == 0)
+	if(bLogWarning && LoadedAssets.Num() == 0)
 	{
-		WHLog(FString::Printf(TEXT("Failed to load item for identifier %s!"), *InPrimaryAssetType.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetType.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
 	}
-	return LoadedItems;
+	return LoadedAssets;
 }

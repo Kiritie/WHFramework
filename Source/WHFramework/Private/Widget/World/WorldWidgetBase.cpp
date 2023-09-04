@@ -34,7 +34,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetShowDistance = 0;
 	WidgetParams = TArray<FParameter>();
 	InputMode = EInputMode::None;
-	OwnerActor = nullptr;
+	OwnerObject = nullptr;
 	WidgetIndex = 0;
 
 	WidgetComponent = nullptr;
@@ -70,16 +70,16 @@ void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 
 void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	OwnerActor = nullptr;
+	OwnerObject = nullptr;
 	WidgetParams.Empty();
 	WidgetIndex = 0;
 	WidgetComponent = nullptr;
 	BindWidgetMap.Empty();
 }
 
-void UWorldWidgetBase::OnCreate_Implementation(AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
-	OwnerActor = InOwner;
+	OwnerObject = InOwner;
 	WidgetParams = InParams;
 	
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
@@ -165,6 +165,7 @@ void UWorldWidgetBase::Refresh_Implementation()
 
 void UWorldWidgetBase::RefreshVisibility_Implementation()
 {
+	const auto OwnerActor = Cast<AActor>(OwnerObject);
 	const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetCameraLocation(true)) < WidgetShowDistance);
 	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }

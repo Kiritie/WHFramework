@@ -18,7 +18,7 @@ UVoxelData::UVoxelData()
 	MainData = nullptr;
 	MeshScale = FVector::OneVector;
 	MeshOffset = FVector::ZeroVector;
-	MeshType = EVoxelMeshType::Cube;
+	bCustomMesh = false;
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
 	MeshUVDatas.SetNum(6);
@@ -79,7 +79,7 @@ void UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScal
 
 void UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const
 {
-	if(MeshType != EVoxelMeshType::Custom) return;
+	if(!bCustomMesh) return;
 
 	for(auto Iter : MeshVertices)
 	{

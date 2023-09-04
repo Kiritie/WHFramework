@@ -43,10 +43,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(AActor* InOwner = nullptr) override;
+	void OnCreate(UObject* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize(AActor* InOwner = nullptr) override;
+	void OnInitialize(UObject* InOwner = nullptr) override;
 
 	UFUNCTION(BlueprintNativeEvent)
 	void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
@@ -70,7 +70,7 @@ public:
 	bool Initialize() override;
 
 	UFUNCTION(BlueprintCallable)
-	void Initialize(AActor* InOwner) override;
+	void Initialize(UObject* InOwner) override;
 	
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
@@ -98,6 +98,25 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	void FinishClose(bool bInstant) override;
+
+public:
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<USubWidgetBase> InClass = T::StaticClass())
+	{
+		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
+	}
+
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<USubWidgetBase> InClass = T::StaticClass())
+	{
+		return Cast<T>(CreateSubWidget(InClass, InParams));
+	}
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
+	USubWidgetBase* CreateSubWidget(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	bool DestroySubWidget(USubWidgetBase* InWidget, bool bRecovery = false);
 
 public:
 	void AddChild(IScreenWidgetInterface* InChildWidget) override;
@@ -195,7 +214,7 @@ protected:
 	EScreenWidgetState WidgetState;
 
 	UPROPERTY(Transient)
-	AActor* OwnerActor;
+	UObject* OwnerObject;
 
 	IScreenWidgetInterface* LastTemporary;
 	
@@ -277,7 +296,7 @@ public:
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
 	UFUNCTION(BlueprintPure)
-	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
+	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 

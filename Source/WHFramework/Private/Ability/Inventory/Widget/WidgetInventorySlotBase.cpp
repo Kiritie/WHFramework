@@ -8,33 +8,56 @@
 UWidgetInventorySlotBase::UWidgetInventorySlotBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	OwnerSlot = nullptr;
+	CooldownTimerHandle = FTimerHandle();
 }
 
-void UWidgetInventorySlotBase::OnInitialize(UInventorySlot* InOwnerSlot)
+void UWidgetInventorySlotBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	if(InOwnerSlot == OwnerSlot) return;
+
+}
+
+void UWidgetInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
+{
+	OwnerSlot = nullptr;
+	CooldownTimerHandle = FTimerHandle();
+	RemoveFromParent();
+}
+
+void UWidgetInventorySlotBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+{
+	Super::OnCreate_Implementation(InOwner, InParams);
+}
+
+void UWidgetInventorySlotBase::OnInitialize_Implementation(const TArray<FParameter>& InParams)
+{
+	if(InParams.IsValidIndex(0))
+	{
+		const auto InOwnerSlot = InParams[0].GetObjectValue<UInventorySlot>();
+		if(InOwnerSlot == OwnerSlot) return;
 	
-	if(OwnerSlot)
-	{
-		OwnerSlot->OnInventorySlotRefresh.RemoveDynamic(this, &UWidgetInventorySlotBase::OnRefresh);
-		OwnerSlot->OnInventorySlotActivated.RemoveDynamic(this, &UWidgetInventorySlotBase::OnActivated);
-		OwnerSlot->OnInventorySlotCanceled.RemoveDynamic(this, &UWidgetInventorySlotBase::OnCanceled);
+		if(OwnerSlot)
+		{
+			OwnerSlot->OnInventorySlotRefresh.RemoveDynamic(this, &UWidgetInventorySlotBase::OnRefresh);
+			OwnerSlot->OnInventorySlotActivated.RemoveDynamic(this, &UWidgetInventorySlotBase::OnActivated);
+			OwnerSlot->OnInventorySlotCanceled.RemoveDynamic(this, &UWidgetInventorySlotBase::OnCanceled);
+		}
+
+		OwnerSlot = InOwnerSlot;
+
+		if(OwnerSlot)
+		{
+			OwnerSlot->OnInventorySlotRefresh.AddDynamic(this, &UWidgetInventorySlotBase::OnRefresh);
+			OwnerSlot->OnInventorySlotActivated.AddDynamic(this, &UWidgetInventorySlotBase::OnActivated);
+			OwnerSlot->OnInventorySlotCanceled.AddDynamic(this, &UWidgetInventorySlotBase::OnCanceled);
+		}
 	}
-
-	OwnerSlot = InOwnerSlot;
-
-	if(OwnerSlot)
-	{
-		OwnerSlot->OnInventorySlotRefresh.AddDynamic(this, &UWidgetInventorySlotBase::OnRefresh);
-		OwnerSlot->OnInventorySlotActivated.AddDynamic(this, &UWidgetInventorySlotBase::OnActivated);
-		OwnerSlot->OnInventorySlotCanceled.AddDynamic(this, &UWidgetInventorySlotBase::OnCanceled);
-	}
-
-	OnRefresh();
+	Super::OnInitialize_Implementation(InParams);
 }
 
-void UWidgetInventorySlotBase::OnRefresh()
+void UWidgetInventorySlotBase::OnRefresh_Implementation()
 {
+	Super::OnRefresh_Implementation();
+	
 	if(!OwnerSlot) return;
 
 	if(!IsEmpty())
@@ -54,7 +77,12 @@ void UWidgetInventorySlotBase::OnRefresh()
 	}
 }
 
-void UWidgetInventorySlotBase::OnActivated()
+void UWidgetInventorySlotBase::OnDestroy_Implementation()
+{
+	Super::OnDestroy_Implementation();
+}
+
+void UWidgetInventorySlotBase::OnActivated_Implementation()
 {
 	if(IsCooldowning())
 	{
@@ -66,22 +94,22 @@ void UWidgetInventorySlotBase::OnActivated()
 	}
 }
 
-void UWidgetInventorySlotBase::OnCanceled()
+void UWidgetInventorySlotBase::OnCanceled_Implementation()
 {
 	StopCooldown();
 }
 
-void UWidgetInventorySlotBase::StartCooldown()
+void UWidgetInventorySlotBase::StartCooldown_Implementation()
 {
 	GetWorld()->GetTimerManager().SetTimer(CooldownTimerHandle, this, &UWidgetInventorySlotBase::OnCooldown, 0.1f, true);
 }
 
-void UWidgetInventorySlotBase::StopCooldown()
+void UWidgetInventorySlotBase::StopCooldown_Implementation()
 {
 	GetWorld()->GetTimerManager().ClearTimer(CooldownTimerHandle);
 }
 
-void UWidgetInventorySlotBase::OnCooldown()
+void UWidgetInventorySlotBase::OnCooldown_Implementation()
 {
 	if(OwnerSlot)
 	{
@@ -93,7 +121,7 @@ void UWidgetInventorySlotBase::OnCooldown()
 	}
 }
 
-void UWidgetInventorySlotBase::SplitItem(int InCount)
+void UWidgetInventorySlotBase::SplitItem_Implementation(int InCount)
 {
 	if(OwnerSlot)
 	{
@@ -101,7 +129,7 @@ void UWidgetInventorySlotBase::SplitItem(int InCount)
 	}
 }
 
-void UWidgetInventorySlotBase::MoveItem(int InCount)
+void UWidgetInventorySlotBase::MoveItem_Implementation(int InCount)
 {
 	if(OwnerSlot)
 	{
@@ -109,7 +137,7 @@ void UWidgetInventorySlotBase::MoveItem(int InCount)
 	}
 }
 
-void UWidgetInventorySlotBase::UseItem(int InCount)
+void UWidgetInventorySlotBase::UseItem_Implementation(int InCount)
 {
 	if(OwnerSlot)
 	{
@@ -117,7 +145,7 @@ void UWidgetInventorySlotBase::UseItem(int InCount)
 	}
 }
 
-void UWidgetInventorySlotBase::DiscardItem(int InCount)
+void UWidgetInventorySlotBase::DiscardItem_Implementation(int InCount)
 {
 	if(OwnerSlot)
 	{

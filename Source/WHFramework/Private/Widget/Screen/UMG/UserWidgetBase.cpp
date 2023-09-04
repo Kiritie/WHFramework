@@ -11,6 +11,7 @@
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Input/InputModuleBPLibrary.h"
+#include "Widget/Screen/UMG/SubWidgetBase.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -37,7 +38,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetState = EScreenWidgetState::None;
 	WidgetParams = TArray<FParameter>();
 	InputMode = EInputMode::None;
-	OwnerActor = nullptr;
+	OwnerObject = nullptr;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;
 	TemporaryChild = nullptr;
@@ -77,7 +78,7 @@ void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	
 }
 
-void UUserWidgetBase::OnCreate_Implementation(AActor* InOwner)
+void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 {
 	if(ParentName != NAME_None)
 	{
@@ -101,9 +102,9 @@ void UUserWidgetBase::OnCreate_Implementation(AActor* InOwner)
 	}
 }
 
-void UUserWidgetBase::OnInitialize_Implementation(AActor* InOwner)
+void UUserWidgetBase::OnInitialize_Implementation(UObject* InOwner)
 {
-	OwnerActor = InOwner;
+	OwnerObject = InOwner;
 }
 
 void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
@@ -244,7 +245,7 @@ bool UUserWidgetBase::Initialize()
 	return Super::Initialize();
 }
 
-void UUserWidgetBase::Initialize(AActor* InOwner)
+void UUserWidgetBase::Initialize(UObject* InOwner)
 {
 	UWidgetModuleBPLibrary::InitializeUserWidget<UUserWidgetBase>(InOwner, GetClass());
 }
@@ -362,6 +363,25 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	}
 
 	UInputModuleBPLibrary::UpdateGlobalInputMode();
+}
+
+bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, bool bRecovery)
+{
+	if(!InWidget) return false;
+
+	UObjectPoolModuleBPLibrary::DespawnObject(InWidget, bRecovery);
+	return true;
+}
+
+
+USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
+{
+	if(USubWidgetBase* SubWidget = UObjectPoolModuleBPLibrary::SpawnObject<USubWidgetBase>(nullptr, InClass))
+	{
+		SubWidget->OnCreate(this, InParams);
+		return SubWidget;
+	}
+	return nullptr;
 }
 
 void UUserWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)

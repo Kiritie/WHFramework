@@ -51,7 +51,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::GetUserWidgetByName(FName InName, TSubc
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner)
+UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
@@ -60,7 +60,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidget(TSubclassOf<UUserWidge
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InName, AActor* InOwner)
+UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InName, UObject* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
@@ -69,7 +69,7 @@ UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InName, AA
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner)
+bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
@@ -193,7 +193,7 @@ TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgetsByName(FName In
 	return TArray<UWorldWidgetBase*>();
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
@@ -202,7 +202,7 @@ UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWi
 	return nullptr;
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{

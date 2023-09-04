@@ -196,6 +196,9 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	if(InPhase == EPhase::Primary)
 	{
 		DestroyChunkQueues();
+		ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)), Item,
+			Item->ReleaseIconAsset();
+		)
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -284,7 +287,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
-				Item->InitIconMat(VoxelsCapture->TextureTarget, 8, ItemIndex);
+				Item->SetIconByTexture(VoxelsCapture->TextureTarget, FVector2D(8.f), ItemIndex);
 			}
 			ItemIndex++;
 		)

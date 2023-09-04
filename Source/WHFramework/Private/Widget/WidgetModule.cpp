@@ -210,17 +210,17 @@ UUserWidgetBase* AWidgetModule::GetUserWidgetByName(FName InName, TSubclassOf<UU
 	return nullptr;
 }
 
-UUserWidgetBase* AWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner)
+UUserWidgetBase* AWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
 {
 	return CreateUserWidget<UUserWidgetBase>(InOwner, InClass);
 }
 
-UUserWidgetBase* AWidgetModule::CreateUserWidgetByName(FName InName, AActor* InOwner)
+UUserWidgetBase* AWidgetModule::CreateUserWidgetByName(FName InName, UObject* InOwner)
 {
 	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner);
 }
 
-bool AWidgetModule::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner)
+bool AWidgetModule::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
 {
 	return InitializeUserWidget<UUserWidgetBase>(InOwner, InClass);
 }
@@ -316,12 +316,12 @@ TArray<UWorldWidgetBase*> AWidgetModule::GetWorldWidgetsByName(FName InName) con
 	return GetWorldWidgetsByName<UWorldWidgetBase>(InName);
 }
 
-UWorldWidgetBase* AWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InLocation, InSceneComp, &InParams, InClass);
 }
 
-UWorldWidgetBase* AWidgetModule::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
 {
 	return CreateWorldWidgetByName<UWorldWidgetBase>(InName, InOwner, InLocation, InSceneComp, &InParams, InClass);
 }

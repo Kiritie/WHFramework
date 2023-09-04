@@ -43,7 +43,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	void OnCreate(UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRefresh();
@@ -115,7 +115,7 @@ protected:
 	EInputMode InputMode;
 
 	UPROPERTY(Transient)
-	AActor* OwnerActor;
+	UObject* OwnerObject;
 	
 	UPROPERTY(Transient)
 	int32 WidgetIndex;
@@ -161,13 +161,13 @@ public:
 	virtual EInputMode GetInputMode() const override { return InputMode; }
 
 	template<class T>
-	T* GetOwnerActor() const
+	T* GetOwnerObject() const
 	{
-		return Cast<T>(OwnerActor);
+		return Cast<T>(OwnerObject);
 	}
 
 	UFUNCTION(BlueprintPure)
-	virtual AActor* GetOwnerActor() const override { return OwnerActor; }
+	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }

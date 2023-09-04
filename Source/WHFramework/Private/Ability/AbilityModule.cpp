@@ -28,6 +28,12 @@ AAbilityModule::AAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
 
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("Material'/WHFramework/Ability/Item/Materials/M_ItemIcon.M_ItemIcon'"));
+	if(IconSourceMatFinder.Succeeded())
+	{
+		ItemIconSourceMat = IconSourceMatFinder.Object;
+	}
+
 	CustomInteractActionMap = TMap<EInteractAction, FString>();
 }
 

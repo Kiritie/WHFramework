@@ -50,7 +50,7 @@ public:
 	
 	void CreateVoxel(const FVoxelItem& InVoxelItem);
 
-	void CreateMesh(int32 InSectionIndex = 0, bool bHasCollider = true);
+	void CreateMesh(int32 InSectionIndex = 0, bool bHasCollision = true);
 
 	void ClearMesh(int32 InSectionIndex = 0);
 

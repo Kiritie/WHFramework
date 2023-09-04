@@ -25,10 +25,7 @@ public:
 
 protected:
 	UPROPERTY(Transient)
-	TMap<FPrimaryAssetId, UPrimaryAssetBase*> PrimaryAssetMap;
-
-	UPROPERTY(Transient)
-	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetsMap;
+	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetMap;
 
 public:
 	virtual TSharedPtr<FStreamableHandle> LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority) override;

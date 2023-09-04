@@ -7,7 +7,7 @@ UWidgetInventoryBase::UWidgetInventoryBase(const FObjectInitializer& ObjectIniti
 
 }
 
-void UWidgetInventoryBase::OnInitialize_Implementation(AActor* InOwner)
+void UWidgetInventoryBase::OnInitialize_Implementation(UObject* InOwner)
 {
 	Super::OnInitialize_Implementation(InOwner);
 }
@@ -19,7 +19,7 @@ void UWidgetInventoryBase::OnRefresh_Implementation()
 
 UInventory* UWidgetInventoryBase::GetInventory() const
 {
-	if(IInventoryAgentInterface* InventoryAgent = Cast<IInventoryAgentInterface>(OwnerActor))
+	if(const IInventoryAgentInterface* InventoryAgent = Cast<IInventoryAgentInterface>(OwnerObject))
 	{
 		return InventoryAgent->GetInventory();
 	}

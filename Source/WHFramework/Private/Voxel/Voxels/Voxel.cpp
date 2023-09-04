@@ -84,7 +84,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxel(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(GetIndex(), EDirection::Up))
+		if(GetOwner()->HasVoxel(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
 		{
 			VoxelItems.Emplace(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
 		}

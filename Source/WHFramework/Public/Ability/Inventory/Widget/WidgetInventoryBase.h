@@ -25,7 +25,7 @@ protected:
 	TMap<ESplitSlotType, FWidgetSplitSlotData> UISlotDatas;
 
 public:
-	virtual void OnInitialize_Implementation(AActor* InOwner) override;
+	virtual void OnInitialize_Implementation(UObject* InOwner) override;
 	
 	virtual void OnRefresh_Implementation() override;
 

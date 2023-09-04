@@ -56,7 +56,7 @@ public:
 
 	virtual EInputMode GetInputMode() const = 0;
 
-	virtual AActor* GetOwnerActor() const = 0;
+	virtual UObject* GetOwnerObject() const = 0;
 
 	virtual class UPanelWidget* GetRootPanelWidget() const = 0;
 };

@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Blueprint/UserWidget.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Widget/Screen/UMG/SubWidgetBase.h"
 #include "WidgetInventorySlotBase.generated.h"
 
 class UInventorySlot;
@@ -13,7 +13,7 @@ class UInventory;
  * UI物品槽
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetInventorySlotBase : public UUserWidget
+class WHFRAMEWORK_API UWidgetInventorySlotBase : public USubWidgetBase
 {
 	GENERATED_BODY()
 
@@ -21,41 +21,50 @@ public:
 	UWidgetInventorySlotBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	UFUNCTION()
-	virtual void OnInitialize(UInventorySlot* InOwnerSlot);
+	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
-protected:
-	UFUNCTION()
-	virtual void OnRefresh();
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
-	UFUNCTION()
-	virtual void OnActivated();
-	
-	UFUNCTION()
-	virtual void OnCanceled();
-		
-protected:
-	UFUNCTION()
-	virtual void StartCooldown();
-			
-	UFUNCTION()
-	virtual void StopCooldown();
-
-	UFUNCTION()
-	virtual void OnCooldown();
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void SplitItem(int InCount = -1);
+	virtual void OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+
+	virtual void OnInitialize_Implementation(const TArray<FParameter>& InParams) override;
+
+	virtual void OnRefresh_Implementation() override;
+
+	virtual void OnDestroy_Implementation() override;
+
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnActivated();
 	
-	UFUNCTION(BlueprintCallable)
-	virtual void MoveItem(int InCount = -1);
+	UFUNCTION(BlueprintNativeEvent)
+	void OnCanceled();
+		
+protected:
+	UFUNCTION(BlueprintNativeEvent)
+	void StartCooldown();
+			
+	UFUNCTION(BlueprintNativeEvent)
+	void StopCooldown();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void UseItem(int InCount = -1);
+	UFUNCTION(BlueprintNativeEvent)
+	void OnCooldown();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DiscardItem(int InCount = -1);
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void SplitItem(int InCount = -1);
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void MoveItem(int InCount = -1);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void UseItem(int InCount = -1);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void DiscardItem(int InCount = -1);
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

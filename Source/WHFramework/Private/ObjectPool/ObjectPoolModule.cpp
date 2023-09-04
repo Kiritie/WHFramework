@@ -61,6 +61,11 @@ void AObjectPoolModule::OnUnPause_Implementation()
 void AObjectPoolModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		ClearAllObject();
+	}
 }
 
 bool AObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
@@ -123,15 +128,7 @@ UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArra
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass()) || ModuleState == EModuleState::Terminated) return nullptr;
 
-	UObjectPool* ObjectPool;
-	if(!HasPool(InType))
-	{
-		ObjectPool = CreatePool(InType);
-	}
-	else
-	{
-		ObjectPool = GetPool(InType);
-	}
+	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
 	return ObjectPool->Spawn(InParams);
 }
 
@@ -142,15 +139,7 @@ void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 	UClass* InType = InObject->GetClass();
 	if(!InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
 
-	UObjectPool* ObjectPool;
-	if(!HasPool(InType))
-	{
-		ObjectPool = CreatePool(InType);
-	}
-	else
-	{
-		ObjectPool = GetPool(InType);
-	}
+	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
 	ObjectPool->Despawn(InObject, bRecovery);
 }
 
@@ -177,7 +166,6 @@ void AObjectPoolModule::ClearAllObject()
 	for (auto Iter : ObjectPools)
 	{
 		Iter.Value->Clear();
-		Iter.Value->ConditionalBeginDestroy();
 	}
 	ObjectPools.Empty();
 }

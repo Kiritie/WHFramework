@@ -15,17 +15,17 @@ struct FPrimaryAssets
 public:
 	FPrimaryAssets()
 	{
-		Assets = TArray<UPrimaryAssetBase*>();
+		Assets = TMap<FPrimaryAssetId, UPrimaryAssetBase*>();
 	}
 
-	FPrimaryAssets(const TArray<UPrimaryAssetBase*>& InAssets)
+	FPrimaryAssets(const TMap<FPrimaryAssetId, UPrimaryAssetBase*>& InAssets)
 	{
 		Assets = InAssets;
 	}
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TArray<UPrimaryAssetBase*> Assets;
+	TMap<FPrimaryAssetId, UPrimaryAssetBase*> Assets;
 };
 
 /**

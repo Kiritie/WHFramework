@@ -12,7 +12,7 @@ class WHFRAMEWORK_API UAbilityItemDataBase : public UPrimaryAssetBase
 
 public:
 	UAbilityItemDataBase();
-	
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Name;
@@ -20,8 +20,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FText Detail;
 		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UTexture2D* Icon;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses="/Script/Engine.Texture,/Script/Engine.MaterialInterface"))
+	UObject* Icon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 Price;
@@ -34,17 +34,15 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
-	
-	UPROPERTY(BlueprintReadOnly)
-	UMaterialInstanceDynamic* IconMat;
-
-protected:
-	UPROPERTY()
-	UMaterialInterface* IconSourceMat;
 
 public:
-	virtual void InitIconMat(UTexture* InTex, int32 InTexSize, int32 InIndex);
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);
 
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void ReleaseIconAsset();
+
+public:
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
 };

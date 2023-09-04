@@ -115,7 +115,7 @@ public:
 	static UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass);
 
 	template<class T>
-	static T* CreateUserWidget(AActor* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -125,10 +125,10 @@ public:
 	}
 	
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleBPLibrary")
-	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner = nullptr);
+	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
 
 	template<class T>
-	static T* CreateUserWidgetByName(FName InName, AActor* InOwner = nullptr)
+	static T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr)
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -138,10 +138,10 @@ public:
 	}
 	
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static UUserWidgetBase* CreateUserWidgetByName(FName InName, AActor* InOwner = nullptr);
+	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
 
 	template<class T>
-	static bool InitializeUserWidget(AActor* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static bool InitializeUserWidget(UObject* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -151,10 +151,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, AActor* InOwner);
+	static bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static bool InitializeUserWidgetByName(FName InName, AActor* InOwner)
+	static bool InitializeUserWidgetByName(FName InName, UObject* InOwner)
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -290,7 +290,7 @@ public:
 	}
 	
 	template<class T>
-	static bool InitializeSlateWidget(AActor* InOwner)
+	static bool InitializeSlateWidget(UObject* InOwner)
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -423,7 +423,7 @@ public:
 	static TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName);
 
 	template<class T>
-	static T* CreateWorldWidget(AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -433,16 +433,16 @@ public:
 	}
 
 	template<class T>
-	static T* CreateWorldWidget(AActor* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		return CreateWorldWidget<T>(InOwner, InLocation, InSceneComp, &InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, AActor* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
@@ -452,13 +452,13 @@ public:
 	}
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, AActor* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		return CreateWorldWidgetByName<T>(InName, InOwner, InLocation, InSceneComp, &InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, AActor* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
 
 	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{
