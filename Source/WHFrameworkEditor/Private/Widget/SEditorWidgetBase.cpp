@@ -10,6 +10,7 @@
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SEditorWidgetBase::SEditorWidgetBase()
+	: WidgetCommands(new FUICommandList())
 {
 	WidgetName = NAME_None;
 	WidgetType = EEditorWidgetType::Main;
@@ -19,13 +20,25 @@ SEditorWidgetBase::SEditorWidgetBase()
 
 void SEditorWidgetBase::Construct(const FArguments& InArgs)
 {
+	OnBindCommands();
+
 	GWorld->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateRaw(this, &SEditorWidgetBase::OnCreate));
+
 	/*
 	ChildSlot
 	[
 		// Populate the widget
 	];
 	*/
+}
+
+FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(WidgetCommands->ProcessCommandBindings(InKeyEvent))
+	{
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
 }
 
 void SEditorWidgetBase::OnWindowActivated()
@@ -53,6 +66,11 @@ void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 	}
 }
 
+void SEditorWidgetBase::OnBindCommands()
+{
+	
+}
+
 void SEditorWidgetBase::OnCreate()
 {
 	if(WidgetType == EEditorWidgetType::Main)
@@ -64,6 +82,10 @@ void SEditorWidgetBase::OnCreate()
 			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
 		}
 	}
+}
+
+void SEditorWidgetBase::OnSave()
+{
 }
 
 void SEditorWidgetBase::OnReset()
@@ -85,6 +107,11 @@ void SEditorWidgetBase::OnDestroy()
 		Iter->OnDestroy();
 	}
 	ChildWidgets.Empty();
+}
+
+void SEditorWidgetBase::Save()
+{
+	OnSave();
 }
 
 void SEditorWidgetBase::Reset()
@@ -114,6 +141,11 @@ void SEditorWidgetBase::Destroy()
 			break;
 		}
 	}
+}
+
+bool SEditorWidgetBase::CanSave()
+{
+	return true;
 }
 
 void SEditorWidgetBase::AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget)

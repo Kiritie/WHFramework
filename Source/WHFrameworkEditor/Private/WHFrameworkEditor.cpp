@@ -33,6 +33,7 @@
 #include "Step/Widget/SStepEditorWidget.h"
 #include "Task/TaskBlueprintActions.h"
 #include "Task/TaskDetailsPanel.h"
+#include "Task/TaskEditor.h"
 #include "Task/TaskEditorSettings.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/TaskModuleDetailsPanel.h"
@@ -72,6 +73,8 @@ void FWHFrameworkEditorModule::StartupModule()
 
 	// Register commands
 	FWHFrameworkEditorCommands::Register();
+
+	FTaskEditorCommands::Register();
 
 	PluginCommands = MakeShareable(new FUICommandList);
 

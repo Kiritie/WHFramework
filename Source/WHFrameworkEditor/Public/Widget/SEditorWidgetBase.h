@@ -27,11 +27,16 @@ public:
 	void Construct(const FArguments& InArgs);
 
 protected:
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
+protected:
 	virtual void OnWindowActivated();
 	
 	virtual void OnWindowDeactivated();
 	
 	virtual void OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow);
+
+	virtual void OnBindCommands();
 
 private:
 	FDelegateHandle OnWindowActivatedHandle;
@@ -41,6 +46,8 @@ private:
 public:
 	virtual void OnCreate();
 
+	virtual void OnSave();
+	
 	virtual void OnReset();
 
 	virtual void OnRefresh();
@@ -48,11 +55,16 @@ public:
 	virtual void OnDestroy();
 
 public:
+	virtual void Save();
+
 	virtual void Reset();
 
 	virtual void Refresh();
 
 	virtual void Destroy();
+
+public:
+	virtual bool CanSave();
 
 public:
 	virtual void AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget);
@@ -71,6 +83,8 @@ protected:
 	TArray<TSharedPtr<SEditorWidgetBase>> ChildWidgets;
 
 	TMap<FName, TSharedPtr<SEditorWidgetBase>> ChildWidgetMap;
+	
+	TSharedRef<FUICommandList> WidgetCommands;
 
 public:
 	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;

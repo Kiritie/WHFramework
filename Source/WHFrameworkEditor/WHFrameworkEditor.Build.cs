@@ -44,6 +44,7 @@ public class WHFrameworkEditor : ModuleRules
 				"ClassViewer",
 				"UnrealEd",
 				"BlueprintGraph",
+				"LevelEditor"
 			});
 	}
 }
