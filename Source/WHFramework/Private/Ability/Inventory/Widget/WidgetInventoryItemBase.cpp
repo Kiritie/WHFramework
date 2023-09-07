@@ -10,19 +10,21 @@
 
 UWidgetInventoryItemBase::UWidgetInventoryItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bIsFocusable = true;
+	
 	Item = FAbilityItem::Empty;
 }
 
 void UWidgetInventoryItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-
+	Super::OnSpawn_Implementation(InParams);
 }
 
 void UWidgetInventoryItemBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Owner = nullptr;
+	Super::OnDespawn_Implementation(bRecovery);
+	
 	Item = FAbilityItem::Empty;
-	RemoveFromParent();
 }
 
 void UWidgetInventoryItemBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -49,13 +51,14 @@ void UWidgetInventoryItemBase::OnDestroy_Implementation()
 	Super::OnDestroy_Implementation();
 }
 
+FReply UWidgetInventoryItemBase::NativeOnFocusReceived(const FGeometry& InGeometry, const FFocusEvent& InFocusEvent)
+{
+	OnSelected();
+	return Super::NativeOnFocusReceived(InGeometry, InFocusEvent);
+}
+
 FReply UWidgetInventoryItemBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if(InMouseEvent.GetEffectingButton() == FKey("LeftMouseButton"))
-	{
-		OnSelected();
-		return FReply::Handled();
-	}
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 

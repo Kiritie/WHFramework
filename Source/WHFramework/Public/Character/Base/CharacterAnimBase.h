@@ -3,18 +3,18 @@
 #pragma once
 
 #include "Animation/AnimInstance.h"
-#include "CharacterAnim.generated.h"
+#include "CharacterAnimBase.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UCharacterAnim : public UAnimInstance
+class WHFRAMEWORK_API UCharacterAnimBase : public UAnimInstance
 {
 	GENERATED_BODY()
 
 public:
-	UCharacterAnim();
+	UCharacterAnimBase();
 
 protected:
 	virtual bool HandleNotify(const FAnimNotifyEvent& AnimNotifyEvent) override;

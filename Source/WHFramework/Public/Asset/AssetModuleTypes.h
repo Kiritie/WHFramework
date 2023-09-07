@@ -24,7 +24,7 @@ public:
 	}
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY()
 	TMap<FPrimaryAssetId, UPrimaryAssetBase*> Assets;
 };
 

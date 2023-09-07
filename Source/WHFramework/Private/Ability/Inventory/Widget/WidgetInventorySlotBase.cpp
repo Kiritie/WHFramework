@@ -4,23 +4,27 @@
 #include "Ability/Inventory/Widget/WidgetInventorySlotBase.h"
 #include "Ability/Inventory/Slot/InventorySlot.h"
 #include "Ability/Inventory/Inventory.h"
+#include "Ability/Inventory/Widget/WidgetInventoryItemBase.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Widget/Screen/UMG/UserWidgetBase.h"
 
 UWidgetInventorySlotBase::UWidgetInventorySlotBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	OwnerSlot = nullptr;
+	DragVisualClass = nullptr;
 	CooldownTimerHandle = FTimerHandle();
 }
 
 void UWidgetInventorySlotBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-
+	Super::OnSpawn_Implementation(InParams);
 }
 
 void UWidgetInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 {
-	OwnerSlot = nullptr;
+	Super::OnDespawn_Implementation(bRecovery);
+	
 	CooldownTimerHandle = FTimerHandle();
-	RemoveFromParent();
 }
 
 void UWidgetInventorySlotBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -80,6 +84,101 @@ void UWidgetInventorySlotBase::OnRefresh_Implementation()
 void UWidgetInventorySlotBase::OnDestroy_Implementation()
 {
 	Super::OnDestroy_Implementation();
+}
+
+bool UWidgetInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+
+	const auto PayloadSlot = Cast<UWidgetInventorySlotBase>(InOperation->Payload);
+	if (PayloadSlot && PayloadSlot != this && !PayloadSlot->IsEmpty())
+	{
+		FAbilityItem& tmpItem = PayloadSlot->GetItem();
+		if(OwnerSlot->CheckSlot(tmpItem))
+		{
+			if (OwnerSlot->Contains(tmpItem))
+			{
+				OwnerSlot->AddItem(tmpItem);
+				PayloadSlot->OwnerSlot->Refresh();
+			}
+			else
+			{
+				OwnerSlot->Replace(PayloadSlot->OwnerSlot);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void UWidgetInventorySlotBase::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
+}
+
+void UWidgetInventorySlotBase::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
+}
+
+void UWidgetInventorySlotBase::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+{
+	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
+
+	if(!IsEmpty() && DragVisualClass)
+	{
+		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
+		OutOperation->Payload = this;
+		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetInventoryItemBase>({ &GetItem() }, DragVisualClass);
+	}
+}
+
+void UWidgetInventorySlotBase::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+}
+
+void UWidgetInventorySlotBase::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+}
+
+FReply UWidgetInventorySlotBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UWidgetInventorySlotBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if(InMouseEvent.GetEffectingButton() == FKey("RightMouseButton"))
+	{
+		if(InMouseEvent.IsLeftControlDown())
+		{
+			MoveItem(-1);
+		}
+		else if(InMouseEvent.IsLeftShiftDown())
+		{
+			UseItem(-1);
+		}
+		else
+		{
+			UseItem(1);
+		}
+		return FReply::Handled();
+	}
+	else if(InMouseEvent.GetEffectingButton() == FKey("MiddleMouseButton"))
+	{
+		if(InMouseEvent.IsLeftShiftDown())
+		{
+			DiscardItem(-1);
+		}
+		else
+		{
+			DiscardItem(1);
+		}
+		return FReply::Handled();
+	}
+	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, FKey("LeftMouseButton")).NativeReply;
 }
 
 void UWidgetInventorySlotBase::OnActivated_Implementation()

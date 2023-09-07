@@ -66,6 +66,7 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<
 TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
 {
 	TArray<UPrimaryAssetBase*> LoadedAssets;
+	
 	if(!PrimaryAssetMap.Contains(InPrimaryAssetType))
 	{
 		TArray<FSoftObjectPath> AssetPaths;
@@ -86,9 +87,9 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 		PrimaryAssetMap[InPrimaryAssetType].Assets.GenerateValueArray(LoadedAssets);
 	}
 
-	if(bLogWarning && LoadedAssets.Num() == 0)
+	if(bLogWarning && LoadedAssets.IsEmpty())
 	{
-		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetType.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
 	}
 	return LoadedAssets;
 }

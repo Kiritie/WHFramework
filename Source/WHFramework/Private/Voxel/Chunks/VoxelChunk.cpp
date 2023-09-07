@@ -241,19 +241,11 @@ void AVoxelChunk::BuildMap(int32 InStage)
 					case EVoxelType::Oak:
 					case EVoxelType::Birch:
 					{
-						const auto& TreeData = VoxelItem.GetData<UVoxelTreeData>();
-						if(!CheckVoxelNeighbors(VoxelIndex, VoxelType, TreeData.TreeRange, true, false, true))
-						{
-							auto& VoxelTree = VoxelItem.GetVoxel<UVoxelTree>();
-							VoxelTree.InitTree(EVoxelTreePart::Root);
-							VoxelItem.Data = VoxelTree.ToData();
-							SetVoxelSample(VoxelIndex, VoxelItem);
-						}
-						break;
+						VoxelItem.Data = VoxelItem.GetVoxel<UVoxelTree>().ToData(EVoxelTreePart::Root, VoxelItem.GetData<UVoxelTreeData>());
 					}
 					default:
 					{
-						SetVoxelSample(VoxelIndex, VoxelType);
+						SetVoxelSample(VoxelIndex, VoxelItem);
 						break;
 					}
 					case EVoxelType::Empty: break;
@@ -272,11 +264,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 					case EVoxelType::Oak:
 					case EVoxelType::Birch:
 					{
-						UVoxelTree& VoxelTree = Iter.Value.GetVoxel<UVoxelTree>();
-						if(VoxelTree.GetTreePart() == EVoxelTreePart::Root)
-						{
-							VoxelTree.BuildTree();
-						}
+						Iter.Value.GetVoxel<UVoxelTree>().OnGenerate(nullptr);
 						break;
 					}
 					default: break;

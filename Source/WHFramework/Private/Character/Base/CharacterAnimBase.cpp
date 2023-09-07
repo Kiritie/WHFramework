@@ -1,14 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Character/Base/CharacterAnim.h"
+#include "Character/Base/CharacterAnimBase.h"
 
 #include "Character/Base/CharacterBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Global/GlobalBPLibrary.h"
 
-UCharacterAnim::UCharacterAnim()
+UCharacterAnimBase::UCharacterAnimBase()
 {
 	bFlying = false;
 	bFalling = false;
@@ -19,19 +19,19 @@ UCharacterAnim::UCharacterAnim()
 	HorizontalSpeed = 0.f;
 }
 
-bool UCharacterAnim::HandleNotify(const FAnimNotifyEvent& AnimNotifyEvent)
+bool UCharacterAnimBase::HandleNotify(const FAnimNotifyEvent& AnimNotifyEvent)
 {
 	const FString NotifyName = AnimNotifyEvent.GetNotifyEventName().ToString().Mid(11);
 	NativeHandleNotify(NotifyName);
 	return false;
 }
 
-void UCharacterAnim::NativeHandleNotify(const FString& AnimNotifyName)
+void UCharacterAnimBase::NativeHandleNotify(const FString& AnimNotifyName)
 {
 
 }
 
-void UCharacterAnim::NativeUpdateAnimation(float DeltaSeconds)
+void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 

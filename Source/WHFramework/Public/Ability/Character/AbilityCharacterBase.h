@@ -233,12 +233,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-
-	UFUNCTION(BlueprintPure)
-	virtual FVector GetMoveVelocity(bool bIgnoreZ = true) const;
-
-	UFUNCTION(BlueprintPure)
-	virtual FVector GetMoveDirection(bool bIgnoreZ = true) const;
 		
 	UFUNCTION(BlueprintPure)
 	virtual float GetDefaultGravityScale() const { return DefaultGravityScale; }

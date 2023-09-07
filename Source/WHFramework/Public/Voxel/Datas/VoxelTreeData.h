@@ -15,9 +15,6 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector TreeRange;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector2D TreeHeight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -11,7 +11,7 @@
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Character/CharacterModuleNetworkComponent.h"
-#include "Character/Base/CharacterAnim.h"
+#include "Character/Base/CharacterAnimBase.h"
 #include "Character/Base/CharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -77,7 +77,7 @@ ACharacterBase::ACharacterBase()
 
 void ACharacterBase::OnInitialize_Implementation()
 {
-	Anim = Cast<UCharacterAnim>(GetMesh()->GetAnimInstance());
+	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
 void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
@@ -411,6 +411,18 @@ UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const
 {
 	return nullptr;
+}
+
+FVector ACharacterBase::GetMoveVelocity(bool bIgnoreZ) const
+{
+	FVector Velocity = GetMovementComponent()->Velocity;
+	if(bIgnoreZ) Velocity.Z = 0;
+	return Velocity;
+}
+
+FVector ACharacterBase::GetMoveDirection(bool bIgnoreZ) const
+{
+	return GetMoveVelocity(bIgnoreZ).GetSafeNormal();
 }
 
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -148,7 +148,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(InPhase == EPhase::Primary)
 	{
-		UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
+		UAssetModuleBPLibrary::LoadPrimaryAssets(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
 
 		for(const auto Iter : VoxelClasses)
 		{
@@ -577,62 +577,74 @@ FVoxelItem& AVoxelModule::FindVoxelByLocation(FVector InLocation)
 	return FVoxelItem::Empty;
 }
 
+float AVoxelModule::GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset) const
+{
+	return UMathBPLibrary::GetNoiseHeight(InLocation, InScale, InOffset, true) * WorldData->ChunkSize.Z * WorldData->WorldSize.Z;
+}
+
+float AVoxelModule::GetNoiseHeight(float InBaseHeight) const
+{
+	return InBaseHeight * WorldData->ChunkSize.Z * WorldData->WorldSize.Z;
+}
+
 EVoxelType AVoxelModule::GetNoiseVoxelType(FIndex InIndex) const
 {
-	const FRandomStream& RandomStream = WorldData->RandomStream;
+	return GetNoiseVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
+}
 
-	const int32 WorldHeight = WorldData->ChunkSize.Z * WorldData->WorldSize.Z;
-	const FVector2D WorldLocation = FVector2D(InIndex.X, InIndex.Y);
+EVoxelType AVoxelModule::GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) const
+{
+	const FVector2D WorldLocation = FVector2D(InX, InY);
 
-	const int32 PlainHeight = UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->PlainScale, WorldData->WorldSeed, true) * WorldHeight;
-	const int32 MountainHeight = UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->MountainScale, WorldData->WorldSeed, true) * WorldHeight;
+	const int32 PlainHeight = GetNoiseHeight(WorldLocation, WorldData->PlainScale, WorldData->WorldSeed);
+	const int32 MountainHeight = GetNoiseHeight(WorldLocation, WorldData->MountainScale, WorldData->WorldSeed);
+	const int32 BlobHeight = GetNoiseHeight(WorldLocation, WorldData->BlobScale, WorldData->WorldSeed);
+	const int32 HoleHeight = GetNoiseHeight(WorldLocation, WorldData->HoleScale, WorldData->WorldSeed);
 
-	const int32 BaseHeight = FMath::Max(PlainHeight, MountainHeight) + WorldData->BaseHeight * WorldHeight;
+	const int32 BaseHeight = GetNoiseHeight(WorldData->BaseHeight) + FMath::Max3(PlainHeight - HoleHeight, MountainHeight, BlobHeight);
 
-	if(InIndex.Z < BaseHeight)
+	if(InZ < BaseHeight)
 	{
-		if(InIndex.Z <= WorldData->BedrockHeight * WorldHeight)
+		if(InZ <= GetNoiseHeight(WorldData->BedrockHeight))
 		{
 			return EVoxelType::Bedrock; //Bedrock
 		}
-		else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->StoneScale, WorldData->WorldSeed, true) * WorldHeight)
+		if(InZ <= GetNoiseHeight(WorldLocation, WorldData->StoneScale, WorldData->WorldSeed))
 		{
 			return EVoxelType::Stone; //Stone
 		}
 		return EVoxelType::Dirt; //Dirt
 	}
-	else
+	if(InZ >= BaseHeight)
 	{
-		const int32 WaterHeight = WorldData->WaterHeight * WorldHeight;
-		if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->SandScale, WorldData->WorldSeed, true) * WorldHeight)
+		const int32 SandHeight = GetNoiseHeight(WorldLocation, WorldData->SandScale, WorldData->WorldSeed);
+		const int32 WaterHeight = GetNoiseHeight(WorldData->WaterHeight);
+		if(InZ <= SandHeight)
 		{
 			return EVoxelType::Sand; //Sand
 		}
-		else if(InIndex.Z <= WaterHeight)
+		if(InZ <= WaterHeight)
 		{
 			return EVoxelType::Water; //Water
 		}
-		else if(InIndex.Z == BaseHeight)
+		if(InZ == BaseHeight)
 		{
 			return EVoxelType::Grass; //Grass
 		}
-		else if(InIndex.Z == BaseHeight + 1 && InIndex.Z != WaterHeight + 1)
+		if(InZ == BaseHeight + 1 && InZ > SandHeight + 1 && InZ > WaterHeight + 1)
 		{
-			if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed, true) * WorldHeight)
+			const FRandomStream& RandomStream = WorldData->RandomStream;
+			if(InZ <= GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->TreeScale.W)
 			{
-				return EVoxelType::Oak; //OakTree
+				return RandomStream.FRand() > 0.4f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
 			}
-			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed * 2, true) * WorldHeight)
-			{
-				return EVoxelType::Birch; //BirchTree
-			}
-			else if(InIndex.Z <= UMathBPLibrary::GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed, true) * WorldHeight)
+			if(InZ <= GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->PlantScale.W)
 			{
 				return RandomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
 			}
 		}
 	}
-	return EVoxelType::Empty; //Empty
+	return EVoxelType::Empty;
 }
 
 FIndex AVoxelModule::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/) const

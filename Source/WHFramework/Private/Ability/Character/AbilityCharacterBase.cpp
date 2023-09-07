@@ -457,18 +457,6 @@ FString AAbilityCharacterBase::GetHeadInfo() const
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
-FVector AAbilityCharacterBase::GetMoveVelocity(bool bIgnoreZ) const
-{
-	FVector Velocity = GetMovementComponent()->Velocity;
-	if(bIgnoreZ) Velocity.Z = 0;
-	return Velocity;
-}
-
-FVector AAbilityCharacterBase::GetMoveDirection(bool bIgnoreZ) const
-{
-	return GetMoveVelocity(bIgnoreZ).GetSafeNormal();
-}
-
 float AAbilityCharacterBase::GetRadius() const
 {
 	if(!GetCapsuleComponent()) return 0.f;

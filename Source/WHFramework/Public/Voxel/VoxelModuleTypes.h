@@ -457,14 +457,17 @@ public:
 		WorldRange = FVector2D(7.f, 7.f);
 
 		BaseHeight = 0.1f;
-		PlainScale = FVector(0.005f, 0.005f, 0.2f);
-		MountainScale = FVector(0.03f, 0.03f, 0.25f);
-		StoneScale = FVector(0.05f, 0.05f, 0.18f);
-		SandScale = FVector(0.04f, 0.04f, 0.21f);
-		PlantScale = FVector(0.5f, 0.5f, 0.3f);
-		TreeScale = FVector(0.8f, 0.8f, 0.23f);
 		BedrockHeight = 0.02f;
-		WaterHeight = 0.25f;
+		WaterHeight = 0.35f;
+		
+		PlainScale = FVector(0.005f, 0.005f, 0.3f);
+		MountainScale = FVector(0.01f, 0.01f, 0.35f);
+		BlobScale = FVector(0.05f, 0.05f, 0.3f);
+		HoleScale = FVector(0.1f, 0.1f, 0.15f);
+		StoneScale = FVector(0.05f, 0.05f, 0.18f);
+		SandScale = FVector(0.04f, 0.04f, 0.25f);
+		PlantScale = FVector4(0.6f, 0.6f, 0.5f, 0.5f);
+		TreeScale = FVector4(0.8f, 0.8f, 0.5f, 0.04f);
 
 		ChunkMaterials = TArray<FVoxelChunkMaterial>();
 
@@ -499,6 +502,12 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector MountainScale;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector BlobScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector HoleScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector StoneScale;
@@ -507,10 +516,10 @@ public:
 	FVector SandScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector PlantScale;
+	FVector4 PlantScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector TreeScale;
+	FVector4 TreeScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FVoxelChunkMaterial> ChunkMaterials;

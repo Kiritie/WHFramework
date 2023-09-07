@@ -552,7 +552,7 @@ public:
 		return *this == Empty;
 	}
 
-	FORCEINLINE bool EqualType(FAbilityItem InItem) const
+	FORCEINLINE bool EqualType(const FAbilityItem& InItem) const
 	{
 		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
 	}

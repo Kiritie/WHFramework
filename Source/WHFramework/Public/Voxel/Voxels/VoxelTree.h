@@ -5,7 +5,7 @@
 #include "Voxel.h"
 #include "VoxelTree.generated.h"
 
-
+class UVoxelTreeData;
 
 /**
  * ����ֲ��
@@ -27,6 +27,8 @@ public:
 
 	virtual FString ToData() override;
 
+	virtual FString ToData(EVoxelTreePart InTreePart, const UVoxelTreeData& InTreeData);
+
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
 
@@ -44,11 +46,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Tree
-public:
-	virtual void InitTree(EVoxelTreePart InTreePart);
-	
-	virtual void BuildTree();
-
 protected:
 	UPROPERTY(VisibleAnywhere)
 	EVoxelTreePart TreePart;

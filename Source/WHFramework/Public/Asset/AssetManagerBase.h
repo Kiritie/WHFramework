@@ -24,7 +24,7 @@ public:
 	static UAssetManagerBase& Get();
 
 protected:
-	UPROPERTY(Transient)
+	UPROPERTY()
 	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetMap;
 
 public:

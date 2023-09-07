@@ -116,9 +116,9 @@ public:
 	/// Anim
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
-	UCharacterAnim* Anim;
+	UCharacterAnimBase* Anim;
 public:
-	virtual UCharacterAnim* GetAnim() const override { return Anim; }
+	virtual UCharacterAnimBase* GetAnim() const override { return Anim; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Controller
@@ -223,6 +223,15 @@ public:
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
 	
 	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Stats
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FVector GetMoveVelocity(bool bIgnoreZ = true) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector GetMoveDirection(bool bIgnoreZ = true) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network
