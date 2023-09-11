@@ -10,7 +10,7 @@
 
 UWidgetInventoryItemBase::UWidgetInventoryItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	bIsFocusable = true;
+	SetIsFocusable(true);
 	
 	Item = FAbilityItem::Empty;
 }

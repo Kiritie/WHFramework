@@ -84,12 +84,12 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 		{
 			if (i > 0 && (i + 1) % 4 == 0)
 			{
-				FVector Vertices[4];
+				FVector Vers[4];
 				for (int j = 0; j < 4; j++)
 				{
-					Vertices[j] = MeshData.MeshVertices[i - (3 - j)];
+					Vers[j] = MeshData.MeshVertices[i - (3 - j)];
 				}
-				BuildFace(InVoxelItem, Vertices, i / 4, MeshData.MeshNormals[i / 4].GetSafeNormal());
+				BuildFace(InVoxelItem, Vers, i / 4, MeshData.MeshNormals[i / 4].GetSafeNormal());
 			}
 		}
 	}
@@ -143,12 +143,12 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].Material);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].MaterialInst);
 				break;
 			}
 			case EVoxelMeshNature::Preview:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].UnlitMaterial);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].UnlitMaterialInst);
 				break;
 			}
 		}
@@ -185,61 +185,61 @@ void UVoxelMeshComponent::ClearData()
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing)
 {
-	FVector Vertices[4];
+	FVector Vers[4];
 	switch (InFacing)
 	{
 		case EDirection::Forward:
 		{
-			Vertices[0] = FVector(0.5f, 0.5f, -0.5f);
-			Vertices[1] = FVector(0.5f, 0.5f, 0.5f);
-			Vertices[2] = FVector(0.5f, -0.5f, 0.5f);
-			Vertices[3] = FVector(0.5f, -0.5f, -0.5f);
+			Vers[0] = FVector(0.5f, 0.5f, -0.5f);
+			Vers[1] = FVector(0.5f, 0.5f, 0.5f);
+			Vers[2] = FVector(0.5f, -0.5f, 0.5f);
+			Vers[3] = FVector(0.5f, -0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Right:
 		{
-			Vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
-			Vertices[1] = FVector(-0.5f, 0.5f, 0.5f);
-			Vertices[2] = FVector(0.5f, 0.5f, 0.5f);
-			Vertices[3] = FVector(0.5f, 0.5f, -0.5f);
+			Vers[0] = FVector(-0.5f, 0.5f, -0.5f);
+			Vers[1] = FVector(-0.5f, 0.5f, 0.5f);
+			Vers[2] = FVector(0.5f, 0.5f, 0.5f);
+			Vers[3] = FVector(0.5f, 0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Backward:
 		{
-			Vertices[0] = FVector(-0.5f, -0.5f, -0.5f);
-			Vertices[1] = FVector(-0.5f, -0.5f, 0.5f);
-			Vertices[2] = FVector(-0.5f, 0.5f, 0.5f);
-			Vertices[3] = FVector(-0.5f, 0.5f, -0.5f);
+			Vers[0] = FVector(-0.5f, -0.5f, -0.5f);
+			Vers[1] = FVector(-0.5f, -0.5f, 0.5f);
+			Vers[2] = FVector(-0.5f, 0.5f, 0.5f);
+			Vers[3] = FVector(-0.5f, 0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Left:
 		{
-			Vertices[0] = FVector(0.5f, -0.5f, -0.5f);
-			Vertices[1] = FVector(0.5f, -0.5f, 0.5f);
-			Vertices[2] = FVector(-0.5f, -0.5f, 0.5f);
-			Vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
+			Vers[0] = FVector(0.5f, -0.5f, -0.5f);
+			Vers[1] = FVector(0.5f, -0.5f, 0.5f);
+			Vers[2] = FVector(-0.5f, -0.5f, 0.5f);
+			Vers[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Up:
 		{
-			Vertices[0] = FVector(-0.5f, -0.5f, 0.5f);
-			Vertices[1] = FVector(0.5f, -0.5f, 0.5f);
-			Vertices[2] = FVector(0.5f, 0.5f, 0.5f);
-			Vertices[3] = FVector(-0.5f, 0.5f, 0.5f);
+			Vers[0] = FVector(-0.5f, -0.5f, 0.5f);
+			Vers[1] = FVector(0.5f, -0.5f, 0.5f);
+			Vers[2] = FVector(0.5f, 0.5f, 0.5f);
+			Vers[3] = FVector(-0.5f, 0.5f, 0.5f);
 			break;
 		}
 		case EDirection::Down:
 		{
-			Vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
-			Vertices[1] = FVector(0.5f, 0.5f, -0.5f);
-			Vertices[2] = FVector(0.5f, -0.5f, -0.5f);
-			Vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
+			Vers[0] = FVector(-0.5f, 0.5f, -0.5f);
+			Vers[1] = FVector(0.5f, 0.5f, -0.5f);
+			Vers[2] = FVector(0.5f, -0.5f, -0.5f);
+			Vers[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, Vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
+	BuildFace(InVoxelItem, Vers, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)

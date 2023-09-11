@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Asset/AssetModuleTypes.h"
+#include "Engine/DataAsset.h"
 
 #include "PrimaryAssetBase.generated.h"
 

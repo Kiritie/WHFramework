@@ -428,17 +428,25 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FVector2D BlockUVSize;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere, Transient)
 	TArray<UTexture2D*> Textures;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	UMaterialInstance* MaterialInst;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	UMaterialInstance* UnlitMaterialInst;
 
 	FORCEINLINE FVoxelChunkMaterial()
 	{
 		Material = nullptr;
 		UnlitMaterial = nullptr;
 		BlockPixelSize = 16;
-		BlockTexSize = FVector2D(16, 1);
-		BlockUVSize = FVector2D(0.0625f, 0.5f);
+		BlockTexSize = FVector2D::ZeroVector;
+		BlockUVSize = FVector2D::ZeroVector;
 		Textures = TArray<UTexture2D*>();
+		MaterialInst = nullptr;
+		UnlitMaterialInst = nullptr;
 	}
 
 	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelChunkMaterial()

@@ -151,7 +151,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		for(const auto Iter1 : UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)))
 		{
-			for(auto& Iter2 : Iter1->MeshData)
+			for(auto& Iter2 : Iter1->MeshDatas)
 			{
 				for(auto& Iter3 : Iter2.MeshUVDatas)
 				{
@@ -166,17 +166,18 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		for(auto& Iter : WorldBasicData.ChunkMaterials)
 		{
 			Iter.Value.BlockTexSize = FVector2D(Iter.Value.BlockPixelSize * 16, (Iter.Value.Textures.Num() / 16 + 1) * Iter.Value.BlockPixelSize);
+
 			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.BlockTexSize))
 			{
 				Iter.Value.BlockUVSize = FVector2D(Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.X, Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.Y);
 			
 				UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
 				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-				Iter.Value.Material = MatInst;
+				Iter.Value.MaterialInst = MatInst;
 			
 				MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
 				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-				Iter.Value.UnlitMaterial = MatInst;
+				Iter.Value.UnlitMaterialInst = MatInst;
 			}
 		}
 		for(const auto Iter : VoxelClasses)

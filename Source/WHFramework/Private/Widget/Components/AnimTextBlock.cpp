@@ -102,7 +102,7 @@ void UAnimTextBlock::OnTick_Implementation(float DeltaSeconds)
 		}
 		case ETextAnimType::LerpAndMove:
 		{
-			for(auto& Iter : AnimTextInfo.TextItems)
+			for(const auto& Iter : AnimTextInfo.TextItems)
 			{
 				if(Iter.TextBlock && Iter.TextBlock->GetVisibility() == ESlateVisibility::SelfHitTestInvisible && TextBox->GetDesiredSize().Y > 0.f)
 				{
@@ -144,8 +144,8 @@ void UAnimTextBlock::PlayTextAnim(int32 TextIndex)
 	{
 		if(AnimType == ETextAnimType::LerpAndMove)
 		{
-			int32 Current = FCString::Atoi(*AnimTextInfo.TextItems[TextIndex].CurrentText.ToString());
-			int32 Target = FCString::Atoi(*AnimTextInfo.TextItems[TextIndex].TargetText.ToString());
+			const int32 Current = FCString::Atoi(*AnimTextInfo.TextItems[TextIndex].CurrentText.ToString());
+			const int32 Target = FCString::Atoi(*AnimTextInfo.TextItems[TextIndex].TargetText.ToString());
 			if(Target - Current > 0)
 			{
 				AnimTextInfo.TextItems[TextIndex].CurrentText = FText::FromString(FString::FromInt(Current + 1));
@@ -178,7 +178,7 @@ void UAnimTextBlock::UpdatePreviewText()
 			UTextBlock* TextBlock = NewObject<UTextBlock>(TextBox);
 			if(UHorizontalBoxSlot* HorizontalBoxSlot = TextBox->AddChildToHorizontalBox(TextBlock))
 			{
-				HorizontalBoxSlot->SetPadding(Padding);
+				HorizontalBoxSlot->SetPadding(GetPadding());
 			}
 		}
 		if(TextBox->GetChildrenCount() > i)
@@ -187,7 +187,7 @@ void UAnimTextBlock::UpdatePreviewText()
 			{
 				TextBlock->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 				TextBlock->SetText(FText::FromString(TextArr[i]));
-				TextBlock->SetColorAndOpacity(ColorAndOpacity);
+				TextBlock->SetColorAndOpacity(GetColorAndOpacity());
 				TextBlock->SetFont(Font);
 				TextBlock->SetStrikeBrush(StrikeBrush);
 				TextBlock->SetShadowOffset(ShadowOffset);
@@ -264,7 +264,7 @@ void UAnimTextBlock::SetText(const FText& InText)
 						}
 						default: break;
 					}
-					AnimTextInfo.TextItems[i].TextBlock->SetColorAndOpacity(ColorAndOpacity);
+					AnimTextInfo.TextItems[i].TextBlock->SetColorAndOpacity(GetColorAndOpacity());
 					AnimTextInfo.TextItems[i].TextBlock->SetFont(Font);
 					AnimTextInfo.TextItems[i].TextBlock->SetStrikeBrush(StrikeBrush);
 					AnimTextInfo.TextItems[i].TextBlock->SetShadowOffset(ShadowOffset);
@@ -273,7 +273,7 @@ void UAnimTextBlock::SetText(const FText& InText)
 					AnimTextInfo.TextItems[i].TextBlock->SetJustification(ETextJustify::Center);
 					if(UHorizontalBoxSlot* HorizontalBoxSlot = TextBox->AddChildToHorizontalBox(AnimTextInfo.TextItems[i].TextBlock))
 					{
-						HorizontalBoxSlot->SetPadding(Padding);
+						HorizontalBoxSlot->SetPadding(GetPadding());
 					}
 				}
 			}
@@ -336,12 +336,12 @@ void UAnimTextBlock::SetAnimTime(float InAnimTime)
 
 void UAnimTextBlock::SetColor(FLinearColor InColor)
 {
-	ColorAndOpacity = InColor;
+	SetColorAndOpacity(InColor);
 	for(auto& Iter : AnimTextInfo.TextItems)
 	{
 		if(Iter.TextBlock)
 		{
-			Iter.TextBlock->SetColorAndOpacity(ColorAndOpacity);
+			Iter.TextBlock->SetColorAndOpacity(InColor);
 		}
 	}
 }
@@ -360,7 +360,7 @@ void UAnimTextBlock::SetFont(FSlateFontInfo InFontInfo)
 
 void UAnimTextBlock::SetOpacity(float InOpacity)
 {
-	FLinearColor CurrentColor = ColorAndOpacity;
+	FLinearColor CurrentColor = GetColorAndOpacity();
 	CurrentColor.A = InOpacity;
 	
 	SetColor(CurrentColor);

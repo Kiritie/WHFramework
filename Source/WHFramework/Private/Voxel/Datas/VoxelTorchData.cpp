@@ -15,8 +15,8 @@ UVoxelTorchData::UVoxelTorchData()
 
 	Transparency = EVoxelTransparency::Transparent;
 
-	MeshScale = FVector(0.1f, 0.1f, 0.5f);
-	MeshOffset = FVector(0.f, 0.f, -0.25f);
+	MeshDatas[0].MeshScale = FVector(0.1f, 0.1f, 0.5f);
+	MeshDatas[0].MeshOffset = FVector(0.f, 0.f, -0.25f);
 
 	EffectAsset = nullptr;
 	EffectScale = FVector::OneVector;

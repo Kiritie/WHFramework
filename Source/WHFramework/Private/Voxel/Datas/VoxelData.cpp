@@ -16,13 +16,7 @@ UVoxelData::UVoxelData()
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
-	bCustomMesh = false;
-	MeshVertices = TArray<FVector>();
-	MeshNormals = TArray<FVector>();
-	MeshScale = FVector::OneVector;
-	MeshOffset = FVector::ZeroVector;
-	MeshUVDatas.SetNum(6);
-	MeshData.SetNum(1);
+	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
 }
 
@@ -79,7 +73,7 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 
 const FVoxelMeshData& UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
-	return MeshData[0];
+	return MeshDatas[0];
 }
 
 bool UVoxelData::IsEmpty() const

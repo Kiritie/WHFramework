@@ -303,7 +303,7 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
 
-	if(bIsFocusable)
+	if(IsFocusable())
 	{
 		SetFocus();
 	}

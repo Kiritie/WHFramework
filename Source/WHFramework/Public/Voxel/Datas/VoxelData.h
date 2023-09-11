@@ -46,25 +46,7 @@ public:
 	TMap<EVoxelSoundType, USoundBase*> Sounds;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bCustomMesh;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
-	TArray<FVector> MeshVertices;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
-	TArray<FVector> MeshNormals;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector MeshScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector MeshOffset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FVoxelMeshData> MeshData;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FVoxelMeshUVData> MeshUVDatas;
+	TArray<FVoxelMeshData> MeshDatas;
 
 public:
 	virtual bool HasPartData(FIndex InIndex) const;
