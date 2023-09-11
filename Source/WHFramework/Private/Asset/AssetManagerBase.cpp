@@ -35,20 +35,23 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimary
 
 UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
 {
-	UPrimaryAssetBase* LoadedAsset;
+	UPrimaryAssetBase* LoadedAsset = nullptr;
 
-	if(!PrimaryAssetMap.FindOrAdd(InPrimaryAssetId.PrimaryAssetType).Assets.Contains(InPrimaryAssetId))
+	if(InPrimaryAssetId.IsValid())
 	{
-		const FSoftObjectPath AssetPath = GetPrimaryAssetPath(InPrimaryAssetId);
-		LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
-		if(LoadedAsset)
+		if(!PrimaryAssetMap.FindOrAdd(InPrimaryAssetId.PrimaryAssetType).Assets.Contains(InPrimaryAssetId))
 		{
-			PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Add(InPrimaryAssetId, LoadedAsset);
+			const FSoftObjectPath AssetPath = GetPrimaryAssetPath(InPrimaryAssetId);
+			LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
+			if(LoadedAsset)
+			{
+				PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Add(InPrimaryAssetId, LoadedAsset);
+			}
 		}
-	}
-	else
-	{
-		LoadedAsset = PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets[InPrimaryAssetId];
+		else
+		{
+			LoadedAsset = PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets[InPrimaryAssetId];
+		}
 	}
 
 	if(bLogWarning && !LoadedAsset)

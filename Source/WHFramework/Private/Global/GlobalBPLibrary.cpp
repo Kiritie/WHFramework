@@ -460,9 +460,6 @@ UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
     // 遍历每个Mip层
     for (int32 MipIndex = 0; MipIndex < TemplatePlatformData->Mips.Num(); ++MipIndex)
     {
-        // 获取模板上对应的Mip层
-        const FTexture2DMipMap& TemplateMip = TemplatePlatformData->Mips[MipIndex];
-
         // 确保当前Mip层对象存在
         if (!PlatformData->Mips.IsValidIndex(MipIndex))
         {
