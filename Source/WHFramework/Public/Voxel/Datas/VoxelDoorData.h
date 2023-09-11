@@ -14,9 +14,7 @@ public:
 	UVoxelDoorData();
 
 public:
-	virtual void GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const override;
-
-	virtual void GetUVData(const FVoxelItem& InVoxelItem, int32 InFaceIndex, FVector2D InUVSize, FVector2D& OutUVCorner, FVector2D& OutUVSpan) const override;
+	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

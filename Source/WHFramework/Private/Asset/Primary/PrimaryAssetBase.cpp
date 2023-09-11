@@ -5,6 +5,10 @@ UPrimaryAssetBase::UPrimaryAssetBase()
 	
 }
 
+void UPrimaryAssetBase::ResetData_Implementation()
+{
+}
+
 bool UPrimaryAssetBase::IsValid() const
 {
 	return GetPrimaryAssetId().IsValid();

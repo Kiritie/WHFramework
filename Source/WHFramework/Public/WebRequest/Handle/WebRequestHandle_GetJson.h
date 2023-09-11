@@ -22,7 +22,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Fill(const FWebRequestResult& InWebRequestResult) override;
+	virtual void Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams) override;
 
 protected:
 	TSharedPtr<FJsonObject> Json;

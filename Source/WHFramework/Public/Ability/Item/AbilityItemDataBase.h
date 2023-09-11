@@ -14,6 +14,9 @@ public:
 	UAbilityItemDataBase();
 
 public:
+	virtual void ResetData_Implementation() override;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Name;
 
@@ -38,9 +41,6 @@ public:
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void ReleaseIconAsset();
 
 public:
 	UFUNCTION(BlueprintPure)

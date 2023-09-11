@@ -93,3 +93,14 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 	}
 	return LoadedAssets;
 }
+
+void UAssetManagerBase::ReleaseRuntimeData()
+{
+	for(auto& Iter1 : PrimaryAssetMap)
+	{
+		for(auto& Iter2 : Iter1.Value.Assets)
+		{
+			Iter2.Value->ResetData();
+		}
+	}
+}

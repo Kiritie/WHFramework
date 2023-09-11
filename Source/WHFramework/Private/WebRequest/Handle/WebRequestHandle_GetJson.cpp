@@ -18,9 +18,13 @@ void UWebRequestHandle_GetJson::OnDespawn_Implementation(bool bRecovery)
 	Json = nullptr;
 }
 
-void UWebRequestHandle_GetJson::Fill(const FWebRequestResult& InWebRequestResult)
+void UWebRequestHandle_GetJson::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
-	Super::Fill(InWebRequestResult);
-
-	UGlobalBPLibrary::ParseJsonObjectFromString(InWebRequestResult.HttpResponse->GetContentAsString(), Json);
+	if(InResult.bSucceeded)
+	{
+		if(UGlobalBPLibrary::ParseJsonObjectFromString(InResult.HttpResponse->GetContentAsString(), Json))
+		{
+			bSucceeded = true;
+		}
+	}
 }

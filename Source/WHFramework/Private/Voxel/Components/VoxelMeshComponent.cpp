@@ -76,21 +76,20 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	const UVoxelData& voxelData = InVoxelItem.GetVoxelData();
-	if(voxelData.bCustomMesh)
+	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
+	if(MeshData.bCustomMesh)
 	{
-		TArray<FVector> meshVertices, meshNormals;
-		voxelData.GetMeshData(InVoxelItem, meshVertices, meshNormals);
-		for (int i = 0; i < meshVertices.Num(); i++)
+		for (int i = 0; i < MeshData.MeshVertices.Num(); i++)
 		{
 			if (i > 0 && (i + 1) % 4 == 0)
 			{
-				FVector vertices[4];
+				FVector Vertices[4];
 				for (int j = 0; j < 4; j++)
 				{
-					vertices[j] = meshVertices[i - (3 - j)];
+					Vertices[j] = MeshData.MeshVertices[i - (3 - j)];
 				}
-				BuildFace(InVoxelItem, vertices, i / 4, meshNormals[i / 4]);
+				BuildFace(InVoxelItem, Vertices, i / 4, MeshData.MeshNormals[i / 4].GetSafeNormal());
 			}
 		}
 	}
@@ -109,18 +108,18 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid())
 	{
-		UVoxelData& voxelData = InVoxelItem.GetVoxelData();
-		const FVector range = voxelData.GetRange();
-		Transparency = voxelData.Transparency;
-		CenterOffset = FVector(0.f, 0.f, -range.Z * 0.5f + 0.5f);
-		ITER_INDEX(partIndex, range, false,
-			UVoxelData& partData = voxelData.GetPartData(partIndex);
-			if(partData.IsValid())
+		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+		const FVector Range = VoxelData.GetRange();
+		Transparency = VoxelData.Transparency;
+		CenterOffset = FVector(0.f, 0.f, -Range.Z * 0.5f + 0.5f);
+		ITER_INDEX(PartIndex, Range, false,
+			UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
+			if(PartData.IsValid())
 			{
-				FVoxelItem partItem;
-				partItem.ID = partData.GetPrimaryAssetId();
-				partItem.Index = partIndex;
-				BuildVoxel(partItem);
+				FVoxelItem PartItem;
+				PartItem.ID = PartData.GetPrimaryAssetId();
+				PartItem.Index = PartIndex;
+				BuildVoxel(PartItem);
 			}
 		)
 		CreateMesh(0, false);
@@ -144,12 +143,12 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(Transparency).Material);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].Material);
 				break;
 			}
 			case EVoxelMeshNature::Preview:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(Transparency).UnlitMaterial);
+				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().ChunkMaterials[Transparency].UnlitMaterial);
 				break;
 			}
 		}
@@ -186,90 +185,91 @@ void UVoxelMeshComponent::ClearData()
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing)
 {
-	FVector vertices[4];
+	FVector Vertices[4];
 	switch (InFacing)
 	{
 		case EDirection::Forward:
 		{
-			vertices[0] = FVector(0.5f, 0.5f, -0.5f);
-			vertices[1] = FVector(0.5f, 0.5f, 0.5f);
-			vertices[2] = FVector(0.5f, -0.5f, 0.5f);
-			vertices[3] = FVector(0.5f, -0.5f, -0.5f);
+			Vertices[0] = FVector(0.5f, 0.5f, -0.5f);
+			Vertices[1] = FVector(0.5f, 0.5f, 0.5f);
+			Vertices[2] = FVector(0.5f, -0.5f, 0.5f);
+			Vertices[3] = FVector(0.5f, -0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Right:
 		{
-			vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
-			vertices[1] = FVector(-0.5f, 0.5f, 0.5f);
-			vertices[2] = FVector(0.5f, 0.5f, 0.5f);
-			vertices[3] = FVector(0.5f, 0.5f, -0.5f);
+			Vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
+			Vertices[1] = FVector(-0.5f, 0.5f, 0.5f);
+			Vertices[2] = FVector(0.5f, 0.5f, 0.5f);
+			Vertices[3] = FVector(0.5f, 0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Backward:
 		{
-			vertices[0] = FVector(-0.5f, -0.5f, -0.5f);
-			vertices[1] = FVector(-0.5f, -0.5f, 0.5f);
-			vertices[2] = FVector(-0.5f, 0.5f, 0.5f);
-			vertices[3] = FVector(-0.5f, 0.5f, -0.5f);
+			Vertices[0] = FVector(-0.5f, -0.5f, -0.5f);
+			Vertices[1] = FVector(-0.5f, -0.5f, 0.5f);
+			Vertices[2] = FVector(-0.5f, 0.5f, 0.5f);
+			Vertices[3] = FVector(-0.5f, 0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Left:
 		{
-			vertices[0] = FVector(0.5f, -0.5f, -0.5f);
-			vertices[1] = FVector(0.5f, -0.5f, 0.5f);
-			vertices[2] = FVector(-0.5f, -0.5f, 0.5f);
-			vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
+			Vertices[0] = FVector(0.5f, -0.5f, -0.5f);
+			Vertices[1] = FVector(0.5f, -0.5f, 0.5f);
+			Vertices[2] = FVector(-0.5f, -0.5f, 0.5f);
+			Vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
 		case EDirection::Up:
 		{
-			vertices[0] = FVector(-0.5f, -0.5f, 0.5f);
-			vertices[1] = FVector(0.5f, -0.5f, 0.5f);
-			vertices[2] = FVector(0.5f, 0.5f, 0.5f);
-			vertices[3] = FVector(-0.5f, 0.5f, 0.5f);
+			Vertices[0] = FVector(-0.5f, -0.5f, 0.5f);
+			Vertices[1] = FVector(0.5f, -0.5f, 0.5f);
+			Vertices[2] = FVector(0.5f, 0.5f, 0.5f);
+			Vertices[3] = FVector(-0.5f, 0.5f, 0.5f);
 			break;
 		}
 		case EDirection::Down:
 		{
-			vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
-			vertices[1] = FVector(0.5f, 0.5f, -0.5f);
-			vertices[2] = FVector(0.5f, -0.5f, -0.5f);
-			vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
+			Vertices[0] = FVector(-0.5f, 0.5f, -0.5f);
+			Vertices[1] = FVector(0.5f, 0.5f, -0.5f);
+			Vertices[2] = FVector(0.5f, -0.5f, -0.5f);
+			Vertices[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
+	BuildFace(InVoxelItem, Vertices, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
 {
-	const int32 verNum = Vertices.Num();
-	const UVoxelData& voxelData = InVoxelItem.GetVoxelData();
-	FVector scale, offset;
-	voxelData.GetMeshData(InVoxelItem, scale, offset);
-	scale = UMathBPLibrary::RotatorVector(scale, InVoxelItem.Angle, false, true);
-	offset = CenterOffset + UMathBPLibrary::RotatorVector(offset, InVoxelItem.Angle) * OffsetScale;
-	FVector2D uvCorner, uvSpan;
-	voxelData.GetUVData(InVoxelItem, InFaceIndex, AVoxelModule::Get()->GetWorldData().GetChunkMaterial(voxelData.Transparency).BlockUVSize, uvCorner, uvSpan);
+	const int32 VerNum = Vertices.Num();
+	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
+	const FVoxelMeshUVData& UVData = MeshData.MeshUVDatas[InFaceIndex];
+	const FVector Scale = UMathBPLibrary::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
+	const FVector Offset = CenterOffset + UMathBPLibrary::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
+	const FVector2D UVSize = AVoxelModule::Get()->GetWorldData().ChunkMaterials[VoxelData.Transparency].BlockUVSize;
+	const FVector2D UVCorner = FVector2D((UVData.UVCorner.X + UVData.UVOffset.X) * UVSize.X, (1.f / UVSize.Y - (UVData.UVCorner.Y + UVData.UVOffset.Y) - UVData.UVSpan.Y) * UVSize.Y);
+	const FVector2D UVSpan = FVector2D(UVData.UVSpan.X * UVSize.X, UVData.UVSpan.Y * UVSize.Y);
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * scale + offset) * AVoxelModule::Get()->GetWorldData().BlockSize);
+		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * AVoxelModule::Get()->GetWorldData().BlockSize);
 	}
 
-	UVs.Add(FVector2D(uvCorner.X, uvCorner.Y + uvSpan.Y));
-	UVs.Add(uvCorner);
-	UVs.Add(FVector2D(uvCorner.X + uvSpan.X, uvCorner.Y));
-	UVs.Add(FVector2D(uvCorner.X + uvSpan.X, uvCorner.Y + uvSpan.Y));
+	UVs.Add(FVector2D(UVCorner.X, UVCorner.Y + UVSpan.Y));
+	UVs.Add(UVCorner);
+	UVs.Add(FVector2D(UVCorner.X + UVSpan.X, UVCorner.Y));
+	UVs.Add(FVector2D(UVCorner.X + UVSpan.X, UVCorner.Y + UVSpan.Y));
 
-	Triangles.Add(verNum + 1);
-	Triangles.Add(verNum + 0);
-	Triangles.Add(verNum + 2);
-	Triangles.Add(verNum + 3);
-	Triangles.Add(verNum + 2);
-	Triangles.Add(verNum + 0);
+	Triangles.Add(VerNum + 1);
+	Triangles.Add(VerNum + 0);
+	Triangles.Add(VerNum + 2);
+	Triangles.Add(VerNum + 3);
+	Triangles.Add(VerNum + 2);
+	Triangles.Add(VerNum + 0);
 
 	Normals.Add(InNormal);
 	Normals.Add(InNormal);
@@ -307,19 +307,19 @@ void UVoxelMeshComponent::SetCollisionEnabled(ECollisionEnabled::Type NewType)
 	Super::SetCollisionEnabled(NewType);
 }
 
-void UVoxelMeshComponent::SetCollisionEnabled(bool bNewEnable)
+void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
 {
 	switch(Transparency)
 	{
 		case EVoxelTransparency::Solid:
 		case EVoxelTransparency::SemiTransparent:
 		{
-			SetCollisionEnabled(bNewEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 			break;
 		}
 		case EVoxelTransparency::Transparent:
 		{
-			SetCollisionEnabled(bNewEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 			break;
 		}
 	}

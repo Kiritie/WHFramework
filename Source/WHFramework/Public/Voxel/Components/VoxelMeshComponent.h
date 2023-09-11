@@ -70,5 +70,5 @@ public:
 
 	virtual void SetCollisionEnabled(ECollisionEnabled::Type NewType) override;
 
-	virtual void SetCollisionEnabled(bool bNewEnable);
+	virtual void SetCollisionEnabled(bool bEnable);
 };

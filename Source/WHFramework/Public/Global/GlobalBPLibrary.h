@@ -89,7 +89,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
-public:
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
 	static ETraceTypeQuery GetGameTraceType(ECollisionChannel InTraceChannel);
 
@@ -212,6 +211,17 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Object
 	static bool ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Texture
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static UTexture2D* LoadTextureFormFile(const FString& InFilePath);
+
+	UFUNCTION(BlueprintCallable, Category = "GlobalBPLibrary")
+	static void SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath);
+
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Blueprint

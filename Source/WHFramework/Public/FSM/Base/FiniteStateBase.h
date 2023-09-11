@@ -11,7 +11,7 @@ class UFSMComponent;
 /**
  * 状态基类
  */
-UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
+UCLASS(Blueprintable, hidecategories = (Default, Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
 class WHFRAMEWORK_API UFiniteStateBase : public UWHObject
 {
 	GENERATED_BODY()

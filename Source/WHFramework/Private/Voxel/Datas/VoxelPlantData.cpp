@@ -11,24 +11,22 @@ UVoxelPlantData::UVoxelPlantData()
 	
 	Transparency = EVoxelTransparency::Transparent;
 
-	bCustomMesh = true;
+	MeshData[0].bCustomMesh = true;
 
-	MeshVertices = TArray<FVector>();
-	MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(-0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(0.5f, 0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, -0.5f));
-	MeshVertices.Add(FVector(0.5f, -0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, 0.5f));
-	MeshVertices.Add(FVector(-0.5f, 0.5f, -0.5f));
+	MeshData[0].MeshVertices.Add(FVector(-0.5f, -0.5f, -0.5f));
+	MeshData[0].MeshVertices.Add(FVector(-0.5f, -0.5f, 0.5f));
+	MeshData[0].MeshVertices.Add(FVector(0.5f, 0.5f, 0.5f));
+	MeshData[0].MeshVertices.Add(FVector(0.5f, 0.5f, -0.5f));
+	MeshData[0].MeshVertices.Add(FVector(0.5f, -0.5f, -0.5f));
+	MeshData[0].MeshVertices.Add(FVector(0.5f, -0.5f, 0.5f));
+	MeshData[0].MeshVertices.Add(FVector(-0.5f, 0.5f, 0.5f));
+	MeshData[0].MeshVertices.Add(FVector(-0.5f, 0.5f, -0.5f));
 
-	MeshUVDatas.SetNum(2);
+	MeshData[0].MeshUVDatas.SetNum(2);
 
-	MeshScale = FVector(0.6f, 0.6f, 0.8f);
-	MeshOffset = FVector(0.f, 0.f, -0.1f);
+	MeshData[0].MeshScale = FVector(0.6f, 0.6f, 0.8f);
+	MeshData[0].MeshOffset = FVector(0.f, 0.f, -0.1f);
 
-	MeshNormals = TArray<FVector>();
-	MeshNormals.Add(FVector(1, -1, 0));
-	MeshNormals.Add(FVector(-1, -1, 0));
+	MeshData[0].MeshNormals.Add(FVector(1, -1, 0));
+	MeshData[0].MeshNormals.Add(FVector(-1, -1, 0));
 }

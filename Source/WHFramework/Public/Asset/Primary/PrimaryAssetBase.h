@@ -11,6 +11,10 @@ class WHFRAMEWORK_API UPrimaryAssetBase : public UPrimaryDataAsset
 
 public:
 	UPrimaryAssetBase();
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void ResetData();
 	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

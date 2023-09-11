@@ -68,4 +68,6 @@ public:
 		}
 		return LoadedItems;
 	}
+
+	virtual void ReleaseRuntimeData();
 };

@@ -40,6 +40,7 @@
 #include "Global/GlobalTypes.h"
 #include "Global/GlobalTypes.h"
 #include "Global/GlobalTypes.h"
+#include "Kismet/KismetMaterialLibrary.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/VoxelSaveGame.h"
@@ -101,19 +102,19 @@ AVoxelModule::AVoxelModule()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid_Unlit.M_Voxels_Solid_Unlit'"));
 	if(SolidMatFinder.Succeeded() && UnlitSolidMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SolidMatFinder.Object, UnlitSolidMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::Solid, FVoxelChunkMaterial(SolidMatFinder.Object, UnlitSolidMatFinder.Object));
 	}
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent_Unlit.M_Voxels_SemiTransparent_Unlit'"));
 	if(SemiTransparentMatFinder.Succeeded() && UnlitSemiTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(SemiTransparentMatFinder.Object, UnlitSemiTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::SemiTransparent, FVoxelChunkMaterial(SemiTransparentMatFinder.Object, UnlitSemiTransparentMatFinder.Object));
 	}
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent_Unlit.M_Voxels_Transparent_Unlit'"));
 	if(TransparentMatFinder.Succeeded() && UnlitTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(FVoxelChunkMaterial(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object, FVector2D(0.0625f, 0.5f)));
+		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::Transparent, FVoxelChunkMaterial(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object));
 	}
 }
 
@@ -146,10 +147,38 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(InPhase == EPhase::Lesser)
 	{
-		UAssetModuleBPLibrary::LoadPrimaryAssets(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel));
-
+		for(const auto Iter1 : UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)))
+		{
+			for(auto& Iter2 : Iter1->MeshData)
+			{
+				for(auto& Iter3 : Iter2.MeshUVDatas)
+				{
+					if(Iter3.Texture && WorldBasicData.ChunkMaterials.Contains(Iter1->Transparency))
+					{
+						const int32 TexIndex = WorldBasicData.ChunkMaterials[Iter1->Transparency].Textures.AddUnique(Iter3.Texture);
+						Iter3.UVOffset = FVector2D(TexIndex % 16, TexIndex / 16);
+					}
+				}
+			}
+		}
+		for(auto& Iter : WorldBasicData.ChunkMaterials)
+		{
+			Iter.Value.BlockTexSize = FVector2D(Iter.Value.BlockPixelSize * 16, (Iter.Value.Textures.Num() / 16 + 1) * Iter.Value.BlockPixelSize);
+			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.BlockTexSize))
+			{
+				Iter.Value.BlockUVSize = FVector2D(Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.X, Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.Y);
+			
+				UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
+				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
+				Iter.Value.Material = MatInst;
+			
+				MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
+				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
+				Iter.Value.UnlitMaterial = MatInst;
+			}
+		}
 		for(const auto Iter : VoxelClasses)
 		{
 			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
@@ -175,8 +204,11 @@ void AVoxelModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	GenerateChunkQueues();
-	GenerateWorld();
+	if(WorldMode != EVoxelWorldMode::None)
+	{
+		GenerateChunkQueues();
+		GenerateWorld();
+	}
 }
 
 void AVoxelModule::OnPause_Implementation()
@@ -196,9 +228,6 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	if(InPhase == EPhase::Primary)
 	{
 		DestroyChunkQueues();
-		ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)), Item,
-			Item->ReleaseIconAsset();
-		)
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{

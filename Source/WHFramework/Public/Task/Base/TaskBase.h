@@ -16,7 +16,7 @@ class ACameraPawnBase;
 /**
  * 任务基类
  */
-UCLASS(Blueprintable, meta = (ShowWorldContextPin), hidecategories = (Default))
+UCLASS(Blueprintable, hidecategories = (Default))
 class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataInterface
 {
 	GENERATED_BODY()

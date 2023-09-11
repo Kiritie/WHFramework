@@ -4,18 +4,18 @@
 
 #include "Base/WebRequestHandleBase.h"
 #include "UObject/Object.h"
-#include "WebRequestHandle_GetText.generated.h"
+#include "WebRequestHandle_DownloadFile.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWebRequestHandle_GetText : public UWebRequestHandleBase
+class WHFRAMEWORK_API UWebRequestHandle_DownloadFile : public UWebRequestHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UWebRequestHandle_GetText();
+	UWebRequestHandle_DownloadFile();
 
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
@@ -25,9 +25,9 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FString Text;
+	FString FilePath;
 	
 public:
 	UFUNCTION(BlueprintPure)
-	FString GetText() const { return Text; }
+	FString GetFilePath() const { return FilePath; }
 };

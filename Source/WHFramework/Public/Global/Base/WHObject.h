@@ -28,4 +28,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void OnReset_Implementation() override;
+
+public:
+	virtual UWorld* GetWorld() const override;
 };

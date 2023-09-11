@@ -3,8 +3,12 @@
 
 #include "Global/GlobalBPLibrary.h"
 
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
+#include "ImageUtils.h"
 #include "Character/Base/CharacterBase.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Engine/Texture2DArray.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Global/EventHandle_PauseGame.h"
 #include "Event/Handle/Global/EventHandle_UnPauseGame.h"
@@ -299,7 +303,7 @@ FText UGlobalBPLibrary::GetInputActionKeyCodeByName(const FString& InInputAction
 {
 	TArray<FInputActionKeyMapping> KeyMappings;
 	UInputSettings::GetInputSettings()->GetActionMappingByName(*InInputActionName, KeyMappings);
-	for(auto Iter : KeyMappings)
+	for(const auto Iter : KeyMappings)
 	{
 		return FText::FromString(Iter.Key.GetFName().ToString());
 	}
@@ -318,6 +322,200 @@ bool UGlobalBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncN
 		}
 	}
 	return false;
+}
+
+UTexture2D* UGlobalBPLibrary::LoadTextureFormFile(const FString& InFilePath)
+{
+	UTexture2D* Texture = nullptr;
+	TArray<uint8> CompressedData;
+	if (FFileHelper::LoadFileToArray(CompressedData, *InFilePath))
+	{
+		IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+		TSharedPtr<IImageWrapper> ImageWrappers[4] =
+		{
+			ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG),
+			ImageWrapperModule.CreateImageWrapper(EImageFormat::JPEG),
+			ImageWrapperModule.CreateImageWrapper(EImageFormat::BMP),
+			ImageWrapperModule.CreateImageWrapper(EImageFormat::EXR)
+		};
+		for ( auto ImageWrapper : ImageWrappers )
+		{
+			if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
+			{
+				TArray<uint8> RawData;
+				if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, RawData))
+				{
+					Texture = UTexture2D::CreateTransient(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), PF_B8G8R8A8);
+					if (Texture)
+					{
+						Texture->AddToRoot();
+						const auto PlatformData = new FTexturePlatformData();
+						Texture->SetPlatformData(PlatformData);
+						void* TextureData = PlatformData->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+						FMemory::Memcpy(TextureData, RawData.GetData(), RawData.Num());
+						PlatformData->Mips[0].BulkData.Unlock();
+						Texture->UpdateResource();
+					}
+				}
+				break;
+			}
+		}
+	}
+	return Texture;
+}
+
+void UGlobalBPLibrary::SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath)
+{
+	if(!InTexture) return;
+
+	if(FTexturePlatformData* PlatformData = InTexture->GetPlatformData())
+	{
+		FTexture2DMipMap& MipMap = PlatformData->Mips[0];
+		const unsigned char* Data = (unsigned char*)MipMap.BulkData.Lock(LOCK_READ_WRITE);
+		const int32 TexSizeX = MipMap.SizeX;
+		const int32 TexSizeY = MipMap.SizeY;
+		TArray<FColor> Colors;
+		Colors.SetNum(TexSizeX * TexSizeY);
+
+		FMemory::Memcpy(Colors.GetData(), Data, (int32)(sizeof(FColor)) * TexSizeX * TexSizeY);
+		MipMap.BulkData.Unlock();
+
+		TArray<uint8> ImgData;
+		FImageUtils::ThumbnailCompressImageArray(TexSizeX, TexSizeY, Colors, ImgData);
+
+		FFileHelper::SaveArrayToFile(ImgData, *InFilePath);
+	}
+}
+
+UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize)
+{
+	if(InTextures.Num() == 0) return nullptr;
+
+	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient );
+
+    // 获取模板纹理
+    UTexture2D* TemplateTexture = InTextures[0];
+
+    // 得到模板纹理的平台数据
+    const FTexturePlatformData* TemplatePlatformData = TemplateTexture->GetPlatformData();
+
+	// 取得模板纹理的像素格式
+	const EPixelFormat PixelFormat = TemplatePlatformData->PixelFormat;
+	const FPixelFormatInfo& PixelFormatInfo = GPixelFormats[PixelFormat];
+
+    // 取得模板纹理的长宽
+    const int32 SizeX = InTexSize.X;
+    const int32 SizeY = InTexSize.Y;
+
+	const int32 TemplateSizeX = TemplatePlatformData->SizeX;
+	const int32 TemplateSizeY = TemplatePlatformData->SizeY;
+
+	const int32 NumSlicesX = SizeX / TemplateSizeX;
+	const int32 NumSlicesY = SizeY / TemplateSizeY;
+
+	// 设置一般属性
+	Texture->AddressX = TemplateTexture->AddressX;
+	Texture->AddressY = TemplateTexture->AddressY;
+	Texture->SRGB = TemplateTexture->SRGB;
+	Texture->Filter = TemplateTexture->Filter;
+	Texture->LODGroup = TemplateTexture->LODGroup;
+	Texture->MipGenSettings = TemplateTexture->MipGenSettings;
+	Texture->MipLoadOptions = TemplateTexture->MipLoadOptions;
+	Texture->CompressionSettings = TemplateTexture->CompressionSettings;
+
+	const int32 NumBlocksX = SizeX / PixelFormatInfo.BlockSizeX;
+	const int32 NumBlocksY = SizeY / PixelFormatInfo.BlockSizeY;
+
+	const int32 TemplateNumBlocksX = TemplateSizeX / PixelFormatInfo.BlockSizeX;
+	const int32 TemplateNumBlocksY = TemplateSizeY / PixelFormatInfo.BlockSizeY;
+
+	TArray<UTexture2D*> Textures;
+    // 筛选有效的纹理
+    for (auto Item : InTextures)
+    {
+        const FTexturePlatformData* SourcePlatformData = Item->GetPlatformData();
+
+        bool bIsInvalid = false;
+
+        // 只有长宽与纹理格式都符号模板才有效
+        bIsInvalid |= SourcePlatformData->SizeX != TemplatePlatformData->SizeX;
+        bIsInvalid |= SourcePlatformData->SizeY != TemplatePlatformData->SizeY;
+        bIsInvalid |= SourcePlatformData->PixelFormat != PixelFormat;
+
+        if (!bIsInvalid)
+        {
+            Textures.AddUnique(Item);
+        }
+    }
+
+	// 获取纹理数组的平台数据
+	FTexturePlatformData* PlatformData = new FTexturePlatformData();
+	Texture->SetPlatformData(PlatformData);
+
+    // 设置纹理长宽元素数与像素格式
+    PlatformData->SizeX = SizeX;
+    PlatformData->SizeY = SizeY;
+    PlatformData->PixelFormat = PixelFormat;
+
+    // 遍历每个Mip层
+    for (int32 MipIndex = 0; MipIndex < TemplatePlatformData->Mips.Num(); ++MipIndex)
+    {
+        // 获取模板上对应的Mip层
+        const FTexture2DMipMap& TemplateMip = TemplatePlatformData->Mips[MipIndex];
+
+        // 确保当前Mip层对象存在
+        if (!PlatformData->Mips.IsValidIndex(MipIndex))
+        {
+            check(PlatformData->Mips.Num() == MipIndex);
+
+            PlatformData->Mips.Add(new FTexture2DMipMap());
+        }
+
+        // 取得纹理数组中的Mip层对象
+        FTexture2DMipMap& Mip = PlatformData->Mips[MipIndex];
+
+        // 设置当前Mip层长宽及元素数
+        Mip.SizeX = SizeX;
+    	Mip.SizeY = SizeY;
+
+        // 以读写方式锁定当前Mip层
+        Mip.BulkData.Lock(LOCK_READ_WRITE);
+
+        // 重置Mip层到所需大小
+        void* BulkData = Mip.BulkData.Realloc(NumBlocksX * NumBlocksY * PixelFormatInfo.BlockBytes);
+
+        // 遍历每个纹理元素
+        for (int32 SliceIndex = 0; SliceIndex < Textures.Num(); ++SliceIndex)
+        {
+            // 获取源纹理平台数据
+            FTexturePlatformData* SourcePlatformData = Textures[SliceIndex]->GetPlatformData();
+
+            // 获取源纹理对应Mip层
+            FTexture2DMipMap& SourceMip = SourcePlatformData->Mips[MipIndex];
+
+            // 以只读方式锁定源纹理Mip层
+            const void* SourceBulkData = SourceMip.BulkData.Lock(LOCK_READ_ONLY);
+
+        	for(int32 TemplateByteYIndex = 0; TemplateByteYIndex < TemplateNumBlocksY * PixelFormatInfo.BlockBytes; TemplateByteYIndex++)
+        	{
+        		// 从源纹理复制数据到纹理数组中
+        		FMemory::Memcpy((uint8*)BulkData + (((NumSlicesY - SliceIndex / NumSlicesX - 1) * NumBlocksX * TemplateNumBlocksY * PixelFormatInfo.BlockBytes) +
+        			((SliceIndex % NumSlicesX) * TemplateNumBlocksX * PixelFormatInfo.BlockBytes) + (NumBlocksX * PixelFormatInfo.BlockBytes * TemplateByteYIndex)),
+        			(uint8*)SourceBulkData + (TemplateNumBlocksX * PixelFormatInfo.BlockBytes * TemplateByteYIndex), TemplateNumBlocksX * PixelFormatInfo.BlockBytes);
+        	}
+
+            // 解锁源纹理Mip层
+            SourceMip.BulkData.Unlock();
+        }
+
+        // 解锁当前Mip层
+        Mip.BulkData.Unlock();
+    }
+
+    // 更新纹理数组渲染资源
+    Texture->UpdateResource();
+	
+	return Texture;
 }
 
 bool UGlobalBPLibrary::IsImplementedInBlueprint(const UFunction* Func)

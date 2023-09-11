@@ -28,7 +28,7 @@ protected:
 	void OnRequestComplete(UWebRequestHandleBase* InWebRequestHandle);
 
 public:
-	void RequestComplete(FWebRequestResult InWebRequestResult);
+	void RequestComplete(FWebRequestResult InResult, const TArray<FParameter>& InParams);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

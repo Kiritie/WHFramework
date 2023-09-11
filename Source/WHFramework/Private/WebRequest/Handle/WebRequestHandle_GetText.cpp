@@ -17,9 +17,11 @@ void UWebRequestHandle_GetText::OnDespawn_Implementation(bool bRecovery)
 	Text = TEXT("");
 }
 
-void UWebRequestHandle_GetText::Fill(const FWebRequestResult& InWebRequestResult)
+void UWebRequestHandle_GetText::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
-	Super::Fill(InWebRequestResult);
-	
-	Text = InWebRequestResult.HttpResponse->GetContentAsString();
+	if(InResult.bSucceeded)
+	{
+		Text = InResult.HttpResponse->GetContentAsString();
+		bSucceeded = true;
+	}
 }

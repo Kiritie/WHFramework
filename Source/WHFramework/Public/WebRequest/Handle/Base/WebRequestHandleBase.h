@@ -23,16 +23,13 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Fill(const FWebRequestResult& InWebRequestResult);
+	virtual void Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams);
 
 protected:
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bSucceeded;
 	
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsSucceeded() const { return bSucceeded; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetSucceeded(bool bInSucceeded) { this->bSucceeded = bInSucceeded; }
 };

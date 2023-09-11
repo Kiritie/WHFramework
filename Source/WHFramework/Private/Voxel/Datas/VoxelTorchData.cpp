@@ -4,11 +4,13 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelPlant.h"
+#include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 
 UVoxelTorchData::UVoxelTorchData()
 {
-	VoxelClass = UVoxelTorchData::StaticClass();
+	VoxelType = EVoxelType::Torch;
+	VoxelClass = UVoxelTorch::StaticClass();
 	AuxiliaryClass = AVoxelTorchAuxiliary::StaticClass();
 
 	Transparency = EVoxelTransparency::Transparent;

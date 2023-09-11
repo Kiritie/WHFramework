@@ -15,6 +15,9 @@ public:
 	UVoxelData();
 
 public:
+	virtual void ResetData_Implementation() override;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 
@@ -45,18 +48,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bCustomMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector MeshScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector MeshOffset;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
 	TArray<FVector> MeshVertices;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
 	TArray<FVector> MeshNormals;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MeshScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MeshOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVoxelMeshData> MeshData;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FVoxelMeshUVData> MeshUVDatas;
 
@@ -69,11 +75,7 @@ public:
 
 	virtual USoundBase* GetSound(EVoxelSoundType InSoundType) const;
 
-	virtual void GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const;
-
-	virtual void GetMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const;
-
-	virtual void GetUVData(const FVoxelItem& InVoxelItem, int32 InFaceIndex, FVector2D InUVSize, FVector2D& OutUVCorner, FVector2D& OutUVSpan) const;
+	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const;
 
 public:
 	bool IsEmpty() const;

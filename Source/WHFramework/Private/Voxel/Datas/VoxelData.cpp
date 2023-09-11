@@ -16,13 +16,19 @@ UVoxelData::UVoxelData()
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
-	MeshScale = FVector::OneVector;
-	MeshOffset = FVector::ZeroVector;
 	bCustomMesh = false;
 	MeshVertices = TArray<FVector>();
 	MeshNormals = TArray<FVector>();
+	MeshScale = FVector::OneVector;
+	MeshOffset = FVector::ZeroVector;
 	MeshUVDatas.SetNum(6);
+	MeshData.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
+}
+
+void UVoxelData::ResetData_Implementation()
+{
+	Super::ResetData_Implementation();
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
@@ -50,7 +56,7 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	if(bMainPart && PartDatas.Num() > 0)
 	{
 		FVector PartRange;
-		for(auto Iter : PartDatas)
+		for(const auto& Iter : PartDatas)
 		{
 			PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
 			PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
@@ -71,33 +77,9 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 	return nullptr;
 }
 
-void UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem, FVector& OutMeshScale, FVector& OutMeshOffset) const
+const FVoxelMeshData& UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
-	OutMeshScale = MeshScale;
-	OutMeshOffset = MeshOffset;
-}
-
-void UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem, TArray<FVector>& OutMeshVertices, TArray<FVector>& OutMeshNormals) const
-{
-	if(!bCustomMesh) return;
-
-	for(auto Iter : MeshVertices)
-	{
-		OutMeshVertices.Add(Iter);
-	}
-	for(auto Iter : MeshNormals)
-	{
-		OutMeshNormals.Add(Iter.GetSafeNormal());
-	}
-}
-
-void UVoxelData::GetUVData(const FVoxelItem& InVoxelItem, int32 InFaceIndex, FVector2D InUVSize, FVector2D& OutUVCorner, FVector2D& OutUVSpan) const
-{
-	if(!MeshUVDatas.IsValidIndex(InFaceIndex)) return;
-	
-	const FVoxelMeshUVData& UVData = MeshUVDatas[InFaceIndex];
-	OutUVCorner = FVector2D(UVData.UVCorner.X * InUVSize.X, (1.f / InUVSize.Y - UVData.UVCorner.Y - UVData.UVSpan.Y) * InUVSize.Y);
-	OutUVSpan = FVector2D(UVData.UVSpan.X * InUVSize.X, UVData.UVSpan.Y * InUVSize.Y);
+	return MeshData[0];
 }
 
 bool UVoxelData::IsEmpty() const

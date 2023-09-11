@@ -213,7 +213,14 @@ public:
 	
 	FParameter(void* InPointerValue)
 	{
-		*this = MakePointer(InPointerValue);
+		if(UObject* Object = static_cast<UObject*>(InPointerValue))
+		{
+			*this = MakeObject(Object);
+		}
+		else
+		{
+			*this = MakePointer(InPointerValue);
+		}
 	}
 
 protected:

@@ -29,27 +29,24 @@ void UWebInterfaceBase::OnRequestComplete_Implementation(UWebRequestHandleBase* 
 	
 }
 
-void UWebInterfaceBase::RequestComplete(FWebRequestResult InWebRequestResult)
+void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray<FParameter>& InParams)
 {
 	UWebRequestHandleBase* WebRequestHandle;
-	if(!HandleMap.Contains(InWebRequestResult.Content))
+	if(!HandleMap.Contains(InResult.Content))
 	{
 		WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, HandleClass);
-		HandleMap.Add(InWebRequestResult.Content, WebRequestHandle);
+		HandleMap.Add(InResult.Content, WebRequestHandle);
 	}
 	else
 	{
-		WebRequestHandle = HandleMap[InWebRequestResult.Content];
+		WebRequestHandle = HandleMap[InResult.Content];
 	}
 	if(WebRequestHandle)
 	{
-		if(InWebRequestResult.bSucceeded)
-		{
-			WebRequestHandle->Fill(InWebRequestResult);
-		}
+		WebRequestHandle->Fill(InResult, InParams);
 		OnRequestComplete(WebRequestHandle);
 		OnWebRequestComplete.Broadcast(WebRequestHandle);
-		HandleMap.Emplace(InWebRequestResult.Content, WebRequestHandle);
+		HandleMap.Emplace(InResult.Content, WebRequestHandle);
 	}
 }
 

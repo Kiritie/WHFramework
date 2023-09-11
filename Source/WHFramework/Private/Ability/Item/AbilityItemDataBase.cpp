@@ -18,6 +18,13 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	AbilityClass = nullptr;
 }
 
+void UAbilityItemDataBase::ResetData_Implementation()
+{
+	Super::ResetData_Implementation();
+	
+	Icon = nullptr;
+}
+
 void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, FVector2D InSize, int32 InIndex)
 {
 	if(!AAbilityModule::Get()->GetItemIconSourceMat()) return;
@@ -30,11 +37,6 @@ void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, 
 		IconMat->SetScalarParameterValue(FName("SizeY"), InSize.Y);
 		IconMat->SetScalarParameterValue(FName("Index"), InIndex);
 	}
-}
-
-void UAbilityItemDataBase::ReleaseIconAsset_Implementation()
-{
-	Icon = nullptr;
 }
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const

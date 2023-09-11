@@ -78,6 +78,11 @@ void AAssetModule::OnUnPause_Implementation()
 void AAssetModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		UAssetManagerBase::Get().ReleaseRuntimeData();
+	}
 }
 
 bool AAssetModule::HasDataAsset(FName InName) const

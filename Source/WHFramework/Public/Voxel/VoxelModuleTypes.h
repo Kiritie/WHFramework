@@ -189,22 +189,59 @@ struct WHFRAMEWORK_API FVoxelMeshUVData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector2D UVCorner;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		UTexture2D* Texture;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector2D UVSpan;
+		FVector2D UVCorner;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+		FVector2D UVSpan;
+
+	UPROPERTY(Transient)
+		FVector2D UVOffset;
 
 	FORCEINLINE FVoxelMeshUVData()
 	{
+		Texture = nullptr;
 		UVCorner = FVector2D::ZeroVector;
 		UVSpan = FVector2D::UnitVector;
+		UVOffset = FVector2D::ZeroVector;
 	}
+};
 
-	FORCEINLINE FVoxelMeshUVData(FVector2D InUVCorner, FVector2D InUVSpan)
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelMeshData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bCustomMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MeshScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MeshOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
+	TArray<FVector> MeshVertices;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bCustomMesh == true"))
+	TArray<FVector> MeshNormals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVoxelMeshUVData> MeshUVDatas;
+
+	FORCEINLINE FVoxelMeshData()
 	{
-		UVCorner = InUVCorner;
-		UVSpan = InUVSpan;
+		bCustomMesh = false;
+		MeshScale = FVector::OneVector;
+		MeshOffset = FVector::ZeroVector;
+		MeshVertices = TArray<FVector>();
+		MeshNormals = TArray<FVector>();
+		MeshUVDatas.SetNum(6);
 	}
 };
 
@@ -383,20 +420,32 @@ public:
 	UMaterialInterface* UnlitMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 BlockPixelSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector2D BlockTexSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FVector2D BlockUVSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<UTexture2D*> Textures;
 
 	FORCEINLINE FVoxelChunkMaterial()
 	{
 		Material = nullptr;
 		UnlitMaterial = nullptr;
+		BlockPixelSize = 16;
+		BlockTexSize = FVector2D(16, 1);
 		BlockUVSize = FVector2D(0.0625f, 0.5f);
+		Textures = TArray<UTexture2D*>();
 	}
 
-	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, FVector2D InBlockUVSize)
+	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelChunkMaterial()
 	{
 		Material = InMaterial;
 		UnlitMaterial = InUnlitMaterial;
-		BlockUVSize = InBlockUVSize;
+		BlockPixelSize = InBlockPixelSize;
 	}
 };
 
@@ -469,7 +518,7 @@ public:
 		PlantScale = FVector4(0.6f, 0.6f, 0.5f, 0.5f);
 		TreeScale = FVector4(0.8f, 0.8f, 0.5f, 0.04f);
 
-		ChunkMaterials = TArray<FVoxelChunkMaterial>();
+		ChunkMaterials = TMap<EVoxelTransparency, FVoxelChunkMaterial>();
 
 		TimeSeconds = -1.f;
 		SecondsOfDay = 600.f;
@@ -522,7 +571,7 @@ public:
 	FVector4 TreeScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FVoxelChunkMaterial> ChunkMaterials;
+	TMap<EVoxelTransparency, FVoxelChunkMaterial> ChunkMaterials;
 		
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	float TimeSeconds;
@@ -544,16 +593,6 @@ public:
 	FORCEINLINE FVector GetWorldRealSize() const
 	{
 		return GetWorldSize() * ChunkSize * BlockSize;
-	}
-
-	FORCEINLINE FVoxelChunkMaterial GetChunkMaterial(EVoxelTransparency InTransparency) const
-	{
-		const int32 Index = FMath::Clamp((int32)InTransparency, 0, ChunkMaterials.Num());
-		if(ChunkMaterials.IsValidIndex(Index))
-		{
-			return ChunkMaterials[Index];
-		}
-		return FVoxelChunkMaterial();
 	}
 
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const

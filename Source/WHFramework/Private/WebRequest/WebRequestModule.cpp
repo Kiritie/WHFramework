@@ -201,7 +201,12 @@ void AWebRequestModule::ClearAllWebInterface()
 	WebInterfaceMap.Empty();
 }
 
-bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
+{
+	return SendWebRequest(InClass, InMethod, InParams ? *InParams : TArray<FParameter>(), InHeadMap, InContent);
+}
+
+bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
 	if(!InClass) return false;
 
@@ -229,6 +234,11 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, E
 				ContentType = TEXT("application/json; charset=utf-8");
 				break;
 			}
+			case EWebContentType::Data:
+			{
+				ContentType = TEXT("multipart/form-data; charset=utf-8; boundary =---------------------------" + FString::FromInt(FDateTime::Now().GetTicks()));
+				break;
+			}
 		}
 		InHeadMap.Add(TEXT("Content-Type"), ContentType);
 		InHeadMap.Add(TEXT("timestamp"), FString::FromInt(FDateTime::UtcNow().ToUnixTimestamp()));
@@ -242,7 +252,7 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, E
 
 		HttpRequest->SetVerb(UGlobalBPLibrary::GetEnumValueDisplayName(TEXT("/Script/WHFramework.EWebRequestMethod"), (int32)InMethod).ToString());
 
-		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString());
+		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString(), InParams);
 
 		WHLog(FString::Printf(TEXT("Start send web request: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
 		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDebugCategory::WebRequest);
@@ -260,12 +270,12 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, E
 	return false;
 }
 
-bool AWebRequestModule::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent)
+bool AWebRequestModule::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return SendWebRequest(InClass, InMethod, InHeadMap, InContent);
+	return SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
 }
 
-void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent)
+void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams)
 {
 	if(!HttpResponse.IsValid())
 	{
@@ -303,5 +313,5 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDebugCategory::WebRequest, EDebugVerbosity::Error);
 	}
 
-	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse));
+	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse), InParams);
 }
