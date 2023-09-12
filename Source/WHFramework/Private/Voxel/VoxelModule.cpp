@@ -157,7 +157,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 				{
 					if(Iter3.Texture && WorldBasicData.ChunkMaterials.Contains(Iter1->Transparency))
 					{
-						const int32 TexIndex = WorldBasicData.ChunkMaterials[Iter1->Transparency].Textures.AddUnique(Iter3.Texture);
+						const int32 TexIndex = WorldBasicData.ChunkMaterials[Iter1->Transparency].BlockTextures.AddUnique(Iter3.Texture);
 						Iter3.UVOffset = FVector2D(TexIndex % 16, TexIndex / 16);
 					}
 				}
@@ -165,10 +165,12 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		}
 		for(auto& Iter : WorldBasicData.ChunkMaterials)
 		{
-			Iter.Value.BlockTexSize = FVector2D(Iter.Value.BlockPixelSize * 16, (Iter.Value.Textures.Num() / 16 + 1) * Iter.Value.BlockPixelSize);
+			Iter.Value.BlockTexSize = FVector2D(Iter.Value.BlockPixelSize * 16, (Iter.Value.BlockTextures.Num() / 16 + 1) * Iter.Value.BlockPixelSize);
 
-			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.BlockTexSize))
+			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.BlockTextures, Iter.Value.BlockTexSize))
 			{
+				Iter.Value.CombineTexture = Texture;
+				
 				Iter.Value.BlockUVSize = FVector2D(Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.X, Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.Y);
 			
 				UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);

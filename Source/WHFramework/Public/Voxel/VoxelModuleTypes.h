@@ -429,13 +429,16 @@ public:
 	FVector2D BlockUVSize;
 
 	UPROPERTY(VisibleAnywhere, Transient)
-	TArray<UTexture2D*> Textures;
-
-	UPROPERTY(VisibleAnywhere, Transient)
 	UMaterialInstance* MaterialInst;
 
 	UPROPERTY(VisibleAnywhere, Transient)
 	UMaterialInstance* UnlitMaterialInst;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	TArray<UTexture2D*> BlockTextures;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	UTexture2D* CombineTexture;
 
 	FORCEINLINE FVoxelChunkMaterial()
 	{
@@ -444,9 +447,10 @@ public:
 		BlockPixelSize = 16;
 		BlockTexSize = FVector2D::ZeroVector;
 		BlockUVSize = FVector2D::ZeroVector;
-		Textures = TArray<UTexture2D*>();
 		MaterialInst = nullptr;
 		UnlitMaterialInst = nullptr;
+		BlockTextures = TArray<UTexture2D*>();
+		CombineTexture = nullptr;
 	}
 
 	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelChunkMaterial()

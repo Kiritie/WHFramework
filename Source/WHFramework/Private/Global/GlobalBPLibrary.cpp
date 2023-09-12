@@ -440,7 +440,8 @@ UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
         // 只有长宽与纹理格式都符号模板才有效
         bIsInvalid |= SourcePlatformData->SizeX != TemplatePlatformData->SizeX;
         bIsInvalid |= SourcePlatformData->SizeY != TemplatePlatformData->SizeY;
-        bIsInvalid |= SourcePlatformData->PixelFormat != PixelFormat;
+    	bIsInvalid |= SourcePlatformData->PixelFormat != PixelFormat;
+    	bIsInvalid |= SourcePlatformData->Mips.Num() != TemplatePlatformData->Mips.Num();
 
         if (!bIsInvalid)
         {
@@ -460,26 +461,19 @@ UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
     // 遍历每个Mip层
     for (int32 MipIndex = 0; MipIndex < TemplatePlatformData->Mips.Num(); ++MipIndex)
     {
-        // 确保当前Mip层对象存在
-        if (!PlatformData->Mips.IsValidIndex(MipIndex))
-        {
-            check(PlatformData->Mips.Num() == MipIndex);
-
-            PlatformData->Mips.Add(new FTexture2DMipMap());
-        }
-
         // 取得纹理数组中的Mip层对象
-        FTexture2DMipMap& Mip = PlatformData->Mips[MipIndex];
+    	FTexture2DMipMap* Mip = new FTexture2DMipMap();
+    	PlatformData->Mips.Add(Mip);
 
         // 设置当前Mip层长宽及元素数
-        Mip.SizeX = SizeX;
-    	Mip.SizeY = SizeY;
+        Mip->SizeX = SizeX;
+    	Mip->SizeY = SizeY;
 
         // 以读写方式锁定当前Mip层
-        Mip.BulkData.Lock(LOCK_READ_WRITE);
+        Mip->BulkData.Lock(LOCK_READ_WRITE);
 
         // 重置Mip层到所需大小
-        void* BulkData = Mip.BulkData.Realloc(NumBlocksX * NumBlocksY * PixelFormatInfo.BlockBytes);
+        void* BulkData = Mip->BulkData.Realloc(NumBlocksX * NumBlocksY * PixelFormatInfo.BlockBytes);
 
         // 遍历每个纹理元素
         for (int32 SliceIndex = 0; SliceIndex < Textures.Num(); ++SliceIndex)
@@ -506,7 +500,7 @@ UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
         }
 
         // 解锁当前Mip层
-        Mip.BulkData.Unlock();
+        Mip->BulkData.Unlock();
     }
 
     // 更新纹理数组渲染资源
