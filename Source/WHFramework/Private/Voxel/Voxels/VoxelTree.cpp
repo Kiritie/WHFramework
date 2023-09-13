@@ -26,7 +26,7 @@ void UVoxelTree::OnReset_Implementation()
 void UVoxelTree::LoadData(const FString& InData)
 {
 	TArray<FString> Datas;
-	InData.ParseIntoArray(Datas, TEXT("|"));
+	InData.ParseIntoArray(Datas, TEXT(";"));
 	TreePart = (EVoxelTreePart)FCString::Atoi(*Datas[0]);
 	switch (TreePart)
 	{
@@ -47,7 +47,7 @@ FString UVoxelTree::ToData()
 	{
 		case EVoxelTreePart::Root:
 		{
-			return FString::Printf(TEXT("%d|%d|%d|%d"), TreePart, TreeHeight, LeavesHeight, LeavesWidth);
+			return FString::Printf(TEXT("%d;%d;%d;%d"), TreePart, TreeHeight, LeavesHeight, LeavesWidth);
 		}
 		case EVoxelTreePart::Bole:
 		case EVoxelTreePart::Leaves:

@@ -221,7 +221,7 @@ public:
 	static void SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath);
 
 	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
-	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize);
+	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize, UTexture2D* InTemplate = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Blueprint

@@ -102,19 +102,19 @@ AVoxelModule::AVoxelModule()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Solid_Unlit.M_Voxels_Solid_Unlit'"));
 	if(SolidMatFinder.Succeeded() && UnlitSolidMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::Solid, FVoxelChunkMaterial(SolidMatFinder.Object, UnlitSolidMatFinder.Object));
+		WorldBasicData.RenderDatas.Add(EVoxelTransparency::Solid, FVoxelRenderData(SolidMatFinder.Object, UnlitSolidMatFinder.Object));
 	}
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent.M_Voxels_SemiTransparent'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSemiTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_SemiTransparent_Unlit.M_Voxels_SemiTransparent_Unlit'"));
 	if(SemiTransparentMatFinder.Succeeded() && UnlitSemiTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::SemiTransparent, FVoxelChunkMaterial(SemiTransparentMatFinder.Object, UnlitSemiTransparentMatFinder.Object));
+		WorldBasicData.RenderDatas.Add(EVoxelTransparency::SemiTransparent, FVoxelRenderData(SemiTransparentMatFinder.Object, UnlitSemiTransparentMatFinder.Object));
 	}
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent.M_Voxels_Transparent'"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitTransparentMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxels_Transparent_Unlit.M_Voxels_Transparent_Unlit'"));
 	if(TransparentMatFinder.Succeeded() && UnlitTransparentMatFinder.Succeeded())
 	{
-		WorldBasicData.ChunkMaterials.Add(EVoxelTransparency::Transparent, FVoxelChunkMaterial(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object));
+		WorldBasicData.RenderDatas.Add(EVoxelTransparency::Transparent, FVoxelRenderData(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object));
 	}
 }
 
@@ -155,24 +155,21 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 			{
 				for(auto& Iter3 : Iter2.MeshUVDatas)
 				{
-					if(Iter3.Texture && WorldBasicData.ChunkMaterials.Contains(Iter1->Transparency))
+					if(Iter3.Texture && WorldBasicData.RenderDatas.Contains(Iter1->Transparency))
 					{
-						const int32 TexIndex = WorldBasicData.ChunkMaterials[Iter1->Transparency].BlockTextures.AddUnique(Iter3.Texture);
-						Iter3.UVOffset = FVector2D(TexIndex % 16, TexIndex / 16);
+						Iter3.UVOffset = FVector2D(0.f, WorldBasicData.RenderDatas[Iter1->Transparency].Textures.AddUnique(Iter3.Texture));
 					}
 				}
 			}
 		}
-		for(auto& Iter : WorldBasicData.ChunkMaterials)
+		for(auto& Iter : WorldBasicData.RenderDatas)
 		{
-			Iter.Value.BlockTexSize = FVector2D(Iter.Value.BlockPixelSize * 16, (Iter.Value.BlockTextures.Num() / 16 + 1) * Iter.Value.BlockPixelSize);
+			Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
 
-			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.BlockTextures, Iter.Value.BlockTexSize))
+			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
 			{
 				Iter.Value.CombineTexture = Texture;
 				
-				Iter.Value.BlockUVSize = FVector2D(Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.X, Iter.Value.BlockPixelSize / Iter.Value.BlockTexSize.Y);
-			
 				UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
 				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
 				Iter.Value.MaterialInst = MatInst;
@@ -290,6 +287,8 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetWorldMode(EVoxelWorldMode::Preview);
 
 		WorldData = NewWorldData(InSaveData);
+
+		WorldData->RenderDatas = WorldBasicData.RenderDatas;
 		
 		if(WorldData->WorldSeed == 0)
 		{

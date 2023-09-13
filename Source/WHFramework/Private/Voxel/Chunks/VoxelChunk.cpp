@@ -805,35 +805,35 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	const auto& WorldData = AVoxelModule::Get()->GetWorldData();
 	if(InX < 0)
 	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Backward, !bGenerate))
+		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
 		{
 			return Chunk->SetVoxelComplex(InX + WorldData.ChunkSize.X, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InX >= WorldData.ChunkSize.X)
 	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Forward, !bGenerate))
+		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
 		{
 			return Chunk->SetVoxelComplex(InX - WorldData.ChunkSize.X, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY < 0)
 	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Left, !bGenerate))
+		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
 		{
 			return Chunk->SetVoxelComplex(InX, InY + WorldData.ChunkSize.Y, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY >= WorldData.ChunkSize.Y)
 	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Right, !bGenerate))
+		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			return Chunk->SetVoxelComplex(InX, InY - WorldData.ChunkSize.Y, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InZ < 0)
 	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Down, !bGenerate))
+		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Down))
 		{
 			return Chunk->SetVoxelComplex(InX, InY, InZ + WorldData.ChunkSize.Z, InVoxelItem, bGenerate, InAgent);
 		}

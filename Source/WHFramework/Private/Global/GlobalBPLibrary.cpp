@@ -387,17 +387,18 @@ void UGlobalBPLibrary::SaveTextureToFile(UTexture2D* InTexture, const FString& I
 	}
 }
 
-UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize)
+UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize, UTexture2D* InTemplate)
 {
 	if(InTextures.Num() == 0) return nullptr;
 
-	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient );
-
     // 获取模板纹理
-    UTexture2D* TemplateTexture = InTextures[0];
+    UTexture2D* TemplateTexture = InTemplate ? InTemplate : InTextures[0];
 
     // 得到模板纹理的平台数据
-    const FTexturePlatformData* TemplatePlatformData = TemplateTexture->GetPlatformData();
+    FTexturePlatformData* TemplatePlatformData = TemplateTexture->GetPlatformData();
+
+	const int32 TemplateSizeX = TemplatePlatformData->SizeX;
+	const int32 TemplateSizeY = TemplatePlatformData->SizeY;
 
 	// 取得模板纹理的像素格式
 	const EPixelFormat PixelFormat = TemplatePlatformData->PixelFormat;
@@ -407,106 +408,126 @@ UTexture2D* UGlobalBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
     const int32 SizeX = InTexSize.X;
     const int32 SizeY = InTexSize.Y;
 
-	const int32 TemplateSizeX = TemplatePlatformData->SizeX;
-	const int32 TemplateSizeY = TemplatePlatformData->SizeY;
+	if(ensureEditorMsgf(SizeX > 0 && SizeY > 0 &&
+		(SizeX % PixelFormatInfo.BlockSizeX) == 0 &&
+		(SizeY % PixelFormatInfo.BlockSizeY) == 0, TEXT("Invalid size and/or pixel format for new texture")))
+	{
+		UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient );
 
-	const int32 NumSlicesX = SizeX / TemplateSizeX;
-	const int32 NumSlicesY = SizeY / TemplateSizeY;
+		const int32 NumSlicesX = SizeX / TemplateSizeX;
+		const int32 NumSlicesY = SizeY / TemplateSizeY;
 
-	// 设置一般属性
-	Texture->AddressX = TemplateTexture->AddressX;
-	Texture->AddressY = TemplateTexture->AddressY;
-	Texture->SRGB = TemplateTexture->SRGB;
-	Texture->Filter = TemplateTexture->Filter;
-	Texture->LODGroup = TemplateTexture->LODGroup;
-	Texture->MipGenSettings = TemplateTexture->MipGenSettings;
-	Texture->MipLoadOptions = TemplateTexture->MipLoadOptions;
-	Texture->CompressionSettings = TemplateTexture->CompressionSettings;
+		// 设置一般属性
+		Texture->AddressX = TemplateTexture->AddressX;
+		Texture->AddressY = TemplateTexture->AddressY;
+		Texture->SRGB = TemplateTexture->SRGB;
+		Texture->Filter = TemplateTexture->Filter;
+		Texture->LODGroup = TemplateTexture->LODGroup;
+		Texture->MipGenSettings = TemplateTexture->MipGenSettings;
+		Texture->MipLoadOptions = TemplateTexture->MipLoadOptions;
+		Texture->CompressionSettings = TemplateTexture->CompressionSettings;
 
-	const int32 NumBlocksX = SizeX / PixelFormatInfo.BlockSizeX;
-	const int32 NumBlocksY = SizeY / PixelFormatInfo.BlockSizeY;
+		const int32 NumBlockBytes = PixelFormatInfo.BlockBytes;
 
-	const int32 TemplateNumBlocksX = TemplateSizeX / PixelFormatInfo.BlockSizeX;
-	const int32 TemplateNumBlocksY = TemplateSizeY / PixelFormatInfo.BlockSizeY;
+		const int32 NumBlocksX = SizeX / PixelFormatInfo.BlockSizeX;
+		const int32 NumBlocksY = SizeY / PixelFormatInfo.BlockSizeY;
 
-	TArray<UTexture2D*> Textures;
-    // 筛选有效的纹理
-    for (auto Item : InTextures)
-    {
-        const FTexturePlatformData* SourcePlatformData = Item->GetPlatformData();
+		const int32 TemplateNumBlocksX = TemplateSizeX / PixelFormatInfo.BlockSizeX;
+		const int32 TemplateNumBlocksY = TemplateSizeY / PixelFormatInfo.BlockSizeY;
 
-        bool bIsInvalid = false;
+		TArray<UTexture2D*> SliceTextures;
+		// 筛选有效的纹理
+		for (auto Item : InTextures)
+		{
+			const FTexturePlatformData* SourcePlatformData = Item->GetPlatformData();
 
-        // 只有长宽与纹理格式都符号模板才有效
-        bIsInvalid |= SourcePlatformData->SizeX != TemplatePlatformData->SizeX;
-        bIsInvalid |= SourcePlatformData->SizeY != TemplatePlatformData->SizeY;
-    	bIsInvalid |= SourcePlatformData->PixelFormat != PixelFormat;
-    	bIsInvalid |= SourcePlatformData->Mips.Num() != TemplatePlatformData->Mips.Num();
+			bool bIsInvalid = false;
 
-        if (!bIsInvalid)
-        {
-            Textures.AddUnique(Item);
-        }
-    }
+			// 只有长宽与纹理格式都符号模板才有效
+			bIsInvalid |= SourcePlatformData->SizeX != TemplatePlatformData->SizeX;
+			bIsInvalid |= SourcePlatformData->SizeY != TemplatePlatformData->SizeY;
+			bIsInvalid |= SourcePlatformData->PixelFormat != PixelFormat;
+			bIsInvalid |= SourcePlatformData->Mips.Num() != TemplatePlatformData->Mips.Num();
 
-	// 获取纹理数组的平台数据
-	FTexturePlatformData* PlatformData = new FTexturePlatformData();
-	Texture->SetPlatformData(PlatformData);
+			if (!bIsInvalid)
+			{
+				SliceTextures.AddUnique(Item);
+			}
+		}
 
-    // 设置纹理长宽元素数与像素格式
-    PlatformData->SizeX = SizeX;
-    PlatformData->SizeY = SizeY;
-    PlatformData->PixelFormat = PixelFormat;
+		// 纹理切片数量
+		const int32 NumSlices = SliceTextures.Num();
 
-    // 遍历每个Mip层
-    for (int32 MipIndex = 0; MipIndex < TemplatePlatformData->Mips.Num(); ++MipIndex)
-    {
-        // 取得纹理数组中的Mip层对象
-    	FTexture2DMipMap* Mip = new FTexture2DMipMap();
-    	PlatformData->Mips.Add(Mip);
+		// 获取纹理数组的平台数据
+		FTexturePlatformData* PlatformData = new FTexturePlatformData();
+		Texture->SetPlatformData(PlatformData);
 
-        // 设置当前Mip层长宽及元素数
-        Mip->SizeX = SizeX;
-    	Mip->SizeY = SizeY;
+		// 设置纹理长宽元素数与像素格式
+		PlatformData->SizeX = SizeX;
+		PlatformData->SizeY = SizeY;
+		PlatformData->SetNumSlices(1);
+		PlatformData->PixelFormat = PixelFormat;
 
-        // 以读写方式锁定当前Mip层
-        Mip->BulkData.Lock(LOCK_READ_WRITE);
+		// 遍历每个Mip层
+		for (int32 MipIndex = 0; MipIndex < TemplatePlatformData->Mips.Num(); ++MipIndex)
+		{
+			// 取得纹理数组中的Mip层对象
+			FTexture2DMipMap* Mip = new FTexture2DMipMap();
+			PlatformData->Mips.Add(Mip);
 
-        // 重置Mip层到所需大小
-        void* BulkData = Mip->BulkData.Realloc(NumBlocksX * NumBlocksY * PixelFormatInfo.BlockBytes);
+			// 设置当前Mip层长宽及元素数
+			Mip->SizeX = SizeX;
+			Mip->SizeY = SizeY;
+			Mip->SizeZ = 1;
 
-        // 遍历每个纹理元素
-        for (int32 SliceIndex = 0; SliceIndex < Textures.Num(); ++SliceIndex)
-        {
-            // 获取源纹理平台数据
-            FTexturePlatformData* SourcePlatformData = Textures[SliceIndex]->GetPlatformData();
+			// 以读写方式锁定当前Mip层
+			Mip->BulkData.Lock(LOCK_READ_WRITE);
 
-            // 获取源纹理对应Mip层
-            FTexture2DMipMap& SourceMip = SourcePlatformData->Mips[MipIndex];
+			// 重置Mip层到所需大小
+			void* BulkData = Mip->BulkData.Realloc((int64)NumBlocksX * NumBlocksY * NumBlockBytes);
 
-            // 以只读方式锁定源纹理Mip层
-            const void* SourceBulkData = SourceMip.BulkData.Lock(LOCK_READ_ONLY);
+			// 遍历每个纹理元素
+			for (int32 SliceIndex = 0; SliceIndex < NumSlicesX * NumSlicesY; ++SliceIndex)
+			{
+				// 获取源纹理平台数据
+				FTexturePlatformData* SourcePlatformData = SliceIndex < NumSlices ? SliceTextures[SliceIndex]->GetPlatformData() : TemplatePlatformData;
+        
+				// 获取源纹理对应Mip层
+				FTexture2DMipMap& SourceMip = SourcePlatformData->Mips[MipIndex];
+        
+				// 以只读方式锁定源纹理Mip层
+				const void* SourceBulkData = SourceMip.BulkData.Lock(LOCK_READ_ONLY);
+        
+				// 从源纹理复制数据到纹理数组中
+				if (NumSlicesX > 1)
+				{
+					for(int32 SourceByteYIndex = 0; SourceByteYIndex < TemplateNumBlocksY * NumBlockBytes; SourceByteYIndex++)
+					{
+						FMemory::Memcpy((uint8*)BulkData + (SliceIndex / NumSlicesX * NumBlocksX * TemplateNumBlocksY * NumBlockBytes +
+							SliceIndex % NumSlicesX * TemplateNumBlocksX * NumBlockBytes + NumBlocksX * SourceByteYIndex * NumBlockBytes),
+							(uint8*)SourceBulkData + SourceByteYIndex * TemplateNumBlocksX * NumBlockBytes, TemplateNumBlocksX * NumBlockBytes);
+					}
+				}
+				else
+				{
+					FMemory::Memcpy((uint8*)BulkData + SliceIndex * TemplateNumBlocksX * TemplateNumBlocksY * NumBlockBytes,
+						SourceBulkData, TemplateNumBlocksX * TemplateNumBlocksY * NumBlockBytes);
+				}
+        
+				// 解锁源纹理Mip层
+				SourceMip.BulkData.Unlock();
+			}
 
-        	for(int32 TemplateByteYIndex = 0; TemplateByteYIndex < TemplateNumBlocksY * PixelFormatInfo.BlockBytes; TemplateByteYIndex++)
-        	{
-        		// 从源纹理复制数据到纹理数组中
-        		FMemory::Memcpy((uint8*)BulkData + (((NumSlicesY - SliceIndex / NumSlicesX - 1) * NumBlocksX * TemplateNumBlocksY * PixelFormatInfo.BlockBytes) +
-        			((SliceIndex % NumSlicesX) * TemplateNumBlocksX * PixelFormatInfo.BlockBytes) + (NumBlocksX * PixelFormatInfo.BlockBytes * TemplateByteYIndex)),
-        			(uint8*)SourceBulkData + (TemplateNumBlocksX * PixelFormatInfo.BlockBytes * TemplateByteYIndex), TemplateNumBlocksX * PixelFormatInfo.BlockBytes);
-        	}
+			// 解锁当前Mip层
+			Mip->BulkData.Unlock();
+		}
 
-            // 解锁源纹理Mip层
-            SourceMip.BulkData.Unlock();
-        }
-
-        // 解锁当前Mip层
-        Mip->BulkData.Unlock();
-    }
-
-    // 更新纹理数组渲染资源
-    Texture->UpdateResource();
+		// 更新纹理数组渲染资源
+		Texture->UpdateResource();
 	
-	return Texture;
+		return Texture;
+	}
+	return nullptr;
 }
 
 bool UGlobalBPLibrary::IsImplementedInBlueprint(const UFunction* Func)

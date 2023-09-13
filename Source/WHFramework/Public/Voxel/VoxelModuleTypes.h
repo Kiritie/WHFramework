@@ -190,16 +190,16 @@ struct WHFRAMEWORK_API FVoxelMeshUVData
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-		UTexture2D* Texture;
+	UTexture2D* Texture;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-		FVector2D UVCorner;
+	FVector2D UVCorner;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-		FVector2D UVSpan;
+	FVector2D UVSpan;
 
 	UPROPERTY(Transient)
-		FVector2D UVOffset;
+	FVector2D UVOffset;
 
 	FORCEINLINE FVoxelMeshUVData()
 	{
@@ -304,9 +304,9 @@ public:
 		bGenerated = false;
 	}
 
-	FVoxelItem(EVoxelType InVoxelType, bool bRefreshData = false);
+	FVoxelItem(EVoxelType InVoxelType);
 
-	FVoxelItem(const FPrimaryAssetId& InID, bool bRefreshData = false);
+	FVoxelItem(const FPrimaryAssetId& InID);
 
 	FVoxelItem(const FString& InSaveData);
 
@@ -408,7 +408,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelChunkMaterial
+struct WHFRAMEWORK_API FVoxelRenderData
 {
 	GENERATED_BODY()
 
@@ -420,44 +420,40 @@ public:
 	UMaterialInterface* UnlitMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 BlockPixelSize;
+	int32 PixelSize;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector2D BlockTexSize;
+	FVector2D TextureSize;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector2D BlockUVSize;
-
-	UPROPERTY(VisibleAnywhere, Transient)
-	UMaterialInstance* MaterialInst;
-
-	UPROPERTY(VisibleAnywhere, Transient)
-	UMaterialInstance* UnlitMaterialInst;
-
-	UPROPERTY(VisibleAnywhere, Transient)
-	TArray<UTexture2D*> BlockTextures;
-
-	UPROPERTY(VisibleAnywhere, Transient)
+	UPROPERTY(Transient)
 	UTexture2D* CombineTexture;
 
-	FORCEINLINE FVoxelChunkMaterial()
+	UPROPERTY(Transient)
+	TArray<UTexture2D*> Textures;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* MaterialInst;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* UnlitMaterialInst;
+
+	FORCEINLINE FVoxelRenderData()
 	{
 		Material = nullptr;
 		UnlitMaterial = nullptr;
-		BlockPixelSize = 16;
-		BlockTexSize = FVector2D::ZeroVector;
-		BlockUVSize = FVector2D::ZeroVector;
+		PixelSize = 16;
+		TextureSize = FVector2D::ZeroVector;
+		CombineTexture = nullptr;
+		Textures = TArray<UTexture2D*>();
 		MaterialInst = nullptr;
 		UnlitMaterialInst = nullptr;
-		BlockTextures = TArray<UTexture2D*>();
-		CombineTexture = nullptr;
 	}
 
-	FORCEINLINE FVoxelChunkMaterial(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelChunkMaterial()
+	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
 	{
 		Material = InMaterial;
 		UnlitMaterial = InUnlitMaterial;
-		BlockPixelSize = InBlockPixelSize;
+		PixelSize = InBlockPixelSize;
 	}
 };
 
@@ -530,7 +526,7 @@ public:
 		PlantScale = FVector4(0.6f, 0.6f, 0.5f, 0.5f);
 		TreeScale = FVector4(0.8f, 0.8f, 0.5f, 0.04f);
 
-		ChunkMaterials = TMap<EVoxelTransparency, FVoxelChunkMaterial>();
+		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
 
 		TimeSeconds = -1.f;
 		SecondsOfDay = 600.f;
@@ -581,10 +577,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector4 TreeScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelTransparency, FVoxelChunkMaterial> ChunkMaterials;
 		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	float TimeSeconds;
 		
@@ -730,6 +726,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 Speed;
 
+	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
 		
 	TArray<FAsyncTask<AsyncTask_ChunkQueue>*> Tasks;
