@@ -135,7 +135,7 @@ protected:
 	FPrimaryAssetId GenerateVoxelID;
 
 public:
-	virtual FVector GetWorldLocation() const override { return GetActorLocation(); }
+	virtual FVector GetAgentLocation() const override { return GetActorLocation(); }
 
 	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
 

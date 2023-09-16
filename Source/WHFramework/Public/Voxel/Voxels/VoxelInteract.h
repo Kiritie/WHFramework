@@ -3,19 +3,18 @@
 #pragma once
 
 #include "Voxel.h"
-#include "VoxelInteract.h"
-#include "VoxelTorch.generated.h"
+#include "VoxelInteract.generated.h"
 
 /**
- * ���ػ��
+ * ����ֲ��
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelTorch : public UVoxelInteract
+class WHFRAMEWORK_API UVoxelInteract : public UVoxel
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelTorch();
+	UVoxelInteract();
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
@@ -42,9 +41,19 @@ public:
 	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Torch
+	// Interact
 public:
-	virtual void Open() override;
+	virtual void Toggle();
 
-	virtual void Close() override;
+	virtual void Open();
+
+	virtual void Close();
+
+protected:
+	UPROPERTY(VisibleAnywhere)
+	bool bOpened;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsOpened() const { return bOpened; }
 };

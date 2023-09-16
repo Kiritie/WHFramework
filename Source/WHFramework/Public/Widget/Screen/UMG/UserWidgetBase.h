@@ -67,11 +67,6 @@ public:
 	void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
-	bool Initialize() override;
-
-	UFUNCTION(BlueprintCallable)
-	void Initialize(UObject* InOwner) override;
-	
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))

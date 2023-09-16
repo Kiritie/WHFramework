@@ -89,7 +89,7 @@ void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 		}
 	}
 
-	for(auto Iter : ChildNames)
+	for(const auto& Iter : ChildNames)
 	{
 		if(UWidgetModuleBPLibrary::HasUserWidgetClassByName(Iter))
 		{
@@ -105,6 +105,11 @@ void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 void UUserWidgetBase::OnInitialize_Implementation(UObject* InOwner)
 {
 	OwnerObject = InOwner;
+	
+	for(auto Iter : ChildWidgets)
+	{
+		Iter->OnInitialize(InOwner);
+	}
 }
 
 void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
@@ -238,16 +243,6 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 void UUserWidgetBase::OnStateChanged_Implementation(EScreenWidgetState InWidgetState)
 {
 	OnWidgetStateChanged.Broadcast(InWidgetState);
-}
-
-bool UUserWidgetBase::Initialize()
-{
-	return Super::Initialize();
-}
-
-void UUserWidgetBase::Initialize(UObject* InOwner)
-{
-	UWidgetModuleBPLibrary::InitializeUserWidget<UUserWidgetBase>(InOwner, GetClass());
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)

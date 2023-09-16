@@ -126,7 +126,7 @@ FQueryItemInfo UInventory::QueryItemByRange(EQueryItemType InQueryType, FAbility
 {
 	if (!InItem.IsValid()) return FQueryItemInfo();
 
-	int32 StartIndex = 0;
+	int32 StartIndex;
 	if (InStartIndex == -1) StartIndex = GetSelectedSlot() ? Slots.IndexOfByKey(GetSelectedSlot()) : 0;
 	else StartIndex = FMath::Clamp(InStartIndex, 0, Slots.Num() - 1);
 	if(InEndIndex != -1) InEndIndex = FMath::Clamp(InEndIndex, InStartIndex, Slots.Num() - 1);
@@ -259,23 +259,27 @@ void UInventory::AddItemBySlots(FAbilityItem& InItem, const TArray<UInventorySlo
 		InSlots[i]->AddItem(InItem);
 		if (InItem.Count <= 0) break;
 	}
+	if(InItem.IsValid(true))
+	{
+		GetOwnerAgent()->OnDiscardItem(InItem, false);
+	}
 }
 
 void UInventory::AddItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex)
 {
-	auto QueryItemInfo = QueryItemByRange(EQueryItemType::Add, InItem, InStartIndex, InEndIndex);
+	const auto QueryItemInfo = QueryItemByRange(EQueryItemType::Add, InItem, InStartIndex, InEndIndex);
 	AddItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
 void UInventory::AddItemBySplitType(FAbilityItem& InItem, ESplitSlotType InSplitSlotType)
 {
-	auto QueryItemInfo = QueryItemBySplitType(EQueryItemType::Add, InItem, InSplitSlotType);
+	const auto QueryItemInfo = QueryItemBySplitType(EQueryItemType::Add, InItem, InSplitSlotType);
 	AddItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
 void UInventory::AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESplitSlotType>& InSplitSlotTypes)
 {
-	auto QueryItemInfo = QueryItemBySplitTypes(EQueryItemType::Add, InItem, InSplitSlotTypes);
+	const auto QueryItemInfo = QueryItemBySplitTypes(EQueryItemType::Add, InItem, InSplitSlotTypes);
 	AddItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
@@ -295,19 +299,19 @@ void UInventory::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UInventory
 
 void UInventory::RemoveItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex)
 {
-	auto QueryItemInfo = QueryItemByRange(EQueryItemType::Remove, InItem, InStartIndex, InEndIndex);
+	const auto QueryItemInfo = QueryItemByRange(EQueryItemType::Remove, InItem, InStartIndex, InEndIndex);
 	RemoveItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
 void UInventory::RemoveItemBySplitType(FAbilityItem& InItem, ESplitSlotType InSplitSlotType)
 {
-	auto QueryItemInfo = QueryItemBySplitType(EQueryItemType::Remove, InItem, InSplitSlotType);
+	const auto QueryItemInfo = QueryItemBySplitType(EQueryItemType::Remove, InItem, InSplitSlotType);
 	RemoveItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
 void UInventory::RemoveItemBySplitTypes(FAbilityItem& InItem, const TArray<ESplitSlotType>& InSplitSlotTypes)
 {
-	auto QueryItemInfo = QueryItemBySplitTypes(EQueryItemType::Remove, InItem, InSplitSlotTypes);
+	const auto QueryItemInfo = QueryItemBySplitTypes(EQueryItemType::Remove, InItem, InSplitSlotTypes);
 	RemoveItemBySlots(InItem, QueryItemInfo.Slots);
 }
 
@@ -383,6 +387,19 @@ FAbilityItem& UInventory::GetSelectedItem() const
 		return GetSelectedSlot()->GetItem();
 	}
 	return FAbilityItem::Empty;
+}
+
+void UInventory::SetConnectInventory(UInventory* InInventory)
+{
+	if(InInventory)
+	{
+		InInventory->ConnectInventory = this;
+	}
+	else if(ConnectInventory)
+	{
+		ConnectInventory->ConnectInventory = nullptr;
+	}
+	ConnectInventory = InInventory;
 }
 
 int32 UInventory::GetSlotsNum() const

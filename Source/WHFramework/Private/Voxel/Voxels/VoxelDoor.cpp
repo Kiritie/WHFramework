@@ -13,24 +13,22 @@
 
 UVoxelDoor::UVoxelDoor()
 {
-	bOpened = false;
+	
 }
 
 void UVoxelDoor::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
-
-	bOpened = false;
 }
 
 void UVoxelDoor::LoadData(const FString& InData)
 {
-	bOpened = (bool)FCString::Atoi(*InData);
+	Super::LoadData(InData);
 }
 
 FString UVoxelDoor::ToData()
 {
-	return FString::FromInt(bOpened);
+	return Super::ToData();
 }
 
 void UVoxelDoor::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -65,54 +63,15 @@ void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 
 bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult)
 {
-	switch (InActionType)
-	{
-		case EVoxelInteractType::Action1:
-		{
-			return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
-		}
-		case EVoxelInteractType::Action2:
-		{
-			Toggle();
-			break;
-		}
-		default: break;
-	}
-	return false;
-}
-
-void UVoxelDoor::Toggle()
-{
-	if(!bOpened) Open();
-	else Close();
+	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
 }
 
 void UVoxelDoor::Open()
 {
-	bOpened = true;
-	RefreshData();
-	if(GetData().bMainPart)
-	{
-		for(auto Iter : GetItem().GetParts())
-		{
-			Iter.GetVoxel<UVoxelDoor>().Open();
-		}
-		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
-	}
+	Super::Open();
 }
 
 void UVoxelDoor::Close()
 {
-	bOpened = false;
-	RefreshData();
-	if(GetData().bMainPart)
-	{
-		for(auto Iter : GetItem().GetParts())
-		{ 
-			Iter.GetVoxel<UVoxelDoor>().Close();
-		}
-		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());
-	}
+	Super::Close();
 }

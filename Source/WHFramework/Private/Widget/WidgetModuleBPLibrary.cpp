@@ -69,15 +69,6 @@ UUserWidgetBase* UWidgetModuleBPLibrary::CreateUserWidgetByName(FName InName, UO
 	return nullptr;
 }
 
-bool UWidgetModuleBPLibrary::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
-{
-	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
-	{
-		return WidgetModule->InitializeUserWidget(InClass, InOwner);
-	}
-	return false;
-}
-
 bool UWidgetModuleBPLibrary::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())

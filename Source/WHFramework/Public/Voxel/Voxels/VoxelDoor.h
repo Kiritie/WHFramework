@@ -3,13 +3,14 @@
 #pragma once
 
 #include "Voxel.h"
+#include "VoxelInteract.h"
 #include "VoxelDoor.generated.h"
 
 /**
  * ������
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelDoor : public UVoxel
+class WHFRAMEWORK_API UVoxelDoor : public UVoxelInteract
 {
 	GENERATED_BODY()
 
@@ -43,17 +44,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Door
 public:
-	virtual void Toggle();
+	virtual void Open() override;
 
-	virtual void Open();
-
-	virtual void Close();
-
-protected:
-	UPROPERTY(VisibleAnywhere)
-	bool bOpened;
-
-public:
-	UFUNCTION(BlueprintPure)
-	bool IsOpened() const { return bOpened; }
+	virtual void Close() override;
 };

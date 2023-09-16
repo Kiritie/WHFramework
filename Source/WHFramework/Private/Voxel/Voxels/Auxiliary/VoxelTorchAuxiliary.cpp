@@ -37,8 +37,8 @@ void AVoxelTorchAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InPa
 	}
 }
 
-void AVoxelTorchAuxiliary::SetLightVisible(bool bNewVisible)
+void AVoxelTorchAuxiliary::SetLightVisible(bool bInVisible)
 {
-	LightComponent->SetVisibility(bNewVisible);
-	EffectComponent->SetVisibility(bNewVisible);
+	LightComponent->SetVisibility(bInVisible);
+	EffectComponent->SetVisibility(bInVisible);
 }

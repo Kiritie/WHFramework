@@ -54,7 +54,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		const UVoxelData& VoxelData = SaveData.GetVoxelData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(Auxiliary && !Auxiliary->IsA(VoxelData.AuxiliaryClass))
+			if(Auxiliary && Auxiliary->GetClass() != VoxelData.AuxiliaryClass)
 			{
 				DestroyAuxiliary();
 			}

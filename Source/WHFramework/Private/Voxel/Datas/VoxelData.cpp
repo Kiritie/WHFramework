@@ -9,7 +9,7 @@ UVoxelData::UVoxelData()
 	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel);
 	MaxCount = 64;
 	VoxelType = EVoxelType::Empty;
-	VoxelClass = nullptr;
+	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
 	Transparency = EVoxelTransparency::Solid;
 	bMainPart = true;

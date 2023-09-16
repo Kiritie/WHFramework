@@ -24,7 +24,7 @@ public:
 	virtual bool InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType);
 
 public:
-	virtual FVector GetWorldLocation() const = 0;
+	virtual FVector GetAgentLocation() const = 0;
 
 	virtual FPrimaryAssetId GetGenerateVoxelID() const = 0;
 

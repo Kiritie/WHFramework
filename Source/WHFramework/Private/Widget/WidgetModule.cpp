@@ -220,11 +220,6 @@ UUserWidgetBase* AWidgetModule::CreateUserWidgetByName(FName InName, UObject* In
 	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner);
 }
 
-bool AWidgetModule::InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
-{
-	return InitializeUserWidget<UUserWidgetBase>(InOwner, InClass);
-}
-
 bool AWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams,  bool bInstant)
 {
 	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, InClass);

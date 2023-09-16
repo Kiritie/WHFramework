@@ -22,7 +22,7 @@ public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
-	virtual void SetLightVisible(bool bNewVisible);
+	virtual void SetLightVisible(bool bInVisible);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

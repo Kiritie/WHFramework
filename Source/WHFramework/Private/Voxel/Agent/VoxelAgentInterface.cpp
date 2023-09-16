@@ -22,7 +22,7 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	VoxelItem.ID = GetGenerateVoxelID();
 	VoxelItem.Owner = Chunk;
 	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const FRotator Rotation = (VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f - GetWorldLocation()).ToOrientationRotator();
+	const FRotator Rotation = (GetAgentLocation() - VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f).ToOrientationRotator();
 	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
 	
 	TArray<AActor*> IgnoreActors;
@@ -56,6 +56,5 @@ bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 
 bool IVoxelAgentInterface::InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType)
 {
-	InVoxelHitResult.GetVoxel().OnAgentInteract(this, InInteractType, InVoxelHitResult);
-	return false;
+	return InVoxelHitResult.GetVoxel().OnAgentInteract(this, InInteractType, InVoxelHitResult);
 }

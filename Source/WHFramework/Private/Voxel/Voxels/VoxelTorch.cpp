@@ -8,24 +8,21 @@
 
 UVoxelTorch::UVoxelTorch()
 {
-	bOn = true;
 }
 
 void UVoxelTorch::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
-
-	bOn = true;
 }
 
 void UVoxelTorch::LoadData(const FString& InData)
 {
-	bOn = (bool)FCString::Atoi(*InData);
+	Super::LoadData(InData);
 }
 
 FString UVoxelTorch::ToData()
 {
-	return FString::FromInt(bOn);
+	return Super::ToData();
 }
 
 void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -34,7 +31,7 @@ void UVoxelTorch::OnGenerate(IVoxelAgentInterface* InAgent)
 
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOpened);
 	}
 }
 
@@ -65,43 +62,25 @@ void UVoxelTorch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 
 bool UVoxelTorch::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult)
 {
-	switch (InActionType)
-	{
-		case EVoxelInteractType::Action1:
-		{
-			return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
-		}
-		case EVoxelInteractType::Action2:
-		{
-			Toggle();
-		}
-		default: break;
-	}
-	return false;
+	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
 }
 
-void UVoxelTorch::Toggle()
+void UVoxelTorch::Open()
 {
-	if(!bOn) TakeOn();
-	else TakeOff();
-}
-
-void UVoxelTorch::TakeOn()
-{
-	bOn = true;
-	RefreshData();
+	Super::Open();
+	
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(true);
 	}
 }
 
-void UVoxelTorch::TakeOff()
+void UVoxelTorch::Close()
 {
-	bOn = false;
-	RefreshData();
+	Super::Close();
+
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
-		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(bOn);
+		GetAuxiliary<AVoxelTorchAuxiliary>()->SetLightVisible(false);
 	}
 }

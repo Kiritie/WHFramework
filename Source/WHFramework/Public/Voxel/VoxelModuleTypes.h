@@ -85,9 +85,11 @@ enum class EVoxelType : uint8
 	Birch_Door_Upper, //???????
 	Torch, //???
 	Water, // ?
-	Box, // ?
+	Chest, // ?
+	Furnace,
+	Crafting_Table, // ?
 	Tall_Grass, //?????
-	Flower_Allium, 
+	Flower_Allium,
 	Flower_Blue_Orchid,
 	Flower_Dandelion,
 	Flower_Houstonia,
@@ -408,6 +410,12 @@ public:
 public:
 	bool IsValid() const;
 
+	template<class T>
+	T& GetVoxel() const
+	{
+		return static_cast<T&>(GetVoxel());
+	}
+
 	UVoxel& GetVoxel() const;
 
 	AVoxelChunk* GetChunk() const;
@@ -431,7 +439,7 @@ public:
 	}
 
 public:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY()
 	FVoxelItem VoxelItem;
 
 	UPROPERTY(BlueprintReadWrite)

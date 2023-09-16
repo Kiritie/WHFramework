@@ -142,7 +142,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass) const;
+	UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr) const;
 
 	template<class T>
 	T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -168,48 +168,32 @@ public:
 			WHLog(FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDebugCategory::Widget, EDebugVerbosity::Warning);
 			return nullptr;
 		}
+
+		UUserWidgetBase* UserWidget;
 		
-		if(!AllUserWidgets.Contains(InName))
+		if(!HasUserWidgetByName(InName))
 		{
-			if(UUserWidgetBase* UserWidget = UObjectPoolModuleBPLibrary::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InName]))
+			UserWidget = UObjectPoolModuleBPLibrary::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InName]);
+			if(UserWidget)
 			{
 				AllUserWidgets.Add(InName, UserWidget);
 				UserWidget->OnCreate();
-				UserWidget->OnInitialize(InOwner);
-				return Cast<T>(UserWidget);
 			}
 		}
 		else
 		{
-			return Cast<T>(AllUserWidgets[InName]);
+			UserWidget = GetUserWidgetByName(InName);
 		}
-		return nullptr;
+		
+		if(UserWidget)
+		{
+			UserWidget->OnInitialize(InOwner);
+		}
+		return Cast<T>(UserWidget);
 	}
 
 	UFUNCTION(BlueprintCallable)
 	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
-
-	template<class T>
-	bool InitializeUserWidget(UObject* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
-
-		return InitializeUserWidgetByName(WidgetName, InOwner);
-	}
-
-	UFUNCTION(BlueprintCallable)
-	bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
-
-	UFUNCTION(BlueprintCallable)
-	bool InitializeUserWidgetByName(FName InName, UObject* InOwner)
-	{
-		if(UUserWidgetBase* UserWidget = GetUserWidgetByName<UUserWidgetBase>(InName))
-		{
-			UserWidget->OnInitialize(InOwner);
-			return true;
-		}
-		return false;
-	}
 
 	template<class T>
 	bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())

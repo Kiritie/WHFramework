@@ -149,7 +149,7 @@ void UInventorySlot::AddItem(FAbilityItem& InItem)
 {
 	if (Contains(InItem))
 	{
-		int32 tmpNum = InItem.Count - GetRemainVolume(InItem);
+		const int32 tmpNum = InItem.Count - GetRemainVolume(InItem);
 		Item.Count = FMath::Clamp(Item.Count + InItem.Count, 0, GetMaxVolume(InItem));
 		InItem.Count = FMath::Max(tmpNum, 0);
 		Refresh();

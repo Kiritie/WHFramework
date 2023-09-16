@@ -103,10 +103,6 @@ void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
-void SSlateWidgetBase::Initialize(UObject* InOwner)
-{
-}
-
 void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 }

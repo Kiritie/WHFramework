@@ -112,7 +112,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	static UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass);
+	static UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr);
 
 	template<class T>
 	static T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -139,29 +139,6 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
 	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
-
-	template<class T>
-	static bool InitializeUserWidget(UObject* InOwner, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
-		{
-			return WidgetModule->InitializeUserWidget<T>(InOwner, InClass);
-		}
-		return false;
-	}
-
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static bool InitializeUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner);
-
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleBPLibrary")
-	static bool InitializeUserWidgetByName(FName InName, UObject* InOwner)
-	{
-		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
-		{
-			return WidgetModule->InitializeUserWidgetByName(InName, InOwner);
-		}
-		return false;
-	}
 
 	template<class T>
 	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())

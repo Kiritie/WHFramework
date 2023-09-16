@@ -141,8 +141,8 @@ public:
 	UInventory* GetConnectInventory() const { return ConnectInventory; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetConnectInventory(UInventory* val) { ConnectInventory = val; }
-	
+	void SetConnectInventory(UInventory* InInventory);
+
 	UFUNCTION(BlueprintPure)
 	int32 GetSlotsNum() const;
 

@@ -4,19 +4,19 @@
 
 #include "Voxel.h"
 #include "VoxelInteract.h"
-#include "VoxelTorch.generated.h"
+#include "VoxelContainer.generated.h"
 
 /**
- * ���ػ��
+ * ������
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelTorch : public UVoxelInteract
+class WHFRAMEWORK_API UVoxelContainer : public UVoxelInteract
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelTorch();
-	
+	UVoxelContainer();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
@@ -42,7 +42,7 @@ public:
 	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Torch
+	// Container
 public:
 	virtual void Open() override;
 

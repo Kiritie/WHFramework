@@ -38,8 +38,6 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
-	virtual void Initialize(UObject* InOwner) = 0;
-
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
