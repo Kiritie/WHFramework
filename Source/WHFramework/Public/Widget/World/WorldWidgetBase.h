@@ -112,7 +112,7 @@ protected:
 	TArray<FParameter> WidgetParams;
 
 	UPROPERTY(EditDefaultsOnly)
-	EInputMode InputMode;
+	EInputMode WidgetInputMode;
 
 	UPROPERTY(Transient)
 	UObject* OwnerObject;
@@ -158,7 +158,7 @@ public:
 	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetInputMode() const override { return InputMode; }
+	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
 
 	template<class T>
 	T* GetOwnerObject() const

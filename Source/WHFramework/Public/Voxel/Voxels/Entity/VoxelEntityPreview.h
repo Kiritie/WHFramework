@@ -18,6 +18,6 @@ public:
 	// Sets default values for this actor's properties
 	AVoxelEntityPreview();
 
-public:
-	virtual void Initialize(FPrimaryAssetId InVoxelID) override;
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 };

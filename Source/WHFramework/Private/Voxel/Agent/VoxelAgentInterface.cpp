@@ -9,6 +9,7 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
@@ -50,5 +51,11 @@ bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_DestroyVoxel>(EEventNetType::Single, Cast<UObject>(this), { &VoxelItem });
 		return true;
 	}
+	return false;
+}
+
+bool IVoxelAgentInterface::InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType)
+{
+	InVoxelHitResult.GetVoxel().OnAgentInteract(this, InInteractType, InVoxelHitResult);
 	return false;
 }

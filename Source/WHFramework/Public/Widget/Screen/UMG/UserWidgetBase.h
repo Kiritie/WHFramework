@@ -208,7 +208,7 @@ protected:
 	TArray<FParameter> WidgetParams;
 
 	UPROPERTY(EditDefaultsOnly)
-	EInputMode InputMode;
+	EInputMode WidgetInputMode;
 
 	UPROPERTY(Transient)
 	EScreenWidgetState WidgetState;
@@ -293,7 +293,7 @@ public:
 	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
 	
 	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetInputMode() const override { return InputMode; }
+	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
 
 	UFUNCTION(BlueprintPure)
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }

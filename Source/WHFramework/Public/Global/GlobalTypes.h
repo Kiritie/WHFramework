@@ -31,6 +31,7 @@ enum class EPhase : uint8
 	Final = 1 << 2,
 	PrimaryAndLesser = Primary | Lesser,
 	LesserAndFinal = Lesser | Final,
+	PrimaryAndFinal = Primary | Final,
 	All = Primary | Lesser | Final
 };
 

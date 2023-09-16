@@ -85,15 +85,18 @@ public:
 	void Termination();
 
 protected:
-	/// 自动运行
-	UPROPERTY(EditAnywhere)
-	bool bAutoRunModule;
 	/// 模块名称
 	UPROPERTY(EditDefaultsOnly)
 	FName ModuleName;
 	/// 模块状态
 	UPROPERTY(VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
+	/// 自动运行
+	UPROPERTY(EditAnywhere)
+	bool bAutoRunModule;
+	/// 自动保存
+	UPROPERTY(EditAnywhere)
+	bool bAutoSaveModule;
 	/// 模块存档
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<USaveGameBase> ModuleSaveGame;

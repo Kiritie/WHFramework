@@ -396,32 +396,32 @@ void AWidgetModule::ClearAllWorldWidget()
 EInputMode AWidgetModule::GetNativeInputMode() const
 {
 	EInputMode TmpInputMode = EInputMode::None;
-    for (auto Iter : AllUserWidgets)
+    for (const auto& Iter : AllUserWidgets)
     {
     	if(!Iter.Value) continue;
         const UUserWidgetBase* UserWidget = Iter.Value;
-    	if (UserWidget && (UserWidget->GetWidgetState() == EScreenWidgetState::Opening || UserWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)UserWidget->GetInputMode() > (int32)TmpInputMode)
+    	if (UserWidget && (UserWidget->GetWidgetState() == EScreenWidgetState::Opening || UserWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)UserWidget->GetWidgetInputMode() > (int32)TmpInputMode)
     	{
-    		TmpInputMode = UserWidget->GetInputMode();
+    		TmpInputMode = UserWidget->GetWidgetInputMode();
     	}
     }
-	for (auto Iter : AllSlateWidgets)
+	for (const auto& Iter : AllSlateWidgets)
 	{
 		if(!Iter.Value) continue;
 		const TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && (SlateWidget->GetWidgetState() == EScreenWidgetState::Opening || SlateWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)SlateWidget->GetInputMode() > (int32)TmpInputMode)
+		if (SlateWidget && (SlateWidget->GetWidgetState() == EScreenWidgetState::Opening || SlateWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)SlateWidget->GetWidgetInputMode() > (int32)TmpInputMode)
 		{
-			TmpInputMode = SlateWidget->GetInputMode();
+			TmpInputMode = SlateWidget->GetWidgetInputMode();
 		}
 	}
-	for (auto Iter1 : AllWorldWidgets)
+	for (const auto& Iter1 : AllWorldWidgets)
 	{
-		for (auto Iter2 : Iter1.Value.WorldWidgets)
+		for (const auto& Iter2 : Iter1.Value.WorldWidgets)
 		{
 			const UWorldWidgetBase* WorldWidget = Iter2;
-			if (WorldWidget && (int32)WorldWidget->GetInputMode() > (int32)TmpInputMode)
+			if (WorldWidget && (int32)WorldWidget->GetWidgetInputMode() > (int32)TmpInputMode)
 			{
-				TmpInputMode = WorldWidget->GetInputMode();
+				TmpInputMode = WorldWidget->GetWidgetInputMode();
 			}
 		}
 	}

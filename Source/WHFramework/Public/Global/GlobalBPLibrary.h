@@ -93,6 +93,14 @@ public:
 	static ETraceTypeQuery GetGameTraceType(ECollisionChannel InTraceChannel);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Phase
+	UFUNCTION(BlueprintPure, Category = "GlobalBPLibrary")
+	static bool PhaseC(EPhase A, EPhase B)
+	{
+		return PHASEC(A, B);
+	}
+	
+	//////////////////////////////////////////////////////////////////////////
 	// Enum
 	/*
 	* 获取枚举值显示名称

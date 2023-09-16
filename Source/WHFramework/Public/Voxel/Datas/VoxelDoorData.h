@@ -15,14 +15,4 @@ public:
 
 public:
 	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const override;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector OpenedMeshScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector OpenedMeshOffset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FVoxelMeshUVData> OpenedMeshUVDatas;
 };

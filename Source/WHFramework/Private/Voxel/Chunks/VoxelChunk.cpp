@@ -56,11 +56,19 @@ AVoxelChunk::AVoxelChunk()
 void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
+	
 	TArray<FString> VoxelDatas;
 	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("/"));
+	
+	TMap<FIndex, FVoxelAuxiliarySaveData> AuxiliaryDatas;
+	for(auto& Iter : SaveData.AuxiliaryDatas)
+	{
+		AuxiliaryDatas.Add(Iter.VoxelItem.Index, Iter);
+	}
 	for(auto& Iter : VoxelDatas)
 	{
-		const FVoxelItem VoxelItem = FVoxelItem(Iter);
+		FVoxelItem VoxelItem = FVoxelItem(Iter);
+		VoxelItem.AuxiliaryData = AuxiliaryDatas.Find(VoxelItem.Index);
 		SetVoxelSample(VoxelItem.Index, VoxelItem);
 	}
 	bBuilded = true;
@@ -78,6 +86,10 @@ FSaveData* AVoxelChunk::ToData(bool bRefresh)
 	for(auto& Iter : VoxelMap)
 	{
 		SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(bRefresh));
+		if(Iter.Value.Auxiliary)
+		{
+			SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(bRefresh));
+		}
 	}
 
 	for(auto& Iter : PickUps)
@@ -118,7 +130,10 @@ void AVoxelChunk::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 
 void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
-	AVoxelModule::Get()->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
+	if(UVoxelModuleBPLibrary::GetWorldMode() == EVoxelWorldMode::Default)
+	{
+		AVoxelModule::Get()->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
+	}
 
 	for(auto& Iter : VoxelMap)
 	{
@@ -964,9 +979,15 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 		{
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass))
 			{
-				AddSceneActor(Auxiliary);
+				FVoxelAuxiliarySaveData AuxiliaryData;
+				if(InVoxelItem.AuxiliaryData)
+				{
+					AuxiliaryData = InVoxelItem.AuxiliaryData->CastRef<FVoxelAuxiliarySaveData>();
+				}
+				AuxiliaryData.VoxelItem = InVoxelItem;
+				Auxiliary->LoadSaveData(&AuxiliaryData);
 				InVoxelItem.Auxiliary = Auxiliary;
-				Auxiliary->Initialize(InVoxelItem);
+				AddSceneActor(Auxiliary);
 				return Auxiliary;
 			}
 		}

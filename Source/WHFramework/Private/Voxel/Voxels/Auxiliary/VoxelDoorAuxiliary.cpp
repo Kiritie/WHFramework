@@ -14,11 +14,6 @@ AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 	Interaction->AddInteractionAction((EInteractAction)EVoxelInteractAction::Close);
 }
 
-void AVoxelDoorAuxiliary::Initialize(FVoxelItem InVoxelItem)
-{
-	Super::Initialize(InVoxelItem);
-}
-
 bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
 {
 	if(!Super::CanInteract(InInteractionAgent, InInteractAction)) return false;
@@ -35,7 +30,6 @@ bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionA
 		}
 		default: return true;
 	}
-	return false;
 }
 
 void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)

@@ -396,11 +396,13 @@ void UTaskBase::Serialize(FArchive& Ar)
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
+			Ar << CurrentSubTaskIndex;
 		}
 		else if(Ar.IsSaving())
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
+			Ar << CurrentSubTaskIndex;
 		}
 	}
 }

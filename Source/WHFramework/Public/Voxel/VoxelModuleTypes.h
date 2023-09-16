@@ -19,7 +19,7 @@ class AVoxelAuxiliary;
 class UVoxel;
 
 UENUM(BlueprintType)
-enum class EVoxelActionType : uint8
+enum class EVoxelInteractType : uint8
 {
 	Action1,
 	Action2,
@@ -85,6 +85,7 @@ enum class EVoxelType : uint8
 	Birch_Door_Upper, //???????
 	Torch, //???
 	Water, // ?
+	Box, // ?
 	Tall_Grass, //?????
 	Flower_Allium, 
 	Flower_Blue_Orchid,
@@ -270,6 +271,8 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
+	FSaveData* AuxiliaryData;
+
 	UPROPERTY(BlueprintReadOnly)
 	bool bGenerated;
 
@@ -281,6 +284,7 @@ public:
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
+		AuxiliaryData = nullptr;
 		bGenerated = false;
 	}
 		
@@ -291,6 +295,7 @@ public:
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
+		AuxiliaryData = nullptr;
 		bGenerated = false;
 	}
 	
@@ -301,6 +306,7 @@ public:
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
+		AuxiliaryData = nullptr;
 		bGenerated = false;
 	}
 
@@ -408,6 +414,31 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelAuxiliarySaveData()
+	{
+		VoxelItem = FVoxelItem();
+		InventoryData = FInventorySaveData();
+	}
+
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem) : FVoxelAuxiliarySaveData()
+	{
+		VoxelItem = InVoxelItem;
+	}
+
+public:
+	UPROPERTY(BlueprintReadWrite)
+	FVoxelItem VoxelItem;
+
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelRenderData
 {
 	GENERATED_BODY()
@@ -471,6 +502,9 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bBuilded;
@@ -483,6 +517,7 @@ public:
 		Index = FIndex::ZeroIndex;
 		VoxelDatas = TEXT("");
 		PickUpDatas = TArray<FPickUpSaveData>();
+		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
 		bBuilded = false;
 		bGenerated = false;
 	}
@@ -492,6 +527,10 @@ public:
 	{
 		Super::MakeSaved();
 		for(auto& Iter : PickUpDatas)
+		{
+			Iter.MakeSaved();
+		}
+		for(auto& Iter : AuxiliaryDatas)
 		{
 			Iter.MakeSaved();
 		}
@@ -669,17 +708,17 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelModuleSaveData : public FVoxelWorldSaveData
+struct WHFRAMEWORK_API FVoxelSaveData : public FVoxelWorldSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelModuleSaveData()
+	FORCEINLINE FVoxelSaveData()
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}
 	
-	FORCEINLINE FVoxelModuleSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
+	FORCEINLINE FVoxelSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}

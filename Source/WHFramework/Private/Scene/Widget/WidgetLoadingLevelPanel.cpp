@@ -13,7 +13,7 @@ UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& obj
 	WidgetName = FName("LoadingLevelPanel");
 	WidgetType = EWidgetType::Temporary;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
-	InputMode = EInputMode::None;
+	WidgetInputMode = EInputMode::None;
 	
 	LoadingLevelPath = NAME_None;
 	LoadProgress = 0.f;

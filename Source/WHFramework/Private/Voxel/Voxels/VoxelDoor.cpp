@@ -63,15 +63,15 @@ void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelDoor::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult)
 {
 	switch (InActionType)
 	{
-		case EVoxelActionType::Action1:
+		case EVoxelInteractType::Action1:
 		{
-			return Super::OnAgentAction(InAgent, InActionType, InHitResult);
+			return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
 		}
-		case EVoxelActionType::Action2:
+		case EVoxelInteractType::Action2:
 		{
 			Toggle();
 			break;

@@ -54,7 +54,7 @@ public:
 
 	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
 
-	virtual EInputMode GetInputMode() const = 0;
+	virtual EInputMode GetWidgetInputMode() const = 0;
 
 	virtual UObject* GetOwnerObject() const = 0;
 

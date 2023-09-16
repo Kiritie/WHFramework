@@ -37,7 +37,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
 	WidgetParams = TArray<FParameter>();
-	InputMode = EInputMode::None;
+	WidgetInputMode = EInputMode::None;
 	OwnerObject = nullptr;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;

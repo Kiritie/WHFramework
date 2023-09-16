@@ -161,7 +161,7 @@ void UVoxelTree::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelTree::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelTree::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentAction(InAgent, InActionType, InHitResult);
+	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
 }

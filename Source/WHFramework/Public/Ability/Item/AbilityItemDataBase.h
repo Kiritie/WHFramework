@@ -23,7 +23,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FText Detail;
 		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses="/Script/Engine.Texture,/Script/Engine.MaterialInterface"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses = "/Script/Engine.Texture,/Script/Engine.MaterialInterface"))
 	UObject* Icon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

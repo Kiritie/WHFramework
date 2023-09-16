@@ -190,9 +190,12 @@ void ACameraModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final && DefaultCamera)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		SwitchCamera(DefaultCamera, DefaultInstantSwitch);
+		if(DefaultCamera)
+		{
+			SwitchCamera(DefaultCamera, DefaultInstantSwitch);
+		}
 	}
 }
 

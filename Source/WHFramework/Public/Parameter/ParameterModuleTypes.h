@@ -575,12 +575,12 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FParameterModuleSaveData : public FSaveData
+struct WHFRAMEWORK_API FParameterSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FParameterModuleSaveData()
+	FORCEINLINE FParameterSaveData()
 	{
 		Parameters = FParameters();
 	}

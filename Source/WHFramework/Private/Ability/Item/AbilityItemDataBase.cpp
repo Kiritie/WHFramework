@@ -21,8 +21,6 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 void UAbilityItemDataBase::ResetData_Implementation()
 {
 	Super::ResetData_Implementation();
-	
-	Icon = nullptr;
 }
 
 void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, FVector2D InSize, int32 InIndex)

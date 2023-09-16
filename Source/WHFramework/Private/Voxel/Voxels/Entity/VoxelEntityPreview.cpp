@@ -15,12 +15,12 @@ AVoxelEntityPreview::AVoxelEntityPreview()
 	MeshComponent->SetRelativeScale3D(FVector(0.3f));
 }
 
-void AVoxelEntityPreview::Initialize(FPrimaryAssetId InVoxelID)
+void AVoxelEntityPreview::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::Initialize(InVoxelID);
+	Super::LoadData(InSaveData, InPhase);
 
-	const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
-	const FVector range = voxelData.GetRange();
-	const float tmpNum = (range.X + range.Y + range.Z) / 3;
-	SetActorScale3D(FVector(tmpNum / range.X, tmpNum / range.Y, tmpNum / range.Z));
+	const UVoxelData& VoxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(VoxelID);
+	const FVector Range = VoxelData.GetRange();
+	const float TmpNum = (Range.X + Range.Y + Range.Z) / 3;
+	SetActorScale3D(FVector(TmpNum / Range.X, TmpNum / Range.Y, TmpNum / Range.Z));
 }

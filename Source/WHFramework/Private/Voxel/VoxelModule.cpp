@@ -147,7 +147,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Lesser)
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
 		for(const auto Iter1 : UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)))
 		{
@@ -188,7 +188,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoGenerate)
 		{
-			if(ModuleSaveGame)
+			if(bAutoSaveModule && ModuleSaveGame)
 			{
 				LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 			}
@@ -225,13 +225,13 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		DestroyChunkQueues();
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoGenerate)
+		if(bAutoSaveModule && ModuleSaveGame)
 		{
 			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 		}
@@ -273,8 +273,8 @@ FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
 
 FVoxelWorldSaveData* AVoxelModule::NewWorldData(FSaveData* InBasicData) const
 {
-	static FVoxelModuleSaveData SaveData;
-	SaveData = !InBasicData ? FVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelModuleSaveData>();
+	static FVoxelSaveData SaveData;
+	SaveData = !InBasicData ? FVoxelSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelSaveData>();
 	return &SaveData;
 }
 
@@ -314,7 +314,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			if(VoxelEntity)
 			{
-				VoxelEntity->Initialize(Item->GetPrimaryAssetId());
+				VoxelEntity->LoadSaveData(new FVoxelItem(Item->GetPrimaryAssetId()));
 				VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
@@ -356,7 +356,7 @@ FSaveData* AVoxelModule::ToData(bool bRefresh)
 
 void AVoxelModule::UnloadData(EPhase InPhase)
 {
-	if(PHASEC(InPhase, EPhase::Primary))
+	if(PHASEC(InPhase, EPhase::PrimaryAndFinal))
 	{
 		SetWorldMode(EVoxelWorldMode::None);
 		SetWorldState(EVoxelWorldState::None);
@@ -374,7 +374,7 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 
 		WorldData = NewWorldData();
 	}
-	if(PHASEC(InPhase, EPhase::LesserAndFinal))
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
 		SetWorldMode(EVoxelWorldMode::Preview);
 

@@ -33,7 +33,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	bWidgetAutoVisibility = false;
 	WidgetShowDistance = 0;
 	WidgetParams = TArray<FParameter>();
-	InputMode = EInputMode::None;
+	WidgetInputMode = EInputMode::None;
 	OwnerObject = nullptr;
 	WidgetIndex = 0;
 

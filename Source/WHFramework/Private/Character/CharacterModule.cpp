@@ -60,9 +60,12 @@ void ACharacterModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final && DefaultCharacter)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
+		if(DefaultCharacter)
+		{
+			SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
+		}
 	}
 }
 

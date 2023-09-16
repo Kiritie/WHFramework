@@ -59,31 +59,39 @@ void ATaskModule::OnDestroy()
 void ATaskModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	if(!FirstTask && RootTasks.Num() > 0)
-	{
-		FirstTask = RootTasks[0];
-	}
-	for(auto Iter : RootTasks)
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
 }
 
 void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		if(!FirstTask && RootTasks.Num() > 0)
+		{
+			FirstTask = RootTasks[0];
+		}
+		for(auto Iter : RootTasks)
+		{
+			if(Iter)
+			{
+				Iter->OnInitialize();
+			}
+		}
+	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+		if(bAutoSaveModule && ModuleSaveGame)
+		{
+			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+		}
 	}
-	if(PHASEC(InPhase, EPhase::Final) && bAutoEnterFirst && !CurrentTask)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		EnterTask(FirstTask);
+		if(bAutoEnterFirst && !CurrentTask)
+		{
+			EnterTask(FirstTask);
+		}
 	}
 }
 
@@ -141,7 +149,10 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+		if(bAutoSaveModule && ModuleSaveGame)
+		{
+			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+		}
 	}
 }
 
@@ -173,6 +184,20 @@ void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
 		}
 	}
+
+	if(!CurrentTask)
+	{
+		EnterTask(FirstTask);
+	}
+}
+
+void ATaskModule::UnloadData(EPhase InPhase)
+{
+	for(auto Iter : RootTasks)
+	{
+		Iter->Restore();
+	}
+	CurrentTask = nullptr;
 }
 
 FSaveData* ATaskModule::ToData(bool bRefresh)
@@ -289,7 +314,7 @@ void ATaskModule::ClearAllTask()
 	{
 		if(Iter)
 		{
-#if(WITH_EDITOR)
+#if WITH_EDITOR
 			Iter->OnUnGenerate();
 #else
 			Iter->ConditionalBeginDestroy();

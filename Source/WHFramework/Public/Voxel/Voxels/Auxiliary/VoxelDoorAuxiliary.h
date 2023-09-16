@@ -18,14 +18,14 @@ public:
 	AVoxelDoorAuxiliary();
 
 public:
-	virtual void Initialize(FVoxelItem InVoxelItem) override;
-
 	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
 public:
-	void OpenDoor();
+	UFUNCTION(BlueprintCallable)
+	virtual void OpenDoor();
 
-	void CloseDoor();
+	UFUNCTION(BlueprintCallable)
+	virtual void CloseDoor();
 };

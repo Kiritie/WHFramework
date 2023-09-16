@@ -256,10 +256,9 @@ void UProcedureBase::ResetCameraView()
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
-	OperationTarget = InOperationTarget;
 	if(ProcedureState == EProcedureState::Entered)
 	{
-		if(OperationTarget)
+		if(InOperationTarget)
 		{
 			if(bResetCameraView)
 			{
@@ -267,14 +266,18 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+				UCameraModuleBPLibrary::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+			}
+		}
+		else
+		{
+			if(bTrackTarget)
+			{
+				UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
 			}
 		}
 	}
-	if(bTrackTarget)
-	{
-		UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
-	}
+	OperationTarget = InOperationTarget;
 }
 
 void UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)

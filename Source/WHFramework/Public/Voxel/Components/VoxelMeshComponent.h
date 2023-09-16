@@ -56,6 +56,10 @@ public:
 
 	void ClearData();
 
+	void SetCollisionEnabled(ECollisionEnabled::Type NewType) override;
+
+	void SetCollisionEnabled(bool bEnable);
+
 private:
 	void BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing);
 
@@ -67,8 +71,4 @@ public:
 	bool HasMesh();
 
 	AVoxelChunk* GetOwnerChunk() const;
-
-	virtual void SetCollisionEnabled(ECollisionEnabled::Type NewType) override;
-
-	virtual void SetCollisionEnabled(bool bEnable);
 };

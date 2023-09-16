@@ -62,7 +62,7 @@ void AProcedureModule::OnInitialize_Implementation()
 void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
-
+	
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		if(!FirstProcedure && Procedures.Num() > 0)
@@ -77,9 +77,12 @@ void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 			}
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Final) && bAutoSwitchFirst && FirstProcedure)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		SwitchProcedure(FirstProcedure);
+		if(bAutoSwitchFirst && FirstProcedure)
+		{
+			SwitchProcedure(FirstProcedure);
+		}
 	}
 }
 

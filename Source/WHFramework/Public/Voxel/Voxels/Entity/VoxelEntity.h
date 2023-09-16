@@ -4,6 +4,7 @@
 
 #include "Global/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "VoxelEntity.generated.h"
 
@@ -15,26 +16,13 @@ class UVoxelMeshComponent;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelEntity : public AWHActor
+class WHFRAMEWORK_API AVoxelEntity : public AWHActor, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
 	AVoxelEntity();
-
-protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* MeshComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FPrimaryAssetId VoxelID;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	AVoxelAuxiliary* Auxiliary;
-
-public:
-	virtual void Initialize(FPrimaryAssetId InVoxelID);
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -44,7 +32,21 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData(bool bRefresh) override;
+	
 	virtual void DestroyAuxiliary();
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* MeshComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId VoxelID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	AVoxelAuxiliary* Auxiliary;
 
 public:
 	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }

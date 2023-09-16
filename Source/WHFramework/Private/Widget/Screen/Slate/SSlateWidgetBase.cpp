@@ -26,7 +26,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetState = EScreenWidgetState::None;
-	InputMode = EInputMode::None;
+	WidgetInputMode = EInputMode::None;
 	OwnerObject = nullptr;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;

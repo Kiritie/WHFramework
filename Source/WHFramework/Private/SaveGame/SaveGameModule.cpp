@@ -214,7 +214,7 @@ USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InClas
 			SaveGameInfos.Add(SaveName, FSaveGameInfo(InClass));
 		}
 		SaveGameInfos[SaveName].SaveGames.Add(SaveGame);
-		UnloadSaveGame(InClass, -1, EPhase::Lesser);
+		UnloadSaveGame(InClass, -1, EPhase::Primary);
 		SaveGame->OnCreate(InIndex);
 		SaveGameInfos[SaveName].ActiveIndex = InIndex;
 		if(InPhase != EPhase::None)
@@ -312,7 +312,10 @@ USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	}
 	if(SaveGame)
 	{
-		UnloadSaveGame(InClass, -1, EPhase::Lesser);
+		if(SaveGameInfos[SaveName].ActiveIndex != InIndex)
+		{
+			UnloadSaveGame(InClass, -1, EPhase::Primary);
+		}
 		SaveGameInfos[SaveName].ActiveIndex = InIndex;
 		SaveGame->bLoaded = true;
 		SaveGame->OnLoad(InPhase);
@@ -333,17 +336,16 @@ bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 I
 		if(PHASEC(InPhase, EPhase::Primary))
 		{
 			SaveGameInfos[SaveName].ActiveIndex = -1;
-			SaveGame->bLoaded = false;
 		}
 
 		SaveGame->OnUnload(InPhase);
 
 		if(PHASEC(InPhase, EPhase::Final))
 		{
-			SaveGame->ConditionalBeginDestroy();
-
+			SaveGame->bLoaded = false;
 			SaveGameInfos[SaveName].SaveGames.Remove(SaveGame);
 			if(SaveGameInfos[SaveName].SaveGames.IsEmpty()) SaveGameInfos.Remove(SaveName);
+			SaveGame->ConditionalBeginDestroy();
 		}
 		return true;
 	}

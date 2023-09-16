@@ -6,7 +6,7 @@
 UWidgetWorldText::UWidgetWorldText(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	WidgetName = FName("WorldText");
-	InputMode = EInputMode::None;
+	WidgetInputMode = EInputMode::None;
 
 	bWidgetAutoVisibility = true;
 	WidgetShowDistance = 1500.f;

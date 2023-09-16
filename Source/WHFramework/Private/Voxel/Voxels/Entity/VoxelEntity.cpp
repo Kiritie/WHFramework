@@ -25,40 +25,6 @@ AVoxelEntity::AVoxelEntity()
 	Auxiliary = nullptr;
 }
 
-void AVoxelEntity::Initialize(FPrimaryAssetId InVoxelID)
-{
-	VoxelID = InVoxelID;
-	
-	MeshComponent->CreateVoxel(InVoxelID);
-
-	if(InVoxelID.IsValid())
-	{
-		const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
-		if(voxelData.AuxiliaryClass)
-		{
-			if(Auxiliary && !Auxiliary->IsA(voxelData.AuxiliaryClass))
-			{
-				DestroyAuxiliary();
-			}
-			if(!Auxiliary)
-			{
-				Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, voxelData.AuxiliaryClass);
-				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
-				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
-			}
-			Auxiliary->Initialize(InVoxelID);
-		}
-		else if(Auxiliary)
-		{
-			DestroyAuxiliary();
-		}
-	}
-	else if(Auxiliary)
-	{
-		DestroyAuxiliary();
-	}
-}
-
 void AVoxelEntity::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
@@ -71,6 +37,52 @@ void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 	VoxelID = FPrimaryAssetId();
 	MeshComponent->ClearMesh();
 	DestroyAuxiliary();
+}
+
+void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
+
+	if(VoxelID == SaveData.ID) return;
+
+	VoxelID = SaveData.ID;
+	
+	MeshComponent->CreateVoxel(SaveData);
+
+	if(VoxelID.IsValid())
+	{
+		const UVoxelData& VoxelData = SaveData.GetVoxelData();
+		if(VoxelData.AuxiliaryClass)
+		{
+			if(Auxiliary && !Auxiliary->IsA(VoxelData.AuxiliaryClass))
+			{
+				DestroyAuxiliary();
+			}
+			if(!Auxiliary)
+			{
+				Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass);
+				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
+				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
+			}
+			if(Auxiliary)
+			{
+				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData));
+			}
+		}
+		else if(Auxiliary)
+		{
+			DestroyAuxiliary();
+		}
+	}
+	else if(Auxiliary)
+	{
+		DestroyAuxiliary();
+	}
+}
+
+FSaveData* AVoxelEntity::ToData(bool bRefresh)
+{
+	return nullptr;
 }
 
 void AVoxelEntity::DestroyAuxiliary()

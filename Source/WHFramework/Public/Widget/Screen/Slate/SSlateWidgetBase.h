@@ -105,7 +105,7 @@ protected:
 	
 	EWidgetRefreshType WidgetRefreshType;
 
-	EInputMode InputMode;
+	EInputMode WidgetInputMode;
 
 	EScreenWidgetState WidgetState;
 
@@ -161,7 +161,7 @@ public:
 	
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
-	virtual EInputMode GetInputMode() const override { return InputMode; }
+	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
 
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 

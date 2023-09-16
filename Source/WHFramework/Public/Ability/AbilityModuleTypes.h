@@ -931,6 +931,7 @@ public:
 		Location = FVector::ZeroVector;
 	}
 };
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVitalitySaveData : public FSaveData
 {

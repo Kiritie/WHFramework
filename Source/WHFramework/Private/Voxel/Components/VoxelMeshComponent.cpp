@@ -183,6 +183,29 @@ void UVoxelMeshComponent::ClearData()
 	Tangents.Empty();
 }
 
+void UVoxelMeshComponent::SetCollisionEnabled(ECollisionEnabled::Type NewType)
+{
+	Super::SetCollisionEnabled(NewType);
+}
+
+void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
+{
+	switch(Transparency)
+	{
+		case EVoxelTransparency::Solid:
+		case EVoxelTransparency::SemiTransparent:
+		{
+			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+			break;
+		}
+		case EVoxelTransparency::Transparent:
+		{
+			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			break;
+		}
+	}
+}
+
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing)
 {
 	FVector Vers[4];
@@ -253,7 +276,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const FVector Offset = CenterOffset + UMathBPLibrary::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
 	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X,
-		(1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
+		(1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
 	const FVector2D UVSpan = FVector2D(MeshUVData.UVSpan.X * UVSize.X, MeshUVData.UVSpan.Y * UVSize.Y);
 
 	for (int32 i = 0; i < 4; i++)
@@ -302,27 +325,4 @@ bool UVoxelMeshComponent::HasMesh()
 AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const
 {
 	return Cast<AVoxelChunk>(GetOwner());
-}
-
-void UVoxelMeshComponent::SetCollisionEnabled(ECollisionEnabled::Type NewType)
-{
-	Super::SetCollisionEnabled(NewType);
-}
-
-void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
-{
-	switch(Transparency)
-	{
-		case EVoxelTransparency::Solid:
-		case EVoxelTransparency::SemiTransparent:
-		{
-			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-			break;
-		}
-		case EVoxelTransparency::Transparent:
-		{
-			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
-			break;
-		}
-	}
 }

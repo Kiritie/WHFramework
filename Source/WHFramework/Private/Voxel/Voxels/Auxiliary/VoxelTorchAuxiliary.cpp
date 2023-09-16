@@ -23,17 +23,17 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 	EffectComponent->SetupAttachment(LightComponent);
 }
 
-void AVoxelTorchAuxiliary::Initialize(FVoxelItem InVoxelItem)
+void AVoxelTorchAuxiliary::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::Initialize(InVoxelItem);
+	Super::OnSpawn_Implementation(InParams);
 
-	if(InVoxelItem.IsValid())
+	if(VoxelItem.IsValid())
 	{
-		EffectComponent->SetTemplate(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectAsset);
-		EffectComponent->SetRelativeScale3D(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale);
-		EffectComponent->SetRelativeLocation(InVoxelItem.GetVoxelData<UVoxelTorchData>().EffectOffset * AVoxelModule::Get()->GetWorldData().BlockSize);
+		EffectComponent->SetTemplate(VoxelItem.GetVoxelData<UVoxelTorchData>().EffectAsset);
+		EffectComponent->SetRelativeScale3D(VoxelItem.GetVoxelData<UVoxelTorchData>().EffectScale);
+		EffectComponent->SetRelativeLocation(VoxelItem.GetVoxelData<UVoxelTorchData>().EffectOffset * AVoxelModule::Get()->GetWorldData().BlockSize);
 		
-		LightComponent->SetRelativeLocation(FVector::UpVector * InVoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
+		LightComponent->SetRelativeLocation(FVector::UpVector * VoxelItem.GetVoxelData().GetRange().Z * 0.5f * AVoxelModule::Get()->GetWorldData().BlockSize);
 	}
 }
 

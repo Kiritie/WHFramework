@@ -18,6 +18,12 @@ class WHFRAMEWORK_API AVoxelTorchAuxiliary : public AVoxelAuxiliary
 public:	
 	AVoxelTorchAuxiliary();
 
+public:
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	virtual void SetLightVisible(bool bNewVisible);
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UPointLightComponent* LightComponent;
@@ -25,12 +31,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UParticleSystemComponent* EffectComponent;
 
-public:	
-	virtual void Initialize(FVoxelItem InVoxelItem) override;
-
-public:
-	void SetLightVisible(bool bNewVisible);
-
 public:
 	UPointLightComponent* GetLightComponent() const { return LightComponent; }
+
+	UParticleSystemComponent* GetEffectComponent() const { return EffectComponent; }
 };

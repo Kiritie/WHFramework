@@ -23,6 +23,8 @@ UVoxelData::UVoxelData()
 void UVoxelData::ResetData_Implementation()
 {
 	Super::ResetData_Implementation();
+
+	Icon = nullptr;
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const

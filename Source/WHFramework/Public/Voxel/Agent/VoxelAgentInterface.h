@@ -21,6 +21,8 @@ public:
 
 	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
 
+	virtual bool InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType);
+
 public:
 	virtual FVector GetWorldLocation() const = 0;
 

@@ -12,10 +12,11 @@ AModuleBase::AModuleBase()
 
 	bReplicates = true;
 
-	bAutoRunModule = true;
 	ModuleName = NAME_None;
-	ModuleSaveGame = nullptr;
 	ModuleState = EModuleState::None;
+	bAutoRunModule = true;
+	bAutoSaveModule = false;
+	ModuleSaveGame = nullptr;
 }
 
 #if WITH_EDITOR

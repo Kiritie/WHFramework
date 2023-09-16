@@ -112,15 +112,15 @@ void UVoxel::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& I
 	
 }
 
-bool UVoxel::OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InInteractType, const FVoxelHitResult& InHitResult)
 {
-	switch (InActionType)
+	switch (InInteractType)
 	{
-		case EVoxelActionType::Action1:
+		case EVoxelInteractType::Action1:
 		{
 			return InAgent->DestroyVoxel(InHitResult);
 		}
-		case EVoxelActionType::Action2:
+		case EVoxelInteractType::Action2:
 		{
 			return InAgent->GenerateVoxel(InHitResult);
 		}

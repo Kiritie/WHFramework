@@ -58,7 +58,7 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnAgentAction(IVoxelAgentInterface* InAgent, EVoxelActionType InActionType, const FVoxelHitResult& InHitResult);
+	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InInteractType, const FVoxelHitResult& InHitResult);
 
 protected:
 	UPROPERTY(VisibleAnywhere)

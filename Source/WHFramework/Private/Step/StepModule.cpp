@@ -63,27 +63,32 @@ void AStepModule::OnDestroy()
 void AStepModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	if(!FirstStep && RootSteps.Num() > 0)
-	{
-		FirstStep = RootSteps[0];
-	}
-	for(auto Iter : RootSteps)
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
 }
 
 void AStepModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(InPhase == EPhase::Final && bAutoStartFirst)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		StartStep(-1, true);
+		if(!FirstStep && RootSteps.Num() > 0)
+		{
+			FirstStep = RootSteps[0];
+		}
+		for(auto Iter : RootSteps)
+		{
+			if(Iter)
+			{
+				Iter->OnInitialize();
+			}
+		}
+	}
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		if(bAutoStartFirst)
+		{
+			StartStep(-1, true);
+		}
 	}
 }
 
@@ -142,7 +147,7 @@ void AStepModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 
-	if(InPhase == EPhase::Primary)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		EndStep();
 	}
