@@ -19,7 +19,7 @@ public:
 	AVoxelTorchAuxiliary();
 
 public:
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 public:
 	virtual void SetLightVisible(bool bInVisible);

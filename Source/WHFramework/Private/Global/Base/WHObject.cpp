@@ -4,7 +4,7 @@
 
 UWHObject::UWHObject()
 {
-	Execute_OnReset(this);
+	
 }
 
 void UWHObject::OnSpawn_Implementation(const TArray<FParameter>& InParams)

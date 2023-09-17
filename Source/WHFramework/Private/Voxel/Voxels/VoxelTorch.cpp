@@ -8,11 +8,14 @@
 
 UVoxelTorch::UVoxelTorch()
 {
+	bOpened = true;
 }
 
 void UVoxelTorch::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
+
+	bOpened = true;
 }
 
 void UVoxelTorch::LoadData(const FString& InData)

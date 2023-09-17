@@ -11,6 +11,10 @@
 
 UVoxelTree::UVoxelTree()
 {
+	TreePart = EVoxelTreePart::None;
+	TreeHeight = 0;
+	LeavesHeight = 0;
+	LeavesWidth = 0;
 }
 
 void UVoxelTree::OnReset_Implementation()

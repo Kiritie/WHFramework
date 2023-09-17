@@ -15,9 +15,5 @@ UVoxelInteractData::UVoxelInteractData()
 
 const FVoxelMeshData& UVoxelInteractData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
-	if(MeshDatas.Num() == 2)
-	{
-		return MeshDatas[InVoxelItem.Owner && InVoxelItem.GetVoxel<UVoxelInteract>().IsOpened() ? 1 : 0];
-	}
-	return Super::GetMeshData(InVoxelItem);
+	return MeshDatas[InVoxelItem.Owner && MeshDatas.Num() >= 2 && InVoxelItem.GetVoxel<UVoxelInteract>().IsOpened() ? 1 : 0];
 }

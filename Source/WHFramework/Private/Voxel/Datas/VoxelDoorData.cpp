@@ -24,8 +24,3 @@ UVoxelDoorData::UVoxelDoorData()
 	MeshDatas[1].MeshScale = FVector(1.f, 0.1f, 1.f);
 	MeshDatas[1].MeshOffset = FVector(0.f, 0.45f, 0.f);
 }
-
-const FVoxelMeshData& UVoxelDoorData::GetMeshData(const FVoxelItem& InVoxelItem) const
-{
-	return MeshDatas[InVoxelItem.Owner && InVoxelItem.GetVoxel<UVoxelDoor>().IsOpened() ? 1 : 0];
-}

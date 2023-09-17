@@ -58,62 +58,55 @@ void AWidgetModule::OnDestroy()
 void AWidgetModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	for(auto Iter : UserWidgetClasses)
+	{
+		if(!Iter) continue;
+		const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+		if(!UserWidgetClassMap.Contains(WidgetName))
+		{
+			UserWidgetClassMap.Add(WidgetName, Iter);
+		}
+		const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
+		if(DefaultObject->GetParentName() == NAME_None)
+		{
+			switch(DefaultObject->GetWidgetCreateType())
+			{
+				case EWidgetCreateType::AutoCreate:
+				{
+					CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
+					break;
+				}
+				case EWidgetCreateType::AutoCreateAndOpen:
+				{
+					OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
+					break;
+				}
+				default: break;
+			}
+		}
+	}
+
+	for(auto Iter : WorldWidgetClasses)
+	{
+		if(!Iter) return;
+		const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
+		if(!WorldWidgetClassMap.Contains(WidgetName))
+		{
+			WorldWidgetClassMap.Add(WidgetName, Iter);
+		}
+	}
+
+	WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
+	if(WorldWidgetContainer)
+	{
+		WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
+	}
 }
 
 void AWidgetModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		for(auto Iter : UserWidgetClasses)
-		{
-			if(Iter)
-			{
-				const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
-				if(!UserWidgetClassMap.Contains(WidgetName))
-				{
-					UserWidgetClassMap.Add(WidgetName, Iter);
-				}
-				const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
-				if(DefaultObject->GetParentName() == NAME_None)
-				{
-					switch(DefaultObject->GetWidgetCreateType())
-					{
-						case EWidgetCreateType::AutoCreate:
-						{
-							CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
-							break;
-						}
-						case EWidgetCreateType::AutoCreateAndOpen:
-						{
-							OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
-							break;
-						}
-						default: break;
-					}
-				}
-			}
-		}
-
-		for(auto Iter : WorldWidgetClasses)
-		{
-			if(Iter)
-			{
-				const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
-				if(!WorldWidgetClassMap.Contains(WidgetName))
-				{
-					WorldWidgetClassMap.Add(WidgetName, Iter);
-				}
-			}
-		}
-
-		WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
-		if(WorldWidgetContainer)
-		{
-			WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
-		}
-	}
 }
 
 void AWidgetModule::OnRefresh_Implementation(float DeltaSeconds)

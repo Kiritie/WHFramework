@@ -40,6 +40,10 @@ public:
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
+
+public:
 	virtual void OnReset_Implementation() override;
 	/**
 	* 当暂停

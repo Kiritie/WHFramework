@@ -22,7 +22,7 @@
 
 UVoxel::UVoxel()
 {
-	
+	Item = FVoxelItem();
 }
 
 UVoxel& UVoxel::GetEmpty()

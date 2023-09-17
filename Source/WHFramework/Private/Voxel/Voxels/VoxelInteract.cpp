@@ -9,7 +9,7 @@
 
 UVoxelInteract::UVoxelInteract()
 {
-	
+	bOpened = false;
 }
 
 void UVoxelInteract::OnReset_Implementation()
