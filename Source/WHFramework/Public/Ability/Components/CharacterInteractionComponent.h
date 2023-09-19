@@ -17,7 +17,4 @@ class WHFRAMEWORK_API UCharacterInteractionComponent : public UInteractionCompon
 		
 public:
 	UCharacterInteractionComponent(const FObjectInitializer& ObjectInitializer);
-
-public:
-	virtual bool DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 };

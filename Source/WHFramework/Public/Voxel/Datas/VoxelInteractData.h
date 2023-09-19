@@ -15,4 +15,8 @@ public:
 
 public:
 	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const override;
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<EInteractAction> InteractActions;
 };

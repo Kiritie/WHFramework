@@ -11,6 +11,9 @@ UVoxelInteractData::UVoxelInteractData()
 {
 	VoxelClass = UVoxelInteract::StaticClass();
 	AuxiliaryClass = AVoxelInteractAuxiliary::StaticClass();
+
+	InteractActions.Add((EInteractAction)EVoxelInteractAction::Open);
+	InteractActions.Add((EInteractAction)EVoxelInteractAction::Close);
 }
 
 const FVoxelMeshData& UVoxelInteractData::GetMeshData(const FVoxelItem& InVoxelItem) const

@@ -12,18 +12,19 @@
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
-bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool IVoxelAgentInterface::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	if(!GetGenerateVoxelID().IsValid()) return false;
 	
 	AVoxelChunk* Chunk = InVoxelHitResult.GetChunk();
-	
-	FVoxelItem VoxelItem;
-	VoxelItem.ID = GetGenerateVoxelID();
+
+	if(!Chunk) return false;
+
+	FVoxelItem VoxelItem = GetGenerateVoxelID();
 	VoxelItem.Owner = Chunk;
 	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - AVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const FRotator Rotation = (GetAgentLocation() - VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f).ToOrientationRotator();
-	VoxelItem.Angle = (ERightAngle)(FMath::RoundToInt((Rotation.Yaw >= 0.f ? Rotation.Yaw : (360.f + Rotation.Yaw)) / 90.f));
+	const float Angle = (GetAgentLocation() - (VoxelItem.GetLocation() + AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw;
+	VoxelItem.Angle = (ERightAngle)FMath::RoundToInt((Angle >= 0.f ? Angle : (360.f + Angle)) / 90.f);
 	
 	TArray<AActor*> IgnoreActors;
 	if(VoxelItem.Auxiliary)
@@ -42,9 +43,12 @@ bool IVoxelAgentInterface::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult
 	return false;
 }
 
-bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool IVoxelAgentInterface::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	AVoxelChunk* Chunk = InVoxelHitResult.GetChunk();
+
+	if(!Chunk) return false;
+	
 	FVoxelItem VoxelItem = InVoxelHitResult.VoxelItem;
 	if(Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this))
 	{
@@ -54,7 +58,7 @@ bool IVoxelAgentInterface::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 	return false;
 }
 
-bool IVoxelAgentInterface::InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType)
+bool IVoxelAgentInterface::OnInteractVoxel(const FVoxelHitResult& InVoxelHitResult, EInputInteractAction InInteractAction)
 {
-	return InVoxelHitResult.GetVoxel().OnAgentInteract(this, InInteractType, InVoxelHitResult);
+	return InVoxelHitResult.GetVoxel().OnAgentInteract(this, InInteractAction, InVoxelHitResult);
 }

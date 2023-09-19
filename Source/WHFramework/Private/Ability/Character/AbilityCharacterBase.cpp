@@ -41,7 +41,7 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
-	Interaction->AddInteractionAction(EInteractAction::Revive);
+	Interaction->AddInteractAction(EInteractAction::Revive);
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Character");
@@ -308,6 +308,11 @@ void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)
 	}
 }
 
+bool AAbilityCharacterBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
+{
+	return false;
+}
+
 void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
@@ -316,12 +321,7 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 {
 }
 
-bool AAbilityCharacterBase::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
-{
-	return false;
-}
-
-void AAbilityCharacterBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
 	
 }

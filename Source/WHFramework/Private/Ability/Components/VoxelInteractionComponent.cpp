@@ -7,17 +7,24 @@ UVoxelInteractionComponent::UVoxelInteractionComponent(const FObjectInitializer&
 {
 }
 
-bool UVoxelInteractionComponent::DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+void UVoxelInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(!Super::DoInteract(InInteractionAgent, InInteractAction)) return false;
+	Super::OnBeginOverlap(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
+}
 
-	switch (InInteractAction)
-	{
-		case EInteractAction::Dialogue:
-		{
-			return true;
-		}
-		default: break;
-	}
-	return false;
+void UVoxelInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	Super::OnEndOverlap(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex);
+}
+
+void UVoxelInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
+{
+	Super::OnAgentEnter(InInteractionAgent);
+}
+
+void UVoxelInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
+{
+	Super::OnAgentLeave(InInteractionAgent);
 }

@@ -63,9 +63,9 @@ void UVoxelTorch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelTorch::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelTorch::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
+	return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
 }
 
 void UVoxelTorch::Open()

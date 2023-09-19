@@ -185,7 +185,7 @@ public:
 			UserWidget = GetUserWidgetByName(InName);
 		}
 		
-		if(UserWidget)
+		if(UserWidget && UserWidget->GetOwnerObject() != InOwner)
 		{
 			UserWidget->OnInitialize(InOwner);
 		}

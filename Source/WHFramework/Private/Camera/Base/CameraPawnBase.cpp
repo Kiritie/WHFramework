@@ -93,12 +93,12 @@ void ACameraPawnBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollis
 	}
 }
 
-bool ACameraPawnBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool ACameraPawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
 }
 
-bool ACameraPawnBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool ACameraPawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }

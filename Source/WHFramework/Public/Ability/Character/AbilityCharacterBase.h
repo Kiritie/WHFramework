@@ -141,13 +141,13 @@ public:
 
 	virtual void PickUp(AAbilityPickUpBase* InPickUp) override;
 
+	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
+
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
-
-	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
 	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -186,6 +186,11 @@ public:
 	}
 
 	virtual UAttributeSetBase* GetAttributeSet() const override;
+
+	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	

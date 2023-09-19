@@ -289,9 +289,17 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
+	
+	template<class T>
+	T* GetOwnerObject() const
+	{
+		return Cast<T>(GetOwnerObject());
+	}
 
-	UFUNCTION(BlueprintPure)
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
+	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InOwnerClass) const { return OwnerObject; }
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 

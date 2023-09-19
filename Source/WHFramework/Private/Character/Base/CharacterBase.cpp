@@ -221,14 +221,14 @@ void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
 	}
 }
 
-bool ACharacterBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool ACharacterBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
 }
 
-bool ACharacterBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool ACharacterBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)

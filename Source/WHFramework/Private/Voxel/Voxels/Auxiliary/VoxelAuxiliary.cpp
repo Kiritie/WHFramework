@@ -12,10 +12,6 @@
 
 AVoxelAuxiliary::AVoxelAuxiliary()
 {
-	Interaction = CreateDefaultSubobject<UVoxelInteractionComponent>(FName("Interaction"));
-	Interaction->SetupAttachment(RootComponent);
-	Interaction->SetRelativeLocation(FVector(0, 0, 0));
-	
 	VoxelItem = FVoxelItem::Empty;
 }
 
@@ -38,11 +34,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		VoxelItem = SaveData.VoxelItem;
-		if(VoxelItem.Owner)
-		{
-			SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
-			Interaction->SetBoxExtent(VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * FVector(1.5f, 1.5f, 0.5f));
-		}
+		SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
 	}
 }
 
@@ -56,25 +48,8 @@ FSaveData* AVoxelAuxiliary::ToData(bool bRefresh)
 	return &SaveData;
 }
 
-void AVoxelAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+FVoxelItem& AVoxelAuxiliary::GetVoxelItem(bool bRefresh)
 {
-}
-
-void AVoxelAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
-{
-}
-
-bool AVoxelAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
-{
-	return true;
-}
-
-void AVoxelAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
-{
-	
-}
-
-UInteractionComponent* AVoxelAuxiliary::GetInteractionComponent() const
-{
-	return Interaction;
+	if(bRefresh) VoxelItem.RefreshData(true);
+	return VoxelItem;
 }

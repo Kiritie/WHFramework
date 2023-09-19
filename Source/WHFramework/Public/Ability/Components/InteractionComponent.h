@@ -14,18 +14,9 @@ UCLASS()
 class WHFRAMEWORK_API UInteractionComponent : public UBoxComponent
 {
 	GENERATED_BODY()
-		
+
 public:
 	UInteractionComponent(const FObjectInitializer& ObjectInitializer);
-
-protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TArray<EInteractAction> InteractActions;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EInteractAction InteractingAction;
-
-	IInteractionAgentInterface* InteractingAgent;
 
 protected:
 	// Called when the game starts or when spawned
@@ -42,22 +33,22 @@ protected:
 	virtual void OnAgentLeave(IInteractionAgentInterface* InInteractionAgent);
 
 public:
-	virtual bool DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction);
+	virtual void AddInteractAction(EInteractAction InInteractAction);
+		
+	virtual void RemoveInteractAction(EInteractAction InInteractAction);
+		
+	virtual void ClearInteractActions();
 
-	virtual void AddInteractionAction(EInteractAction InInteractAction);
-		
-	virtual void RemoveInteractionAction(EInteractAction InInteractAction);
-		
-	virtual TArray<EInteractAction> GetValidInteractActions(IInteractionAgentInterface* InInteractionAgent) const;
-	
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TArray<EInteractAction> InteractActions;
+
 public:
-	EInteractAction GetInteractingAction() const { return InteractingAction; }
+	virtual bool IsInteractable() const;
+	
+	virtual void SetInteractable(bool bValue);
 
-	IInteractionAgentInterface* GetInteractingAgent() const { return InteractingAgent; }
+	virtual IInteractionAgentInterface* GetInteractionAgent() const;
 
-	UInteractionComponent* GetInteractingComponent() const;
-
-	void SetInteractingAgent(IInteractionAgentInterface* InInteractingAgent);
-
-	IInteractionAgentInterface* GetInteractionOwner() const;
+	virtual TArray<EInteractAction> GetInteractActions() const { return InteractActions; }
 };

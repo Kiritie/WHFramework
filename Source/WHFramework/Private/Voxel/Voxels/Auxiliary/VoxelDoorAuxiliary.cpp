@@ -12,12 +12,12 @@ AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 {
 }
 
-bool AVoxelDoorAuxiliary::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+bool AVoxelDoorAuxiliary::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
-	return Super::CanInteract(InInteractionAgent, InInteractAction);
+	return Super::CanInteract(InInteractAction, InInteractionAgent);
 }
 
-void AVoxelDoorAuxiliary::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+void AVoxelDoorAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
-	Super::OnInteract(InInteractionAgent, InInteractAction);
+	Super::OnInteract(InInteractAction, InInteractionAgent, bPassivity);
 }

@@ -873,12 +873,12 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 				if(VoxelData.bMainPart && VoxelRange != FVector::OneVector)
 				{
 					TMap<FIndex, FVoxelItem> VoxelItems;
-					VoxelItems.Emplace(VoxelIndex, InVoxelItem.IsValid() ? VoxelData.GetPrimaryAssetId() : FPrimaryAssetId());
+					VoxelItems.Emplace(VoxelIndex, InVoxelItem.IsValid() ? InVoxelItem.ReplaceID(VoxelData.GetPrimaryAssetId()) : FVoxelItem::Empty);
 					ITER_INDEX(PartIndex, VoxelRange, false,
 						UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
 						if(!PartData.bMainPart)
 						{
-							VoxelItems.Emplace(VoxelIndex + PartIndex, InVoxelItem.IsValid() ? PartData.GetPrimaryAssetId() : FPrimaryAssetId());
+							VoxelItems.Emplace(VoxelIndex + PartIndex, InVoxelItem.IsValid() ? InVoxelItem.ReplaceID(PartData.GetPrimaryAssetId()) : FVoxelItem::Empty);
 						}
 					)
 					return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);

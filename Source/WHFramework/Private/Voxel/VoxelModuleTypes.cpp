@@ -75,15 +75,31 @@ void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 	bGenerated = false;
 }
 
-void FVoxelItem::RefreshData(UVoxel* InVoxel)
+void FVoxelItem::RefreshData(bool bOrigin)
 {
-	if(!InVoxel)
+	if(bOrigin && Owner)
+	{
+		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
+		OriginItem.RefreshData(false);
+		*this = OriginItem;
+	}
+	else
 	{
 		Data = GetVoxel().ToData();
 	}
-	else if(Owner)
+}
+
+void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
+{
+	if(bOrigin && Owner)
 	{
-		Owner->GetVoxelItem(Index).Data = InVoxel->ToData();
+		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
+		OriginItem.RefreshData(InVoxel, false);
+		*this = OriginItem;
+	}
+	else
+	{
+		Data = InVoxel.ToData();
 	}
 }
 
@@ -105,6 +121,13 @@ bool FVoxelItem::IsUnknown() const
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
 	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
+}
+
+FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
+{
+	FVoxelItem tmpItem = *this;
+	tmpItem.ID = InID;
+	return tmpItem;
 }
 
 FVoxelItem& FVoxelItem::GetMain() const

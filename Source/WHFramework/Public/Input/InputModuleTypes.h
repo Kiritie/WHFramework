@@ -25,15 +25,12 @@ enum class EInputMode : uint8
 	GameAndUI_NotHideCursor
 };
 
-/**
- * 鼠标按钮
- */
 UENUM(BlueprintType)
-enum class EMouseButton : uint8
+enum class EInputInteractAction : uint8
 {
-	Left,
-	Middle,
-	Right
+	Action1,
+	Action2,
+	Action3
 };
 
 USTRUCT(BlueprintType)

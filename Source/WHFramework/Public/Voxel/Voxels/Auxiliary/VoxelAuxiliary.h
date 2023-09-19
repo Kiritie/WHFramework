@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "Ability/Interaction/InteractionAgentInterface.h"
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -17,7 +16,7 @@ class UVoxel;
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public ISaveDataInterface, public IInteractionAgentInterface
+class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -36,24 +35,10 @@ protected:
 
 	virtual FSaveData* ToData(bool bRefresh) override;
 
-public:
-	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
-
-	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
-
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class UVoxelInteractionComponent* Interaction;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FVoxelItem VoxelItem;
 
 public:
-	FVoxelItem& GetVoxelItem() { return VoxelItem; }
-
-	virtual UInteractionComponent* GetInteractionComponent() const override;
+	FVoxelItem& GetVoxelItem(bool bRefresh = false);
 };

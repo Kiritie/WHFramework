@@ -3,6 +3,7 @@
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
+#include "Input/InputModuleTypes.h"
 
 #include "VoxelAgentInterface.generated.h"
 
@@ -17,11 +18,11 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult);
+	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult);
 
-	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
+	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
 
-	virtual bool InteractVoxel(const FVoxelHitResult& InVoxelHitResult, EVoxelInteractType InInteractType);
+	virtual bool OnInteractVoxel(const FVoxelHitResult& InVoxelHitResult, EInputInteractAction InInteractAction);
 
 public:
 	virtual FVector GetAgentLocation() const = 0;

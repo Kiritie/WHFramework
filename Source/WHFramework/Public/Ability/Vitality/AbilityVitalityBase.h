@@ -99,14 +99,14 @@ public:
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
+	
+	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-	
-	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
 
-	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -123,9 +123,9 @@ public:
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 public:
-	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
-	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 public:
 	template<class T>
@@ -151,6 +151,11 @@ public:
 	}
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	

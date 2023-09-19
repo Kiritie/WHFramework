@@ -20,16 +20,36 @@ class WHFRAMEWORK_API IInteractionAgentInterface
 {
 	GENERATED_BODY()
 
+	friend class UInteractionComponent;
+
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) = 0;
+	
+	virtual bool DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent = nullptr);
+
+protected:
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
-	virtual bool CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) = 0;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) = 0;
 
-	virtual void OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) = 0;
-
+protected:
+	IInteractionAgentInterface* InteractingAgent;
+	
 public:
-	virtual class UInteractionComponent* GetInteractionComponent() const = 0;
+	template<class T>
+	T* GetInteractingAgent() const
+	{
+		return Cast<T>(GetInteractingAgent());
+	}
+
+	virtual IInteractionAgentInterface* GetInteractingAgent() const { return InteractingAgent; }
+
+	virtual void SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent);
+
+	virtual TArray<EInteractAction> GetInteractableActions(IInteractionAgentInterface* InInteractionAgent = nullptr);
+
+	virtual UInteractionComponent* GetInteractionComponent() const = 0;
 };

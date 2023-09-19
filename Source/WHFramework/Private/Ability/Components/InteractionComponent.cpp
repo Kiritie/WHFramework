@@ -22,7 +22,7 @@ void UInteractionComponent::BeginPlay()
 
 void UInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(!GetInteractionOwner() || OtherActor == GetOwner()) return;
+	if(!GetInteractionAgent() || OtherActor == GetOwner()) return;
 
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
@@ -32,7 +32,7 @@ void UInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedCompon
 
 void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if(!GetInteractionOwner() || OtherActor == GetOwner()) return;
+	if(!GetInteractionAgent() || OtherActor == GetOwner()) return;
 
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
@@ -42,33 +42,19 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 
 void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(InteractingAgent == nullptr)
-	{
-		SetInteractingAgent(InInteractionAgent);
-	}
+	if(GetInteractionAgent()->GetInteractingAgent() || InInteractionAgent->GetInteractingAgent()) return;
+
+	GetInteractionAgent()->SetInteractingAgent(InInteractionAgent);
 }
 
 void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(InInteractionAgent == InteractingAgent)
-	{
-		SetInteractingAgent(nullptr);
-	}
+	if(GetInteractionAgent()->GetInteractingAgent() != InInteractionAgent) return;
+
+	GetInteractionAgent()->SetInteractingAgent(nullptr);
 }
 
-bool UInteractionComponent::DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
-{
-	if(!InInteractionAgent || InInteractAction == EInteractAction::None || !InteractActions.Contains(InInteractAction) || InteractingAction != EInteractAction::None) return false;
-	
-	if(GetInteractionOwner()->CanInteract(InInteractionAgent, InInteractAction))
-	{
-		GetInteractionOwner()->OnInteract(InInteractionAgent, InInteractAction);
-		InInteractionAgent->OnInteract(GetInteractionOwner(), InInteractAction);
-	}
-	return false;
-}
-
-void UInteractionComponent::AddInteractionAction(EInteractAction InInteractAction)
+void UInteractionComponent::AddInteractAction(EInteractAction InInteractAction)
 {
 	if(!InteractActions.Contains(InInteractAction))
 	{
@@ -76,7 +62,7 @@ void UInteractionComponent::AddInteractionAction(EInteractAction InInteractActio
 	}
 }
 
-void UInteractionComponent::RemoveInteractionAction(EInteractAction InInteractAction)
+void UInteractionComponent::RemoveInteractAction(EInteractAction InInteractAction)
 {
 	if(InteractActions.Contains(InInteractAction))
 	{
@@ -84,46 +70,22 @@ void UInteractionComponent::RemoveInteractionAction(EInteractAction InInteractAc
 	}
 }
 
-TArray<EInteractAction> UInteractionComponent::GetValidInteractActions(IInteractionAgentInterface* InInteractionAgent) const
+void UInteractionComponent::ClearInteractActions()
 {
-	TArray<EInteractAction> ReturnValues;
-	for(auto Iter : InteractActions)
-	{
-		if(GetInteractionOwner()->CanInteract(InInteractionAgent, Iter))
-		{
-			ReturnValues.Add(Iter);
-		}
-	}
-	return ReturnValues;
+	InteractActions.Empty();
 }
 
-void UInteractionComponent::SetInteractingAgent(IInteractionAgentInterface* InInteractingAgent)
+bool UInteractionComponent::IsInteractable() const
 {
-	if(InInteractingAgent == InteractingAgent) return;
-
-	if(InteractingAgent)
-	{
-		GetInteractionOwner()->OnLeaveInteract(InteractingAgent);
-	}
-
-	InteractingAgent = InInteractingAgent;
-
-	if(InteractingAgent)
-	{
-		GetInteractionOwner()->OnEnterInteract(InteractingAgent);
-	}
+	return GetCollisionEnabled() == ECollisionEnabled::QueryOnly;
 }
 
-UInteractionComponent* UInteractionComponent::GetInteractingComponent() const
+void UInteractionComponent::SetInteractable(bool bValue)
 {
-	if(InteractingAgent)
-	{
-		return InteractingAgent->GetInteractionComponent();
-	}
-	return nullptr;
+	SetCollisionEnabled(bValue ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
-IInteractionAgentInterface* UInteractionComponent::GetInteractionOwner() const
+IInteractionAgentInterface* UInteractionComponent::GetInteractionAgent() const
 {
 	return Cast<IInteractionAgentInterface>(GetOwner());
 }

@@ -142,9 +142,9 @@ public:
 	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 public:
-	virtual bool GenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
-	virtual bool DestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound

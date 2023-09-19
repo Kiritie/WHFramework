@@ -52,7 +52,7 @@ FString UVoxel::ToData()
 
 void UVoxel::RefreshData()
 {
-	Item.RefreshData(this);
+	Item.RefreshData(*this, true);
 }
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -112,17 +112,17 @@ void UVoxel::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& I
 	
 }
 
-bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EVoxelInteractType InInteractType, const FVoxelHitResult& InHitResult)
+bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
 {
-	switch (InInteractType)
+	switch (InInteractAction)
 	{
-		case EVoxelInteractType::Action1:
+		case EInputInteractAction::Action1:
 		{
-			return InAgent->DestroyVoxel(InHitResult);
+			return InAgent->OnDestroyVoxel(InHitResult);
 		}
-		case EVoxelInteractType::Action2:
+		case EInputInteractAction::Action2:
 		{
-			return InAgent->GenerateVoxel(InHitResult);
+			return InAgent->OnGenerateVoxel(InHitResult);
 		}
 		default: break;
 	}

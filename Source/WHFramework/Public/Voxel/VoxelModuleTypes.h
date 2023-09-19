@@ -19,14 +19,6 @@ class AVoxelAuxiliary;
 class UVoxel;
 
 UENUM(BlueprintType)
-enum class EVoxelInteractType : uint8
-{
-	Action1,
-	Action2,
-	Action3
-};
-
-UENUM(BlueprintType)
 enum class EVoxelRaycastType : uint8
 {
 	FromAimPoint,
@@ -327,7 +319,9 @@ public:
 
 	void OnDestroy(IVoxelAgentInterface* InAgent = nullptr);
 
-	void RefreshData(UVoxel* InVoxel = nullptr);
+	void RefreshData(bool bOrigin = false);
+
+	void RefreshData(UVoxel& InVoxel, bool bOrigin = false);
 
 	FString ToSaveData(bool bRefresh = false) const;
 
@@ -337,6 +331,8 @@ public:
 	bool IsUnknown() const;
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
+
+	FVoxelItem ReplaceID(const FPrimaryAssetId& InID) const;
 
 	FVoxelItem& GetMain() const;
 
@@ -405,7 +401,7 @@ public:
 	
 	FVoxelHitResult(const FHitResult& InHitResult);
 	
-	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal);
+	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint = FVector::ZeroVector, FVector InNormal = FVector::ZeroVector);
 
 public:
 	bool IsValid() const;

@@ -19,5 +19,11 @@ public:
 	UVoxelInteractionComponent(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual bool DoInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction) override;
+	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
+
+	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex) override;
+
+	virtual void OnAgentEnter(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnAgentLeave(IInteractionAgentInterface* InInteractionAgent) override;
 };

@@ -195,6 +195,11 @@ void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 	FSM->SwitchDefaultState();
 }
 
+bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
+{
+	return false;
+}
+
 void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
@@ -203,12 +208,7 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 {
 }
 
-bool AAbilityVitalityBase::CanInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
-{
-	return false;
-}
-
-void AAbilityVitalityBase::OnInteract(IInteractionAgentInterface* InInteractionAgent, EInteractAction InInteractAction)
+void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
 	
 }
@@ -257,14 +257,14 @@ void AAbilityVitalityBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 }
 
-bool AAbilityVitalityBase::GenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool AAbilityVitalityBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::GenerateVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
 }
 
-bool AAbilityVitalityBase::DestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+bool AAbilityVitalityBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
-	return IVoxelAgentInterface::DestroyVoxel(InVoxelHitResult);
+	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
