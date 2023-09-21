@@ -4,7 +4,7 @@
 #include "Asset/AssetManagerBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Abilities/GameplayAbility.h"
-#include "Global/Base/WHObject.h"
+#include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
 
@@ -15,8 +15,8 @@ class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
-class UWidgetInventorySlotBase;
-class UInventorySlot;
+class UWidgetAbilityInventorySlotBase;
+class UAbilityInventorySlot;
 
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -621,7 +621,7 @@ public:
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryRefresh);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UInventorySlot*, InInventorySlot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlot*, InInventorySlot);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotRefresh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
@@ -647,10 +647,10 @@ public:
 	FORCEINLINE FQueryItemInfo()
 	{
 		Item = FAbilityItem();
-		Slots = TArray<UInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlot*>();
 	}
 
-	FORCEINLINE FQueryItemInfo(FAbilityItem InItem, TArray<UInventorySlot*> InSlots)
+	FORCEINLINE FQueryItemInfo(FAbilityItem InItem, TArray<UAbilityInventorySlot*> InSlots)
 	{
 		Item = InItem;
 		Slots = InSlots;
@@ -660,7 +660,7 @@ public:
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TArray<UInventorySlot*> Slots;
+	TArray<UAbilityInventorySlot*> Slots;
 
 public:
 	FORCEINLINE bool IsSuccess() const
@@ -722,11 +722,11 @@ struct WHFRAMEWORK_API FSplitSlotData
 public:
 	FORCEINLINE FSplitSlotData()
 	{
-		Slots = TArray<UInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlot*>();
 	}
 	
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UInventorySlot*> Slots;
+	TArray<UAbilityInventorySlot*> Slots;
 };
 
 USTRUCT(BlueprintType)
@@ -737,11 +737,11 @@ struct WHFRAMEWORK_API FWidgetSplitSlotData
 public:
 	FORCEINLINE FWidgetSplitSlotData()
 	{
-		Slots = TArray<UWidgetInventorySlotBase*>();
+		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UWidgetInventorySlotBase*> Slots;
+	TArray<UWidgetAbilityInventorySlotBase*> Slots;
 };
 
 USTRUCT(BlueprintType)
@@ -960,17 +960,24 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 Level;
-		
-	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
 
 	UPROPERTY()
 	FVector SpawnLocation;
 	
 	UPROPERTY()
 	FRotator SpawnRotation;
+		
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
 
 public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		InventoryData.MakeSaved();
+	}
+
 	template<class T>
 	T& GetVitalityData() const
 	{

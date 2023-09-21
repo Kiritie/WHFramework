@@ -3,17 +3,12 @@
 #include "Step/StepBlueprintFactory.h"
 
 #include "BlueprintEditorSettings.h"
-#include "ClassViewerFilter.h"
-#include "K2Node_Event.h"
-#include "SlateOptMacros.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Step/StepGraph.h"
 #include "Step/StepGraphSchema.h"
 #include "Step/Base/StepBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Step/Base/StepBlueprint.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Debug/DebugModuleTypes.h"
 
 #define LOCTEXT_NAMESPACE "StepBlueprintFactory"
 

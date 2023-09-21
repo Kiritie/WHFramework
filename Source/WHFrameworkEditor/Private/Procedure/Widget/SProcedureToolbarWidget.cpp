@@ -4,9 +4,6 @@
 #include "Procedure/Widget/SProcedureToolbarWidget.h"
 
 #include "SlateOptMacros.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Procedure/ProcedureEditorSettings.h"
-#include "Procedure/Widget/SProcedureToolbarWidget.h"
 
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
@@ -40,7 +37,7 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 				FExecuteAction::CreateRaw(this, &SProcedureToolbarWidget::OnPreviewModeToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return UGlobalBPLibrary::IsPlaying();
+					return UCommonBPLibrary::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;

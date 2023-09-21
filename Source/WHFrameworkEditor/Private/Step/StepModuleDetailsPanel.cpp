@@ -15,9 +15,6 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
-#include "Step/StepModule.h"
-#include "Step/Base/StepBase.h"
 
 FStepModuleDetailsPanel::FStepModuleDetailsPanel() {}
 

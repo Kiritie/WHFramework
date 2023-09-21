@@ -1,7 +1,6 @@
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
 
 UAbilitySkillDataBase::UAbilitySkillDataBase()
 {

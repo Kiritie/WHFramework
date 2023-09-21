@@ -3,7 +3,7 @@
 
 #include "Asset/Data/DataAssetBase.h"
 
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 
 UDataAssetBase::UDataAssetBase()
 {
@@ -13,7 +13,7 @@ UDataAssetBase::UDataAssetBase()
 void UDataAssetBase::FillData(const FString& InJsonString)
 {
 	TSharedPtr<FJsonObject> JsonObject;
-	UGlobalBPLibrary::ParseJsonObjectFromString(InJsonString, JsonObject);
+	UCommonBPLibrary::ParseJsonObjectFromString(InJsonString, JsonObject);
 	FillData(InJsonString);
 }
 

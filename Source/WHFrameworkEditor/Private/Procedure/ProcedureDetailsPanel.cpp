@@ -16,7 +16,6 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
 #include "Procedure/Base/ProcedureBase.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 

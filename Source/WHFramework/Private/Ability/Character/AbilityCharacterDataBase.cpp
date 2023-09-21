@@ -1,7 +1,6 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
 
 UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {

@@ -3,7 +3,6 @@
 
 #include "Event/EventModuleNetworkComponent.h"
 
-#include "Main/MainModule.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
 

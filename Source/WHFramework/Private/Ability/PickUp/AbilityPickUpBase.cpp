@@ -5,8 +5,8 @@
 
 #include "Ability/AbilityModule.h"
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Ability/Components/FallingMovementComponent.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
+#include "Common/Components/FallingMovementComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
@@ -49,6 +49,10 @@ void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
+	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
+
+	Item = SaveData.Item;
+	SetActorLocationAndRotation(SaveData.Location, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 }
 
 FSaveData* AAbilityPickUpBase::ToData(bool bRefresh)
@@ -62,29 +66,20 @@ FSaveData* AAbilityPickUpBase::ToData(bool bRefresh)
 	return &SaveData;
 }
 
-void AAbilityPickUpBase::Initialize_Implementation(FAbilityItem InItem)
-{
-	Item = InItem;
-}
-
 void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
 
-	if (OtherActor)
+	if(OtherActor && OtherActor->GetClass()->ImplementsInterface(UAbilityPickerInterface::StaticClass()))
 	{
-		if (OtherActor->GetClass()->ImplementsInterface(UAbilityPickerInterface::StaticClass()))
-		{
-			OnPickUp(OtherActor);
-		}
+		OnPickUp(OtherActor);
 	}
 }
 
 void AAbilityPickUpBase::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
 {
-	if(InPicker)
+	if(InPicker && InPicker->Execute_OnPickUp(InPicker.GetObject(), this))
 	{
-		InPicker->PickUp(this);
+		UObjectPoolModuleBPLibrary::DespawnObject(this);
 	}
-	UObjectPoolModuleBPLibrary::DespawnObject(this);
 }

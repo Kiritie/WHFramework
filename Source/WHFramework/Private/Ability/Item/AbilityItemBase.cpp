@@ -5,7 +5,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 
 // Sets default values
 AAbilityItemBase::AAbilityItemBase()

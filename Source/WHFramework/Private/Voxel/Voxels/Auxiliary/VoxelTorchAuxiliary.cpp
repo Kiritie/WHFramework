@@ -5,7 +5,6 @@
 #include "Components/PointLightComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Datas/VoxelTorchData.h"
 

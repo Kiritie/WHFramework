@@ -7,11 +7,7 @@
 #include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
-#include "SSkeletonWidget.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
+#include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Procedure/ProcedureBlueprintFactory.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/ProcedureModule.h"
@@ -388,7 +384,7 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewProcedure && OldProcedure)
 				{
-					UGlobalBPLibrary::ExportPropertiesToObject(OldProcedure, NewProcedure);
+					UCommonBPLibrary::ExportPropertiesToObject(OldProcedure, NewProcedure);
 					ProcedureModule->GetProcedures().EmplaceAt(OldProcedure->ProcedureIndex, NewProcedure);
 					ProcedureModule->GetProcedureMap().Remove(OldProcedure->GetClass());
 					ProcedureModule->GetProcedureMap().Add(OldProcedure->GetClass(), OldProcedure);

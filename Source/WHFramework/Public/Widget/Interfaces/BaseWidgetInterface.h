@@ -5,7 +5,6 @@
 #include "TickAbleWidgetInterface.h"
 
 #include "Input/InputModuleTypes.h"
-#include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Widgets/Layout/Anchors.h"

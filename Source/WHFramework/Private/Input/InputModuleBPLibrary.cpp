@@ -3,9 +3,8 @@
 
 #include "Input/InputModuleBPLibrary.h"
 
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
-#include "Main/MainModule.h"
 
 int32 UInputModuleBPLibrary::GetTouchPressedCount()
 {
@@ -70,7 +69,7 @@ void UInputModuleBPLibrary::UpdateGlobalInputMode()
 
 void UInputModuleBPLibrary::BindInputKey(const FKey Key, const EInputEvent KeyEvent, const FInputActionHandlerDynamicSignature& Delegate)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		FInputKeyBinding KB(FInputChord(Key, false, false, false, false), KeyEvent);
 		KB.KeyDelegate = FInputActionUnifiedDelegate(Delegate);
@@ -80,7 +79,7 @@ void UInputModuleBPLibrary::BindInputKey(const FKey Key, const EInputEvent KeyEv
 
 void UInputModuleBPLibrary::BindInputAction(const FName ActionName, const EInputEvent KeyEvent, const FInputActionHandlerDynamicSignature& Delegate)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		FInputActionBinding AB(ActionName, KeyEvent);
 		AB.ActionDelegate = FInputActionUnifiedDelegate(Delegate);
@@ -90,7 +89,7 @@ void UInputModuleBPLibrary::BindInputAction(const FName ActionName, const EInput
 
 void UInputModuleBPLibrary::BindInputAxis(const FName AxisName, const FInputAxisHandlerDynamicSignature& Delegate)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		FInputAxisBinding AB(AxisName);
 		AB.AxisDelegate.BindDelegate(const_cast<UObject*>(Delegate.GetUObject()), Delegate.GetFunctionName());
@@ -100,7 +99,7 @@ void UInputModuleBPLibrary::BindInputAxis(const FName AxisName, const FInputAxis
 
 void UInputModuleBPLibrary::BindInputTouch(const EInputEvent KeyEvent, const FInputTouchHandlerDynamicSignature& Delegate)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		FInputTouchBinding TB(KeyEvent);
 		TB.TouchDelegate.BindDelegate(const_cast<UObject*>(Delegate.GetUObject()), Delegate.GetFunctionName());

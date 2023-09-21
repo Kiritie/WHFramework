@@ -4,10 +4,8 @@
 
 
 #include "Task/TaskModuleTypes.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalTypes.h"
-#include "Global/Base/WHObject.h"
-#include "Math/MathTypes.h"
+#include "Common/CommonTypes.h"
+#include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 
 #include "TaskBase.generated.h"

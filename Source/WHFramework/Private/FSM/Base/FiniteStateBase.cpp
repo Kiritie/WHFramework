@@ -7,7 +7,7 @@
 #include "Event/Handle/FiniteState/EventHandle_EnterFiniteState.h"
 #include "Event/Handle/FiniteState/EventHandle_LeaveFiniteState.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
@@ -16,10 +16,10 @@ UFiniteStateBase::UFiniteStateBase()
 	FSM = nullptr;
 
 	const UFunction* OnEnterValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnEnterValidate")));
-	bHasBlueprintOnEnterValidate = UGlobalBPLibrary::IsImplementedInBlueprint(OnEnterValidateFunction);
+	bHasBlueprintOnEnterValidate = UCommonBPLibrary::IsImplementedInBlueprint(OnEnterValidateFunction);
 
 	const UFunction* OnLeaveValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnLeaveValidate")));
-	bHasBlueprintOnLeaveValidate = UGlobalBPLibrary::IsImplementedInBlueprint(OnLeaveValidateFunction);
+	bHasBlueprintOnLeaveValidate = UCommonBPLibrary::IsImplementedInBlueprint(OnLeaveValidateFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -50,7 +50,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	if(FSM->bShowDebugMessage)
 	{
-		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDebugCategory::FSM);
+		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
 	K2_OnEnter(InLastFiniteState);
@@ -73,7 +73,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	if(FSM->bShowDebugMessage)
 	{
-		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDebugCategory::FSM);
+		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
 	K2_OnLeave(InNextFiniteState);

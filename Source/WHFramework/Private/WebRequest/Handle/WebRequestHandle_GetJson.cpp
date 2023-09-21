@@ -3,7 +3,7 @@
 
 #include "WebRequest/Handle/WebRequestHandle_GetJson.h"
 
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 
 UWebRequestHandle_GetJson::UWebRequestHandle_GetJson()
@@ -22,7 +22,7 @@ void UWebRequestHandle_GetJson::Fill(const FWebRequestResult& InResult, const TA
 {
 	if(InResult.bSucceeded)
 	{
-		if(UGlobalBPLibrary::ParseJsonObjectFromString(InResult.HttpResponse->GetContentAsString(), Json))
+		if(UCommonBPLibrary::ParseJsonObjectFromString(InResult.HttpResponse->GetContentAsString(), Json))
 		{
 			bSucceeded = true;
 		}

@@ -2,11 +2,8 @@
 
 #include "SaveGame/Module/ParameterSaveGame.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
+#include "Common/CommonBPLibrary.h"
 #include "Parameter/ParameterModule.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
 
 UParameterSaveGame::UParameterSaveGame()
 {

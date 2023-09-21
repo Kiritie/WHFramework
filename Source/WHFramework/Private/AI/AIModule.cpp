@@ -3,8 +3,6 @@
 
 #include "AI/AIModule.h"
 
-#include "Net/UnrealNetwork.h"
-		
 IMPLEMENTATION_MODULE(AAIModule)
 
 // Sets default values

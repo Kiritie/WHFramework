@@ -3,8 +3,7 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/KismetMathLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
 UWorldWidgetComponent::UWorldWidgetComponent()
@@ -50,7 +49,7 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UGlobalBPLibrary::IsPlaying())
+	if(UCommonBPLibrary::IsPlaying())
 	{
 		DestroyWorldWidget();
 	}
@@ -60,11 +59,11 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if(!UGlobalBPLibrary::IsPlaying()) return;
+	if(!UCommonBPLibrary::IsPlaying()) return;
 	
 	if(bOrientCamera)
 	{
-		if(const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+		if(const AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
 			const FRotator TargetRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
 			SetWorldRotation(TargetRotation);

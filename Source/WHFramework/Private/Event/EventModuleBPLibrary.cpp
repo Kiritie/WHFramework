@@ -3,11 +3,8 @@
 
 #include "Event/EventModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
 #include "Event/EventModule.h"
 #include "Event/EventModuleNetworkComponent.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 
 void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {

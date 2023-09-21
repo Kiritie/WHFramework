@@ -3,7 +3,7 @@
 #pragma once
 
 #include "VoxelInteractAuxiliary.h"
-#include "Ability/Inventory/InventoryAgentInterface.h"
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "VoxelContainerAuxiliary.generated.h"
 
 class UVoxel;
@@ -11,7 +11,7 @@ class UVoxel;
 /**
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelContainerAuxiliary : public AVoxelInteractAuxiliary, public IInventoryAgentInterface
+class WHFRAMEWORK_API AVoxelContainerAuxiliary : public AVoxelInteractAuxiliary, public IAbilityInventoryAgentInterface
 {
 	GENERATED_BODY()
 	
@@ -43,8 +43,8 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UInventory* Inventory;
+	UAbilityInventoryBase* Inventory;
 
 public:
-	virtual UInventory* GetInventory() const override { return Inventory; }
+	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 };

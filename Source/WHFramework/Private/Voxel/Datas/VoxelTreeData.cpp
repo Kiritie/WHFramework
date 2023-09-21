@@ -1,10 +1,5 @@
 #include "Voxel/Datas/VoxelTreeData.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Voxel/Voxels/Voxel.h"
-#include "Voxel/Voxels/VoxelTree.h"
-
 UVoxelTreeData::UVoxelTreeData()
 {
 	Transparency = EVoxelTransparency::Solid;

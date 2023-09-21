@@ -5,7 +5,6 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 

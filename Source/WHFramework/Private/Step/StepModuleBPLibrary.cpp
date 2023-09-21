@@ -3,11 +3,7 @@
 
 #include "Step/StepModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Step/StepModule.h"
-#include "Step/StepModuleNetworkComponent.h"
 #include "Step/Base/StepBase.h"
 
 UStepBase* UStepModuleBPLibrary::GetCurrentStep()

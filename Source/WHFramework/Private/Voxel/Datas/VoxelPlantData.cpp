@@ -1,8 +1,5 @@
 #include "Voxel/Datas/VoxelPlantData.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelPlant.h"
 
 UVoxelPlantData::UVoxelPlantData()

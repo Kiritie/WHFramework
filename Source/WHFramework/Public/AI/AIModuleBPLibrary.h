@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "AIModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AIModuleBPLibrary.generated.h"
 /**

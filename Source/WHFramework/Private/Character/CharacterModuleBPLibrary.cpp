@@ -3,10 +3,7 @@
 
 #include "Character/CharacterModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
 #include "Character/CharacterModule.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 
 ACharacterBase* UCharacterModuleBPLibrary::GetCurrentCharacter()
 {

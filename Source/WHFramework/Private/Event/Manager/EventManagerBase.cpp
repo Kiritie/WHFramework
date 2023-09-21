@@ -4,9 +4,9 @@
 #include "Event/Manager/EventManagerBase.h"
 
 #include "Event/EventModuleBPLibrary.h"
-#include "Event/Handle/Global/EventHandle_BeginPlay.h"
-#include "Event/Handle/Global/EventHandle_EndPlay.h"
-#include "Global/GlobalTypes.h"
+#include "Event/Handle/Common/EventHandle_BeginPlay.h"
+#include "Event/Handle/Common/EventHandle_EndPlay.h"
+#include "Common/CommonTypes.h"
 
 // ParamSets default values
 AEventManagerBase::AEventManagerBase()

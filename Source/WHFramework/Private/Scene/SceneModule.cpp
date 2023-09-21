@@ -206,7 +206,7 @@ void ASceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 			UWidgetModuleBPLibrary::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
 		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([=](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDebugCategory::Scene);
+			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
 			if(Result == EAsyncLoadingResult::Failed)
 			{
 				WHLog(TEXT("Load level failed!"));

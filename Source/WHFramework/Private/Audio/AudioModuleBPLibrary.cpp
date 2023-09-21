@@ -3,10 +3,7 @@
 
 #include "Audio/AudioModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
 #include "Audio/AudioModule.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 
 void UAudioModuleBPLibrary::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {

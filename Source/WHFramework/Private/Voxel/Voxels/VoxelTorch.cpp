@@ -3,7 +3,6 @@
 
 #include "Voxel/Voxels/VoxelTorch.h"
 
-#include "Components/PointLightComponent.h"
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"
 
 UVoxelTorch::UVoxelTorch()

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 
 #include "EventManagerBase.generated.h"
 

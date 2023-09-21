@@ -3,8 +3,7 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "Global/Base/WHActor.h"
-#include "Scene/Actor/SceneActorInterface.h"
+#include "Common/Base/WHActor.h"
 
 #include "CountdownBase.generated.h"
 

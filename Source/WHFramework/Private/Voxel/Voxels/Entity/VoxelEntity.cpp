@@ -3,8 +3,6 @@
 
 #include "Voxel/Voxels/Entity/VoxelEntity.h"
 
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"

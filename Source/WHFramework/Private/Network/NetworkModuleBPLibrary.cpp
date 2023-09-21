@@ -4,10 +4,8 @@
 #include "Network/NetworkModuleBPLibrary.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
+#include "Common/CommonBPLibrary.h"
 #include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Network/NetworkModule.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 
@@ -113,9 +111,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFunc(AActor* InActor, FName InFu
 	
 	if (InActor->GetWorld()->GetNetMode() != ENetMode::NM_Client)
 	{
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, nullptr))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, nullptr))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -130,9 +128,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncOneParam(AActor* InActor, FN
 	
 	if (InActor->GetWorld()->GetNetMode() != ENetMode::NM_Client)
 	{
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &InParam))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &InParam))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -153,9 +151,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncTwoParam(AActor* InActor, FN
 			FParameter Param2;
 		} Params{InParam1, InParam2};
 		
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -177,9 +175,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncThreeParam(AActor* InActor, 
 			FParameter Param3;
 		} Params{InParam1, InParam2, InParam3};
 		
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -202,9 +200,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncFourParam(AActor* InActor, F
 			FParameter Param4;
 		} Params{InParam1, InParam2, InParam3, InParam4};
 
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())
@@ -228,9 +226,9 @@ void UNetworkModuleBPLibrary::ServerExecuteActorFuncFiveParam(AActor* InActor, F
 			FParameter Param5;
 		} Params{InParam1, InParam2, InParam3, InParam4, InParam5};
 		
-		if (UGlobalBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonBPLibrary::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
-			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDebugCategory::Network);
+			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
 	}
 	else if(UNetworkModuleNetworkComponent* NetworkModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UNetworkModuleNetworkComponent>())

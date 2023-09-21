@@ -3,14 +3,8 @@
 
 #include "Voxel/Voxels/VoxelContainer.h"
 
-#include "Ability/Inventory/Inventory.h"
-#include "Audio/AudioModuleBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
-#include "Voxel/Datas/VoxelContainerData.h"
 #include "Voxel/Voxels/Auxiliary/VoxelContainerAuxiliary.h"
 
 UVoxelContainer::UVoxelContainer()

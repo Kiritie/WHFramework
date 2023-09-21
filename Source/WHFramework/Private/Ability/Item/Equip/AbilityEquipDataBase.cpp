@@ -1,8 +1,6 @@
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 
-#include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
 
 UAbilityEquipDataBase::UAbilityEquipDataBase()
 {

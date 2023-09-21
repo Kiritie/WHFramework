@@ -13,13 +13,12 @@
 #include "Ability/Character/States/AbilityCharacterState_Static.h"
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
-#include "Ability/Components/CharacterInteractionComponent.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Common/CommonBPLibrary.h"
 #include "Scene/SceneModuleBPLibrary.h"
-#include "Ability/Inventory/CharacterInventory.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -37,7 +36,7 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 	
 	//Inventory = CreateDefaultSubobject<UCharacterInventory>(FName("Inventory"));
 
-	Interaction = CreateDefaultSubobject<UCharacterInteractionComponent>(FName("Interaction"));
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
@@ -108,6 +107,43 @@ void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 	Level = 0;
 
 	Inventory->UnloadSaveData();
+}
+
+void AAbilityCharacterBase::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
+
+	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
+	{
+		float BaseValue = 0.f;
+		float CurrentValue = 0.f;
+		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
+		{
+			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
+			{
+				if(Ar.IsLoading())
+				{
+					Ar << BaseValue;
+					Ar << CurrentValue;
+					AttributeData->SetBaseValue(BaseValue);
+					AttributeData->SetCurrentValue(CurrentValue);
+				}
+				else if(Ar.IsSaving())
+				{
+					BaseValue = AttributeData->GetBaseValue();
+					CurrentValue = AttributeData->GetCurrentValue();
+					Ar << BaseValue;
+					Ar << CurrentValue;
+				}
+			}
+		}
+	}
+	if(Ar.IsLoading())
+	{
+		RefreshAttributes();
+	}
 }
 
 void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -216,43 +252,6 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 	}
 }
 
-void AAbilityCharacterBase::Serialize(FArchive& Ar)
-{
-	Super::Serialize(Ar);
-
-	if(!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
-
-	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
-	{
-		float BaseValue = 0.f;
-		float CurrentValue = 0.f;
-		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
-		{
-			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
-			{
-				if(Ar.IsLoading())
-				{
-					Ar << BaseValue;
-					Ar << CurrentValue;
-					AttributeData->SetBaseValue(BaseValue);
-					AttributeData->SetCurrentValue(CurrentValue);
-				}
-				else if(Ar.IsSaving())
-				{
-					BaseValue = AttributeData->GetBaseValue();
-					CurrentValue = AttributeData->GetCurrentValue();
-					Ar << BaseValue;
-					Ar << CurrentValue;
-				}
-			}
-		}
-	}
-	if(Ar.IsLoading())
-	{
-		RefreshAttributes();
-	}
-}
-
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
@@ -300,12 +299,14 @@ void AAbilityCharacterBase::UnJump()
 	}
 }
 
-void AAbilityCharacterBase::PickUp(AAbilityPickUpBase* InPickUp)
+bool AAbilityCharacterBase::OnPickUp_Implementation(AAbilityPickUpBase* InPickUp)
 {
 	if(InPickUp)
 	{
 		Inventory->AddItemByRange(InPickUp->GetItem(), -1);
+		return InPickUp->GetItem().Count <= 0;
 	}
+	return false;
 }
 
 bool AAbilityCharacterBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
@@ -385,7 +386,7 @@ UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 	return Interaction;
 }
 
-UInventory* AAbilityCharacterBase::GetInventory() const
+UAbilityInventoryBase* AAbilityCharacterBase::GetInventory() const
 {
 	return Inventory;
 }
@@ -522,12 +523,17 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UGlobalBPLibrary::GetPlayerPawn() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UCommonBPLibrary::GetPlayerPawn() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
 
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
+}
+
+bool AAbilityCharacterBase::IsTargetable_Implementation() const
+{
+	return !IsDead();
 }
 
 void AAbilityCharacterBase::OnRep_Controller()

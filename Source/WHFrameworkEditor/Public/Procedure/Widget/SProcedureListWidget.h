@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ClassViewerModule.h"
-#include "WHFrameworkEditorStyle.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
 #include "Widget/SEditorWidgetBase.h"

@@ -4,7 +4,6 @@
 
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Scene/Actor/SceneActorInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelAuxiliary.generated.h"

@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "AIModuleTypes.h"
 #include "Main/Base/ModuleNetworkComponentBase.h"
 
 #include "AIModuleNetworkComponent.generated.h"

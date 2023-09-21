@@ -2,8 +2,6 @@
 
 #include "FSM/FiniteStateGraphSchema.h"
 
-#include "EdGraphSchema_K2_Actions.h"
-#include "Kismet2/BlueprintEditorUtils.h"
 
 UFiniteStateGraphSchema::UFiniteStateGraphSchema(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer) {}

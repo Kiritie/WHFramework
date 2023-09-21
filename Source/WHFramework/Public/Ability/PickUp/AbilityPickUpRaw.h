@@ -19,9 +19,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* MeshComponent;
 
-public:
-	virtual void Initialize_Implementation(FAbilityItem InItem) override;
-
 protected:
 	virtual void OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker) override;
 

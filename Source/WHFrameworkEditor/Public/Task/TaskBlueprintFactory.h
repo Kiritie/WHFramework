@@ -7,7 +7,7 @@
 #include "Templates/SubclassOf.h"
 #include "Engine/Blueprint.h"
 #include "Factories/Factory.h"
-#include "Global/Blueprint/Factory/BlueprintFactoryBase.h"
+#include "Common/Blueprint/Factory/BlueprintFactoryBase.h"
 #include "TaskBlueprintFactory.generated.h"
 
 UCLASS(HideCategories=Object, MinimalAPI)

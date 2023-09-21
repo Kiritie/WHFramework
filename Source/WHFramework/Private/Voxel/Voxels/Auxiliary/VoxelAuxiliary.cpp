@@ -3,12 +3,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-#include "Ability/Components/VoxelInteractionComponent.h"
-#include "Ability/Inventory/Inventory.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Chunks/VoxelChunk.h"
 
 AVoxelAuxiliary::AVoxelAuxiliary()
 {

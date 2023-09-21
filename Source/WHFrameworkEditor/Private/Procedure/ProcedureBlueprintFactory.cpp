@@ -3,17 +3,12 @@
 #include "Procedure/ProcedureBlueprintFactory.h"
 
 #include "BlueprintEditorSettings.h"
-#include "ClassViewerFilter.h"
-#include "K2Node_Event.h"
-#include "SlateOptMacros.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Procedure/ProcedureGraph.h"
 #include "Procedure/ProcedureGraphSchema.h"
 #include "Procedure/Base/ProcedureBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Debug/DebugModuleTypes.h"
 
 #define LOCTEXT_NAMESPACE "ProcedureBlueprintFactory"
 

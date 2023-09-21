@@ -4,9 +4,6 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelDoorAuxiliary.h"
 
-#include "Ability/Components/VoxelInteractionComponent.h"
-#include "Voxel/Voxels/VoxelDoor.h"
-
 // Sets default values
 AVoxelDoorAuxiliary::AVoxelDoorAuxiliary()
 {

@@ -11,14 +11,9 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
-#include "DetailCategoryBuilder.h"
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
-#include "Camera/CameraModule.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalTypes.h"
 #include "Main/MainModule.h"
 
 FMainModuleDetailsPanel::FMainModuleDetailsPanel() {}

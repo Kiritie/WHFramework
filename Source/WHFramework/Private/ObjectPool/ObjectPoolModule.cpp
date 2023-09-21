@@ -4,7 +4,9 @@
 #include "ObjectPool/ObjectPoolModule.h"
 
 #include "ObjectPool/ObjectPool.h"
-		
+#include "ObjectPool/Actor/ActorPool.h"
+#include "ObjectPool/Widget/WidgetPool.h"
+
 IMPLEMENTATION_MODULE(AObjectPoolModule)
 
 // Sets default values

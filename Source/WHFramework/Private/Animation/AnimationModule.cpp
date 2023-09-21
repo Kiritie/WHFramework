@@ -125,7 +125,7 @@ void AAnimationModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint,
 				}
 				else
 				{
-					WHLog(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"), EDebugCategory::Default, EDebugVerbosity::Warning);
+					WHLog(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换"), EDC_Default, EDV_Warning);
 				}
 			}
 			else if (MoveAction == EMoveActorAction::Stop)
@@ -184,7 +184,7 @@ void AAnimationModule::RotatorActorTo(AActor* InActor, FRotator InRotator, float
 				}
 				else
 				{
-					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDebugCategory::Default, EDebugVerbosity::Warning);
+					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDC_Default, EDV_Warning);
 				}
 			}
 			
@@ -240,7 +240,7 @@ void AAnimationModule::ScaleActorTo(AActor* InActor, FVector InScale, float Appl
 				}
 				else
 				{
-					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDebugCategory::Default, EDebugVerbosity::Warning);
+					WHLog(FString::Printf(TEXT("请求执行失败 ,因为当前的Actor正在进行插值变换")), EDC_Default, EDV_Warning);
 				}
 			}
 			

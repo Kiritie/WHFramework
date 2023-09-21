@@ -4,7 +4,6 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
-#include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
 {

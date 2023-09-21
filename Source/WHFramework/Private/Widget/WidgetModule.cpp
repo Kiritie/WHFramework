@@ -5,9 +5,6 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/CanvasPanel.h"
-#include "Kismet/GameplayStatics.h"
-#include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
 IMPLEMENTATION_MODULE(AWidgetModule)

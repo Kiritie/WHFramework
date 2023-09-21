@@ -7,7 +7,6 @@
 #include "GameFramework/Actor.h"
 #include "Input/InputManager.h"
 #include "Input/InputModule.h"
-#include "Main/MainModule.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
@@ -165,7 +164,7 @@ public:
 		if(!UserWidgetClassMap.Contains(InName))
 		{
 			ensureEditor(true);
-			WHLog(FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDebugCategory::Widget, EDebugVerbosity::Warning);
+			WHLog(FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
 			return nullptr;
 		}
 
@@ -593,7 +592,7 @@ public:
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
 			ensureEditor(false);
-			WHLog(FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDebugCategory::Widget, EDebugVerbosity::Warning);
+			WHLog(FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
 			return nullptr;
 		}
 		

@@ -3,11 +3,7 @@
 
 #include "Task/TaskModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Task/TaskModule.h"
-#include "Task/TaskModuleNetworkComponent.h"
 #include "Task/Base/TaskBase.h"
 
 UTaskBase* UTaskModuleBPLibrary::GetCurrentTask()

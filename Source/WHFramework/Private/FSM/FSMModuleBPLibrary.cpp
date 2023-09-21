@@ -3,6 +3,8 @@
 
 #include "FSM/FSMModuleBPLibrary.h"
 
+#include "FSM/FSMModule.h"
+
 void UFSMModuleBPLibrary::RegisterFSM(UFSMComponent* InFSM)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
@@ -19,68 +21,50 @@ void UFSMModuleBPLibrary::UnregisterFSM(UFSMComponent* InFSM)
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupStateByIndex(const FName InFSMGroup, int32 InStateIndex)
+void UFSMModuleBPLibrary::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupStateByIndex(InFSMGroup, InStateIndex);
+		FSMModule->SwitchGroupStateByIndex(InGroupName, InStateIndex);
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupStateByClass(const FName InFSMGroup, TSubclassOf<UFiniteStateBase> InStateClass)
+void UFSMModuleBPLibrary::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupStateByClass(InFSMGroup, InStateClass);
+		FSMModule->SwitchGroupStateByClass(InGroupName, InStateClass);
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupDefaultState(const FName InFSMGroup)
+void UFSMModuleBPLibrary::SwitchGroupDefaultState(const FName InGroupName)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupDefaultState(InFSMGroup);
+		FSMModule->SwitchGroupDefaultState(InGroupName);
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupFinalState(const FName InFSMGroup)
+void UFSMModuleBPLibrary::SwitchGroupFinalState(const FName InGroupName)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupFinalState(InFSMGroup);
+		FSMModule->SwitchGroupFinalState(InGroupName);
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupLastState(const FName InFSMGroup)
+void UFSMModuleBPLibrary::SwitchGroupLastState(const FName InGroupName)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupLastState(InFSMGroup);
+		FSMModule->SwitchGroupLastState(InGroupName);
 	}
 }
 
-void UFSMModuleBPLibrary::SwitchFSMGroupNextState(const FName InFSMGroup)
+void UFSMModuleBPLibrary::SwitchGroupNextState(const FName InGroupName)
 {
 	if(AFSMModule* FSMModule = AFSMModule::Get())
 	{
-		FSMModule->SwitchFSMGroupNextState(InFSMGroup);
+		FSMModule->SwitchGroupNextState(InGroupName);
 	}
-}
-
-bool UFSMModuleBPLibrary::HasFSMGroup(const FName InFSMGroup)
-{
-	if(AFSMModule* FSMModule = AFSMModule::Get())
-	{
-		return FSMModule->HasFSMGroup(InFSMGroup);
-	}
-	return false;
-}
-
-TArray<UFSMComponent*> UFSMModuleBPLibrary::GetFSMGroupArray(const FName InFSMGroup)
-{
-	if(AFSMModule* FSMModule = AFSMModule::Get())
-	{
-		return FSMModule->GetFSMGroupArray(InFSMGroup);
-	}
-	return TArray<UFSMComponent*>();
 }

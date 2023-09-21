@@ -5,7 +5,7 @@
 
 #include "PhysicsVolumeTypes.h"
 #include "GameFramework/PhysicsVolume.h"
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 

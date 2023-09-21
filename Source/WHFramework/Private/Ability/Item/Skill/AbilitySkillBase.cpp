@@ -9,6 +9,7 @@
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 
 AAbilitySkillBase::AAbilitySkillBase()
 {

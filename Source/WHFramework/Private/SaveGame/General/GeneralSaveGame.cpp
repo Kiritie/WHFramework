@@ -3,7 +3,7 @@
 #include "SaveGame/General/GeneralSaveGame.h"
 
 #include "Camera/CameraModuleBPLibrary.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModule.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"

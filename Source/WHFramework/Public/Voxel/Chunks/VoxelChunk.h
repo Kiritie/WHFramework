@@ -3,7 +3,6 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"

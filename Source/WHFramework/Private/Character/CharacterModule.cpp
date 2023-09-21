@@ -6,7 +6,7 @@
 #include "Camera/CameraModuleBPLibrary.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 		
 IMPLEMENTATION_MODULE(ACharacterModule)
@@ -117,7 +117,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 {
 	if(!CurrentCharacter || CurrentCharacter != InCharacter)
 	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+		if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
 			if(InCharacter)
 			{

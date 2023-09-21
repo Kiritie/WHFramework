@@ -5,16 +5,14 @@
 
 #include "Main/MainModule.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Engine/ActorChannel.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/EventModuleNetworkComponent.h"
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
-#include "Network/NetworkModuleBPLibrary.h"
-		
+
 IMPLEMENTATION_MODULE(AEventModule)
 
 // ParamSets default values
@@ -206,9 +204,9 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{
-				if (EventHandle->Filter(Iter1.Key, Iter2) && UGlobalBPLibrary::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
+				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonBPLibrary::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
-					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDebugCategory::Event);
+					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDC_Event);
 				}
 			}
 		}

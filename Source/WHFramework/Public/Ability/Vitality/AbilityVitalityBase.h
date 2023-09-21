@@ -5,29 +5,30 @@
 #include "AbilityVitalityInterface.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
-#include "Ability/Interaction/InteractionAgentInterface.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "../Inventory/InventoryAgentInterface.h"
+#include "../Inventory/AbilityInventoryAgentInterface.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 
 #include "AbilityVitalityBase.generated.h"
 
 class UFSMComponent;
-class UVitalityInteractionComponent;
+class UInteractionComponent;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
-class UVitalityInventory;
+class UAbilityVitalityInventoryBase;
 
 /**
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IInventoryAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -49,10 +50,10 @@ protected:
 	UVitalityAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityInteractionComponent* Interaction;
+	UInteractionComponent* Interaction;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityInventory* Inventory;
+	UAbilityVitalityInventoryBase* Inventory;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
@@ -159,7 +160,7 @@ public:
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	
-	virtual UInventory* GetInventory() const override;
+	virtual UAbilityInventoryBase* GetInventory() const override;
 
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 

@@ -3,7 +3,6 @@
 
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 
-#include "ISinglePropertyView.h"
 #include "SlateOptMacros.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureBase.h"

@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "AIModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "AIModule.generated.h"

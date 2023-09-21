@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "SaveGame/SaveGameModuleTypes.h"
-
 #include "SceneModuleTypes.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);

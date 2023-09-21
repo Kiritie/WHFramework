@@ -3,7 +3,6 @@
 
 #include "Task/Widget/STaskDetailsWidget.h"
 
-#include "ISinglePropertyView.h"
 #include "SlateOptMacros.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskBase.h"

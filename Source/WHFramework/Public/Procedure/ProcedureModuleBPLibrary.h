@@ -3,10 +3,8 @@
 #pragma once
 
 #include "ProcedureModule.h"
-#include "ProcedureModuleTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Main/MainModule.h"
 
 #include "ProcedureModuleBPLibrary.generated.h"
 

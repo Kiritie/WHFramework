@@ -4,7 +4,6 @@
 
 #include "Engine/DirectionalLight.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 
 UWorldTimerComponent::UWorldTimerComponent()

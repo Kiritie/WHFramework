@@ -5,8 +5,6 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Components/BoxComponent.h"
 
 AAbilityEquipBase::AAbilityEquipBase()
 {

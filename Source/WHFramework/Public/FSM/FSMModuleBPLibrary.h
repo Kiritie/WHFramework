@@ -2,11 +2,9 @@
 
 #pragma once
 
-#include "FSMModule.h"
 #include "FSMModuleTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Main/MainModule.h"
 
 #include "FSMModuleBPLibrary.generated.h"
 
@@ -32,30 +30,23 @@ public:
 	/// FSMGroup
 public:
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupStateByIndex(const FName InFSMGroup, int32 InStateIndex);
+	static void SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex);
 
 	template<class T>
-	static void SwitchFSMGroupStateByClass(const FName InFSMGroup) { SwitchFSMGroupStateByClass(T::StaticClass()); }
+	static void SwitchGroupStateByClass(const FName InGroupName) { SwitchGroupStateByClass(InGroupName, T::StaticClass()); }
 
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupStateByClass(const FName InFSMGroup, TSubclassOf<UFiniteStateBase> InStateClass);
+	static void SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass);
 
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupDefaultState(const FName InFSMGroup);
+	static void SwitchGroupDefaultState(const FName InGroupName);
 
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupFinalState(const FName InFSMGroup);
+	static void SwitchGroupFinalState(const FName InGroupName);
 
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupLastState(const FName InFSMGroup);
+	static void SwitchGroupLastState(const FName InGroupName);
 
 	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static void SwitchFSMGroupNextState(const FName InFSMGroup);
-
-public:
-	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static bool HasFSMGroup(const FName InFSMGroup);
-
-	UFUNCTION(BlueprintCallable, Category = "FSMModuleBPLibrary")
-	static TArray<UFSMComponent*> GetFSMGroupArray(const FName InFSMGroup);
+	static void SwitchGroupNextState(const FName InGroupName);
 };

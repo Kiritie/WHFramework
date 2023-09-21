@@ -4,7 +4,7 @@
 
 
 #include "Event/EventModuleTypes.h"
-#include "Global/Base/WHObject.h"
+#include "Common/Base/WHObject.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "EventHandleBase.generated.h"

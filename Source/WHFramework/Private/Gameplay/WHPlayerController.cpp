@@ -2,24 +2,15 @@
 
 #include "Gameplay/WHPlayerController.h"
 
-#include "Net/UnrealNetwork.h"
 #include "Audio/AudioModuleNetworkComponent.h"
-#include "Camera/CameraModule.h"
 #include "Camera/CameraModuleNetworkComponent.h"
-#include "Camera/Base/CameraPawnBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Components/WidgetInteractionComponent.h"
-#include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleNetworkComponent.h"
-#include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
-#include "Input/InputModuleBPLibrary.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
-#include "Main/MainModule.h"
-#include "Math/MathBPLibrary.h"
 #include "Media/MediaModuleNetworkComponent.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 #include "Procedure/ProcedureModule.h"
@@ -129,7 +120,7 @@ bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollis
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }
@@ -146,7 +137,7 @@ bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, EC
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UGlobalBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }

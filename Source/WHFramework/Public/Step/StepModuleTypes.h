@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "UObject/NoExportTypes.h"
 #include "StepModuleTypes.generated.h"
 
 UENUM(BlueprintType)

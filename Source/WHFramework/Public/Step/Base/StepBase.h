@@ -4,8 +4,7 @@
 
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalTypes.h"
-#include "Global/Base/WHObject.h"
+#include "Common/Base/WHObject.h"
 #include "Math/MathTypes.h"
 #include "Camera/CameraModuleTypes.h"
 
@@ -481,7 +480,7 @@ public:
 
 		OnExecuteDelegate.Broadcast();
 
-		WHLog(FString::Printf(TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString()), EDebugCategory::Step);
+		WHLog(FString::Printf(TEXT("ExecuteStepTask : TaskName = %s"), *TaskName.ToString()), EDC_Step);
 	}
 
 	void TryComplete(float DeltaSeconds)

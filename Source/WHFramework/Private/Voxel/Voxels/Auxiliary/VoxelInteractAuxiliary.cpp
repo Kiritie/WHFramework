@@ -4,7 +4,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
-#include "Ability/Components/VoxelInteractionComponent.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Datas/VoxelInteractData.h"
@@ -13,7 +13,7 @@
 // Sets default values
 AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 {
-	Interaction = CreateDefaultSubobject<UVoxelInteractionComponent>(FName("Interaction"));
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
 }

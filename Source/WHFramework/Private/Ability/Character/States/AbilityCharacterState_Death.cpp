@@ -9,8 +9,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
-#include "Ability/Components/InteractionComponent.h"
 #include "AI/Base/AIControllerBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {

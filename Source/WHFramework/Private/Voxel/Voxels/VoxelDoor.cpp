@@ -3,13 +3,7 @@
 
 #include "Voxel/Voxels/VoxelDoor.h"
 
-#include "Audio/AudioModuleBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
-#include "Voxel/Datas/VoxelDoorData.h"
 
 UVoxelDoor::UVoxelDoor()
 {

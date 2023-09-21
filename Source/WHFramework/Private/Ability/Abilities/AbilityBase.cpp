@@ -1,6 +1,5 @@
 #include "Ability/Abilities/AbilityBase.h"
 
-#include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 
 UAbilityBase::UAbilityBase()

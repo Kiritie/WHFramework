@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 
 #include "Media/MediaModuleTypes.h"
 

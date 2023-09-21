@@ -1,7 +1,6 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "SaveGame/Base/SaveGameBase.h"
-#include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 
 USaveGameBase::USaveGameBase()

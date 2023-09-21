@@ -1,7 +1,6 @@
 #pragma once
 
 #include "VoxelData.h"
-#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelTreeData.generated.h"
 

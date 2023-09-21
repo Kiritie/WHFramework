@@ -1,5 +1,6 @@
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 
+#include "AbilitySystemComponent.h"
 #include "GameplayEffectExtension.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Net/UnrealNetwork.h"

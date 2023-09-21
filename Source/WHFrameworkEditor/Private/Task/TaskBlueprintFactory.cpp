@@ -3,17 +3,12 @@
 #include "Task/TaskBlueprintFactory.h"
 
 #include "BlueprintEditorSettings.h"
-#include "ClassViewerFilter.h"
-#include "K2Node_Event.h"
-#include "SlateOptMacros.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Task/TaskGraph.h"
 #include "Task/TaskGraphSchema.h"
 #include "Task/Base/TaskBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Task/Base/TaskBlueprint.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Debug/DebugModuleTypes.h"
 
 #define LOCTEXT_NAMESPACE "TaskBlueprintFactory"
 

@@ -3,11 +3,9 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Asset/AssetModuleTypes.h"
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "AbilityPickUpBase.generated.h"
 
@@ -42,10 +40,6 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
-	
-public:
-	UFUNCTION(BlueprintNativeEvent)
-	void Initialize(FAbilityItem InItem);
 
 protected:
 	UFUNCTION()

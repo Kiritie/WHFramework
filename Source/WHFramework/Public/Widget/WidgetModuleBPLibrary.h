@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "Main/MainModule.h"
 #include "WidgetModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "WidgetModuleBPLibrary.generated.h"

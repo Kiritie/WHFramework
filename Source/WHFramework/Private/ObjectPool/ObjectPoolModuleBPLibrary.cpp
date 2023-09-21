@@ -3,9 +3,6 @@
 
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
-
 UObject* UObjectPoolModuleBPLibrary::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
 	if(AObjectPoolModule* ObjectPoolModule = AObjectPoolModule::Get())

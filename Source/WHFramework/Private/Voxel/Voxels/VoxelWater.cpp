@@ -3,7 +3,6 @@
 
 #include "Voxel/Voxels/VoxelWater.h"
 
-#include "GameFramework/PawnMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModule.h"

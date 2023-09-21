@@ -3,17 +3,12 @@
 #include "FSM/FiniteStateBlueprintFactory.h"
 
 #include "BlueprintEditorSettings.h"
-#include "ClassViewerFilter.h"
-#include "K2Node_Event.h"
-#include "SlateOptMacros.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "FSM/FiniteStateGraph.h"
 #include "FSM/FiniteStateGraphSchema.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "FSM/Base/FiniteStateBlueprint.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Debug/DebugModuleTypes.h"
 
 #define LOCTEXT_NAMESPACE "FiniteStateBlueprintFactory"
 

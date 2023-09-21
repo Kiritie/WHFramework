@@ -3,7 +3,7 @@
 #pragma once
 
 #include "GameFramework/GameStateBase.h"
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "WHGameState.generated.h"
 
 /**

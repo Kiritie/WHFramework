@@ -2,8 +2,6 @@
 
 #include "Task/TaskEditor.h"
 
-#include "EditorReimportHandler.h"
-
 #if WITH_EDITOR
 #include "Editor.h"
 #endif

@@ -7,7 +7,6 @@
 #include "ContentBrowserModule.h"
 #include "IAssetTools.h"
 #include "IContentBrowserSingleton.h"
-#include "Debug/DebugModuleTypes.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 
 #define LOCTEXT_NAMESPACE "SelectPathDialog"

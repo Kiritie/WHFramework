@@ -1,7 +1,6 @@
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
 
 UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 {

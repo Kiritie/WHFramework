@@ -3,8 +3,6 @@
 
 #include "Event/Handle/EventHandleBase.h"
 
-#include "Serialization/BufferArchive.h"
-
 UEventHandleBase::UEventHandleBase()
 {
 	EventType = EEventType::Multicast;

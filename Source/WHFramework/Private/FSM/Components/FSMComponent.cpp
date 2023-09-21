@@ -38,7 +38,7 @@ void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UGlobalBPLibrary::IsPlaying())
+	if(UCommonBPLibrary::IsPlaying())
 	{
 		OnTermination();
 	}
@@ -152,7 +152,7 @@ bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	{
 		if(bShowDebugMessage)
 		{
-			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex), EDebugCategory::FSM, EDebugVerbosity::Warning);
+			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex), EDC_FSM, EDV_Warning);
 		}
 	}
 	return false;
@@ -168,7 +168,7 @@ bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	{
 		if(bShowDebugMessage)
 		{
-			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None")), EDebugCategory::FSM, EDebugVerbosity::Warning);
+			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None")), EDC_FSM, EDV_Warning);
 		}
 	}
 	return false;

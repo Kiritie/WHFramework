@@ -3,10 +3,8 @@
 
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
-#include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
-#include "Main/MainModule.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"

@@ -5,10 +5,7 @@
 
 #include "SocketSubsystem.h"
 #include "Main/MainModule.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Network/NetworkModuleBPLibrary.h"
-#include "Network/NetworkModuleNetworkComponent.h"
-		
+
 IMPLEMENTATION_MODULE(ANetworkModule)
 
 // ParamSets default values

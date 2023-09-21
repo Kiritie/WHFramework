@@ -10,7 +10,6 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Main/MainModule.h"
 
 ARoamCameraPawn::ARoamCameraPawn()
 {

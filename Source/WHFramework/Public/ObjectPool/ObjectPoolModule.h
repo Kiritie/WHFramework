@@ -5,10 +5,7 @@
 
 #include "ObjectPool.h"
 #include "ObjectPoolInterface.h"
-#include "Actor/ActorPool.h"
-#include "Blueprint/UserWidget.h"
 #include "Main/Base/ModuleBase.h"
-#include "Widget/WidgetPool.h"
 
 #include "ObjectPoolModule.generated.h"
 

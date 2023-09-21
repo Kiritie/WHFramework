@@ -17,14 +17,14 @@ AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 	MeshComponent->Initialize(EVoxelMeshNature::PickUp);
 }
 
-void AAbilityPickUpVoxel::Initialize_Implementation(FAbilityItem InItem)
+void AAbilityPickUpVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Super::Initialize_Implementation(InItem);
+	Super::LoadData(InSaveData, InPhase);
 
-	const FVector range = Item.GetData<UVoxelData>().GetRange();
-	BoxComponent->SetBoxExtent(range * AVoxelModule::Get()->GetWorldData().BlockSize * 0.15f);
+	const FVector Range = Item.GetData<UVoxelData>().GetRange();
+	BoxComponent->SetBoxExtent(Range * AVoxelModule::Get()->GetWorldData().BlockSize * 0.15f);
 
-	MeshComponent->CreateVoxel(InItem);
+	MeshComponent->CreateVoxel(Item);
 }
 
 void AAbilityPickUpVoxel::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)

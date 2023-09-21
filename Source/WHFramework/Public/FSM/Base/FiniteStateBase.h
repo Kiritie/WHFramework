@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Global/Base/WHObject.h"
+#include "Common/Base/WHObject.h"
 
 #include "FiniteStateBase.generated.h"
 

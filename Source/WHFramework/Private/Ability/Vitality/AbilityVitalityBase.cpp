@@ -4,23 +4,19 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
-#include "Ability/Components/VitalityInteractionComponent.h"
-#include "Ability/Abilities/VitalityAbilityBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
+#include "Common/CommonBPLibrary.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
-#include "Ability/Inventory/VitalityInventory.h"
 #include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase()
 {
@@ -40,7 +36,7 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 			
 	//Inventory = CreateDefaultSubobject<UVitalityInventory>(FName("Inventory"));
 
-	Interaction = CreateDefaultSubobject<UVitalityInteractionComponent>(FName("Interaction"));
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0, 0, 0));
 
@@ -334,7 +330,7 @@ UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
 	return Interaction;
 }
 
-UInventory* AAbilityVitalityBase::GetInventory() const
+UAbilityInventoryBase* AAbilityVitalityBase::GetInventory() const
 {
 	return Inventory;
 }

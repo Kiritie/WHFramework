@@ -20,7 +20,7 @@ void UAbilityCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 	
 	AAbilityCharacterBase* Character = Cast<AAbilityCharacterBase>(TryGetPawnOwner());
 
-	if(!Character || !Character->GetAssetID().IsValid() || !UGlobalBPLibrary::IsPlaying()) return;
+	if(!Character || !Character->GetAssetID().IsValid() || !UCommonBPLibrary::IsPlaying()) return;
 
 	bFalling = Character->IsFalling();
 

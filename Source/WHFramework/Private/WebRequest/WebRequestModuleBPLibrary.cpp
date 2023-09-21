@@ -3,7 +3,6 @@
 
 #include "WebRequest/WebRequestModuleBPLibrary.h"
 
-#include "Main/MainModule.h"
 #include "WebRequest/WebRequestModule.h"
 
 bool UWebRequestModuleBPLibrary::IsWebLocalMode()

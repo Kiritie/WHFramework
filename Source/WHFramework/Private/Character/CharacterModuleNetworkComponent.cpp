@@ -3,7 +3,6 @@
 
 #include "Character/CharacterModuleNetworkComponent.h"
 
-#include "Character/Base/CharacterBase.h"
 #include "Character/Base/CharacterInterface.h"
 
 UCharacterModuleNetworkComponent::UCharacterModuleNetworkComponent()

@@ -3,8 +3,6 @@
 #include "Audio/AudioModuleNetworkComponent.h"
 
 #include "Audio/AudioModule.h"
-#include "Audio/AudioModuleBPLibrary.h"
-#include "Main/MainModule.h"
 
 UAudioModuleNetworkComponent::UAudioModuleNetworkComponent()
 {

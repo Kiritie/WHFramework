@@ -4,21 +4,14 @@
 #include "Voxel/Voxels/Voxel.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Asset/AssetModuleTypes.h"
 #include "Asset/AssetManagerBase.h"
 #include "Audio/AudioModuleBPLibrary.h"
-#include "Global/GlobalBPLibrary.h"
 #include "Voxel/Datas/VoxelData.h"
-#include "Kismet/GameplayStatics.h"
 #include "Math/MathBPLibrary.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Voxels/VoxelWater.h"
-#include "Widget/WidgetModuleBPLibrary.h"
 
 UVoxel::UVoxel()
 {

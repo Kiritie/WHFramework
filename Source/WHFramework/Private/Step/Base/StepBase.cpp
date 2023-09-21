@@ -9,9 +9,6 @@
 #include "Event/Handle/Step/EventHandle_EnterStep.h"
 #include "Event/Handle/Step/EventHandle_ExecuteStep.h"
 #include "Event/Handle/Step/EventHandle_LeaveStep.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleBPLibrary.h"
 
@@ -148,7 +145,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	StepExecuteResult = EStepExecuteResult::None;
 
-	WHDebug(FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()), EDebugMode::All, EDebugCategory::Step, EDebugVerbosity::Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()), EDebugMode::All, EDC_Step, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastStep);
 
@@ -367,7 +364,7 @@ void UStepBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EDebugMode::All, EDebugCategory::Step, EDebugVerbosity::Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EDebugMode::All, EDC_Step, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave();
 

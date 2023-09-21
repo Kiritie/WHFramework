@@ -4,8 +4,6 @@
 #include "Parameter/ParameterModuleBPLibrary.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Parameter/ParameterModule.h"
 
 bool UParameterModuleBPLibrary::HasGlobalParameter(FName InName, bool bEnsured)

@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ClassViewerFilter.h"
 #include "Styling/SlateStyle.h"
 
 /**  */

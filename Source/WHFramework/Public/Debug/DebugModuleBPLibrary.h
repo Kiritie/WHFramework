@@ -14,41 +14,41 @@ enum class EDebugMode : uint8
 };
 
 UENUM(BlueprintType)
-enum class EDebugCategory : uint8
+enum EDebugCategory : uint8
 {
-	Default,
-	Editor,
-	Controller,
-	Ability,
-	Asset,
-	Audio,
-	Camera,
-	Character,
-	Event,
-	FSM,
-	Input,
-	LatentAction,
-	Media,
-	Network,
-	ObjectPool,
-	Parameter,
-	Procedure,
-	ReferencePool,
-	SaveGame,
-	Scene,
-	Step,
-	Task,
-	Voxel,
-	WebRequest,
-	Widget
+	EDC_Default,
+	EDC_Editor,
+	EDC_Controller,
+	EDC_Ability,
+	EDC_Asset,
+	EDC_Audio,
+	EDC_Camera,
+	EDC_Character,
+	EDC_Event,
+	EDC_FSM,
+	EDC_Input,
+	EDC_LatentAction,
+	EDC_Media,
+	EDC_Network,
+	EDC_ObjectPool,
+	EDC_Parameter,
+	EDC_Procedure,
+	EDC_ReferencePool,
+	EDC_SaveGame,
+	EDC_Scene,
+	EDC_Step,
+	EDC_Task,
+	EDC_Voxel,
+	EDC_WebRequest,
+	EDC_Widget
 };
 
 UENUM(BlueprintType)
-enum class EDebugVerbosity : uint8
+enum EDebugVerbosity : uint8
 {
-	Log,
-	Warning,
-	Error
+	EDV_Log,
+	EDV_Warning,
+	EDV_Error
 };
 
 USTRUCT(BlueprintType)
@@ -98,10 +98,10 @@ public:
 	static void EnsureEditorMsgf(const FString& Message, bool Expression = true);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void LogMessage(const FString& Message, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log);
+	static void LogMessage(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void DebugMessage(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true);
+	static void DebugMessage(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true);
 
 	UFUNCTION(BlueprintPure, Category = "DebugModuleBPLibrary")
 	static FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory);

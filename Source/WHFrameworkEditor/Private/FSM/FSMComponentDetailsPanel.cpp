@@ -15,7 +15,6 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
 
 FFSMComponentDetailsPanel::FFSMComponentDetailsPanel() {}
 

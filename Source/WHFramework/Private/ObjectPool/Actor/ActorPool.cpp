@@ -4,7 +4,6 @@
 #include "ObjectPool/Actor/ActorPool.h"
 
 #include "Main/MainModule.h"
-#include "ObjectPool/ObjectPoolInterface.h"
 
 UActorPool::UActorPool()
 {

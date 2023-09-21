@@ -17,7 +17,7 @@ UAssetManagerBase& UAssetManagerBase::Get()
 		return *Instance;
 	}
 	ensureEditor(true);
-	WHLog(FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDebugCategory::Asset, EDebugVerbosity::Warning);
+	WHLog(FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDC_Asset, EDV_Warning);
 	return UReferencePoolModuleBPLibrary::GetReference<UAssetManagerBase>();
 }
 
@@ -56,7 +56,7 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 
 	if(bLogWarning && !LoadedAsset)
 	{
-		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDC_Asset, EDV_Warning);
 	}
 	return LoadedAsset;
 }
@@ -92,7 +92,7 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 
 	if(bLogWarning && LoadedAssets.IsEmpty())
 	{
-		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDebugCategory::Asset, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Warning);
 	}
 	return LoadedAssets;
 }

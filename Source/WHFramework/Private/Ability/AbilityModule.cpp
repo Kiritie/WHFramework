@@ -5,7 +5,6 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
-#include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
@@ -16,7 +15,7 @@
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -28,7 +27,7 @@ AAbilityModule::AAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("Material'/WHFramework/Ability/Item/Materials/M_ItemIcon.M_ItemIcon'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Ability/Materials/M_ItemIcon.M_ItemIcon'"));
 	if(IconSourceMatFinder.Succeeded())
 	{
 		ItemIconSourceMat = IconSourceMatFinder.Object;
@@ -104,7 +103,7 @@ FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
 	{
 		EnumName = CustomInteractActionMap[(EInteractAction)InInteractAction];
 	}
-	return UGlobalBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
+	return UCommonBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
 }
 
 ECollisionChannel AAbilityModule::GetPickUpTraceChannel() const
@@ -116,8 +115,19 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 {
 	if(!InItem.IsValid()) return nullptr;
 
+	FPickUpSaveData SaveData;
+	SaveData.Item = InItem;
+	SaveData.Location = InLocation;
+
+	return SpawnPickUp(&SaveData, InContainer);
+}
+
+AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
+	
 	AAbilityPickUpBase* PickUp = nullptr;
-	switch (InItem.GetType())
+	switch (SaveData.Item.GetType())
 	{
 		case EAbilityItemType::Voxel:
 		{
@@ -126,17 +136,17 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 		}
 		case EAbilityItemType::Prop:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, InItem.GetData<UAbilityPropDataBase>().PropPickUpClass);
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Equip:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, InItem.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Skill:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, InItem.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
 			break;
 		}
 		default: break;
@@ -144,20 +154,13 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InL
 
 	if(PickUp)
 	{
-		PickUp->Initialize(InItem);
-		PickUp->SetActorLocationAndRotation(InLocation, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
+		PickUp->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(PickUp);
 		}
 	}
 	return PickUp;
-}
-
-AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
-	return SpawnPickUp(SaveData.Item, SaveData.Location, InContainer);
 }
 
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)

@@ -7,11 +7,7 @@
 #include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
-#include "SSkeletonWidget.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
+#include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Step/StepBlueprintFactory.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/StepModule.h"
@@ -457,7 +453,7 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewStep && OldStep)
 				{
-					UGlobalBPLibrary::ExportPropertiesToObject(OldStep, NewStep);
+					UCommonBPLibrary::ExportPropertiesToObject(OldStep, NewStep);
 					if(OldStep->ParentStep)
 					{
 						OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;

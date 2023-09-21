@@ -5,10 +5,9 @@
 
 #include "HttpModule.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
-#include "Parameter/ParameterModuleBPLibrary.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 		
 IMPLEMENTATION_MODULE(AWebRequestModule)
@@ -118,7 +117,7 @@ UWebInterfaceBase* AWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfa
 		UWebInterfaceBase* WebInterface = UObjectPoolModuleBPLibrary::SpawnObject<UWebInterfaceBase>(nullptr, InClass);
 		WebInterfaceMap.Add(InClass, WebInterface);
 		
-		WHLog(FString::Printf(TEXT("Succeeded to creating the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
+		WHLog(FString::Printf(TEXT("Succeeded to creating the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
 		
 		return WebInterface;
 	}
@@ -135,7 +134,7 @@ bool AWebRequestModule::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InCl
 		{
 			WebInterface->GetOnWebRequestComplete().Add(InOnRequestComplete);
 			
-			WHLog(FString::Printf(TEXT("Succeeded to register the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
+			WHLog(FString::Printf(TEXT("Succeeded to register the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
 			
 			return true;
 		}
@@ -153,7 +152,7 @@ bool AWebRequestModule::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> In
 		{
 			WebInterface->GetOnWebRequestComplete().Remove(InOnRequestComplete);
 
-			WHLog(FString::Printf(TEXT("Succeeded to un register the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
+			WHLog(FString::Printf(TEXT("Succeeded to un register the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
 
 			return true;
 		}
@@ -169,7 +168,7 @@ bool AWebRequestModule::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase>
 	{
 		WebInterface->GetOnWebRequestComplete().Clear();
 
-		WHLog(FString::Printf(TEXT("Succeeded to un register all the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
+		WHLog(FString::Printf(TEXT("Succeeded to un register all the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
 		
 		return true;
 	}
@@ -185,7 +184,7 @@ bool AWebRequestModule::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass
 		WebInterfaceMap.Remove(InClass);
 		UObjectPoolModuleBPLibrary::DespawnObject(WebInterface);
 
-		WHLog(FString::Printf(TEXT("Succeeded to clear the interface: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
+		WHLog(FString::Printf(TEXT("Succeeded to clear the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
 		
 		return true;
 	}
@@ -250,22 +249,22 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, E
 
 		HttpRequest->SetContentAsString(InContent.ToString());
 
-		HttpRequest->SetVerb(UGlobalBPLibrary::GetEnumValueDisplayName(TEXT("/Script/WHFramework.EWebRequestMethod"), (int32)InMethod).ToString());
+		HttpRequest->SetVerb(UCommonBPLibrary::GetEnumValueDisplayName(TEXT("/Script/WHFramework.EWebRequestMethod"), (int32)InMethod).ToString());
 
 		HttpRequest->OnProcessRequestComplete().BindUObject(this, &AWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString(), InParams);
 
-		WHLog(FString::Printf(TEXT("Start send web request: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> Method: %s"), *HttpRequest->GetVerb()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> Head: %s"), *InHeadMap.ToString()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> Content: %s"), *InContent.ToString()), EDebugCategory::WebRequest);
+		WHLog(FString::Printf(TEXT("Start send web request: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> Method: %s"), *HttpRequest->GetVerb()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> Head: %s"), *InHeadMap.ToString()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> Content: %s"), *InContent.ToString()), EDC_WebRequest);
 
 		return HttpRequest->ProcessRequest();
 	}
 	else
 	{
 		ensureEditor(true);
-		WHLog(FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetName().ToString()), EDebugCategory::WebRequest, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest, EDV_Warning);
 	}
 	return false;
 }
@@ -280,7 +279,7 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 	if(!HttpResponse.IsValid())
 	{
 		bSucceeded = false;
-		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *InWebInterface->GetName().ToString()), EDebugCategory::WebRequest, EDebugVerbosity::Error);
+		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *InWebInterface->GetName().ToString()), EDC_WebRequest, EDV_Error);
 	}
 
 	if(HttpRequest.IsValid())
@@ -293,24 +292,24 @@ void AWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpR
 			const int64 SpendTime = Now - RequestTime;
 			if(SpendTime > 8000)
 			{
-				WHLog(FString::Printf(TEXT("Web request: %s, Spendtime to long: %d"), *InWebInterface->GetName().ToString(), (int)SpendTime), EDebugCategory::WebRequest, EDebugVerbosity::Warning);
-				WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDebugCategory::WebRequest, EDebugVerbosity::Warning);
+				WHLog(FString::Printf(TEXT("Web request: %s, Spendtime to long: %d"), *InWebInterface->GetName().ToString(), (int)SpendTime), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
 			}
 		}
 	}
 
 	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
 	{
-		WHLog(FString::Printf(TEXT("Web request successed: %s"), *InWebInterface->GetName().ToString()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDebugCategory::WebRequest);
-		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDebugCategory::WebRequest);
+		WHLog(FString::Printf(TEXT("Web request successed: %s"), *InWebInterface->GetName().ToString()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest);
 	}
 	else
 	{
 		bSucceeded = false;
-		WHLog(FString::Printf(TEXT("Web response returned error code: %d , Web request: %s"), HttpResponse->GetResponseCode(), *InWebInterface->GetName().ToString()), EDebugCategory::WebRequest, EDebugVerbosity::Error);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDebugCategory::WebRequest, EDebugVerbosity::Error);
-		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDebugCategory::WebRequest, EDebugVerbosity::Error);
+		WHLog(FString::Printf(TEXT("Web response returned error code: %d , Web request: %s"), HttpResponse->GetResponseCode(), *InWebInterface->GetName().ToString()), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest, EDV_Error);
 	}
 
 	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse), InParams);

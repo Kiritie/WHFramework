@@ -1,7 +1,6 @@
 #pragma once
 
 #include "VoxelInteractData.h"
-#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelDoorData.generated.h"
 

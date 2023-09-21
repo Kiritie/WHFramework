@@ -2,9 +2,6 @@
 
 #include "Task/TaskGraphSchema.h"
 
-#include "EdGraphSchema_K2_Actions.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-
 UTaskGraphSchema::UTaskGraphSchema(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer) {}
 

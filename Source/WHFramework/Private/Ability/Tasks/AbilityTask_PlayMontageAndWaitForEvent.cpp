@@ -155,17 +155,17 @@ void UAbilityTask_PlayMontageAndWaitForEvent::Activate()
 		}
 		else
 		{
-			WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent call to PlayMontage failed!")), EDebugCategory::Ability, EDebugVerbosity::Warning);
+			WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent call to PlayMontage failed!")), EDC_Ability, EDV_Warning);
 		}
 	}
 	else
 	{
-		WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent called on invalid AbilitySystemComponent")), EDebugCategory::Ability, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent called on invalid AbilitySystemComponent")), EDC_Ability, EDV_Warning);
 	}
 
 	if (!bPlayedMontage)
 	{
-		WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay),*InstanceName.ToString()), EDebugCategory::Ability, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("UAbilityTask_PlayMontageAndWaitForEvent called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay),*InstanceName.ToString()), EDC_Ability, EDV_Warning);
 		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnCancelled.Broadcast(FGameplayTag(), FGameplayEventData());

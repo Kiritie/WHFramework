@@ -7,11 +7,7 @@
 #include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
-#include "SSkeletonWidget.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
+#include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Task/TaskBlueprintFactory.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/TaskModule.h"
@@ -458,7 +454,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewTask && OldTask)
 				{
-					UGlobalBPLibrary::ExportPropertiesToObject(OldTask, NewTask);
+					UCommonBPLibrary::ExportPropertiesToObject(OldTask, NewTask);
 					if(OldTask->ParentTask)
 					{
 						OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;

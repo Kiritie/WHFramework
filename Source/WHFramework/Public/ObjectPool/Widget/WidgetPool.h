@@ -4,7 +4,6 @@
 
 #include "ObjectPool/ObjectPool.h"
 
-#include "UObject/NoExportTypes.h"
 #include "WidgetPool.generated.h"
 
 /**

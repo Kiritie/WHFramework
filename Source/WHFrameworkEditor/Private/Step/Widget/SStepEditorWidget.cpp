@@ -3,15 +3,9 @@
 
 #include "Step/Widget/SStepEditorWidget.h"
 
-#include "Main/MainModule.h"
 #include "SlateOptMacros.h"
-#include "WHFrameworkEditor.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Step/StepModule.h"
-#include "Step/StepModuleBPLibrary.h"
 #include "Step/Widget/SStepDetailsWidget.h"
 #include "Step/Widget/SStepListWidget.h"
 #include "Step/Widget/SStepStatusWidget.h"
@@ -38,7 +32,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	StepModule = AStepModule::Get(!UGlobalBPLibrary::IsPlaying());
+	StepModule = AStepModule::Get(!UCommonBPLibrary::IsPlaying());
 
 	if(StepModule)
 	{
@@ -178,7 +172,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 		
-		SetIsPreviewMode(UGlobalBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
 	}
 	else
 	{

@@ -5,7 +5,7 @@
 
 #include "Ability/AbilityModule.h"
 #include "Ability/Abilities/AbilityBase.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 
 const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
 {
@@ -39,12 +39,12 @@ bool UAbilityModuleBPLibrary::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility
 
 FPrimaryAssetType UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType InItemType)
 {
-	return *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)InItemType);
+	return *UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)InItemType);
 }
 
 EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType InAssetType)
 {
-	return (EAbilityItemType)UGlobalBPLibrary::GetEnumIndexByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), InAssetType.ToString());
+	return (EAbilityItemType)UCommonBPLibrary::GetEnumIndexByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), InAssetType.ToString());
 }
 
 void UAbilityModuleBPLibrary::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)

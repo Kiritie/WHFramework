@@ -4,7 +4,6 @@
 
 #include "Parameter/ParameterModuleTypes.h"
 
-#include "UObject/NoExportTypes.h"
 #include "ObjectPool.generated.h"
 
 /**

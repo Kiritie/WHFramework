@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
-#include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
 
 #include "AbilitySkillMeleeDataBase.generated.h"

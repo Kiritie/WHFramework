@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ClassViewerModule.h"
-#include "WHFrameworkEditorStyle.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskBase.h"
 #include "Widget/SEditorWidgetBase.h"

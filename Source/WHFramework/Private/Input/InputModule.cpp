@@ -11,9 +11,7 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Input/InputManager.h"
-#include "Kismet/GameplayStatics.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Input/InputModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 		
@@ -431,7 +429,7 @@ AWHPlayerController* AInputModule::GetPlayerController()
 {
 	if(!PlayerController)
 	{
-		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>();
+		PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>();
 	}
 	return PlayerController;
 }

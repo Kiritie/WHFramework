@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "Main/MainModuleTypes.h"
 #include "ModuleBase.generated.h"
 

@@ -4,7 +4,6 @@
 #include "Media/MediaPlayer/Panel/PanelMediaPlayer.h"
 
 #include "MediaPlayer.h"
-#include "Debug/DebugModuleTypes.h"
 
 APanelMediaPlayer::APanelMediaPlayer()
 {

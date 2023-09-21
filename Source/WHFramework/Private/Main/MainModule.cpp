@@ -10,11 +10,9 @@
 #include "Character/CharacterModule.h"
 #include "Camera/CameraModule.h"
 #include "Debug/DebugModule.h"
-#include "Debug/DebugModuleTypes.h"
 #include "Event/EventModule.h"
-#include "Event/EventModuleBPLibrary.h"
 #include "FSM/FSMModule.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
 #include "Animation/AnimationModule.h"
 #include "Media/MediaModule.h"
@@ -286,7 +284,7 @@ UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponentByClass(TSubc
 {
 	if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
 	{
-		if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+		if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
 			return PlayerController->GetModuleNetCompByClass(InModuleNetworkComponentClass);
 		}

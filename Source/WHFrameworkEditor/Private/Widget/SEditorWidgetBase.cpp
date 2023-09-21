@@ -3,9 +3,6 @@
 
 #include "Widget/SEditorWidgetBase.h"
 #include "SlateOptMacros.h"
-#include "Main/MainModule.h"
-#include "Widget/WidgetModule.h"
-#include "Widget/WidgetModuleBPLibrary.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 

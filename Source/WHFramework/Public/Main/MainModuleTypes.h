@@ -3,7 +3,6 @@
 #pragma once
 
 #include "UObject/UObjectGlobals.h"
-#include "Global/GlobalBPLibrary.h"
 #include "Main/MainModuleBPLibrary.h"
 
 UENUM(BlueprintType)
@@ -58,7 +57,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!Instance) \
 		{ \
-			Instance = UGlobalBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			Instance = UCommonBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
 												}, false); \
 		} \
@@ -68,7 +67,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!InstanceEditor) \
 		{ \
-			InstanceEditor = UGlobalBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			InstanceEditor = UCommonBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
                              					}, true); \
 		} \

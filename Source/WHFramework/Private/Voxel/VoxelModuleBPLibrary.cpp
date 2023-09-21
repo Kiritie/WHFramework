@@ -4,8 +4,7 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 
 #include "Asset/AssetModuleBPLibrary.h"
-#include "Global/GlobalBPLibrary.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -15,7 +14,7 @@ FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType
 {
 	if(InVoxelType == EVoxelType::Empty) FPrimaryAssetId();
 
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UGlobalBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
 }
 
 FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()

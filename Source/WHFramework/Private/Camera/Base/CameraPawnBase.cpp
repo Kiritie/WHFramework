@@ -4,11 +4,8 @@
 #include "Camera/Base/CameraPawnBase.h"
 
 #include "Camera/CameraComponent.h"
-#include "Debug/DebugModuleTypes.h"
-#include "GameFramework/DefaultPawn.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 ACameraPawnBase::ACameraPawnBase()

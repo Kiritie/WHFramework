@@ -4,16 +4,10 @@
 #include "Task/Widget/STaskEditorWidget.h"
 
 #include "LevelEditorActions.h"
-#include "Main/MainModule.h"
 #include "SlateOptMacros.h"
-#include "WHFrameworkEditor.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Task/TaskEditor.h"
 #include "Task/TaskModule.h"
-#include "Task/TaskModuleBPLibrary.h"
 #include "Task/Widget/STaskDetailsWidget.h"
 #include "Task/Widget/STaskListWidget.h"
 #include "Task/Widget/STaskStatusWidget.h"
@@ -40,7 +34,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	TaskModule = ATaskModule::Get(!UGlobalBPLibrary::IsPlaying());
+	TaskModule = ATaskModule::Get(!UCommonBPLibrary::IsPlaying());
 
 	if(TaskModule)
 	{
@@ -187,7 +181,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 
-		SetIsPreviewMode(UGlobalBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
 	}
 	else
 	{

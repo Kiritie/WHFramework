@@ -3,7 +3,7 @@
 
 #include "WebRequest/Handle/WebRequestHandle_DownloadFile.h"
 
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Interfaces/IHttpResponse.h"
 
 UWebRequestHandle_DownloadFile::UWebRequestHandle_DownloadFile()

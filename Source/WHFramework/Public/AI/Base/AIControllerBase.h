@@ -3,7 +3,7 @@
 #pragma once
 
 #include "AIController.h"
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "AIControllerBase.generated.h"
 

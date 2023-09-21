@@ -15,9 +15,6 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
-#include "Procedure/ProcedureModule.h"
-#include "Procedure/Base/ProcedureBase.h"
 
 FProcedureModuleDetailsPanel::FProcedureModuleDetailsPanel() {}
 

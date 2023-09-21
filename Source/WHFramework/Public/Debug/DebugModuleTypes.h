@@ -119,7 +119,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  * @param Category 调试类别
  * @param Verbosity 调试级别
  */
-FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log)
+FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log)
 {
 	UDebugModuleBPLibrary::LogMessage(Message, Category, Verbosity);
 }
@@ -135,7 +135,7 @@ FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDebugC
  * @param Key 调试ID
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDebugCategory::Default, EDebugVerbosity Verbosity = EDebugVerbosity::Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
 {
 	UDebugModuleBPLibrary::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
 }

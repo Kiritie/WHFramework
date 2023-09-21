@@ -3,7 +3,6 @@
 
 #include "Step/Widget/SStepDetailsWidget.h"
 
-#include "ISinglePropertyView.h"
 #include "SlateOptMacros.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepBase.h"

@@ -5,9 +5,9 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Ability/Components/InteractionComponent.h"
 
 UAbilityCharacterState_Static::UAbilityCharacterState_Static()
 {

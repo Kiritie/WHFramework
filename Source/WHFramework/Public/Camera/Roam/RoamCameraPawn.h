@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Camera/Base/CameraPawnBase.h"
-#include "Gameplay/WHPlayerInterface.h"
 #include "RoamCameraPawn.generated.h"
 
 UCLASS()

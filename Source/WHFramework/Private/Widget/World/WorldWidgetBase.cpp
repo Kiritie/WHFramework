@@ -3,16 +3,11 @@
 
 #include "Widget/World/WorldWidgetBase.h"
 
-#include "Blueprint/SlateBlueprintLibrary.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Camera/CameraModuleBPLibrary.h"
-#include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Main/MainModule.h"
-#include "Slate/SGameLayerManager.h"
+#include "Common/CommonBPLibrary.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 #include "Widget/World/WorldWidgetComponent.h"
@@ -50,7 +45,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Iter.Key->Slot))
 			{
 				FVector2D ScreenPos;
-				if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(), Iter.Value.SceneComp ? Iter.Value.SceneComp->GetComponentLocation() + Iter.Value.Location : Iter.Value.Location, ScreenPos, false))
+				if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController<AWHPlayerController>(), Iter.Value.SceneComp ? Iter.Value.SceneComp->GetComponentLocation() + Iter.Value.Location : Iter.Value.Location, ScreenPos, false))
 				{
 					CanvasPanelSlot->SetPosition(ScreenPos);
 				}
@@ -183,7 +178,7 @@ void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FVector
 		if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
 		{
 			FVector2D ScreenPos;
-			if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UGlobalBPLibrary::GetPlayerController<AWHPlayerController>(), InSceneComp ? InSceneComp->GetComponentLocation() + InLocation : InLocation, ScreenPos, false))
+			if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController<AWHPlayerController>(), InSceneComp ? InSceneComp->GetComponentLocation() + InLocation : InLocation, ScreenPos, false))
 			{
 				CanvasPanelSlot->SetPosition(ScreenPos);
 			}

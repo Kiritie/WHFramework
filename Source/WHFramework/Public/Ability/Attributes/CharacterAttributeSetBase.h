@@ -1,5 +1,7 @@
 #pragma once
 
+#include "AbilitySystemComponent.h"
+#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 
 #include "CharacterAttributeSetBase.generated.h"

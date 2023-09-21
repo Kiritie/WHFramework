@@ -8,12 +8,11 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Input/InputModuleBPLibrary.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
-#include "Net/UnrealNetwork.h"
 		
 IMPLEMENTATION_MODULE(ACameraModule)
 
@@ -672,7 +671,7 @@ AWHPlayerController* ACameraModule::GetPlayerController()
 {
 	if(!PlayerController)
 	{
-		PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>();
+		PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>();
 	}
 	return PlayerController;
 }

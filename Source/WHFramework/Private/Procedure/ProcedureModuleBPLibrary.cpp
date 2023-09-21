@@ -3,10 +3,6 @@
 
 #include "Procedure/ProcedureModuleBPLibrary.h"
 
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
-#include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Procedure/Base/ProcedureBase.h"
 
 UProcedureBase* UProcedureModuleBPLibrary::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)

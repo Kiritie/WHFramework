@@ -4,7 +4,6 @@
 
 
 #include "CharacterModuleTypes.h"
-#include "Base/CharacterInterface.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "CharacterModule.generated.h"

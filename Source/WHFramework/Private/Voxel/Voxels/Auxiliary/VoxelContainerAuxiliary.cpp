@@ -5,14 +5,14 @@
 #include "Voxel/Voxels/Auxiliary/VoxelContainerAuxiliary.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Ability/Components/VoxelInteractionComponent.h"
-#include "Ability/Inventory/Inventory.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/Datas/VoxelContainerData.h"
 
 // Sets default values
 AVoxelContainerAuxiliary::AVoxelContainerAuxiliary()
 {
-	Inventory = CreateDefaultSubobject<UInventory>(FName("Inventory"));
+	Inventory = CreateDefaultSubobject<UAbilityInventoryBase>(FName("Inventory"));
 }
 
 void AVoxelContainerAuxiliary::OnDespawn_Implementation(bool bRecovery)

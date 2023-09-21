@@ -4,7 +4,6 @@
 
 #include "AssetModuleTypes.h"
 #include "Engine/AssetManager.h"
-#include "Primary/PrimaryEntityInterface.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 #include "Primary/PrimaryAssetBase.h"
 #include "AssetManagerBase.generated.h"

@@ -4,8 +4,7 @@
 
 #include "Input/InputModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
-#include "Global/Base/WHObject.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "Common/Base/WHObject.h"
 
 #include "Voxel.generated.h"
 

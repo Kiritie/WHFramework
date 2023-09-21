@@ -15,9 +15,6 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
-#include "Task/TaskModule.h"
-#include "Task/Base/TaskBase.h"
 
 FTaskModuleDetailsPanel::FTaskModuleDetailsPanel() {}
 

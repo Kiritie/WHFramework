@@ -4,22 +4,11 @@
 #include "Task/TaskModule.h"
 
 #include "Main/MainModule.h"
-#include "Engine/TargetPoint.h"
-#include "Kismet/GameplayStatics.h"
 #include "Task/Base/TaskBase.h"
-#include "Net/UnrealNetwork.h"
-#include "Character/CharacterModuleBPLibrary.h"
 #include "Character/CharacterModuleTypes.h"
-#include "Event/EventModule.h"
-#include "Event/EventModuleBPLibrary.h"
-#include "Network/NetworkModuleBPLibrary.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/TaskSaveGame.h"
-#include "Task/TaskModuleBPLibrary.h"
-#include "Task/TaskModuleNetworkComponent.h"
-#include "Scene/SceneModule.h"
-#include "Scene/SceneModuleBPLibrary.h"
-		
+
 IMPLEMENTATION_MODULE(ATaskModule)
 
 // ParamSets default values

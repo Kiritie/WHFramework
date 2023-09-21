@@ -42,7 +42,9 @@ protected:
 
 	float TimeChangeWillEnd;
 
+	UPROPERTY()
 	class UCameraComponent* CameraComponent;
 
+	UPROPERTY()
 	UCurveFloat* LerpCurve;
 };

@@ -2,9 +2,6 @@
 
 #include "Procedure/ProcedureGraphSchema.h"
 
-#include "EdGraphSchema_K2_Actions.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-
 UProcedureGraphSchema::UProcedureGraphSchema(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer) {}
 

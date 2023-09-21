@@ -4,7 +4,6 @@
 
 #include "BaseWidgetInterface.h"
 
-#include "Input/InputModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
 #include "ScreenWidgetInterface.generated.h"

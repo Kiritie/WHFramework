@@ -50,5 +50,5 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere)
-	TMap<EDebugCategory, FDebugCategoryState> DebugCategoryStates;
+	TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState> DebugCategoryStates;
 };

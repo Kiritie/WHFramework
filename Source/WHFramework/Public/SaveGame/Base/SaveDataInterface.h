@@ -1,8 +1,7 @@
 #pragma once
 
-#include "Global/GlobalTypes.h"
+#include "Common/CommonTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
-#include "Scene/SceneModuleTypes.h"
 
 #include "SaveDataInterface.generated.h"
 

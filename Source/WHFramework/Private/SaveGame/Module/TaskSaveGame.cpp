@@ -2,11 +2,8 @@
 
 #include "SaveGame/Module/TaskSaveGame.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
+#include "Common/CommonBPLibrary.h"
 #include "Task/TaskModule.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
 
 UTaskSaveGame::UTaskSaveGame()
 {

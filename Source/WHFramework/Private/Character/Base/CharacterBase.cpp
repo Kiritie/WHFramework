@@ -6,7 +6,6 @@
 #include "AIController.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
-#include "Components/AudioComponent.h"
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Camera/CameraComponent.h"
@@ -17,7 +16,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Scene/SceneModuleBPLibrary.h"
-#include "Net/UnrealNetwork.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
 #include "Perception/AISense_Sight.h"
@@ -25,7 +23,6 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
 
 ACharacterBase::ACharacterBase()
 {

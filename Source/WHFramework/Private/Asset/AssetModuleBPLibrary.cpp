@@ -4,8 +4,6 @@
 #include "Asset/AssetModuleBPLibrary.h"
 
 #include "Asset/AssetModule.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 
 bool UAssetModuleBPLibrary::HasDataAsset(FName InName)
 {

@@ -10,11 +10,10 @@ ADebugModule::ADebugModule()
 {
 	ModuleName = FName("DebugModule");
 
-	DebugCategoryStates = TMap<EDebugCategory, FDebugCategoryState>();
-	for(int32 i = 0; i < UGlobalBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EDebugCategory")) - 1; i++)
-	{
+	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
+	DON_WITHINDEX(UCommonBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EDebugCategory")) - 1, i, 
 		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
-	}
+	)
 }
 
 ADebugModule::~ADebugModule()

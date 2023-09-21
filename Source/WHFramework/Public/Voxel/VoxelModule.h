@@ -4,7 +4,7 @@
 
 #include "VoxelModuleTypes.h"
 #include "GameFramework/Actor.h"
-#include "Global/GlobalTypes.h"
+#include "Common/CommonTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "VoxelModule.generated.h"

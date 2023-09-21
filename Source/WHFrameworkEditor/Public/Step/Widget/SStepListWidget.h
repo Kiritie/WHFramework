@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ClassViewerModule.h"
-#include "WHFrameworkEditorStyle.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepBase.h"
 #include "Widget/SEditorWidgetBase.h"

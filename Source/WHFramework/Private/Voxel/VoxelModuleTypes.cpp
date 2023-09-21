@@ -9,7 +9,6 @@
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
-#include "Voxel/Voxels/VoxelPlant.h"
 
 FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
 

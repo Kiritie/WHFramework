@@ -4,22 +4,12 @@
 #include "Step/StepModule.h"
 
 #include "Main/MainModule.h"
-#include "Engine/TargetPoint.h"
-#include "Kismet/GameplayStatics.h"
 #include "Step/Base/StepBase.h"
-#include "Net/UnrealNetwork.h"
-#include "Character/CharacterModuleBPLibrary.h"
 #include "Character/CharacterModuleTypes.h"
-#include "Event/EventModule.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Step/EventHandle_EndStep.h"
 #include "Event/Handle/Step/EventHandle_StartStep.h"
-#include "Network/NetworkModuleBPLibrary.h"
-#include "Step/StepModuleBPLibrary.h"
-#include "Step/StepModuleNetworkComponent.h"
-#include "Scene/SceneModule.h"
-#include "Scene/SceneModuleBPLibrary.h"
-		
+
 IMPLEMENTATION_MODULE(AStepModule)
 
 // ParamSets default values

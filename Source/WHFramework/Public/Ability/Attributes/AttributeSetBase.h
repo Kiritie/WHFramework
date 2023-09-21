@@ -1,8 +1,6 @@
 #pragma once
 
 #include "AttributeSet.h"
-#include "Ability/AbilityModuleTypes.h"
-#include "AbilitySystemComponent.h"
 #include "AttributeSetBase.generated.h"
 
 /**

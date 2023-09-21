@@ -6,8 +6,6 @@
 #include "Main/MainModule.h"
 #include "Media/MediaModuleBPLibrary.h"
 #include "Media/MediaModuleNetworkComponent.h"
-#include "Scene/SceneModuleBPLibrary.h"
-#include "Net/UnrealNetwork.h"
 
 AMediaPlayerBase::AMediaPlayerBase()
 {

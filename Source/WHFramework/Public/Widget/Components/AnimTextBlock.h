@@ -6,10 +6,8 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/SlateColor.h"
 #include "Widgets/SWidget.h"
-#include "Components/TextWidgetTypes.h"
 #include "Blueprint/UserWidget.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Widget/Interfaces/TickAbleWidgetInterface.h"
 
 #include "AnimTextBlock.generated.h"
@@ -82,7 +80,7 @@ public:
 public:
 	bool IsNumber() const
 	{
-		return UGlobalBPLibrary::TextIsNumber(TargetText);
+		return UCommonBPLibrary::TextIsNumber(TargetText);
 	}
 };
 
@@ -119,13 +117,13 @@ public:
 public:
 	FText GetCurrentText() const
 	{
-		return UGlobalBPLibrary::NumberToText(TargetNum - CurrentNum > 0.f ? FMath::FloorToInt(CurrentNum) : FMath::CeilToInt(CurrentNum), SymbolInfos);
+		return UCommonBPLibrary::NumberToText(TargetNum - CurrentNum > 0.f ? FMath::FloorToInt(CurrentNum) : FMath::CeilToInt(CurrentNum), SymbolInfos);
 	}
 
 	void SetTargetText(FText InTargetText)
 	{
 		TargetText = InTargetText;
-		TargetNum = UGlobalBPLibrary::TextToNumber(TargetText, SymbolInfos);
+		TargetNum = UCommonBPLibrary::TextToNumber(TargetText, SymbolInfos);
 		AnimSpeed = FMath::Abs(TargetNum - CurrentNum);
 	}
 };

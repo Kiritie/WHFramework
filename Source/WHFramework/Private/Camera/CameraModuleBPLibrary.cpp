@@ -3,12 +3,8 @@
 
 #include "Camera/CameraModuleBPLibrary.h"
 
-#include "Camera/CameraComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Camera/CameraModule.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
 {
@@ -242,7 +238,7 @@ void UCameraModuleBPLibrary::AddCameraDistanceInput(float InValue)
 
 void UCameraModuleBPLibrary::SetViewTargetWithBlend(AActor* NewViewTarget, float BlendTime, EViewTargetBlendFunction BlendFunc, float BlendExp, bool bLockOutgoing)
 {
-	if(AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController<AWHPlayerController>())
+	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 	{
 		PlayerController->SetViewTargetWithBlend(NewViewTarget, BlendTime, BlendFunc, BlendExp, bLockOutgoing);
 	}

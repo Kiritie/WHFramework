@@ -3,9 +3,6 @@
 
 #include "Widget/WidgetModuleBPLibrary.h"
 
-#include "Main/MainModule.h"
-#include "Kismet/GameplayStatics.h"
-
 UUserWidgetBase* UWidgetModuleBPLibrary::GetTemporaryUserWidget()
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())

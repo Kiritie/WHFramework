@@ -4,19 +4,19 @@
 
 #include "AbilitySystemInterface.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
-#include "Ability/Interaction/InteractionAgentInterface.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
-#include "Voxel/VoxelModuleTypes.h"
-#include "Ability/Inventory/InventoryAgentInterface.h"
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Common/Targeting/TargetingAgentInterface.h"
 
 #include "AbilityCharacterBase.generated.h"
 
 class UFSMComponent;
-class UCharacterInteractionComponent;
+class UInteractionComponent;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
 class AVoxelChunk;
@@ -25,13 +25,13 @@ class AController;
 class UAbilityBase;
 class UAbilitySystemComponentBase;
 class AAbilitySkillBase;
-class UCharacterInventory;
+class UAbilityCharacterInventoryBase;
 
 /**
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface, public IInventoryAgentInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -82,10 +82,10 @@ protected:
 	UCharacterAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCharacterInteractionComponent* Interaction;
+	UInteractionComponent* Interaction;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCharacterInventory* Inventory;
+	UAbilityCharacterInventoryBase* Inventory;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
@@ -111,6 +111,10 @@ protected:
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+	virtual bool HasArchive() const override { return true; }
+
+	virtual void Serialize(FArchive& Ar) override;
+
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData(bool bRefresh) override;
@@ -124,10 +128,6 @@ protected:
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
 public:
-	virtual bool HasArchive() const override { return true; }
-
-	virtual void Serialize(FArchive& Ar) override;
-			
 	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
@@ -139,7 +139,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void UnJump();
 
-	virtual void PickUp(AAbilityPickUpBase* InPickUp) override;
+public:
+	virtual bool OnPickUp_Implementation(AAbilityPickUpBase* InPickUp) override;
 
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -194,7 +195,7 @@ public:
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	
-	virtual UInventory* GetInventory() const override;
+	virtual UAbilityInventoryBase* GetInventory() const override;
 
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
@@ -275,6 +276,8 @@ public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
+	virtual bool IsTargetable_Implementation() const override;
+
 	virtual void OnRep_Controller() override;
 
 	virtual void OnRep_PlayerState() override;

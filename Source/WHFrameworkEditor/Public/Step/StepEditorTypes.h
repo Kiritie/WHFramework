@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ClassViewerFilter.h"
-#include "Styling/SlateStyle.h"
 
 FString GStepEditorIni;
 

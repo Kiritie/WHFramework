@@ -3,9 +3,7 @@
 
 #include "ObjectPool/Widget/WidgetPool.h"
 
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "Blueprint/UserWidget.h"
-#include "Debug/DebugModuleTypes.h"
 
 UWidgetPool::UWidgetPool()
 {

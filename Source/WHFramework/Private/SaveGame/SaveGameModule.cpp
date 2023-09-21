@@ -4,7 +4,6 @@
 #include "SaveGame/SaveGameModule.h"
 
 #include "Kismet/GameplayStatics.h"
-#include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Base/SaveGameBase.h"
 #include "SaveGame/General/GeneralSaveGame.h"
@@ -252,7 +251,6 @@ bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InI
 			{
 				SaveGame->OnRefresh();
 			}
-			SaveGame->GetSaveData()->MakeSaved();
 			SaveGame->OnSave();
 		}
 		return UGameplayStatics::SaveGameToSlot(SaveGame, GetSaveSlotName(SaveName, SaveGame->GetSaveIndex()), UserIndex);

@@ -2,9 +2,8 @@
 
 #pragma once
 
-#include "Global/Base/WHActor.h"
+#include "Common/Base/WHActor.h"
 #include "GameFramework/PlayerController.h"
-#include "Math/MathTypes.h"
 
 #include "WHPlayerController.generated.h"
 

@@ -3,7 +3,6 @@
 
 #include "Audio/AudioModule.h"
 
-#include "Debug/DebugModuleTypes.h"
 #include "Components/AudioComponent.h"
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Audio/AudioModuleNetworkComponent.h"

@@ -15,10 +15,8 @@
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
-#include "WHFrameworkEditor.h"
 #include "Camera/CameraModule.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalTypes.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
 FCameraModuleDetailsPanel::FCameraModuleDetailsPanel() {}
@@ -67,7 +65,7 @@ FReply FCameraModuleDetailsPanel::OnClickCopyCameraParamsButton()
 
 			FPlatformApplicationMisc::ClipboardCopy(*CameraParams.ToString());
 			
-			WHLog(FString::Printf(TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance), EDebugCategory::Camera);
+			WHLog(FString::Printf(TEXT("Copied Camera Params: Location = %s , Rotation = %s , Distance = %f"), *CameraParams.CameraLocation.ToString(), *CameraParams.CameraRotation.ToString(), CameraParams.CameraDistance), EDC_Camera);
 		}
 	}
 	return FReply::Handled();

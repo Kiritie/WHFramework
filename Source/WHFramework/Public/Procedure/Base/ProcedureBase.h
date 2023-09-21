@@ -5,11 +5,8 @@
 #include "Camera/CameraModuleTypes.h"
 
 #include "Procedure/ProcedureModuleTypes.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Global/GlobalTypes.h"
-#include "Global/Base/WHObject.h"
+#include "Common/Base/WHObject.h"
 #include "Math/MathTypes.h"
-#include "Parameter/ParameterModuleTypes.h"
 
 #include "ProcedureBase.generated.h"
 

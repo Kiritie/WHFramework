@@ -4,8 +4,6 @@
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
 #include "TimerManager.h"
-#include "Engine/TargetPoint.h"
-#include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
 APhysicsVolumeBase::APhysicsVolumeBase()

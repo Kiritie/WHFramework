@@ -3,8 +3,6 @@
 
 #include "Scene/SceneModuleBPLibrary.h"
 
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "Scene/SceneModule.h"
 
 UWorldTimerComponent* USceneModuleBPLibrary::GetWorldTimer()

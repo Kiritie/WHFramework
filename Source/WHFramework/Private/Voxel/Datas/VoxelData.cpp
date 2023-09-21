@@ -1,7 +1,6 @@
 #include "Voxel/Datas/VoxelData.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Asset/AssetModuleBPLibrary.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()

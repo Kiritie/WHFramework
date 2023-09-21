@@ -3,15 +3,9 @@
 
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 
-#include "Main/MainModule.h"
 #include "SlateOptMacros.h"
-#include "WHFrameworkEditor.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Kismet/GameplayStatics.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Procedure/ProcedureModule.h"
-#include "Procedure/ProcedureModuleBPLibrary.h"
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 #include "Procedure/Widget/SProcedureStatusWidget.h"
@@ -38,7 +32,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	ProcedureModule = AProcedureModule::Get(!UGlobalBPLibrary::IsPlaying());
+	ProcedureModule = AProcedureModule::Get(!UCommonBPLibrary::IsPlaying());
 
 	if(ProcedureModule)
 	{
@@ -178,7 +172,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 		
-		SetIsPreviewMode(UGlobalBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
 	}
 	else
 	{

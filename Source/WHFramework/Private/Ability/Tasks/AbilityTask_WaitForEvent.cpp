@@ -2,9 +2,7 @@
 
 #include "Ability/Tasks/AbilityTask_WaitForEvent.h"
 
-#include "GameFramework/Character.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystemGlobals.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Animation/AnimInstance.h"
 #include "Debug/DebugModuleTypes.h"
@@ -54,7 +52,7 @@ void UAbilityTask_WaitForEvent::Activate()
 	}
 	else
 	{
-		WHLog(FString::Printf(TEXT("UAbilityTask_WaitForEvent called on invalid AbilitySystemComponent")), EDebugCategory::Ability, EDebugVerbosity::Warning);
+		WHLog(FString::Printf(TEXT("UAbilityTask_WaitForEvent called on invalid AbilitySystemComponent")), EDC_Ability, EDV_Warning);
 	}
 
 	SetWaitingOnAvatar();

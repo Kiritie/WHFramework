@@ -3,8 +3,6 @@
 
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 
-#include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
 #include "ReferencePool/ReferencePoolModule.h"
 
 void UReferencePoolModuleBPLibrary::ClearAllReference()

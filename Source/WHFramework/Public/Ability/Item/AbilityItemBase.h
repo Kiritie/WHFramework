@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Asset/AssetModuleTypes.h"
 #include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
 

@@ -4,11 +4,8 @@
 #include "Task/Widget/STaskToolbarWidget.h"
 
 #include "SlateOptMacros.h"
-#include "WHFrameworkEditorStyle.h"
-#include "Task/TaskEditorSettings.h"
-#include "Task/Widget/STaskToolbarWidget.h"
 
-#include "Global/GlobalBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
 #include "Task/Widget/STaskEditorWidget.h"
 #include "Task/Widget/STaskListWidget.h"
 
@@ -41,7 +38,7 @@ void STaskToolbarWidget::Construct(const FArguments& InArgs)
 				FExecuteAction::CreateRaw(this, &STaskToolbarWidget::OnPreviewModeToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return UGlobalBPLibrary::IsPlaying();
+					return UCommonBPLibrary::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;

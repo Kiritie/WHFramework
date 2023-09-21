@@ -3,43 +3,30 @@
 
 #include "Voxel/VoxelModule.h"
 
-#include "ImageUtils.h"
 #include "Ability/AbilityModuleBPLibrary.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Asset/AssetModuleBPLibrary.h"
-#include "Character/Base/CharacterBase.h"
 #include "Components/SceneCaptureComponent2D.h"
-#include "Debug/DebugModuleTypes.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Voxel/EventHandle_ChangeWorldMode.h"
 #include "Event/Handle/Voxel/EventHandle_ChangeWorldState.h"
-#include "Gameplay/WHPlayerInterface.h"
-#include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
 #include "Math/MathBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
-#include "Scene/SceneModule.h"
 #include "Scene/Components/WorldTimerComponent.h"
 #include "ReferencePool/ReferencePoolModuleBPLibrary.h"
 #include "Scene/SceneModuleBPLibrary.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelDoor.h"
 #include "Voxel/Voxels/VoxelPlant.h"
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/VoxelWater.h"
-#include "Voxel/Voxels/Entity/VoxelEntity.h"
 #include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
-#include "Global/GlobalBPLibrary.h"
-#include "Global/GlobalTypes.h"
-#include "Global/GlobalTypes.h"
-#include "Global/GlobalTypes.h"
-#include "Global/GlobalTypes.h"
+#include "Common/CommonBPLibrary.h"
+#include "Common/CommonTypes.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
@@ -166,7 +153,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
 
-			if(UTexture2D* Texture = UGlobalBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
+			if(UTexture2D* Texture = UCommonBPLibrary::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
 			{
 				Iter.Value.CombineTexture = Texture;
 				
@@ -727,7 +714,7 @@ ECollisionChannel AVoxelModule::GetVoxelTraceChannel() const
 bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult HitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult, true))
+	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, UCommonBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult, true))
 	{
 		OutHitResult = FVoxelHitResult(HitResult);
 		return OutHitResult.IsValid();
@@ -738,7 +725,7 @@ bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const
 bool AVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult HitResult;
-	if(const AWHPlayerController* PlayerController = UGlobalBPLibrary::GetPlayerController())
+	if(const AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController())
 	{
 		switch (InRaycastType)
 		{
@@ -763,7 +750,7 @@ bool AVoxelModule::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TAr
 {
 	const FVector Size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
 	const FVector Location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, UCommonBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }
 
 bool AVoxelModule::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
@@ -797,10 +784,10 @@ bool AVoxelModule::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, 
 bool AVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	FHitResult HitResult1;
-	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UGlobalBPLibrary::GetGameTraceType(GetChunkTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult1, true))
+	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, UCommonBPLibrary::GetGameTraceType(GetChunkTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult1, true))
 	{
 		FHitResult HitResult2;
-		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), HitResult1.Location, HitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, UGlobalBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult2, true))
+		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), HitResult1.Location, HitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, UCommonBPLibrary::GetGameTraceType(GetVoxelTraceChannel()), false, InIgnoreActors, EDrawDebugTrace::None, HitResult2, true))
 		{
 			FVoxelItem& VoxelItem = FindVoxelByLocation(HitResult1.Location);
 			if(!VoxelItem.IsValid())
@@ -818,7 +805,7 @@ void AVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	if(bForce) DestroyChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
 	FVector GenerateOffset = FVector::ZeroVector;
-	const auto VoxelAgent  = UGlobalBPLibrary::GetPossessedPawn<IVoxelAgentInterface>();
+	const auto VoxelAgent  = UCommonBPLibrary::GetPossessedPawn<IVoxelAgentInterface>();
 	if(bFromAgent && VoxelAgent)
 	{
 		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetAgentLocation().Y : 0.f, 0.f);

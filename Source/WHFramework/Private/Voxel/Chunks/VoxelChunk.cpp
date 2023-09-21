@@ -7,8 +7,7 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Character/Base/CharacterBase.h"
-#include "Components/BoxComponent.h"
-#include "Global/GlobalTypes.h"
+#include "Common/CommonTypes.h"
 #include "Math/MathBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -55,21 +54,19 @@ AVoxelChunk::AVoxelChunk()
 
 void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
+	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	
 	TArray<FString> VoxelDatas;
 	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("/"));
-	
-	TMap<FIndex, FVoxelAuxiliarySaveData> AuxiliaryDatas;
-	for(auto& Iter : SaveData.AuxiliaryDatas)
-	{
-		AuxiliaryDatas.Add(Iter.VoxelItem.Index, Iter);
-	}
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter);
-		VoxelItem.AuxiliaryData = AuxiliaryDatas.Find(VoxelItem.Index);
 		SetVoxelSample(VoxelItem.Index, VoxelItem);
+	}
+	for(auto& Iter : SaveData.AuxiliaryDatas)
+	{
+		FVoxelItem& VoxelItem = GetVoxelItem(Iter.VoxelItem.Index);
+		VoxelItem.AuxiliaryData = &Iter;
 	}
 	bBuilded = true;
 }

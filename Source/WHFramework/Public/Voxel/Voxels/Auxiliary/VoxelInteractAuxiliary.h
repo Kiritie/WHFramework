@@ -3,7 +3,7 @@
 #pragma once
 
 #include "VoxelAuxiliary.h"
-#include "Ability/Interaction/InteractionAgentInterface.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
 #include "VoxelInteractAuxiliary.generated.h"
 
 class UVoxel;
@@ -36,7 +36,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class UVoxelInteractionComponent* Interaction;
+	class UInteractionComponent* Interaction;
 
 public:
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }

@@ -3,12 +3,9 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Asset/AssetModuleTypes.h"
 #include "AsyncTasks/AsyncTask_ChunkQueue.h"
 #include "Math/MathTypes.h"
-#include "Parameter/ParameterModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
-#include "Scene/SceneModuleTypes.h"
 
 #include "VoxelModuleTypes.generated.h"
 
@@ -377,6 +374,40 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelAuxiliarySaveData()
+	{
+		VoxelItem = FVoxelItem();
+		InventoryData = FInventorySaveData();
+	}
+
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem) : FVoxelAuxiliarySaveData()
+	{
+		VoxelItem = InVoxelItem;
+	}
+
+public:
+	UPROPERTY()
+	FVoxelItem VoxelItem;
+
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		VoxelItem.MakeSaved();
+		InventoryData.MakeSaved();
+	}
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelHitResult
 {
 	GENERATED_BODY()
@@ -415,31 +446,6 @@ public:
 	UVoxel& GetVoxel() const;
 
 	AVoxelChunk* GetChunk() const;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = FVoxelItem();
-		InventoryData = FInventorySaveData();
-	}
-
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem) : FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = InVoxelItem;
-	}
-
-public:
-	UPROPERTY()
-	FVoxelItem VoxelItem;
-
-	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
 };
 
 USTRUCT(BlueprintType)
@@ -735,7 +741,7 @@ public:
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
-		for(auto Iter : ChunkDatas)
+		for(auto& Iter : ChunkDatas)
 		{
 			Iter.Value.MakeSaved();
 		}

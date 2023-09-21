@@ -22,7 +22,7 @@ protected:
 	UVoxelMeshComponent* MeshComponent;
 
 public:
-	virtual void Initialize_Implementation(FAbilityItem InItem) override;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 protected:
 	virtual void OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker) override;

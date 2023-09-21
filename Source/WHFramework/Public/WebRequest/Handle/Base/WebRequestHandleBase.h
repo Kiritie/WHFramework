@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "Global/Base/WHObject.h"
-#include "ObjectPool/ObjectPoolInterface.h"
+#include "Common/Base/WHObject.h"
 #include "UObject/Object.h"
 #include "WebRequest/WebRequestModuleTypes.h"
 #include "WebRequestHandleBase.generated.h"

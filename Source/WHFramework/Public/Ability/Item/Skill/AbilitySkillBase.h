@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "Ability/Interfaces/AbilityAttackerInterface.h"
 #include "Ability/Item/AbilityItemBase.h"
-#include "../../Interfaces/AbilityAttackerInterface.h"
 #include "AbilitySkillBase.generated.h"
 
 /**
