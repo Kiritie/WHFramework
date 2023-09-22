@@ -39,10 +39,10 @@ protected:
 	class UInteractionComponent* Interaction;
 
 public:
-	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
-
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
+
+	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 	
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

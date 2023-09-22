@@ -28,7 +28,7 @@ ACharacterBase::ACharacterBase()
 {
 	bReplicates = true;
 
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
+	GetCapsuleComponent()->InitCapsuleSize(30.f, 89.f);
 	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Character"));
 	GetCapsuleComponent()->CanCharacterStepUpOn = ECanBeCharacterBase::ECB_No;
 

@@ -7,6 +7,7 @@
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonBPLibrary.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
 		
 IMPLEMENTATION_MODULE(ACharacterModule)
@@ -123,7 +124,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 			{
 				UCameraModuleBPLibrary::SwitchCamera(nullptr);
 				PlayerController->Possess(InCharacter);
-				UCameraModuleBPLibrary::SetCameraRotationAndDistance(bResetCamera ? InCharacter->GetActorRotation().Yaw : -1, -1, -1, bInstant);
+				UCameraModuleBPLibrary::SetCameraRotationAndDistance(bResetCamera ? InCharacter->GetActorRotation().Yaw : -1, -1, bResetCamera ? InCharacter->Execute_GetCameraBoom(InCharacter)->TargetArmLength : -1.f, bInstant);
 				if(CurrentCharacter && CurrentCharacter->GetDefaultController())
 				{
 					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);

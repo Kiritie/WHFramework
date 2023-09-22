@@ -3,6 +3,7 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
+#include "Camera/CameraModuleBPLibrary.h"
 #include "Common/CommonBPLibrary.h"
 #include "Widget/WidgetModuleBPLibrary.h"
 
@@ -63,12 +64,8 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	
 	if(bOrientCamera)
 	{
-		if(const AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
-		{
-			const FRotator TargetRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
-			SetWorldRotation(TargetRotation);
-			SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
-		}
+		SetWorldRotation(UCameraModuleBPLibrary::GetCameraRotation(true));
+		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
 	}
 	else
 	{

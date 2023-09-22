@@ -14,11 +14,37 @@ void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass
 	}
 }
 
+void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	SubscribeEventByDelegate(InClass, InDelegate);
+}
+
+void UEventModuleBPLibrary::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	if(AEventModule* EventModule = AEventModule::Get())
+	{
+		EventModule->SubscribeEventByDelegate(InClass, InDelegate);
+	}
+}
+
 void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{
 		EventModule->UnsubscribeEvent(InClass, InOwner, InFuncName);
+	}
+}
+
+void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	UnsubscribeEventByDelegate(InClass, InDelegate);
+}
+
+void UEventModuleBPLibrary::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	if(AEventModule* EventModule = AEventModule::Get())
+	{
+		EventModule->UnsubscribeEventByDelegate(InClass, InDelegate);
 	}
 }
 

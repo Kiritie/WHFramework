@@ -38,7 +38,7 @@ AAbilityCharacterBase::AAbilityCharacterBase()
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
-	Interaction->SetRelativeLocation(FVector(0, 0, 0));
+	Interaction->SetRelativeLocation(FVector(0.f, 0.f, -39.f));
 
 	Interaction->AddInteractAction(EInteractAction::Revive);
 

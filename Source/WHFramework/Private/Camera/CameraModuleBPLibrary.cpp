@@ -4,7 +4,6 @@
 #include "Camera/CameraModuleBPLibrary.h"
 
 #include "Camera/CameraModule.h"
-#include "Common/CommonBPLibrary.h"
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
 {
@@ -233,13 +232,5 @@ void UCameraModuleBPLibrary::AddCameraDistanceInput(float InValue)
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraDistanceInput(InValue);
-	}
-}
-
-void UCameraModuleBPLibrary::SetViewTargetWithBlend(AActor* NewViewTarget, float BlendTime, EViewTargetBlendFunction BlendFunc, float BlendExp, bool bLockOutgoing)
-{
-	if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
-	{
-		PlayerController->SetViewTargetWithBlend(NewViewTarget, BlendTime, BlendFunc, BlendExp, bLockOutgoing);
 	}
 }

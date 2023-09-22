@@ -40,7 +40,7 @@ public:
 	virtual void ClearInteractActions();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EInteractAction> InteractActions;
 
 public:

@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "SaveGame/SaveGameModuleTypes.h"
 #include "Json.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "ParameterModuleTypes.generated.h"
 
@@ -98,9 +98,9 @@ public:
 		FString JsonString;
 		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
 		JsonWriter->WriteObjectStart();
-		for (auto& It : Map)
+		for (auto& Iter : Map)
 		{
-			JsonWriter->WriteValue(It.Key, It.Value);
+			JsonWriter->WriteValue(Iter.Key, Iter.Value);
 		}
 		JsonWriter->WriteObjectEnd();
 		JsonWriter->Close();

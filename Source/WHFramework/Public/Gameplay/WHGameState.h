@@ -29,6 +29,9 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
+protected:
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

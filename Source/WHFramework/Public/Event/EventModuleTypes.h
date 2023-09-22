@@ -10,6 +10,8 @@ class UEventHandleBase;
 
 DECLARE_DELEGATE_ThreeParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>);
 
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FEventExecuteDelegate, UObject*, InSender, UEventHandleBase*, InEventHandle);
+
 UENUM(BlueprintType)
 enum class EEventType : uint8
 {
