@@ -168,6 +168,10 @@ protected:
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void UpdateInputMode();
+
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputMode")
 	EInputMode NativeInputMode;
@@ -176,9 +180,6 @@ protected:
 	EInputMode GlobalInputMode;
 	
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void UpdateInputMode();
-
 	UFUNCTION(BlueprintCallable)
 	virtual void SetGlobalInputMode(EInputMode InInputMode);
 

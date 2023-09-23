@@ -100,7 +100,7 @@ ETraceTypeQuery UCommonBPLibrary::GetGameTraceType(ECollisionChannel InTraceChan
 
 int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->NumEnums();
 	}
@@ -109,7 +109,7 @@ int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 
 FString UCommonBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetAuthoredNameStringByValue(InEnumValue);
 	}
@@ -118,7 +118,7 @@ FString UCommonBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, in
 
 FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetDisplayNameTextByValue(InEnumValue);
 	}
@@ -127,7 +127,7 @@ FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 
 int32 UCommonBPLibrary::GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetValueByNameString(InValueName);
 	}
