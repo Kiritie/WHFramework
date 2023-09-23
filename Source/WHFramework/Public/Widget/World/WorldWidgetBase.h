@@ -56,13 +56,14 @@ public:
 	void Refresh();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void Destroy(bool bRecovery = false);
+
+protected:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void RefreshVisibility();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void RefreshLocation(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo);
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Destroy(bool bRecovery = false);
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -72,7 +73,7 @@ public:
 	void UnBindWidgetPoint(UWidget* InWidget);
 	
 	UFUNCTION(BlueprintPure, BlueprintNativeEvent)
-	FWorldWidgetBindInfo GetWidgetBindInfo(UWidget* InWidget);
+	bool GetWidgetBindInfo(UWidget* InWidget, FWorldWidgetBindInfo& OutBindInfo);
 
 protected:
 	UPROPERTY(EditDefaultsOnly)

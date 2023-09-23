@@ -492,7 +492,7 @@ void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextCol
 	{
 		InBindInfo.Location = InBindInfo.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(this, InBindInfo, { InText, InTextColor, (int32)InTextStyle });
+	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(nullptr, InBindInfo, { InText, InTextColor, (int32)InTextStyle });
 }
 
 FLinearColor ASceneModule::GetOutlineColor() const
