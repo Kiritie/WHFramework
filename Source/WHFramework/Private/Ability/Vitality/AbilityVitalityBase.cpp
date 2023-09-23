@@ -350,7 +350,7 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -359,7 +359,7 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
 	if (GetHealth() <= 0.f)
 	{

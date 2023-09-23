@@ -304,14 +304,14 @@ TArray<UWorldWidgetBase*> AWidgetModule::GetWorldWidgetsByName(FName InName) con
 	return GetWorldWidgetsByName<UWorldWidgetBase>(InName);
 }
 
-UWorldWidgetBase* AWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
-	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InLocation, InSceneComp, &InParams, InClass);
+	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InBindInfo, &InParams, InClass);
 }
 
-UWorldWidgetBase* AWidgetModule::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* AWidgetModule::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
-	return CreateWorldWidgetByName<UWorldWidgetBase>(InName, InOwner, InLocation, InSceneComp, &InParams, InClass);
+	return CreateWorldWidgetByName<UWorldWidgetBase>(InName, InOwner, InBindInfo, &InParams, InClass);
 }
 
 bool AWidgetModule::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery)

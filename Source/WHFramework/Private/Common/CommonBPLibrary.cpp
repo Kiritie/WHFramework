@@ -98,6 +98,29 @@ ETraceTypeQuery UCommonBPLibrary::GetGameTraceType(ECollisionChannel InTraceChan
 	return UEngineTypes::ConvertToTraceType(InTraceChannel);
 }
 
+bool UCommonBPLibrary::IsInScreenViewport(const FVector& InWorldLocation)
+{
+	const APlayerController* PC = GetPlayerController();
+	const ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
+	if (LP && LP->ViewportClient)
+	{
+		// get the projection data
+		FSceneViewProjectionData ProjectionData;
+		if (LP->GetProjectionData(LP->ViewportClient->Viewport, ProjectionData))
+		{
+			FMatrix const ViewProjectionMatrix = ProjectionData.ComputeViewProjectionMatrix();
+			FVector2D ScreenPosition;
+			const bool bResult = FSceneView::ProjectWorldToScreen(InWorldLocation, ProjectionData.GetConstrainedViewRect(), ViewProjectionMatrix, ScreenPosition);
+			if (bResult && ScreenPosition.X > ProjectionData.GetViewRect().Min.X && ScreenPosition.X < ProjectionData.GetViewRect().Max.X
+				&& ScreenPosition.Y > ProjectionData.GetViewRect().Min.Y && ScreenPosition.Y < ProjectionData.GetViewRect().Max.Y)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 {
 	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
