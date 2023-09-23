@@ -26,7 +26,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
 	bWidgetAutoVisibility = false;
-	WidgetShowDistance = 0;
+	WidgetShowDistance = -1;
 	WidgetParams = TArray<FParameter>();
 	WidgetInputMode = EInputMode::None;
 	OwnerObject = nullptr;
@@ -40,16 +40,9 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	if(GetWidgetSpace() == EWidgetSpace::Screen)
 	{
-		for(auto Iter : BindWidgetMap)
+		for(const auto Iter : BindWidgetMap)
 		{
-			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Iter.Key->Slot))
-			{
-				FVector2D ScreenPos;
-				if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController<AWHPlayerController>(), Iter.Value.SceneComp ? Iter.Value.SceneComp->GetComponentLocation() + Iter.Value.Location : Iter.Value.Location, ScreenPos, false))
-				{
-					CanvasPanelSlot->SetPosition(ScreenPos);
-				}
-			}
+			RefreshLocation(Iter.Key, Iter.Value);
 		}
 	}
 	if(bWidgetAutoVisibility)
@@ -72,7 +65,20 @@ void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	BindWidgetMap.Empty();
 }
 
-void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo)
+{
+	if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
+	{
+		FVector2D ScreenPos;
+		const FVector Location = InBindInfo.SceneComp ? (InBindInfo.SocketName.IsNone() ? InBindInfo.SceneComp->GetComponentLocation() : InBindInfo.SceneComp->GetSocketLocation(InBindInfo.SocketName)) + InBindInfo.Location : InBindInfo.Location;
+		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController(), Location, ScreenPos, false))
+		{
+			CanvasPanelSlot->SetPosition(ScreenPos);
+		}
+	}
+}
+
+void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
 	WidgetParams = InParams;
@@ -87,9 +93,9 @@ void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FVector InLocat
 		InputModule->UpdateInputMode();
 	}
 
-	if(InSceneComp && InSceneComp->IsA<UWorldWidgetComponent>())
+	if(InBindInfo.SceneComp && InBindInfo.SceneComp->IsA<UWorldWidgetComponent>())
 	{
-		WidgetComponent = Cast<UWorldWidgetComponent>(InSceneComp);
+		WidgetComponent = Cast<UWorldWidgetComponent>(InBindInfo.SceneComp);
 	}
 
 	if(GetWidgetSpace() == EWidgetSpace::Screen && !IsInViewport())
@@ -100,9 +106,9 @@ void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FVector InLocat
 			{
 				CanvasPanelSlot->SetZOrder(WidgetZOrder);
 				CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
+				CanvasPanelSlot->SetAnchors(WidgetAnchors);
 				if(!bWidgetAutoSize)
 				{
-					CanvasPanelSlot->SetAnchors(WidgetAnchors);
 					CanvasPanelSlot->SetOffsets(WidgetOffsets);
 				}
 				CanvasPanelSlot->SetAlignment(WidgetAlignment);
@@ -110,11 +116,12 @@ void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FVector InLocat
 
 				if(!WidgetComponent)
 				{
-					BindWidgetPoint(this, InLocation, InSceneComp);
+					BindWidgetPoint(this, InBindInfo);
 				}
 				else if(WidgetComponent->IsBindToSelf())
 				{
-					BindWidgetPoint(this, InLocation, WidgetComponent);
+					InBindInfo.SceneComp = WidgetComponent;
+					BindWidgetPoint(this, InBindInfo);
 				}
 			}
 		}
@@ -161,7 +168,8 @@ void UWorldWidgetBase::Refresh_Implementation()
 void UWorldWidgetBase::RefreshVisibility_Implementation()
 {
 	const auto OwnerActor = Cast<AActor>(OwnerObject);
-	const bool bShow = !OwnerActor || OwnerActor->WasRecentlyRendered() && (WidgetShowDistance == 0 || FVector::Distance(OwnerActor->GetActorLocation(), UCameraModuleBPLibrary::GetCameraLocation(true)) < WidgetShowDistance);
+	const auto Location = OwnerActor ? OwnerActor->GetActorLocation() : GetWidgetBindInfo(this).Location;
+	const bool bShow = (!OwnerActor && UCommonBPLibrary::IsInScreenViewport(Location) || OwnerActor->WasRecentlyRendered()) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleBPLibrary::GetCameraLocation(true)) < WidgetShowDistance);
 	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
@@ -170,27 +178,12 @@ void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 	UWidgetModuleBPLibrary::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
 }
 
-void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp)
+void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo)
 {
 	if(!BindWidgetMap.Contains(InWidget))
 	{
-		BindWidgetMap.Add(InWidget, FWorldWidgetBindInfo(InLocation, InSceneComp));
-		if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
-		{
-			FVector2D ScreenPos;
-			if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController<AWHPlayerController>(), InSceneComp ? InSceneComp->GetComponentLocation() + InLocation : InLocation, ScreenPos, false))
-			{
-				CanvasPanelSlot->SetPosition(ScreenPos);
-			}
-		}
-	}
-}
-
-void UWorldWidgetBase::BindWidgetPointByName_Implementation(UWidget* InWidget, FVector InLocation, FName InPointName)
-{
-	if(WidgetComponent)
-	{
-		BindWidgetPoint(InWidget, InLocation, WidgetComponent->GetWidgetPoint(InPointName));
+		BindWidgetMap.Add(InWidget, InBindInfo);
+		RefreshLocation(InWidget, InBindInfo);
 	}
 }
 

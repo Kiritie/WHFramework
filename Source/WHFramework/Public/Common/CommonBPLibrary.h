@@ -90,6 +90,11 @@ public:
 	static ETraceTypeQuery GetGameTraceType(ECollisionChannel InTraceChannel);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Viewport
+	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
+	static bool IsInScreenViewport(const FVector& InWorldLocation);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Phase
 	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
 	static bool PhaseC(EPhase A, EPhase B)

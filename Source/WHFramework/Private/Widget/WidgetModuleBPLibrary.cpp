@@ -181,20 +181,20 @@ TArray<UWorldWidgetBase*> UWidgetModuleBPLibrary::GetWorldWidgetsByName(FName In
 	return TArray<UWorldWidgetBase*>();
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
-		return WidgetModule->CreateWorldWidget(InClass, InOwner, InLocation, InSceneComp, InParams);
+		return WidgetModule->CreateWorldWidget(InClass, InOwner, InBindInfo, InParams);
 	}
 	return nullptr;
 }
 
-UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, USceneComponent* InSceneComp, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleBPLibrary::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
 	if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 	{
-		return WidgetModule->CreateWorldWidgetByName(InName, InClass, InOwner, InLocation, InSceneComp, InParams);
+		return WidgetModule->CreateWorldWidgetByName(InName, InClass, InOwner, InBindInfo, InParams);
 	}
 	return nullptr;
 }

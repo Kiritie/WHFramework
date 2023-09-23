@@ -43,7 +43,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	void OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
 	
 	UFUNCTION(BlueprintNativeEvent)
 	void OnRefresh();
@@ -59,14 +59,14 @@ public:
 	void RefreshVisibility();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RefreshLocation(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Destroy(bool bRecovery = false);
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void BindWidgetPoint(UWidget* InWidget, FVector InLocation, USceneComponent* InSceneComp = nullptr);
-		
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void BindWidgetPointByName(UWidget* InWidget, FVector InLocation, FName InPointName);
+	void BindWidgetPoint(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void UnBindWidgetPoint(UWidget* InWidget);

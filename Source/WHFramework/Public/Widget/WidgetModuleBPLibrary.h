@@ -399,42 +399,42 @@ public:
 	static TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName);
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
-			return WidgetModule->CreateWorldWidget<T>(InOwner, InLocation, InSceneComp, InParams, InClass);
+			return WidgetModule->CreateWorldWidget<T>(InOwner, InBindInfo, InParams, InClass);
 		}
 		return nullptr;
 	}
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateWorldWidget<T>(InOwner, InLocation, InSceneComp, &InParams, InClass);
+		return CreateWorldWidget<T>(InOwner, InBindInfo, &InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(AWidgetModule* WidgetModule = AWidgetModule::Get())
 		{
-			return WidgetModule->CreateWorldWidgetByName<T>(InName, InOwner, InLocation, InSceneComp, InParams, InClass);
+			return WidgetModule->CreateWorldWidgetByName<T>(InName, InOwner, InBindInfo, InParams, InClass);
 		}
 		return nullptr;
 	}
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, FVector InLocation = FVector::ZeroVector, class USceneComponent* InSceneComp = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateWorldWidgetByName<T>(InName, InOwner, InLocation, InSceneComp, &InParams, InClass);
+		return CreateWorldWidgetByName<T>(InName, InOwner, InBindInfo, &InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleBPLibrary")
-	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FVector InLocation, class USceneComponent* InSceneComp, const TArray<FParameter>& InParams);
+	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
 
 	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{

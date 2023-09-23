@@ -95,7 +95,7 @@ void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
 			WorldWidget = Cast<UWorldWidgetBase>(InWidget);
 			if(WorldWidget)
 			{
-				WorldWidget->OnCreate(GetOwner(), FVector::ZeroVector, this, WidgetParams);
+				WorldWidget->OnCreate(GetOwner(), this, WidgetParams);
 			}
 		}
 	}
@@ -213,7 +213,7 @@ void UWorldWidgetComponent::CreateWorldWidget()
 			}
 			case EWidgetSpace::Screen:
 			{
-				SetWorldWidget(UWidgetModuleBPLibrary::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), FVector::ZeroVector, this, &WidgetParams, WorldWidgetClass));
+				SetWorldWidget(UWidgetModuleBPLibrary::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, &WidgetParams, WorldWidgetClass));
 				break;
 			}
 		}

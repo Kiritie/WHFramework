@@ -486,13 +486,13 @@ void ASceneModule::RemovePhysicsVolumeByName(FName InName)
 	}
 }
 
-void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange, AActor* InOwnerActor, USceneComponent* InSceneComp)
+void ASceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange)
 {
 	if(InOffsetRange != FVector::ZeroVector)
 	{
-		InLocation = InLocation + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
+		InBindInfo.Location = InBindInfo.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(InOwnerActor, { InText, InTextColor, (int32)InTextStyle }, InLocation, InSceneComp);
+	UWidgetModuleBPLibrary::CreateWorldWidget<UWidgetWorldText>(this, InBindInfo, { InText, InTextColor, (int32)InTextStyle });
 }
 
 FLinearColor ASceneModule::GetOutlineColor() const

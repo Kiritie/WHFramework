@@ -502,7 +502,7 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	{
 		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetMoveSpeedAttribute())
@@ -523,7 +523,7 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UCommonBPLibrary::GetPlayerPawn() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), UCommonBPLibrary::GetPlayerPawn() == this ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
 	if (GetHealth() <= 0.f)
 	{

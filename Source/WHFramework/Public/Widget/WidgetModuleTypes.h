@@ -147,20 +147,29 @@ public:
 	{
 		Location = FVector();
 		SceneComp = nullptr;
+		SocketName = NAME_None;
 	}
 	
-	FWorldWidgetBindInfo(FVector InLocation, USceneComponent* InSceneComp)
+	FWorldWidgetBindInfo(FVector InLocation) : FWorldWidgetBindInfo()
 	{
 		Location = InLocation;
-		SceneComp = InSceneComp;
 	}
-	
+		
+	FWorldWidgetBindInfo(USceneComponent* InSceneComp, const FName InSocketName = NAME_None) : FWorldWidgetBindInfo()
+	{
+		SceneComp = InSceneComp;
+		SocketName = InSocketName;
+	}
+
 public:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadWrite)
 	FVector Location;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadWrite)
 	USceneComponent* SceneComp;
+
+	UPROPERTY(BlueprintReadWrite)
+	FName SocketName;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);

@@ -4,6 +4,7 @@
 
 #include "SceneModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Widget/WidgetModuleTypes.h"
 
 #include "SceneModuleBPLibrary.generated.h"
 
@@ -116,5 +117,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FVector InLocation, FVector InOffsetRange = FVector::ZeroVector, AActor* InOwnerActor = nullptr, USceneComponent* InSceneComp = nullptr);
+	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange = FVector::ZeroVector);
 };
