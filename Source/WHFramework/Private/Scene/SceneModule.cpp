@@ -408,7 +408,7 @@ void ASceneModule::AddScenePointByName(FName InName, USceneComponent* InSceneCom
 	}
 }
 
-inline void ASceneModule::RemoveScenePointByName(FName InName)
+void ASceneModule::RemoveScenePointByName(FName InName)
 {
 	if(ScenePoints.Contains(InName))
 	{

@@ -446,7 +446,7 @@ UTexture2D* UCommonBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
 		Texture->SRGB = TemplateTexture->SRGB;
 		Texture->Filter = TemplateTexture->Filter;
 		Texture->LODGroup = TemplateTexture->LODGroup;
-		Texture->MipGenSettings = TemplateTexture->MipGenSettings;
+		// Texture->MipGenSettings = TemplateTexture->MipGenSettings;
 		Texture->MipLoadOptions = TemplateTexture->MipLoadOptions;
 		Texture->CompressionSettings = TemplateTexture->CompressionSettings;
 

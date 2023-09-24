@@ -50,7 +50,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 {
 	if(FSM->bShowDebugMessage)
 	{
-		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDC_FSM);
+		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
 	K2_OnEnter(InLastFiniteState);
@@ -73,7 +73,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 {
 	if(FSM->bShowDebugMessage)
 	{
-		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorLabel(), *StateName.ToString()), EDC_FSM);
+		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
 	K2_OnLeave(InNextFiniteState);
