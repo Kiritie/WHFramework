@@ -152,7 +152,7 @@ bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	{
 		if(bShowDebugMessage)
 		{
-			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorLabel(), InStateIndex), EDC_FSM, EDV_Warning);
+			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定索引的状态: %d"), *GetAgent()->GetActorNameOrLabel(), InStateIndex), EDC_FSM, EDV_Warning);
 		}
 	}
 	return false;
@@ -168,7 +168,7 @@ bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	{
 		if(bShowDebugMessage)
 		{
-			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None")), EDC_FSM, EDV_Warning);
+			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定类型的状态: %s"), *GetAgent()->GetActorNameOrLabel(), InStateClass ? *InStateClass->GetName() : TEXT("None")), EDC_FSM, EDV_Warning);
 		}
 	}
 	return false;

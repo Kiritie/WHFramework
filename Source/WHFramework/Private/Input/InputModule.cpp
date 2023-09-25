@@ -436,18 +436,18 @@ AWHPlayerController* AInputModule::GetPlayerController()
 
 void AInputModule::UpdateInputMode()
 {
-	EInputMode TmpInputMode = EInputMode::None;
-	for (auto Iter : AMainModule::GetAllModule())
+	EInputMode InputMode = EInputMode::None;
+	for (const auto Iter : AMainModule::GetAllModule())
 	{
-		if(IInputManager* InputManager = Cast<IInputManager>(Iter))
+		if(const IInputManager* InputManager = Cast<IInputManager>(Iter))
 		{
-			if ((int32)InputManager->GetNativeInputMode() > (int32)TmpInputMode)
+			if ((int32)InputManager->GetNativeInputMode() > (int32)InputMode)
 			{
-				TmpInputMode = InputManager->GetNativeInputMode();
+				InputMode = InputManager->GetNativeInputMode();
 			}
 		}
 	}
-	SetGlobalInputMode(TmpInputMode);
+	SetGlobalInputMode(InputMode);
 }
 
 void AInputModule::SetGlobalInputMode(EInputMode InInputMode)

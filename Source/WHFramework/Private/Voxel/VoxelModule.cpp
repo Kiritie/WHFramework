@@ -808,7 +808,7 @@ void AVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	const auto VoxelAgent  = UCommonBPLibrary::GetPossessedPawn<IVoxelAgentInterface>();
 	if(bFromAgent && VoxelAgent)
 	{
-		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetAgentLocation().Y : 0.f, 0.f);
+		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f, 0.f);
 		GenerateIndex = LocationToChunkIndex(AgentLocation);
 		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector()).GetAbs();
 	}

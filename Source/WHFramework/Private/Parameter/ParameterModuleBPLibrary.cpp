@@ -517,6 +517,11 @@ FParameter UParameterModuleBPLibrary::MakeRotatorParameter(FRotator InValue)
 	return FParameter::MakeRotator(InValue);
 }
 
+FParameter UParameterModuleBPLibrary::MakeColorParameter(FColor InValue)
+{
+	return FParameter::MakeColor(InValue);
+}
+
 FParameter UParameterModuleBPLibrary::MakeClassParameter(UClass* InValue)
 {
 	return FParameter::MakeClass(InValue);

@@ -175,6 +175,20 @@ enum class EVoxelMeshNature : uint8
 	Vitality
 };
 
+/**
+ * 体术交互选项
+ */
+UENUM(BlueprintType)
+enum class EVoxelInteractAction : uint8
+{
+	// 无
+	None = EInteractAction::None UMETA(DisplayName="无"),
+	// 打开
+	Open = EInteractAction::Custom1 UMETA(DisplayName="打开"),
+	// 关闭
+	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelMeshUVData
 {

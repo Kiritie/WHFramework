@@ -23,9 +23,19 @@ public:
 	{
 		SubscribeEvent(T::StaticClass(), InOwner, InFuncName);
 	}
+	template<class T>
+	static void SubscribeEvent(const FEventExecuteDelegate& InDelegate)
+	{
+		SubscribeEvent(T::StaticClass(), InDelegate);
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
+
+	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
+
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary", meta = (DisplayName = "Subscribe Event"))
+	static void SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
 
 	template<class T>
 	static void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
@@ -33,8 +43,19 @@ public:
 		UnsubscribeEvent(T::StaticClass(), InOwner, InFuncName);
 	}
 
+	template<class T>
+	static void UnsubscribeEvent(const FEventExecuteDelegate& InDelegate)
+	{
+		UnsubscribeEvent(T::StaticClass(), InDelegate);
+	}
+
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
+
+	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
+
+	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary", meta = (DisplayName = "Unsubscribe Event"))
+	static void UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleBPLibrary")
 	static void UnsubscribeAllEvent();

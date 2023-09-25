@@ -107,6 +107,16 @@ void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 	}
 }
 
+void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	SubscribeEventByDelegate(InClass, InDelegate);
+}
+
+void AEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	SubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
+}
+
 void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(!InClass || !InOwner || InFuncName.IsNone()) return;
@@ -132,6 +142,16 @@ void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObje
 	{
 		EventHandleInfos[InClass].EventHandleDelegate.Unbind();
 	}
+}
+
+void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	UnsubscribeEventByDelegate(InClass, InDelegate);
+}
+
+void AEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+{
+	UnsubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }
 
 void AEventModule::UnsubscribeAllEvent()

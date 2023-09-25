@@ -72,6 +72,9 @@ public:
 		return Cast<T>(CurrentCharacter);
 	}
 
+	UFUNCTION(BlueprintPure)
+	TArray<ACharacterBase*> GetAllCharacter() const { return Characters; }
+
 	ACharacterBase* GetCurrentCharacter() const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))

@@ -220,6 +220,9 @@ public:
 	static FParameter MakeRotatorParameter(FRotator InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
+	static FParameter MakeColorParameter(FColor InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
 	static FParameter MakeClassParameter(UClass* InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")

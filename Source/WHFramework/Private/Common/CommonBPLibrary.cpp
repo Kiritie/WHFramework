@@ -98,9 +98,32 @@ ETraceTypeQuery UCommonBPLibrary::GetGameTraceType(ECollisionChannel InTraceChan
 	return UEngineTypes::ConvertToTraceType(InTraceChannel);
 }
 
+bool UCommonBPLibrary::IsInScreenViewport(const FVector& InWorldLocation)
+{
+	const APlayerController* PC = GetPlayerController();
+	const ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
+	if (LP && LP->ViewportClient)
+	{
+		// get the projection data
+		FSceneViewProjectionData ProjectionData;
+		if (LP->GetProjectionData(LP->ViewportClient->Viewport, ProjectionData))
+		{
+			FMatrix const ViewProjectionMatrix = ProjectionData.ComputeViewProjectionMatrix();
+			FVector2D ScreenPosition;
+			const bool bResult = FSceneView::ProjectWorldToScreen(InWorldLocation, ProjectionData.GetConstrainedViewRect(), ViewProjectionMatrix, ScreenPosition);
+			if (bResult && ScreenPosition.X > ProjectionData.GetViewRect().Min.X && ScreenPosition.X < ProjectionData.GetViewRect().Max.X
+				&& ScreenPosition.Y > ProjectionData.GetViewRect().Min.Y && ScreenPosition.Y < ProjectionData.GetViewRect().Max.Y)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->NumEnums();
 	}
@@ -109,7 +132,7 @@ int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 
 FString UCommonBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetAuthoredNameStringByValue(InEnumValue);
 	}
@@ -118,7 +141,7 @@ FString UCommonBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, in
 
 FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetDisplayNameTextByValue(InEnumValue);
 	}
@@ -127,7 +150,7 @@ FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 
 int32 UCommonBPLibrary::GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName)
 {
-	if(const UEnum* EnumPtr = FindObject<UEnum>(nullptr, *InEnumName, true))
+	if(const UEnum* EnumPtr = Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, true)))
 	{
 		return EnumPtr->GetValueByNameString(InValueName);
 	}
@@ -423,7 +446,7 @@ UTexture2D* UCommonBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
 		Texture->SRGB = TemplateTexture->SRGB;
 		Texture->Filter = TemplateTexture->Filter;
 		Texture->LODGroup = TemplateTexture->LODGroup;
-		Texture->MipGenSettings = TemplateTexture->MipGenSettings;
+		// Texture->MipGenSettings = TemplateTexture->MipGenSettings;
 		Texture->MipLoadOptions = TemplateTexture->MipLoadOptions;
 		Texture->CompressionSettings = TemplateTexture->CompressionSettings;
 

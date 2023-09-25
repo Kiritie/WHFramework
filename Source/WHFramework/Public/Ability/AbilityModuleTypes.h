@@ -411,49 +411,6 @@ enum class ESkillMode : uint8
 };
 
 /**
- * 交互选项
- */
-UENUM(BlueprintType)
-enum class EInteractAction : uint8
-{
-	// 无
-	None = 0 UMETA(DisplayName="无"),
-	// 复活
-	Revive = 1 UMETA(DisplayName="复活"),
-	// 战斗
-	Fight = 2 UMETA(DisplayName="战斗"),
-	// 对话
-	Dialogue = 3 UMETA(DisplayName="对话"),
-	// 交易
-	Transaction = 4 UMETA(DisplayName="交易"),
-	
-	Custom1 = 10 UMETA(Hidden),
-	Custom2 = 11 UMETA(Hidden),
-	Custom3 = 12 UMETA(Hidden),
-	Custom4 = 13 UMETA(Hidden),
-	Custom5 = 14 UMETA(Hidden),
-	Custom6 = 15 UMETA(Hidden),
-	Custom7 = 16 UMETA(Hidden),
-	Custom8 = 17 UMETA(Hidden),
-	Custom9 = 18 UMETA(Hidden),
-	Custom10 = 19 UMETA(Hidden)
-};
-
-/**
- * 体术交互选项
- */
-UENUM(BlueprintType)
-enum class EVoxelInteractAction : uint8
-{
-	// 无
-	None = EInteractAction::None UMETA(DisplayName="无"),
-	// 打开
-	Open = EInteractAction::Custom1 UMETA(DisplayName="打开"),
-	// 关闭
-	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
-};
-
-/**
  * 能力项类型
  */
 UENUM(BlueprintType)

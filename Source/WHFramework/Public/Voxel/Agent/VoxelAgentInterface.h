@@ -23,7 +23,7 @@ public:
 	virtual bool OnInteractVoxel(const FVoxelHitResult& InVoxelHitResult, EInputInteractAction InInteractAction);
 
 public:
-	virtual FVector GetAgentLocation() const = 0;
+	virtual FVector GetVoxelAgentLocation() const = 0;
 
 	virtual FPrimaryAssetId GetGenerateVoxelID() const = 0;
 

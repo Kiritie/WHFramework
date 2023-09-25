@@ -77,24 +77,17 @@ DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);
 // UI
 DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 
+// 打印
+#define WH_LOG(CategoryName, Verbosity, Format, ...) \
+{ \
+	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
+}
+
 // 断言实现
 #define WH_ENSURE_IMPL(Capture, InExpression, InFormat, ...) \
 (LIKELY(!!(InExpression)) || (([Capture] () ->bool \
 { \
 	static bool bExecuted = false; \
-	if ((!bExecuted)) \
-	{ \
-		bExecuted = true; \
-		FString Expr = #InExpression;\
-		FString File = __FILE__;\
-		int32 Line = __LINE__;\
-		WH_LOG(LogTemp, Error, TEXT("WHFramework CRASH"));\
-		WH_LOG(LogTemp, Error, TEXT("Expression : %s, %s, %d"), *Expr, *File, Line);\
-		if(InFormat != TEXT("")) \
-		{ \
-			WH_LOG(LogTemp, Error, InFormat, ##__VA_ARGS__); \
-		} \
-	} \
 	return false; \
 })()))
 
@@ -106,12 +99,6 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 	#define ensureEditor(InExpression) WH_ENSURE_IMPL( , InExpression, TEXT(""))
 	#define ensureEditorMsgf( InExpression, InFormat, ... ) WH_ENSURE_IMPL(&, InExpression, InFormat, ##__VA_ARGS__)
 #endif
-
-// 打印
-#define WH_LOG(CategoryName, Verbosity, Format, ...) \
-{ \
-	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
-}
 
 /*
  * 打印日志

@@ -35,6 +35,35 @@ enum class EPhase : uint8
 	All = Primary | Lesser | Final
 };
 
+/**
+ * 交互选项
+ */
+UENUM(BlueprintType)
+enum class EInteractAction : uint8
+{
+	// 无
+	None = 0 UMETA(DisplayName="无"),
+	// 复活
+	Revive = 1 UMETA(DisplayName="复活"),
+	// 战斗
+	Fight = 2 UMETA(DisplayName="战斗"),
+	// 对话
+	Dialogue = 3 UMETA(DisplayName="对话"),
+	// 交易
+	Transaction = 4 UMETA(DisplayName="交易"),
+	
+	Custom1 = 10,
+	Custom2 = 11,
+	Custom3 = 12,
+	Custom4 = 13,
+	Custom5 = 14,
+	Custom6 = 15,
+	Custom7 = 16,
+	Custom8 = 17,
+	Custom9 = 18,
+	Custom10 = 19
+};
+
 struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 {
 	FSaveDataArchive(FArchive& InInnerArchive) : FObjectAndNameAsStringProxyArchive(InInnerArchive, false)

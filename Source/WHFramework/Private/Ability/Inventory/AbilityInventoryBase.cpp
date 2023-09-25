@@ -124,7 +124,7 @@ void UAbilityInventoryBase::UnloadData(EPhase InPhase)
 
 FQueryItemInfo UAbilityInventoryBase::QueryItemByRange(EQueryItemType InQueryType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
 {
-	if (!InItem.IsValid()) return FQueryItemInfo();
+	if (!InItem.IsValid() || Slots.IsEmpty()) return FQueryItemInfo();
 
 	int32 StartIndex;
 	if (InStartIndex == -1) StartIndex = GetSelectedSlot() ? Slots.IndexOfByKey(GetSelectedSlot()) : 0;
