@@ -8,21 +8,21 @@
 
 UAIServiceBase::UAIServiceBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	OwnerController = nullptr;
-	OwnerCharacter = nullptr;
+	Controller = nullptr;
+	Agent = nullptr;
 }
 
 bool UAIServiceBase::InitService(UBehaviorTreeComponent& OwnerComp)
 {
-	if(OwnerController == nullptr)
+	if(Controller == nullptr)
 	{
-		OwnerController = Cast<AAIControllerBase>(OwnerComp.GetOwner());
-		if (OwnerController != nullptr && OwnerCharacter == nullptr)
+		Controller = Cast<AAIControllerBase>(OwnerComp.GetOwner());
+		if (Controller != nullptr && Agent == nullptr)
 		{
-			OwnerCharacter = Cast<ACharacterBase>(OwnerController->GetPawn());
+			Agent = Cast<IAIAgentInterface>(Controller->GetPawn());
 		}
 	}
-	if(OwnerController && OwnerCharacter)
+	if(Controller && Agent)
 	{
 		return true;	
 	}

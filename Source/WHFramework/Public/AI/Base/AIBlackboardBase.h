@@ -14,14 +14,12 @@ class ACharacterBase;
 UCLASS()
 class WHFRAMEWORK_API UAIBlackboardBase : public UBlackboardData
 {
-
-private:
 	GENERATED_BODY()
 
 public:
 	virtual void PostLoad() override;
 
-	virtual void Initialize(UBlackboardComponent* InComponent, ACharacterBase* InCharacter);
+	virtual void Initialize(UBlackboardComponent* InComponent, IAIAgentInterface* InAgent);
 
 	virtual void Refresh();
 
@@ -33,29 +31,32 @@ protected:
 	virtual void OnValueChanged(FName InValueName);
 
 public:
+	BLACKBOARD_VALUE_ACCESSORS_BOOL(IsLostTarget);
+	BLACKBOARD_VALUE_ACCESSORS_VECTOR(TargetLocation);
+	BLACKBOARD_VALUE_ACCESSORS_OBJECT(TargetAgent);
+
+public:
 	FOnBlackboardValuePreChange OnBlackboardValuePreChange;
 	FOnBlackboardValueChanged OnBlackboardValueChanged;
 
-public:
-	BLACKBOARD_VALUE_ACCESSORS_BOOL(IsLostTarget);
-	BLACKBOARD_VALUE_ACCESSORS_VECTOR(TargetLocation);
-	BLACKBOARD_VALUE_ACCESSORS_OBJECT(TargetCharacter);
-
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY()
 	UBlackboardComponent* Component;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	ACharacterBase* Character;
+	IAIAgentInterface* Agent;
 	
 public:
+	UFUNCTION(BlueprintPure)
 	UBlackboardComponent* GetComponent() const { return Component; }
 
 	template<class T>
-	T* GetCharacter() const
+	T* GetAgent() const
 	{
-		return Cast<T>(Character);
+		return Cast<T>(Agent);
 	}
 
-	ACharacterBase* GetCharacter() const { return Character; }
+	IAIAgentInterface* GetAgent() const { return Agent; }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return Cast<APawn>(Agent); }
 };

@@ -21,14 +21,4 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bAutoEndAbility;
-
-public:
-	template<class T>
-	T* GetOwnerCharacter() const
-	{
-		return Cast<T>(GetOwningActorFromActorInfo());
-	}
-	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
-	AAbilityCharacterBase* GetOwnerCharacter(TSubclassOf<AAbilityCharacterBase> InOwnerClass = nullptr) const;
 };

@@ -14,13 +14,13 @@ void UAIBlackboardBase::PostLoad()
 
 	// BLACKBOARD_VALUE_GENERATE_BOOL(IsLostTarget);
 	// BLACKBOARD_VALUE_GENERATE_VECTOR(TargetLocation);
-	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, ACharacterBase);
+	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, APawn);
 }
 
-void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, ACharacterBase* InCharacter)
+void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, IAIAgentInterface* InAgent)
 {
 	Component = InComponent;
-	Character = InCharacter;
+	Agent = InAgent;
 }
 
 void UAIBlackboardBase::Refresh()
@@ -46,9 +46,9 @@ void UAIBlackboardBase::OnValueChanged(FName InValueName)
 	{
 		if(GetIsLostTarget())
 		{
-			if(GetTargetCharacter<ACharacterBase>())
+			if(GetTargetAgent<APawn>())
 			{
-				SetTargetLocation(GetTargetCharacter<ACharacterBase>()->GetActorLocation());
+				SetTargetLocation(GetTargetAgent<APawn>()->GetActorLocation());
 			}
 			else
 			{

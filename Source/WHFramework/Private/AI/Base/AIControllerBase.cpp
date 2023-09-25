@@ -6,7 +6,6 @@
 #include "AI/Base/AIAgentInterface.h"
 #include "AI/Base/AIBlackboardBase.h"
 #include "BehaviorTree/BehaviorTree.h"
-#include "Character/Base/CharacterBase.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -23,7 +22,7 @@ AAIControllerBase::AAIControllerBase()
 	AffiliationFilter.bDetectFriendlies = true;
 	AffiliationFilter.bDetectNeutrals = true;
 
-	auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
+	const auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
 	SightSenseConfig->SightRadius = 1000;
 	SightSenseConfig->LoseSightRadius = 1200;
 	SightSenseConfig->PeripheralVisionAngleDegrees = 90;
@@ -32,7 +31,7 @@ AAIControllerBase::AAIControllerBase()
 	PerceptionComponent->ConfigureSense(*SightSenseConfig);
 	PerceptionComponent->SetDominantSense(*SightSenseConfig->GetSenseImplementation());
 
-	auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
+	const auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
 	PerceptionComponent->ConfigureSense(*damageSenseConfig);
 }
 
@@ -50,9 +49,9 @@ void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
 	
-	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
+	IAIAgentInterface* OwnerAgent = GetPawn<IAIAgentInterface>();
 
-	if(!OwnerCharacter) return;
+	if(!OwnerAgent) return;
 
 	if(IsRunningBehaviorTree())
 	{
@@ -109,23 +108,23 @@ void AAIControllerBase::OnUnPossess()
 
 void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	ACharacterBase* OwnerCharacter = GetPawn<ACharacterBase>();
-	ACharacterBase* TargetCharacter = Cast<ACharacterBase>(Actor);
+	const APawn* OwnerAgent = GetPawn();
+	APawn* TargetAgent = Cast<APawn>(Actor);
 
-	if (!OwnerCharacter || !TargetCharacter || TargetCharacter == OwnerCharacter) return;
+	if (!OwnerAgent || !TargetAgent || TargetAgent == OwnerAgent) return;
 	
 	if (Stimulus.WasSuccessfullySensed())
 	{
-		if (!GetBlackboard()->GetTargetCharacter())
+		if (!GetBlackboard()->GetTargetAgent())
 		{
-			GetBlackboard()->SetTargetCharacter(TargetCharacter);
+			GetBlackboard()->SetTargetAgent(TargetAgent);
 		}
-		else if(TargetCharacter == GetBlackboard()->GetTargetCharacter())
+		else if(TargetAgent == GetBlackboard()->GetTargetAgent())
 		{
 			GetBlackboard()->SetIsLostTarget(false);
 		}
 	}
-	else if(TargetCharacter == GetBlackboard()->GetTargetCharacter())
+	else if(TargetAgent == GetBlackboard()->GetTargetAgent())
 	{
 		GetBlackboard()->SetIsLostTarget(true);
 	}
@@ -161,7 +160,7 @@ bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 	const bool bSuccess = Super::RunBehaviorTree(BTAsset);
 	if(BlackboardAsset)
 	{
-		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<ACharacterBase>());
+		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<IAIAgentInterface>());
 	}
 	return bSuccess;
 }

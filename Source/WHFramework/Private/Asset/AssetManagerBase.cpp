@@ -2,7 +2,6 @@
 
 #include "Asset/AssetManagerBase.h"
 
-#include "AbilitySystemGlobals.h"
 #include "Debug/DebugModuleTypes.h"
 
 UAssetManagerBase::UAssetManagerBase()
@@ -24,8 +23,6 @@ UAssetManagerBase& UAssetManagerBase::Get()
 void UAssetManagerBase::StartInitialLoading()
 {
 	Super::StartInitialLoading();
-
-	UAbilitySystemGlobals::Get().InitGlobalData();
 }
 
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)

@@ -15,13 +15,6 @@ UCLASS()
 class WHFRAMEWORK_API UAITaskBase : public UBTTaskNode
 {
 	GENERATED_UCLASS_BODY()
-
-protected:
-	UPROPERTY(VisibleAnywhere)
-	AAIControllerBase* OwnerController;
-
-	UPROPERTY(VisibleAnywhere)
-	ACharacterBase* OwnerCharacter;
 	
 protected:
 	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
@@ -36,20 +29,30 @@ protected:
 
 	virtual void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult) override;
 
+protected:
+	UPROPERTY()
+	AAIControllerBase* Controller;
+	
+	IAIAgentInterface* Agent;
+	
 public:
 	template<class T>
-	T* GetOwnerController() const
+	T* GetController() const
 	{
-		return Cast<T>(OwnerController);
+		return Cast<T>(Controller);
 	}
 
-	AAIControllerBase* GetOwnerController() const { return OwnerController; }
+	UFUNCTION(BlueprintPure)
+	AAIControllerBase* GetController() const { return Controller; }
 
 	template<class T>
-	T* GetOwnerCharacter() const
+	T* GetAgent() const
 	{
-		return Cast<T>(OwnerCharacter);
+		return Cast<T>(Agent);
 	}
 
-	ACharacterBase* GetOwnerCharacter() const { return OwnerCharacter; }
+	IAIAgentInterface* GetAgent() const { return Agent; }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return Cast<APawn>(Agent); }
 };

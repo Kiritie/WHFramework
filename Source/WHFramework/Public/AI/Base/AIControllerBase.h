@@ -39,10 +39,10 @@ protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UBehaviorTree* BehaviorTreeAsset;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAIBlackboardBase* BlackboardAsset;
 
 protected:

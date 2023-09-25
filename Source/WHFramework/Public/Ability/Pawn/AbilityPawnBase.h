@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "AbilityVitalityInterface.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
@@ -11,9 +10,10 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
 
-#include "AbilityVitalityBase.generated.h"
+#include "AbilityPawnBase.generated.h"
 
 class UFSMComponent;
 class UInteractionComponent;
@@ -22,22 +22,22 @@ class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
-class UAbilityVitalityInventoryBase;
+class UAbilityPawnInventoryBase;
 
 /**
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterface, public ISceneActorInterface, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
-	friend class UAbilityVitalityState_Death;
-	friend class UAbilityVitalityState_Default;
+	friend class UAbilityPawnState_Death;
+	friend class UAbilityPawnState_Default;
 
 public:
 	// Sets default values for this actor's properties
-	AAbilityVitalityBase();
+	AAbilityPawnBase();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -53,10 +53,33 @@ protected:
 	UInteractionComponent* Interaction;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilityVitalityInventoryBase* Inventory;
+	UAbilityPawnInventoryBase* Inventory;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Actor
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	FGuid ActorID;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	bool bVisible;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
+	TScriptInterface<ISceneContainerInterface> Container;
+	
+public:
+	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
+
+	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
+
+	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
+
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
+
+	virtual bool IsVisible_Implementation() const override { return bVisible; }
+
+	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
 
 protected:
 	// stats
@@ -130,12 +153,12 @@ public:
 
 public:
 	template<class T>
-	T& GetVitalityData() const
+	T& GetPawnData() const
 	{
-		return static_cast<T&>(GetVitalityData());
+		return static_cast<T&>(GetPawnData());
 	}
 	
-	UAbilityVitalityDataBase& GetVitalityData() const;
+	UAbilityPawnDataBase& GetPawnData() const;
 
 	template<class T>
 	T* GetAttributeSet() const

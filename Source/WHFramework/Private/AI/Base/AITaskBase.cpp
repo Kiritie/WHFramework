@@ -13,8 +13,8 @@ UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer) : Super(Ob
 	bNotifyTick = true;
 	bNotifyTaskFinished = true;
 
-	OwnerController = nullptr;
-	OwnerCharacter = nullptr;
+	Controller = nullptr;
+	Agent = nullptr;
 }
 
 void UAITaskBase::InitializeFromAsset(UBehaviorTree& Asset)
@@ -33,12 +33,12 @@ void UAITaskBase::InitializeFromAsset(UBehaviorTree& Asset)
 
 bool UAITaskBase::InitTask(UBehaviorTreeComponent& OwnerComp)
 {
-	OwnerController = Cast<AAIControllerBase>(OwnerComp.GetOwner());
-	if (OwnerController)
+	Controller = Cast<AAIControllerBase>(OwnerComp.GetOwner());
+	if (Controller)
 	{
-		OwnerCharacter = Cast<ACharacterBase>(OwnerController->GetPawn());
+		Agent = Cast<IAIAgentInterface>(Controller->GetPawn());
 	}
-	return OwnerController && OwnerCharacter;
+	return Controller && Agent;
 }
 
 void UAITaskBase::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)

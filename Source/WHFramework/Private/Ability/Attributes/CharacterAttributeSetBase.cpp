@@ -13,30 +13,6 @@ UCharacterAttributeSetBase::UCharacterAttributeSetBase()
 {
 }
 
-void UCharacterAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
-{
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
-
-	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
-	if(Attribute == GetMoveSpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if(Attribute == GetRotationSpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if(Attribute == GetJumpForceAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else
-	{
-		Super::PreAttributeBaseChange(Attribute, NewValue);
-	}
-}
-
 void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
