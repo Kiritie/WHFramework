@@ -18,7 +18,8 @@
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 
-AAbilityVitalityBase::AAbilityVitalityBase()
+AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
+	Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -28,13 +29,13 @@ AAbilityVitalityBase::AAbilityVitalityBase()
 	BoxComponent->CanCharacterStepUpOn = ECB_No;
 	SetRootComponent(BoxComponent);
 
-	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	// AbilitySystem->SetIsReplicated(true);
-	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	AbilitySystem->SetIsReplicated(true);
+	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
-			
-	//Inventory = CreateDefaultSubobject<UVitalityInventory>(FName("Inventory"));
+	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
+		
+	Inventory = CreateDefaultSubobject<UAbilityVitalityInventoryBase>(FName("Inventory"));
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);

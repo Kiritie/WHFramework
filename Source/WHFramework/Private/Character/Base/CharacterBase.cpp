@@ -24,7 +24,8 @@
 #include "Voxel/VoxelModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
-ACharacterBase::ACharacterBase()
+ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
+	Super(ObjectInitializer)
 {
 	bReplicates = true;
 

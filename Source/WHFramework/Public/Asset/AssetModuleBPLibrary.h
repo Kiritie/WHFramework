@@ -3,7 +3,6 @@
 #pragma once
 
 #include "AssetModule.h"
-#include "AssetModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 #include "Primary/PrimaryEntityInterface.h"
@@ -17,6 +16,33 @@ UCLASS()
 class WHFRAMEWORK_API UAssetModuleBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Objects
+public:
+	template<class T> 
+	static T* FindObject(const FString& InName, bool bExactClass = false)
+	{
+		return Cast<T>(FindObject(T::StaticClass(), InName, bExactClass));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UObject* FindObject(UClass* InClass, const FString& InName, bool bExactClass = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Enums
+public:
+	UFUNCTION(BlueprintPure)
+	static UEnum* FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
+
+	UFUNCTION(BlueprintPure)
+	static UEnum* FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass = false);
+
+	UFUNCTION(BlueprintCallable)
+	static void AddEnumMapping(const FString& InEnumName, const FString& InOtherName);
+
+	UFUNCTION(BlueprintCallable)
+	static void RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// DataAsset

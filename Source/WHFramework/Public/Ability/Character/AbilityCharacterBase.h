@@ -43,8 +43,8 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 	friend class UAbilityCharacterState_Walk;
 
 public:
-	AAbilityCharacterBase();
-	
+	AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
 public:

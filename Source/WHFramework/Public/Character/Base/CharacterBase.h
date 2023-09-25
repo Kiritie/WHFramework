@@ -24,7 +24,7 @@ class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInter
 	GENERATED_BODY()
 	
 public:
-	ACharacterBase();
+	ACharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor

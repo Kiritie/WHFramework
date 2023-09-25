@@ -17,7 +17,8 @@
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/Pawn/AbilityPawnInventoryBase.h"
 
-AAbilityPawnBase::AAbilityPawnBase()
+AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) :
+	Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -27,13 +28,13 @@ AAbilityPawnBase::AAbilityPawnBase()
 	BoxComponent->CanCharacterStepUpOn = ECB_No;
 	SetRootComponent(BoxComponent);
 
-	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	// AbilitySystem->SetIsReplicated(true);
-	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	AbilitySystem->SetIsReplicated(true);
+	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	// AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
-			
-	//Inventory = CreateDefaultSubobject<UVitalityInventory>(FName("Inventory"));
+	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
+		
+	Inventory = CreateDefaultSubobject<UAbilityPawnInventoryBase>(FName("Inventory"));
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -72,10 +73,18 @@ void AAbilityPawnBase::SetActorVisible_Implementation(bool bNewVisible)
 	}
 }
 
+bool AAbilityPawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
+}
+
+bool AAbilityPawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
+{
+	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
+}
+
 void AAbilityPawnBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
-
 	if(InParams.IsValidIndex(0))
 	{
 		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
@@ -88,8 +97,6 @@ void AAbilityPawnBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation(bRecovery);
-
 	FSM->SwitchState(nullptr);
 
 	RaceID = NAME_None;
@@ -271,16 +278,6 @@ void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 }
 
-bool AAbilityPawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool AAbilityPawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
-}
-
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GetPawnData().DeadTag) || bCheckDying && IsDying();
@@ -368,7 +365,7 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -377,7 +374,7 @@ void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDam
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f), this);
+	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
 	if (GetHealth() <= 0.f)
 	{

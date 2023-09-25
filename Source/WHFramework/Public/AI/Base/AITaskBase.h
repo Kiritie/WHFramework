@@ -6,7 +6,7 @@
 #include "AITaskBase.generated.h"
 
 class AAIControllerBase;
-class ACharacterBase;
+class IAIAgentInterface;
 
 /**
  * AI任务基类

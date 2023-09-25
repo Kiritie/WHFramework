@@ -20,21 +20,23 @@
 #include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
+#include "Camera/CameraModuleBPLibrary.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
-AAbilityCharacterBase::AAbilityCharacterBase()
+AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	// AbilitySystem->SetIsReplicated(true);
-	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	AbilitySystem->SetIsReplicated(true);
+	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	// AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
+	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 	
-	//Inventory = CreateDefaultSubobject<UCharacterInventory>(FName("Inventory"));
+	Inventory = CreateDefaultSubobject<UAbilityCharacterInventoryBase>(FName("Inventory"));
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -184,6 +186,9 @@ FSaveData* AAbilityCharacterBase::ToData(bool bRefresh)
 
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
+	
+	SaveData.CameraRotation = UCameraModuleBPLibrary::GetCameraRotation();
+	SaveData.CameraDistance = UCameraModuleBPLibrary::GetCameraDistance();
 
 	return &SaveData;
 }

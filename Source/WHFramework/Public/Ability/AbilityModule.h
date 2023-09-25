@@ -46,28 +46,6 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Asset
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UMaterialInterface* ItemIconSourceMat;
-
-public:
-	UMaterialInterface* GetItemIconSourceMat() const { return ItemIconSourceMat; }
-
-	//////////////////////////////////////////////////////////////////////////
-	// Interact
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EInteractAction, FString> CustomInteractActionMap;
-
-public:
-	void AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName);
-
-	void RemoveCustomInteractAction(int32 InInteractAction);
-
-	FText GetInteractActionDisplayName(int32 InInteractAction);
-
-	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
 	virtual ECollisionChannel GetPickUpTraceChannel() const;

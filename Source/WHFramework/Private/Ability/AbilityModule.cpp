@@ -26,14 +26,6 @@ IMPLEMENTATION_MODULE(AAbilityModule)
 AAbilityModule::AAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Ability/Materials/M_ItemIcon.M_ItemIcon'"));
-	if(IconSourceMatFinder.Succeeded())
-	{
-		ItemIconSourceMat = IconSourceMatFinder.Object;
-	}
-
-	CustomInteractActionMap = TMap<EInteractAction, FString>();
 }
 
 AAbilityModule::~AAbilityModule()
@@ -83,32 +75,9 @@ void AAbilityModule::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-void AAbilityModule::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)
-{
-	CustomInteractActionMap.Emplace((EInteractAction)InInteractAction, InTypeName);
-}
-
-void AAbilityModule::RemoveCustomInteractAction(int32 InInteractAction)
-{
-	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
-	{
-		CustomInteractActionMap.Remove((EInteractAction)InInteractAction);
-	}
-}
-
-FText AAbilityModule::GetInteractActionDisplayName(int32 InInteractAction)
-{
-	FString EnumName = TEXT("/Script/WHFramework.EInteractAction");
-	if(CustomInteractActionMap.Contains((EInteractAction)InInteractAction))
-	{
-		EnumName = CustomInteractActionMap[(EInteractAction)InInteractAction];
-	}
-	return UCommonBPLibrary::GetEnumValueDisplayName(EnumName, InInteractAction);
-}
-
 ECollisionChannel AAbilityModule::GetPickUpTraceChannel() const
 {
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)

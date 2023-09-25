@@ -30,14 +30,10 @@ class UAbilityVitalityInventoryBase;
 UCLASS()
 class WHFRAMEWORK_API AAbilityVitalityBase : public AWHActor, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
 {
-	GENERATED_BODY()
+	GENERATED_UCLASS_BODY()
 
 	friend class UAbilityVitalityState_Death;
 	friend class UAbilityVitalityState_Default;
-
-public:
-	// Sets default values for this actor's properties
-	AAbilityVitalityBase();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

@@ -40,17 +40,6 @@ public:
 	static EAbilityItemType AssetTypeToItemType(FPrimaryAssetType InAssetType);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Interact
-	UFUNCTION(BlueprintCallable, Category = "AbilityModuleBPLibrary")
-	static void AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName);
-
-	UFUNCTION(BlueprintCallable, Category = "AbilityModuleBPLibrary")
-	static void RemoveCustomInteractAction(int32 InInteractAction);
-
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FText GetInteractActionDisplayName(int32 InInteractAction);
-
-	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
 	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)

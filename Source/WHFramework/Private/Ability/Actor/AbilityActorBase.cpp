@@ -6,16 +6,17 @@
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 
-AAbilityActorBase::AAbilityActorBase()
+AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer) :
+	Super(ObjectInitializer)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
-	// AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	// AbilitySystem->SetIsReplicated(true);
-	// AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	AbilitySystem->SetIsReplicated(true);
+	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	// AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(FName("AttributeSet"));
+	AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(FName("AttributeSet"));
 
 	ActorID = FGuid::NewGuid();
 	Container = nullptr;

@@ -4,6 +4,62 @@
 #include "Asset/AssetModuleBPLibrary.h"
 
 #include "Asset/AssetModule.h"
+#include "Common/CommonBPLibrary.h"
+
+UObject* UAssetModuleBPLibrary::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
+{
+	if(!UCommonBPLibrary::IsPlaying())
+	{
+		return StaticFindObject(InClass, nullptr, *InName, bExactClass);
+	}
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->FindObject(InClass, InName, bExactClass);
+	}
+	return nullptr;
+}
+
+UEnum* UAssetModuleBPLibrary::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
+{
+	if(!UCommonBPLibrary::IsPlaying())
+	{
+		return Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, bExactClass));
+	}
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->FindEnumByValue(InEnumName, InEnumValue, bExactClass);
+	}
+	return nullptr;
+}
+
+UEnum* UAssetModuleBPLibrary::FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass)
+{
+	if(!UCommonBPLibrary::IsPlaying())
+	{
+		return Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, bExactClass));
+	}
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->FindEnumByValueName(InEnumName, InEnumValueName, bExactClass);
+	}
+	return nullptr;
+}
+
+void UAssetModuleBPLibrary::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		AssetModule->AddEnumMapping(InEnumName, InOtherName);
+	}
+}
+
+void UAssetModuleBPLibrary::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		AssetModule->RemoveEnumMapping(InEnumName, InOtherName);
+	}
+}
 
 bool UAssetModuleBPLibrary::HasDataAsset(FName InName)
 {

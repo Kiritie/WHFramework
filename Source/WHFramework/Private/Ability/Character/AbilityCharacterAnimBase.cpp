@@ -4,6 +4,7 @@
 #include "Ability/Character/AbilityCharacterAnimBase.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Common/CommonBPLibrary.h"
 
 UAbilityCharacterAnimBase::UAbilityCharacterAnimBase()
 {

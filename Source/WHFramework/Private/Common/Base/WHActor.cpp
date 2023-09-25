@@ -5,7 +5,8 @@
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
-AWHActor::AWHActor()
+AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
+	Super(ObjectInitializer)
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 

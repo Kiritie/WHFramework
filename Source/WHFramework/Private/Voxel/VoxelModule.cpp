@@ -126,8 +126,7 @@ void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Open, TEXT("/Script/WHFramework.EVoxelInteractAction"));
-	UAbilityModuleBPLibrary::AddCustomInteractAction((int32)EVoxelInteractAction::Close, TEXT("/Script/WHFramework.EVoxelInteractAction"));
+	UAssetModuleBPLibrary::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
 }
 
 void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -170,6 +169,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
 		}
+		UAssetModuleBPLibrary::FindObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType"));
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -703,12 +703,12 @@ FIndex AVoxelModule::NumberToVoxelIndex(int32 InNumber) const
 
 ECollisionChannel AVoxelModule::GetChunkTraceChannel() const
 {
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 ECollisionChannel AVoxelModule::GetVoxelTraceChannel() const
 {
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 bool AVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

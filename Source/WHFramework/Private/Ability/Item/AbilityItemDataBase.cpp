@@ -14,6 +14,12 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	MaxCount = -1;
 	MaxLevel = -1;
 	AbilityClass = nullptr;
+	
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Ability/Materials/M_ItemIcon.M_ItemIcon'"));
+	if(IconSourceMatFinder.Succeeded())
+	{
+		IconSourceMat = IconSourceMatFinder.Object;
+	}
 }
 
 void UAbilityItemDataBase::ResetData_Implementation()
@@ -23,9 +29,9 @@ void UAbilityItemDataBase::ResetData_Implementation()
 
 void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, FVector2D InSize, int32 InIndex)
 {
-	if(!AAbilityModule::Get()->GetItemIconSourceMat()) return;
+	if(!IconSourceMat) return;
 	
-	if(const auto IconMat = UMaterialInstanceDynamic::Create(AAbilityModule::Get()->GetItemIconSourceMat(), nullptr))
+	if(const auto IconMat = UMaterialInstanceDynamic::Create(IconSourceMat, nullptr))
 	{
 		Icon = IconMat;
 		IconMat->SetTextureParameterValue(FName("Texture"), InTexture);

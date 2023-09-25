@@ -44,6 +44,40 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Objects
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "Objects")
+	TMap<FString, UObject*> ObjectMap;
+
+public:
+	template<class T> 
+	T* FindObject(const FString& InName, bool bExactClass = false)
+	{
+		return Cast<T>(FindObject(T::StaticClass(), InName, bExactClass));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UObject* FindObject(UClass* InClass, const FString& InName, bool bExactClass = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Enums
+protected:
+	TMap<FString, TArray<FString>> EnumMappings;
+
+public:
+	UFUNCTION(BlueprintPure)
+	UEnum* FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
+
+	UFUNCTION(BlueprintPure)
+	UEnum* FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass = false);
+
+	UFUNCTION(BlueprintCallable)
+	void AddEnumMapping(const FString& InEnumName, const FString& InOtherName);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName);
+
+	//////////////////////////////////////////////////////////////////////////
 	/// DataAsset
 protected:
 	UPROPERTY(EditAnywhere, Category = "DataAsset")

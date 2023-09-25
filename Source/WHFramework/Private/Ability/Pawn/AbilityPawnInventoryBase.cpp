@@ -1,6 +1,6 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
-#include "Ability/Vitality/AbilityPawnInventoryBase.h"
+#include "Ability/Pawn/AbilityPawnInventoryBase.h"
 
 UAbilityPawnInventoryBase::UAbilityPawnInventoryBase()
 {

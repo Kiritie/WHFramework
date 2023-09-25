@@ -1,4 +1,4 @@
-#include "Ability/Vitality/AbilityPawnDataBase.h"
+#include "Ability/Pawn/AbilityPawnDataBase.h"
 
 #include "Ability/AbilityModuleBPLibrary.h"
 

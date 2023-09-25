@@ -64,7 +64,7 @@ class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public
 	GENERATED_BODY()
 	
 public:	
-	AWHActor();
+	AWHActor(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor

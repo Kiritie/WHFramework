@@ -4,6 +4,7 @@
 #include "Network/NetworkModule.h"
 
 #include "SocketSubsystem.h"
+#include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 
 IMPLEMENTATION_MODULE(ANetworkModule)

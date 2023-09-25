@@ -23,6 +23,7 @@ class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
 class UAbilityPawnInventoryBase;
+class UAbilityPawnDataBase;
 
 /**
  * Ability Vitality基类
@@ -36,27 +37,7 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterfa
 	friend class UAbilityPawnState_Default;
 
 public:
-	// Sets default values for this actor's properties
-	AAbilityPawnBase();
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UBoxComponent* BoxComponent;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilitySystemComponentBase* AbilitySystem;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UVitalityAttributeSetBase* AttributeSet;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UInteractionComponent* Interaction;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilityPawnInventoryBase* Inventory;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UFSMComponent* FSM;
+	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
@@ -81,22 +62,23 @@ public:
 
 	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Voxel
 protected:
-	// stats
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
-	FPrimaryAssetId AssetID;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FName Name;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FName RaceID;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	int32 Level;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FPrimaryAssetId GenerateVoxelID;
+
+public:
+	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
+
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
+
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
+
+public:
+	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+
+	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -146,10 +128,38 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
-public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilitySystemComponentBase* AbilitySystem;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UVitalityAttributeSetBase* AttributeSet;
 
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UInteractionComponent* Interaction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilityPawnInventoryBase* Inventory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UFSMComponent* FSM;
+
+protected:
+	// stats
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
+	FPrimaryAssetId AssetID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	FName Name;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	FName RaceID;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	int32 Level;
 
 public:
 	template<class T>
@@ -186,13 +196,6 @@ public:
 	virtual UAbilityInventoryBase* GetInventory() const override;
 
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
-
-public:
-	virtual FVector GetAgentLocation() const override { return GetActorLocation(); }
-
-	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
-
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 public:
 	UFUNCTION(BlueprintPure)

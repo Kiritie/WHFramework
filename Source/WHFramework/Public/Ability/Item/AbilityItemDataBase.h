@@ -37,6 +37,9 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
+	
+	UPROPERTY(Transient)
+	UMaterialInterface* IconSourceMat;
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)

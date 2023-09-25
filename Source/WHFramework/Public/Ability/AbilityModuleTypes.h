@@ -952,7 +952,15 @@ struct WHFRAMEWORK_API FCharacterSaveData : public FVitalitySaveData
 public:
 	FORCEINLINE FCharacterSaveData()
 	{
+		CameraRotation = FRotator(-1.f);
+		CameraDistance = -1.f;
 	}
+
+	UPROPERTY()
+	FRotator CameraRotation;
+
+	UPROPERTY()
+	float CameraDistance;
 
 public:
 	template<class T>

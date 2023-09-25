@@ -19,7 +19,7 @@ UTargetingComponent::UTargetingComponent()
 
 	LockedOnWidgetClass = StaticLoadClass(UObject::StaticClass(), nullptr, TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Common/Blueprints/Widget/WBP_LockOn.WBP_LockOn_C'"));
 	TargetableActors = APawn::StaticClass();
-	TargetableCollisionChannel = ECollisionChannel::ECC_Pawn;
+	TargetableCollisionChannel = ECC_Pawn;
 }
 
 // Called when the game starts

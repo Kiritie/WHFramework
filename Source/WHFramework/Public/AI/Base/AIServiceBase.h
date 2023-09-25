@@ -5,7 +5,7 @@
 #include "BehaviorTree/BTService.h"
 #include "AIServiceBase.generated.h"
 
-class ACharacterBase;
+class IAIAgentInterface;
 class AAIControllerBase;
 
 /**

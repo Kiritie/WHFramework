@@ -2,11 +2,8 @@
 
 
 #include "AI/Base/AIBlackboardBase.h"
-
+#include "AI/Base/AIAgentInterface.h"
 #include "Math/MathTypes.h"
-#include "Character/Base/CharacterBase.h"
-
-class UBlackboardKeyType_Class;
 
 void UAIBlackboardBase::PostLoad()
 {

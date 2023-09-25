@@ -47,38 +47,13 @@ EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType 
 	return (EAbilityItemType)UCommonBPLibrary::GetEnumIndexByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), InAssetType.ToString());
 }
 
-void UAbilityModuleBPLibrary::AddCustomInteractAction(int32 InInteractAction, const FString& InTypeName)
-{
-	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
-	{
-		AbilityModule->AddCustomInteractAction(InInteractAction, InTypeName);
-	}
-}
-
-void UAbilityModuleBPLibrary::RemoveCustomInteractAction(int32 InInteractAction)
-{
-	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
-	{
-		AbilityModule->RemoveCustomInteractAction(InInteractAction);
-	}
-}
-
-FText UAbilityModuleBPLibrary::GetInteractActionDisplayName(int32 InInteractAction)
-{
-	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
-	{
-		return AbilityModule->GetInteractActionDisplayName(InInteractAction);
-	}
-	return FText::GetEmpty();
-}
-
 ECollisionChannel UAbilityModuleBPLibrary::GetPickUpTraceChannel()
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->GetPickUpTraceChannel();
 	}
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)

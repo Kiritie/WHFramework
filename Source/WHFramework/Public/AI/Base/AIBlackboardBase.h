@@ -7,7 +7,7 @@
 #include "AI/AIModuleTypes.h"
 #include "AIBlackboardBase.generated.h"
 
-class ACharacterBase;
+class IAIAgentInterface;
 /**
  * AI黑板基类
  */

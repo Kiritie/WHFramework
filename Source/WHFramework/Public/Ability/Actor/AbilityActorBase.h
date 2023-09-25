@@ -19,14 +19,7 @@ class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorI
 	GENERATED_BODY()
 
 public:
-	AAbilityActorBase();
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilitySystemComponentBase* AbilitySystem;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAttributeSetBase* AttributeSet;
+	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -45,6 +38,13 @@ protected:
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilitySystemComponentBase* AbilitySystem;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAttributeSetBase* AttributeSet;
 
 public:
 	UFUNCTION(BlueprintPure)

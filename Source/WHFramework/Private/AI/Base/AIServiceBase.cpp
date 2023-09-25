@@ -4,7 +4,7 @@
 #include "AI/Base/AIServiceBase.h"
 
 #include "AI/Base/AIControllerBase.h"
-#include "Character/Base/CharacterBase.h"
+#include "AI/Base/AIAgentInterface.h"
 
 UAIServiceBase::UAIServiceBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {

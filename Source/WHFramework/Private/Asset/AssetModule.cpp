@@ -85,6 +85,69 @@ void AAssetModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
+UObject* AAssetModule::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
+{
+	if(!ObjectMap.Contains(InName))
+	{
+		ObjectMap.Add(InName, StaticFindObject(InClass, nullptr, *InName, bExactClass));
+	}
+	return ObjectMap[InName];
+}
+
+UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
+{
+	if(EnumMappings.Contains(InEnumName))
+	{
+		for(auto& Iter : EnumMappings[InEnumName])
+		{
+			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
+			{
+				if(Enum->IsValidEnumValue(InEnumValue))
+				{
+					return Enum;
+				}
+			}
+		}
+	}
+	return FindObject<UEnum>(InEnumName, bExactClass);
+}
+
+UEnum* AAssetModule::FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass)
+{
+	if(EnumMappings.Contains(InEnumName))
+	{
+		for(auto& Iter : EnumMappings[InEnumName])
+		{
+			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
+			{
+				if(Enum->IsValidEnumName(*InEnumValueName))
+				{
+					return Enum;
+				}
+			}
+		}
+	}
+	return FindObject<UEnum>(InEnumName, bExactClass);
+}
+
+void AAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
+{
+	TArray<FString>& Mappings = EnumMappings.FindOrAdd(InEnumName);
+	if(!Mappings.Contains(InOtherName))
+	{
+		Mappings.Add(InOtherName);
+	}
+}
+
+void AAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
+{
+	TArray<FString>& Mappings = EnumMappings.FindOrAdd(InEnumName);
+	if(Mappings.Contains(InOtherName))
+	{
+		Mappings.Remove(InOtherName);
+	}
+}
+
 bool AAssetModule::HasDataAsset(FName InName) const
 {
 	return DataAssetMap.Contains(InName);

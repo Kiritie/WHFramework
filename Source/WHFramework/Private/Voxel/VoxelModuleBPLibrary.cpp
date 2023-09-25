@@ -189,7 +189,7 @@ ECollisionChannel UVoxelModuleBPLibrary::GetChunkTraceChannel()
 	{
 		return VoxelModule->GetChunkTraceChannel();
 	}
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 ECollisionChannel UVoxelModuleBPLibrary::GetVoxelTraceChannel()
@@ -198,7 +198,7 @@ ECollisionChannel UVoxelModuleBPLibrary::GetVoxelTraceChannel()
 	{
 		return VoxelModule->GetVoxelTraceChannel();
 	}
-	return ECollisionChannel::ECC_MAX;
+	return ECC_MAX;
 }
 
 bool UVoxelModuleBPLibrary::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
