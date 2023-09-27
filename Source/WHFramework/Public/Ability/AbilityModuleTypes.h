@@ -428,6 +428,8 @@ enum class EAbilityItemType : uint8
 	Equip UMETA(DisplayName="装备"),
 	// 技能
 	Skill UMETA(DisplayName="技能"),
+	// 对象
+	Actor UMETA(DisplayName="对象"),
 	// 生命
 	Vitality UMETA(DisplayName="生命"),
 	// 角色
@@ -499,9 +501,14 @@ public:
 	
 	EAbilityItemType GetType() const;
 
-	FORCEINLINE virtual bool IsValid(bool bNeedNotNull = false) const
+	FORCEINLINE virtual bool IsValid() const override
 	{
-		return ID.IsValid() && (!bNeedNotNull || Count > 0);
+		return ID.IsValid();
+	}
+
+	FORCEINLINE virtual bool IsNull() const
+	{
+		return Count <= 0;
 	}
 
 	FORCEINLINE virtual bool IsEmpty() const
@@ -585,7 +592,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotCanceled);
 
 UENUM(BlueprintType)
-enum class ESplitSlotType : uint8
+enum class ESlotSplitType : uint8
 {
 	None,
 	Default,
@@ -596,18 +603,18 @@ enum class ESplitSlotType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FQueryItemInfo
+struct WHFRAMEWORK_API FItemQueryInfo
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FQueryItemInfo()
+	FORCEINLINE FItemQueryInfo()
 	{
 		Item = FAbilityItem();
 		Slots = TArray<UAbilityInventorySlot*>();
 	}
 
-	FORCEINLINE FQueryItemInfo(FAbilityItem InItem, TArray<UAbilityInventorySlot*> InSlots)
+	FORCEINLINE FItemQueryInfo(FAbilityItem InItem, TArray<UAbilityInventorySlot*> InSlots)
 	{
 		Item = InItem;
 		Slots = InSlots;
@@ -620,12 +627,12 @@ public:
 	TArray<UAbilityInventorySlot*> Slots;
 
 public:
-	FORCEINLINE bool IsSuccess() const
+	FORCEINLINE bool IsValid() const
 	{
 		return Item.Count > 0;
 	}
 
-	FORCEINLINE friend FQueryItemInfo operator+(FQueryItemInfo& A, FQueryItemInfo& B)
+	FORCEINLINE friend FItemQueryInfo operator+(FItemQueryInfo& A, FItemQueryInfo& B)
 	{
 		A.Item += B.Item;
 		for(auto Iter : B.Slots)
@@ -635,7 +642,7 @@ public:
 		return A;
 	}
 
-	FORCEINLINE friend FQueryItemInfo operator+=(FQueryItemInfo& A, FQueryItemInfo B)
+	FORCEINLINE friend FItemQueryInfo operator+=(FItemQueryInfo& A, FItemQueryInfo B)
 	{
 		A.Item = B.Item;
 		for(auto Iter : B.Slots)
@@ -647,52 +654,30 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSplitSlotInfo
+struct WHFRAMEWORK_API FInventorySlots
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FSplitSlotInfo()
-	{
-		StartIndex = 0;
-		TotalCount = 0;
-	}
-
-	FORCEINLINE FSplitSlotInfo(int32 InStartIndex, int32 InTotalCount)
-	{
-		StartIndex = InStartIndex;
-		TotalCount = InTotalCount;
-	}
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	int32 StartIndex;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	int32 TotalCount;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSplitSlotData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FSplitSlotData()
+	FORCEINLINE FInventorySlots()
 	{
 		Slots = TArray<UAbilityInventorySlot*>();
 	}
 	
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	TArray<UAbilityInventorySlot*> Slots;
+
+public:
+	FAbilityItems GetItems();
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetSplitSlotData
+struct WHFRAMEWORK_API FWidgetInventorySlots
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FWidgetSplitSlotData()
+	FORCEINLINE FWidgetInventorySlots()
 	{
 		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
 	}
@@ -709,13 +694,12 @@ struct WHFRAMEWORK_API FInventorySaveData : public FSaveData
 public:
 	FORCEINLINE FInventorySaveData()
 	{
-		SplitInfos = TMap<ESplitSlotType, FSplitSlotInfo>();
-		Items = TArray<FAbilityItem>();
+		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndex = -1;
 	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<ESplitSlotType, FSplitSlotInfo> SplitInfos;
+	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FAbilityItem> Items;
@@ -724,33 +708,34 @@ public:
 	int32 SelectedIndex;
 
 public:
-	FSplitSlotInfo GetSplitSlotInfo(ESplitSlotType InSplitSlotType) const
+	virtual bool IsValid() const override
 	{
-		if(SplitInfos.Contains(InSplitSlotType))
-		{
-			return SplitInfos[InSplitSlotType];
-		}
-		return FSplitSlotInfo();
-	}
+		if(!Super::IsValid()) return false;
 
-	void AddItem(const FAbilityItem& InItem, ESplitSlotType InSplitSlotType = ESplitSlotType::None)
+		return SplitItems.Num() > 0;
+	}
+	
+	virtual void AddItem(const FAbilityItem& InItem, ESlotSplitType InSplitType = ESlotSplitType::None)
 	{
-		FSplitSlotInfo SplitSlotInfo = GetSplitSlotInfo(InSplitSlotType);
-		for(int32 i = SplitSlotInfo.StartIndex; i < (SplitSlotInfo.TotalCount > 0 ? SplitSlotInfo.TotalCount : Items.Num()); i++)
+		if(SplitItems.Contains(InSplitType))
 		{
-			if(Items.IsValidIndex(i) && !Items[i].IsValid())
+			FAbilityItems& tmpItems = SplitItems[InSplitType];
+			for(int32 i = 0; i < tmpItems.Items.Num(); i++)
 			{
-				Items[i] = InItem;
-				break;
+				if(!tmpItems.Items[i].IsValid())
+				{
+					tmpItems.Items[i] = InItem;
+					break;
+				}
 			}
 		}
 	}
 
-	void ClearAllItem()
+	virtual void ClearAllItem()
 	{
-		for(auto& Iter : Items)
+		for(auto& Iter : SplitItems)
 		{
-			Iter = FAbilityItem::Empty;
+			Iter.Value.Items.Empty();
 		}
 	}
 };
@@ -759,14 +744,14 @@ public:
  * 查询项类型
  */
 UENUM(BlueprintType)
-enum class EQueryItemType : uint8
+enum class EItemQueryType : uint8
 {
 	// 获取
 	Get,
 	// 添加
 	Add,
 	// 移除
-	Remove,
+	Remove
 };
 
 USTRUCT(BlueprintType)
@@ -890,15 +875,14 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVitalitySaveData : public FSaveData
+struct WHFRAMEWORK_API FActorSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVitalitySaveData()
+	FORCEINLINE FActorSaveData()
 	{
 		Name = NAME_None;
-		RaceID = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
 		SpawnLocation = FVector::ZeroVector;
@@ -911,9 +895,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;
-		
-	UPROPERTY(BlueprintReadWrite)
-	FName RaceID;
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 Level;
@@ -936,16 +917,52 @@ public:
 	}
 
 	template<class T>
-	T& GetVitalityData() const
+	T& GetItemData() const
 	{
-		return static_cast<T&>(GetVitalityData());
+		return static_cast<T&>(GetItemData());
 	}
 
-	UAbilityVitalityDataBase& GetVitalityData() const;
+	UAbilityItemDataBase& GetItemData() const;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FCharacterSaveData : public FVitalitySaveData
+struct WHFRAMEWORK_API FVitalitySaveData : public FActorSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVitalitySaveData()
+	{
+		RaceID = NAME_None;
+	}
+
+	FORCEINLINE FVitalitySaveData(const FActorSaveData& InActorSaveData) : FActorSaveData(InActorSaveData)
+	{
+		RaceID = NAME_None;
+	}
+
+public:
+	UPROPERTY(BlueprintReadWrite)
+	FName RaceID;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPawnSaveData : public FVitalitySaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FPawnSaveData()
+	{
+	}
+
+	FORCEINLINE FPawnSaveData(const FVitalitySaveData& InVitalitySaveData) : FVitalitySaveData(InVitalitySaveData)
+	{
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCharacterSaveData : public FPawnSaveData
 {
 	GENERATED_BODY()
 
@@ -956,18 +973,16 @@ public:
 		CameraDistance = -1.f;
 	}
 
+	FORCEINLINE FCharacterSaveData(const FPawnSaveData& InPawnSaveData) : FPawnSaveData(InPawnSaveData)
+	{
+		CameraRotation = FRotator(-1.f);
+		CameraDistance = -1.f;
+	}
+
+public:
 	UPROPERTY()
 	FRotator CameraRotation;
 
 	UPROPERTY()
 	float CameraDistance;
-
-public:
-	template<class T>
-	T& GetCharacterData() const
-	{
-		return static_cast<T&>(GetCharacterData());
-	}
-
-	UAbilityCharacterDataBase& GetCharacterData() const;
 };

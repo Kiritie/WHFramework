@@ -337,7 +337,7 @@ public:
 	FString ToSaveData(bool bRefresh = false) const;
 
 public:
-	bool IsValid(bool bNeedNotNull = false) const override;
+	virtual bool IsValid() const override;
 
 	bool IsUnknown() const;
 

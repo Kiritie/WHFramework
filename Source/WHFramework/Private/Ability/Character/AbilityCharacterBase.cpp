@@ -55,6 +55,7 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
 
 	// stats
+	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
 	RaceID = NAME_None;
 	Level = 0;

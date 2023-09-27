@@ -41,22 +41,6 @@ public:
 	virtual void SetRaceID(FName InRaceID) = 0;
 
 	virtual FString GetHeadInfo() const = 0;
-		
-	virtual float GetHealth() const = 0;
-				
-	virtual void SetHealth(float InValue)  = 0;
-
-	virtual float GetMaxHealth() const = 0;
-			
-	virtual void SetMaxHealth(float InValue) = 0;
-
-	virtual float GetPhysicsDamage() const = 0;
-		
-	virtual float GetMagicDamage() const = 0;
-	
-	virtual float GetRadius() const = 0;
-
-	virtual float GetHalfHeight() const = 0;
 
 public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;

@@ -26,11 +26,11 @@ UAbilityInventoryBase* UWidgetAbilityInventoryBase::GetInventory() const
 	return nullptr;
 }
 
-TArray<UWidgetAbilityInventorySlotBase*> UWidgetAbilityInventoryBase::GetSplitUISlots(ESplitSlotType InSplitSlotType) const
+TArray<UWidgetAbilityInventorySlotBase*> UWidgetAbilityInventoryBase::GetSplitUISlots(ESlotSplitType InSplitType) const
 {
-	if(UISlotDatas.Contains(InSplitSlotType))
+	if(UISlotDatas.Contains(InSplitType))
 	{
-		return UISlotDatas[InSplitSlotType].Slots;
+		return UISlotDatas[InSplitType].Slots;
 	}
 	return TArray<UWidgetAbilityInventorySlotBase*>();
 }

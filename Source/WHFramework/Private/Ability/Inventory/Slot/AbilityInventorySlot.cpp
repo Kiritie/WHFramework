@@ -17,10 +17,10 @@ UAbilityInventorySlot::UAbilityInventorySlot()
 	Item = FAbilityItem::Empty;
 	Inventory = nullptr;
 	LimitType = EAbilityItemType::None;
-	SplitType = ESplitSlotType::Default;
+	SplitType = ESlotSplitType::Default;
 }
 
-void UAbilityInventorySlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /*= EAbilityItemType::None*/, ESplitSlotType InSplitType /*= ESplitSlotType::Default*/)
+void UAbilityInventorySlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /*= EAbilityItemType::None*/, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
 {
 	Item = InItem;
 	Inventory = InInventory;
@@ -38,7 +38,7 @@ void UAbilityInventorySlot::OnDespawn_Implementation(bool bRecovery)
 	SetItem(FAbilityItem::Empty);
 	Inventory = nullptr;
 	LimitType = EAbilityItemType::None;
-	SplitType = ESplitSlotType::Default;
+	SplitType = ESlotSplitType::Default;
 }
 
 bool UAbilityInventorySlot::CheckSlot(FAbilityItem& InItem) const
@@ -58,9 +58,9 @@ bool UAbilityInventorySlot::IsMatch(FAbilityItem InItem, bool bForce) const
 	const auto ItemType = InItem.GetType();
 	switch(SplitType)
 	{
-		case ESplitSlotType::Default:
-		case ESplitSlotType::Shortcut:
-		case ESplitSlotType::Auxiliary:
+		case ESlotSplitType::Default:
+		case ESlotSplitType::Shortcut:
+		case ESlotSplitType::Auxiliary:
 		{
 			if(!bForce)
 			{
@@ -68,11 +68,11 @@ bool UAbilityInventorySlot::IsMatch(FAbilityItem InItem, bool bForce) const
 			}
 			break;
 		}
-		case ESplitSlotType::Skill:
+		case ESlotSplitType::Skill:
 		{
 			return ItemType == EAbilityItemType::Skill;
 		}
-		case ESplitSlotType::Equip:
+		case ESlotSplitType::Equip:
 		{
 			return ItemType == EAbilityItemType::Equip;
 		}
@@ -177,17 +177,17 @@ void UAbilityInventorySlot::SplitItem(int32 InCount /*= -1*/)
 
 	if(InCount == - 1) InCount = Item.Count;
 	const int32 tmpCount = Item.Count / InCount;
-	auto QueryItemInfo = Inventory->QueryItemByRange(EQueryItemType::Add, Item);
+	auto ItemQueryInfo = Inventory->QueryItemByRange(EItemQueryType::Add, Item);
 	for (int32 i = 0; i < InCount; i++)
 	{
 		FAbilityItem tmpItem = FAbilityItem(Item, tmpCount);
 		Item.Count -= tmpItem.Count;
-		for (int32 j = 0; j < QueryItemInfo.Slots.Num(); j++)
+		for (int32 j = 0; j < ItemQueryInfo.Slots.Num(); j++)
 		{
-			if (QueryItemInfo.Slots[j]->IsEmpty() && QueryItemInfo.Slots[j] != this)
+			if (ItemQueryInfo.Slots[j]->IsEmpty() && ItemQueryInfo.Slots[j] != this)
 			{
-				QueryItemInfo.Slots[j]->SetItem(tmpItem);
-				QueryItemInfo.Slots.RemoveAt(j);
+				ItemQueryInfo.Slots[j]->SetItem(tmpItem);
+				ItemQueryInfo.Slots.RemoveAt(j);
 				break;
 			}
 		}
@@ -210,25 +210,25 @@ void UAbilityInventorySlot::MoveItem(int32 InCount /*= -1*/)
 	{
 		switch(GetSplitType())
 		{
-			case ESplitSlotType::Default:
+			case ESlotSplitType::Default:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESplitSlotType::Shortcut, ESplitSlotType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
 				break;
 			}
-			case ESplitSlotType::Shortcut:
+			case ESlotSplitType::Shortcut:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESplitSlotType::Default, ESplitSlotType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Auxiliary});
 				break;
 			}
-			case ESplitSlotType::Auxiliary:
+			case ESlotSplitType::Auxiliary:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESplitSlotType::Default, ESplitSlotType::Shortcut});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut});
 				break;
 			}
-			case ESplitSlotType::Equip:
-			case ESplitSlotType::Skill:
+			case ESlotSplitType::Equip:
+			case ESlotSplitType::Skill:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESplitSlotType::Default, ESplitSlotType::Shortcut, ESplitSlotType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
 				break;
 			}
 			default: break;
@@ -278,13 +278,13 @@ void UAbilityInventorySlot::AssembleItem()
 	{
 		case EAbilityItemType::Equip:
 		{
-			Inventory->AddItemBySplitType(Item, ESplitSlotType::Equip); 
+			Inventory->AddItemBySplitType(Item, ESlotSplitType::Equip); 
 			Refresh();
 			break;
 		}
 		case EAbilityItemType::Skill:
 		{
-			Inventory->AddItemBySplitType(Item, ESplitSlotType::Skill);
+			Inventory->AddItemBySplitType(Item, ESlotSplitType::Skill);
 			Refresh();
 			break;
 		}
@@ -306,7 +306,7 @@ void UAbilityInventorySlot::DischargeItem()
 		case EAbilityItemType::Equip:
 		case EAbilityItemType::Skill:
 		{
-			Inventory->AddItemBySplitTypes(Item, {ESplitSlotType::Default, ESplitSlotType::Shortcut, ESplitSlotType::Auxiliary});
+			Inventory->AddItemBySplitTypes(Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
 			Refresh();
 			break;
 		}
@@ -341,7 +341,7 @@ bool UAbilityInventorySlot::ActiveItem(bool bPassive /*= false*/)
 		if(Vitality->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
 		{
 			OnInventorySlotActivated.Broadcast();
-			for(auto Iter : GetInventory()->QueryItemByRange(EQueryItemType::Get, Item).Slots)
+			for(auto Iter : GetInventory()->QueryItemByRange(EItemQueryType::Get, Item).Slots)
 			{
 				if(Iter != this)
 				{
@@ -397,9 +397,9 @@ bool UAbilityInventorySlot::IsMatched(bool bForce) const
 	return IsMatch(Item, bForce);
 }
 
-int32 UAbilityInventorySlot::GetSplitIndex(ESplitSlotType InSplitSlotType)
+int32 UAbilityInventorySlot::GetSplitIndex(ESlotSplitType InSplitType)
 {
-	return GetInventory()->GetSplitSlots(InSplitSlotType).Find(this);
+	return GetInventory()->GetSlotsBySplitType(InSplitType).Find(this);
 }
 
 int32 UAbilityInventorySlot::GetRemainVolume(FAbilityItem InItem) const

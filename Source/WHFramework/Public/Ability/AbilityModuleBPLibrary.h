@@ -8,12 +8,14 @@
 #include "Math/MathBPLibrary.h"
 #include "AbilityModuleBPLibrary.generated.h"
 
+class AAbilityActorBase;
 class UAbilitySystemComponentBase;
 class UGameplayAbility;
 class ISceneContainerInterface;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPickUpBase;
+class AAbilityPawnBase;
 /**
  * 
  */
@@ -69,10 +71,18 @@ public:
 	static AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Character
-	static AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	// Actor
+	static AAbilityActorBase* SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vitality
 	static AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Pawn
+	static AAbilityPawnBase* SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Character
+	static AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

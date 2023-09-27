@@ -7,12 +7,12 @@ UAbilityInventoryEquipSlot::UAbilityInventoryEquipSlot()
 {
 }
 
-void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESplitSlotType InSplitType /*= ESplitSlotType::Default*/)
+void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
 {
 	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
 }
 
-void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType, ESplitSlotType InSplitType, int32 InPartType)
+void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InPartType)
 {
 	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
 }

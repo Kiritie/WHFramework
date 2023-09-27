@@ -13,7 +13,7 @@ UAbilityPawnDataBase::UAbilityPawnDataBase()
 
 	InventoryData = FInventorySaveData();
 	InventoryData.Items.SetNum(5);
-	InventoryData.SplitInfos.Add(ESplitSlotType::Default, FSplitSlotInfo(0, 4));
+	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
 
 	// tags
 	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");

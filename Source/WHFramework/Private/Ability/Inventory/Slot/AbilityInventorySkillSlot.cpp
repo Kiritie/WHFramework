@@ -10,7 +10,7 @@ UAbilityInventorySkillSlot::UAbilityInventorySkillSlot()
 {
 }
 
-void UAbilityInventorySkillSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESplitSlotType InSplitType /*= ESplitSlotType::Default*/)
+void UAbilityInventorySkillSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
 {
 	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
 }

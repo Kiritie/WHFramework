@@ -22,7 +22,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TMap<ESplitSlotType, FWidgetSplitSlotData> UISlotDatas;
+	TMap<ESlotSplitType, FWidgetInventorySlots> UISlotDatas;
 
 public:
 	virtual void OnInitialize_Implementation(UObject* InOwner) override;
@@ -34,5 +34,5 @@ public:
 	UAbilityInventoryBase* GetInventory() const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<UWidgetAbilityInventorySlotBase*> GetSplitUISlots(ESplitSlotType InSplitSlotType) const;
+	TArray<UWidgetAbilityInventorySlotBase*> GetSplitUISlots(ESlotSplitType InSplitType) const;
 };

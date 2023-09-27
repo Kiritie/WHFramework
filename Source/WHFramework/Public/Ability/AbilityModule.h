@@ -11,6 +11,9 @@
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPickUpBase;
+class AAbilityActorBase;
+class AAbilityPawnBase;
+
 UCLASS()
 class WHFRAMEWORK_API AAbilityModule : public AModuleBase
 {
@@ -55,12 +58,22 @@ public:
 	virtual AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Character
+	// Actor
 public:
-	virtual AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityActorBase* SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vitality
 public:
 	virtual AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Pawn
+public:
+	virtual AAbilityPawnBase* SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Character
+public:
+	virtual AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

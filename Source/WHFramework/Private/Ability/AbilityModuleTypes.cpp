@@ -3,6 +3,7 @@
 #include "Asset/AssetModuleBPLibrary.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlot.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
@@ -53,16 +54,6 @@ UAbilityItemDataBase& FAbilityItemData::GetItemData() const
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
 }
 
-UAbilityVitalityDataBase& FVitalitySaveData::GetVitalityData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(ID);
-}
-
-UAbilityCharacterDataBase& FCharacterSaveData::GetCharacterData() const
-{
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityCharacterDataBase>(ID);
-}
-
 bool FGameplayEffectContainerSpec::HasValidTargets() const
 {
 	return TargetGameplayEffectSpecs.Num() > 0;
@@ -96,4 +87,19 @@ void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResul
 EAbilityItemType FAbilityItem::GetType() const
 {
 	return GetData().GetItemType();
+}
+
+FAbilityItems FInventorySlots::GetItems()
+{
+	FAbilityItems Items;
+	for(const auto Iter : Slots)
+	{
+		Items.Items.Add(Iter->GetItem());
+	}
+	return Items;
+}
+
+UAbilityItemDataBase& FActorSaveData::GetItemData() const
+{
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
 }

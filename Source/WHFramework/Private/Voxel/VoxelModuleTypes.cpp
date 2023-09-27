@@ -107,9 +107,9 @@ FString FVoxelItem::ToSaveData(bool bRefresh) const
 	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleBPLibrary::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
 }
 
-bool FVoxelItem::IsValid(bool bNeedNotNull) const
+bool FVoxelItem::IsValid() const
 {
-	return Super::IsValid(bNeedNotNull) && !IsUnknown();
+	return Super::IsValid() && !IsUnknown();
 }
 
 bool FVoxelItem::IsUnknown() const

@@ -32,7 +32,7 @@ protected:
 	EAbilityItemType LimitType;
 		
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
-	ESplitSlotType SplitType;
+	ESlotSplitType SplitType;
 	
 public:
 	UPROPERTY(BlueprintAssignable)
@@ -48,7 +48,7 @@ public:
 	/// Initialize
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType/* = EAbilityItemType::None*/, ESplitSlotType InSplitType/* = ESplitSlotType::Default*/);
+	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType/* = EAbilityItemType::None*/, ESlotSplitType InSplitType/* = ESlotSplitType::Default*/);
 	
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 
@@ -132,7 +132,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsMatched(bool bForce = false) const;
 
-	int32 GetSplitIndex(ESplitSlotType InSplitSlotType = ESplitSlotType::None);
+	int32 GetSplitIndex(ESlotSplitType InSplitType = ESlotSplitType::None);
 
 	int32 GetRemainVolume(FAbilityItem InItem = FAbilityItem::Empty) const;
 
@@ -151,7 +151,7 @@ public:
 	void SetLimitType(EAbilityItemType val) { LimitType = val; }
 	
 	UFUNCTION(BlueprintPure)
-	ESplitSlotType GetSplitType() const { return SplitType; }
+	ESlotSplitType GetSplitType() const { return SplitType; }
 
 	UFUNCTION(BlueprintPure)
 	virtual FAbilityInfo GetAbilityInfo() const;

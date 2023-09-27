@@ -26,11 +26,9 @@ protected:
 	virtual void UnloadData(EPhase InPhase) override;
 
 public:
-	virtual FQueryItemInfo QueryItemByRange(EQueryItemType InActionType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1) override;
+	virtual FItemQueryInfo QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1) override;
 
 	virtual void DiscardAllItem() override;
 
 	virtual void ClearAllItem() override;
-
-	virtual UAbilityInventorySkillSlot* GetSkillSlotByID(const FPrimaryAssetId& InSkillID);
 };

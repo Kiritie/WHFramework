@@ -2,9 +2,14 @@
 
 #include "Ability/Actor/AbilityActorBase.h"
 
-#include "Ability/Abilities/AbilityBase.h"
+#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Asset/AssetModuleBPLibrary.h"
+#include "Common/Interaction/InteractionComponent.h"
+#include "Components/BoxComponent.h"
 
 AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
@@ -12,19 +17,37 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
+	BoxComponent->SetCollisionProfileName(FName("Vitality"));
+	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
+	BoxComponent->CanCharacterStepUpOn = ECB_No;
+	SetRootComponent(BoxComponent);
+
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(FName("AttributeSet"));
+		
+	Inventory = CreateDefaultSubobject<UAbilityInventoryBase>(FName("Inventory"));
 
-	ActorID = FGuid::NewGuid();
-	Container = nullptr;
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
+	Interaction->SetupAttachment(RootComponent);
+	Interaction->SetRelativeLocation(FVector(0, 0, 0));
+
+	// stats
+	AssetID = FPrimaryAssetId();
+	Level = 0;
 }
 
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+	}
 
 	InitializeAbilitySystem();
 }
@@ -67,21 +90,149 @@ void AAbilityActorBase::Serialize(FArchive& Ar)
 	}
 }
 
+void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		SetActorLocation(SaveData.SpawnLocation);
+		SetActorRotation(SaveData.SpawnRotation);
+	}
+	if(PHASEC(InPhase, EPhase::All))
+	{
+		SetLevelV(SaveData.Level);
+
+		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+
+		if(!SaveData.IsSaved())
+		{
+			ResetData();
+		}
+	}
+}
+
+FSaveData* AAbilityActorBase::ToData(bool bRefresh)
+{
+	static FVitalitySaveData SaveData;
+	SaveData = FVitalitySaveData();
+
+	SaveData.ID = AssetID;
+	SaveData.Level = Level;
+
+	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
+
+	SaveData.SpawnLocation = GetActorLocation();
+	SaveData.SpawnRotation = GetActorRotation();
+
+	return &SaveData;
+}
+
+void AAbilityActorBase::ResetData()
+{
+}
+
+bool AAbilityActorBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
+{
+	return false;
+}
+
+void AAbilityActorBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+{
+	
+}
+
+void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
+{
+
+}
+
+void AAbilityActorBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
+{
+
+}
+
+void AAbilityActorBase::OnAssembleItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityActorBase::OnDischargeItem(const FAbilityItem& InItem)
+{
+
+}
+
+void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
+{
+	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+}
+
+void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)
+{
+}
+
+void AAbilityActorBase::OnAuxiliaryItem(const FAbilityItem& InItem)
+{
+
+}
+
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
 }
 
-bool AAbilityActorBase::SetLevelV(int32 InLevel)
+UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
 {
-	if(Level != InLevel)
-	{
-		Level = InLevel;
-		return true;
-	}
-	return false;
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
+}
+
+UAttributeSetBase* AAbilityActorBase::GetAttributeSet() const
+{
+	return AttributeSet;
 }
 
 UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystem;
+}
+
+bool AAbilityActorBase::SetLevelV(int32 InLevel)
+{
+	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
+	InLevel = FMath::Clamp(InLevel, 0, ActorData.MaxLevel != -1 ? ActorData.MaxLevel : InLevel);
+
+	if(Level != InLevel)
+	{
+		Level = InLevel;
+
+		auto EffectContext = AbilitySystem->MakeEffectContext();
+		EffectContext.AddSourceObject(this);
+		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(ActorData.PEClass, InLevel, EffectContext);
+		if (SpecHandle.IsValid())
+		{
+			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
+		}
+
+		return true;
+	}
+	return false;
+}
+
+float AAbilityActorBase::GetRadius() const
+{
+	return FMath::Max(BoxComponent->GetScaledBoxExtent().X, BoxComponent->GetScaledBoxExtent().Y);
+}
+
+float AAbilityActorBase::GetHalfHeight() const
+{
+	return BoxComponent->GetScaledBoxExtent().Z;
 }

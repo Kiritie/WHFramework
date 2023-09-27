@@ -4,43 +4,21 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
-#include "Common/Interaction/InteractionComponent.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleBPLibrary.h"
-#include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonBPLibrary.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Datas/VoxelData.h"
-#include "Ability/AbilityModuleBPLibrary.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer)
+	Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>("AttributeSet").
+		SetDefaultSubobjectClass<UAbilityVitalityInventoryBase>("Inventory"))
 {
-	PrimaryActorTick.bCanEverTick = true;
-
-	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(FName("Vitality"));
-	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
-	BoxComponent->CanCharacterStepUpOn = ECB_No;
-	SetRootComponent(BoxComponent);
-
-	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	AbilitySystem->SetIsReplicated(true);
-	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
-
-	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
-		
-	Inventory = CreateDefaultSubobject<UAbilityVitalityInventoryBase>(FName("Inventory"));
-
-	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
-	Interaction->SetupAttachment(RootComponent);
-	Interaction->SetRelativeLocation(FVector(0, 0, 0));
-
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
 	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
@@ -48,23 +26,14 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
 
 	// stats
-	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
 	RaceID = NAME_None;
-	Level = 0;
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InParams);
-
-	if(InParams.IsValidIndex(0))
-	{
-		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
-	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
 }
@@ -83,42 +52,24 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
+	Super::LoadData(InSaveData, InPhase);
+	
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
-	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
-
-		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
-
-		if(!SaveData.IsSaved())
-		{
-			ResetData();
-		}
 	}
 }
 
 FSaveData* AAbilityVitalityBase::ToData(bool bRefresh)
 {
 	static FVitalitySaveData SaveData;
-	SaveData = FVitalitySaveData();
+	SaveData = Super::ToData(bRefresh)->CastRef<FActorSaveData>();
 
-	SaveData.ID = AssetID;
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
-	SaveData.Level = Level;
-
-	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
-
-	SaveData.SpawnLocation = GetActorLocation();
-	SaveData.SpawnRotation = GetActorRotation();
 
 	return &SaveData;
 }
@@ -135,38 +86,6 @@ void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
 void AAbilityVitalityBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
-
-	if(!GetAttributeSet<UVitalityAttributeSetBase>()) return;
-
-	if(Ar.ArIsSaveGame && GetAttributeSet<UVitalityAttributeSetBase>()->GetPersistentAttributes().Num() > 0)
-	{
-		float BaseValue = 0.f;
-		float CurrentValue = 0.f;
-		for(FGameplayAttribute& Attribute : GetAttributeSet<UVitalityAttributeSetBase>()->GetPersistentAttributes())
-		{
-			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(GetAttributeSet<UVitalityAttributeSetBase>()))
-			{
-				if(Ar.IsLoading())
-				{
-					Ar << BaseValue;
-					Ar << CurrentValue;
-					AttributeData->SetBaseValue(BaseValue);
-					AttributeData->SetCurrentValue(CurrentValue);
-				}
-				else if(Ar.IsSaving())
-				{
-					BaseValue = AttributeData->GetBaseValue();
-					CurrentValue = AttributeData->GetCurrentValue();
-					Ar << BaseValue;
-					Ar << CurrentValue;
-				}
-			}
-		}
-	}
-	if(Ar.IsLoading())
-	{
-		RefreshAttributes();
-	}
 }
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
@@ -194,51 +113,53 @@ void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 
 bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
-	return false;
+	return Super::CanInteract(InInteractAction, InInteractionAgent);
 }
 
 void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
+	Super::OnEnterInteract(InInteractionAgent);
 }
 
 void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
+	Super::OnLeaveInteract(InInteractionAgent);
 }
 
 void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
-	
+	Super::OnInteract(InInteractAction, InInteractionAgent, bPassivity);
 }
 
 void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
-
+	Super::OnActiveItem(InItem, bPassive, bSuccess);
 }
 
 void AAbilityVitalityBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
 {
-
+	Super::OnCancelItem(InItem, bPassive);
 }
 
 void AAbilityVitalityBase::OnAssembleItem(const FAbilityItem& InItem)
 {
-
+	Super::OnAssembleItem(InItem);
 }
 
 void AAbilityVitalityBase::OnDischargeItem(const FAbilityItem& InItem)
 {
-
+	Super::OnDischargeItem(InItem);
 }
 
 void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+	Super::OnDiscardItem(InItem, bInPlace);
 }
 
 void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
 {
+	Super::OnSelectItem(InItem);
+	
 	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 	{
 		SetGenerateVoxelID(InItem.ID);
@@ -251,7 +172,7 @@ void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
 
 void AAbilityVitalityBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 {
-
+	Super::OnAuxiliaryItem(InItem);
 }
 
 bool AAbilityVitalityBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
@@ -301,52 +222,22 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
-float AAbilityVitalityBase::GetRadius() const
-{
-	return FMath::Max(BoxComponent->GetScaledBoxExtent().X, BoxComponent->GetScaledBoxExtent().Y);
-}
-
-float AAbilityVitalityBase::GetHalfHeight() const
-{
-	return BoxComponent->GetScaledBoxExtent().Z;
-}
-
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
-UAttributeSetBase* AAbilityVitalityBase::GetAttributeSet() const
-{
-	return AttributeSet;
-}
-
-UAbilitySystemComponent* AAbilityVitalityBase::GetAbilitySystemComponent() const
-{
-	return AbilitySystem;
-}
-
-UInteractionComponent* AAbilityVitalityBase::GetInteractionComponent() const
-{
-	return Interaction;
-}
-
-UAbilityInventoryBase* AAbilityVitalityBase::GetInventory() const
-{
-	return Inventory;
-}
-
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxExp())
 		{
 			SetLevelV(GetLevelV() + 1);
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	else if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)

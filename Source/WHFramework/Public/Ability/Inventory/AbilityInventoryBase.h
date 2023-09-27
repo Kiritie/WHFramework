@@ -28,10 +28,7 @@ public:
 	/// Properties
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TMap<ESplitSlotType, FSplitSlotInfo> SplitInfos;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TArray<UAbilityInventorySlot*> Slots;
+	TMap<ESlotSplitType, FInventorySlots> SplitSlots;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilityInventoryBase* ConnectInventory;
@@ -71,13 +68,13 @@ protected:
 	/// Actions
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FQueryItemInfo QueryItemByRange(EQueryItemType InQueryType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
+	virtual FItemQueryInfo QueryItemByRange(EItemQueryType InQueryType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
 
 	UFUNCTION(BlueprintPure)
-	virtual FQueryItemInfo QueryItemBySplitType(EQueryItemType InQueryType, FAbilityItem InItem, ESplitSlotType InSplitSlotType);
+	virtual FItemQueryInfo QueryItemBySplitType(EItemQueryType InQueryType, FAbilityItem InItem, ESlotSplitType InSplitType);
 	
 	UFUNCTION(BlueprintPure)
-	virtual FQueryItemInfo QueryItemBySplitTypes(EQueryItemType InQueryType, FAbilityItem InItem, const TArray<ESplitSlotType>& InSplitSlotTypes);
+	virtual FItemQueryInfo QueryItemBySplitTypes(EItemQueryType InQueryType, FAbilityItem InItem, const TArray<ESlotSplitType>& InSplitTypes);
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -87,13 +84,13 @@ public:
 	virtual void AddItemByRange(FAbilityItem& InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemBySplitType(FAbilityItem& InItem, ESplitSlotType InSplitSlotType);
+	virtual void AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType);
 		
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESplitSlotType>& InSplitSlotTypes);
+	virtual void AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemByQueryInfo(FQueryItemInfo& InQueryInfo);
+	virtual void AddItemByQueryInfo(FItemQueryInfo& InQueryInfo);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots);
@@ -102,19 +99,19 @@ public:
 	virtual void RemoveItemByRange(FAbilityItem& InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void RemoveItemBySplitType(FAbilityItem& InItem, ESplitSlotType InSplitSlotType);
+	virtual void RemoveItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void RemoveItemBySplitTypes(FAbilityItem& InItem, const TArray<ESplitSlotType>& InSplitSlotTypes);
+	virtual void RemoveItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void RemoveItemByQueryInfo(FQueryItemInfo& InQueryInfo);
+	virtual void RemoveItemByQueryInfo(FItemQueryInfo& InQueryInfo);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void MoveItemByRange(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, int32 InSelfStartIndex = 0, int32 InSelfEndIndex = -1, int32 InTargetStartIndex = 0, int32 InTargetEndIndex = -1);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void MoveItemBySplitType(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, ESplitSlotType InSelfSplitSlotType, ESplitSlotType InTargetSplitSlotType);
+	virtual void MoveItemBySplitType(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, ESlotSplitType InSelfSlotSplitType, ESlotSplitType InTargetSlotSplitType);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void ClearItem(FAbilityItem InItem);
@@ -142,12 +139,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetConnectInventory(UAbilityInventoryBase* InInventory);
-
-	UFUNCTION(BlueprintPure)
-	int32 GetSlotsNum() const;
-
-	UFUNCTION(BlueprintPure)
-	TArray<UAbilityInventorySlot*> GetSlots() const { return Slots; }
 					
 	UFUNCTION(BlueprintPure)
 	UAbilityInventorySlot* GetSelectedSlot() const { return SelectedSlot; }
@@ -159,28 +150,20 @@ public:
 	FAbilityItem& GetSelectedItem() const;
 
 	UFUNCTION(BlueprintPure)
-	bool HasSplitSlotInfo(ESplitSlotType InSplitSlotType) const;
-
-	UFUNCTION(BlueprintPure)
-	FSplitSlotInfo GetSplitSlotInfo(ESplitSlotType InSplitSlotType) const;
+	bool HasSplitType(ESlotSplitType InSplitType) const;
 	
 	UFUNCTION(BlueprintPure)
-	TMap<ESplitSlotType, FSplitSlotInfo> GetSplitSlotInfos() const { return SplitInfos; }
-
-	template<typename T>
-	TArray<T*> GetSplitSlots(ESplitSlotType InSplitSlotType)
-	{
-		TArray<T*> SplitSlots;
-		for (auto Iter : GetSplitSlots(InSplitSlotType))
-		{
-			SplitSlots.Add(Cast<T>(Iter));
-		}
-		return SplitSlots;
-	}
-		
+	TMap<ESlotSplitType, FInventorySlots>& GetSplitSlots() { return SplitSlots; }
+				
 	UFUNCTION(BlueprintPure)
-	TArray<UAbilityInventorySlot*> GetSplitSlots(ESplitSlotType InSplitSlotType);
+	TArray<UAbilityInventorySlot*> GetSlots();
 
 	UFUNCTION(BlueprintPure)
-	TMap<ESplitSlotType, FSplitSlotData> GetSplitSlotDatas();
+	TArray<UAbilityInventorySlot*> GetSlotsBySplitType(ESlotSplitType InSplitType);
+
+	UFUNCTION(BlueprintPure)
+	UAbilityInventorySlot* GetSlotBySplitTypeAndIndex(ESlotSplitType InSplitType, int32 InIndex);
+
+	UFUNCTION(BlueprintPure)
+	UAbilityInventorySlot* GetSlotBySplitTypeAndItemID(ESlotSplitType InSplitType, const FPrimaryAssetId& InItemID);
 };

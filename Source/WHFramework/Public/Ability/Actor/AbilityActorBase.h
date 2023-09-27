@@ -5,16 +5,27 @@
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "AbilityActorInterface.h"
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "AbilityActorBase.generated.h"
 
-class UAttributeSetBase;
+class UInteractionComponent;
+class UActorAttributeSetBase;
+class UActorAbilityBase;
 class UAbilitySystemComponentBase;
+class UBoxComponent;
+class UAttributeSetBase;
+class UAbilityInventoryBase;
+class UAbilityActorDataBase;
+
 /**
  * Ability Actor基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface
+class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -28,30 +39,73 @@ public:
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+	virtual bool HasArchive() const override { return true; }
+
 	virtual void Serialize(FArchive& Ar) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Ability
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
-	int32 Level;
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData(bool bRefresh) override;
+
+	virtual void ResetData();
 
 public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
+
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+
+	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
+		
+	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
+
+	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+
+	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
+
+	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+
+	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAttributeSetBase* AttributeSet;
 
-public:
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UInteractionComponent* Interaction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilityInventoryBase* Inventory;
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats")
+	FPrimaryAssetId AssetID;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	int32 Level;
 
-	UFUNCTION(BlueprintCallable)
-	virtual bool SetLevelV(int32 InLevel) override;
+public:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+
+public:
+	template<class T>
+	T& GetActorData() const
+	{
+		return static_cast<T&>(GetActorData());
+	}
+	
+	UAbilityActorDataBase& GetActorData() const;
 
 	template<class T>
 	T* GetAttributeSet() const
@@ -59,7 +113,7 @@ public:
 		return Cast<T>(GetAttributeSet());
 	}
 
-	virtual UAttributeSetBase* GetAttributeSet() const override { return AttributeSet; }
+	virtual UAttributeSetBase* GetAttributeSet() const override;
 
 	template<class T>
 	T* GetAbilitySystemComponent() const
@@ -68,4 +122,29 @@ public:
 	}
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
+
+	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
+	
+	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
+
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetLevelV() const override { return Level; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool SetLevelV(int32 InLevel) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual float GetRadius() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetHalfHeight() const override;
 };

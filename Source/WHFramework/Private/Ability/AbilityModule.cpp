@@ -3,14 +3,19 @@
 
 #include "Ability/AbilityModule.h"
 
+#include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
+#include "Ability/Item/Raw/AbilityRawDataBase.h"
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
+#include "Ability/Pawn/AbilityPawnBase.h"
+#include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Ability/PickUp/AbilityPickUpEquip.h"
 #include "Ability/PickUp/AbilityPickUpProp.h"
+#include "Ability/PickUp/AbilityPickUpRaw.h"
 #include "Ability/PickUp/AbilityPickUpSkill.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
@@ -118,6 +123,11 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneCon
 			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
 			break;
 		}
+		case EAbilityItemType::Raw:
+		{
+			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpRaw>(nullptr, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
+			break;
+		}
 		default: break;
 	}
 
@@ -132,10 +142,56 @@ AAbilityPickUpBase* AAbilityModule::SpawnPickUp(FSaveData* InSaveData, ISceneCon
 	return PickUp;
 }
 
+AAbilityActorBase* AAbilityModule::SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
+	if(AAbilityActorBase* Actor = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityActorBase>({ &SaveData.ID }, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	{
+		Actor->LoadSaveData(InSaveData);
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Actor);
+		}
+		return Actor;
+	}
+	return nullptr;
+}
+
+AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
+	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ID }, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
+	{
+		Vitality->LoadSaveData(InSaveData);
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Vitality);
+		}
+		return Vitality;
+	}
+	return nullptr;
+}
+
+AAbilityPawnBase* AAbilityModule::SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
+	if(AAbilityPawnBase* Pawn = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPawnBase>({ &SaveData.ID }, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
+	{
+		Pawn->LoadSaveData(InSaveData);
+		Pawn->SpawnDefaultController();
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Pawn);
+		}
+		return Pawn;
+	}
+	return nullptr;
+}
+
 AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ID }, SaveData.GetCharacterData().Class))
+	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ID }, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
 	{
 		Character->LoadSaveData(InSaveData);
 		Character->SpawnDefaultController();
@@ -144,21 +200,6 @@ AAbilityCharacterBase* AAbilityModule::SpawnCharacter(FSaveData* InSaveData, ISc
 			InContainer->AddSceneActor(Character);
 		}
 		return Character;
-	}
-	return nullptr;
-}
-
-AAbilityVitalityBase* AAbilityModule::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ID }, SaveData.GetVitalityData().Class))
-	{
-		Vitality->LoadSaveData(InSaveData);
-		if(InContainer)
-		{
-			InContainer->AddSceneActor(Vitality);
-		}
-		return Vitality;
 	}
 	return nullptr;
 }

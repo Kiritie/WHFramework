@@ -160,8 +160,6 @@ void AAbilityPawnBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(!GetAttributeSet<UVitalityAttributeSetBase>()) return;
-
 	if(Ar.ArIsSaveGame && GetAttributeSet<UVitalityAttributeSetBase>()->GetPersistentAttributes().Num() > 0)
 	{
 		float BaseValue = 0.f;

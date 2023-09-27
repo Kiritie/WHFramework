@@ -74,11 +74,29 @@ AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, 
 	return nullptr;
 }
 
+AAbilityActorBase* UAbilityModuleBPLibrary::SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
+	{
+		return AbilityModule->SpawnActor(InSaveData, InContainer);
+	}
+	return nullptr;
+}
+
 AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
 		return AbilityModule->SpawnCharacter(InSaveData, InContainer);
+	}
+	return nullptr;
+}
+
+AAbilityPawnBase* UAbilityModuleBPLibrary::SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+{
+	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
+	{
+		return AbilityModule->SpawnPawn(InSaveData, InContainer);
 	}
 	return nullptr;
 }

@@ -32,7 +32,7 @@ void UAbilityPawnInventoryBase::ClearAllItem()
 	Super::ClearAllItem();
 }
 
-FQueryItemInfo UAbilityPawnInventoryBase::QueryItemByRange(EQueryItemType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
+FItemQueryInfo UAbilityPawnInventoryBase::QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
 {
 	return Super::QueryItemByRange(InActionType, InItem, InStartIndex, InEndIndex);
 }

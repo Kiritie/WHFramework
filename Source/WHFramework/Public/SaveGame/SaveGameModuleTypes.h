@@ -27,6 +27,8 @@ protected:
 	TArray<uint8> Datas;
 
 public:
+	virtual bool IsValid() const { return true; }
+	
 	virtual bool IsSaved() const { return bSaved; }
 
 	virtual void MakeSaved() { bSaved = true; }

@@ -32,7 +32,7 @@ void UAbilityVitalityInventoryBase::ClearAllItem()
 	Super::ClearAllItem();
 }
 
-FQueryItemInfo UAbilityVitalityInventoryBase::QueryItemByRange(EQueryItemType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
+FItemQueryInfo UAbilityVitalityInventoryBase::QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
 {
 	return Super::QueryItemByRange(InActionType, InItem, InStartIndex, InEndIndex);
 }
