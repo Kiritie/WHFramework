@@ -701,9 +701,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FAbilityItem> Items;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int32 SelectedIndex;
 
@@ -715,17 +712,20 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void AddItem(const FAbilityItem& InItem, ESlotSplitType InSplitType = ESlotSplitType::None)
+	virtual void AddItem(const FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes)
 	{
-		if(SplitItems.Contains(InSplitType))
+		for(const auto& Iter : InSplitTypes)
 		{
-			FAbilityItems& tmpItems = SplitItems[InSplitType];
-			for(int32 i = 0; i < tmpItems.Items.Num(); i++)
+			if(SplitItems.Contains(Iter))
 			{
-				if(!tmpItems.Items[i].IsValid())
+				FAbilityItems& tmpItems = SplitItems[Iter];
+				for(int32 i = 0; i < tmpItems.Items.Num(); i++)
 				{
-					tmpItems.Items[i] = InItem;
-					break;
+					if(!tmpItems.Items[i].IsValid())
+					{
+						tmpItems.Items[i] = InItem;
+						return;
+					}
 				}
 			}
 		}
@@ -733,9 +733,12 @@ public:
 
 	virtual void ClearAllItem()
 	{
-		for(auto& Iter : SplitItems)
+		for(auto& Iter1 : SplitItems)
 		{
-			Iter.Value.Items.Empty();
+			for(auto& Iter2 : Iter1.Value.Items)
+			{
+				Iter2 = FAbilityItem::Empty;
+			}
 		}
 	}
 };
@@ -896,17 +899,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FInventorySaveData InventoryData;
 
 	UPROPERTY()
 	FVector SpawnLocation;
 	
 	UPROPERTY()
 	FRotator SpawnRotation;
-		
-	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
 
 public:
 	virtual void MakeSaved() override

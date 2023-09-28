@@ -34,14 +34,6 @@ public:
 	static bool GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> AbilityClass, FAbilityInfo& OutAbilityInfo);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Item
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static FPrimaryAssetType ItemTypeToAssetType(EAbilityItemType InItemType);
-
-	UFUNCTION(BlueprintPure, Category = "AbilityModuleBPLibrary")
-	static EAbilityItemType AssetTypeToItemType(FPrimaryAssetType InAssetType);
-
-	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
 	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)

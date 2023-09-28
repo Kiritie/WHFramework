@@ -17,9 +17,7 @@ public:
 	UAbilityInventoryEquipSlot();
 
 public:
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType , ESlotSplitType InSplitType) override;
-
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType , ESlotSplitType InSplitType, int32 InPartType);
+	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 

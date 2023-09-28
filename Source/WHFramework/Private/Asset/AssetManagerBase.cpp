@@ -25,6 +25,14 @@ void UAssetManagerBase::StartInitialLoading()
 	Super::StartInitialLoading();
 }
 
+void UAssetManagerBase::RegisterPrimaryAssetType(FPrimaryAssetType InPrimaryAssetType)
+{
+	if(!PrimaryAssetMap.Contains(InPrimaryAssetType))
+	{
+		PrimaryAssetMap.Add(InPrimaryAssetType);
+	}
+}
+
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
 {
 	return Super::LoadPrimaryAsset(AssetToLoad, LoadBundles, DelegateToCall, Priority);
@@ -34,9 +42,9 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 {
 	UPrimaryAssetBase* LoadedAsset = nullptr;
 
-	if(InPrimaryAssetId.IsValid())
+	if(InPrimaryAssetId.IsValid() && PrimaryAssetMap.Contains(InPrimaryAssetId.PrimaryAssetType))
 	{
-		if(!PrimaryAssetMap.FindOrAdd(InPrimaryAssetId.PrimaryAssetType).Assets.Contains(InPrimaryAssetId))
+		if(!PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Contains(InPrimaryAssetId))
 		{
 			const FSoftObjectPath AssetPath = GetPrimaryAssetPath(InPrimaryAssetId);
 			LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
@@ -66,27 +74,21 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<
 TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
 {
 	TArray<UPrimaryAssetBase*> LoadedAssets;
-	
-	if(!PrimaryAssetMap.Contains(InPrimaryAssetType))
+
+	if(PrimaryAssetMap.Contains(InPrimaryAssetType))
 	{
-		TArray<FSoftObjectPath> AssetPaths;
-		GetPrimaryAssetPathList(InPrimaryAssetType, AssetPaths);
-		TMap<FPrimaryAssetId, UPrimaryAssetBase*> LoadedAssetMap;
-		for(auto Iter : AssetPaths)
+		TArray<FPrimaryAssetId> AssetIds;
+		GetPrimaryAssetIdList(InPrimaryAssetType, AssetIds);
+	
+		for(auto& Iter : AssetIds)
 		{
-			if(UPrimaryAssetBase* LoadedAsset = Cast<UPrimaryAssetBase>(Iter.TryLoad()))
+			if(UPrimaryAssetBase* Asset = LoadPrimaryAsset(Iter, bLogWarning))
 			{
-				LoadedAssets.Add(LoadedAsset);
-				LoadedAssetMap.Add(LoadedAsset->GetPrimaryAssetId(), LoadedAsset);
+				LoadedAssets.Add(Asset);
 			}
 		}
-		PrimaryAssetMap.Add(InPrimaryAssetType, LoadedAssetMap);
 	}
-	else
-	{
-		PrimaryAssetMap[InPrimaryAssetType].Assets.GenerateValueArray(LoadedAssets);
-	}
-
+	
 	if(bLogWarning && LoadedAssets.IsEmpty())
 	{
 		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Warning);

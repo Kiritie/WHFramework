@@ -6,9 +6,9 @@ UAbilityInventoryShortcutSlot::UAbilityInventoryShortcutSlot()
 {
 }
 
-void UAbilityInventoryShortcutSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
+void UAbilityInventoryShortcutSlot::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
 {
-	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
+	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
 void UAbilityInventoryShortcutSlot::Refresh()

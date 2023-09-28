@@ -5,7 +5,7 @@
 
 UVoxelData::UVoxelData()
 {
-	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel);
+	Type = FName("Voxel");
 	MaxCount = 64;
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();

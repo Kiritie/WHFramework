@@ -1,10 +1,8 @@
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-
 UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 {
-	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Vitality);
+	Type = FName("Vitality");
 	MaxCount = 1;
 	Class = nullptr;
 	PEClass = nullptr;
@@ -12,7 +10,6 @@ UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 	HalfHeight = 40.f;
 
 	InventoryData = FInventorySaveData();
-	InventoryData.Items.SetNum(5);
 	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
 
 	// tags

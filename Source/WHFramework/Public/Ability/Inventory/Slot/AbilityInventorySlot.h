@@ -47,8 +47,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Initialize
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType/* = EAbilityItemType::None*/, ESlotSplitType InSplitType/* = ESlotSplitType::Default*/);
+	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex);
 	
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 
@@ -103,10 +102,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UseItem(int32 InCount = -1);
-
-	virtual void AssembleItem();
-
-	virtual void DischargeItem();
 
 	UFUNCTION(BlueprintCallable)
 	virtual void DiscardItem(int32 InCount = -1, bool bInPlace = true);

@@ -149,7 +149,7 @@ FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32
 	return FText::GetEmpty();
 }
 
-int32 UCommonBPLibrary::GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName)
+int32 UCommonBPLibrary::GetEnumValueByValueName(const FString& InEnumName, const FString& InValueName)
 {
 	if(const UEnum* EnumPtr = UAssetModuleBPLibrary::FindEnumByValueName(InEnumName, InValueName))
 	{

@@ -125,17 +125,19 @@ void AVoxelModule::OnDestroy()
 void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	UAssetModuleBPLibrary::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
 }
 
 void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		UAssetModuleBPLibrary::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
+	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		for(const auto Iter1 : UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)))
+		for(const auto Iter1 : UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(FName("Voxel")))
 		{
 			for(auto& Iter2 : Iter1->MeshDatas)
 			{
@@ -286,7 +288,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		VoxelsCapture->OrthoWidth = WorldData->BlockSize * 4.f;
 		
 		int32 ItemIndex = 0;
-		ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Voxel)), Item,
+		ITER_ARRAY(UAssetModuleBPLibrary::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
 			if(Item->IsUnknown() || !Item->bMainPart) continue;
 			AVoxelEntityPreview* VoxelEntity;
 			if(PreviewVoxels.IsValidIndex(ItemIndex))

@@ -10,7 +10,6 @@
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Chunks/VoxelChunk.h"
 
 UAbilityInventorySlot::UAbilityInventorySlot()
 {
@@ -20,9 +19,8 @@ UAbilityInventorySlot::UAbilityInventorySlot()
 	SplitType = ESlotSplitType::Default;
 }
 
-void UAbilityInventorySlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /*= EAbilityItemType::None*/, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
+void UAbilityInventorySlot::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
 {
-	Item = InItem;
 	Inventory = InInventory;
 	LimitType = InLimitType;
 	SplitType = InSplitType;
@@ -245,7 +243,6 @@ void UAbilityInventorySlot::UseItem(int32 InCount /*= -1*/)
 
 	if(InCount == -1) InCount = Item.Count;
 
-
 	switch (Item.GetType())
 	{
 		case EAbilityItemType::Prop:
@@ -261,22 +258,6 @@ void UAbilityInventorySlot::UseItem(int32 InCount /*= -1*/)
 			break;
 		}
 		case EAbilityItemType::Equip:
-		case EAbilityItemType::Skill:
-		{
-			AssembleItem();
-			break;
-		}
-		default: break;
-	}
-}
-
-void UAbilityInventorySlot::AssembleItem()
-{
-	if (IsEmpty()) return;
-
-	switch (Item.GetType())
-	{
-		case EAbilityItemType::Equip:
 		{
 			Inventory->AddItemBySplitType(Item, ESlotSplitType::Equip); 
 			Refresh();
@@ -289,33 +270,6 @@ void UAbilityInventorySlot::AssembleItem()
 			break;
 		}
 		default: break;
-	}
-
-	if(auto Agent = GetInventory()->GetOwnerAgent())
-	{
-		Agent->OnAssembleItem(Item);
-	}
-}
-
-void UAbilityInventorySlot::DischargeItem()
-{
-	if (IsEmpty()) return;
-
-	switch (Item.GetType())
-	{
-		case EAbilityItemType::Equip:
-		case EAbilityItemType::Skill:
-		{
-			Inventory->AddItemBySplitTypes(Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
-			Refresh();
-			break;
-		}
-		default: break;
-	}
-
-	if(auto Agent = GetInventory()->GetOwnerAgent())
-	{
-		Agent->OnDischargeItem(Item);
 	}
 }
 

@@ -10,9 +10,6 @@
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Camera/CameraModuleDetailsPanel.h"
-#include "Event/EventModuleBPLibrary.h"
-#include "Event/Handle/Common/EventHandle_BeginPlay.h"
-#include "Event/Handle/Common/EventHandle_EndPlay.h"
 #include "FSM/FiniteStateBlueprintActions.h"
 #include "FSM/FSMComponentDetailsPanel.h"
 #include "Kismet/GameplayStatics.h"
@@ -317,12 +314,14 @@ void FWHFrameworkEditorModule::RegisterAssetTypeAction(class IAssetTools& AssetT
 
 void FWHFrameworkEditorModule::OnBeginPIE(bool bIsSimulating)
 {
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_BeginPlay::StaticClass(), EEventNetType::Single, nullptr, { bIsSimulating });
+	GIsPlaying = true;
+	GIsSimulating = bIsSimulating;
 }
 
 void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
 {
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EndPlay::StaticClass(), EEventNetType::Single, nullptr, { bIsSimulating });
+	GIsPlaying = false;
+	GIsSimulating = false;
 }
 
 void FWHFrameworkEditorModule::OnClickedProcedureEditorButton()

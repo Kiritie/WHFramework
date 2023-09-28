@@ -3,18 +3,16 @@
 
 #include "Ability/Inventory/Slot/AbilityInventoryEquipSlot.h"
 
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+
 UAbilityInventoryEquipSlot::UAbilityInventoryEquipSlot()
 {
 }
 
-void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/)
+void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
 {
-	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
-}
-
-void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InPartType)
-{
-	Super::OnInitialize(InInventory, InItem, InLimitType, InSplitType);
+	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
 void UAbilityInventoryEquipSlot::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -41,10 +39,20 @@ void UAbilityInventoryEquipSlot::OnItemPreChange(FAbilityItem& InNewItem)
 {
 	Super::OnItemPreChange(InNewItem);
 	CancelItem(true);
+	
+	if(auto Agent = GetInventory()->GetOwnerAgent())
+	{
+		Agent->OnDischargeItem(Item);
+	}
 }
 
 void UAbilityInventoryEquipSlot::OnItemChanged(FAbilityItem& InOldItem)
 {
 	Super::OnItemChanged(InOldItem);
 	ActiveItem(true);
+
+	if(auto Agent = GetInventory()->GetOwnerAgent())
+	{
+		Agent->OnAssembleItem(Item);
+	}
 }

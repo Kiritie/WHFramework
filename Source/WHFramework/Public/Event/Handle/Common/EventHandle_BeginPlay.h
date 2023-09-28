@@ -17,9 +17,6 @@ class WHFRAMEWORK_API UEventHandle_BeginPlay : public UEventHandleBase
 
 public:
 	UEventHandle_BeginPlay();
-	
-public:
-	bool bIsSimulating;
 
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;

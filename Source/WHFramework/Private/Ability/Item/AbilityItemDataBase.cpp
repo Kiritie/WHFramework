@@ -1,11 +1,12 @@
 #include "Ability/Item/AbilityItemDataBase.h"
 
 #include "Ability/AbilityModule.h"
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Common/CommonBPLibrary.h"
+#include "Debug/DebugModuleTypes.h"
 
 UAbilityItemDataBase::UAbilityItemDataBase()
 {
-	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::None);
+	Type = FName("None");
 
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();
@@ -43,5 +44,5 @@ void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, 
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return UAbilityModuleBPLibrary::AssetTypeToItemType(Type);
+	return (EAbilityItemType)UCommonBPLibrary::GetEnumValueByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
 }

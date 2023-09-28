@@ -32,17 +32,12 @@ public:
 	 * 当前是否为播放状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
-	static bool IsPlaying() { return GIsPlaying; }
+	static bool IsPlaying() { return GIsPlayInEditorWorld; }
 	/*
 	 * 当前是否为模拟状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
 	static bool IsSimulating() { return GIsSimulating; }
-	/*
-	 * 当前是否为运行状态
-	 */
-	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
-	static bool IsRunning() { return GIsRunning; }
 	/*
 	 * 当前是否为编辑器状态运行
 	 */
@@ -128,12 +123,12 @@ public:
 	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
 
 	/*
-	 * 获取枚举值变量名称
+	 * 通过获取枚举值名称获取枚举值
 	 * @param InEnumName 枚举名称
-	 * @param InEnumValue 枚举值
+	 * @param InValueName 枚举值名称
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
-	static int32 GetEnumIndexByValueName(const FString& InEnumName, const FString& InValueName);
+	static int32 GetEnumValueByValueName(const FString& InEnumName, const FString& InValueName);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize

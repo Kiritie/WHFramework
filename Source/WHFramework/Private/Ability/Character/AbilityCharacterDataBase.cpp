@@ -1,10 +1,8 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-
 UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {
-	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Character);
+	Type = FName("Character");
 	MaxCount = 1;
 	Class = nullptr;
 	PEClass = nullptr;
@@ -12,7 +10,6 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 	HalfHeight = 69.f;
 
 	InventoryData = FInventorySaveData();
-	InventoryData.Items.SetNum(16);
 	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(10);
 	InventoryData.SplitItems.Add(ESlotSplitType::Equip).Items.SetNum(6);
 

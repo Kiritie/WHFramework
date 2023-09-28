@@ -1,10 +1,8 @@
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
-
 UAbilityPawnDataBase::UAbilityPawnDataBase()
 {
-	Type = UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType::Vitality);
+	Type = FName("Vitality");
 	MaxCount = 1;
 	Class = nullptr;
 	PEClass = nullptr;
@@ -12,7 +10,6 @@ UAbilityPawnDataBase::UAbilityPawnDataBase()
 	HalfHeight = 40.f;
 
 	InventoryData = FInventorySaveData();
-	InventoryData.Items.SetNum(5);
 	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
 
 	// tags

@@ -3,6 +3,8 @@
 
 #include "Debug/DebugModule.h"
 
+#include "Common/CommonBPLibrary.h"
+
 IMPLEMENTATION_MODULE(ADebugModule)
 
 // Sets default values
@@ -11,7 +13,7 @@ ADebugModule::ADebugModule()
 	ModuleName = FName("DebugModule");
 
 	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
-	DON_WITHINDEX(UCommonBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EDebugCategory")) - 1, i, 
+	DON_WITHINDEX(FindObject<UEnum>(nullptr, TEXT("/Script/WHFramework.EDebugCategory"))->NumEnums() - 1, i, 
 		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
 	)
 }

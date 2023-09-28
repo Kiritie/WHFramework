@@ -5,7 +5,6 @@
 
 #include "Ability/AbilityModule.h"
 #include "Ability/Abilities/AbilityBase.h"
-#include "Common/CommonBPLibrary.h"
 
 const UGameplayAbility* UAbilityModuleBPLibrary::GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance)
 {
@@ -35,16 +34,6 @@ bool UAbilityModuleBPLibrary::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility
 		return true;
 	}
 	return false;
-}
-
-FPrimaryAssetType UAbilityModuleBPLibrary::ItemTypeToAssetType(EAbilityItemType InItemType)
-{
-	return *UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)InItemType);
-}
-
-EAbilityItemType UAbilityModuleBPLibrary::AssetTypeToItemType(FPrimaryAssetType InAssetType)
-{
-	return (EAbilityItemType)UCommonBPLibrary::GetEnumIndexByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), InAssetType.ToString());
 }
 
 ECollisionChannel UAbilityModuleBPLibrary::GetPickUpTraceChannel()

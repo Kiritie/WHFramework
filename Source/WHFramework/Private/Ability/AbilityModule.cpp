@@ -20,6 +20,7 @@
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Common/CommonBPLibrary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
@@ -58,6 +59,13 @@ void AAbilityModule::OnInitialize_Implementation()
 void AAbilityModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		DON_WITHINDEX(UCommonBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
+			UAssetModuleBPLibrary::RegisterPrimaryAssetType(*UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
+		);
+	}
 }
 
 void AAbilityModule::OnRefresh_Implementation(float DeltaSeconds)

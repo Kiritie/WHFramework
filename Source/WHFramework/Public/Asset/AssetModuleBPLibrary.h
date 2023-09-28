@@ -200,12 +200,19 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// PrimaryAsset
 public:
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
+	static void RegisterPrimaryAssetType(FPrimaryAssetType InPrimaryAssetType)
+	{
+		UAssetManagerBase::Get().RegisterPrimaryAssetType(InPrimaryAssetType);
+	}
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleBPLibrary")
 	static UPrimaryAssetBase* K2_LoadPrimaryAsset(FPrimaryAssetId InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
 		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
 	}
 
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
 	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
 		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);

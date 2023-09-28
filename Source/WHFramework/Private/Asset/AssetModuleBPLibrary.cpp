@@ -4,14 +4,9 @@
 #include "Asset/AssetModuleBPLibrary.h"
 
 #include "Asset/AssetModule.h"
-#include "Common/CommonBPLibrary.h"
 
 UObject* UAssetModuleBPLibrary::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
 {
-	if(!UCommonBPLibrary::IsPlaying())
-	{
-		return StaticFindObject(InClass, nullptr, *InName, bExactClass);
-	}
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->FindObject(InClass, InName, bExactClass);
@@ -21,10 +16,6 @@ UObject* UAssetModuleBPLibrary::FindObject(UClass* InClass, const FString& InNam
 
 UEnum* UAssetModuleBPLibrary::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
 {
-	if(!UCommonBPLibrary::IsPlaying())
-	{
-		return Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, bExactClass));
-	}
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->FindEnumByValue(InEnumName, InEnumValue, bExactClass);
@@ -34,10 +25,6 @@ UEnum* UAssetModuleBPLibrary::FindEnumByValue(const FString& InEnumName, int32 I
 
 UEnum* UAssetModuleBPLibrary::FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass)
 {
-	if(!UCommonBPLibrary::IsPlaying())
-	{
-		return Cast<UEnum>(StaticFindObject(UEnum::StaticClass(), nullptr, *InEnumName, bExactClass));
-	}
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->FindEnumByValueName(InEnumName, InEnumValueName, bExactClass);

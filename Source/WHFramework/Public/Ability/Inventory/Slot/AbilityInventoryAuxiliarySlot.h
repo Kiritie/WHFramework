@@ -17,7 +17,7 @@ public:
 	UAbilityInventoryAuxiliarySlot();
 
 public:
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, FAbilityItem InItem, EAbilityItemType InLimitType /* = EAbilityItemType::None */, ESlotSplitType InSplitType /*= ESlotSplitType::Default*/) override;
+	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
 	virtual void OnItemChanged(FAbilityItem& InOldItem) override;
 };
