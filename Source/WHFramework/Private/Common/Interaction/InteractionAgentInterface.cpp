@@ -8,6 +8,11 @@
 
 // Add default functionality here for any IInteractionInterface functions that are not pure virtual.
 
+bool IInteractionAgentInterface::IsOverlapping(IInteractionAgentInterface* InInteractionAgent)
+{
+	return OverlappingAgents.Contains(InInteractionAgent);
+}
+
 bool IInteractionAgentInterface::DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
 	if(!InInteractionAgent) InInteractionAgent = InteractingAgent;
@@ -23,25 +28,34 @@ bool IInteractionAgentInterface::DoInteract(EInteractAction InInteractAction, II
 	return false;
 }
 
-void IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent)
+bool IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent, bool bForce)
 {
-	if(InteractingAgent == InInteractionAgent) return;
+	if(InteractingAgent == InInteractionAgent) return false;
 
 	if(InInteractionAgent)
 	{
-		const auto InteractionAgent = InteractingAgent;
-		OnEnterInteract(InInteractionAgent);
-		InteractingAgent = InInteractionAgent;
-		if(InteractionAgent) OnLeaveInteract(InteractionAgent);
-		InInteractionAgent->SetInteractingAgent(this);
+		if(!InteractingAgent && !InInteractionAgent->InteractingAgent || bForce)
+		{
+			const auto LastInteractingAgent = InteractingAgent;
+			InteractingAgent = InInteractionAgent;
+			if(LastInteractingAgent) OnLeaveInteract(LastInteractingAgent);
+			OnEnterInteract(InteractingAgent);
+			InteractingAgent->SetInteractingAgent(this, true);
+			return true;
+		}
 	}
-	else if(InteractingAgent)
+	else
 	{
-		OnLeaveInteract(InteractingAgent);
-		const auto InteractionAgent = InteractingAgent;
-		InteractingAgent = nullptr;
-		InteractionAgent->SetInteractingAgent(nullptr);
+		if(InteractingAgent && InteractingAgent->InteractingAgent == this || bForce)
+		{
+			const auto LastInteractingAgent = InteractingAgent;
+			InteractingAgent = nullptr;
+			if(LastInteractingAgent) OnLeaveInteract(LastInteractingAgent);
+			if(LastInteractingAgent) LastInteractingAgent->SetInteractingAgent(nullptr, true);
+			return true;
+		}
 	}
+	return false;
 }
 
 TArray<EInteractAction> IInteractionAgentInterface::GetInteractableActions(IInteractionAgentInterface* InInteractionAgent)

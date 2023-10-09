@@ -396,17 +396,22 @@ public:
 	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = FVoxelItem();
+		MeshNature = EVoxelMeshNature::Chunk;
 		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem) : FVoxelAuxiliarySaveData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature = EVoxelMeshNature::Chunk) : FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = InVoxelItem;
+		MeshNature = InMeshNature;
 	}
 
 public:
 	UPROPERTY()
 	FVoxelItem VoxelItem;
+
+	UPROPERTY()
+	EVoxelMeshNature MeshNature;
 
 	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;

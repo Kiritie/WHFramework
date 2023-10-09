@@ -60,12 +60,12 @@ bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAc
 	return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
 }
 
-void UVoxelDoor::Open()
+void UVoxelDoor::Open(IVoxelAgentInterface* InAgent)
 {
-	Super::Open();
+	Super::Open(InAgent);
 }
 
-void UVoxelDoor::Close()
+void UVoxelDoor::Close(IVoxelAgentInterface* InAgent)
 {
-	Super::Close();
+	Super::Close(InAgent);
 }

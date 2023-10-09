@@ -11,8 +11,6 @@
 AVoxelEntityPreview::AVoxelEntityPreview()
 {
 	MeshComponent->Initialize(EVoxelMeshNature::Preview);
-	MeshComponent->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
-	MeshComponent->SetRelativeScale3D(FVector(0.3f));
 }
 
 void AVoxelEntityPreview::LoadData(FSaveData* InSaveData, EPhase InPhase)

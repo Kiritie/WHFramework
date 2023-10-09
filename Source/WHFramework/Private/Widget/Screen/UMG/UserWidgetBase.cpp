@@ -187,6 +187,9 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 			}
 		}
 	}
+
+	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
+	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
 }
 
 void UUserWidgetBase::OnClose_Implementation(bool bInstant)
@@ -206,6 +209,9 @@ void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, bInstant);
 		GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
 	}
+
+	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
+	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
 }
 
 void UUserWidgetBase::OnReset_Implementation()

@@ -29,7 +29,20 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		VoxelItem = SaveData.VoxelItem;
-		SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
+		switch(SaveData.MeshNature)
+		{
+			case EVoxelMeshNature::Chunk:
+			{
+				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
+				break;
+			}
+			case EVoxelMeshNature::Vitality:
+			{
+				SetActorRelativeLocation(FVector(0.f, 0.f, VoxelItem.GetRange().Z * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f));
+				break;
+			}
+			default: break;
+		}
 	}
 }
 

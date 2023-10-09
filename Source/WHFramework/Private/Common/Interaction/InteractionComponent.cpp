@@ -42,16 +42,34 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 
 void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(GetInteractionAgent()->GetInteractingAgent() || InInteractionAgent->GetInteractingAgent()) return;
-
-	GetInteractionAgent()->SetInteractingAgent(InInteractionAgent);
+	if(!GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent))
+	{
+		GetInteractionAgent()->GetOverlappingAgents().Add(InInteractionAgent);
+		if(!InInteractionAgent->GetOverlappingAgents().Contains(GetInteractionAgent()))
+		{
+			InInteractionAgent->GetOverlappingAgents().Add(GetInteractionAgent());
+		}
+	}
+	if(GetInteractionAgent()->GetInteractingAgent() != InInteractionAgent)
+	{
+		GetInteractionAgent()->SetInteractingAgent(InInteractionAgent);
+	}
 }
 
 void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(GetInteractionAgent()->GetInteractingAgent() != InInteractionAgent) return;
-
-	GetInteractionAgent()->SetInteractingAgent(nullptr);
+	if(GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent))
+	{
+		GetInteractionAgent()->GetOverlappingAgents().Remove(InInteractionAgent);
+		if(InInteractionAgent->GetOverlappingAgents().Contains(GetInteractionAgent()))
+		{
+			InInteractionAgent->GetOverlappingAgents().Remove(GetInteractionAgent());
+		}
+	}
+	if(GetInteractionAgent()->GetInteractingAgent() == InInteractionAgent)
+	{
+		GetInteractionAgent()->SetInteractingAgent(nullptr);
+	}
 }
 
 void UInteractionComponent::AddInteractAction(EInteractAction InInteractAction)

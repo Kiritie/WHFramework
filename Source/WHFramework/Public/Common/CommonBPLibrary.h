@@ -265,6 +265,11 @@ public:
 		return GetWorldFromObjectExisted(GetWorldContext(bInEditor));
 	}
 
+	static FTimerManager& GetCurrentTimerManager(bool bInEditor = false)
+	{
+		return GetCurrentWorld(bInEditor)->GetTimerManager();
+	}
+
 	template<class T>
 	static T* GetGameInstance()
 	{

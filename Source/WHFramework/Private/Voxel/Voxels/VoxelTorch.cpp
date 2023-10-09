@@ -67,9 +67,9 @@ bool UVoxelTorch::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractA
 	return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
 }
 
-void UVoxelTorch::Open()
+void UVoxelTorch::Open(IVoxelAgentInterface* InAgent)
 {
-	Super::Open();
+	Super::Open(InAgent);
 	
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{
@@ -77,9 +77,9 @@ void UVoxelTorch::Open()
 	}
 }
 
-void UVoxelTorch::Close()
+void UVoxelTorch::Close(IVoxelAgentInterface* InAgent)
 {
-	Super::Close();
+	Super::Close(InAgent);
 
 	if(GetAuxiliary<AVoxelTorchAuxiliary>())
 	{

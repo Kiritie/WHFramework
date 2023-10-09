@@ -6,6 +6,7 @@
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
 UVoxelInteract::UVoxelInteract()
 {
@@ -69,7 +70,7 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 		}
 		case EInputInteractAction::Action2:
 		{
-			Toggle();
+			Toggle(InAgent);
 			break;
 		}
 		default: break;
@@ -77,36 +78,50 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 	return false;
 }
 
-void UVoxelInteract::Toggle()
+void UVoxelInteract::Toggle(IVoxelAgentInterface* InAgent)
 {
-	if(!bOpened) Open();
-	else Close();
+	if(!bOpened) Open(InAgent);
+	else Close(InAgent);
 }
 
-void UVoxelInteract::Open()
+void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
 {
-	bOpened = true;
-	RefreshData();
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	{
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		{
+			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Open, InteractAuxiliary);
+		}
+	}
+	SetOpened(true);
 	if(GetData().bMainPart)
 	{
 		for(auto Iter : GetItem().GetParts())
 		{
-			Iter.GetVoxel<ThisClass>().Open();
+			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
 	}
 }
 
-void UVoxelInteract::Close()
+void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
 {
-	bOpened = false;
-	RefreshData();
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	{
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		{
+			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Close, InteractAuxiliary);
+		}
+	}
+	SetOpened(false);
 	if(GetData().bMainPart)
 	{
 		for(auto Iter : GetItem().GetParts())
 		{ 
-			Iter.GetVoxel<ThisClass>().Close();
+			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());

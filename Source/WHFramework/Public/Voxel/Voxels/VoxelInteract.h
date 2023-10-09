@@ -43,17 +43,18 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Interact
 public:
-	virtual void Toggle();
+	virtual void Toggle(IVoxelAgentInterface* InAgent);
 
-	virtual void Open();
+	virtual void Open(IVoxelAgentInterface* InAgent);
 
-	virtual void Close();
+	virtual void Close(IVoxelAgentInterface* InAgent);
 
 protected:
 	UPROPERTY(VisibleAnywhere)
 	bool bOpened;
 
 public:
-	UFUNCTION(BlueprintPure)
 	bool IsOpened() const { return bOpened; }
+
+	void SetOpened(bool bInOpened) { bOpened = bInOpened; RefreshData(); }
 };

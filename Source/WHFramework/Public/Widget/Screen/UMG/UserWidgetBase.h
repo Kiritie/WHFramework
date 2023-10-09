@@ -222,6 +222,17 @@ protected:
 	UPROPERTY(BlueprintAssignable)
 	FOnWidgetStateChanged OnWidgetStateChanged;
 
+public:
+	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnOpened"))
+	FK2_OnWidgetOpened K2_OnOpened;
+
+	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnClosed"))
+	FK2_OnWidgetClosed K2_OnClosed;
+
+	FOnWidgetOpened OnOpened;
+
+	FOnWidgetClosed OnClosed;
+
 private:
 	FTimerHandle WidgetFinishOpenTimerHandle;
 	FTimerHandle WidgetFinishCloseTimerHandle;

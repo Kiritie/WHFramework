@@ -125,6 +125,12 @@ public:
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
+	template<class T>
+	T* GetInteractingAgent() const
+	{
+		return Cast<T>(GetInteractingAgent());
+	}
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
 

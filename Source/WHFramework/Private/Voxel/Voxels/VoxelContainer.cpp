@@ -67,12 +67,12 @@ bool UVoxelContainer::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInter
 	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
 }
 
-void UVoxelContainer::Open()
+void UVoxelContainer::Open(IVoxelAgentInterface* InAgent)
 {
-	Super::Open();
+	Super::Open(InAgent);
 }
 
-void UVoxelContainer::Close()
+void UVoxelContainer::Close(IVoxelAgentInterface* InAgent)
 {
-	Super::Close();
+	Super::Close(InAgent);
 }

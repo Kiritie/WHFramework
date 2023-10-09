@@ -31,6 +31,7 @@
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/VoxelSaveGame.h"
+#include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Voxels/VoxelTree.h"
 
 IMPLEMENTATION_MODULE(AVoxelModule)
@@ -307,6 +308,8 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				VoxelEntity->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
+				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
+				VoxelEntity->GetMeshComponent()->SetRelativeScale3D(FVector(0.3f));
 				Item->SetIconByTexture(VoxelsCapture->TextureTarget, FVector2D(8.f), ItemIndex);
 			}
 			ItemIndex++;

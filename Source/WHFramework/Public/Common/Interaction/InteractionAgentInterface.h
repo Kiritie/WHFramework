@@ -24,8 +24,10 @@ class WHFRAMEWORK_API IInteractionAgentInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual bool IsOverlapping(IInteractionAgentInterface* InInteractionAgent);
+
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) = 0;
-	
+
 	virtual bool DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent = nullptr);
 
 protected:
@@ -36,18 +38,16 @@ protected:
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) = 0;
 
 protected:
+	TArray<IInteractionAgentInterface*> OverlappingAgents;
+	
 	IInteractionAgentInterface* InteractingAgent;
 	
 public:
-	template<class T>
-	T* GetInteractingAgent() const
-	{
-		return Cast<T>(GetInteractingAgent());
-	}
+	virtual TArray<IInteractionAgentInterface*>& GetOverlappingAgents() { return OverlappingAgents; }
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const { return InteractingAgent; }
 
-	virtual void SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent);
+	virtual bool SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent, bool bForce = false);
 
 	virtual TArray<EInteractAction> GetInteractableActions(IInteractionAgentInterface* InInteractionAgent = nullptr);
 

@@ -44,7 +44,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Container
 public:
-	virtual void Open() override;
+	virtual void Open(IVoxelAgentInterface* InAgent) override;
 
-	virtual void Close() override;
+	virtual void Close(IVoxelAgentInterface* InAgent) override;
 };

@@ -85,12 +85,12 @@ void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInte
 	{
 		case EVoxelInteractAction::Open:
 		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Open();
+			GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
 			break;
 		}
 		case EVoxelInteractAction::Close:
 		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Close();
+			GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
 			break;
 		}
 		default: break;

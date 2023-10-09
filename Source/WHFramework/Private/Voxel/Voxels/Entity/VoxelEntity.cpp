@@ -16,7 +16,6 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->Initialize(EVoxelMeshNature::Entity);
 
 	VoxelID = FPrimaryAssetId();
@@ -64,7 +63,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			if(Auxiliary)
 			{
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData));
+				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, EVoxelMeshNature::Entity));
 			}
 		}
 		else if(Auxiliary)

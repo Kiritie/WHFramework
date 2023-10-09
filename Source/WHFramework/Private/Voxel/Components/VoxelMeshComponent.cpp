@@ -55,11 +55,25 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			break;
 		}
 		case EVoxelMeshNature::PickUp:
+		{
+			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector(0.5f);
+			SetCollisionEnabled(false);
+			break;
+		}
 		case EVoxelMeshNature::Entity:
+		{
+			OffsetScale = FVector(0.f, 0.f, 1.f);
+			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			SetCastShadow(false);
+			SetCollisionEnabled(false);
+			break;
+		}
 		case EVoxelMeshNature::Preview:
 		{
 			OffsetScale = FVector::ZeroVector;
 			CenterOffset = FVector(0.5f);
+			SetCastShadow(false);
 			SetCollisionEnabled(false);
 			break;
 		}

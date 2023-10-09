@@ -173,3 +173,11 @@ public:
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FK2_OnWidgetOpened, const TArray<FParameter>&, InParams, bool, bInstant);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetClosed, bool, bInstant);
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWidgetOpened, const TArray<FParameter>&, bool);
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetClosed, bool);

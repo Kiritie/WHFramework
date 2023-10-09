@@ -130,95 +130,95 @@ FItemQueryInfo UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 	if(InEndIndex != -1) InEndIndex = FMath::Clamp(InEndIndex, InStartIndex, Slots.Num() - 1);
 
 	FItemQueryInfo QueryInfo;
+	#define ITERATION1(Index, Expression) \
+	for (int32 Index = (InStartIndex == -1 ? 0 : StartIndex); i <= (InEndIndex == -1 ? (Slots.Num() - 1) : InEndIndex); i++) \
+	{ \
+		Expression \
+	}
+
 	switch (InQueryType)
 	{
 		case EItemQueryType::Get:
 		{
 			QueryInfo.Item = FAbilityItem(InItem, 0);
-			#define Expression1(Index) \
-			if (!QueryInfo.Slots.Contains(Slots[Index])) \
+			#define EXPRESSION1(Index) \
+			if (Slots[Index]->Contains(InItem)) \
 			{ \
-				QueryInfo.Slots.Add(Slots[Index]); \
-				QueryInfo.Item.Count += Slots[Index]->GetItem().Count; \
-				if (InItem.Count > 0 && QueryInfo.Item.Count >= InItem.Count) goto End; \
+				if (!QueryInfo.Slots.Contains(Slots[Index])) \
+				{ \
+					QueryInfo.Slots.Add(Slots[Index]); \
+					QueryInfo.Item.Count += Slots[Index]->GetItem().Count; \
+					if (InItem.Count > 0 && QueryInfo.Item.Count >= InItem.Count) goto END; \
+				} \
 			}
-			if (InStartIndex == -1 && Slots[StartIndex]->Contains(InItem))
+			if (InStartIndex == -1)
 			{
-				Expression1(StartIndex)
+				EXPRESSION1(StartIndex)
 			}
-			for (int32 i = (InStartIndex == -1 ? 0 : StartIndex); i <= (InEndIndex == -1 ? (Slots.Num() - 1) : InEndIndex); i++)
-			{
-				if (Slots[i]->Contains(InItem))
-				{
-					Expression1(i)
-				}
-			}
+			ITERATION1(i ,
+				EXPRESSION1(i)
+			)
 			break;
 		}
 		case EItemQueryType::Add:
 		{
 			QueryInfo.Item = InItem;
-			if (InItem.Count <= 0) goto End;
-			#define Expression2(Index) \
-			if (!QueryInfo.Slots.Contains(Slots[StartIndex])) \
+			if (InItem.Count <= 0) goto END;
+			#define EXPRESSION2(Index) \
+			if (Slots[Index]->CanPutIn(InItem)) \
 			{ \
-				QueryInfo.Slots.Add(Slots[StartIndex]); \
-				InItem.Count -= Slots[StartIndex]->GetRemainVolume(InItem); \
-				if (InItem.Count <= 0) goto End; \
-			}
-			#define Expression3(bNeedMatch, bNeedContains) \
-			for (int32 i = (InStartIndex == -1 ? 0 : StartIndex); i <= (InEndIndex == -1 ? (Slots.Num() - 1) : InEndIndex); i++) \
-			{ \
-				if (Slots[i]->CanPutIn(InItem) && (!bNeedMatch || Slots[i]->IsMatch(InItem, true)) && (!bNeedContains || Slots[i]->Contains(InItem))) \
+				if (!QueryInfo.Slots.Contains(Slots[Index])) \
 				{ \
-					Expression2(i) \
+					QueryInfo.Slots.Add(Slots[Index]); \
+					InItem.Count -= Slots[Index]->GetRemainVolume(InItem); \
+					if (InItem.Count <= 0) goto END; \
 				} \
 			}
-			Expression3(true, false)
-			if (InStartIndex == -1 && Slots[StartIndex]->CanPutIn(InItem))
+			#define EXPRESSION3(bNeedMatch, bNeedContains) \
+			ITERATION1(i , \
+				if ((!bNeedMatch || Slots[i]->IsMatch(InItem, true)) && (!bNeedContains || Slots[i]->Contains(InItem))) \
+				{ \
+					EXPRESSION2(i) \
+				} \
+			)
+			EXPRESSION3(true, false)
+			if (InStartIndex == -1)
 			{
-				Expression2(StartIndex)
+				EXPRESSION2(StartIndex)
 			}
-			Expression3(false, true)
-			Expression3(false, false)
+			EXPRESSION3(false, true)
+			EXPRESSION3(false, false)
 			break;
 		}
 		case EItemQueryType::Remove:
 		{
 			QueryInfo.Item = InItem;
-			if (InItem.Count <= 0) goto End;
-			#define Expression4(Index) \
-			if (!QueryInfo.Slots.Contains(Slots[Index])) \
+			if (InItem.Count <= 0) goto END;
+			#define EXPRESSION4(Index) \
+			if (Slots[Index]->Contains(InItem)) \
 			{ \
-				QueryInfo.Slots.Add(Slots[StartIndex]); \
-				InItem.Count -= Slots[StartIndex]->GetItem().Count; \
-				if (InItem.Count <= 0) goto End; \
+				if (!QueryInfo.Slots.Contains(Slots[Index])) \
+				{ \
+					QueryInfo.Slots.Add(Slots[Index]); \
+					InItem.Count -= Slots[Index]->GetItem().Count; \
+					if (InItem.Count <= 0) goto END; \
+				} \
 			}
-			if (InStartIndex == -1 && Slots[StartIndex]->Contains(InItem))
+			if (InStartIndex == -1)
 			{
-				Expression4(StartIndex)
+				EXPRESSION4(StartIndex)
 			}
-			for (int32 i = (InStartIndex == -1 ? 0 : StartIndex); i <= (InEndIndex == -1 ? (Slots.Num() - 1) : InEndIndex); i++)
-			{
-				if (Slots[i]->Contains(InItem))
-				{
-					Expression4(i)
-				}
-			}
+			ITERATION1(i ,
+				EXPRESSION4(i)
+			)
 			break;
 		}
 	}
-	End:
+	END:
 	if(InItem.Count > 0)
 	{
-		if(InQueryType != EItemQueryType::Get)
-		{
-			QueryInfo.Item.Count -= InItem.Count;
-		}
-		else
-		{
-			QueryInfo.Item.Count = FMath::Clamp(QueryInfo.Item.Count, 0, InItem.Count);
-		}
+		if(InQueryType != EItemQueryType::Get) QueryInfo.Item.Count -= InItem.Count;
+		else QueryInfo.Item.Count = FMath::Clamp(QueryInfo.Item.Count, 0, InItem.Count);
 	}
 	return QueryInfo;
 }
