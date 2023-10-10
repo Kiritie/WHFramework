@@ -22,6 +22,7 @@ void UVoxelTree::OnReset_Implementation()
 	Super::OnReset_Implementation();
 
 	TreePart = EVoxelTreePart::None;
+	RootIndex = FIndex::ZeroIndex;
 	TreeHeight = 0;
 	LeavesHeight = 0;
 	LeavesWidth = 0;
@@ -41,6 +42,12 @@ void UVoxelTree::LoadData(const FString& InData)
 			LeavesWidth = FCString::Atoi(*Datas[3]);
 			break;
 		}
+		case EVoxelTreePart::Bole:
+		case EVoxelTreePart::Leaves:
+		{
+			RootIndex = UVoxelModuleBPLibrary::NumberToVoxelIndex(FCString::Atoi(*Datas[1]));
+			break;
+		}
 		default: break;
 	}
 }
@@ -56,27 +63,55 @@ FString UVoxelTree::ToData()
 		case EVoxelTreePart::Bole:
 		case EVoxelTreePart::Leaves:
 		{
-			return FString::Printf(TEXT("%d"), TreePart);
+			return FString::Printf(TEXT("%d;%d"), TreePart, UVoxelModuleBPLibrary::VoxelIndexToNumber(RootIndex));
 		}
 		default: break;
 	}
 	return TEXT("");
 }
 
-FString UVoxelTree::ToData(EVoxelTreePart InTreePart, const UVoxelTreeData& InTreeData)
+FString UVoxelTree::BuildData(EVoxelTreePart InTreePart)
 {
-	TreePart = InTreePart;
-	switch (TreePart)
+	if(AVoxelChunk* Owner = GetOwner())
 	{
-		case EVoxelTreePart::Root:
+		TreePart = InTreePart;
+		switch (TreePart)
 		{
-			const FRandomStream& RandomStream = AVoxelModule::Get()->GetWorldData().RandomStream;
-			TreeHeight = RandomStream.RandRange(InTreeData.TreeHeight.X, InTreeData.TreeHeight.Y);
-			LeavesHeight = RandomStream.RandRange(InTreeData.LeavesHeight.X, InTreeData.LeavesHeight.Y);
-			LeavesWidth = RandomStream.FRand() < 0.5f ? InTreeData.LeavesWidth.X : InTreeData.LeavesWidth.Y;
-			break;
+			case EVoxelTreePart::Root:
+			{
+				const auto& TreeData = GetData<UVoxelTreeData>();
+				
+				const FRandomStream& RandomStream = AVoxelModule::Get()->GetWorldData().RandomStream;
+				TreeHeight = RandomStream.RandRange(TreeData.TreeHeight.X, TreeData.TreeHeight.Y);
+				LeavesHeight = RandomStream.RandRange(TreeData.LeavesHeight.X, TreeData.LeavesHeight.Y);
+				LeavesWidth = RandomStream.FRand() < 0.5f ? TreeData.LeavesWidth.X : TreeData.LeavesWidth.Y;
+				
+				TMap<FIndex, FVoxelItem> VoxelItems;
+				VoxelItems.Emplace(GetIndex(), FVoxelItem(TreeData.VoxelType, FIndex::ZeroIndex, nullptr, ToData()));
+				for(int32 OffsetZ = TreeHeight - LeavesHeight / 2; OffsetZ <= TreeHeight + LeavesHeight / 2; OffsetZ++)
+				{
+					for(int32 OffsetX = -LeavesWidth / 2; OffsetX <= LeavesWidth / 2; OffsetX++)
+					{
+						for(int32 OffsetY = -LeavesWidth / 2; OffsetY <= LeavesWidth / 2; OffsetY++)
+						{
+							VoxelItems.Emplace(GetIndex() + FIndex(OffsetX, OffsetY, OffsetZ - 1), FVoxelItem(TreeData.LeavesData->VoxelType, FIndex::ZeroIndex, nullptr, BuildData(EVoxelTreePart::Leaves)));
+						}
+					}
+				}
+				DON_WITHINDEX(TreeHeight - 1, i,
+					VoxelItems.Emplace(GetIndex() + FIndex(0, 0, i + 1), FVoxelItem(TreeData.VoxelType, FIndex::ZeroIndex, nullptr, BuildData(EVoxelTreePart::Bole)));
+				)
+				Owner->SetVoxelComplex(VoxelItems);
+				break;
+			}
+			case EVoxelTreePart::Bole:
+			case EVoxelTreePart::Leaves:
+			{
+				RootIndex = GetIndex();
+				break;
+			}
+			default: break;
 		}
-		default: break;
 	}
 	return ToData();
 }
@@ -84,26 +119,6 @@ FString UVoxelTree::ToData(EVoxelTreePart InTreePart, const UVoxelTreeData& InTr
 void UVoxelTree::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	Super::OnGenerate(InAgent);
-
-	if(GetOwner() && !IsGenerated() && TreePart == EVoxelTreePart::Root)
-	{
-		const auto& TreeData = GetData<UVoxelTreeData>();
-		TMap<FIndex, FVoxelItem> VoxelItems;
-		for(int32 OffsetZ = TreeHeight - LeavesHeight / 2; OffsetZ <= TreeHeight + LeavesHeight / 2; OffsetZ++)
-		{
-			for(int32 OffsetX = -LeavesWidth / 2; OffsetX <= LeavesWidth / 2; OffsetX++)
-			{
-				for(int32 OffsetY = -LeavesWidth / 2; OffsetY <= LeavesWidth / 2; OffsetY++)
-				{
-					VoxelItems.Emplace(GetIndex() + FIndex(OffsetX, OffsetY, OffsetZ - 1), FVoxelItem(TreeData.LeavesData->VoxelType, ToData(EVoxelTreePart::Leaves, TreeData)));
-				}
-			}
-		}
-		DON_WITHINDEX(TreeHeight - 1, i,
-			VoxelItems.Emplace(GetIndex() + FIndex(0, 0, i + 1), FVoxelItem(TreeData.VoxelType, ToData(EVoxelTreePart::Bole, TreeData)));
-		)
-		GetOwner()->SetVoxelComplex(VoxelItems);
-	}
 }
 
 void UVoxelTree::OnDestroy(IVoxelAgentInterface* InAgent)
@@ -112,6 +127,7 @@ void UVoxelTree::OnDestroy(IVoxelAgentInterface* InAgent)
 
 	if(AVoxelChunk* Owner = GetOwner())
 	{
+		const FIndex VoxelIndex = GetIndex();
 		switch (TreePart)
 		{
 			case EVoxelTreePart::Root:
@@ -132,7 +148,7 @@ void UVoxelTree::OnDestroy(IVoxelAgentInterface* InAgent)
 				}
 				for(auto Iter : TMap(VoxelItems))
 				{
-					if(Owner->GetVoxel<UVoxelTree>(Iter.Key).TreePart == EVoxelTreePart::None)
+					if(Owner->GetVoxel<UVoxelTree>(Iter.Key).RootIndex != VoxelIndex)
 					{
 						VoxelItems.Remove(Iter.Key);
 					}

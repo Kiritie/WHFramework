@@ -452,7 +452,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		{
 			if(IsOnTheWorld(InIndex, false))
 			{
-				if(WorldData->IsExistChunkData(InIndex))
+				if(WorldData->IsExistChunkData(InIndex) && WorldData->GetChunkData(InIndex)->HasVoxelData())
 				{
 					AddToChunkQueue(EVoxelWorldState::MapLoad, InIndex);
 					if(!WorldData->IsBuildChunkData(InIndex))
@@ -654,18 +654,27 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) cons
 		{
 			return EVoxelType::Grass; //Grass
 		}
-		if(InZ == BaseHeight + 1 && InZ > SandHeight + 1 && InZ > WaterHeight + 1)
-		{
-			const FRandomStream& RandomStream = WorldData->RandomStream;
-			if(InZ <= GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->TreeScale.W)
-			{
-				return RandomStream.FRand() > 0.4f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
-			}
-			if(InZ <= GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->PlantScale.W)
-			{
-				return RandomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
-			}
-		}
+	}
+	return EVoxelType::Empty;
+}
+
+EVoxelType AVoxelModule::GetRandomVoxelType(FIndex InIndex) const
+{
+	return GetRandomVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
+}
+
+EVoxelType AVoxelModule::GetRandomVoxelType(int32 InX, int32 InY, int32 InZ) const
+{
+	const FVector2D WorldLocation = FVector2D(InX, InY);
+
+	const FRandomStream& RandomStream = WorldData->RandomStream;
+	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->TreeScale.W)
+	{
+		return RandomStream.FRand() > 0.4f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
+	}
+	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->PlantScale.W)
+	{
+		return RandomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
 	}
 	return EVoxelType::Empty;
 }

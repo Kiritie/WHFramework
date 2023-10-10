@@ -112,15 +112,7 @@ public:
 	{
 		return static_cast<T&>(GetVoxel(InIndex, bMainPart));
 	}
-
 	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
-
-	template<class T>
-	T& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false)
-	{
-		return static_cast<T&>(GetVoxel(InX, InY, InZ, bMainPart));
-	}
-	virtual UVoxel& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
 
@@ -187,6 +179,9 @@ protected:
 	bool bGenerated;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bChanged;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TMap<EDirection, AVoxelChunk*> Neighbors;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
@@ -203,6 +198,10 @@ public:
 
 	bool IsGenerated() const { return bGenerated; }
 	
+	bool IsChanged() const { return bChanged; }
+	
+	void SetChanged(bool bInChanged) { bChanged = bInChanged; }
+
 	AVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
 
 	AVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);

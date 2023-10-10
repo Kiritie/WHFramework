@@ -102,7 +102,7 @@ UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValu
 		{
 			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
 			{
-				if(Enum->IsValidEnumValue(InEnumValue))
+				if(Enum->GetMaxEnumValue() != InEnumValue && Enum->IsValidEnumValue(InEnumValue))
 				{
 					return Enum;
 				}

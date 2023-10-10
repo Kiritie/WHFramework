@@ -77,15 +77,30 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
+	template<class T>
+	static T& GetVoxel(EVoxelType InVoxelType)
+	{
+		return static_cast<T&>(GetVoxel(InVoxelType));
+	}
 	static UVoxel& GetVoxel(EVoxelType InVoxelType);
 
+	template<class T>
+	static T& GetVoxel(const FPrimaryAssetId& InVoxelID)
+	{
+		return static_cast<T&>(GetVoxel(InVoxelID));
+	}
 	static UVoxel& GetVoxel(const FPrimaryAssetId& InVoxelID);
 
+	template<class T>
+	static T& GetVoxel(const FVoxelItem& InVoxelItem)
+	{
+		return static_cast<T&>(GetVoxel(InVoxelItem));
+	}
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
 	
-	//////////////////////////////////////////////////////////////////////////
-	// Noise
 	static EVoxelType GetNoiseVoxelType(FIndex InIndex);
+	
+	static EVoxelType GetRandomVoxelType(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace

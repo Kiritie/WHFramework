@@ -37,6 +37,7 @@ ACameraModule::ACameraModule()
 	bClampCameraMove = false;
 	CameraMoveRange = FBox(EForceInit::ForceInitToZero);
 	CameraMoveRate = 300.f;
+	bSmoothCameraMove = true;
 	CameraMoveSpeed = 5.f;
 
 	bCameraRotateAble = true;
@@ -44,6 +45,7 @@ ACameraModule::ACameraModule()
 	bReverseCameraPitch = false;
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
+	bSmoothCameraRotate = true;
 	CameraRotateSpeed = 5.f;
 	MinCameraPitch = -89.f;
 	MaxCameraPitch = 89.f;
@@ -53,6 +55,7 @@ ACameraModule::ACameraModule()
 	bCameraZoomControlAble = true;
 	bNormalizeCameraZoom = false;
 	CameraZoomRate = 150.f;
+	bSmoothCameraZoom = true;
 	CameraZoomSpeed = 5.f;
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
@@ -218,7 +221,7 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			}
 			else
 			{
-				CurrentCamera->SetActorLocation(CameraMoveSpeed == 0 ? TargetCameraLocation : FMath::VInterpTo(CurrentCamera->GetActorLocation(), TargetCameraLocation, DeltaSeconds, CameraMoveSpeed));
+				CurrentCamera->SetActorLocation(!bSmoothCameraMove ? TargetCameraLocation : FMath::VInterpTo(CurrentCamera->GetActorLocation(), TargetCameraLocation, DeltaSeconds, CameraMoveSpeed));
 			}
 		}
 		else if(CameraDoMoveDuration != 0.f)
@@ -239,7 +242,7 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			}
 			else
 			{
-				GetPlayerController()->SetControlRotation(CameraRotateSpeed == 0 ? TargetCameraRotation : FMath::RInterpTo(GetPlayerController()->GetControlRotation(), TargetCameraRotation, DeltaSeconds, CameraRotateSpeed));
+				GetPlayerController()->SetControlRotation(!bSmoothCameraRotate ? TargetCameraRotation : FMath::RInterpTo(GetPlayerController()->GetControlRotation(), TargetCameraRotation, DeltaSeconds, CameraRotateSpeed));
 			}
 		}
 		else if(CameraDoRotateDuration != 0.f)
@@ -260,7 +263,7 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			}
 			else
 			{
-				GetCurrentCameraBoom()->TargetArmLength = CameraZoomSpeed == 0 ? TargetCameraDistance : FMath::FInterpTo(GetCurrentCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaSeconds, bNormalizeCameraZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(GetCurrentCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
+				GetCurrentCameraBoom()->TargetArmLength = !bSmoothCameraZoom ? TargetCameraDistance : FMath::FInterpTo(GetCurrentCameraBoom()->TargetArmLength, TargetCameraDistance, DeltaSeconds, bNormalizeCameraZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(GetCurrentCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
 			}
 		}
 		else if(CameraDoZoomDuration != 0.f)

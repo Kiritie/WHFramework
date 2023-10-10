@@ -148,6 +148,9 @@ protected:
 	float CameraMoveRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bSmoothCameraMove;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraMove == true"), Category = "CameraControl|Move")
 	float CameraMoveSpeed;
 
 	// Rotate
@@ -167,6 +170,9 @@ protected:
 	float CameraLookUpRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	bool bSmoothCameraRotate;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraRotate == true"), Category = "CameraControl|Rotate")
 	float CameraRotateSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
@@ -192,6 +198,9 @@ protected:
 	float CameraZoomRate;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	bool bSmoothCameraZoom;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraZoom == true"), Category = "CameraControl|Zoom")
 	float CameraZoomSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")

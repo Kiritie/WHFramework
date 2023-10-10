@@ -315,15 +315,11 @@ public:
 		bGenerated = false;
 	}
 
-	FVoxelItem(EVoxelType InVoxelType);
+	FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
 
-	FVoxelItem(const FPrimaryAssetId& InID);
+	FVoxelItem(EVoxelType InVoxelType, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
 
 	FVoxelItem(const FString& InSaveData);
-
-	FVoxelItem(EVoxelType InVoxelType, const FString& InData);
-	
-	FVoxelItem(const FPrimaryAssetId& InID, const FString& InData);
 
 public:
 	void OnGenerate(IVoxelAgentInterface* InAgent = nullptr);
@@ -563,6 +559,11 @@ public:
 		{
 			Iter.MakeSaved();
 		}
+	}
+
+	bool HasVoxelData() const
+	{
+		return !VoxelDatas.IsEmpty();
 	}
 };
 

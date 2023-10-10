@@ -159,6 +159,10 @@ public:
 
 	virtual EVoxelType GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) const;
 
+	virtual EVoxelType GetRandomVoxelType(FIndex InIndex) const;
+
+	virtual EVoxelType GetRandomVoxelType(int32 InX, int32 InY, int32 InZ) const;
+
 	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
 
 	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;

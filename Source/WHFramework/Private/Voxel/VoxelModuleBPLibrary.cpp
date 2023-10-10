@@ -150,13 +150,13 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(EVoxelType InVoxelType)
 
 UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FPrimaryAssetId& InVoxelID)
 {
-	const UVoxelData& voxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
-	if(voxelData.IsValid())
+	const UVoxelData& VoxelData = UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
+	if(VoxelData.IsValid())
 	{
-		const TSubclassOf<UVoxel> tmpClass = voxelData.VoxelClass ? voxelData.VoxelClass : UVoxel::StaticClass();
-		UVoxel& voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true, tmpClass);
-		voxel.SetItem(InVoxelID);
-		return voxel;
+		const TSubclassOf<UVoxel> VoxelClass = VoxelData.VoxelClass ? VoxelData.VoxelClass : UVoxel::StaticClass();
+		UVoxel& Voxel = UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true, VoxelClass);
+		Voxel.SetItem(InVoxelID);
+		return Voxel;
 	}
 	return UReferencePoolModuleBPLibrary::GetReference<UVoxel>(true);
 }
@@ -165,13 +165,13 @@ UVoxel& UVoxelModuleBPLibrary::GetVoxel(const FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsEmpty()) return UVoxel::GetEmpty();
 	if(InVoxelItem.IsUnknown()) return UVoxel::GetUnknown();
-	UVoxel& voxel = GetVoxel(InVoxelItem.ID);
-	voxel.SetItem(InVoxelItem);
+	UVoxel& Voxel = GetVoxel(InVoxelItem.ID);
+	Voxel.SetItem(InVoxelItem);
 	if(!InVoxelItem.Data.IsEmpty())
 	{
-		voxel.LoadData(InVoxelItem.Data);
+		Voxel.LoadData(InVoxelItem.Data);
 	}
-	return voxel;
+	return Voxel;
 }
 
 EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
@@ -179,6 +179,15 @@ EVoxelType UVoxelModuleBPLibrary::GetNoiseVoxelType(FIndex InIndex)
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetNoiseVoxelType(InIndex);
+	}
+	return EVoxelType::Empty;
+}
+
+EVoxelType UVoxelModuleBPLibrary::GetRandomVoxelType(FIndex InIndex)
+{
+	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
+	{
+		return VoxelModule->GetRandomVoxelType(InIndex);
 	}
 	return EVoxelType::Empty;
 }

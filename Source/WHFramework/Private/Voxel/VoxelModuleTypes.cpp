@@ -15,14 +15,17 @@ FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
 FVoxelItem FVoxelItem::Empty = FVoxelItem();
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
 
-FVoxelItem::FVoxelItem(EVoxelType InVoxelType) : FVoxelItem()
-{
-	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType);
-}
-
-FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID) : FVoxelItem()
+FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
 {
 	ID = InID;
+	Index = InIndex;
+	Owner = InOwner;
+	Data = InData;
+}
+
+FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData)
+	: FVoxelItem(UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType), InIndex, InOwner, InData)
+{
 }
 
 FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
@@ -36,18 +39,6 @@ FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 	{
 		Data = *DataStrs[3];
 	}
-}
-
-FVoxelItem::FVoxelItem(EVoxelType InVoxelType, const FString& InData) : FVoxelItem()
-{
-	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType);
-	Data = InData;
-}
-
-FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, const FString& InData) : FVoxelItem()
-{
-	ID = InID;
-	Data = InData;
 }
 
 void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -81,6 +72,7 @@ void FVoxelItem::RefreshData(bool bOrigin)
 		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
 		OriginItem.RefreshData(false);
 		*this = OriginItem;
+		Owner->SetChanged(true);
 	}
 	else
 	{
@@ -95,6 +87,7 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
 		OriginItem.RefreshData(InVoxel, false);
 		*this = OriginItem;
+		Owner->SetChanged(true);
 	}
 	else
 	{

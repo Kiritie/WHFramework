@@ -27,7 +27,7 @@ public:
 
 	virtual FString ToData() override;
 
-	virtual FString ToData(EVoxelTreePart InTreePart, const UVoxelTreeData& InTreeData);
+	virtual FString BuildData(EVoxelTreePart InTreePart);
 
 public:
 	virtual void OnGenerate(IVoxelAgentInterface* InAgent) override;
@@ -49,6 +49,9 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere)
 	EVoxelTreePart TreePart;
+
+	UPROPERTY(VisibleAnywhere)
+	FIndex RootIndex;
 
 	UPROPERTY(VisibleAnywhere)
 	int32 TreeHeight;

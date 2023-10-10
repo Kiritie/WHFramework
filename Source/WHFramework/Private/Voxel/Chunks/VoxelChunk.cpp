@@ -17,7 +17,6 @@
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Voxel/VoxelModuleBPLibrary.h"
-#include "Voxel/Datas/VoxelTreeData.h"
 #include "Voxel/Voxels/VoxelTree.h"
 
 // Sets default values
@@ -46,6 +45,7 @@ AVoxelChunk::AVoxelChunk()
 	Index = FIndex::ZeroIndex;
 	bBuilded = false;
 	bGenerated = false;
+	bChanged = false;
 	VoxelMap = TMap<FIndex, FVoxelItem>();
 	Neighbors = TMap<EDirection, AVoxelChunk*>();
 	ITER_DIRECTION(Iter, Neighbors.Add(Iter); )
@@ -82,11 +82,18 @@ FSaveData* AVoxelChunk::ToData(bool bRefresh)
 
 	for(auto& Iter : VoxelMap)
 	{
-		SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(bRefresh));
+		if(bChanged)
+		{
+			SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(bRefresh));
+		}
 		if(Iter.Value.Auxiliary)
 		{
 			SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(bRefresh));
 		}
+	}
+	if(!bChanged && AVoxelModule::Get()->GetWorldData().IsExistChunkData(Index))
+	{
+		SaveData.VoxelDatas = AVoxelModule::Get()->GetWorldData().GetChunkData(Index)->VoxelDatas;
 	}
 
 	for(auto& Iter : PickUps)
@@ -145,6 +152,7 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	Batch = -1;
 	bBuilded = false;
 	bGenerated = false;
+	bChanged = false;
 
 	SolidMesh->ClearData();
 	SemiMesh->ClearData();
@@ -245,16 +253,10 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		{
 			const auto& WorldData = AVoxelModule::Get()->GetWorldData();
 			ITER_INDEX(VoxelIndex, WorldData.ChunkSize, false,
-				const EVoxelType VoxelType = UVoxelModuleBPLibrary::GetNoiseVoxelType(LocalIndexToWorld(VoxelIndex));
-				FVoxelItem VoxelItem = FVoxelItem(VoxelType);
+				const auto VoxelType = UVoxelModuleBPLibrary::GetNoiseVoxelType(LocalIndexToWorld(VoxelIndex));
+				const FVoxelItem VoxelItem = FVoxelItem(VoxelType);
 				switch(VoxelType)
 				{
-					// Tree
-					case EVoxelType::Oak:
-					case EVoxelType::Birch:
-					{
-						VoxelItem.Data = VoxelItem.GetVoxel<UVoxelTree>().ToData(EVoxelTreePart::Root, VoxelItem.GetData<UVoxelTreeData>());
-					}
 					default:
 					{
 						SetVoxelSample(VoxelIndex, VoxelItem);
@@ -267,21 +269,36 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		}
 		case 1:
 		{
-			for(auto Iter : TMap(VoxelMap))
-			{
-				auto& VoxelData = Iter.Value.GetVoxelData();
-				switch(VoxelData.VoxelType)
+			ITER_MAP(TMap(VoxelMap), Iter,
+				switch(Iter.Value.GetVoxelType())
 				{
-					// Tree
-					case EVoxelType::Oak:
-					case EVoxelType::Birch:
+					// Grass
+					case EVoxelType::Grass:
 					{
-						Iter.Value.GetVoxel<UVoxelTree>().OnGenerate(nullptr);
+						const FIndex VoxelIndex = Iter.Key + FIndex(0, 0, 1);
+						const auto VoxelType = UVoxelModuleBPLibrary::GetRandomVoxelType(LocalIndexToWorld(VoxelIndex));
+						const FVoxelItem VoxelItem = FVoxelItem(VoxelType, VoxelIndex, this);
+						switch(VoxelType)
+						{
+							// Tree
+							case EVoxelType::Oak:
+							case EVoxelType::Birch:
+							{
+								VoxelItem.GetVoxel<UVoxelTree>().BuildData(EVoxelTreePart::Root);
+								break;
+							}
+							default:
+							{
+								SetVoxelComplex(VoxelIndex, VoxelType);
+								break;
+							}
+							case EVoxelType::Empty: break;
+						}
 						break;
 					}
 					default: break;
 				}
-			}
+			)
 			break;
 		}
 		default: break;
@@ -554,12 +571,7 @@ bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ)
 
 UVoxel& AVoxelChunk::GetVoxel(FIndex InIndex, bool bMainPart)
 {
-	return GetVoxel(InIndex.X, InIndex.Y, InIndex.Z, bMainPart);
-}
-
-UVoxel& AVoxelChunk::GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart)
-{
-	return GetVoxelItem(InX, InY, InZ, bMainPart).GetVoxel();
+	return GetVoxelItem(InIndex, bMainPart).GetVoxel();
 }
 
 FVoxelItem& AVoxelChunk::GetVoxelItem(FIndex InIndex, bool bMainPart)
@@ -794,10 +806,17 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 			bSuccess = true;
 		}
 	}
-	if(bSuccess && bGenerate)
+	if(bSuccess)
 	{
-		Generate(EPhase::Lesser);
-		GenerateNeighbors(InIndex, EPhase::Lesser);
+		if(bGenerate)
+		{
+			Generate(EPhase::Lesser);
+			GenerateNeighbors(InIndex, EPhase::Lesser);
+		}
+		if(InAgent)
+		{
+			bChanged = true;
+		}
 	}
 	return bSuccess;
 }
