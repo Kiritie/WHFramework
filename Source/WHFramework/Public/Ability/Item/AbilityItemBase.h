@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 #include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
 
@@ -12,7 +13,7 @@ class AAbilityCharacterBase;
  * 物品基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityItemBase : public AWHActor
+class WHFRAMEWORK_API AAbilityItemBase : public AWHActor, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -25,7 +26,7 @@ protected:
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	AAbilityCharacterBase* OwnerCharacter;
+	AActor* OwnerActor;
 
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -36,9 +37,13 @@ protected:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void Initialize(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem = FAbilityItem::Empty);
+	void Initialize(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty);
 
 public:
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }
+
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { Item.ID = InID; }
+	
 	template<class T >
 	T& GetItemData() const
 	{
@@ -53,11 +58,11 @@ public:
 	FAbilityItem& GetItem() { return Item; }
 
 	template<class T>
-	T* GetOwnerCharacter() const
+	T* GetOwnerActor() const
 	{
-		return Cast<T>(OwnerCharacter);
+		return Cast<T>(OwnerActor);
 	}
 
 	UFUNCTION(BlueprintPure)
-	AAbilityCharacterBase* GetOwnerCharacter() const { return OwnerCharacter; }
+	AActor* GetOwnerActor() const { return OwnerActor; }
 };

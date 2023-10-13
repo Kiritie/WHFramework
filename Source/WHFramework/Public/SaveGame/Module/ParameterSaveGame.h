@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FParameterSaveData ParameterSaveData;
+	FParameterModuleSaveData SaveData;
 
 public:
-	virtual FSaveData* GetSaveData() override { return &ParameterSaveData; }
+	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { ParameterSaveData = InSaveData->CastRef<FParameterSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FParameterModuleSaveData>(); }
 };

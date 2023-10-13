@@ -97,7 +97,7 @@ void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
 	SetOpened(true);
 	if(GetData().bMainPart)
 	{
-		for(auto Iter : GetItem().GetParts())
+		for(auto& Iter : GetItem().GetParts())
 		{
 			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
@@ -119,7 +119,7 @@ void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
 	SetOpened(false);
 	if(GetData().bMainPart)
 	{
-		for(auto Iter : GetItem().GetParts())
+		for(auto& Iter : GetItem().GetParts())
 		{ 
 			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}

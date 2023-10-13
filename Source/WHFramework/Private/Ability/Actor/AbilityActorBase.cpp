@@ -42,12 +42,16 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 
 void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
-
 	if(InParams.IsValidIndex(0))
 	{
-		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+		ActorID = InParams[0].GetPointerValueRef<FGuid>();
 	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	Super::OnSpawn_Implementation(InParams);
 
 	InitializeAbilitySystem();
 }
@@ -117,7 +121,8 @@ FSaveData* AAbilityActorBase::ToData(bool bRefresh)
 	static FVitalitySaveData SaveData;
 	SaveData = FVitalitySaveData();
 
-	SaveData.ID = AssetID;
+	SaveData.ActorID = ActorID;
+	SaveData.AssetID = AssetID;
 	SaveData.Level = Level;
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
@@ -174,7 +179,7 @@ void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)

@@ -21,6 +21,5 @@ class WHFRAMEWORK_API IAbilityPickerInterface
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	bool OnPickUp(AAbilityPickUpBase* InPickUp);
+	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) = 0;
 };

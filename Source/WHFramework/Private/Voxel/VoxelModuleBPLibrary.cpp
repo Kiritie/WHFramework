@@ -17,13 +17,13 @@ FPrimaryAssetId UVoxelModuleBPLibrary::VoxelTypeToAssetID(EVoxelType InVoxelType
 	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
 }
 
-FVoxelWorldSaveData& UVoxelModuleBPLibrary::GetWorldData()
+FVoxelModuleSaveData& UVoxelModuleBPLibrary::GetWorldData()
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldData();
 	}
-	return FVoxelWorldSaveData::Empty;
+	return FVoxelModuleSaveData::Empty;
 }
 
 EVoxelWorldMode UVoxelModuleBPLibrary::GetWorldMode()
@@ -44,13 +44,13 @@ EVoxelWorldState UVoxelModuleBPLibrary::GetWorldState()
 	return EVoxelWorldState::None;
 }
 
-FVoxelWorldBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
+FVoxelModuleBasicSaveData UVoxelModuleBPLibrary::GetWorldBasicData()
 {
 	if(AVoxelModule* VoxelModule = AVoxelModule::Get())
 	{
 		return VoxelModule->GetWorldBasicData();
 	}
-	return FVoxelWorldBasicSaveData();
+	return FVoxelModuleBasicSaveData();
 }
 
 FIndex UVoxelModuleBPLibrary::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)

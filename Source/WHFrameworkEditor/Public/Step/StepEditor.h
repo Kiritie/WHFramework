@@ -4,6 +4,29 @@
 
 #include "CoreMinimal.h"
 #include "Editor/Kismet/Public/BlueprintEditor.h"
+#include "Main/Base/ModuleEditorBase.h"
+
+class SStepEditorWidget;
+
+class FStepEditor : public FModuleEditorBase
+{
+	GENERATED_EDITOR_MODULE(FStepEditor)
+	
+public:
+	virtual void StartupModule() override;
+
+	virtual void ShutdownModule() override;
+
+	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
+	
+private:
+	void OnClickedStepEditorButton();
+	
+	TSharedRef<class SDockTab> OnSpawnStepEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
+
+private:
+	TSharedPtr<SStepEditorWidget> StepEditorWidget;
+};
 
 //////////////////////////////////////////////////////////////////////////
 // FStepBlueprintEditor

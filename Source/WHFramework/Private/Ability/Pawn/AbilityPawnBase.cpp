@@ -58,17 +58,17 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void AAbilityPawnBase::SetActorVisible_Implementation(bool bNewVisible)
+void AAbilityPawnBase::SetActorVisible_Implementation(bool bInVisible)
 {
-	bVisible = bNewVisible;
-	GetRootComponent()->SetVisibility(bNewVisible, true);
+	bVisible = bInVisible;
+	GetRootComponent()->SetVisibility(bInVisible, true);
 	TArray<AActor*> AttachedActors;
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
 		if(Iter && Iter->Implements<USceneActorInterface>())
 		{
-			ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
 	}
 }
@@ -87,8 +87,14 @@ void AAbilityPawnBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 {
 	if(InParams.IsValidIndex(0))
 	{
-		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+		ActorID = InParams[0].GetPointerValueRef<FGuid>();
 	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	USceneModuleBPLibrary::AddSceneActor(this);
 
 	InitializeAbilitySystem();
 
@@ -134,7 +140,8 @@ FSaveData* AAbilityPawnBase::ToData(bool bRefresh)
 	static FVitalitySaveData SaveData;
 	SaveData = FVitalitySaveData();
 
-	SaveData.ID = AssetID;
+	SaveData.ActorID = ActorID;
+	SaveData.AssetID = AssetID;
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
@@ -256,7 +263,7 @@ void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
@@ -346,6 +353,21 @@ UInteractionComponent* AAbilityPawnBase::GetInteractionComponent() const
 UAbilityInventoryBase* AAbilityPawnBase::GetInventory() const
 {
 	return Inventory;
+}
+
+bool AAbilityPawnBase::IsPlayer() const
+{
+	return UCommonBPLibrary::GetPlayerPawn() == this;
+}
+
+bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
+{
+	return !InTarget->GetRaceID().IsEqual(RaceID);
+}
+
+bool AAbilityPawnBase::IsTargetable_Implementation() const
+{
+	return !IsDead();
 }
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)

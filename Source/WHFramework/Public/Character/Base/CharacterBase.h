@@ -85,9 +85,11 @@ protected:
 	virtual void MoveUp_Implementation(float InValue) override;
 
 public:
-	virtual UCameraComponent* GetCameraComp_Implementation() override { return FollowCamera; }
+	virtual UCameraComponent* GetEyeCamera() const override { return nullptr; };
+	
+	virtual UCameraComponent* GetFollowCamera() const override { return FollowCamera; }
 
-	virtual USpringArmComponent* GetCameraBoom_Implementation() override { return CameraBoom; }
+	virtual USpringArmComponent* GetCameraBoom() const override { return CameraBoom; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
@@ -110,7 +112,7 @@ public:
 
 	virtual bool IsVisible_Implementation() const override { return bVisible; }
 
-	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim
@@ -201,8 +203,9 @@ protected:
 	FPrimaryAssetId AssetID;
 
 public:
-	UFUNCTION(BlueprintPure)
-	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
+	
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
 	
 	template<class T>
 	T& GetCharacterData() const

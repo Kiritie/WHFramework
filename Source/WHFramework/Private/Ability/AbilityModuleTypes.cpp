@@ -101,5 +101,5 @@ FAbilityItems FInventorySlots::GetItems()
 
 UAbilityItemDataBase& FActorSaveData::GetItemData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
+	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
 }

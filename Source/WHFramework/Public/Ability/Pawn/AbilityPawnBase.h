@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "AbilityPawnInterface.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
@@ -10,8 +11,8 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Common/Targeting/TargetingAgentInterface.h"
 
 #include "AbilityPawnBase.generated.h"
 
@@ -29,7 +30,7 @@ class UAbilityPawnDataBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterface, public ISceneActorInterface, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterface, public ISceneActorInterface, public IAbilityPawnInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -60,7 +61,7 @@ public:
 
 	virtual bool IsVisible_Implementation() const override { return bVisible; }
 
-	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Voxel
@@ -205,14 +206,22 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
+	virtual bool IsPlayer() const override;
+
+	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
+
+	virtual bool IsTargetable_Implementation() const override;
+	
+	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDying() const override;
 
 public:
-	UFUNCTION(BlueprintPure)
-	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
+	
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
 
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameV() const override { return Name; }

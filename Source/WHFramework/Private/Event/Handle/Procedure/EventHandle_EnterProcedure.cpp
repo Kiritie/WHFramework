@@ -3,6 +3,8 @@
 
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 
+#include "Procedure/Base/ProcedureBase.h"
+
 UEventHandle_EnterProcedure::UEventHandle_EnterProcedure()
 {
 	EventType = EEventType::Multicast;

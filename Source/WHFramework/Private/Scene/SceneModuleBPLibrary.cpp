@@ -75,20 +75,22 @@ AActor* USceneModuleBPLibrary::GetSceneActor(FGuid InID, TSubclassOf<AActor> InC
 	return nullptr;
 }
 
-void USceneModuleBPLibrary::AddSceneActor(AActor* InActor)
+bool USceneModuleBPLibrary::AddSceneActor(AActor* InActor)
 {
 	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
-		SceneModule->AddSceneActor(InActor);
+		return SceneModule->AddSceneActor(InActor);
 	}
+	return false;
 }
 
-void USceneModuleBPLibrary::RemoveSceneActor(AActor* InActor)
+bool USceneModuleBPLibrary::RemoveSceneActor(AActor* InActor)
 {
 	if(ASceneModule* SceneModule = ASceneModule::Get())
 	{
-		SceneModule->AddSceneActor(InActor);
+		return SceneModule->RemoveSceneActor(InActor);
 	}
+	return false;
 }
 
 bool USceneModuleBPLibrary::HasTargetPointByName(FName InName, bool bEnsured)

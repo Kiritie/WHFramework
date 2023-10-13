@@ -26,7 +26,7 @@ FString USaveGameModuleBPLibrary::GetSaveSlotName(FName InSaveName, int32 InInde
 {
 	if(ASaveGameModule* SaveGameModule = ASaveGameModule::Get())
 	{
-		return SaveGameModule->GetSaveSlotName(InSaveName, InIndex);
+		return SaveGameModule->GetSlotName(InSaveName, InIndex);
 	}
 	return TEXT("");
 }

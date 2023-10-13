@@ -54,10 +54,7 @@ void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 
 	Execute_SetActorVisible(this, true);
 	
-	if(Execute_IsAddToList(this))
-	{
-		USceneModuleBPLibrary::AddSceneActor(this);
-	}
+	USceneModuleBPLibrary::AddSceneActor(this);
 }
 
 void AWHActor::OnDespawn_Implementation(bool bRecovery)
@@ -66,11 +63,8 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 
 	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	
-	if(Execute_IsAddToList(this))
-	{
-		USceneModuleBPLibrary::RemoveSceneActor(this);
-	}
-	else if(Container)
+	USceneModuleBPLibrary::RemoveSceneActor(this);
+	if(Container)
 	{
 		Container->RemoveSceneActor(this);
 	}
@@ -83,15 +77,15 @@ void AWHActor::OnReset_Implementation()
 	
 }
 
-void AWHActor::SetActorVisible_Implementation(bool bNewVisible)
+void AWHActor::SetActorVisible_Implementation(bool bInVisible)
 {
-	bVisible = bNewVisible;
-	GetRootComponent()->SetVisibility(bNewVisible, true);
+	bVisible = bInVisible;
+	GetRootComponent()->SetVisibility(bInVisible, true);
 	TArray<AActor*> AttachedActors;
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
-		ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+		ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 	}
 }
 

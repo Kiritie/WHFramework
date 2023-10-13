@@ -46,7 +46,7 @@ void AWebRequestModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	for(auto Iter : WebInterfaces)
+	for(auto& Iter : WebInterfaces)
 	{
 		CreateWebInterface(Iter);
 	}

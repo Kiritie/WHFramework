@@ -7,6 +7,9 @@
 #include "UObject/Interface.h"
 #include "CameraPawnInterface.generated.h"
 
+class UCameraComponent;
+class USpringArmComponent;
+
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UCameraPawnInterface : public UInterface
@@ -22,9 +25,9 @@ class WHFRAMEWORK_API ICameraPawnInterface
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	class UCameraComponent* GetCameraComp();
+	virtual UCameraComponent* GetEyeCamera() const = 0;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	class USpringArmComponent* GetCameraBoom();
+	virtual UCameraComponent* GetFollowCamera() const = 0;
+
+	virtual USpringArmComponent* GetCameraBoom() const = 0;
 };

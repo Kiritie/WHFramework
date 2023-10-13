@@ -8,7 +8,6 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
-#include "Scene/Container/SceneContainerInterface.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 
@@ -39,11 +38,6 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
-	}
-
-	if(Character->Container)
-	{
-		Character->Container->RemoveSceneActor(Character);
 	}
 
 	if(Killer)

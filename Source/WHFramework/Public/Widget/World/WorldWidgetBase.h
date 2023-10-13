@@ -25,12 +25,8 @@ class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetI
 public:
 	UWorldWidgetBase(const FObjectInitializer& ObjectInitializer);
 
-protected:
-	UPROPERTY(EditDefaultsOnly)
-	bool bWidgetTickAble;
-
 public:
-	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+	virtual bool IsTickAble_Implementation() const override { return true; }
 
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
 

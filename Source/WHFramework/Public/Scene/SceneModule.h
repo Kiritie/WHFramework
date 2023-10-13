@@ -102,14 +102,20 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual bool HasSceneActor(FGuid InID, bool bEnsured = true) const override;
 
+	template<class T>
+	T* GetSceneActor(FGuid InID, bool bEnsured = true) const
+	{
+		return Cast<T>(GetSceneActor(InID, nullptr, bEnsured));
+	}
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	virtual AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddSceneActor(AActor* InActor) override;
+	virtual bool AddSceneActor(AActor* InActor) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void RemoveSceneActor(AActor* InActor) override;
+	virtual bool RemoveSceneActor(AActor* InActor) override;
 
 	//////////////////////////////////////////////////////////////////////////
     /// Target Point

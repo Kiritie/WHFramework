@@ -40,9 +40,9 @@ AAbilitySkillRemoteBase::AAbilitySkillRemoteBase()
 
 void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(Execute_CanHitTarget(this, OtherActor))
+	if(CanHitTarget(OtherActor))
 	{
-		Execute_OnHitTarget(this, OtherActor, SweepResult);
+		OnHitTarget(OtherActor, SweepResult);
 	}
 }
 
@@ -55,39 +55,39 @@ void AAbilitySkillRemoteBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
-	Execute_SetHitAble(this, false);
-	Execute_ClearHitTargets(this);
+	SetHitAble(false);
+	ClearHitTargets();
 	MovementComponent->Velocity = FVector::ZeroVector;
 }
 
-void AAbilitySkillRemoteBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilitySkillRemoteBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
 {
-	Super::Initialize_Implementation(InOwnerCharacter, InItem);
+	Super::Initialize_Implementation(InOwnerActor, InItem);
 
-	Execute_SetHitAble(this, true);
+	SetHitAble(true);
 	MovementComponent->Velocity = GetActorRotation().RotateVector(InitialVelocity);
 }
 
-bool AAbilitySkillRemoteBase::CanHitTarget_Implementation(AActor* InTarget)
+bool AAbilitySkillRemoteBase::CanHitTarget(AActor* InTarget) const
 {
-	return Super::CanHitTarget_Implementation(InTarget);
+	return Super::CanHitTarget(InTarget);
 }
 
-void AAbilitySkillRemoteBase::OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult)
+void AAbilitySkillRemoteBase::OnHitTarget(AActor* InTarget, const FHitResult& InHitResult)
 {
-	Super::OnHitTarget_Implementation(InTarget, InHitResult);
+	Super::OnHitTarget(InTarget, InHitResult);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(this);
 }
 
-void AAbilitySkillRemoteBase::ClearHitTargets_Implementation()
+void AAbilitySkillRemoteBase::ClearHitTargets()
 {
-	Super::ClearHitTargets_Implementation();
+	Super::ClearHitTargets();
 }
 
-void AAbilitySkillRemoteBase::SetHitAble_Implementation(bool bValue)
+void AAbilitySkillRemoteBase::SetHitAble(bool bValue)
 {
-	Super::SetHitAble_Implementation(bValue);
+	Super::SetHitAble(bValue);
 
 	SphereComponent->SetGenerateOverlapEvents(bValue);
 }

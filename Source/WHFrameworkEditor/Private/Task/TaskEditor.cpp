@@ -6,11 +6,51 @@
 #include "Editor.h"
 #endif
 
+#include "WHFrameworkEditorCommands.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Task/TaskGraphSchema.h"
 #include "Task/Base/TaskBlueprint.h"
+#include "Task/Widget/STaskEditorWidget.h"
 
 #define LOCTEXT_NAMESPACE "FTaskEditor"
+
+static const FName TaskEditorTabName("TaskEditor");
+
+IMPLEMENTATION_EDITOR_MODULE(FTaskEditor)
+
+void FTaskEditor::StartupModule()
+{
+	// Register tabs
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TaskEditorTabName, FOnSpawnTab::CreateRaw(this, &FTaskEditor::OnSpawnTaskEditorTab))
+		.SetDisplayName(LOCTEXT("FTaskEditorTabTitle", "Task Editor"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+}
+
+void FTaskEditor::ShutdownModule()
+{
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TaskEditorTabName);
+}
+
+void FTaskEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+{
+	InCommands->MapAction(
+		FWHFrameworkEditorCommands::Get().OpenTaskEditorWindow,
+		FExecuteAction::CreateRaw(this, &FTaskEditor::OnClickedTaskEditorButton),
+		FCanExecuteAction());
+}
+
+void FTaskEditor::OnClickedTaskEditorButton()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(TaskEditorTabName);
+}
+
+TSharedRef<SDockTab> FTaskEditor::OnSpawnTaskEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
+	[
+		SAssignNew(TaskEditorWidget, STaskEditorWidget)
+	];
+}
 
 void FTaskEditorCommands::RegisterCommands()
 {

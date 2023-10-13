@@ -9,6 +9,7 @@
 #include "ToolMenus.h"
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
+#include "Achievement/AchievementEditor.h"
 #include "Camera/CameraModuleDetailsPanel.h"
 #include "FSM/FiniteStateBlueprintActions.h"
 #include "FSM/FSMComponentDetailsPanel.h"
@@ -16,29 +17,22 @@
 #include "Main/MainModuleDetailsPanel.h"
 #include "Procedure/ProcedureBlueprintActions.h"
 #include "Procedure/ProcedureDetailsPanel.h"
+#include "Procedure/ProcedureEditor.h"
 #include "Procedure/ProcedureEditorSettings.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/ProcedureModuleDetailsPanel.h"
-#include "Procedure/Widget/SProcedureEditorWidget.h"
 #include "Step/StepBlueprintActions.h"
 #include "Step/StepDetailsPanel.h"
+#include "Step/StepEditor.h"
 #include "Step/StepEditorSettings.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/StepModuleDetailsPanel.h"
-#include "Step/Widget/SStepEditorWidget.h"
 #include "Task/TaskBlueprintActions.h"
 #include "Task/TaskDetailsPanel.h"
 #include "Task/TaskEditor.h"
 #include "Task/TaskEditorSettings.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/TaskModuleDetailsPanel.h"
-#include "Task/Widget/STaskEditorWidget.h"
-
-static const FName ProcedureEditorTabName("ProcedureEditor");
-
-static const FName StepEditorTabName("StepEditor");
-
-static const FName TaskEditorTabName("TaskEditor");
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -71,38 +65,20 @@ void FWHFrameworkEditorModule::StartupModule()
 
 	FTaskEditorCommands::Register();
 
+	FAchievementEditor::Get().StartupModule();
+	FProcedureEditor::Get().StartupModule();
+	FStepEditor::Get().StartupModule();
+	FTaskEditor::Get().StartupModule();
+
 	PluginCommands = MakeShareable(new FUICommandList);
 
-	PluginCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow,
-		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedProcedureEditorButton),
-		FCanExecuteAction());
-
-	PluginCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenStepEditorWindow,
-		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedStepEditorButton),
-		FCanExecuteAction());
-
-	PluginCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenTaskEditorWindow,
-		FExecuteAction::CreateRaw(this, &FWHFrameworkEditorModule::OnClickedTaskEditorButton),
-		FCanExecuteAction());
+	FAchievementEditor::Get().RegisterCommands(PluginCommands);
+	FProcedureEditor::Get().RegisterCommands(PluginCommands);
+	FStepEditor::Get().RegisterCommands(PluginCommands);
+	FTaskEditor::Get().RegisterCommands(PluginCommands);
 
 	// Register menus
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
-
-	// Register tabs
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnProcedureEditorTab))
-		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
-
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StepEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnStepEditorTab))
-		.SetDisplayName(LOCTEXT("FStepEditorTabTitle", "Step Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
-
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TaskEditorTabName, FOnSpawnTab::CreateRaw(this, &FWHFrameworkEditorModule::OnSpawnTaskEditorTab))
-		.SetDisplayName(LOCTEXT("FTaskEditorTabTitle", "Task Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
 
 	// Register asset types
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -168,7 +144,10 @@ void FWHFrameworkEditorModule::ShutdownModule()
 
 	FWHFrameworkEditorCommands::Unregister();
 
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ProcedureEditorTabName);
+	FAchievementEditor::Get().ShutdownModule();
+	FProcedureEditor::Get().ShutdownModule();
+	FStepEditor::Get().ShutdownModule();
+	FTaskEditor::Get().ShutdownModule();
 
 	// Unregister asset type actions
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
@@ -322,45 +301,6 @@ void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
 {
 	GIsPlaying = false;
 	GIsSimulating = false;
-}
-
-void FWHFrameworkEditorModule::OnClickedProcedureEditorButton()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(ProcedureEditorTabName);
-}
-
-TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnProcedureEditorTab(const FSpawnTabArgs& SpawnTabArgs)
-{
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(ProcedureEditorWidget, SProcedureEditorWidget)
-	];
-}
-
-void FWHFrameworkEditorModule::OnClickedStepEditorButton()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(StepEditorTabName);
-}
-
-TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnStepEditorTab(const FSpawnTabArgs& SpawnTabArgs)
-{
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(StepEditorWidget, SStepEditorWidget)
-	];
-}
-
-void FWHFrameworkEditorModule::OnClickedTaskEditorButton()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(TaskEditorTabName);
-}
-
-TSharedRef<SDockTab> FWHFrameworkEditorModule::OnSpawnTaskEditorTab(const FSpawnTabArgs& SpawnTabArgs)
-{
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(TaskEditorWidget, STaskEditorWidget)
-	];
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -6,12 +6,51 @@
 #include "Editor.h"
 #endif
 
+#include "WHFrameworkEditorCommands.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Step/StepGraphSchema.h"
 #include "Step/Base/StepBlueprint.h"
+#include "Step/Widget/SStepEditorWidget.h"
 
 #define LOCTEXT_NAMESPACE "FStepEditor"
 
+IMPLEMENTATION_EDITOR_MODULE(FStepEditor)
+
+static const FName StepEditorTabName("StepEditor");
+
+void FStepEditor::StartupModule()
+{
+	// Register tabs
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StepEditorTabName, FOnSpawnTab::CreateRaw(this, &FStepEditor::OnSpawnStepEditorTab))
+		.SetDisplayName(LOCTEXT("FStepEditorTabTitle", "Step Editor"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+}
+
+void FStepEditor::ShutdownModule()
+{
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(StepEditorTabName);
+}
+
+void FStepEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+{
+	InCommands->MapAction(
+		FWHFrameworkEditorCommands::Get().OpenStepEditorWindow,
+		FExecuteAction::CreateRaw(this, &FStepEditor::OnClickedStepEditorButton),
+		FCanExecuteAction());
+}
+
+void FStepEditor::OnClickedStepEditorButton()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(StepEditorTabName);
+}
+
+TSharedRef<SDockTab> FStepEditor::OnSpawnStepEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
+	[
+		SAssignNew(StepEditorWidget, SStepEditorWidget)
+	];
+}
 
 /////////////////////////////////////////////////////
 // FStepEditor

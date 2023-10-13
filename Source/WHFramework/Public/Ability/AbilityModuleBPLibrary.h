@@ -44,7 +44,7 @@ public:
 			for(int32 i = 0; i < raceDatas.Num(); i++)
 			{
 				const auto& raceData = raceDatas[i];
-				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1), true);
+				const float noiseHeight = UMathBPLibrary::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
 				if(noiseHeight >= raceData.NoiseScale.Z)
 				{
 					OutDatas.Add(raceData);
@@ -58,23 +58,23 @@ public:
 	// PickUp
 	static ECollisionChannel GetPickUpTraceChannel();
 
-	static AAbilityPickUpBase* SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
-	static AAbilityPickUpBase* SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
-	static AAbilityActorBase* SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityActorBase* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vitality
-	static AAbilityVitalityBase* SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityVitalityBase* SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Pawn
-	static AAbilityPawnBase* SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPawnBase* SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Character
-	static AAbilityCharacterBase* SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityCharacterBase* SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

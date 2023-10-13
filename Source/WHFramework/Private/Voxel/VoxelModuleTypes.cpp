@@ -10,7 +10,7 @@
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
-FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
+FVoxelModuleSaveData FVoxelModuleSaveData::Empty = FVoxelModuleSaveData();
 
 FVoxelItem FVoxelItem::Empty = FVoxelItem();
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
@@ -142,7 +142,7 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 	if(Owner)
 	{
 		TArray<FVoxelItem> Parts;
-		for(auto Iter : GetVoxelData().PartDatas)
+		for(auto& Iter : GetVoxelData().PartDatas)
 		{
 			Parts.Add(Owner->GetVoxelItem(Index + Iter.Key));
 		}

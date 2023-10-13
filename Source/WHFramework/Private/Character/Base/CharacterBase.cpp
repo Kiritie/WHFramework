@@ -137,15 +137,16 @@ void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		AssetID = InParams[0].GetPointerValueRef<FPrimaryAssetId>();
+		ActorID = InParams[0].GetPointerValueRef<FGuid>();
 	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	USceneModuleBPLibrary::AddSceneActor(this);
 
 	Execute_SetActorVisible(this, true);
-
-	if(Execute_IsAddToList(this))
-	{
-		USceneModuleBPLibrary::AddSceneActor(this);
-	}
 }
 
 void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
@@ -154,11 +155,8 @@ void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
 
 	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 
-	if(Execute_IsAddToList(this))
-	{
-		USceneModuleBPLibrary::RemoveSceneActor(this);
-	}
-	else if(Container)
+	USceneModuleBPLibrary::RemoveSceneActor(this);
+	if(Container)
 	{
 		Container->RemoveSceneActor(this);
 	}
@@ -204,17 +202,17 @@ void ACharacterBase::MoveUp_Implementation(float InValue)
 	AddMovementInput(FVector(Direction.X * 0.2f, Direction.Y * 0.2f, 0.5f * InValue), 1.f);
 }
 
-void ACharacterBase::SetActorVisible_Implementation(bool bNewVisible)
+void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
 {
-	bVisible = bNewVisible;
-	GetRootComponent()->SetVisibility(bNewVisible, true);
+	bVisible = bInVisible;
+	GetRootComponent()->SetVisibility(bInVisible, true);
 	TArray<AActor*> AttachedActors;
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
 		if(Iter && Iter->Implements<USceneActorInterface>())
 		{
-			ISceneActorInterface::Execute_SetActorVisible(Iter, bNewVisible);
+			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
 	}
 }

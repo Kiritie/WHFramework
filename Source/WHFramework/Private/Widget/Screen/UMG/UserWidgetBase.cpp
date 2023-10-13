@@ -104,7 +104,7 @@ void UUserWidgetBase::OnInitialize_Implementation(UObject* InOwner)
 {
 	OwnerObject = InOwner;
 	
-	for(auto Iter : ChildWidgets)
+	for(auto& Iter : ChildWidgets)
 	{
 		Iter->OnInitialize(InOwner);
 	}

@@ -1,5 +1,3 @@
-#pragma once
-
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "Event/EventModuleBPLibrary.h"

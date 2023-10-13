@@ -82,13 +82,15 @@ void AParameterModule::OnTermination_Implementation(EPhase InPhase)
 
 void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	Parameters = InSaveData->CastRef<FParameterSaveData>().Parameters;
+	auto& SaveData = InSaveData->CastRef<FParameterModuleSaveData>();
+
+	Parameters = SaveData.Parameters;
 }
 
 FSaveData* AParameterModule::ToData(bool bRefresh)
 {
-	static FParameterSaveData SaveData;
-	SaveData = FParameterSaveData();
+	static FParameterModuleSaveData SaveData;
+	SaveData = FParameterModuleSaveData();
 	
 	SaveData.Parameters = Parameters;
 	return &SaveData;

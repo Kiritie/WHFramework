@@ -23,9 +23,6 @@ class WHFRAMEWORK_API ISceneActorInterface
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	bool IsAddToList() const;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
 	FGuid GetActorID() const;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
@@ -41,5 +38,5 @@ public:
 	bool IsVisible() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void SetActorVisible(bool bNewVisible);
+	void SetActorVisible(bool bInVisible);
 };

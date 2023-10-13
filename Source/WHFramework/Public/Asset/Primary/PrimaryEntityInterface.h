@@ -22,5 +22,9 @@ class WHFRAMEWORK_API IPrimaryEntityInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual FPrimaryAssetId GetAssetID() const = 0;
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	FPrimaryAssetId GetAssetID() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void SetAssetID(const FPrimaryAssetId& InID);
 };

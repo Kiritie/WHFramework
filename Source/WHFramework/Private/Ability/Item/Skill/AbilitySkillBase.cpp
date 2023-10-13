@@ -31,40 +31,40 @@ void AAbilitySkillBase::OnDespawn_Implementation(bool bRecovery)
 	GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
 }
 
-void AAbilitySkillBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilitySkillBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
 {
-	Super::Initialize_Implementation(InOwnerCharacter, InItem);
+	Super::Initialize_Implementation(InOwnerActor, InItem);
 
-	SetActorLocation(OwnerCharacter->GetMesh()->GetSocketLocation(SocketName));
-	SetActorRotation(OwnerCharacter->GetActorRotation());
+	SetActorLocation(GetOwnerActor<AAbilityCharacterBase>()->GetMesh()->GetSocketLocation(SocketName));
+	SetActorRotation(GetOwnerActor<AAbilityCharacterBase>()->GetActorRotation());
 
 	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this](){
 		UObjectPoolModuleBPLibrary::DespawnObject(this);
 	}, DurationTime, false);
 }
 
-bool AAbilitySkillBase::CanHitTarget_Implementation(AActor* InTarget)
+bool AAbilitySkillBase::CanHitTarget(AActor* InTarget) const
 {
-	return InTarget != GetOwnerCharacter() && !HitTargets.Contains(InTarget);
+	return InTarget != OwnerActor && !HitTargets.Contains(InTarget);
 }
 
-void AAbilitySkillBase::OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult)
+void AAbilitySkillBase::OnHitTarget(AActor* InTarget, const FHitResult& InHitResult)
 {
 	HitTargets.Add(InTarget);
 	
 	FGameplayEventData EventData;
-	EventData.Instigator = GetOwnerCharacter();
+	EventData.Instigator = OwnerActor;
 	EventData.Target = InTarget;
 	EventData.OptionalObject = this;
-	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwnerCharacter(), FGameplayTag::RequestGameplayTag("Event.Hit.Skill"), EventData);
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(OwnerActor, FGameplayTag::RequestGameplayTag("Event.Hit.Skill"), EventData);
 }
 
-void AAbilitySkillBase::ClearHitTargets_Implementation()
+void AAbilitySkillBase::ClearHitTargets()
 {
 	HitTargets.Empty();
 }
 
-void AAbilitySkillBase::SetHitAble_Implementation(bool bValue)
+void AAbilitySkillBase::SetHitAble(bool bValue)
 {
 
 }

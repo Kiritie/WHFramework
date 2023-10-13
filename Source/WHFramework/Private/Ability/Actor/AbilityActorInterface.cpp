@@ -18,7 +18,7 @@ void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActo
 	}
 	RefreshAttributes();
 
-	for(auto Iter : AttributeSet->GetAllAttributes())
+	for(auto& Iter : AttributeSet->GetAllAttributes())
 	{
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
 	}
@@ -27,7 +27,7 @@ void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActo
 void IAbilityActorInterface::RefreshAttributes()
 {
 	UAttributeSetBase* AttributeSet = GetAttributeSet();
-	for(auto Iter : AttributeSet->GetAllAttributes())
+	for(auto& Iter : AttributeSet->GetAllAttributes())
 	{
 		FOnAttributeChangeData OnAttributeChangeData;
 		OnAttributeChangeData.Attribute = Iter;

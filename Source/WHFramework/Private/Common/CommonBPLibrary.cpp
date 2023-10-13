@@ -38,6 +38,11 @@ float UCommonBPLibrary::GetTimeScale()
 	return UGameplayStatics::GetGlobalTimeDilation(GetWorldContext());
 }
 
+float UCommonBPLibrary::GetDeltaSeconds()
+{
+	return UGameplayStatics::GetWorldDeltaSeconds(GetWorldContext());
+}
+
 void UCommonBPLibrary::SetTimeScale(float TimeScale)
 {
 	return UGameplayStatics::SetGlobalTimeDilation(GetWorldContext(), TimeScale);
@@ -180,7 +185,7 @@ void UCommonBPLibrary::LoadObjectDataFromMemory(UObject* InObject, const TArray<
 
 void UCommonBPLibrary::ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject)
 {
-    for(auto Iter: InJsonObject->Values)
+    for(auto& Iter: InJsonObject->Values)
     {
         FString TempStr, PropertyName, PropertyType;
         Iter.Key.Split("> ",&TempStr,& PropertyName);
@@ -274,7 +279,7 @@ TArray<FString> UCommonBPLibrary::NotNumberSymbols = TArray<FString>{ TEXT("."),
 bool UCommonBPLibrary::TextIsNumber(const FText& InText)
 {
 	const FString TextStr = InText.ToString();
-	for(auto Iter : NotNumberSymbols)
+	for(auto& Iter : NotNumberSymbols)
 	{
 		if(TextStr.Contains(Iter))
 		{
@@ -296,7 +301,7 @@ int32 UCommonBPLibrary::TextToNumber(const FText& InText, TMap<int32, FString>& 
 			OutSymbols.Add(TextArr.Num() - i - 1, TextArr[i]);
 		}
 	}
-	for(auto Iter : NotNumberSymbols)
+	for(auto& Iter : NotNumberSymbols)
 	{
 		TextStr = TextStr.Replace(*Iter, *FString(""));
 	}
@@ -306,7 +311,7 @@ int32 UCommonBPLibrary::TextToNumber(const FText& InText, TMap<int32, FString>& 
 FText UCommonBPLibrary::NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols)
 {
 	FString TextStr = FString::FromInt(InNumber);
-	for(auto Iter : InSymbols)
+	for(auto& Iter : InSymbols)
 	{
 		const int32 InsertIndex = TextStr.Len() - Iter.Key;
 		if(InsertIndex > 0)
@@ -327,7 +332,7 @@ FText UCommonBPLibrary::GetInputActionKeyCodeByName(const FString& InInputAction
 {
 	TArray<FInputActionKeyMapping> KeyMappings;
 	UInputSettings::GetInputSettings()->GetActionMappingByName(*InInputActionName, KeyMappings);
-	for(const auto Iter : KeyMappings)
+	for(const auto& Iter : KeyMappings)
 	{
 		return FText::FromString(Iter.Key.GetFName().ToString());
 	}

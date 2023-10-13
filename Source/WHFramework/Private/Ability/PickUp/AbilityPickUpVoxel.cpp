@@ -27,9 +27,9 @@ void AAbilityPickUpVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	MeshComponent->CreateVoxel(Item);
 }
 
-void AAbilityPickUpVoxel::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
+void AAbilityPickUpVoxel::OnPickUp(IAbilityPickerInterface* InPicker)
 {
-	Super::OnPickUp_Implementation(InPicker);
+	Super::OnPickUp(InPicker);
 }
 
 UMeshComponent* AAbilityPickUpVoxel::GetMeshComponent() const

@@ -166,27 +166,36 @@ void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
-	for(auto Iter : SaveData.TaskItemMap)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(TaskMap.Contains(Iter.Key))
+		for(auto Iter : SaveData.TaskItemMap)
 		{
-			TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
+			if(TaskMap.Contains(Iter.Key))
+			{
+				TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
+			}
 		}
-	}
-
-	if(!CurrentTask)
-	{
-		EnterTask(FirstTask);
+		if(!CurrentTask)
+		{
+			EnterTask(FirstTask);
+		}
 	}
 }
 
 void ATaskModule::UnloadData(EPhase InPhase)
 {
-	for(auto Iter : RootTasks)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		Iter->Restore();
+		if(CurrentTask)
+		{
+			CurrentTask->Leave();
+		}
+		for(auto Iter : RootTasks)
+		{
+			Iter->Restore();
+		}
+		CurrentTask = nullptr;
 	}
-	CurrentTask = nullptr;
 }
 
 FSaveData* ATaskModule::ToData(bool bRefresh)

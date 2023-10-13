@@ -327,25 +327,28 @@ AActor* ASceneModule::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, boo
 	return nullptr;
 }
 
-void ASceneModule::AddSceneActor(AActor* InActor)
+bool ASceneModule::AddSceneActor(AActor* InActor)
 {
-	if(!InActor || !InActor->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetContainer(InActor) == this) return;
+	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
 
-	if(ISceneActorInterface::Execute_GetContainer(InActor))
+	if(!SceneActorMap.Contains(Execute_GetActorID(InActor)))
 	{
-		ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
+		SceneActorMap.Add(Execute_GetActorID(InActor), InActor);
+		return true;
 	}
-
-	SceneActorMap.Add(ISceneActorInterface::Execute_GetActorID(InActor), InActor);
-	ISceneActorInterface::Execute_SetContainer(InActor, this);
+	return false;
 }
 
-void ASceneModule::RemoveSceneActor(AActor* InActor)
+bool ASceneModule::RemoveSceneActor(AActor* InActor)
 {
-	if(!InActor || !InActor->Implements<USceneActorInterface>() || !SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor))) return;
+	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
 
-	SceneActorMap.Remove(ISceneActorInterface::Execute_GetActorID(InActor));
-	ISceneActorInterface::Execute_SetContainer(SceneActorMap[ISceneActorInterface::Execute_GetActorID(InActor)], nullptr);
+	if(SceneActorMap.Contains(Execute_GetActorID(InActor)))
+	{
+		SceneActorMap.Remove(Execute_GetActorID(InActor));
+		return true;
+	}
+	return false;
 }
 
 bool ASceneModule::HasTargetPointByName(FName InName, bool bEnsured) const

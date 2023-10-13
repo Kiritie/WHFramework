@@ -25,7 +25,7 @@ public:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 protected:
-	virtual void OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker) override;
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

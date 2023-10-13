@@ -65,7 +65,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(GetData().bMainPart)
 	{
 		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, GetOwner());
+		UAbilityModuleBPLibrary::SpawnAbilityPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, GetOwner());
 	}
 	if(GetOwner())
 	{

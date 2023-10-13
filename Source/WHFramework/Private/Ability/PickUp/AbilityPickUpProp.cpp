@@ -13,9 +13,9 @@ AAbilityPickUpProp::AAbilityPickUpProp()
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AAbilityPickUpProp::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
+void AAbilityPickUpProp::OnPickUp(IAbilityPickerInterface* InPicker)
 {
-	Super::OnPickUp_Implementation(InPicker);
+	Super::OnPickUp(InPicker);
 }
 
 UMeshComponent* AAbilityPickUpProp::GetMeshComponent() const

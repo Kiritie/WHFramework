@@ -10,7 +10,7 @@ void UItemAbilityBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	for(auto Iter : ItemEffectClasses)
+	for(auto& Iter : ItemEffectClasses)
 	{
 		const FGameplayEffectSpecHandle EffectSpec = MakeOutgoingGameplayEffectSpec(Iter, GetCurrentAbilitySpec()->Level);
 		ItemEffectHandles.Add(ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, EffectSpec));
@@ -23,7 +23,7 @@ void UItemAbilityBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const
 	
 	if(bWasCancelled)
 	{
-		for(auto Iter : ItemEffectHandles)
+		for(auto& Iter : ItemEffectHandles)
 		{
 			BP_RemoveGameplayEffectFromOwnerWithHandle(Iter);
 		}

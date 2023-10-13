@@ -7,9 +7,6 @@
 
 #include "Modules/ModuleManager.h"
 
-class STaskEditorWidget;
-class SStepEditorWidget;
-class SProcedureEditorWidget;
 class FToolBarBuilder;
 class FMenuBuilder;
 
@@ -45,34 +42,4 @@ private:
 	void OnBeginPIE(bool bIsSimulating);
 
 	void OnEndPIE(bool bIsSimulating);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ProcedureEditor
-private:
-	void OnClickedProcedureEditorButton();
-	
-	TSharedRef<class SDockTab> OnSpawnProcedureEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
-
-private:
-	TSharedPtr<SProcedureEditorWidget> ProcedureEditorWidget;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// StepEditor
-private:
-	void OnClickedStepEditorButton();
-	
-	TSharedRef<class SDockTab> OnSpawnStepEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
-
-private:
-	TSharedPtr<SStepEditorWidget> StepEditorWidget;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// TaskEditor
-private:
-	void OnClickedTaskEditorButton();
-	
-	TSharedRef<class SDockTab> OnSpawnTaskEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
-
-private:
-	TSharedPtr<STaskEditorWidget> TaskEditorWidget;
 };

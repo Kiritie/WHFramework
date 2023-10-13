@@ -68,9 +68,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SaveData")
 	TMap<FName, FSaveGameInfo> SaveGameInfos;
 
+	UPROPERTY()
+	TArray<FString> DestroyedSlotNames;
+
 public:
 	UFUNCTION(BlueprintPure)
-	FString GetSaveSlotName(FName InSaveName, int32 InIndex) const;
+	FString GetSlotName(FName InSaveName, int32 InIndex) const;
 
 	template<class T>
 	bool HasSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass()) const

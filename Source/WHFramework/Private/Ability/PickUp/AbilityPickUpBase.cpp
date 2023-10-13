@@ -66,20 +66,20 @@ FSaveData* AAbilityPickUpBase::ToData(bool bRefresh)
 	return &SaveData;
 }
 
+void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
+{
+	if(InPicker && InPicker->OnPickUp(this))
+	{
+		UObjectPoolModuleBPLibrary::DespawnObject(this);
+	}
+}
+
 void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
 
-	if(OtherActor && OtherActor->GetClass()->ImplementsInterface(UAbilityPickerInterface::StaticClass()))
+	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(OtherActor))
 	{
-		OnPickUp(OtherActor);
-	}
-}
-
-void AAbilityPickUpBase::OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker)
-{
-	if(InPicker && InPicker->Execute_OnPickUp(InPicker.GetObject(), this))
-	{
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
+		OnPickUp(Picker);
 	}
 }

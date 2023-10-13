@@ -63,7 +63,7 @@ void AWidgetModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		for(auto Iter : UserWidgetClasses)
+		for(auto& Iter : UserWidgetClasses)
 		{
 			if(!Iter) continue;
 			const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();

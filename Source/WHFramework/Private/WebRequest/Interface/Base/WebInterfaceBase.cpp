@@ -17,7 +17,7 @@ UWebInterfaceBase::UWebInterfaceBase()
 void UWebInterfaceBase::OnDespawn_Implementation(bool bRecovery)
 {
 	OnWebRequestComplete.Clear();
-	for(auto Iter : HandleMap)
+	for(auto& Iter : HandleMap)
 	{
 		 UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
 	}

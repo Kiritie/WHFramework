@@ -6,11 +6,11 @@
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
-#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Character/Base/CharacterBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Pawn/AbilityPawnInterface.h"
 #include "Common/Targeting/TargetingAgentInterface.h"
 
 #include "AbilityCharacterBase.generated.h"
@@ -31,7 +31,7 @@ class UAbilityCharacterInventoryBase;
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public ISaveDataInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -140,7 +140,7 @@ public:
 	virtual void UnJump();
 
 public:
-	virtual bool OnPickUp_Implementation(AAbilityPickUpBase* InPickUp) override;
+	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) override;
 
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -206,6 +206,13 @@ public:
 	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual bool IsPlayer() const override;
+
+	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
+
+	virtual bool IsTargetable_Implementation() const override;
+
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive(bool bNeedNotDead = false) const;
 
@@ -282,8 +289,6 @@ public:
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
-	virtual bool IsTargetable_Implementation() const override;
-
 	virtual void OnRep_Controller() override;
 
 	virtual void OnRep_PlayerState() override;

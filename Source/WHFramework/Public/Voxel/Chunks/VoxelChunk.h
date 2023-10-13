@@ -51,7 +51,7 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
@@ -67,14 +67,6 @@ public:
 	virtual void BuildMap(int32 InStage);
 
 	virtual void BuildMesh();
-
-	virtual void SpawnActors();
-
-	virtual void LoadActors(FSaveData* InSaveData);
-
-	virtual void CreateActors();
-
-	virtual void DestroyActors();
 
 protected:
 	virtual void GenerateNeighbors(FIndex InIndex, EPhase InPhase = EPhase::Primary);
@@ -138,11 +130,33 @@ public:
 	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// SceneContainer
-public:
-	virtual void AddSceneActor(AActor* InActor) override;
+	// SceneActor
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
+	TMap<FGuid, AActor*> SceneActorMap;
 
-	virtual void RemoveSceneActor(AActor* InActor) override;
+public:
+	virtual bool HasSceneActor(FGuid InID, bool bEnsured) const override;
+
+	template<class T>
+	T* GetSceneActor(FGuid InID, bool bEnsured = true) const
+	{
+		return Cast<T>(GetSceneActor(InID, nullptr, bEnsured));
+	}
+
+	virtual AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured) const override;
+	
+	virtual bool AddSceneActor(AActor* InActor) override;
+
+	virtual bool RemoveSceneActor(AActor* InActor) override;
+
+	virtual void GenerateSceneActors();
+
+	virtual void LoadSceneActors(FSaveData* InSaveData) override;
+
+	virtual void SpawnSceneActors() override;
+
+	virtual void DestroySceneActors() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -183,9 +197,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TMap<EDirection, AVoxelChunk*> Neighbors;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TArray<AAbilityPickUpBase*> PickUps;
 
 	TMap<FIndex, FVoxelItem> VoxelMap;
 	

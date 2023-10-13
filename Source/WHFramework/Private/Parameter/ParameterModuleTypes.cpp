@@ -21,7 +21,7 @@
 
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {
-	for (auto Iter : ParamSets)
+	for (auto& Iter : ParamSets)
 	{
 		if(Iter.Name == InName)
 		{
@@ -133,7 +133,7 @@ TArray<int32> FParameters::GetIntegerParameters(FName InName, bool bEnsured) con
 	TArray<int32> TmpArr = TArray<int32>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetIntegerValue());
 		}
@@ -165,7 +165,7 @@ TArray<float> FParameters::GetFloatParameters(FName InName, bool bEnsured) const
 	TArray<float> TmpArr = TArray<float>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetFloatValue());
 		}
@@ -197,7 +197,7 @@ TArray<FString> FParameters::GetStringParameters(FName InName, bool bEnsured) co
 	TArray<FString> TmpArr = TArray<FString>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetStringValue());
 		}
@@ -229,7 +229,7 @@ TArray<FText> FParameters::GetTextParameters(FName InName, bool bEnsured) const
 	TArray<FText> TmpArr = TArray<FText>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetTextValue());
 		}
@@ -261,7 +261,7 @@ TArray<bool> FParameters::GetBooleanParameters(FName InName, bool bEnsured) cons
 	TArray<bool> TmpArr = TArray<bool>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetBooleanValue());
 		}
@@ -293,7 +293,7 @@ TArray<FVector> FParameters::GetVectorParameters(FName InName, bool bEnsured) co
 	TArray<FVector> TmpArr = TArray<FVector>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetVectorValue());
 		}
@@ -325,7 +325,7 @@ TArray<FRotator> FParameters::GetRotatorParameters(FName InName, bool bEnsured) 
 	TArray<FRotator> TmpArr = TArray<FRotator>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetRotatorValue());
 		}
@@ -357,7 +357,7 @@ TArray<FColor> FParameters::GetColorParameters(FName InName, bool bEnsured) cons
 	TArray<FColor> TmpArr = TArray<FColor>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetColorValue());
 		}
@@ -389,7 +389,7 @@ TArray<UClass*> FParameters::GetClassParameters(FName InName, bool bEnsured) con
 	TArray<UClass*> TmpArr = TArray<UClass*>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetClassValue());
 		}
@@ -421,7 +421,7 @@ TArray<UObject*> FParameters::GetObjectParameters(FName InName, bool bEnsured) c
 	TArray<UObject*> TmpArr = TArray<UObject*>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetObjectValue());
 		}
@@ -453,7 +453,7 @@ TArray<void*> FParameters::GetPointerParameters(FName InName, bool bEnsured) con
 	TArray<void*> TmpArr = TArray<void*>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (auto Iter : GetParameters(InName, bEnsured))
+		for (auto& Iter : GetParameters(InName, bEnsured))
 		{
 			TmpArr.Add(Iter.GetPointerValue());
 		}

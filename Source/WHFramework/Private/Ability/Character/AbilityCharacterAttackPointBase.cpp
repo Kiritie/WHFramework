@@ -21,18 +21,18 @@ UAbilityCharacterAttackPointBase::UAbilityCharacterAttackPointBase(const FObject
 
 void UAbilityCharacterAttackPointBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(Execute_CanHitTarget(this, OtherActor))
+	if(CanHitTarget(OtherActor))
 	{
-		Execute_OnHitTarget(this, OtherActor, SweepResult);
+		OnHitTarget(OtherActor, SweepResult);
 	}
 }
 
-bool UAbilityCharacterAttackPointBase::CanHitTarget_Implementation(AActor* InTarget)
+bool UAbilityCharacterAttackPointBase::CanHitTarget(AActor* InTarget) const
 {
 	return InTarget != GetOwnerCharacter() && !HitTargets.Contains(InTarget);
 }
 
-void UAbilityCharacterAttackPointBase::OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult)
+void UAbilityCharacterAttackPointBase::OnHitTarget(AActor* InTarget, const FHitResult& InHitResult)
 {
 	HitTargets.Add(InTarget);
 	
@@ -42,12 +42,12 @@ void UAbilityCharacterAttackPointBase::OnHitTarget_Implementation(AActor* InTarg
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwnerCharacter(), FGameplayTag::RequestGameplayTag("Event.Hit.Attack"), EventData);
 }
 
-void UAbilityCharacterAttackPointBase::ClearHitTargets_Implementation()
+void UAbilityCharacterAttackPointBase::ClearHitTargets()
 {
 	HitTargets.Empty();
 }
 
-void UAbilityCharacterAttackPointBase::SetHitAble_Implementation(bool bValue)
+void UAbilityCharacterAttackPointBase::SetHitAble(bool bValue)
 {
 	SetGenerateOverlapEvents(bValue);
 }

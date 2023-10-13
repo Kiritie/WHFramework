@@ -28,12 +28,13 @@ void AVoxelContainerAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	
 	auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
 
+	if(!SaveData.InventoryData.IsSaved())
+	{
+		SaveData.InventoryData = VoxelItem.GetVoxelData<UVoxelContainerData>().InventoryData;
+	}
+
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(!SaveData.InventoryData.IsSaved())
-		{
-			SaveData.InventoryData = VoxelItem.GetVoxelData<UVoxelContainerData>().InventoryData;
-		}
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 	}
 }
@@ -71,7 +72,7 @@ void AVoxelContainerAuxiliary::OnDiscardItem(const FAbilityItem& InItem, bool bI
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
-	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AVoxelContainerAuxiliary::OnSelectItem(const FAbilityItem& InItem)

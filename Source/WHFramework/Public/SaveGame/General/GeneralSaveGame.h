@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FGeneralSaveData GeneralSaveData;
+	FGeneralSaveData SaveData;
 
 public:
-	virtual FSaveData* GetSaveData() override { return &GeneralSaveData; }
+	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { GeneralSaveData = InSaveData->CastRef<FGeneralSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FGeneralSaveData>(); }
 };

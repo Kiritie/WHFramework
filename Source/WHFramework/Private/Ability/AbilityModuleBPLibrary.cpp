@@ -45,56 +45,56 @@ ECollisionChannel UAbilityModuleBPLibrary::GetPickUpTraceChannel()
 	return ECC_MAX;
 }
 
-AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnPickUp(InItem, InLocation, InContainer);
+		return AbilityModule->SpawnAbilityPickUp(InItem, InLocation, InContainer);
 	}
 	return nullptr;
 }
 
-AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModuleBPLibrary::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnPickUp(InSaveData, InContainer);
+		return AbilityModule->SpawnAbilityPickUp(InSaveData, InContainer);
 	}
 	return nullptr;
 }
 
-AAbilityActorBase* UAbilityModuleBPLibrary::SpawnActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityActorBase* UAbilityModuleBPLibrary::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnActor(InSaveData, InContainer);
+		return AbilityModule->SpawnAbilityActor(InSaveData, InContainer);
 	}
 	return nullptr;
 }
 
-AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityCharacterBase* UAbilityModuleBPLibrary::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnCharacter(InSaveData, InContainer);
+		return AbilityModule->SpawnAbilityCharacter(InSaveData, InContainer);
 	}
 	return nullptr;
 }
 
-AAbilityPawnBase* UAbilityModuleBPLibrary::SpawnPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPawnBase* UAbilityModuleBPLibrary::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnPawn(InSaveData, InContainer);
+		return AbilityModule->SpawnAbilityPawn(InSaveData, InContainer);
 	}
 	return nullptr;
 }
 
-AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityVitalityBase* UAbilityModuleBPLibrary::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	if(AAbilityModule* AbilityModule = AAbilityModule::Get())
 	{
-		return AbilityModule->SpawnVitality(InSaveData, InContainer);
+		return AbilityModule->SpawnAbilityVitality(InSaveData, InContainer);
 	}
 	return nullptr;
 }

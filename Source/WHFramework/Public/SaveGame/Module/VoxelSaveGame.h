@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FVoxelSaveData VoxelSaveData;
+	FDefaultVoxelModuleSaveData SaveData;
 
 public:
-	virtual FSaveData* GetSaveData() override { return &VoxelSaveData; }
+	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { VoxelSaveData = InSaveData->CastRef<FVoxelSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FDefaultVoxelModuleSaveData>(); }
 };

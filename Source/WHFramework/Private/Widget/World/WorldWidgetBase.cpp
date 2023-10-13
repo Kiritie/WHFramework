@@ -16,7 +16,6 @@
 UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	WidgetName = NAME_None;
-	bWidgetTickAble = true;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;
@@ -46,7 +45,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 		}
 		if(BindWidgetMap.Num() > 1)
 		{
-			for(const auto Iter : BindWidgetMap)
+			for(const auto& Iter : BindWidgetMap)
 			{
 				if(Iter.Key == this) continue;
 				RefreshLocation(Iter.Key, Iter.Value);

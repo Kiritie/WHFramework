@@ -14,15 +14,11 @@ class WHFRAMEWORK_API IAbilityAttackerInterface
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	bool CanHitTarget(AActor* InTarget);
+	virtual bool CanHitTarget(AActor* InTarget) const = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult);
+	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) = 0;
 	
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void ClearHitTargets();
+	virtual void ClearHitTargets() = 0;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetHitAble(bool bValue);
+	virtual void SetHitAble(bool bValue) = 0;
 };

@@ -11,7 +11,7 @@ AAbilityRawBase::AAbilityRawBase()
 	MeshComponent->SetCastShadow(false);
 }
 
-void AAbilityRawBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilityRawBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
 {
-	Super::Initialize_Implementation(InOwnerCharacter, InItem);
+	Super::Initialize_Implementation(InOwnerActor, InItem);
 }

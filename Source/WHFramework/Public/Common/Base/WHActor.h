@@ -115,7 +115,7 @@ public:
 
 	virtual bool IsVisible_Implementation() const override { return bVisible; }
 
-	virtual void SetActorVisible_Implementation(bool bNewVisible) override;
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 protected:
 	virtual void BeginPlay() override;

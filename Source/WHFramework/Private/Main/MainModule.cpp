@@ -4,6 +4,7 @@
 #include "Main/MainModule.h"
 
 #include "Ability/AbilityModule.h"
+#include "Achievement/AchievementModule.h"
 #include "AI/AIModule.h"
 #include "Audio/AudioModule.h"
 #include "Asset/AssetModule.h"
@@ -42,6 +43,7 @@ AMainModule::AMainModule()
 	
 	ModuleClasses = TArray<TSubclassOf<AModuleBase>>();
 	ModuleClasses.Add(AAbilityModule::StaticClass());
+	ModuleClasses.Add(AAchievementModule::StaticClass());
 	ModuleClasses.Add(AAIModule::StaticClass());
 	ModuleClasses.Add(AAnimationModule::StaticClass());
 	ModuleClasses.Add(AAssetModule::StaticClass());

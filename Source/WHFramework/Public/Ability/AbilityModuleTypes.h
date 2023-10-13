@@ -885,6 +885,8 @@ struct WHFRAMEWORK_API FActorSaveData : public FSaveData
 public:
 	FORCEINLINE FActorSaveData()
 	{
+		ActorID = FGuid::NewGuid();
+		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
@@ -894,7 +896,10 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FPrimaryAssetId ID;
+	FGuid ActorID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId AssetID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;

@@ -21,7 +21,7 @@ protected:
 	UPaperSpriteComponent* MeshComponent;
 
 protected:
-	virtual void OnPickUp_Implementation(const TScriptInterface<IAbilityPickerInterface>& InPicker) override;
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

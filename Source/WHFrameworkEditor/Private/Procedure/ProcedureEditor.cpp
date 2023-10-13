@@ -6,12 +6,51 @@
 #include "Editor.h"
 #endif
 
+#include "WHFrameworkEditorCommands.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Procedure/ProcedureGraphSchema.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
+#include "Procedure/Widget/SProcedureEditorWidget.h"
 
 #define LOCTEXT_NAMESPACE "FProcedureEditor"
 
+static const FName ProcedureEditorTabName("ProcedureEditor");
+
+IMPLEMENTATION_EDITOR_MODULE(FProcedureEditor)
+
+void FProcedureEditor::StartupModule()
+{
+	// Register tabs
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FProcedureEditor::OnSpawnProcedureEditorTab))
+		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+}
+
+void FProcedureEditor::ShutdownModule()
+{
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ProcedureEditorTabName);
+}
+
+void FProcedureEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+{
+	InCommands->MapAction(
+		FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow,
+		FExecuteAction::CreateRaw(this, &FProcedureEditor::OnClickedProcedureEditorButton),
+		FCanExecuteAction());
+}
+
+void FProcedureEditor::OnClickedProcedureEditorButton()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(ProcedureEditorTabName);
+}
+
+TSharedRef<SDockTab> FProcedureEditor::OnSpawnProcedureEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
+	[
+		SAssignNew(ProcedureEditorWidget, SProcedureEditorWidget)
+	];
+}
 
 /////////////////////////////////////////////////////
 // FProcedureEditor

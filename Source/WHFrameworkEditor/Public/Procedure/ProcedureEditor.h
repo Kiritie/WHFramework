@@ -4,6 +4,29 @@
 
 #include "CoreMinimal.h"
 #include "Editor/Kismet/Public/BlueprintEditor.h"
+#include "Main/Base/ModuleEditorBase.h"
+
+class SProcedureEditorWidget;
+
+class FProcedureEditor : public FModuleEditorBase
+{
+	GENERATED_EDITOR_MODULE(FProcedureEditor)
+	
+public:
+	virtual void StartupModule() override;
+
+	virtual void ShutdownModule() override;
+
+	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
+
+private:
+	void OnClickedProcedureEditorButton();
+	
+	TSharedRef<class SDockTab> OnSpawnProcedureEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
+
+private:
+	TSharedPtr<SProcedureEditorWidget> ProcedureEditorWidget;
+};
 
 //////////////////////////////////////////////////////////////////////////
 // FProcedureBlueprintEditor

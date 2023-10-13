@@ -4,6 +4,29 @@
 
 #include "CoreMinimal.h"
 #include "Editor/Kismet/Public/BlueprintEditor.h"
+#include "Main/Base/ModuleEditorBase.h"
+
+class STaskEditorWidget;
+
+class FTaskEditor : public FModuleEditorBase
+{
+	GENERATED_EDITOR_MODULE(FTaskEditor)
+	
+public:
+	virtual void StartupModule() override;
+
+	virtual void ShutdownModule() override;
+
+	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
+	
+private:
+	void OnClickedTaskEditorButton();
+	
+	TSharedRef<class SDockTab> OnSpawnTaskEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
+
+private:
+	TSharedPtr<STaskEditorWidget> TaskEditorWidget;
+};
 
 class FTaskEditorCommands : public TCommands<FTaskEditorCommands>
 {	  

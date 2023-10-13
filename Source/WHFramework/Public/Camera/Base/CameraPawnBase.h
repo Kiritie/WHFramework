@@ -60,9 +60,11 @@ public:
 	UFUNCTION(BlueprintPure)
 	FName GetCameraName() const { return CameraName; }
 
-	UCameraComponent* GetCameraComp_Implementation() override { return Camera; }
+	virtual UCameraComponent* GetEyeCamera() const override { return nullptr; };
+	
+	virtual UCameraComponent* GetFollowCamera() const override { return Camera; }
 
-	USpringArmComponent* GetCameraBoom_Implementation() override { return CameraBoom; }
+	virtual USpringArmComponent* GetCameraBoom() const override { return CameraBoom; }
 
 	UFUNCTION(BlueprintPure)
 	ECameraCollisionMode GetCameraCollisionMode() const { return CameraCollisionMode; }

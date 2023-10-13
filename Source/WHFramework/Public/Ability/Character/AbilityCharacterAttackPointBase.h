@@ -29,13 +29,13 @@ protected:
 	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
 
 public:
-	virtual bool CanHitTarget_Implementation(AActor* InTarget) override;
+	virtual bool CanHitTarget(AActor* InTarget) const override;
 
-	virtual void OnHitTarget_Implementation(AActor* InTarget, const FHitResult& InHitResult) override;
+	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
 	
-	virtual void ClearHitTargets_Implementation();
+	virtual void ClearHitTargets();
 
-	virtual void SetHitAble_Implementation(bool bValue);
+	virtual void SetHitAble(bool bValue);
 
 public:
 	UFUNCTION(BlueprintPure)

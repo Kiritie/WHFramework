@@ -55,7 +55,7 @@ void UFSMComponent::OnInitialize()
 {
 	UFSMModuleBPLibrary::RegisterFSM(this);
 	
-	for(auto Iter : States)
+	for(auto& Iter : States)
 	{
 		if(Iter)
 		{
@@ -91,7 +91,7 @@ void UFSMComponent::OnTermination()
 {
 	UFSMModuleBPLibrary::UnregisterFSM(this);
 	
-	for(auto Iter : StateMap)
+	for(auto& Iter : StateMap)
 	{
 		if(Iter.Value)
 		{
@@ -232,7 +232,7 @@ bool UFSMComponent::TerminateState(UFiniteStateBase* InState)
 
 bool UFSMComponent::HasState(UFiniteStateBase* InState) const
 {
-	for(auto Iter : StateMap)
+	for(auto& Iter : StateMap)
 	{
 		if(Iter.Value == InState)
 		{

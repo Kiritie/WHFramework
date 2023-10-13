@@ -289,8 +289,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
 	static void SetClassValue(UPARAM(ref) FParameter& InParameter, UClass* InClassValue) { InParameter.SetClassValue(InClassValue); }
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleBPLibrary")
-	static UObject* GetObjectValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetObjectValue(); }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ParameterModuleBPLibrary")
+	static UObject* GetObjectValue(UPARAM(ref) FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return InParameter.GetObjectValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleBPLibrary")
 	static void SetObjectValue(UPARAM(ref) FParameter& InParameter, UObject* InObjectValue) { InParameter.SetObjectValue(InObjectValue); }

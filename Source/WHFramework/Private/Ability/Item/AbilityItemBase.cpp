@@ -14,7 +14,7 @@ AAbilityItemBase::AAbilityItemBase()
 	PrimaryActorTick.bCanEverTick = false;
 
 	Item = FAbilityItem::Empty;
-	OwnerCharacter = nullptr;
+	OwnerActor = nullptr;
 }
 
 void AAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -27,8 +27,8 @@ void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 }
 
-void AAbilityItemBase::Initialize_Implementation(AAbilityCharacterBase* InOwnerCharacter, const FAbilityItem& InItem)
+void AAbilityItemBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
 {
-	OwnerCharacter = InOwnerCharacter;
+	OwnerActor = InOwnerActor;
 	Item = InItem;
 }

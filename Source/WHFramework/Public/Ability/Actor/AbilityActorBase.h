@@ -139,8 +139,9 @@ public:
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 
 public:
-	UFUNCTION(BlueprintPure)
-	virtual FPrimaryAssetId GetAssetID() const override { return AssetID; }
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
+	
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetLevelV() const override { return Level; }

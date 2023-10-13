@@ -76,25 +76,25 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		for(auto Iter : KeyMappings)
+		for(auto& Iter : KeyMappings)
 		{
 			FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Event);
 			KB.KeyDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
 			GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
 		}
-		for(auto Iter : ActionMappings)
+		for(auto& Iter : ActionMappings)
 		{
 			FInputActionBinding AB(Iter.ActionName, Iter.Event);
 			AB.ActionDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
 			GetPlayerController()->InputComponent->AddActionBinding(AB);
 		}
-		for(auto Iter : AxisMappings)
+		for(auto& Iter : AxisMappings)
 		{
 			FInputAxisBinding AB(Iter.AxisName);
 			AB.AxisDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
 			GetPlayerController()->InputComponent->AxisBindings.Emplace(MoveTemp(AB));
 		}
-		for(auto Iter : TouchMappings)
+		for(auto& Iter : TouchMappings)
 		{
 			FInputTouchBinding TB(Iter.Event);
 			TB.TouchDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);

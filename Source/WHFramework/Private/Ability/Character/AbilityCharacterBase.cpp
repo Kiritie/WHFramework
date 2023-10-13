@@ -178,7 +178,8 @@ FSaveData* AAbilityCharacterBase::ToData(bool bRefresh)
 	static FCharacterSaveData SaveData;
 	SaveData = FCharacterSaveData();
 
-	SaveData.ID = AssetID;
+	SaveData.ActorID = ActorID;
+	SaveData.AssetID = AssetID;
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
@@ -305,7 +306,7 @@ void AAbilityCharacterBase::UnJump()
 	}
 }
 
-bool AAbilityCharacterBase::OnPickUp_Implementation(AAbilityPickUpBase* InPickUp)
+bool AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(InPickUp)
 	{
@@ -357,7 +358,7 @@ void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPl
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
@@ -395,6 +396,16 @@ UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 UAbilityInventoryBase* AAbilityCharacterBase::GetInventory() const
 {
 	return Inventory;
+}
+
+bool AAbilityCharacterBase::IsPlayer() const
+{
+	return UCommonBPLibrary::GetPlayerPawn() == this;
+}
+
+bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
+{
+	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
 bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const

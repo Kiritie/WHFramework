@@ -42,11 +42,11 @@ protected:
 	virtual FSaveData* ToData(bool bRefresh) override;
 
 protected:
+	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
+
+protected:
 	UFUNCTION()
 	void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPickUp(const TScriptInterface<IAbilityPickerInterface>& InPicker);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

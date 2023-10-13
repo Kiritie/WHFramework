@@ -32,7 +32,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		for(const auto Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+		for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
 		{
 			Interaction->AddInteractAction(Iter);
 		}

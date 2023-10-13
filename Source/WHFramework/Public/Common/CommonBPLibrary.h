@@ -59,6 +59,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
 	static float GetTimeScale();
 	/*
+	 * 获取时间缩放
+	 */
+	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
+	static float GetDeltaSeconds();
+	/*
 	 * 设置时间缩放
 	 */
 	UFUNCTION(BlueprintCallable, Category = "CommonBPLibrary")

@@ -14,6 +14,9 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Controller, Log, All);
 // 能力
 DEFINE_LOG_CATEGORY_STATIC(WH_Ability, Log, All);
 
+// 能力
+DEFINE_LOG_CATEGORY_STATIC(WH_Achievement, Log, All);
+
 // 资源
 DEFINE_LOG_CATEGORY_STATIC(WH_Asset, Log, All);
 

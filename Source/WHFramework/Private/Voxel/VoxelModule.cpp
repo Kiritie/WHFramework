@@ -57,7 +57,7 @@ AVoxelModule::AVoxelModule()
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
-	WorldBasicData = FVoxelWorldBasicSaveData();
+	WorldBasicData = FVoxelModuleBasicSaveData();
 
 	WorldData = AVoxelModule::NewWorldData();
 
@@ -168,7 +168,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 				Iter.Value.UnlitMaterialInst = MatInst;
 			}
 		}
-		for(const auto Iter : VoxelClasses)
+		for(const auto& Iter : VoxelClasses)
 		{
 			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
 		}
@@ -256,21 +256,21 @@ void AVoxelModule::OnWorldStateChanged()
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeWorldState::StaticClass(), EEventNetType::Single, this, {&WorldState});
 }
 
-FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
+FVoxelModuleSaveData& AVoxelModule::GetWorldData() const
 {
-	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
+	return WorldData ? *WorldData : FVoxelModuleSaveData::Empty;
 }
 
-FVoxelWorldSaveData* AVoxelModule::NewWorldData(FSaveData* InBasicData) const
+FVoxelModuleSaveData* AVoxelModule::NewWorldData(FSaveData* InBasicData) const
 {
-	static FVoxelSaveData SaveData;
-	SaveData = !InBasicData ? FVoxelSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelSaveData>();
+	static FDefaultVoxelModuleSaveData SaveData;
+	SaveData = !InBasicData ? FDefaultVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FDefaultVoxelModuleSaveData>();
 	return &SaveData;
 }
 
 void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
+	const auto& SaveData = InSaveData->CastRef<FVoxelModuleSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -332,7 +332,7 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AVoxelModule::ToData(bool bRefresh)
 {
-	static FVoxelWorldSaveData* SaveData;
+	static FVoxelModuleSaveData* SaveData;
 	SaveData = NewWorldData(WorldData);
 	for(auto& Iter : ChunkMap)
 	{
@@ -348,10 +348,12 @@ FSaveData* AVoxelModule::ToData(bool bRefresh)
 
 void AVoxelModule::UnloadData(EPhase InPhase)
 {
-	if(PHASEC(InPhase, EPhase::PrimaryAndFinal))
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		SetWorldMode(EVoxelWorldMode::None);
 		SetWorldState(EVoxelWorldState::None);
+
+		DestroyChunkQueues();
 
 		for(auto& Iter : ChunkMap)
 		{
@@ -361,8 +363,6 @@ void AVoxelModule::UnloadData(EPhase InPhase)
 
 		ChunkSpawnBatch = 0;
 		ChunkGenerateIndex = Index_Empty;
-
-		DestroyChunkQueues();
 
 		WorldData = NewWorldData();
 	}
@@ -474,7 +474,7 @@ AVoxelChunk* AVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		{
 			AddToChunkQueue(EVoxelWorldState::MeshBuild, InIndex);
 			AddToChunkQueue(EVoxelWorldState::Generate, InIndex);
-			for(const auto Iter : Chunk->GetNeighbors())
+			for(const auto& Iter : Chunk->GetNeighbors())
 			{
 				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
 				{

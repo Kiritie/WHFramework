@@ -48,14 +48,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SceneModuleBPLibrary")
 	static bool HasSceneActor(FGuid InID, bool bEnsured = true);
 
+	template<class T>
+	static T* GetSceneActor(FGuid InID, bool bEnsured = true)
+	{
+		return Cast<T>(GetSceneActor(InID, nullptr, bEnsured));
+	}
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleBPLibrary")
 	static AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void AddSceneActor(AActor* InActor);
+	static bool AddSceneActor(AActor* InActor);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleBPLibrary")
-	static void RemoveSceneActor(AActor* InActor);
+	static bool RemoveSceneActor(AActor* InActor);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Target Point
