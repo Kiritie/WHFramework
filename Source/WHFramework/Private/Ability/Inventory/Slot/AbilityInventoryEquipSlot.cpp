@@ -38,21 +38,27 @@ void UAbilityInventoryEquipSlot::Refresh()
 void UAbilityInventoryEquipSlot::OnItemPreChange(FAbilityItem& InNewItem)
 {
 	Super::OnItemPreChange(InNewItem);
+
 	CancelItem(true);
-	
-	if(auto Agent = GetInventory()->GetOwnerAgent())
+
+	if(IsEmpty()) return;
+
+	if(const auto InventoryAgent = GetInventory()->GetOwnerAgent())
 	{
-		Agent->OnDischargeItem(Item);
+		InventoryAgent->OnDischargeItem(Item);
 	}
 }
 
 void UAbilityInventoryEquipSlot::OnItemChanged(FAbilityItem& InOldItem)
 {
 	Super::OnItemChanged(InOldItem);
+	
 	ActiveItem(true);
+	
+	if(IsEmpty()) return;
 
-	if(auto Agent = GetInventory()->GetOwnerAgent())
+	if(const auto InventoryAgent = GetInventory()->GetOwnerAgent())
 	{
-		Agent->OnAssembleItem(Item);
+		InventoryAgent->OnAssembleItem(Item);
 	}
 }

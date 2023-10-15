@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "GameFramework/Actor.h"
-#include "Common/Base/WHActor.h"
+#include "Common/Base/WHObject.h"
 
 #include "EventManagerBase.generated.h"
 
@@ -11,16 +10,17 @@ class UEventHandle_EndPlay;
 class UEventHandle_BeginPlay;
 
 UCLASS()
-class WHFRAMEWORK_API AEventManagerBase : public AWHActor
+class WHFRAMEWORK_API UEventManagerBase : public UWHObject
 {
 	GENERATED_BODY()
 	
 public:	
-	// ParamSets default values for this actor's properties
-	AEventManagerBase();
+	// ParamSets default values for this object's properties
+	UEventManagerBase();
 
 public:
-	virtual void OnInitialize_Implementation() override;
+	UFUNCTION(BlueprintNativeEvent)
+	void OnInitialize();
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)

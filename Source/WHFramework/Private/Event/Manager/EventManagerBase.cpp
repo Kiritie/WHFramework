@@ -8,22 +8,22 @@
 #include "Event/Handle/Common/EventHandle_EndPlay.h"
 
 // ParamSets default values
-AEventManagerBase::AEventManagerBase()
+UEventManagerBase::UEventManagerBase()
 {
 }
 
-void AEventManagerBase::OnInitialize_Implementation()
+void UEventManagerBase::OnInitialize_Implementation()
 {
 	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_BeginPlay>(this, FName("OnBeginPlay"));
 	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_EndPlay>(this, FName("OnEndPlay"));
 }
 
-void AEventManagerBase::OnBeginPlay_Implementation(UObject* InSender, UEventHandle_BeginPlay* InEventHandle)
+void UEventManagerBase::OnBeginPlay_Implementation(UObject* InSender, UEventHandle_BeginPlay* InEventHandle)
 {
 	
 }
 
-void AEventManagerBase::OnEndPlay_Implementation(UObject* InSender, UEventHandle_EndPlay* InEventHandle)
+void UEventManagerBase::OnEndPlay_Implementation(UObject* InSender, UEventHandle_EndPlay* InEventHandle)
 {
 	
 }

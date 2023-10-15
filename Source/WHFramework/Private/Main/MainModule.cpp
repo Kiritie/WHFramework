@@ -107,6 +107,11 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_BeginPlay>(EEventNetType::Single, this);
+	}
+
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
 		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
@@ -120,11 +125,6 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 				ModuleRefs[i]->Run();
 			}
 		}
-	}
-
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_BeginPlay>(EEventNetType::Single, this);
 	}
 }
 

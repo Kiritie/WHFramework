@@ -20,7 +20,7 @@ AEventModule::AEventModule()
 {
 	ModuleName = FName("EventModule");
 	
-	EventManagerClass = AEventManagerBase::StaticClass();
+	EventManagerClass = UEventManagerBase::StaticClass();
 }
 
 AEventModule::~AEventModule()
@@ -44,9 +44,10 @@ void AEventModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	if(HasAuthority())
+	if(EventManagerClass)
 	{
-		SpawnEventManager();
+		EventManager = UObjectPoolModuleBPLibrary::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
+		EventManager->OnInitialize();
 	}
 }
 
@@ -232,37 +233,6 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 		}
 
 		UObjectPoolModuleBPLibrary::DespawnObject(EventHandle);
-	}
-}
-
-void AEventModule::SpawnEventManager()
-{
-	if(EventManagerClass && (!EventManager || !EventManager->IsA(EventManagerClass)))
-	{
-		DestroyEventManager();
-		
-		FActorSpawnParameters ActorSpawnParameters = FActorSpawnParameters();
-        ActorSpawnParameters.Owner = this;
-        ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-		EventManager = GetWorld()->SpawnActor<AEventManagerBase>(EventManagerClass, ActorSpawnParameters);
-        if(EventManager)
-        {
-        	EventManager->Execute_OnInitialize(EventManager);
-#if(WITH_EDITOR)
-        	EventManager->SetActorLabel(TEXT("EventManager"));
-#endif
-        	EventManager->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
-        }
-	}
-}
-
-void AEventModule::DestroyEventManager()
-{
-	if(EventManager)
-	{
-		EventManager->Destroy();
-		EventManager = nullptr;
 	}
 }
 

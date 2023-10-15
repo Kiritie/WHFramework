@@ -50,20 +50,20 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetGlobalSoundVolume(float InVolume, bool bMulticast = false);
+	static void SetGlobalSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// BackgroundSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetBackgroundSoundVolume(float InVolume, bool bMulticast = false);
+	static void SetBackgroundSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EnvironmentSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetEnvironmentSoundVolume(float InVolume, bool bMulticast = false);
+	static void SetEnvironmentSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EffectSound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetEffectSoundVolume(float InVolume, bool bMulticast = false);
+	static void SetEffectSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 };

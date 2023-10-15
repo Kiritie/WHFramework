@@ -114,7 +114,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetGlobalSoundVolume(float InVolume, bool bMulticast = false);
+	virtual void SetGlobalSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiSetGlobalSoundVolume(float InVolume);
 
@@ -129,7 +129,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetBackgroundSoundVolume(float InVolume, bool bMulticast = false);
+	virtual void SetBackgroundSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiSetBackgroundSoundVolume(float InVolume);
 
@@ -144,7 +144,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetEnvironmentSoundVolume(float InVolume, bool bMulticast = false);
+	virtual void SetEnvironmentSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiSetEnvironmentSoundVolume(float InVolume);
 
@@ -159,7 +159,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetEffectSoundVolume(float InVolume, bool bMulticast = false);
+	virtual void SetEffectSoundVolume(float InVolume = 1.f, bool bMulticast = false);
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiSetEffectSoundVolume(float InVolume);
 

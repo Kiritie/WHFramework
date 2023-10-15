@@ -6,6 +6,7 @@
 #include "Components/AudioComponent.h"
 #include "Audio/AudioModuleBPLibrary.h"
 #include "Audio/AudioModuleNetworkComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"

@@ -103,7 +103,7 @@ void UAbilityInventorySlot::OnItemChanged(FAbilityItem& InOldItem)
 {
 	if(Item.IsValid())
 	{
-		auto Vitality = Inventory->GetOwnerAgent<IAbilityVitalityInterface>();
+		const auto Vitality = Inventory->GetOwnerAgent<IAbilityVitalityInterface>();
 		if (Vitality && Item.GetData().AbilityClass)
 		{
 			Item.AbilityHandle = Vitality->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
@@ -115,7 +115,7 @@ void UAbilityInventorySlot::OnItemChanged(FAbilityItem& InOldItem)
 	}
 	if(IsSelected())
 	{
-		if(auto InventoryAgent = Inventory->GetOwnerAgent())
+		if(const auto InventoryAgent = Inventory->GetOwnerAgent())
 		{
 			InventoryAgent->OnSelectItem(GetItem());
 		}

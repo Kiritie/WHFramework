@@ -14,7 +14,9 @@ UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectIni
 {
 	WidgetName = FName("AchievementHUD");
 	WidgetType = EWidgetType::Permanent;
-	WidgetInputMode = EInputMode::GameOnly;
+	WidgetInputMode = EInputMode::None;
+
+	WidgetZOrder = 10;
 
 	WidgetCreateType = EWidgetCreateType::AutoCreateAndOpen;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
@@ -28,8 +30,6 @@ void UWidgetAchievementHUD::OnCreate_Implementation(UObject* InOwner)
 void UWidgetAchievementHUD::OnInitialize_Implementation(UObject* InOwner)
 {
 	Super::OnInitialize_Implementation(InOwner);
-
-	
 }
 
 void UWidgetAchievementHUD::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
