@@ -3,6 +3,8 @@
 
 #include "Event/Handle/Step/EventHandle_CompleteStep.h"
 
+#include "Step/Base/StepBase.h"
+
 UEventHandle_CompleteStep::UEventHandle_CompleteStep()
 {
 	EventType = EEventType::Multicast;

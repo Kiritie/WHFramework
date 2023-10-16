@@ -6,6 +6,7 @@
 #include "CameraModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "Math/MathTypes.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "CameraModule.generated.h"
 
@@ -15,7 +16,7 @@ class AWHPlayerController;
 class ACameraPawnBase;
 
 UCLASS()
-class WHFRAMEWORK_API ACameraModule : public AModuleBase
+class WHFRAMEWORK_API ACameraModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -47,6 +48,13 @@ public:
 	virtual void OnUnPause_Implementation() override;
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera

@@ -54,7 +54,7 @@ void AAchievementModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	States.SetNum(Achievements.Num(), true);
+	States.SetNum(Achievements.Num());
 }
 
 void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -63,7 +63,7 @@ void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule && ModuleSaveGame)
+		if(bAutoSaveModule)
 		{
 			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 		}
@@ -91,7 +91,7 @@ void AAchievementModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule && ModuleSaveGame)
+		if(bAutoSaveModule)
 		{
 			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 		}
@@ -106,7 +106,7 @@ void AAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	TotalUnlocked = SaveData.TotalUnlocked;
 }
 
-FSaveData* AAchievementModule::ToData(bool bRefresh)
+FSaveData* AAchievementModule::ToData()
 {
 	static FAchievementModuleSaveData SaveData;
 	SaveData = FAchievementModuleSaveData();
@@ -144,7 +144,6 @@ void AAchievementModule::GetAchievementState(FName InKey, bool &OutFoundAchievem
 		return;
 
 	const FAchievementData Current = i.Data;
-	int32 index = i.Index;
 	
 	OutState = States[i.Index];
 	OutData = Current;

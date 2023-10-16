@@ -72,7 +72,7 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	bBuilded = true;
 }
 
-FSaveData* AVoxelChunk::ToData(bool bRefresh)
+FSaveData* AVoxelChunk::ToData()
 {
 	static FVoxelChunkSaveData SaveData;
 	SaveData = FVoxelChunkSaveData();
@@ -85,11 +85,11 @@ FSaveData* AVoxelChunk::ToData(bool bRefresh)
 	{
 		if(bChanged)
 		{
-			SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(bRefresh));
+			SaveData.VoxelDatas.Appendf(TEXT("/%s"), *Iter.Value.ToSaveData(true));
 		}
 		if(Iter.Value.Auxiliary)
 		{
-			SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(bRefresh));
+			SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
 		}
 	}
 	if(!bChanged && AVoxelModule::Get()->GetWorldData().IsExistChunkData(Index))
@@ -101,7 +101,7 @@ FSaveData* AVoxelChunk::ToData(bool bRefresh)
 	{
 		if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(Iter.Value))
 		{
-			SaveData.PickUpDatas.Add(PickUp->GetSaveDataRef<FPickUpSaveData>(bRefresh));
+			SaveData.PickUpDatas.Add(PickUp->GetSaveDataRef<FPickUpSaveData>(true));
 		}
 	}
 

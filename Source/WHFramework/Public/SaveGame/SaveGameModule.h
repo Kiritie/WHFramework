@@ -51,7 +51,7 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FSaveData* ToData() override;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "UserData")

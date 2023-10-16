@@ -70,7 +70,7 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule && ModuleSaveGame)
+		if(bAutoSaveModule)
 		{
 			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 		}
@@ -138,7 +138,7 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule && ModuleSaveGame)
+		if(bAutoSaveModule)
 		{
 			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 		}
@@ -166,19 +166,16 @@ void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
-	if(PHASEC(InPhase, EPhase::Final))
+	for(auto Iter : SaveData.TaskItemMap)
 	{
-		for(auto Iter : SaveData.TaskItemMap)
+		if(TaskMap.Contains(Iter.Key))
 		{
-			if(TaskMap.Contains(Iter.Key))
-			{
-				TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
-			}
+			TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
 		}
-		if(!CurrentTask)
-		{
-			EnterTask(FirstTask);
-		}
+	}
+	if(!CurrentTask)
+	{
+		EnterTask(FirstTask);
 	}
 }
 
@@ -198,14 +195,14 @@ void ATaskModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FSaveData* ATaskModule::ToData(bool bRefresh)
+FSaveData* ATaskModule::ToData()
 {
 	static FTaskModuleSaveData SaveData;
 	SaveData = FTaskModuleSaveData();
 
 	for(auto Iter : TaskMap)
 	{
-		SaveData.TaskItemMap.Add(Iter.Key, Iter.Value->GetSaveDataRef<FSaveData>());
+		SaveData.TaskItemMap.Add(Iter.Key, Iter.Value->GetSaveDataRef<FSaveData>(true));
 	}
 	return &SaveData;
 }

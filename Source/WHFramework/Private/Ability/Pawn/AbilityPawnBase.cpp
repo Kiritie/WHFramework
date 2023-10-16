@@ -135,7 +135,7 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityPawnBase::ToData(bool bRefresh)
+FSaveData* AAbilityPawnBase::ToData()
 {
 	static FVitalitySaveData SaveData;
 	SaveData = FVitalitySaveData();

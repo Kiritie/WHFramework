@@ -77,7 +77,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelEntity::ToData(bool bRefresh)
+FSaveData* AVoxelEntity::ToData()
 {
 	return nullptr;
 }

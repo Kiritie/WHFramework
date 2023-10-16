@@ -30,7 +30,7 @@ public:
 		return static_cast<T&>(GetWorldData());
 	}
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FVoxelModuleSaveData& GetWorldData();
+	static FVoxelWorldSaveData& GetWorldData();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
 	static EVoxelWorldMode GetWorldMode();
@@ -39,7 +39,7 @@ public:
 	static EVoxelWorldState GetWorldState();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleBPLibrary")
-	static FVoxelModuleBasicSaveData GetWorldBasicData();
+	static FVoxelWorldBasicSaveData GetWorldBasicData();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Index

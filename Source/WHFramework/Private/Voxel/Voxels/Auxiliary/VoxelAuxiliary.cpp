@@ -46,7 +46,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelAuxiliary::ToData(bool bRefresh)
+FSaveData* AVoxelAuxiliary::ToData()
 {
 	static FVoxelAuxiliarySaveData SaveData;
 	SaveData = FVoxelAuxiliarySaveData();

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "AudioModuleTypes.generated.h"
 
@@ -82,4 +82,68 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	UAudioComponent* Audio;
+};
+
+USTRUCT(BlueprintType)
+struct FSoundParams : public FSaveData
+{
+	GENERATED_USTRUCT_BODY()
+
+	FSoundParams()
+	{
+		Volume = 0.f;
+		Pitch = 0.f;
+	}
+
+	FSoundParams(float InVolume, float InPitch)
+	{
+		Volume = InVolume;
+		Pitch = InPitch;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float Volume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float Pitch;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAudioModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAudioModuleSaveData()
+	{
+		GlobalSoundParams = FSoundParams(1.f, 1.f);
+		BackgroundSoundParams = FSoundParams(1.f, 1.f);
+		EnvironmentSoundParams = FSoundParams(1.f, 1.f);
+		EffectSoundParams = FSoundParams(1.f, 1.f);
+	}
+
+public:
+	UPROPERTY()
+	FSoundParams GlobalSoundParams;
+
+	UPROPERTY()
+	FSoundParams BackgroundSoundParams;
+
+	UPROPERTY()
+	FSoundParams EnvironmentSoundParams;
+
+	UPROPERTY()
+	FSoundParams EffectSoundParams;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		GlobalSoundParams.MakeSaved();
+		BackgroundSoundParams.MakeSaved();
+		EnvironmentSoundParams.MakeSaved();
+		EffectSoundParams.MakeSaved();
+	}
 };

@@ -39,9 +39,9 @@ void AVoxelContainerAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelContainerAuxiliary::ToData(bool bRefresh)
+FSaveData* AVoxelContainerAuxiliary::ToData()
 {
-	auto& SaveData = Super::ToData(bRefresh)->CastRef<FVoxelAuxiliarySaveData>();
+	auto& SaveData = Super::ToData()->CastRef<FVoxelAuxiliarySaveData>();
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 

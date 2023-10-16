@@ -33,7 +33,7 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FSaveData* ToData() override;
 
 	UFUNCTION()
 	virtual void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);

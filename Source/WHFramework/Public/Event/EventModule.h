@@ -8,6 +8,8 @@
 
 #include "EventModule.generated.h"
 
+class UEventManagerBase;
+
 UCLASS()
 class WHFRAMEWORK_API AEventModule : public AModuleBase
 {
@@ -117,7 +119,7 @@ protected:
 	/// Event Manager
 protected:
 	UPROPERTY(EditAnywhere, Category = "EventManager")
-	TSubclassOf<class UEventManagerBase> EventManagerClass;
+	TSubclassOf<UEventManagerBase> EventManagerClass;
 
 	UPROPERTY(Transient)
 	UEventManagerBase* EventManager;

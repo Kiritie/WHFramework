@@ -78,7 +78,7 @@ protected:
 	EVoxelWorldState WorldState;
 
 	UPROPERTY(EditAnywhere, Category = "World")
-	FVoxelModuleBasicSaveData WorldBasicData;
+	FVoxelWorldBasicSaveData WorldBasicData;
 public:
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
@@ -87,7 +87,7 @@ public:
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
 	UFUNCTION(BlueprintPure)
-	FVoxelModuleBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
+	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
 
 protected:
 	void SetWorldMode(EVoxelWorldMode InWorldMode);
@@ -99,21 +99,23 @@ protected:
 	virtual void OnWorldStateChanged();
 
 protected:
-	FVoxelModuleSaveData* WorldData;
+	FVoxelWorldSaveData* WorldData;
 public:
 	template<class T>
 	T& GetWorldData() const
 	{
 		return static_cast<T&>(GetWorldData());
 	}
-	FVoxelModuleSaveData& GetWorldData() const;
+	FVoxelWorldSaveData& GetWorldData() const;
 
-	virtual FVoxelModuleSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
+	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FSaveData* GetData() const override { return WorldData; }
+
+	virtual FSaveData* ToData() override;
 
 	virtual void UnloadData(EPhase InPhase) override;
 

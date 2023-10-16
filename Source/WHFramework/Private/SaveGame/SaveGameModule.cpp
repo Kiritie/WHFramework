@@ -72,7 +72,7 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SaveSaveGame<UGeneralSaveGame>(0, true, ModuleSaveGame);
+		SaveSaveGame(ModuleSaveGame, 0, true);
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -112,7 +112,7 @@ void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* ASaveGameModule::ToData(bool bRefresh)
+FSaveData* ASaveGameModule::ToData()
 {
 	static FGeneralSaveData SaveData;
 	SaveData = FGeneralSaveData();

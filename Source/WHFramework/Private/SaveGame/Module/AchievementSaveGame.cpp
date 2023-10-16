@@ -12,6 +12,8 @@ UAchievementSaveGame::UAchievementSaveGame()
 void UAchievementSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
+
+	SaveData.States.SetNum(AAchievementModule::Get()->Achievements.Num());
 }
 
 void UAchievementSaveGame::OnLoad_Implementation(EPhase InPhase)

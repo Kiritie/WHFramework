@@ -37,7 +37,9 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;
 
-	virtual FSaveData* ToData(bool bRefresh) = 0;
+	virtual FSaveData* GetData() const { return nullptr; }
+
+	virtual FSaveData* ToData() = 0;
 
 	virtual void UnloadData(EPhase InPhase) { }
 

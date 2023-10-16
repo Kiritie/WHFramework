@@ -82,34 +82,138 @@ void UAudioModuleBPLibrary::SetSingleSoundPaused(const FSingleSoundHandle& InHan
 	}
 }
 
-void UAudioModuleBPLibrary::SetGlobalSoundVolume(float InVolume, bool bMulticast)
+float UAudioModuleBPLibrary::GetGlobalSoundVolume()
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetGlobalSoundVolume(InVolume, bMulticast);
+		return AudioModule->GetGlobalSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetGlobalSoundVolume(float InVolume, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetGlobalSoundVolume(InVolume, InFadeInTime);
 	}
 }
 
-void UAudioModuleBPLibrary::SetBackgroundSoundVolume(float InVolume, bool bMulticast)
+float UAudioModuleBPLibrary::GetGlobalSoundPitch()
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetBackgroundSoundVolume(InVolume, bMulticast);
+		return AudioModule->GetGlobalSoundPitch();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetGlobalSoundPitch(float InPitch, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetGlobalSoundPitch(InPitch, InFadeInTime);
 	}
 }
 
-void UAudioModuleBPLibrary::SetEnvironmentSoundVolume(float InVolume, bool bMulticast)
+float UAudioModuleBPLibrary::GetBackgroundSoundVolume()
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetEnvironmentSoundVolume(InVolume, bMulticast);
+		return AudioModule->GetBackgroundSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetBackgroundSoundVolume(float InVolume, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetBackgroundSoundVolume(InVolume, InFadeInTime);
 	}
 }
 
-void UAudioModuleBPLibrary::SetEffectSoundVolume(float InVolume, bool bMulticast)
+float UAudioModuleBPLibrary::GetBackgroundSoundPitch()
 {
 	if(AAudioModule* AudioModule = AAudioModule::Get())
 	{
-		AudioModule->SetEffectSoundVolume(InVolume, bMulticast);
+		return AudioModule->GetBackgroundSoundPitch();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetBackgroundSoundPitch(float InPitch, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetBackgroundSoundPitch(InPitch, InFadeInTime);
+	}
+}
+
+float UAudioModuleBPLibrary::GetEnvironmentSoundVolume()
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		return AudioModule->GetEnvironmentSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetEnvironmentSoundVolume(float InVolume, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetEnvironmentSoundVolume(InVolume, InFadeInTime);
+	}
+}
+
+float UAudioModuleBPLibrary::GetEnvironmentSoundPitch()
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		return AudioModule->GetEnvironmentSoundPitch();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetEnvironmentSoundPitch(float InPitch, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetEnvironmentSoundPitch(InPitch, InFadeInTime);
+	}
+}
+
+float UAudioModuleBPLibrary::GetEffectSoundVolume()
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		return AudioModule->GetEffectSoundVolume();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetEffectSoundVolume(float InVolume, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetEffectSoundVolume(InVolume, InFadeInTime);
+	}
+}
+
+float UAudioModuleBPLibrary::GetEffectSoundPitch()
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		return AudioModule->GetEffectSoundPitch();
+	}
+	return 0.f;
+}
+
+void UAudioModuleBPLibrary::SetEffectSoundPitch(float InPitch, float InFadeInTime)
+{
+	if(AAudioModule* AudioModule = AAudioModule::Get())
+	{
+		AudioModule->SetEffectSoundPitch(InPitch, InFadeInTime);
 	}
 }

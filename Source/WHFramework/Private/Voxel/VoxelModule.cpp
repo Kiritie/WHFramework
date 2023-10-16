@@ -57,7 +57,7 @@ AVoxelModule::AVoxelModule()
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
-	WorldBasicData = FVoxelModuleBasicSaveData();
+	WorldBasicData = FVoxelWorldBasicSaveData();
 
 	WorldData = AVoxelModule::NewWorldData();
 
@@ -178,7 +178,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoGenerate)
 		{
-			if(bAutoSaveModule && ModuleSaveGame)
+			if(bAutoSaveModule)
 			{
 				LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
 			}
@@ -221,7 +221,7 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule && ModuleSaveGame)
+		if(bAutoSaveModule)
 		{
 			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 		}
@@ -256,21 +256,21 @@ void AVoxelModule::OnWorldStateChanged()
 	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeWorldState::StaticClass(), EEventNetType::Single, this, {&WorldState});
 }
 
-FVoxelModuleSaveData& AVoxelModule::GetWorldData() const
+FVoxelWorldSaveData& AVoxelModule::GetWorldData() const
 {
-	return WorldData ? *WorldData : FVoxelModuleSaveData::Empty;
+	return WorldData ? *WorldData : FVoxelWorldSaveData::Empty;
 }
 
-FVoxelModuleSaveData* AVoxelModule::NewWorldData(FSaveData* InBasicData) const
+FVoxelWorldSaveData* AVoxelModule::NewWorldData(FSaveData* InBasicData) const
 {
-	static FDefaultVoxelModuleSaveData SaveData;
-	SaveData = !InBasicData ? FDefaultVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FDefaultVoxelModuleSaveData>();
+	static FVoxelModuleSaveData SaveData;
+	SaveData = !InBasicData ? FVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelModuleSaveData>();
 	return &SaveData;
 }
 
 void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelModuleSaveData>();
+	const auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -330,15 +330,15 @@ void AVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelModule::ToData(bool bRefresh)
+FSaveData* AVoxelModule::ToData()
 {
-	static FVoxelModuleSaveData* SaveData;
+	static FVoxelWorldSaveData* SaveData;
 	SaveData = NewWorldData(WorldData);
 	for(auto& Iter : ChunkMap)
 	{
 		if(Iter.Value->IsGenerated())
 		{
-			SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(bRefresh));
+			SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
 		}
 	}
 	SaveData->TimeSeconds = USceneModuleBPLibrary::GetWorldTimer()->GetTimeSeconds();

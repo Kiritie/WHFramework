@@ -433,7 +433,7 @@ void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 }
 
-FSaveData* UTaskBase::ToData(bool bRefresh)
+FSaveData* UTaskBase::ToData()
 {
 	static FSaveData SaveData;
 	SaveData = FSaveData();

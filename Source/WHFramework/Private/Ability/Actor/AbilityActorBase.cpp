@@ -116,7 +116,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityActorBase::ToData(bool bRefresh)
+FSaveData* AAbilityActorBase::ToData()
 {
 	static FVitalitySaveData SaveData;
 	SaveData = FVitalitySaveData();

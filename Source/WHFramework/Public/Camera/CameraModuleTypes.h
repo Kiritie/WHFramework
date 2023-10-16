@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "CameraModuleTypes.generated.h"
 
@@ -64,5 +65,76 @@ public:
 	FString ToString() const
 	{
 		return FString::Printf(TEXT("%s|%s|%f"), *CameraLocation.ToString(), *CameraRotation.ToString(), CameraDistance);
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FCameraModuleSaveData()
+	{
+		bReverseCameraPanMove = false;
+		CameraMoveRate = 300.f;
+		bSmoothCameraMove = true;
+		CameraMoveSpeed = 5.f;
+
+		bReverseCameraPitch = false;
+		CameraTurnRate = 90.f;
+		CameraLookUpRate = 90.f;
+		bSmoothCameraRotate = true;
+		CameraRotateSpeed = 5.f;
+
+		CameraZoomRate = 150.f;
+		bSmoothCameraZoom = true;
+		CameraZoomSpeed = 5.f;
+	}
+
+public:
+	// Move
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bReverseCameraPanMove;
+	
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	float CameraMoveRate;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bSmoothCameraMove;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraMove == true"), Category = "CameraControl|Move")
+	float CameraMoveSpeed;
+
+	// Rotate
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	bool bReverseCameraPitch;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	float CameraTurnRate;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	float CameraLookUpRate;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	bool bSmoothCameraRotate;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraRotate == true"), Category = "CameraControl|Rotate")
+	float CameraRotateSpeed;
+
+	// Zoom
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	float CameraZoomRate;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	bool bSmoothCameraZoom;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraZoom == true"), Category = "CameraControl|Zoom")
+	float CameraZoomSpeed;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
 	}
 };

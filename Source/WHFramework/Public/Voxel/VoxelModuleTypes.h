@@ -568,12 +568,12 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelModuleBasicSaveData : public FSaveData
+struct WHFRAMEWORK_API FVoxelWorldBasicSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelModuleBasicSaveData()
+	FORCEINLINE FVoxelWorldBasicSaveData()
 	{
 		BlockSize = 80.f;
 		
@@ -679,25 +679,25 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelModuleSaveData : public FVoxelModuleBasicSaveData
+struct WHFRAMEWORK_API FVoxelWorldSaveData : public FVoxelWorldBasicSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelModuleSaveData()
+	FORCEINLINE FVoxelWorldSaveData()
 	{
 		WorldSeed = 0;
 		RandomStream = FRandomStream();
 	}
 	
-	FORCEINLINE FVoxelModuleSaveData(const FVoxelModuleBasicSaveData& InBasicSaveData) : FVoxelModuleBasicSaveData(InBasicSaveData)
+	FORCEINLINE FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldBasicSaveData(InBasicSaveData)
 	{
 		WorldSeed = 0;
 		RandomStream = FRandomStream();
 	}
 
 public:
-	static FVoxelModuleSaveData Empty;
+	static FVoxelWorldSaveData Empty;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 WorldSeed;
@@ -738,17 +738,17 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FDefaultVoxelModuleSaveData : public FVoxelModuleSaveData
+struct WHFRAMEWORK_API FVoxelModuleSaveData : public FVoxelWorldSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FDefaultVoxelModuleSaveData()
+	FORCEINLINE FVoxelModuleSaveData()
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}
 	
-	FORCEINLINE FDefaultVoxelModuleSaveData(const FVoxelModuleBasicSaveData& InBasicSaveData) : FVoxelModuleSaveData(InBasicSaveData)
+	FORCEINLINE FVoxelModuleSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
 	{
 		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
 	}

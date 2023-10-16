@@ -102,7 +102,7 @@ protected:
 	UPROPERTY(EditAnywhere)
 	bool bAutoSaveModule;
 	/// 模块存档
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bAutoSaveModule == true"))
 	TSubclassOf<USaveGameBase> ModuleSaveGame;
 
 public:

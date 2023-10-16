@@ -49,21 +49,58 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
+public:
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetGlobalSoundVolume();
+
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetGlobalSoundVolume(float InVolume = 1.f, bool bMulticast = false);
+	static void SetGlobalSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetGlobalSoundPitch();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void SetGlobalSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// BackgroundSound
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetBackgroundSoundVolume();
+
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetBackgroundSoundVolume(float InVolume = 1.f, bool bMulticast = false);
+	static void SetBackgroundSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetBackgroundSoundPitch();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void SetBackgroundSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EnvironmentSound
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetEnvironmentSoundVolume();
+
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetEnvironmentSoundVolume(float InVolume = 1.f, bool bMulticast = false);
+	static void SetEnvironmentSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetEnvironmentSoundPitch();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void SetEnvironmentSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EffectSound
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetEffectSoundVolume();
+
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
-	static void SetEffectSoundVolume(float InVolume = 1.f, bool bMulticast = false);
+	static void SetEffectSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+
+	UFUNCTION(BlueprintPure, Category = "AudioModuleBPLibrary")
+	static float GetEffectSoundPitch();
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleBPLibrary")
+	static void SetEffectSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
 };

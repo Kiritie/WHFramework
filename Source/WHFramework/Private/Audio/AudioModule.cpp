@@ -9,14 +9,69 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/Base/SaveGameBase.h"
+#include "SaveGame/Module/AudioSaveGame.h"
 #include "Sound/SoundBase.h"
-		
+#include "Sound/SoundClass.h"
+#include "Sound/SoundMix.h"
+
 IMPLEMENTATION_MODULE(AAudioModule)
 
 // Sets default values
 AAudioModule::AAudioModule()
 {
 	ModuleName = FName("AudioModule");
+
+	ModuleSaveGame = UAudioSaveGame::StaticClass();
+	
+	static ConstructorHelpers::FObjectFinder<USoundMix> GlobalSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Global.SCM_Global'"));
+	if(GlobalSoundMixFinder.Succeeded())
+	{
+		GlobalSoundMix = GlobalSoundMixFinder.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<USoundClass> GlobalSoundClassFinder(TEXT("/Script/Engine.SoundClass'/WHFramework/Audio/Sounds/Class/SC_Global.SC_Global'"));
+	if(GlobalSoundClassFinder.Succeeded())
+	{
+		GlobalSoundClass = GlobalSoundClassFinder.Object;
+	}
+	GlobalSoundParams = FSoundParams(1.f, 1.f);
+
+	static ConstructorHelpers::FObjectFinder<USoundMix> BackgroundSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Background.SCM_Background'"));
+	if(BackgroundSoundMixFinder.Succeeded())
+	{
+		BackgroundSoundMix = BackgroundSoundMixFinder.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<USoundClass> BackgroundSoundClassFinder(TEXT("/Script/Engine.SoundClass'/WHFramework/Audio/Sounds/Class/SC_Background.SC_Background'"));
+	if(BackgroundSoundClassFinder.Succeeded())
+	{
+		BackgroundSoundClass = BackgroundSoundClassFinder.Object;
+	}
+	BackgroundSoundParams = FSoundParams(1.f, 1.f);
+
+	static ConstructorHelpers::FObjectFinder<USoundMix> EnvironmentSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Environment.SCM_Environment'"));
+	if(EnvironmentSoundMixFinder.Succeeded())
+	{
+		EnvironmentSoundMix = EnvironmentSoundMixFinder.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<USoundClass> EnvironmentSoundClassFinder(TEXT("/Script/Engine.SoundClass'/WHFramework/Audio/Sounds/Class/SC_Environment.SC_Environment'"));
+	if(EnvironmentSoundClassFinder.Succeeded())
+	{
+		EnvironmentSoundClass = EnvironmentSoundClassFinder.Object;
+	}
+	EnvironmentSoundParams = FSoundParams(1.f, 1.f);
+
+	static ConstructorHelpers::FObjectFinder<USoundMix> EffectSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Effect.SCM_Effect'"));
+	if(EffectSoundMixFinder.Succeeded())
+	{
+		EffectSoundMix = EffectSoundMixFinder.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<USoundClass> EffectSoundClassFinder(TEXT("/Script/Engine.SoundClass'/WHFramework/Audio/Sounds/Class/SC_Effect.SC_Effect'"));
+	if(EffectSoundClassFinder.Succeeded())
+	{
+		EffectSoundClass = EffectSoundClassFinder.Object;
+	}
+	EffectSoundParams = FSoundParams(1.f, 1.f);
 }
 
 AAudioModule::~AAudioModule()
@@ -44,6 +99,22 @@ void AAudioModule::OnInitialize_Implementation()
 void AAudioModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
+		{
+			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+		}
+	}
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, 0.f);
+		SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, 0.f);
+		SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, 0.f);
+		SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, 0.f);
+	}
 }
 
 void AAudioModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -64,6 +135,44 @@ void AAudioModule::OnUnPause_Implementation()
 void AAudioModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
+		{
+			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+		}
+	}
+}
+
+void AAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FAudioModuleSaveData>();
+
+	if(SaveData.IsSaved())
+	{
+		GlobalSoundParams = SaveData.GlobalSoundParams;
+		BackgroundSoundParams = SaveData.BackgroundSoundParams;
+		EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
+		EffectSoundParams = SaveData.EffectSoundParams;
+	}
+}
+
+void AAudioModule::UnloadData(EPhase InPhase)
+{
+}
+
+FSaveData* AAudioModule::ToData()
+{
+	static FAudioModuleSaveData SaveData;
+	SaveData = FAudioModuleSaveData();
+
+	SaveData.GlobalSoundParams = GlobalSoundParams;
+	SaveData.BackgroundSoundParams = BackgroundSoundParams;
+	SaveData.EnvironmentSoundParams = EnvironmentSoundParams;
+	SaveData.EffectSoundParams = EffectSoundParams;
+	
+	return &SaveData;
 }
 
 void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
@@ -308,99 +417,11 @@ void AAudioModule::SetSingleSoundPausedImpl(const FSingleSoundHandle& InHandle, 
 	}
 }
 
-void AAudioModule::SetGlobalSoundVolume(float InVolume, bool bMulticast)
-{
-	if(bMulticast)
-	{
-		if(HasAuthority())
-		{
-			MultiSetGlobalSoundVolume(InVolume);
-		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
-		{
-			AudioModuleNetworkComponent->ServerSetGlobalSoundVolumeMulticast(InVolume);
-		}
-		return;
-	}
-	SetSoundVolumeImpl(GlobalSoundMix, GlobalSoundClass, InVolume);
-}
-
-void AAudioModule::MultiSetGlobalSoundVolume_Implementation(float InVolume)
-{
-	SetGlobalSoundVolume(InVolume, false);
-}
-
-void AAudioModule::SetBackgroundSoundVolume(float InVolume, bool bMulticast)
-{
-	if(bMulticast)
-	{
-		if(HasAuthority())
-		{
-			MultiSetBackgroundSoundVolume(InVolume);
-		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
-		{
-			AudioModuleNetworkComponent->ServerSetBackgroundSoundVolumeMulticast(InVolume);
-		}
-		return;
-	}
-	SetSoundVolumeImpl(BackgroundSoundMix, BackgroundSoundClass, InVolume);
-}
-
-void AAudioModule::MultiSetBackgroundSoundVolume_Implementation(float InVolume)
-{
-	SetBackgroundSoundVolume(InVolume, false);
-}
-
-void AAudioModule::SetEnvironmentSoundVolume(float InVolume, bool bMulticast)
-{
-	if(bMulticast)
-	{
-		if(HasAuthority())
-		{
-			MultiSetEnvironmentSoundVolume(InVolume);
-		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
-		{
-			AudioModuleNetworkComponent->ServerSetEnvironmentSoundVolumeMulticast(InVolume);
-		}
-		return;
-	}
-	SetSoundVolumeImpl(EnvironmentSoundMix, EnvironmentSoundClass, InVolume);
-}
-
-void AAudioModule::MultiSetEnvironmentSoundVolume_Implementation(float InVolume)
-{
-	SetEnvironmentSoundVolume(InVolume, false);
-}
-
-void AAudioModule::SetEffectSoundVolume(float InVolume, bool bMulticast)
-{
-	if(bMulticast)
-	{
-		if(HasAuthority())
-		{
-			MultiSetEffectSoundVolume(InVolume);
-		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
-		{
-			AudioModuleNetworkComponent->ServerSetEffectSoundVolumeMulticast(InVolume);
-		}
-		return;
-	}
-	SetSoundVolumeImpl(EffectSoundMix, EffectSoundClass, InVolume);
-}
-
-void AAudioModule::MultiSetEffectSoundVolume_Implementation(float InVolume)
-{
-	SetEffectSoundVolume(InVolume, false);
-}
-
-void AAudioModule::SetSoundVolumeImpl(USoundMix* InSoundMix, USoundClass* InSoundClass, float InVolume)
+void AAudioModule::SetSoundParams(USoundMix* InSoundMix, USoundClass* InSoundClass, const FSoundParams& InParams, float InFadeInTime)
 {
 	if(InSoundMix && InSoundClass)
 	{
-		UGameplayStatics::SetSoundMixClassOverride(this, InSoundMix, InSoundClass, InVolume);
+		UGameplayStatics::SetSoundMixClassOverride(this, InSoundMix, InSoundClass, InParams.Volume, InParams.Pitch, InFadeInTime);
 		UGameplayStatics::PushSoundMixModifier(this, InSoundMix);
 	}
 }

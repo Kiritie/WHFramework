@@ -173,7 +173,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityCharacterBase::ToData(bool bRefresh)
+FSaveData* AAbilityCharacterBase::ToData()
 {
 	static FCharacterSaveData SaveData;
 	SaveData = FCharacterSaveData();

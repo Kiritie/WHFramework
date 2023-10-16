@@ -14,9 +14,9 @@ void UAbilityCharacterInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPh
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UAbilityCharacterInventoryBase::ToData(bool bRefresh)
+FSaveData* UAbilityCharacterInventoryBase::ToData()
 {
-	return Super::ToData(bRefresh);
+	return Super::ToData();
 }
 
 void UAbilityCharacterInventoryBase::UnloadData(EPhase InPhase)

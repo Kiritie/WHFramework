@@ -13,13 +13,16 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
-		
+#include "SaveGame/Module/CameraSaveGame.h"
+
 IMPLEMENTATION_MODULE(ACameraModule)
 
 // Sets default values
 ACameraModule::ACameraModule()
 {
 	ModuleName = FName("CameraModule");
+
+	ModuleSaveGame = UCameraSaveGame::StaticClass();
 
 	DefaultCamera = nullptr;
 	DefaultInstantSwitch = false;
@@ -286,6 +289,56 @@ void ACameraModule::OnUnPause_Implementation()
 void ACameraModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+}
+
+void ACameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FCameraModuleSaveData>();
+
+	if(SaveData.IsSaved())
+	{
+		bReverseCameraPanMove = SaveData.bReverseCameraPanMove;
+		CameraMoveRate = SaveData.CameraMoveRate;
+		bSmoothCameraMove = SaveData.bSmoothCameraMove;
+		CameraMoveSpeed = SaveData.CameraMoveSpeed;
+
+		bReverseCameraPitch = SaveData.bReverseCameraPitch;
+		CameraTurnRate = SaveData.CameraTurnRate;
+		CameraLookUpRate = SaveData.CameraLookUpRate;
+		bSmoothCameraRotate = SaveData.bSmoothCameraRotate;
+		CameraRotateSpeed = SaveData.CameraRotateSpeed;
+
+		CameraZoomRate = SaveData.CameraZoomRate;
+		bSmoothCameraZoom = SaveData.bSmoothCameraZoom;
+		CameraZoomSpeed = SaveData.CameraZoomSpeed;
+	}
+}
+
+void ACameraModule::UnloadData(EPhase InPhase)
+{
+}
+
+FSaveData* ACameraModule::ToData()
+{
+	static FCameraModuleSaveData SaveData;
+	SaveData = FCameraModuleSaveData();
+
+	SaveData.bReverseCameraPanMove = bReverseCameraPanMove;
+	SaveData.CameraMoveRate = CameraMoveRate;
+	SaveData.bSmoothCameraMove = bSmoothCameraMove;
+	SaveData.CameraMoveSpeed = CameraMoveSpeed;
+
+	SaveData.bReverseCameraPitch = bReverseCameraPitch;
+	SaveData.CameraTurnRate = CameraTurnRate;
+	SaveData.CameraLookUpRate = CameraLookUpRate;
+	SaveData.bSmoothCameraRotate = bSmoothCameraRotate;
+	SaveData.CameraRotateSpeed = CameraRotateSpeed;
+
+	SaveData.CameraZoomRate = CameraZoomRate;
+	SaveData.bSmoothCameraZoom = bSmoothCameraZoom;
+	SaveData.CameraZoomSpeed = CameraZoomSpeed;
+	
+	return &SaveData;
 }
 
 ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass) const

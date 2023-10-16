@@ -43,7 +43,7 @@ void AEventModule::OnDestroy()
 void AEventModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
+	
 	if(EventManagerClass)
 	{
 		EventManager = UObjectPoolModuleBPLibrary::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
@@ -54,6 +54,11 @@ void AEventModule::OnInitialize_Implementation()
 void AEventModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		BroadcastEvent<UEventHandle_BeginPlay>(EEventNetType::Single, this);
+	}
 }
 
 void AEventModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -74,6 +79,11 @@ void AEventModule::OnUnPause_Implementation()
 void AEventModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		BroadcastEvent<UEventHandle_EndPlay>(EEventNetType::Single, this);
+	}
 }
 
 void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)

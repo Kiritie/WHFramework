@@ -39,7 +39,7 @@ protected:
 
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FSaveData* ToData() override;
 
 protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker);

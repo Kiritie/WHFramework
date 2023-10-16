@@ -90,7 +90,7 @@ protected:
 
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData(bool bRefresh) override;
+	virtual FSaveData* ToData() override;
 	
 	virtual void ResetData();
 

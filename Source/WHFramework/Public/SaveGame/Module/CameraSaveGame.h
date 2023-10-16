@@ -1,23 +1,23 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2021 Sam Carey. All Rights Reserved.
 
 #pragma once
 
-#include "Voxel/VoxelModuleTypes.h"
+#include "CoreMinimal.h"
+#include "Camera/CameraModuleTypes.h"
 #include "SaveGame/Base/SaveGameBase.h"
-
-#include "VoxelSaveGame.generated.h"
+#include "CameraSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UCameraSaveGame : public USaveGameBase
 {
 	GENERATED_BODY()
-
-public:
-	UVoxelSaveGame();
 	
+public:
+	UCameraSaveGame();
+
 public:
 	virtual void OnCreate_Implementation(int32 InIndex) override;
 	
@@ -29,10 +29,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	FVoxelModuleSaveData SaveData;
+	FCameraModuleSaveData SaveData;
 
 public:
 	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FVoxelModuleSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FCameraModuleSaveData>(); }
 };

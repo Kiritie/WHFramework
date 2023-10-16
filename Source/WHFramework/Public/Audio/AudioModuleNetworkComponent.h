@@ -36,16 +36,4 @@ public:
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
 	void ServerSetSingleSoundPausedMulticast(const FSingleSoundHandle& InHandle, bool bPaused);
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetGlobalSoundVolumeMulticast(float InVolume);
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetBackgroundSoundVolumeMulticast(float InVolume);
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetEnvironmentSoundVolumeMulticast(float InVolume);
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSetEffectSoundVolumeMulticast(float InVolume);
 };

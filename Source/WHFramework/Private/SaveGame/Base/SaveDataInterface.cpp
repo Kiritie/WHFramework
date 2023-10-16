@@ -15,7 +15,7 @@ void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)
 {
-	FSaveData* SaveData = ToData(bRefresh);
+	FSaveData* SaveData = !bRefresh ? GetData() : ToData();
 	if (HasArchive())
 	{
 		UCommonBPLibrary::SaveObjectDataToMemory(Cast<UObject>(this), SaveData->GetDatas());

@@ -12,9 +12,9 @@ void UAbilityPawnInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UAbilityPawnInventoryBase::ToData(bool bRefresh)
+FSaveData* UAbilityPawnInventoryBase::ToData()
 {
-	return Super::ToData(bRefresh);
+	return Super::ToData();
 }
 
 void UAbilityPawnInventoryBase::UnloadData(EPhase InPhase)

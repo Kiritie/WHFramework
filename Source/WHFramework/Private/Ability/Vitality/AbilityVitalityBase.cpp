@@ -63,10 +63,10 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityVitalityBase::ToData(bool bRefresh)
+FSaveData* AAbilityVitalityBase::ToData()
 {
 	static FVitalitySaveData SaveData;
-	SaveData = Super::ToData(bRefresh)->CastRef<FActorSaveData>();
+	SaveData = Super::ToData()->CastRef<FActorSaveData>();
 
 	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;

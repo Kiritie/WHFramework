@@ -87,7 +87,7 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* UAbilityInventoryBase::ToData(bool bRefresh)
+FSaveData* UAbilityInventoryBase::ToData()
 {
 	static FInventorySaveData SaveData;
 	SaveData = FInventorySaveData();

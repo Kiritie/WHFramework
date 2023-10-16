@@ -62,39 +62,3 @@ void UAudioModuleNetworkComponent::ServerSetSingleSoundPausedMulticast_Implement
 		AudioModule->MultiSetSingleSoundPaused(InHandle, bPaused);
 	}
 }
-
-bool UAudioModuleNetworkComponent::ServerSetGlobalSoundVolumeMulticast_Validate(float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerSetGlobalSoundVolumeMulticast_Implementation(float InVolume)
-{
-	if(AAudioModule* AudioModule = AAudioModule::Get())
-	{
-		AudioModule->MultiSetGlobalSoundVolume(InVolume);
-	}
-}
-
-bool UAudioModuleNetworkComponent::ServerSetBackgroundSoundVolumeMulticast_Validate(float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerSetBackgroundSoundVolumeMulticast_Implementation(float InVolume)
-{
-	if(AAudioModule* AudioModule = AAudioModule::Get())
-	{
-		AudioModule->MultiSetBackgroundSoundVolume(InVolume);
-	}
-}
-
-bool UAudioModuleNetworkComponent::ServerSetEnvironmentSoundVolumeMulticast_Validate(float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerSetEnvironmentSoundVolumeMulticast_Implementation(float InVolume)
-{
-	if(AAudioModule* AudioModule = AAudioModule::Get())
-	{
-		AudioModule->MultiSetEnvironmentSoundVolume(InVolume);
-	}
-}
-
-bool UAudioModuleNetworkComponent::ServerSetEffectSoundVolumeMulticast_Validate(float InVolume) { return true; }
-void UAudioModuleNetworkComponent::ServerSetEffectSoundVolumeMulticast_Implementation(float InVolume)
-{
-	if(AAudioModule* AudioModule = AAudioModule::Get())
-	{
-		AudioModule->MultiSetEffectSoundVolume(InVolume);
-	}
-}

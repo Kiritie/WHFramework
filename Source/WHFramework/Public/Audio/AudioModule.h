@@ -5,12 +5,13 @@
 
 #include "Audio/AudioModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "AudioModule.generated.h"
 
 class UAudioComponent;
 UCLASS()
-class WHFRAMEWORK_API AAudioModule : public AModuleBase
+class WHFRAMEWORK_API AAudioModule : public AModuleBase, public ISaveDataInterface
 {
 	GENERATED_BODY()
 		
@@ -42,6 +43,13 @@ public:
 	virtual void OnUnPause_Implementation() override;
 	
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
@@ -106,65 +114,137 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GlobalSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GlobalSound")
 	USoundMix* GlobalSoundMix;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GlobalSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GlobalSound")
 	USoundClass* GlobalSoundClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GlobalSound")
+	FSoundParams GlobalSoundParams;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual float GetGlobalSoundVolume() const { return GlobalSoundParams.Volume; }
+
 	UFUNCTION(BlueprintCallable)
-	virtual void SetGlobalSoundVolume(float InVolume = 1.f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiSetGlobalSoundVolume(float InVolume);
+	virtual void SetGlobalSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f)
+	{
+		GlobalSoundParams.Volume = InVolume;
+		SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, InFadeInTime);
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetGlobalSoundPitch() const { return GlobalSoundParams.Pitch; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetGlobalSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f)
+	{
+		GlobalSoundParams.Pitch = InPitch;
+		SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, InFadeInTime);
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// BackgroundSound
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BackgroundSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "BackgroundSound")
 	USoundMix* BackgroundSoundMix;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "BackgroundSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "BackgroundSound")
 	USoundClass* BackgroundSoundClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "BackgroundSound")
+	FSoundParams BackgroundSoundParams;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual float GetBackgroundSoundVolume() const { return BackgroundSoundParams.Volume; }
+
 	UFUNCTION(BlueprintCallable)
-	virtual void SetBackgroundSoundVolume(float InVolume = 1.f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiSetBackgroundSoundVolume(float InVolume);
+	virtual void SetBackgroundSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f)
+	{
+		BackgroundSoundParams.Volume = InVolume;
+		SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, InFadeInTime);
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetBackgroundSoundPitch() const { return BackgroundSoundParams.Pitch; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetBackgroundSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f)
+	{
+		BackgroundSoundParams.Pitch = InPitch;
+		SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, InFadeInTime);
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EnvironmentSound
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EnvironmentSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EnvironmentSound")
 	USoundMix* EnvironmentSoundMix;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EnvironmentSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EnvironmentSound")
 	USoundClass* EnvironmentSoundClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EnvironmentSound")
+	FSoundParams EnvironmentSoundParams;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual float GetEnvironmentSoundVolume() const { return EnvironmentSoundParams.Volume; }
+
 	UFUNCTION(BlueprintCallable)
-	virtual void SetEnvironmentSoundVolume(float InVolume = 1.f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiSetEnvironmentSoundVolume(float InVolume);
+	virtual void SetEnvironmentSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f)
+	{
+		EnvironmentSoundParams.Volume = InVolume;
+		SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, InFadeInTime);
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetEnvironmentSoundPitch() const { return EnvironmentSoundParams.Pitch; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetEnvironmentSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f)
+	{
+		EnvironmentSoundParams.Pitch = InPitch;
+		SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, InFadeInTime);
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EffectSound
 protected:
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EffectSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EffectSound")
 	USoundMix* EffectSoundMix;
 	
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "EffectSound")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EffectSound")
 	USoundClass* EffectSoundClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EffectSound")
+	FSoundParams EffectSoundParams;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual float GetEffectSoundVolume() const { return EffectSoundParams.Volume; }
+
 	UFUNCTION(BlueprintCallable)
-	virtual void SetEffectSoundVolume(float InVolume = 1.f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiSetEffectSoundVolume(float InVolume);
+	virtual void SetEffectSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f)
+	{
+		EffectSoundParams.Volume = InVolume;
+		SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, InFadeInTime);
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetEffectSoundPitch() const { return EffectSoundParams.Pitch; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetEffectSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f)
+	{
+		EffectSoundParams.Pitch = InPitch;
+		SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, InFadeInTime);
+	}
 
 protected:
-	virtual void SetSoundVolumeImpl(USoundMix* InSoundMix, USoundClass* InSoundClass, float InVolume);
+	virtual void SetSoundParams(USoundMix* InSoundMix, USoundClass* InSoundClass, const FSoundParams& InParams, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

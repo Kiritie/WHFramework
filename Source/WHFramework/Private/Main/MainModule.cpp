@@ -16,9 +16,6 @@
 #include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
 #include "Animation/AnimationModule.h"
-#include "Event/EventModuleBPLibrary.h"
-#include "Event/Handle/Common/EventHandle_BeginPlay.h"
-#include "Event/Handle/Common/EventHandle_EndPlay.h"
 #include "Media/MediaModule.h"
 #include "Network/NetworkModule.h"
 #include "ReferencePool/ReferencePoolModule.h"
@@ -107,11 +104,6 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_BeginPlay>(EEventNetType::Single, this);
-	}
-
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{
 		if(ModuleRefs[i] && ModuleRefs[i]->IsValidLowLevel())
@@ -154,11 +146,6 @@ void AMainModule::OnUnPause_Implementation()
 void AMainModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_EndPlay>(EEventNetType::Single, this);
-	}
 
 	for(int32 i = 0; i < ModuleRefs.Num(); i++)
 	{

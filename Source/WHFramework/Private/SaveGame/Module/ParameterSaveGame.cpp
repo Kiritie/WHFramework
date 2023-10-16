@@ -13,6 +13,8 @@ UParameterSaveGame::UParameterSaveGame()
 void UParameterSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
+
+	Refresh();
 }
 
 void UParameterSaveGame::OnLoad_Implementation(EPhase InPhase)
