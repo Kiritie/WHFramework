@@ -65,7 +65,7 @@ void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+			USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
 		}
 	}
 }

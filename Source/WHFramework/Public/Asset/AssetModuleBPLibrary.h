@@ -18,8 +18,41 @@ class WHFRAMEWORK_API UAssetModuleBPLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Classes
+public:
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
+	static void AddStaticClass(const FName InName, const FStaticClass& InStaticClass);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UClass* GetStaticClass(const FName InName);
+
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
+	static UClass* FindClass(const FString& InName, bool bExactClass = false);
+
+	template<class T> 
+	static UClass* LoadClass(const FString& InName)
+	{
+		return LoadClass(T::StaticClass(), InName);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
+	static UClass* LoadClass(UClass* InClass, const FString& InName);
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Objects
 public:
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
+	static void AddStaticObject(const FName InName, const FStaticObject& InStaticObject);
+
+	template<class T> 
+	static T* GetStaticObject(const FName InName)
+	{
+		return Cast<T>(GetStaticObject(T::StaticClass(), InName));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UObject* GetStaticObject(UClass* InClass, const FName InName);
+
 	template<class T> 
 	static T* FindObject(const FString& InName, bool bExactClass = false)
 	{
@@ -29,19 +62,31 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
 	static UObject* FindObject(UClass* InClass, const FString& InName, bool bExactClass = false);
 
+	template<class T> 
+	static T* LoadObject(const FString& InName)
+	{
+		return Cast<T>(LoadObject(T::StaticClass(), InName));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleBPLibrary")
+	static UObject* LoadObject(UClass* InClass, const FString& InName);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Enums
 public:
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
 	static UEnum* FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
 
-	UFUNCTION(BlueprintPure)
-	static UEnum* FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
+	static UEnum* FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass = false);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintPure, Category = "AssetModuleBPLibrary")
+	static UEnum* FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass = false);
+
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
 	static void AddEnumMapping(const FString& InEnumName, const FString& InOtherName);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleBPLibrary")
 	static void RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName);
 
 	//////////////////////////////////////////////////////////////////////////

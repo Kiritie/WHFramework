@@ -13,7 +13,7 @@ ADebugModule::ADebugModule()
 	ModuleName = FName("DebugModule");
 
 	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
-	DON_WITHINDEX(FindObject<UEnum>(nullptr, TEXT("/Script/WHFramework.EDebugCategory"))->NumEnums() - 1, i, 
+	DON_WITHINDEX(FindObject<UEnum>(nullptr, TEXT("/Script/WHFramework.EDebugCategory"))->NumEnums() - 2, i, 
 		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
 	)
 }

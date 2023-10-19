@@ -895,7 +895,7 @@ public:
 	}
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FGuid ActorID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

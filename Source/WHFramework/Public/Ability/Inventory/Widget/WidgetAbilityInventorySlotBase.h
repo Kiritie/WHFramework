@@ -87,9 +87,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FText KeyCode;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TSubclassOf<class UWidgetAbilityInventoryItemBase> DragVisualClass;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilityInventorySlot* OwnerSlot;
 

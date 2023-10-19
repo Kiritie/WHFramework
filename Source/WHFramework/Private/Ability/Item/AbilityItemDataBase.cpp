@@ -44,5 +44,5 @@ void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, 
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return (EAbilityItemType)UCommonBPLibrary::GetEnumValueByValueName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
+	return (EAbilityItemType)UCommonBPLibrary::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
 }

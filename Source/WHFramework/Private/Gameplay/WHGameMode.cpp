@@ -3,6 +3,7 @@
 #include "Gameplay/WHGameMode.h"
 
 #include "Gameplay/WHGameState.h"
+#include "Gameplay/WHPlayerController.h"
 #include "Main/MainModule.h"
 
 AWHGameMode::AWHGameMode()

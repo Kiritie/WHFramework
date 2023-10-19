@@ -10,7 +10,6 @@ IMPLEMENTATION_MODULE(AAssetModule)
 AAssetModule::AAssetModule()
 {
 	ModuleName = FName("AssetModule");
-
 }
 
 AAssetModule::~AAssetModule()
@@ -33,31 +32,47 @@ void AAssetModule::OnDestroy()
 void AAssetModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	for(auto Iter : DataAssets)
-	{
-		if(Iter)
-		{
-			DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
-		}
-	}
-	for(auto Iter : DataTables)
-	{
-		if(Iter)
-		{
-			FString ContextStr;
-			Iter->ForeachRow<FDataTableRowBase>(ContextStr, [](const FName& Key, const FDataTableRowBase& Value)
-			{
-				const_cast<FDataTableRowBase&>(Value).OnInitializeRow(Key);
-			});
-			DataTableMap.Add(Iter->RowStruct, Iter);
-		}
-	}
 }
 
 void AAssetModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		for(auto& Iter : StaticClasses)
+		{
+			FStaticClass& StaticClass = Iter.Value;
+			StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
+		}
+		
+		for(auto& Iter : StaticObjects)
+		{
+			FStaticObject& StaticObject = Iter.Value;
+			StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
+		}
+		
+		for(auto Iter : DataAssets)
+		{
+			if(Iter)
+			{
+				DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
+			}
+		}
+		
+		for(auto Iter : DataTables)
+		{
+			if(Iter)
+			{
+				FString ContextStr;
+				Iter->ForeachRow<FDataTableRowBase>(ContextStr, [](const FName& Key, const FDataTableRowBase& Value)
+				{
+					const_cast<FDataTableRowBase&>(Value).OnInitializeRow(Key);
+				});
+				DataTableMap.Add(Iter->RowStruct, Iter);
+			}
+		}
+	}
 }
 
 void AAssetModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -85,20 +100,67 @@ void AAssetModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
+void AAssetModule::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
+{
+	StaticClasses.Add(InName, InStaticClass);
+}
+
+UClass* AAssetModule::GetStaticClass(const FName InName)
+{
+	return StaticClasses[InName].LoadedClass;
+}
+
+UClass* AAssetModule::FindClass(const FString& InName, bool bExactClass)
+{
+	if(!ClassMappings.Contains(InName))
+	{
+		ClassMappings.Add(InName, Cast<UClass>(StaticFindObject(UClass::StaticClass(), nullptr, *InName, bExactClass)));
+	}
+	return ClassMappings[InName];
+}
+
+UClass* AAssetModule::LoadClass(UClass* InClass, const FString& InName)
+{
+	if(!ClassMappings.Contains(InName))
+	{
+		ClassMappings.Add(InName, StaticLoadClass(InClass, nullptr, *InName));
+	}
+	return ClassMappings[InName];
+}
+
+void AAssetModule::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
+{
+	StaticObjects.Add(InName, InStaticObject);
+}
+
+UObject* AAssetModule::GetStaticObject(UClass* InClass, const FName InName)
+{
+	return StaticObjects[InName].LoadedObject;
+}
+
 UObject* AAssetModule::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
 {
-	if(!ObjectMap.Contains(InName))
+	if(!ObjectMappings.Contains(InName))
 	{
-		ObjectMap.Add(InName, StaticFindObject(InClass, nullptr, *InName, bExactClass));
+		ObjectMappings.Add(InName, StaticFindObject(InClass, nullptr, *InName, bExactClass));
 	}
-	return ObjectMap[InName];
+	return ObjectMappings[InName];
+}
+
+UObject* AAssetModule::LoadObject(UClass* InClass, const FString& InName)
+{
+	if(!ObjectMappings.Contains(InName))
+	{
+		ObjectMappings.Add(InName, StaticLoadObject(InClass, nullptr, *InName));
+	}
+	return ObjectMappings[InName];
 }
 
 UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
 {
 	if(EnumMappings.Contains(InEnumName))
 	{
-		for(auto& Iter : EnumMappings[InEnumName])
+		for(auto& Iter : EnumMappings[InEnumName].EnumNames)
 		{
 			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
 			{
@@ -112,15 +174,15 @@ UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValu
 	return FindObject<UEnum>(InEnumName, bExactClass);
 }
 
-UEnum* AAssetModule::FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass)
+UEnum* AAssetModule::FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
 {
 	if(EnumMappings.Contains(InEnumName))
 	{
-		for(auto& Iter : EnumMappings[InEnumName])
+		for(auto& Iter : EnumMappings[InEnumName].EnumNames)
 		{
 			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
 			{
-				if(Enum->IsValidEnumName(*InEnumValueName))
+				if(Enum->IsValidEnumName(*InEnumAuthoredName))
 				{
 					return Enum;
 				}
@@ -130,21 +192,42 @@ UEnum* AAssetModule::FindEnumByValueName(const FString& InEnumName, const FStrin
 	return FindObject<UEnum>(InEnumName, bExactClass);
 }
 
+UEnum* AAssetModule::FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
+{
+	if(EnumMappings.Contains(InEnumName))
+	{
+		for(auto& Iter : EnumMappings[InEnumName].EnumNames)
+		{
+			if(UEnum* Enum = FindObject<UEnum>(Iter, bExactClass))
+			{
+				for(int32 i = 0; i < Enum->NumEnums() - 1; i++)
+				{
+					if(Enum->GetDisplayNameTextByIndex(i).ToString().Equals(InEnumDisplayName))
+					{
+						return Enum;
+					}
+				}
+			}
+		}
+	}
+	return FindObject<UEnum>(InEnumName, bExactClass);
+}
+
 void AAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
-	TArray<FString>& Mappings = EnumMappings.FindOrAdd(InEnumName);
-	if(!Mappings.Contains(InOtherName))
+	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
+	if(!Mappings.EnumNames.Contains(InOtherName))
 	{
-		Mappings.Add(InOtherName);
+		Mappings.EnumNames.Add(InOtherName);
 	}
 }
 
 void AAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
-	TArray<FString>& Mappings = EnumMappings.FindOrAdd(InEnumName);
-	if(Mappings.Contains(InOtherName))
+	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
+	if(Mappings.EnumNames.Contains(InOtherName))
 	{
-		Mappings.Remove(InOtherName);
+		Mappings.EnumNames.Remove(InOtherName);
 	}
 }
 

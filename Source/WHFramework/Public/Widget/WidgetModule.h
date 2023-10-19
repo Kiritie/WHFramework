@@ -184,7 +184,7 @@ public:
 			UserWidget = GetUserWidgetByName(InName);
 		}
 		
-		if(UserWidget && UserWidget->GetOwnerObject() != InOwner)
+		if(UserWidget && (UserWidget->GetOwnerObject() != InOwner || !InOwner))
 		{
 			UserWidget->OnInitialize(InOwner);
 		}
@@ -217,8 +217,9 @@ public:
 					{
 						if(TemporaryUserWidget)
 						{
-							TemporaryUserWidget->Close(true);
 							UserWidget->SetLastTemporary(TemporaryUserWidget);
+							TemporaryUserWidget->SetLastTemporary(nullptr);
+							TemporaryUserWidget->Close(true);
 						}
 						TemporaryUserWidget = UserWidget;
 					}

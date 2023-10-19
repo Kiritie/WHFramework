@@ -4,14 +4,14 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlot.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/Widget/WidgetAbilityInventoryItemBase.h"
+#include "Ability/Item/Widget/WidgetAbilityItemBase.h"
+#include "Asset/AssetModuleBPLibrary.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
 UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	OwnerSlot = nullptr;
-	DragVisualClass = nullptr;
 	CooldownTimerHandle = FTimerHandle();
 }
 
@@ -125,11 +125,11 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 {
 	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
 
-	if(!IsEmpty() && DragVisualClass)
+	if(!IsEmpty())
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetAbilityInventoryItemBase>({ &GetItem() }, DragVisualClass);
+		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetAbilityItemBase>({ &GetItem() }, UAssetModuleBPLibrary::GetStaticClass(FName("DragItem")));
 	}
 }
 

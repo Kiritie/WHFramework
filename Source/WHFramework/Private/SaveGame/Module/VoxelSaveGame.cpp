@@ -19,6 +19,8 @@ void UVoxelSaveGame::OnCreate_Implementation(int32 InIndex)
 void UVoxelSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
+
+	AVoxelModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UVoxelSaveGame::OnUnload_Implementation(EPhase InPhase)

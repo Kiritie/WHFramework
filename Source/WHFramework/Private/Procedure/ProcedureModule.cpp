@@ -6,6 +6,7 @@
 #include "Main/MainModule.h"
 #include "Procedure/Base/ProcedureBase.h"
 #include "Character/CharacterModuleTypes.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"
 
 IMPLEMENTATION_MODULE(AProcedureModule)

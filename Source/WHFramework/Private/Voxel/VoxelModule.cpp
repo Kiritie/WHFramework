@@ -126,6 +126,8 @@ void AVoxelModule::OnDestroy()
 void AVoxelModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	UAssetModuleBPLibrary::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
 }
 
 void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -172,7 +174,6 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			UReferencePoolModuleBPLibrary::CreateReference(nullptr, Iter);
 		}
-		UAssetModuleBPLibrary::FindObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType"));
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -180,7 +181,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			if(bAutoSaveModule)
 			{
-				LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+				USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
 			}
 			else
 			{

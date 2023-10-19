@@ -129,36 +129,51 @@ bool UCommonBPLibrary::IsInScreenViewport(const FVector& InWorldLocation)
 
 int32 UCommonBPLibrary::GetEnumItemNum(const FString& InEnumName)
 {
-	if(const UEnum* EnumPtr = UAssetModuleBPLibrary::FindObject<UEnum>(InEnumName, true))
+	if(const UEnum* Enum = UAssetModuleBPLibrary::FindObject<UEnum>(InEnumName, true))
 	{
-		return EnumPtr->NumEnums();
+		return Enum->NumEnums() - 1;
 	}
 	return 0;
 }
 
 FString UCommonBPLibrary::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = UAssetModuleBPLibrary::FindEnumByValue(InEnumName, InEnumValue, true))
+	if(const UEnum* Enum = UAssetModuleBPLibrary::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
-		return EnumPtr->GetAuthoredNameStringByValue(InEnumValue);
+		return Enum->GetAuthoredNameStringByValue(InEnumValue);
 	}
 	return TEXT("");
 }
 
 FText UCommonBPLibrary::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* EnumPtr = UAssetModuleBPLibrary::FindEnumByValue(InEnumName, InEnumValue, true))
+	if(const UEnum* Enum = UAssetModuleBPLibrary::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
-		return EnumPtr->GetDisplayNameTextByValue(InEnumValue);
+		return Enum->GetDisplayNameTextByValue(InEnumValue);
 	}
 	return FText::GetEmpty();
 }
 
-int32 UCommonBPLibrary::GetEnumValueByValueName(const FString& InEnumName, const FString& InValueName)
+int32 UCommonBPLibrary::GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
 {
-	if(const UEnum* EnumPtr = UAssetModuleBPLibrary::FindEnumByValueName(InEnumName, InValueName))
+	if(const UEnum* Enum = UAssetModuleBPLibrary::FindEnumByAuthoredName(InEnumName, InEnumAuthoredName))
 	{
-		return EnumPtr->GetValueByNameString(InValueName);
+		return Enum->GetValueByNameString(InEnumAuthoredName);
+	}
+	return -1;
+}
+
+int32 UCommonBPLibrary::GetEnumValueByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName)
+{
+	if(const UEnum* Enum = UAssetModuleBPLibrary::FindEnumByDisplayName(InEnumName, InEnumDisplayName))
+	{
+		for(int32 i = 0; i < Enum->NumEnums() - 1; i++)
+		{
+			if(Enum->GetDisplayNameTextByIndex(i).ToString().Equals(InEnumDisplayName))
+			{
+				return Enum->GetValueByIndex(i);
+			}
+		}
 	}
 	return -1;
 }

@@ -79,9 +79,9 @@ public:
 	static USaveGameBase* CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::None);
 
 	template<class T>
-	static T* GetOrCreateSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
+	static T* GetOrCreateSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::None, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetOrCreateSaveGame(InClass, InIndex));
+		return Cast<T>(GetOrCreateSaveGame(InClass, InIndex, InPhase));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "SaveGameModuleBPLibrary")

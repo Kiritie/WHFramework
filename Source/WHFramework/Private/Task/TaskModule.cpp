@@ -72,7 +72,7 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			LoadSaveData(USaveGameModuleBPLibrary::GetOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+			USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))

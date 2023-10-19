@@ -121,7 +121,7 @@ public:
     /// Target Point
 protected:
 	UPROPERTY(EditAnywhere, Category = "TargetPoint")
-	TMap<FName, class ATargetPoint*> TargetPoints;
+	TMap<FName, ATargetPoint*> TargetPoints;
 
 public:
 	UFUNCTION(BlueprintPure)

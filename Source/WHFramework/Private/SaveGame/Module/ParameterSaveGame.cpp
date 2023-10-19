@@ -20,6 +20,8 @@ void UParameterSaveGame::OnCreate_Implementation(int32 InIndex)
 void UParameterSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
+
+	AParameterModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UParameterSaveGame::OnUnload_Implementation(EPhase InPhase)

@@ -153,13 +153,13 @@ public:
 	USaveGameBase* CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::None);
 
 	template<class T>
-	T* GetOrCreateSaveGame(int32 InIndex = -1, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
+	T* GetOrCreateSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::None, TSubclassOf<USaveGameBase> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetOrCreateSaveGame(InClass, InIndex));
+		return Cast<T>(GetOrCreateSaveGame(InClass, InIndex, InPhase));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	USaveGameBase* GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1);
+	USaveGameBase* GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex = -1, EPhase InPhase = EPhase::None);
 
 	template<class T>
 	T* LoadOrCreateSaveGame(int32 InIndex = -1, EPhase InPhase = EPhase::All, TSubclassOf<USaveGameBase> InClass = T::StaticClass())

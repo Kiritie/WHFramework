@@ -44,10 +44,55 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Classes
+protected:
+	UPROPERTY(EditAnywhere, Category = "Classes")
+	TMap<FName, FStaticClass> StaticClasses;
+
+	UPROPERTY(VisibleAnywhere, Category = "Classes")
+	TMap<FString, UClass*> ClassMappings;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void AddStaticClass(const FName InName, const FStaticClass& InStaticClass);
+
+	UFUNCTION(BlueprintPure)
+	UClass* GetStaticClass(const FName InName);
+
+public:
+	UFUNCTION(BlueprintPure)
+	UClass* FindClass(const FString& InName, bool bExactClass = false);
+
+	template<class T> 
+	UClass* LoadClass(const FString& InName)
+	{
+		return LoadClass(T::StaticClass(), InName);
+	}
+
+	UFUNCTION(BlueprintPure)
+	UClass* LoadClass(UClass* InClass, const FString& InName);
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Objects
 protected:
+	UPROPERTY(EditAnywhere, Category = "Objects")
+	TMap<FName, FStaticObject> StaticObjects;
+
 	UPROPERTY(VisibleAnywhere, Category = "Objects")
-	TMap<FString, UObject*> ObjectMap;
+	TMap<FString, UObject*> ObjectMappings;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void AddStaticObject(const FName InName, const FStaticObject& InStaticObject);
+
+	template<class T> 
+	T* GetStaticObject(const FName InName)
+	{
+		return Cast<T>(GetStaticObject(T::StaticClass(), InName));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UObject* GetStaticObject(UClass* InClass, const FName InName);
 
 public:
 	template<class T> 
@@ -59,17 +104,30 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UObject* FindObject(UClass* InClass, const FString& InName, bool bExactClass = false);
 
+	template<class T> 
+	T* LoadObject(const FString& InName)
+	{
+		return Cast<T>(LoadObject(T::StaticClass(), InName));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UObject* LoadObject(UClass* InClass, const FString& InName);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Enums
 protected:
-	TMap<FString, TArray<FString>> EnumMappings;
+	UPROPERTY(EditAnywhere, Category = "Enums")
+	TMap<FString, FEnumMapping> EnumMappings;
 
 public:
 	UFUNCTION(BlueprintPure)
 	UEnum* FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
 
 	UFUNCTION(BlueprintPure)
-	UEnum* FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass = false);
+	UEnum* FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass = false);
+
+	UFUNCTION(BlueprintPure)
+	UEnum* FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass = false);
 
 	UFUNCTION(BlueprintCallable)
 	void AddEnumMapping(const FString& InEnumName, const FString& InOtherName);

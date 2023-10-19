@@ -5,11 +5,72 @@
 
 #include "Asset/AssetModule.h"
 
+void UAssetModuleBPLibrary::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		AssetModule->AddStaticClass(InName, InStaticClass);
+	}
+}
+
+UClass* UAssetModuleBPLibrary::GetStaticClass(const FName InName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->GetStaticClass(InName);
+	}
+	return nullptr;
+}
+
+UClass* UAssetModuleBPLibrary::FindClass(const FString& InName, bool bExactClass)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->FindClass(InName, bExactClass);
+	}
+	return nullptr;
+}
+
+UClass* UAssetModuleBPLibrary::LoadClass(UClass* InClass, const FString& InName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->LoadClass(InClass, InName);
+	}
+	return nullptr;
+}
+
+void UAssetModuleBPLibrary::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		AssetModule->AddStaticObject(InName, InStaticObject);
+	}
+}
+
+UObject* UAssetModuleBPLibrary::GetStaticObject(UClass* InClass, const FName InName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->GetStaticObject(InClass, InName);
+	}
+	return nullptr;
+}
+
 UObject* UAssetModuleBPLibrary::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
 		return AssetModule->FindObject(InClass, InName, bExactClass);
+	}
+	return nullptr;
+}
+
+UObject* UAssetModuleBPLibrary::LoadObject(UClass* InClass, const FString& InName)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->LoadObject(InClass, InName);
 	}
 	return nullptr;
 }
@@ -23,11 +84,20 @@ UEnum* UAssetModuleBPLibrary::FindEnumByValue(const FString& InEnumName, int32 I
 	return nullptr;
 }
 
-UEnum* UAssetModuleBPLibrary::FindEnumByValueName(const FString& InEnumName, const FString& InEnumValueName, bool bExactClass)
+UEnum* UAssetModuleBPLibrary::FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
 {
 	if(AAssetModule* AssetModule = AAssetModule::Get())
 	{
-		return AssetModule->FindEnumByValueName(InEnumName, InEnumValueName, bExactClass);
+		return AssetModule->FindEnumByAuthoredName(InEnumName, InEnumAuthoredName, bExactClass);
+	}
+	return nullptr;
+}
+
+UEnum* UAssetModuleBPLibrary::FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
+{
+	if(AAssetModule* AssetModule = AAssetModule::Get())
+	{
+		return AssetModule->FindEnumByDisplayName(InEnumName, InEnumDisplayName, bExactClass);
 	}
 	return nullptr;
 }

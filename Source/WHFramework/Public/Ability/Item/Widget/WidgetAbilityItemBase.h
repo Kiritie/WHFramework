@@ -4,22 +4,18 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Widget/Screen/UMG/SubWidgetBase.h"
-#include "WidgetAbilityInventoryItemBase.generated.h"
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryItemSelected);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryItemUnSelected);
+#include "WidgetAbilityItemBase.generated.h"
 
 /**
  * UI构建项
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetAbilityInventoryItemBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityItemBase : public USubWidgetBase
 {
 	GENERATED_BODY()
 	
 public:
-	UWidgetAbilityInventoryItemBase(const FObjectInitializer& ObjectInitializer);
+	UWidgetAbilityItemBase(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -36,18 +32,6 @@ public:
 	virtual void OnRefresh_Implementation() override;
 
 	virtual void OnDestroy_Implementation() override;
-
-public:
-	virtual FReply NativeOnFocusReceived(const FGeometry& InGeometry, const FFocusEvent& InFocusEvent) override;
-	
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-
-public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnSelected();
-
-	UFUNCTION(BlueprintNativeEvent)
-	void OnUnSelected();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

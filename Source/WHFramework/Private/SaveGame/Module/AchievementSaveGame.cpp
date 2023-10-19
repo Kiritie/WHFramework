@@ -19,6 +19,8 @@ void UAchievementSaveGame::OnCreate_Implementation(int32 InIndex)
 void UAchievementSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
+
+	AAchievementModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UAchievementSaveGame::OnUnload_Implementation(EPhase InPhase)

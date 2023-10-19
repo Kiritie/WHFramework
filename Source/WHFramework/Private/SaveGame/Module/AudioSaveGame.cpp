@@ -19,6 +19,8 @@ void UAudioSaveGame::OnCreate_Implementation(int32 InIndex)
 void UAudioSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
+
+	AAudioModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UAudioSaveGame::OnUnload_Implementation(EPhase InPhase)

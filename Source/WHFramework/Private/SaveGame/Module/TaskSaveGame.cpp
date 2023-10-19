@@ -18,6 +18,8 @@ void UTaskSaveGame::OnCreate_Implementation(int32 InIndex)
 void UTaskSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
+
+	ATaskModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UTaskSaveGame::OnUnload_Implementation(EPhase InPhase)

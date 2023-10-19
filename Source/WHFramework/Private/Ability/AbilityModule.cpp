@@ -54,6 +54,8 @@ void AAbilityModule::OnDestroy()
 void AAbilityModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	UAssetModuleBPLibrary::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
 }
 
 void AAbilityModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -63,7 +65,7 @@ void AAbilityModule::OnPreparatory_Implementation(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		DON_WITHINDEX(UCommonBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
-			UAssetModuleBPLibrary::RegisterPrimaryAssetType(*UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
+			if(i > 0) UAssetModuleBPLibrary::RegisterPrimaryAssetType(*UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
 		);
 	}
 }
