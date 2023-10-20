@@ -109,4 +109,20 @@ public:
 	virtual FSaveData* GetSaveData() { return nullptr; }
 
 	virtual void SetSaveData(FSaveData* InSaveData) { }
+
+	template<typename T>
+	T* GetDefaultData()
+	{
+		return static_cast<T*>(GetDefaultData());
+	}
+	
+	template<typename T>
+	T& GetDefaultDataRef()
+	{
+		return *GetDefaultData<T>();
+	}
+
+	virtual FSaveData* GetDefaultData() { return nullptr; }
+
+	virtual void SetDefaultData(FSaveData* InDefaultData) { }
 };

@@ -16,7 +16,7 @@ class UTaskBase;
  */
 
 UCLASS()
-class WHFRAMEWORK_API ATaskModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API ATaskModule : public AModuleBase
 {
 	GENERATED_BODY()
 		

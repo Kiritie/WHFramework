@@ -72,7 +72,7 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+			Load();
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
@@ -140,7 +140,7 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+			Save();
 		}
 	}
 }

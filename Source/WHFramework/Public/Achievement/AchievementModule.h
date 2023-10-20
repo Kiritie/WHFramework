@@ -17,7 +17,7 @@ class UWidgetAchievement;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AAchievementModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API AAchievementModule : public AModuleBase
 {
 	GENERATED_BODY()
 
@@ -52,6 +52,8 @@ public:
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
 

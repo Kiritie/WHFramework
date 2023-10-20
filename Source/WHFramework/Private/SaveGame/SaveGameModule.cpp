@@ -14,6 +14,7 @@ IMPLEMENTATION_MODULE(ASaveGameModule)
 ASaveGameModule::ASaveGameModule()
 {
 	ModuleName = FName("SaveGameModule");
+	bAutoSaveModule = true;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 
 	UserIndex = 0;
@@ -47,7 +48,10 @@ void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		LoadSaveData(LoadOrCreateSaveGame(ModuleSaveGame, 0)->GetSaveData());
+		if(bAutoSaveModule)
+		{
+			Load();
+		}
 	}
 }
 
@@ -72,25 +76,31 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SaveSaveGame(ModuleSaveGame, 0, true);
+		if(bAutoSaveModule)
+		{
+			Save();
+		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		for(auto& Iter1 : SaveGameInfos)
+		if(bAutoSaveModule)
 		{
-			for(const auto Iter2 : Iter1.Value.SaveGames)
+			for(auto& Iter1 : SaveGameInfos)
 			{
-				if(Iter2->IsSaved())
+				for(const auto Iter2 : Iter1.Value.SaveGames)
 				{
-					UGameplayStatics::SaveGameToSlot(Iter2, GetSlotName(Iter2->SaveName, Iter2->GetSaveIndex()), UserIndex);
+					if(Iter2->IsSaved())
+					{
+						UGameplayStatics::SaveGameToSlot(Iter2, GetSlotName(Iter2->SaveName, Iter2->GetSaveIndex()), UserIndex);
+					}
 				}
 			}
-		}
-		for(auto Iter : DestroyedSlotNames)
-		{
-			if(UGameplayStatics::DoesSaveGameExist(Iter, UserIndex))
+			for(auto Iter : DestroyedSlotNames)
 			{
-				UGameplayStatics::DeleteGameInSlot(Iter, UserIndex);
+				if(UGameplayStatics::DoesSaveGameExist(Iter, UserIndex))
+				{
+					UGameplayStatics::DeleteGameInSlot(Iter, UserIndex);
+				}
 			}
 		}
 	}

@@ -13,6 +13,9 @@ UTaskSaveGame::UTaskSaveGame()
 void UTaskSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
+
+	Refresh();
+	SetDefaultData(GetSaveData());
 }
 
 void UTaskSaveGame::OnLoad_Implementation(EPhase InPhase)

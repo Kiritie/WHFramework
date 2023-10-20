@@ -1,9 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Media/MediaPlayer/Panel/PanelMediaPlayer.h"
+#include "Video/MediaPlayer/Panel/PanelMediaPlayer.h"
 
 #include "MediaPlayer.h"
+#include "Video/VideoModuleTypes.h"
 
 APanelMediaPlayer::APanelMediaPlayer()
 {

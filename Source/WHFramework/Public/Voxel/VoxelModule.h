@@ -21,7 +21,7 @@ class AVoxelEntityPreview;
  * 体素模块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelModule : public AModuleBase
 {
 	GENERATED_BODY()
 

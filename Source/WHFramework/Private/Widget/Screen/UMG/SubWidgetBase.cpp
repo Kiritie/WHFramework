@@ -3,6 +3,8 @@
 
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 
+#include "Widget/Screen/UMG/UserWidgetBase.h"
+
 USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	Owner = nullptr;
@@ -19,6 +21,19 @@ void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	RemoveFromParent();
 }
 
+void USubWidgetBase::Refresh()
+{
+	OnRefresh();
+}
+
+void USubWidgetBase::Destroy(bool bRecovery)
+{
+	if(Owner)
+	{
+		Owner->DestroySubWidget(this, bRecovery);
+	}
+}
+
 void USubWidgetBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
 {
 	Owner = InOwner;
@@ -27,6 +42,7 @@ void USubWidgetBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TAr
 
 void USubWidgetBase::OnInitialize_Implementation(const TArray<FParameter>& InParams)
 {
+	Params = InParams;
 	OnRefresh();
 }
 

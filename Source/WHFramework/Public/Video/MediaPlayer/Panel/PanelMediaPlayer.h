@@ -4,7 +4,7 @@
 
 
 #include "Components/ArrowComponent.h"
-#include "Media/MediaPlayer/MediaPlayerBase.h"
+#include "Video/MediaPlayer/MediaPlayerBase.h"
 #include "PanelMediaPlayer.generated.h"
 
 /**

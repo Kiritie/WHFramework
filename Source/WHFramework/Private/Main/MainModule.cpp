@@ -16,7 +16,7 @@
 #include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
 #include "Animation/AnimationModule.h"
-#include "Media/MediaModule.h"
+#include "Video/VideoModule.h"
 #include "Network/NetworkModule.h"
 #include "ReferencePool/ReferencePoolModule.h"
 #include "Parameter/ParameterModule.h"
@@ -51,7 +51,7 @@ AMainModule::AMainModule()
 	ModuleClasses.Add(AEventModule::StaticClass());
 	ModuleClasses.Add(AFSMModule::StaticClass());
 	ModuleClasses.Add(AInputModule::StaticClass());
-	ModuleClasses.Add(AMediaModule::StaticClass());
+	ModuleClasses.Add(AVideoModule::StaticClass());
 	ModuleClasses.Add(ANetworkModule::StaticClass());
 	ModuleClasses.Add(AObjectPoolModule::StaticClass());
 	ModuleClasses.Add(AParameterModule::StaticClass());
@@ -206,18 +206,16 @@ void AMainModule::GenerateModules()
 	}
 
 	// 生成新的模块
-	for(int32 i = 0; i < ModuleClasses.Num(); i++)
+	for(auto Iter1 : ModuleClasses)
 	{
-		if(!ModuleClasses[i]) continue;
+		if(!Iter1) continue;
 
 		bool IsNeedSpawn = true;
-		for(auto Iter : ModuleRefs)
+		for(auto Iter2 : ModuleRefs)
 		{
-			if(Iter && Iter->IsA(ModuleClasses[i]))
+			if(Iter2 && Iter2->IsA(Iter1))
 			{
-				Iter->OnGenerate();
-				const FName Name = Iter->GetModuleName();
-				ModuleMap.Emplace(Name, Iter);
+				Iter2->OnGenerate();
 				IsNeedSpawn = false;
 				break;
 			}
@@ -228,14 +226,23 @@ void AMainModule::GenerateModules()
 		ActorSpawnParameters.Owner = this;
 		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(ModuleClasses[i], ActorSpawnParameters))
+		if(AModuleBase* Module = GetWorld()->SpawnActor<AModuleBase>(Iter1, ActorSpawnParameters))
 		{
 			const FName Name = Module->GetModuleName();
 			Module->SetActorLabel(Name.ToString());
 			Module->AttachToActor(this, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			Module->OnGenerate();
 			ModuleRefs.AddUnique(Module);
-			ModuleMap.Emplace(Name, Module);
+		}
+	}
+
+	ModuleMap.Empty();
+	for(auto Iter : ModuleRefs)
+	{
+		if(Iter)
+		{
+			const FName Name = Iter->GetModuleName();
+			ModuleMap.Emplace(Name, Iter);
 		}
 	}
 

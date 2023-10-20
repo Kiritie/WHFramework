@@ -13,7 +13,8 @@ void UVoxelSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
 
-	SaveData = *AVoxelModule::Get()->NewWorldData();
+	Refresh();
+	SetDefaultData(GetSaveData());
 }
 
 void UVoxelSaveGame::OnLoad_Implementation(EPhase InPhase)

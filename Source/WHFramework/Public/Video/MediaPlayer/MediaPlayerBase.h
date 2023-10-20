@@ -4,7 +4,7 @@
 
 #include "Common/Base/WHActor.h"
 
-#include "Media/MediaModuleTypes.h"
+#include "Video/VideoModuleTypes.h"
 
 #include "MediaPlayerBase.generated.h"
 

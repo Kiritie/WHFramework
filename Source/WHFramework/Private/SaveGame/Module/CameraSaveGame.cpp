@@ -14,6 +14,7 @@ void UCameraSaveGame::OnCreate_Implementation(int32 InIndex)
 	Super::OnCreate_Implementation(InIndex);
 
 	Refresh();
+	SetDefaultData(GetSaveData());
 }
 
 void UCameraSaveGame::OnLoad_Implementation(EPhase InPhase)

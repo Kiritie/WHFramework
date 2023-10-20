@@ -16,7 +16,7 @@ UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectIni
 	WidgetType = EWidgetType::Permanent;
 	WidgetInputMode = EInputMode::None;
 
-	WidgetZOrder = 10;
+	WidgetZOrder = 5;
 
 	WidgetCreateType = EWidgetCreateType::AutoCreateAndOpen;
 	WidgetRefreshType = EWidgetRefreshType::Tick;

@@ -3,6 +3,7 @@
 
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
@@ -86,7 +87,7 @@ void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 			ParentWidget->AddChild(this);
 		}
 	}
-
+	
 	for(const auto& Iter : ChildNames)
 	{
 		if(UWidgetModuleBPLibrary::HasUserWidgetClassByName(Iter))
@@ -97,6 +98,11 @@ void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 				UWidgetModuleBPLibrary::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
 			}
 		}
+	}
+
+	for(auto Iter : GetAllSubWidgets())
+	{
+		Iter->OnCreate(this, Iter->GetParams());
 	}
 }
 
@@ -364,15 +370,6 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	UInputModuleBPLibrary::UpdateGlobalInputMode();
 }
 
-bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, bool bRecovery)
-{
-	if(!InWidget) return false;
-
-	UObjectPoolModuleBPLibrary::DespawnObject(InWidget, bRecovery);
-	return true;
-}
-
-
 USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
 {
 	if(USubWidgetBase* SubWidget = UObjectPoolModuleBPLibrary::SpawnObject<USubWidgetBase>(nullptr, InClass))
@@ -381,6 +378,31 @@ USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USub
 		return SubWidget;
 	}
 	return nullptr;
+}
+
+bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, bool bRecovery)
+{
+	if(!InWidget) return false;
+
+	InWidget->OnDestroy();
+
+	UObjectPoolModuleBPLibrary::DespawnObject(InWidget, bRecovery);
+	return true;
+}
+
+TArray<USubWidgetBase*> UUserWidgetBase::GetAllSubWidgets() const
+{
+	TArray<USubWidgetBase*> SubWidgets;
+	TArray<UWidget*> Widgets;
+	UWidgetTree::GetChildWidgets(GetRootPanelWidget(), Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(USubWidgetBase* SubWidget = Cast<USubWidgetBase>(Iter))
+		{
+			SubWidgets.Add(SubWidget);
+		}
+	}
+	return SubWidgets;
 }
 
 void UUserWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)

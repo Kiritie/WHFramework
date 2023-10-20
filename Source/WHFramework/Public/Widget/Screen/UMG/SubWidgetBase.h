@@ -37,9 +37,19 @@ public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnDestroy();
 
+public:
+	UFUNCTION(BlueprintCallable)
+	void Refresh();
+
+	UFUNCTION(BlueprintCallable)
+	void Destroy(bool bRecovery = false);
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UUserWidgetBase* Owner;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn))
+	TArray<FParameter> Params;
 
 public:
 	template<class T>
@@ -50,4 +60,7 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return Owner; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<FParameter>& GetParams() { return Params; }
 };

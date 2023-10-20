@@ -3,20 +3,20 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Achievement/AchievementModuleTypes.h"
+#include "Video/VideoModuleTypes.h"
 #include "SaveGame/Base/SaveGameBase.h"
-#include "AchievementSaveGame.generated.h"
+#include "VideoSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAchievementSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UVideoSaveGame : public USaveGameBase
 {
 	GENERATED_BODY()
 	
 public:
-	UAchievementSaveGame();
+	UVideoSaveGame();
 
 public:
 	virtual void OnCreate_Implementation(int32 InIndex) override;
@@ -29,17 +29,17 @@ public:
 	
 protected:
 	UPROPERTY()
-	FAchievementModuleSaveData SaveData;
+	FVideoModuleSaveData SaveData;
 
 	UPROPERTY()
-	FAchievementModuleSaveData DefaultData;
+	FVideoModuleSaveData DefaultData;
 
 public:
 	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
-	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FAchievementModuleSaveData>(); }
+	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FVideoModuleSaveData>(); }
 
 	virtual FSaveData* GetDefaultData() override { return &DefaultData; }
 
-	virtual void SetDefaultData(FSaveData* InDefaultData) override { DefaultData = InDefaultData->CastRef<FAchievementModuleSaveData>(); }
+	virtual void SetDefaultData(FSaveData* InDefaultData) override { DefaultData = InDefaultData->CastRef<FVideoModuleSaveData>(); }
 };

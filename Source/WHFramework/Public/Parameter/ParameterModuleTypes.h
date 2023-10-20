@@ -216,6 +216,46 @@ public:
 		*this = MakePointer(InPointerValue);
 	}
 
+	friend bool operator==(const FParameter& A, const FParameter& B)
+	{
+		switch (A.ParameterType)
+		{
+			case EParameterType::Integer: return A.IntegerValue == B.IntegerValue;
+			case EParameterType::Float: return A.FloatValue == B.FloatValue;
+			case EParameterType::String: return A.StringValue == B.StringValue;
+			case EParameterType::Text: return A.TextValue.EqualTo(B.TextValue);
+			case EParameterType::Boolean: return A.BooleanValue == B.BooleanValue;
+			case EParameterType::Vector: return A.VectorValue == B.VectorValue;
+			case EParameterType::Rotator: return A.RotatorValue == B.RotatorValue;
+			case EParameterType::Color: return A.ColorValue == B.ColorValue;
+			case EParameterType::Class: return A.ClassValue == B.ClassValue;
+			case EParameterType::Object: return A.ObjectValue == B.ObjectValue;
+			case EParameterType::Pointer: return A.PointerValue == B.PointerValue;
+			default: ;
+		}
+		return false;
+	}
+
+	friend bool operator!=(const FParameter& A, const FParameter& B)
+	{
+		switch (A.ParameterType)
+		{
+			case EParameterType::Integer: return A.IntegerValue != B.IntegerValue;
+			case EParameterType::Float: return A.FloatValue != B.FloatValue;
+			case EParameterType::String: return A.StringValue != B.StringValue;
+			case EParameterType::Text: return !A.TextValue.EqualTo(B.TextValue);
+			case EParameterType::Boolean: return A.BooleanValue != B.BooleanValue;
+			case EParameterType::Vector: return A.VectorValue != B.VectorValue;
+			case EParameterType::Rotator: return A.RotatorValue != B.RotatorValue;
+			case EParameterType::Color: return A.ColorValue != B.ColorValue;
+			case EParameterType::Class: return A.ClassValue != B.ClassValue;
+			case EParameterType::Object: return A.ObjectValue != B.ObjectValue;
+			case EParameterType::Pointer: return A.PointerValue != B.PointerValue;
+			default: ;
+		}
+		return false;
+	}
+
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EParameterType ParameterType;

@@ -13,6 +13,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathBPLibrary.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/CameraSaveGame.h"
 
 IMPLEMENTATION_MODULE(ACameraModule)
@@ -195,6 +196,14 @@ void ACameraModule::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
 
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
+		{
+			Load();
+		}
+	}
+
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(DefaultCamera)
@@ -289,29 +298,34 @@ void ACameraModule::OnUnPause_Implementation()
 void ACameraModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
+		{
+			Save();
+		}
+	}
 }
 
 void ACameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FCameraModuleSaveData>();
 
-	if(SaveData.IsSaved())
-	{
-		bReverseCameraPanMove = SaveData.bReverseCameraPanMove;
-		CameraMoveRate = SaveData.CameraMoveRate;
-		bSmoothCameraMove = SaveData.bSmoothCameraMove;
-		CameraMoveSpeed = SaveData.CameraMoveSpeed;
+	bReverseCameraPanMove = SaveData.bReverseCameraPanMove;
+	CameraMoveRate = SaveData.CameraMoveRate;
+	bSmoothCameraMove = SaveData.bSmoothCameraMove;
+	CameraMoveSpeed = SaveData.CameraMoveSpeed;
 
-		bReverseCameraPitch = SaveData.bReverseCameraPitch;
-		CameraTurnRate = SaveData.CameraTurnRate;
-		CameraLookUpRate = SaveData.CameraLookUpRate;
-		bSmoothCameraRotate = SaveData.bSmoothCameraRotate;
-		CameraRotateSpeed = SaveData.CameraRotateSpeed;
+	bReverseCameraPitch = SaveData.bReverseCameraPitch;
+	CameraTurnRate = SaveData.CameraTurnRate;
+	CameraLookUpRate = SaveData.CameraLookUpRate;
+	bSmoothCameraRotate = SaveData.bSmoothCameraRotate;
+	CameraRotateSpeed = SaveData.CameraRotateSpeed;
 
-		CameraZoomRate = SaveData.CameraZoomRate;
-		bSmoothCameraZoom = SaveData.bSmoothCameraZoom;
-		CameraZoomSpeed = SaveData.CameraZoomSpeed;
-	}
+	CameraZoomRate = SaveData.CameraZoomRate;
+	bSmoothCameraZoom = SaveData.bSmoothCameraZoom;
+	CameraZoomSpeed = SaveData.CameraZoomSpeed;
 }
 
 void ACameraModule::UnloadData(EPhase InPhase)

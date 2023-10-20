@@ -11,7 +11,7 @@
 #include "Common/CommonBPLibrary.h"
 #include "Input/InputModule.h"
 #include "Kismet/GameplayStatics.h"
-#include "Media/MediaModuleNetworkComponent.h"
+#include "Video/VideoModuleNetworkComponent.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
@@ -35,8 +35,8 @@ AWHPlayerController::AWHPlayerController()
 	EventModuleNetComp = CreateDefaultSubobject<UEventModuleNetworkComponent>(FName("EventModuleNetComp"));
 	ModuleNetCompMap.Add(UEventModuleNetworkComponent::StaticClass(), EventModuleNetComp);
 	
-	MediaModuleNetComp = CreateDefaultSubobject<UMediaModuleNetworkComponent>(FName("MediaModuleNetComp"));
-	ModuleNetCompMap.Add(UMediaModuleNetworkComponent::StaticClass(), MediaModuleNetComp);
+	VideoModuleNetComp = CreateDefaultSubobject<UVideoModuleNetworkComponent>(FName("VideoModuleNetComp"));
+	ModuleNetCompMap.Add(UVideoModuleNetworkComponent::StaticClass(), VideoModuleNetComp);
 	
 	NetworkModuleNetComp = CreateDefaultSubobject<UNetworkModuleNetworkComponent>(FName("NetworkModuleNetComp"));
 	ModuleNetCompMap.Add(UNetworkModuleNetworkComponent::StaticClass(), NetworkModuleNetComp);

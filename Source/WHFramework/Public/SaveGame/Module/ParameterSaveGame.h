@@ -31,8 +31,15 @@ protected:
 	UPROPERTY()
 	FParameterModuleSaveData SaveData;
 
+	UPROPERTY()
+	FParameterModuleSaveData DefaultData;
+
 public:
 	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
 	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FParameterModuleSaveData>(); }
+
+	virtual FSaveData* GetDefaultData() override { return &DefaultData; }
+
+	virtual void SetDefaultData(FSaveData* InDefaultData) override { DefaultData = InDefaultData->CastRef<FParameterModuleSaveData>(); }
 };

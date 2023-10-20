@@ -65,7 +65,7 @@ void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+			Load();
 		}
 	}
 }
@@ -93,7 +93,7 @@ void AAchievementModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+			Save();
 		}
 	}
 }
@@ -104,6 +104,14 @@ void AAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	States = SaveData.States;
 	TotalUnlocked = SaveData.TotalUnlocked;
+}
+
+void AAchievementModule::UnloadData(EPhase InPhase)
+{
+	Super::UnloadData(InPhase);
+
+	States.SetNum(Achievements.Num());
+	TotalUnlocked = 0;
 }
 
 FSaveData* AAchievementModule::ToData()

@@ -6,13 +6,12 @@
 #include "ParameterManager.h"
 #include "ParameterModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "ParameterModule.generated.h"
 
 class ATargetPoint;
 
 UCLASS()
-class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterManager, public ISaveDataInterface
+class WHFRAMEWORK_API AParameterModule : public AModuleBase, public IParameterManager
 {
 	GENERATED_BODY()
 				

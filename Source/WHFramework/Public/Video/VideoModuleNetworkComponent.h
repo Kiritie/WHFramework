@@ -5,19 +5,19 @@
 
 #include "Main/Base/ModuleNetworkComponentBase.h"
 
-#include "MediaModuleNetworkComponent.generated.h"
+#include "VideoModuleNetworkComponent.generated.h"
 
 class AMediaPlayerBase;
 /**
 * 
 */
 UCLASS()
-class WHFRAMEWORK_API UMediaModuleNetworkComponent : public UModuleNetworkComponentBase
+class WHFRAMEWORK_API UVideoModuleNetworkComponent : public UModuleNetworkComponentBase
 {
 	GENERATED_BODY()
 
 public:
-	UMediaModuleNetworkComponent();
+	UVideoModuleNetworkComponent();
 	
 public:
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)

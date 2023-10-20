@@ -104,7 +104,7 @@ void AAudioModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+			Load();
 		}
 	}
 
@@ -140,7 +140,7 @@ void AAudioModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+			Save();
 		}
 	}
 }
@@ -149,13 +149,10 @@ void AAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FAudioModuleSaveData>();
 
-	if(SaveData.IsSaved())
-	{
-		GlobalSoundParams = SaveData.GlobalSoundParams;
-		BackgroundSoundParams = SaveData.BackgroundSoundParams;
-		EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
-		EffectSoundParams = SaveData.EffectSoundParams;
-	}
+	GlobalSoundParams = SaveData.GlobalSoundParams;
+	BackgroundSoundParams = SaveData.BackgroundSoundParams;
+	EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
+	EffectSoundParams = SaveData.EffectSoundParams;
 }
 
 void AAudioModule::UnloadData(EPhase InPhase)

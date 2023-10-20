@@ -4,7 +4,6 @@
 
 
 #include "SaveGameModuleTypes.h"
-#include "Base/SaveDataInterface.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "SaveGameModule.generated.h"
@@ -13,7 +12,7 @@ class UGeneralSaveGame;
 class ATargetPoint;
 
 UCLASS()
-class WHFRAMEWORK_API ASaveGameModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API ASaveGameModule : public AModuleBase
 {
 	GENERATED_BODY()
 

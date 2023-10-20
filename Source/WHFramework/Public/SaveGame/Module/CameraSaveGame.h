@@ -31,8 +31,15 @@ protected:
 	UPROPERTY()
 	FCameraModuleSaveData SaveData;
 
+	UPROPERTY()
+	FCameraModuleSaveData DefaultData;
+
 public:
 	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
 	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FCameraModuleSaveData>(); }
+
+	virtual FSaveData* GetDefaultData() override { return &DefaultData; }
+
+	virtual void SetDefaultData(FSaveData* InDefaultData) override { DefaultData = InDefaultData->CastRef<FCameraModuleSaveData>(); }
 };

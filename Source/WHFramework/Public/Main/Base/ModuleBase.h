@@ -5,12 +5,13 @@
 
 #include "Common/Base/WHActor.h"
 #include "Main/MainModuleTypes.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 #include "ModuleBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
 UCLASS()
-class WHFRAMEWORK_API AModuleBase : public AWHActor
+class WHFRAMEWORK_API AModuleBase : public AWHActor, public ISaveDataInterface
 {
 	GENERATED_BODY()
 	
@@ -41,10 +42,19 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
 public:
 	virtual void OnReset_Implementation() override;
+
+public:
 	/**
 	* 当暂停
 	*/
@@ -62,6 +72,16 @@ public:
 	void OnStateChanged(EModuleState InModuleState);
 
 public:
+	/**
+	* 加载
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void Load();
+	/**
+	* 保存
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	void Save();
 	/**
 	* 运行
 	*/

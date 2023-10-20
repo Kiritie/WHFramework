@@ -31,8 +31,15 @@ protected:
 	UPROPERTY()
 	FAudioModuleSaveData SaveData;
 
+	UPROPERTY()
+	FAudioModuleSaveData DefaultData;
+
 public:
 	virtual FSaveData* GetSaveData() override { return &SaveData; }
 
 	virtual void SetSaveData(FSaveData* InSaveData) override { SaveData = InSaveData->CastRef<FAudioModuleSaveData>(); }
+
+	virtual FSaveData* GetDefaultData() override { return &DefaultData; }
+
+	virtual void SetDefaultData(FSaveData* InDefaultData) override { DefaultData = InDefaultData->CastRef<FAudioModuleSaveData>(); }
 };

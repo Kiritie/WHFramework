@@ -16,7 +16,7 @@ class AWHPlayerController;
 class ACameraPawnBase;
 
 UCLASS()
-class WHFRAMEWORK_API ACameraModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API ACameraModule : public AModuleBase
 {
 	GENERATED_BODY()
 	
@@ -377,6 +377,12 @@ public:
 	void SetCameraMoveRate(float InCameraMoveRate) { CameraMoveRate = InCameraMoveRate; }
 
 	UFUNCTION(BlueprintPure)
+	bool IsSmoothCameraMove() const { return bSmoothCameraMove; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetSmoothCameraMove(bool bInSmoothCameraMove) { bSmoothCameraMove = bInSmoothCameraMove; }
+
+	UFUNCTION(BlueprintPure)
 	float GetCameraMoveSpeed() const { return CameraMoveSpeed; }
 
 	UFUNCTION(BlueprintCallable)
@@ -397,6 +403,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsReverseCameraPitch() const { return bReverseCameraPitch; }
 
+	UFUNCTION(BlueprintCallable)
+	void SetReverseCameraPitch(bool bInReverseCameraPitch) { bReverseCameraPitch = bInReverseCameraPitch; }
+
 	UFUNCTION(BlueprintPure)
 	float GetCameraTurnRate() const { return CameraTurnRate; }
 
@@ -408,6 +417,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetCameraLookUpRate(float InCameraLookUpRate) { CameraLookUpRate = InCameraLookUpRate; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsSmoothCameraRotate() const { return bSmoothCameraRotate; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetSmoothCameraRotate(bool bInSmoothCameraRotate) { bSmoothCameraRotate = bInSmoothCameraRotate; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraRotateSpeed() const { return CameraRotateSpeed; }
@@ -450,6 +465,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetCameraZoomRate(float InCameraZoomRate) { CameraZoomRate = InCameraZoomRate; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsSmoothCameraZoom() const { return bSmoothCameraZoom; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetSmoothCameraZoom(bool bInSmoothCameraZoom) { bSmoothCameraZoom = bInSmoothCameraZoom; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraZoomSpeed() const { return CameraZoomSpeed; }

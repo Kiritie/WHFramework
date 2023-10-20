@@ -181,7 +181,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 		{
 			if(bAutoSaveModule)
 			{
-				USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+				Load();
 			}
 			else
 			{
@@ -224,7 +224,7 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		if(bAutoSaveModule)
 		{
-			USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+			Save();
 		}
 	}
 }

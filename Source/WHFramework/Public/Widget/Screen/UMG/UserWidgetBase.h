@@ -113,6 +113,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	bool DestroySubWidget(USubWidgetBase* InWidget, bool bRecovery = false);
 
+	UFUNCTION(BlueprintPure)
+	TArray<USubWidgetBase*> GetAllSubWidgets() const;
+
 public:
 	void AddChild(IScreenWidgetInterface* InChildWidget) override;
 

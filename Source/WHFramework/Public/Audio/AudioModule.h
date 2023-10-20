@@ -11,7 +11,7 @@
 
 class UAudioComponent;
 UCLASS()
-class WHFRAMEWORK_API AAudioModule : public AModuleBase, public ISaveDataInterface
+class WHFRAMEWORK_API AAudioModule : public AModuleBase
 {
 	GENERATED_BODY()
 		

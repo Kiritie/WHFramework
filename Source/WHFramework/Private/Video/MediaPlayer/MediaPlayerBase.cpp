@@ -1,11 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Media/MediaPlayer/MediaPlayerBase.h"
+#include "Video/MediaPlayer/MediaPlayerBase.h"
 
 #include "Main/MainModule.h"
-#include "Media/MediaModuleBPLibrary.h"
-#include "Media/MediaModuleNetworkComponent.h"
+#include "Video/VideoModuleBPLibrary.h"
+#include "Video/VideoModuleNetworkComponent.h"
 
 AMediaPlayerBase::AMediaPlayerBase()
 {
@@ -25,9 +25,9 @@ void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bM
 		{
 			MultiPlayMovie(InMovieName);
 		}
-		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UMediaModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
 		{
-			MediaModuleNetworkComponent->ServerPlayMovieMulticast(this, InMovieName);
+			VideoModuleNetworkComponent->ServerPlayMovieMulticast(this, InMovieName);
 		}
 		return;
 	}
@@ -59,9 +59,9 @@ void AMediaPlayerBase::StopMovie_Implementation(bool bSkip, bool bMulticast)
 		{
 			MultiStopMovie(bSkip);
 		}
-		else if(UMediaModuleNetworkComponent* MediaModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UMediaModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
 		{
-			MediaModuleNetworkComponent->ServerStopMovieMulticast(this, bSkip);
+			VideoModuleNetworkComponent->ServerStopMovieMulticast(this, bSkip);
 		}
 		return;
 	}

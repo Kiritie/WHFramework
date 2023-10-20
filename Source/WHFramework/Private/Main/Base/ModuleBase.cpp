@@ -4,6 +4,7 @@
 #include "Main/Base/ModuleBase.h"
 
 #include "Net/UnrealNetwork.h"
+#include "SaveGame/SaveGameModuleBPLibrary.h"
 
 // Sets default values
 AModuleBase::AModuleBase()
@@ -51,9 +52,33 @@ void AModuleBase::OnTermination_Implementation(EPhase InPhase)
 	
 }
 
+void AModuleBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+}
+
+void AModuleBase::UnloadData(EPhase InPhase)
+{
+	ISaveDataInterface::UnloadData(InPhase);
+}
+
+FSaveData* AModuleBase::ToData()
+{
+	return nullptr;
+}
+
 void AModuleBase::OnReset_Implementation()
 {
 	
+}
+
+void AModuleBase::Load_Implementation()
+{
+	USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+}
+
+void AModuleBase::Save_Implementation()
+{
+	USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
 }
 
 void AModuleBase::OnPause_Implementation()

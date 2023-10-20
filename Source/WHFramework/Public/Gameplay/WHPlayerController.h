@@ -58,7 +58,7 @@ protected:
 	class UEventModuleNetworkComponent* EventModuleNetComp;
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UMediaModuleNetworkComponent* MediaModuleNetComp;
+	class UVideoModuleNetworkComponent* VideoModuleNetComp;
 		
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UNetworkModuleNetworkComponent* NetworkModuleNetComp;

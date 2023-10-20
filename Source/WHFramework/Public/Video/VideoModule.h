@@ -1,0 +1,167 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+
+#include "VideoModuleTypes.h"
+#include "Main/Base/ModuleBase.h"
+
+#include "VideoModule.generated.h"
+
+class AMediaPlayerBase;
+class UGameUserSettings;
+UCLASS()
+class WHFRAMEWORK_API AVideoModule : public AModuleBase
+{
+	GENERATED_BODY()
+			
+	GENERATED_MODULE(AVideoModule)
+
+public:	
+	// ParamSets default values for this actor's properties
+	AVideoModule();
+
+	~AVideoModule();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Module
+public:
+#if WITH_EDITOR
+	virtual void OnGenerate() override;
+
+	virtual void OnDestroy() override;
+#endif
+
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnPause_Implementation() override;
+
+	virtual void OnUnPause_Implementation() override;
+
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// MediaPlayer
+protected:
+	UPROPERTY(EditAnywhere, Replicated, Category = "MediaPlayer")
+	TArray<AMediaPlayerBase*> MediaPlayers;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveMediaPlayerFromListByName(const FName InName);
+
+	UFUNCTION(BlueprintPure)
+	AMediaPlayerBase* GetMediaPlayerByName(const FName InName) const;
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Movie
+public:
+	UFUNCTION(BlueprintCallable)
+	void PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable)
+	void PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	
+	UFUNCTION(BlueprintCallable)
+	void StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// VideoSetting
+protected:
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality GlobalVideoQuality;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void ApplyVideoQualitySettings();
+	
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetGlobalVideoQuality() const { return GlobalVideoQuality; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetViewDistanceQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetViewDistanceQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetShadowQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetShadowQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetGlobalIlluminationQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetGlobalIlluminationQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetReflectionQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetReflectionQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetAntiAliasingQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetAntiAliasingQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetTextureQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetTextureQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetVisualEffectQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetVisualEffectQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetPostProcessingQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetPostProcessingQuality() const;
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetFoliageQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetFoliageQuality() const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetShadingQuality(EVideoQuality InQuality, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetShadingQuality() const;
+
+protected:
+	UFUNCTION(BlueprintPure)
+	virtual UGameUserSettings* GetGameUserSettings() const;
+
+public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+};
