@@ -4,6 +4,7 @@
 
 #include "Audio/AudioModuleNetworkComponent.h"
 #include "Camera/CameraModuleNetworkComponent.h"
+#include "Camera/Base/CameraManagerBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Event/EventModuleNetworkComponent.h"
@@ -18,6 +19,8 @@
 
 AWHPlayerController::AWHPlayerController()
 {
+	PlayerCameraManagerClass = ACameraManagerBase::StaticClass();
+	
 	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(FName("WidgetInteractionComp"));
 	WidgetInteractionComp->SetupAttachment(RootComponent);
 
@@ -96,6 +99,11 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 void AWHPlayerController::OnUnPossess()
 {
 	Super::OnUnPossess();
+}
+
+void AWHPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
 }
 
 void AWHPlayerController::Tick(float DeltaSeconds) 

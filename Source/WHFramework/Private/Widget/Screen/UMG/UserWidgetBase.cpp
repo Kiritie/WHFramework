@@ -46,19 +46,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 FReply UUserWidgetBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if(UInputModuleBPLibrary::OnWidgetInputKeyDown(InGeometry, InKeyEvent).NativeReply.IsEventHandled())
-	{
-		return FReply::Handled();
-	}
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
 FReply UUserWidgetBase::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if(UInputModuleBPLibrary::OnWidgetInputKeyUp(InGeometry, InKeyEvent).NativeReply.IsEventHandled())
-	{
-		return FReply::Handled();
-	}
 	return Super::NativeOnKeyUp(InGeometry, InKeyEvent);
 }
 
@@ -77,7 +69,7 @@ void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	
 }
 
-void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
+void UUserWidgetBase::OnCreate(UObject* InOwner)
 {
 	if(ParentName != NAME_None)
 	{
@@ -104,9 +96,11 @@ void UUserWidgetBase::OnCreate_Implementation(UObject* InOwner)
 	{
 		Iter->OnCreate(this, Iter->GetParams());
 	}
+
+	K2_OnCreate(InOwner);
 }
 
-void UUserWidgetBase::OnInitialize_Implementation(UObject* InOwner)
+void UUserWidgetBase::OnInitialize(UObject* InOwner)
 {
 	OwnerObject = InOwner;
 	
@@ -114,9 +108,11 @@ void UUserWidgetBase::OnInitialize_Implementation(UObject* InOwner)
 	{
 		Iter->OnInitialize(InOwner);
 	}
+
+	K2_OnInitialize(InOwner);
 }
 
-void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
+void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
 	
@@ -196,9 +192,11 @@ void UUserWidgetBase::OnOpen_Implementation(const TArray<FParameter>& InParams, 
 
 	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
 	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
+
+	K2_OnOpen(InParams, bInstant);
 }
 
-void UUserWidgetBase::OnClose_Implementation(bool bInstant)
+void UUserWidgetBase::OnClose(bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Closing || WidgetState == EScreenWidgetState::Closed) return;
 	
@@ -218,19 +216,21 @@ void UUserWidgetBase::OnClose_Implementation(bool bInstant)
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
+
+	K2_OnClose(bInstant);
 }
 
-void UUserWidgetBase::OnReset_Implementation()
+void UUserWidgetBase::OnReset()
 {
-	
+	K2_OnReset();
 }
 
-void UUserWidgetBase::OnRefresh_Implementation()
+void UUserWidgetBase::OnRefresh()
 {
-	
+	K2_OnRefresh();
 }
 
-void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
+void UUserWidgetBase::OnDestroy(bool bRecovery)
 {
 	if(IsInViewport())
 	{
@@ -248,11 +248,15 @@ void UUserWidgetBase::OnDestroy_Implementation(bool bRecovery)
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
+
+	K2_OnDestroy(bRecovery);
 }
 
-void UUserWidgetBase::OnStateChanged_Implementation(EScreenWidgetState InWidgetState)
+void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 {
 	OnWidgetStateChanged.Broadcast(InWidgetState);
+
+	K2_OnStateChanged(InWidgetState);
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)

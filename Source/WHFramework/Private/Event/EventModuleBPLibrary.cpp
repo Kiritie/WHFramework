@@ -16,10 +16,13 @@ void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass
 
 void UEventModuleBPLibrary::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	SubscribeEventByDelegate(InClass, InDelegate);
+	if(AEventModule* EventModule = AEventModule::Get())
+	{
+		EventModule->SubscribeEvent(InClass, InDelegate);
+	}
 }
 
-void UEventModuleBPLibrary::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void UEventModuleBPLibrary::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{
@@ -37,10 +40,13 @@ void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InCla
 
 void UEventModuleBPLibrary::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	UnsubscribeEventByDelegate(InClass, InDelegate);
+	if(AEventModule* EventModule = AEventModule::Get())
+	{
+		EventModule->UnsubscribeEvent(InClass, InDelegate);
+	}
 }
 
-void UEventModuleBPLibrary::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void UEventModuleBPLibrary::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	if(AEventModule* EventModule = AEventModule::Get())
 	{

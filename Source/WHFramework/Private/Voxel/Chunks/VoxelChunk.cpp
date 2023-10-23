@@ -312,8 +312,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 
 void AVoxelChunk::BuildMesh()
 {
-	for(auto& Iter : VoxelMap)
-	{
+	ITER_MAP(TMap(VoxelMap), Iter,
 		const FVoxelItem& VoxelItem = Iter.Value;
 		if(VoxelItem.IsValid())
 		{
@@ -337,7 +336,7 @@ void AVoxelChunk::BuildMesh()
 				default: break;
 			}
 		}
-	}
+	);
 }
 
 void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)

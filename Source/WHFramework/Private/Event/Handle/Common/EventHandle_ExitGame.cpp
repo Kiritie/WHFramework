@@ -1,21 +1,21 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Event/Handle/Common/EventHandle_EndPlay.h"
+#include "Event/Handle/Common/EventHandle_ExitGame.h"
 
-UEventHandle_EndPlay::UEventHandle_EndPlay()
+UEventHandle_ExitGame::UEventHandle_ExitGame()
 {
 	EventType = EEventType::Multicast;
 
 	bIsSimulating = false;
 }
 
-void UEventHandle_EndPlay::OnDespawn_Implementation(bool bRecovery)
+void UEventHandle_ExitGame::OnDespawn_Implementation(bool bRecovery)
 {
 	bIsSimulating = false;
 }
 
-void UEventHandle_EndPlay::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ExitGame::Fill_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

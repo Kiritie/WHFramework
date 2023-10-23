@@ -17,7 +17,7 @@ ACameraPawnBase::ACameraPawnBase()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
-	CameraBoom->bUsePawnControlRotation = true;
+	CameraBoom->bUsePawnControlRotation = false;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(FName("Camera"));
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -25,7 +25,12 @@ ACameraPawnBase::ACameraPawnBase()
 	Camera->bUsePawnControlRotation = false;
 
 	MovementComponent = CreateDefaultSubobject<UPawnMovementComponent>(FName("MovementComponent"));
-	//MovementComponent->UpdatedComponent = CameraBoom;
+
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	AutoPossessAI = EAutoPossessAI::Disabled;
 
 	CameraCollisionMode = ECameraCollisionMode::None;
 }
@@ -84,10 +89,7 @@ void ACameraPawnBase::Tick(float DeltaSeconds)
 void ACameraPawnBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
 {
 	CameraCollisionMode = InCameraCollisionMode;
-	if(GetCameraBoom())
-	{
-		GetCameraBoom()->bDoCollisionTest = CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::SightOnly;
-	}
+	CameraBoom->bDoCollisionTest = CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::SightOnly;
 }
 
 bool ACameraPawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)

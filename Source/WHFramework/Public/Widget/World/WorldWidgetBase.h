@@ -38,14 +38,17 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
+	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
+	virtual void OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	virtual void OnRefresh();
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy(bool bRecovery = false);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
+	void K2_OnDestroy(bool bRecovery = false);
+	virtual void OnDestroy(bool bRecovery = false);
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)

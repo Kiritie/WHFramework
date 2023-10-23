@@ -24,24 +24,6 @@ FInputKeyShortcut UInputModuleBPLibrary::GetKeyShortcutByName(const FName InName
 	return FInputKeyShortcut();
 }
 
-FEventReply UInputModuleBPLibrary::OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	if(AInputModule* InputModule = AInputModule::Get())
-	{
-		return InputModule->OnWidgetInputKeyDown(InGeometry, InKeyEvent);
-	}
-	return FEventReply(false);
-}
-
-FEventReply UInputModuleBPLibrary::OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	if(AInputModule* InputModule = AInputModule::Get())
-	{
-		return InputModule->OnWidgetInputKeyUp(InGeometry, InKeyEvent);
-	}
-	return FEventReply(false);
-}
-
 EInputMode UInputModuleBPLibrary::GetGlobalInputMode()
 {
 	if(AInputModule* InputModule = AInputModule::Get())

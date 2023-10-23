@@ -32,9 +32,9 @@ void UWidgetAchievementHUD::OnInitialize_Implementation(UObject* InOwner)
 	Super::OnInitialize_Implementation(InOwner);
 }
 
-void UWidgetAchievementHUD::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetAchievementHUD::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	Super::OnOpen_Implementation(InParams, bInstant);
+	Super::OnOpen(InParams, bInstant);
 
 	SpawnAnchors = FAnchors(
 		AAchievementModule::Get()->IsRightOfScreen() ? 1 : 0,
@@ -51,9 +51,9 @@ void UWidgetAchievementHUD::OnOpen_Implementation(const TArray<FParameter>& InPa
 	}
 }
 
-void UWidgetAchievementHUD::OnClose_Implementation(bool bInstant)
+void UWidgetAchievementHUD::OnClose(bool bInstant)
 {
-	Super::OnClose_Implementation(bInstant);
+	Super::OnClose(bInstant);
 }
 
 void UWidgetAchievementHUD::OnRefresh_Implementation()

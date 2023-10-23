@@ -37,6 +37,14 @@ public:
 		GlobalVideoQuality = EVideoQuality::Epic;
 		ViewDistanceQuality = EVideoQuality::Epic;
 		ShadowQuality = EVideoQuality::Epic;
+		GlobalIlluminationQuality = EVideoQuality::Epic;
+		ReflectionQuality = EVideoQuality::Epic;
+		AntiAliasingQuality = EVideoQuality::Epic;
+		TextureQuality = EVideoQuality::Epic;
+		VisualEffectQuality = EVideoQuality::Epic;
+		PostProcessingQuality = EVideoQuality::Epic;
+		FoliageQuality = EVideoQuality::Epic;
+		ShadingQuality = EVideoQuality::Epic;
 	}
 
 public:
@@ -48,4 +56,28 @@ public:
 
 	UPROPERTY()
 	EVideoQuality ShadowQuality;
+
+	UPROPERTY()
+	EVideoQuality GlobalIlluminationQuality;
+
+	UPROPERTY()
+	EVideoQuality ReflectionQuality;
+
+	UPROPERTY()
+	EVideoQuality AntiAliasingQuality;
+
+	UPROPERTY()
+	EVideoQuality TextureQuality;
+
+	UPROPERTY()
+	EVideoQuality VisualEffectQuality;
+
+	UPROPERTY()
+	EVideoQuality PostProcessingQuality;
+
+	UPROPERTY()
+	EVideoQuality FoliageQuality;
+
+	UPROPERTY()
+	EVideoQuality ShadingQuality;
 };

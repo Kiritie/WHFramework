@@ -72,7 +72,7 @@ void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	BindWidgetMap.Empty();
 }
 
-void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
+void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
 	WidgetParams = InParams;
@@ -125,14 +125,16 @@ void UWorldWidgetBase::OnCreate_Implementation(UObject* InOwner, FWorldWidgetBin
 	{
 		RefreshVisibility();
 	}
+
+	K2_OnCreate(InOwner, InParams);
 }
 
-void UWorldWidgetBase::OnRefresh_Implementation()
+void UWorldWidgetBase::OnRefresh()
 {
-	
+	K2_OnRefresh();
 }
 
-void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
+void UWorldWidgetBase::OnDestroy(bool bRecovery)
 {
 	if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
 	{
@@ -150,6 +152,8 @@ void UWorldWidgetBase::OnDestroy_Implementation(bool bRecovery)
 	}
 
 	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
+
+	K2_OnDestroy(bRecovery);
 }
 
 void UWorldWidgetBase::Refresh_Implementation()

@@ -14,7 +14,10 @@
 #include "Common/CommonBPLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleBPLibrary.h"
-		
+#include "InputMappingContext.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+
 IMPLEMENTATION_MODULE(AInputModule)
 
 // Sets default values
@@ -22,25 +25,13 @@ AInputModule::AInputModule()
 {
 	ModuleName = FName("InputModule");
 	
-	KeyShortcuts.Add(FName("CameraPanMove"), FInputKeyShortcut(FKey("MiddleMouseButton")));
-	KeyShortcuts.Add(FName("CameraRotate"), FInputKeyShortcut());
-	KeyShortcuts.Add(FName("CameraZoom"), FInputKeyShortcut());
+	AddKeyShortcut(FName("CameraPanMove"), FKey("MiddleMouseButton"));
+	AddKeyShortcut(FName("CameraRotate"));
+	AddKeyShortcut(FName("CameraZoom"));
 
-	AxisMappings.Add(FInputAxisMapping(FName("TurnCamera"), this, FName("TurnCamera")));
-	AxisMappings.Add(FInputAxisMapping(FName("LookUpCamera"), this, FName("LookUpCamera")));
-	AxisMappings.Add(FInputAxisMapping(FName("PanHCamera"), this, FName("PanHCamera")));
-	AxisMappings.Add(FInputAxisMapping(FName("PanVCamera"), this, FName("PanVCamera")));
-	AxisMappings.Add(FInputAxisMapping(FName("ZoomCamera"), this, FName("ZoomCamera")));
-	AxisMappings.Add(FInputAxisMapping(FName("TurnPlayer"), this, FName("TurnPlayer")));
-	AxisMappings.Add(FInputAxisMapping(FName("MoveHPlayer"), this, FName("MoveHPlayer")));
-	AxisMappings.Add(FInputAxisMapping(FName("MoveVPlayer"), this, FName("MoveVPlayer")));
-	AxisMappings.Add(FInputAxisMapping(FName("MoveForwardPlayer"), this, FName("MoveForwardPlayer")));
-	AxisMappings.Add(FInputAxisMapping(FName("MoveRightPlayer"), this, FName("MoveRightPlayer")));
-	AxisMappings.Add(FInputAxisMapping(FName("MoveUpPlayer"), this, FName("MoveUpPlayer")));
-
-	TouchMappings.Add(FInputTouchMapping(IE_Pressed, this, FName("TouchPressed")));
-	TouchMappings.Add(FInputTouchMapping(IE_Released, this, FName("TouchReleased")));
-	TouchMappings.Add(FInputTouchMapping(IE_Repeat, this, FName("TouchMoved")));
+	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchPressed)));
+	AddTouchMapping(FInputTouchMapping(IE_Released, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchReleased)));
+	AddTouchMapping(FInputTouchMapping(IE_Repeat, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchMoved)));
 
 	TouchInputRate = 1.f;
 	TouchPressedCount = 0;
@@ -76,29 +67,27 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		for(auto& Iter : KeyMappings)
+		ApplyKeyMappings();
+		ApplyTouchMappings();
+		
+		for(auto& Iter1 : ActionMappings)
 		{
-			FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Event);
-			KB.KeyDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-			GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
+			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetPlayerController()->GetLocalPlayer()))
+			{
+				Subsystem->AddMappingContext(Iter1.Value, 0);
+			}
+			for(auto& Iter2 : Iter1.Value->GetMappings())
+			{
+				const auto InputAction = const_cast<UInputAction*>(Iter2.Action.Get());
+				BindActionMapping(InputAction->GetFName(), InputAction, Cast<UEnhancedInputComponent>(GetPlayerController()->InputComponent));
+			}
 		}
-		for(auto& Iter : ActionMappings)
+	}
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
 		{
-			FInputActionBinding AB(Iter.ActionName, Iter.Event);
-			AB.ActionDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-			GetPlayerController()->InputComponent->AddActionBinding(AB);
-		}
-		for(auto& Iter : AxisMappings)
-		{
-			FInputAxisBinding AB(Iter.AxisName);
-			AB.AxisDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-			GetPlayerController()->InputComponent->AxisBindings.Emplace(MoveTemp(AB));
-		}
-		for(auto& Iter : TouchMappings)
-		{
-			FInputTouchBinding TB(Iter.Event);
-			TB.TouchDelegate.BindDelegate(Iter.TargetActor ? Iter.TargetActor : this, Iter.FuncName);
-			GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
+			Load();
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
@@ -132,6 +121,79 @@ void AInputModule::OnUnPause_Implementation()
 void AInputModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		if(bAutoSaveModule)
+		{
+			Save();
+		}
+	}
+}
+
+void AInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FInputModuleSaveData>();
+
+	for(auto& Iter : SaveData.KeyShortcuts)
+	{
+		if(KeyShortcuts.Contains(Iter.Key))
+		{
+			KeyShortcuts[Iter.Key].Key = Iter.Value;
+		}
+	}
+
+	for(auto& Iter : SaveData.ActionMappings)
+	{
+		if(ActionMappings.Contains(Iter.Key))
+		{
+			const_cast<TArray<FEnhancedActionKeyMapping>&>(ActionMappings[Iter.Key]->GetMappings()) = Iter.Value.Mappings;
+		}
+	}
+
+	for(auto& Iter : SaveData.KeyMappings)
+	{
+		if(KeyMappings.Contains(Iter.Key))
+		{
+			KeyMappings[Iter.Key].Key = Iter.Value;
+		}
+	}
+}
+
+void AInputModule::UnloadData(EPhase InPhase)
+{
+}
+
+FSaveData* AInputModule::ToData()
+{
+	static FInputModuleSaveData SaveData;
+	SaveData = FInputModuleSaveData();
+
+	for(auto& Iter : KeyShortcuts)
+	{
+		if(SaveData.KeyShortcuts.Contains(Iter.Key))
+		{
+			SaveData.KeyShortcuts[Iter.Key] = Iter.Value.Key;
+		}
+	}
+
+	for(auto& Iter : ActionMappings)
+	{
+		if(SaveData.ActionMappings.Contains(Iter.Key))
+		{
+			SaveData.ActionMappings[Iter.Key].Mappings = Iter.Value->GetMappings();
+		}
+	}
+
+	for(auto& Iter : KeyMappings)
+	{
+		if(SaveData.KeyMappings.Contains(Iter.Key))
+		{
+			SaveData.KeyMappings[Iter.Key] = Iter.Value.Key;
+		}
+	}
+
+	return &SaveData;
 }
 
 FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const
@@ -143,127 +205,224 @@ FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const
 	return FInputKeyShortcut();
 }
 
-FEventReply AInputModule::OnWidgetInputKeyDown_Implementation(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+void AInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
 {
-	return FEventReply(false);
-}
-
-FEventReply AInputModule::OnWidgetInputKeyUp_Implementation(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	return FEventReply(false);
-}
-
-void AInputModule::TurnCamera(float InRate)
-{
-	if(InRate == 0.f || ACameraModule::Get()->IsControllingMove()) return;
-
-	if(!GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraRotate")).Key))
+	if(!KeyShortcuts.Contains(InName))
 	{
-		ACameraModule::Get()->AddCameraRotationInput(InRate, 0.f);
+		KeyShortcuts.Add(InName, InKeyShortcut);
 	}
 }
 
-void AInputModule::LookUpCamera(float InRate)
+void AInputModule::RemoveKeyShortcut(const FName InName)
 {
-	if(InRate == 0.f || GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key)) return;
-
-	if(!GetKeyShortcutByName(FName("CameraRotate")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraRotate")).Key))
+	if(KeyShortcuts.Contains(InName))
 	{
-		ACameraModule::Get()->AddCameraRotationInput(0.f, ACameraModule::Get()->IsReverseCameraPitch() ? -InRate : InRate);
+		KeyShortcuts.Remove(InName);
 	}
 }
 
-void AInputModule::PanHCamera(float InRate)
+void AInputModule::BindActionMapping_Implementation(const FName InActionName, UInputAction* InInputAction, UEnhancedInputComponent* InInputComponent)
 {
-	if(InRate == 0.f) return;
+	if(InActionName == TEXT("TurnCamera"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::TurnCamera);
+	}
+	if(InActionName == TEXT("LookUpCamera"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::LookUpCamera);
+	}
+	if(InActionName == TEXT("PanHCamera"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::PanHCamera);
+	}
+	if(InActionName == TEXT("PanVCamera"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::PanVCamera);
+	}
+	if(InActionName == TEXT("ZoomCamera"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::ZoomCamera);
+	}
+	if(InActionName == TEXT("TurnPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::TurnPlayer);
+	}
+	if(InActionName == TEXT("MoveHPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveHPlayer);
+	}
+	if(InActionName == TEXT("MoveVPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveVPlayer);
+	}
+	if(InActionName == TEXT("MoveForwardPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveForwardPlayer);
+	}
+	if(InActionName == TEXT("MoveRightPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveRightPlayer);
+	}
+	if(InActionName == TEXT("MoveUpPlayer"))
+	{
+		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveUpPlayer);
+	}
+}
 
-	if(GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
+void AInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
+{
+	if(!KeyMappings.Contains(InName))
+	{
+		KeyMappings.Add(InName, InKeyMapping);
+	}
+}
+
+void AInputModule::RemoveKeyMapping(const FName InName)
+{
+	if(KeyMappings.Contains(InName))
+	{
+		KeyMappings.Remove(InName);
+	}
+}
+
+void AInputModule::ApplyKeyMappings()
+{
+	GetPlayerController()->InputComponent->KeyBindings.Empty();
+	for(auto& Iter : KeyMappings)
+	{
+		FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Value.Event);
+		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.DynamicDelegate.GetUObject(), Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.TryGetBoundFunctionName() : Iter.Value.DynamicDelegate.GetFunctionName());
+		GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
+	}
+}
+
+void AInputModule::ApplyTouchMappings()
+{
+	GetPlayerController()->InputComponent->TouchBindings.Empty();
+	for(auto& Iter : TouchMappings)
+	{
+		FInputTouchBinding TB(Iter.Event);
+		TB.TouchDelegate.BindDelegate(Iter.Delegate.IsBound() ? Iter.Delegate.GetUObject() : Iter.DynamicDelegate.GetUObject(), Iter.Delegate.IsBound() ? Iter.Delegate.TryGetBoundFunctionName() : Iter.DynamicDelegate.GetFunctionName());
+		GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
+	}
+}
+
+void AInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
+{
+	TouchMappings.Add(InKeyMapping);
+}
+
+void AInputModule::TurnCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f || ACameraModule::Get()->IsControllingMove()) return;
+
+	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
+	{
+		ACameraModule::Get()->AddCameraRotationInput(InValue.Get<float>(), 0.f);
+	}
+}
+
+void AInputModule::LookUpCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f || ACameraModule::Get()->IsControllingMove()) return;
+
+	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
+	{
+		ACameraModule::Get()->AddCameraRotationInput(0.f, ACameraModule::Get()->IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
+	}
+}
+
+void AInputModule::PanHCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f) return;
+
+	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		ACameraModule::Get()->AddCameraMovementInput(Direction, InRate);
+		ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
-void AInputModule::PanVCamera(float InRate)
+void AInputModule::PanVCamera(const FInputActionValue& InValue)
 {
-	if(InRate == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
-	if(GetKeyShortcutByName(FName("CameraPanMove")).IsValid() && GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraPanMove")).Key))
+	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		ACameraModule::Get()->AddCameraMovementInput(Direction, InRate);
+		ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
-void AInputModule::ZoomCamera(float InRate)
+void AInputModule::ZoomCamera(const FInputActionValue& InValue)
 {
-	if(InRate == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
-	if(!GetKeyShortcutByName(FName("CameraZoom")).IsValid() || GetPlayerController()->IsInputKeyDown(GetKeyShortcutByName(FName("CameraZoom")).Key))
+	if(!GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
 	{
-		ACameraModule::Get()->AddCameraDistanceInput(-InRate);
+		ACameraModule::Get()->AddCameraDistanceInput(-InValue.Get<float>());
 	}
 }
 
-void AInputModule::TurnPlayer(float InValue)
+void AInputModule::TurnPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_Turn(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_Turn(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveHPlayer(float InValue)
+void AInputModule::MoveHPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveH(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_MoveH(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveVPlayer(float InValue)
+void AInputModule::MoveVPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveV(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_MoveV(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveForwardPlayer(float InValue)
+void AInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveForward(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_MoveForward(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveRightPlayer(float InValue)
+void AInputModule::MoveRightPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveRight(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_MoveRight(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveUpPlayer(float InValue)
+void AInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 {
-	if(InValue == 0.f) return;
+	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveUp(GetPlayerController()->GetPawn(), InValue);
+		IWHPlayerInterface::Execute_MoveUp(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
 }
 

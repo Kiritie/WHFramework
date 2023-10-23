@@ -14,7 +14,6 @@
 #include "Character/Base/CharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/SpringArmComponent.h"
 #include "Scene/SceneModuleBPLibrary.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
@@ -42,17 +41,6 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	GetCharacterMovement()->JumpZVelocity = 420.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->bComponentShouldUpdatePhysicsVolume = false;
-
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 200.f;
-	CameraBoom->SocketOffset = FVector(0.f, 30.f, 40.f);
-	CameraBoom->bUsePawnControlRotation = true;
-
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(FName("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FollowCamera->SetRelativeLocationAndRotation(FVector(0.f, 0.f, 0.f), FRotator(0.f, 0.f, 0.f));
-	FollowCamera->bUsePawnControlRotation = false;
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -200,6 +188,11 @@ void ACharacterBase::MoveUp_Implementation(float InValue)
 	const FRotator YawRotation(0, Rotation.Yaw, 0);
 	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	AddMovementInput(FVector(Direction.X * 0.2f, Direction.Y * 0.2f, 0.5f * InValue), 1.f);
+}
+
+FVector ACharacterBase::GetCameraTraceOffset_Implementation() const
+{
+	return FVector::ZeroVector;
 }
 
 void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)

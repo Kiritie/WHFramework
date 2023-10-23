@@ -4,6 +4,21 @@
 #include "Input/InputModuleTypes.h"
 #include "Widgets/SViewport.h"
 
+bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
+{
+	if(!IsValid() && bAllowInvalid) return true;
+	bool bPressing = InPlayerController->IsInputKeyDown(Key);
+	for(auto& Iter : Auxs)
+	{
+		if(!InPlayerController->IsInputKeyDown(Iter))
+		{
+			bPressing = false;
+			break;
+		}
+	}
+	return bPressing;
+}
+
 void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
 {
 	TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();

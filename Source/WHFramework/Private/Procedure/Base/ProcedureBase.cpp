@@ -5,6 +5,7 @@
 
 #include "Camera/CameraModule.h"
 #include "Camera/CameraModuleBPLibrary.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
@@ -80,7 +81,10 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	K2_OnEnter(InLastProcedure);
 
-	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
+	if(CameraViewPawn)
+	{
+		UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
+	}
 
 	ResetCameraView();
 

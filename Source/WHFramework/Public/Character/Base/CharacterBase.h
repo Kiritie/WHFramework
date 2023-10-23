@@ -69,13 +69,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCameraComponent* FollowCamera;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USpringArmComponent* CameraBoom;
-
-protected:
 	virtual void Turn_Implementation(float InValue) override;
 
 	virtual void MoveForward_Implementation(float InValue) override;
@@ -84,12 +77,11 @@ protected:
 
 	virtual void MoveUp_Implementation(float InValue) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera
 public:
-	virtual UCameraComponent* GetEyeCamera() const override { return nullptr; };
-	
-	virtual UCameraComponent* GetFollowCamera() const override { return FollowCamera; }
-
-	virtual USpringArmComponent* GetCameraBoom() const override { return CameraBoom; }
+	UFUNCTION(BlueprintNativeEvent)
+	FVector GetCameraTraceOffset() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor

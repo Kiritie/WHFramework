@@ -14,6 +14,7 @@ class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
 class ACameraPawnBase;
+class ACameraManagerBase;
 
 UCLASS()
 class WHFRAMEWORK_API ACameraModule : public AModuleBase
@@ -89,13 +90,7 @@ public:
 	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
-	UCameraComponent* GetCurrentCameraComp();
-
-	UFUNCTION(BlueprintPure)
-	USpringArmComponent* GetCurrentCameraBoom();
-
-	UFUNCTION(BlueprintPure)
-	APlayerCameraManager* GetCurrentCameraManager();
+	ACameraManagerBase* GetCurrentCameraManager();
 
 	template<class T>
 	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
@@ -260,7 +255,7 @@ private:
 	float TrackYawOffset;
 	float TrackPitchOffset;
 	float TrackDistance;
-	bool TrackAllowControl;
+	bool bTrackAllowControl;
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
 	bool bIsControllingZoom;

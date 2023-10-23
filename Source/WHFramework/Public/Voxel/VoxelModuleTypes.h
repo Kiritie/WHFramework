@@ -586,14 +586,13 @@ public:
 		BedrockHeight = 0.02f;
 		WaterHeight = 0.35f;
 		
-		PlainScale = FVector(0.005f, 0.005f, 0.3f);
-		MountainScale = FVector(0.01f, 0.01f, 0.35f);
-		BlobScale = FVector(0.05f, 0.05f, 0.3f);
-		HoleScale = FVector(0.1f, 0.1f, 0.15f);
-		StoneScale = FVector(0.05f, 0.05f, 0.18f);
-		SandScale = FVector(0.04f, 0.04f, 0.25f);
-		PlantScale = FVector4(0.6f, 0.6f, 0.5f, 0.5f);
-		TreeScale = FVector4(0.8f, 0.8f, 0.5f, 0.04f);
+		PlainScale = FVector(0.001f, 0.001f, 0.25f);
+		MountainScale = FVector(0.01f, 0.01f, 0.3f);
+		BlobScale = FVector(0.05f, 0.05f, 0.2f);
+		StoneScale = FVector(0.05f, 0.05f, 0.15f);
+		SandScale = FVector(0.03f, 0.03f, 0.25f);
+		PlantScale = FVector4(0.8f, 0.8f, 0.5f, 0.08f);
+		TreeScale = FVector4(0.01f, 0.01f, 0.5f, 0.005f);
 
 		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
 
@@ -631,9 +630,6 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector BlobScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector HoleScale;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector StoneScale;

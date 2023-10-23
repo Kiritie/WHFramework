@@ -8,6 +8,10 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraPawnBase.generated.h"
 
+class UCameraComponent;
+class USpringArmComponent;
+class UPawnMovementComponent;
+
 UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod))
 class WHFRAMEWORK_API ACameraPawnBase : public APawn, public IWHPlayerInterface, public IVoxelAgentInterface, public IWHActorInterface
 {
@@ -60,11 +64,11 @@ public:
 	UFUNCTION(BlueprintPure)
 	FName GetCameraName() const { return CameraName; }
 
-	virtual UCameraComponent* GetEyeCamera() const override { return nullptr; };
-	
-	virtual UCameraComponent* GetFollowCamera() const override { return Camera; }
+	UFUNCTION(BlueprintPure)
+	UCameraComponent* GetCamera() const { return Camera; }
 
-	virtual USpringArmComponent* GetCameraBoom() const override { return CameraBoom; }
+	UFUNCTION(BlueprintPure)
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 
 	UFUNCTION(BlueprintPure)
 	ECameraCollisionMode GetCameraCollisionMode() const { return CameraCollisionMode; }

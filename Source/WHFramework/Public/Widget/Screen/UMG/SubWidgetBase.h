@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+
 #include "SubWidgetBase.generated.h"
 
 /**
@@ -25,17 +26,21 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
+	void K2_OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
+	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize(const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize(const TArray<FParameter>& InParams);
+	virtual void OnInitialize(const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	virtual void OnRefresh();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
+	void K2_OnDestroy();
+	virtual void OnDestroy();
 
 public:
 	UFUNCTION(BlueprintCallable)

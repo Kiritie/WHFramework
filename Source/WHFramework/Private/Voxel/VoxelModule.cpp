@@ -623,9 +623,8 @@ EVoxelType AVoxelModule::GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) cons
 	const int32 PlainHeight = GetNoiseHeight(WorldLocation, WorldData->PlainScale, WorldData->WorldSeed);
 	const int32 MountainHeight = GetNoiseHeight(WorldLocation, WorldData->MountainScale, WorldData->WorldSeed);
 	const int32 BlobHeight = GetNoiseHeight(WorldLocation, WorldData->BlobScale, WorldData->WorldSeed);
-	const int32 HoleHeight = GetNoiseHeight(WorldLocation, WorldData->HoleScale, WorldData->WorldSeed);
 
-	const int32 BaseHeight = GetNoiseHeight(WorldData->BaseHeight) + FMath::Max3(PlainHeight - HoleHeight, MountainHeight, BlobHeight);
+	const int32 BaseHeight = GetNoiseHeight(WorldData->BaseHeight) + FMath::Max3(PlainHeight, MountainHeight, BlobHeight);
 
 	if(InZ < BaseHeight)
 	{
@@ -671,11 +670,11 @@ EVoxelType AVoxelModule::GetRandomVoxelType(int32 InX, int32 InY, int32 InZ) con
 	const FRandomStream& RandomStream = WorldData->RandomStream;
 	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->TreeScale.W)
 	{
-		return RandomStream.FRand() > 0.4f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
+		return RandomStream.FRand() < 0.6f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
 	}
 	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->PlantScale.W)
 	{
-		return RandomStream.FRand() > 0.2f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
+		return RandomStream.FRand() < 0.3f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
 	}
 	return EVoxelType::Empty;
 }
@@ -931,7 +930,7 @@ bool AVoxelModule::IsBasicGenerated() const
 FBox AVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
 {
 	const FVector WorldRadius = WorldData->GetWorldRealSize() * 0.5f;
-	const FVector WorldCenter = FVector(ChunkIndexToLocation(ChunkGenerateIndex).X + (int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f, ChunkIndexToLocation(ChunkGenerateIndex).Y + (int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f, WorldRadius.Y);
+	const FVector WorldCenter = FVector(ChunkIndexToLocation(ChunkGenerateIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(ChunkGenerateIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldRadius.Z);
 	return FBox(WorldCenter - FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldRadius.Z - InHalfHeight), WorldCenter + FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldRadius.Z - InHalfHeight));
 }
 

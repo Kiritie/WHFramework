@@ -42,29 +42,37 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnCreate(UObject* InOwner = nullptr) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
+	void K2_OnCreate(UObject* InOwner = nullptr);
+	virtual void OnCreate(UObject* InOwner = nullptr) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnInitialize(UObject* InOwner = nullptr) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize(UObject* InOwner = nullptr);
+	virtual void OnInitialize(UObject* InOwner = nullptr) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnOpen")
+	void K2_OnOpen(const TArray<FParameter>& InParams, bool bInstant = false);
+	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnClose(bool bInstant = false) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnClose")
+	void K2_OnClose(bool bInstant = false);
+	virtual void OnClose(bool bInstant = false) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnReset() override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset();
+	virtual void OnReset() override;
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnRefresh() override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	virtual void OnRefresh() override;
 	
-	UFUNCTION(BlueprintNativeEvent)
-	void OnDestroy(bool bRecovery = false) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
+	void K2_OnDestroy(bool bRecovery = false);
+	virtual void OnDestroy(bool bRecovery = false) override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void OnStateChanged(EScreenWidgetState InWidgetState) override;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
+	void K2_OnStateChanged(EScreenWidgetState InWidgetState);
+	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
 	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;

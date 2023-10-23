@@ -4,6 +4,7 @@
 #include "Character/CharacterModule.h"
 
 #include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/Base/CameraPawnBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonBPLibrary.h"
@@ -122,14 +123,14 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 		{
 			if(InCharacter)
 			{
-				UCameraModuleBPLibrary::SwitchCamera(nullptr);
-				PlayerController->Possess(InCharacter);
-				UCameraModuleBPLibrary::SetCameraRotationAndDistance(bResetCamera ? InCharacter->GetActorRotation().Yaw : -1, -1, bResetCamera ? InCharacter->GetCameraBoom()->TargetArmLength : -1.f, bInstant);
 				if(CurrentCharacter && CurrentCharacter->GetDefaultController())
 				{
 					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
 				}
 				CurrentCharacter = InCharacter;
+				PlayerController->Possess(InCharacter);
+				UCameraModuleBPLibrary::EndTrackTarget();
+				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
 			}
 			else if(CurrentCharacter)
 			{

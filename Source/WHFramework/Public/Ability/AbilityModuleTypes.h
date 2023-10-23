@@ -977,7 +977,7 @@ struct WHFRAMEWORK_API FCharacterSaveData : public FPawnSaveData
 public:
 	FORCEINLINE FCharacterSaveData()
 	{
-		CameraRotation = FRotator(-1.f);
+		CameraRotation = FRotator::ZeroRotator;
 		CameraDistance = -1.f;
 	}
 

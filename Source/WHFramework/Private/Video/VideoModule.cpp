@@ -99,6 +99,14 @@ void AVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	SetGlobalVideoQuality(SaveData.GlobalVideoQuality, false);
 	SetViewDistanceQuality(SaveData.ViewDistanceQuality, false);
 	SetShadowQuality(SaveData.ShadowQuality, false);
+	SetGlobalIlluminationQuality(SaveData.GlobalIlluminationQuality, false);
+	SetReflectionQuality(SaveData.ReflectionQuality, false);
+	SetAntiAliasingQuality(SaveData.AntiAliasingQuality, false);
+	SetTextureQuality(SaveData.TextureQuality, false);
+	SetVisualEffectQuality(SaveData.VisualEffectQuality, false);
+	SetPostProcessingQuality(SaveData.PostProcessingQuality, false);
+	SetFoliageQuality(SaveData.FoliageQuality, false);
+	SetShadingQuality(SaveData.ShadingQuality, false);
 
 	ApplyVideoQualitySettings();
 }
@@ -116,6 +124,14 @@ FSaveData* AVideoModule::ToData()
 	SaveData.GlobalVideoQuality = GetGlobalVideoQuality();
 	SaveData.ViewDistanceQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetViewDistanceQuality() : GetGlobalVideoQuality();
 	SaveData.ShadowQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetShadowQuality() : GetGlobalVideoQuality();
+	SaveData.GlobalIlluminationQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetGlobalIlluminationQuality() : GetGlobalVideoQuality();
+	SaveData.ReflectionQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetReflectionQuality() : GetGlobalVideoQuality();
+	SaveData.AntiAliasingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetAntiAliasingQuality() : GetGlobalVideoQuality();
+	SaveData.TextureQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetTextureQuality() : GetGlobalVideoQuality();
+	SaveData.VisualEffectQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetVisualEffectQuality() : GetGlobalVideoQuality();
+	SaveData.PostProcessingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetPostProcessingQuality() : GetGlobalVideoQuality();
+	SaveData.FoliageQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetFoliageQuality() : GetGlobalVideoQuality();
+	SaveData.ShadingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetShadingQuality() : GetGlobalVideoQuality();
 
 	return &SaveData;
 }

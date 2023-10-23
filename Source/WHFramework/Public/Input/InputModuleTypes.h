@@ -4,6 +4,7 @@
 
 
 #include "GameFramework/PlayerController.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "InputModuleTypes.generated.h"
 
@@ -57,11 +58,14 @@ public:
 	{
 	}
 
+public:
 	bool IsValid() const
 	{
 		return Key.IsValid();
 	}
 	
+	bool IsPressing(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
+
 public:
 	UPROPERTY(EditAnywhere)
 	FKey Key;
@@ -80,97 +84,26 @@ public:
 	{
 		Key = FKey();
 		Event = EInputEvent::IE_MAX;
-		TargetActor = nullptr;
-		FuncName = NAME_None;
 	}
 
-	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
+	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, const FInputActionHandlerWithKeySignature& InDelegate)
 		: Key(InKey),
 		  Event(InEvent),
-		  TargetActor(InTargetActor),
-		  FuncName(InFuncName)
+		  Delegate(InDelegate)
 	{
 	}
 	
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(BlueprintReadWrite)
 	FKey Key;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(BlueprintReadWrite)
 	TEnumAsByte<EInputEvent> Event;
 
-	UPROPERTY(EditAnywhere)
-	AActor* TargetActor;
+	FInputActionHandlerWithKeySignature Delegate;
 
-	UPROPERTY(EditAnywhere)
-	FName FuncName;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputActionMapping
-{
-	GENERATED_BODY()
-
-public:
-	FInputActionMapping()
-	{
-		ActionName = NAME_None;
-		Event = EInputEvent::IE_MAX;
-		TargetActor = nullptr;
-		FuncName = NAME_None;
-	}
-
-	FInputActionMapping(const FName& InActionName, EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
-		: ActionName(InActionName),
-		  Event(InEvent),
-		  TargetActor(InTargetActor),
-		  FuncName(InFuncName)
-	{
-	}
-
-public:
-	UPROPERTY(EditAnywhere)
-	FName ActionName;
-
-	UPROPERTY(EditAnywhere)
-	TEnumAsByte<EInputEvent> Event;
-
-	UPROPERTY(EditAnywhere)
-	AActor* TargetActor;
-
-	UPROPERTY(EditAnywhere)
-	FName FuncName;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputAxisMapping
-{
-	GENERATED_BODY()
-
-public:
-	FInputAxisMapping()
-	{
-		AxisName = NAME_None;
-		TargetActor = nullptr;
-		FuncName = NAME_None;
-	}
-
-	FInputAxisMapping(const FName& InAxisName, AActor* InTargetActor, const FName& InFuncName)
-		: AxisName(InAxisName),
-		  TargetActor(InTargetActor),
-		  FuncName(InFuncName)
-	{
-	}
-
-public:
-	UPROPERTY(EditAnywhere)
-	FName AxisName;
-
-	UPROPERTY(EditAnywhere)
-	AActor* TargetActor;
-
-	UPROPERTY(EditAnywhere)
-	FName FuncName;
+	UPROPERTY(BlueprintReadWrite)
+	FInputActionHandlerDynamicSignature DynamicDelegate;
 };
 
 USTRUCT(BlueprintType)
@@ -182,26 +115,22 @@ public:
 	FInputTouchMapping()
 	{
 		Event = EInputEvent::IE_MAX;
-		TargetActor = nullptr;
-		FuncName = NAME_None;
 	}
 
-	FInputTouchMapping(EInputEvent InEvent, AActor* InTargetActor, const FName& InFuncName)
+	FInputTouchMapping(EInputEvent InEvent, const FInputTouchHandlerSignature& InDelegate)
 		: Event(InEvent),
-		  TargetActor(InTargetActor),
-		  FuncName(InFuncName)
+		  Delegate(InDelegate)
 	{
 	}
 
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(BlueprintReadWrite)
 	TEnumAsByte<EInputEvent> Event;
 
-	UPROPERTY(EditAnywhere)
-	AActor* TargetActor;
+	FInputTouchHandlerSignature Delegate;
 
-	UPROPERTY(EditAnywhere)
-	FName FuncName;
+	UPROPERTY(BlueprintReadWrite)
+	FInputTouchHandlerDynamicSignature DynamicDelegate;
 };
 
 struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
@@ -218,5 +147,56 @@ struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGame
 	FInputModeGameAndUI_NotHideCursor()
 	{
 		bHideCursorDuringCapture = false;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputActionMappings : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FInputActionMappings()
+	{
+		Mappings = TArray<FEnhancedActionKeyMapping>();
+	}
+
+public:
+	UPROPERTY()
+	TArray<FEnhancedActionKeyMapping> Mappings;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FInputModuleSaveData()
+	{
+		ActionMappings = TMap<FName, FInputActionMappings>();
+		KeyShortcuts = TMap<FName, FKey>();
+		KeyMappings = TMap<FName, FKey>();
+	}
+
+public:
+	UPROPERTY()
+	TMap<FName, FInputActionMappings> ActionMappings;
+
+	UPROPERTY()
+	TMap<FName, FKey> KeyShortcuts;
+
+	UPROPERTY()
+	TMap<FName, FKey> KeyMappings;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		for(auto& Iter : ActionMappings)
+		{
+			Iter.Value.MakeSaved();
+		}
 	}
 };

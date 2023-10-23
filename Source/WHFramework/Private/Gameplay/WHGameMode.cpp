@@ -9,6 +9,8 @@
 AWHGameMode::AWHGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	DefaultPawnClass = nullptr;
 }
 
 void AWHGameMode::OnInitialize_Implementation()

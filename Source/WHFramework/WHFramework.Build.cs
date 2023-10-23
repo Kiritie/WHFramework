@@ -34,6 +34,8 @@ public class WHFramework : ModuleRules
 				"Paper2D",
 				"SlateCore",
 				"InputCore",
+				"CommonUI",
+				"EnhancedInput",
 				"ApplicationCore",
 				"MediaAssets",
 				"AIModule",

@@ -20,9 +20,9 @@ UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& obj
 	CurrentProgress = 0.f;
 }
 
-void UWidgetLoadingLevelPanel::OnOpen_Implementation(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	Super::OnOpen_Implementation(InParams, bInstant);
+	Super::OnOpen(InParams, bInstant);
 	if(InParams.IsValidIndex(0))
 	{
 		LoadingLevelPath = *InParams[0].GetStringValue();
@@ -32,9 +32,9 @@ void UWidgetLoadingLevelPanel::OnOpen_Implementation(const TArray<FParameter>& I
 	FinishOpen(bInstant);
 }
 
-void UWidgetLoadingLevelPanel::OnClose_Implementation(bool bInstant)
+void UWidgetLoadingLevelPanel::OnClose(bool bInstant)
 {
-	Super::OnClose_Implementation(bInstant);
+	Super::OnClose(bInstant);
 	
 	FinishClose(bInstant);
 }

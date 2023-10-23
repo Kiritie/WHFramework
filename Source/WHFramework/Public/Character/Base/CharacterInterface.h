@@ -50,5 +50,7 @@ public:
 
 	virtual class UCharacterAnimBase* GetAnim() const = 0;
 
-	virtual class AController* GetDefaultController() const = 0;
+	virtual AController* GetDefaultController() const = 0;
+	
+	virtual FVector GetCameraTraceOffset() const = 0;
 };

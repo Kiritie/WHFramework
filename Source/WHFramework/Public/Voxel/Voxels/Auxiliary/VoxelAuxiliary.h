@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "GameFramework/Actor.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 
@@ -15,7 +15,7 @@ class UVoxel;
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public ISaveDataInterface, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
@@ -40,4 +40,8 @@ protected:
 
 public:
 	FVoxelItem& GetVoxelItem(bool bRefresh = false);
+
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return VoxelItem.ID; }
+
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { VoxelItem.ID = InID; }
 };

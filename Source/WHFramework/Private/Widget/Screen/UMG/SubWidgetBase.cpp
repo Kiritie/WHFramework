@@ -21,6 +21,32 @@ void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	RemoveFromParent();
 }
 
+void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+{
+	Owner = InOwner;
+	K2_OnCreate(InOwner, InParams);
+
+	OnInitialize(InParams);
+}
+
+void USubWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
+{
+	Params = InParams;
+	K2_OnInitialize(InParams);
+
+	OnRefresh();
+}
+
+void USubWidgetBase::OnRefresh()
+{
+	K2_OnRefresh();
+}
+
+void USubWidgetBase::OnDestroy()
+{
+	K2_OnDestroy();
+}
+
 void USubWidgetBase::Refresh()
 {
 	OnRefresh();
@@ -32,26 +58,4 @@ void USubWidgetBase::Destroy(bool bRecovery)
 	{
 		Owner->DestroySubWidget(this, bRecovery);
 	}
-}
-
-void USubWidgetBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
-{
-	Owner = InOwner;
-	OnInitialize(InParams);
-}
-
-void USubWidgetBase::OnInitialize_Implementation(const TArray<FParameter>& InParams)
-{
-	Params = InParams;
-	OnRefresh();
-}
-
-void USubWidgetBase::OnRefresh_Implementation()
-{
-
-}
-
-void USubWidgetBase::OnDestroy_Implementation()
-{
-	
 }

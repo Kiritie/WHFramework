@@ -6,9 +6,12 @@
 #include "InputManager.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
-#include "Components/SlateWrapperTypes.h"
 
 #include "InputModule.generated.h"
+
+class UInputMappingContext;
+class UInputAction;
+class UEnhancedInputComponent;
 
 UCLASS()
 class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
@@ -45,6 +48,13 @@ public:
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
 protected:
@@ -53,70 +63,96 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
+	TMap<FName, FInputKeyShortcut>& GetKeyShortcuts() { return KeyShortcuts; }
+
+	UFUNCTION(BlueprintPure)
 	FInputKeyShortcut GetKeyShortcutByName(const FName InName) const;
+
+	UFUNCTION(BlueprintCallable)
+	void AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveKeyShortcut(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMappings
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InputMappings|Context")
+	TMap<FName, UInputMappingContext*> ActionMappings;
+
 	UPROPERTY(EditAnywhere, Category = "InputMappings|Key")
-	TArray<FInputKeyMapping> KeyMappings;
-
-	UPROPERTY(EditAnywhere, Category = "InputMappings|Action")
-	TArray<FInputActionMapping> ActionMappings;
-
-	UPROPERTY(EditAnywhere, Category = "InputMappings|Axis")
-	TArray<FInputAxisMapping> AxisMappings;
+	TMap<FName, FInputKeyMapping> KeyMappings;
 
 	UPROPERTY(EditAnywhere, Category = "InputMappings|Touch")
 	TArray<FInputTouchMapping> TouchMappings;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// WidgetInputs
-public:
+protected:
 	UFUNCTION(BlueprintNativeEvent)
-	FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
+	void BindActionMapping(const FName InActionName, UInputAction* InInputAction, UEnhancedInputComponent* InInputComponent);
 
-	UFUNCTION(BlueprintNativeEvent)
-	FEventReply OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
+public:
+	UFUNCTION(BlueprintPure)
+	TMap<FName, UInputMappingContext*>& GetActionMappings() { return ActionMappings; }
+
+	UFUNCTION(BlueprintPure)
+	TMap<FName, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<FInputTouchMapping>& GetTouchMappings() { return TouchMappings; }
+
+	UFUNCTION(BlueprintCallable)
+	void AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveKeyMapping(const FName InName);
+
+	UFUNCTION(BlueprintCallable)
+	void AddTouchMapping(const FInputTouchMapping& InKeyMapping);
+
+	UFUNCTION(BlueprintCallable)
+	void ApplyKeyMappings();
+
+	UFUNCTION(BlueprintCallable)
+	void ApplyTouchMappings();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraInputs
 protected:
 	UFUNCTION()
-	virtual void TurnCamera(float InRate);
+	virtual void TurnCamera(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void LookUpCamera(float InRate);
+	virtual void LookUpCamera(const FInputActionValue& InValue);
 	
 	UFUNCTION()
-	virtual void PanHCamera(float InRate);
+	virtual void PanHCamera(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void PanVCamera(float InRate);
+	virtual void PanVCamera(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void ZoomCamera(float InRate);
+	virtual void ZoomCamera(const FInputActionValue& InValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// PlayerInputs
 protected:
 	UFUNCTION()
-	virtual void TurnPlayer(float InValue);
+	virtual void TurnPlayer(const FInputActionValue& InValue);
 	
 	UFUNCTION()
-	virtual void MoveHPlayer(float InValue);
+	virtual void MoveHPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void MoveVPlayer(float InValue);
+	virtual void MoveVPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void MoveForwardPlayer(float InValue);
+	virtual void MoveForwardPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void MoveRightPlayer(float InValue);
+	virtual void MoveRightPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION()
-	virtual void MoveUpPlayer(float InValue);
+	virtual void MoveUpPlayer(const FInputActionValue& InValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TouchInputs

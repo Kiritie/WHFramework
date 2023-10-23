@@ -19,6 +19,7 @@ enum class ETrackTargetMode : uint8
 {
 	LocationOnly,
 	LocationAndRotation,
+	LocationAndRotationOnce,
 	LocationAndRotationAndDistance,
 	LocationAndRotationAndDistanceOnce
 };

@@ -6,8 +6,9 @@
 
 #include "EventManagerBase.generated.h"
 
-class UEventHandle_EndPlay;
-class UEventHandle_BeginPlay;
+class UEventHandle_InitGame;
+class UEventHandle_ExitGame;
+class UEventHandle_StartGame;
 
 UCLASS()
 class WHFRAMEWORK_API UEventManagerBase : public UWHObject
@@ -24,8 +25,11 @@ public:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnBeginPlay(UObject* InSender, UEventHandle_BeginPlay* InEventHandle);
+	void OnInitGame(UObject* InSender, UEventHandle_InitGame* InEventHandle);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnEndPlay(UObject* InSender, UEventHandle_EndPlay* InEventHandle);
+	void OnStartGame(UObject* InSender, UEventHandle_StartGame* InEventHandle);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
 };

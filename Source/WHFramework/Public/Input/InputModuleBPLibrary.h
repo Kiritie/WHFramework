@@ -22,15 +22,6 @@ public:
 	static FInputKeyShortcut GetKeyShortcutByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// WidgetInputs
-public:
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static FEventReply OnWidgetInputKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
-
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static FEventReply OnWidgetInputKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent);
-
-	//////////////////////////////////////////////////////////////////////////
 	// InputStates
 public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleBPLibrary")

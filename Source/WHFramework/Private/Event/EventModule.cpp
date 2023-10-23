@@ -57,7 +57,7 @@ void AEventModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		BroadcastEvent<UEventHandle_BeginPlay>(EEventNetType::Single, this);
+		BroadcastEvent<UEventHandle_StartGame>(EEventNetType::Single, this);
 	}
 }
 
@@ -82,7 +82,7 @@ void AEventModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		BroadcastEvent<UEventHandle_EndPlay>(EEventNetType::Single, this);
+		BroadcastEvent<UEventHandle_ExitGame>(EEventNetType::Single, this);
 	}
 }
 
@@ -120,10 +120,10 @@ void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 
 void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	SubscribeEventByDelegate(InClass, InDelegate);
+	SubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
 }
 
-void AEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void AEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	SubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }
@@ -157,10 +157,10 @@ void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObje
 
 void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	UnsubscribeEventByDelegate(InClass, InDelegate);
+	UnsubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
 }
 
-void AEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void AEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	UnsubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }

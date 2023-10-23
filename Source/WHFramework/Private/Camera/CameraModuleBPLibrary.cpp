@@ -4,6 +4,7 @@
 #include "Camera/CameraModuleBPLibrary.h"
 
 #include "Camera/CameraModule.h"
+#include "Camera/Base/CameraManagerBase.h"
 
 ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
 {

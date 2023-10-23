@@ -5,19 +5,22 @@
 #include "Event/Handle/EventHandleBase.h"
 #include "Parameter/ParameterModuleTypes.h"
 
-#include "EventHandle_BeginPlay.generated.h"
+#include "EventHandle_ExitGame.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_BeginPlay : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_ExitGame : public UEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_BeginPlay();
+	UEventHandle_ExitGame();
 
+public:
+	bool bIsSimulating;
+	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 

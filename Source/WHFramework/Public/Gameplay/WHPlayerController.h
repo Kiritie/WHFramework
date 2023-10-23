@@ -92,6 +92,8 @@ protected:
 
 	virtual void OnUnPossess() override;
 
+	virtual void SetupInputComponent() override;
+
 public:
 	virtual void Tick(float DeltaSeconds) override;
 	

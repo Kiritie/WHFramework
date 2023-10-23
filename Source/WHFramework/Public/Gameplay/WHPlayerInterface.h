@@ -2,13 +2,11 @@
 
 #pragma once
 
-
-#include "Camera/Base/CameraPawnInterface.h"
 #include "WHPlayerInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWHPlayerInterface : public UCameraPawnInterface
+class UWHPlayerInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -16,7 +14,7 @@ class UWHPlayerInterface : public UCameraPawnInterface
 /**
 * 
 */
-class WHFRAMEWORK_API IWHPlayerInterface : public ICameraPawnInterface
+class WHFRAMEWORK_API IWHPlayerInterface : public IInterface
 {
 	GENERATED_BODY()
 
