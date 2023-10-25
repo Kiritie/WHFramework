@@ -39,9 +39,9 @@ void UWidgetLoadingLevelPanel::OnClose(bool bInstant)
 	FinishClose(bInstant);
 }
 
-void UWidgetLoadingLevelPanel::OnRefresh_Implementation()
+void UWidgetLoadingLevelPanel::OnRefresh()
 {
-	Super::OnRefresh_Implementation();
+	Super::OnRefresh();
 
 	const float Progress = USceneModuleBPLibrary::GetAsyncLoadLevelProgress(LoadingLevelPath);
 	if(Progress > LoadProgress)

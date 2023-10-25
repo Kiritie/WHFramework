@@ -14,7 +14,7 @@ class UWHPlayerInterface : public UInterface
 /**
 * 
 */
-class WHFRAMEWORK_API IWHPlayerInterface : public IInterface
+class WHFRAMEWORK_API IWHPlayerInterface
 {
 	GENERATED_BODY()
 

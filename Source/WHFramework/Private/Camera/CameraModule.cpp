@@ -4,7 +4,7 @@
 #include "Camera/CameraModule.h"
 
 #include "Camera/Base/CameraManagerBase.h"
-#include "Camera/Roam/RoamCameraPawn.h"
+#include "Camera/Roam/RoamCameraActor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHPlayerController.h"
@@ -27,10 +27,10 @@ ACameraModule::ACameraModule()
 
 	DefaultCamera = nullptr;
 	DefaultInstantSwitch = false;
-	CameraClasses = TArray<TSubclassOf<ACameraPawnBase>>();
-	CameraClasses.Add(ARoamCameraPawn::StaticClass());
-	Cameras = TArray<ACameraPawnBase*>();
-	CameraMap = TMap<FName, ACameraPawnBase*>();
+	CameraClasses = TArray<TSubclassOf<ACameraActorBase>>();
+	CameraClasses.Add(ARoamCameraActor::StaticClass());
+	Cameras = TArray<ACameraActorBase*>();
+	CameraMap = TMap<FName, ACameraActorBase*>();
 	CurrentCamera = nullptr;
 		
 	bCameraControlAble = true;
@@ -111,14 +111,14 @@ void ACameraModule::OnGenerate()
 	GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
-		if(auto Camera = Cast<ACameraPawnBase>(Iter))
+		if(auto Camera = Cast<ACameraActorBase>(Iter))
 		{
 			Cameras.AddUnique(Camera);
 		}
 	}
 
 	// 移除废弃Camera
-	TArray<ACameraPawnBase*> RemoveList;
+	TArray<ACameraActorBase*> RemoveList;
 	for(auto Iter : Cameras)
 	{
 		if(!Iter || !CameraClasses.Contains(Iter->GetClass()))
@@ -154,7 +154,7 @@ void ACameraModule::OnGenerate()
 		{
 			FActorSpawnParameters ActorSpawnParameters;
 			ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			if(ACameraPawnBase* CameraPawn = GetWorld()->SpawnActor<ACameraPawnBase>(Class, ActorSpawnParameters))
+			if(ACameraActorBase* CameraPawn = GetWorld()->SpawnActor<ACameraActorBase>(Class, ActorSpawnParameters))
 			{
 				CameraPawn->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 				Cameras.Add(CameraPawn);
@@ -229,11 +229,11 @@ void ACameraModule::OnRefresh_Implementation(float DeltaSeconds)
 			if(CameraDoMoveDuration != 0.f)
 			{
 				CameraDoMoveTime = FMath::Clamp(CameraDoMoveTime + DeltaSeconds, 0.f, CameraDoMoveDuration);
-				CurrentCamera->SetActorLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathBPLibrary::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
+				CurrentCamera->SetCameraLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathBPLibrary::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
 			}
 			else
 			{
-				CurrentCamera->SetActorLocation(!bSmoothCameraMove ? TargetCameraLocation : FMath::VInterpTo(CurrentCamera->GetActorLocation(), TargetCameraLocation, DeltaSeconds, CameraMoveSpeed));
+				CurrentCamera->SetCameraLocation(!bSmoothCameraMove ? TargetCameraLocation : FMath::VInterpTo(CurrentCamera->GetActorLocation(), TargetCameraLocation, DeltaSeconds, CameraMoveSpeed));
 			}
 		}
 		else if(CameraDoMoveDuration != 0.f)
@@ -359,7 +359,7 @@ FSaveData* ACameraModule::ToData()
 	return &SaveData;
 }
 
-ACameraPawnBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass) const
+ACameraActorBase* ACameraModule::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass) const
 {
 	return CurrentCamera;
 }
@@ -373,7 +373,7 @@ ACameraManagerBase* ACameraModule::GetCurrentCameraManager()
 	return nullptr;
 }
 
-ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass)
+ACameraActorBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)
 {
 	if(!InClass) return nullptr;
 	
@@ -381,7 +381,7 @@ ACameraPawnBase* ACameraModule::GetCameraByClass(TSubclassOf<ACameraPawnBase> In
 	return GetCameraByName(CameraName);
 }
 
-ACameraPawnBase* ACameraModule::GetCameraByName(const FName InName) const
+ACameraActorBase* ACameraModule::GetCameraByName(const FName InName) const
 {
 	if(CameraMap.Contains(InName))
 	{
@@ -390,7 +390,7 @@ ACameraPawnBase* ACameraModule::GetCameraByName(const FName InName) const
 	return nullptr;
 }
 
-void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
+void ACameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 {
 	if(!CurrentCamera || CurrentCamera != InCamera)
 	{
@@ -403,6 +403,7 @@ void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 			}
 			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
+			InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 		}
 		else if(CurrentCamera)
 		{
@@ -415,7 +416,7 @@ void ACameraModule::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
 	}
 }
 
-void ACameraModule::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
+void ACameraModule::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant)
 {
 	const FName CameraName = InClass ? InClass.GetDefaultObject()->GetCameraName() : NAME_None;
 	SwitchCameraByName(CameraName, bInstant);
@@ -501,7 +502,7 @@ void ACameraModule::DoTrackTarget(bool bInstant)
 	}
 }
 
-void ACameraModule::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
+void ACameraModule::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
 	if(!InTargetActor || !CurrentCamera) return;
 
@@ -510,6 +511,7 @@ void ACameraModule::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InT
 		TrackTargetActor = InTargetActor;
 		TrackTargetMode = InTrackTargetMode;
 		TrackLocationOffset = InLocationOffset == FVector(-1.f) ? TargetCameraLocation - InTargetActor->GetActorLocation() : InTrackTargetSpace == ETrackTargetSpace::Local ? InLocationOffset : InLocationOffset - InTargetActor->GetActorLocation();
+		CurrentCamera->GetCameraBoom()->SocketOffset = InSocketOffset == FVector(-1.f) ? InitSocketOffset : InSocketOffset;
 		TrackYawOffset = InYawOffset == -1.f ? TargetCameraRotation.Yaw - InTargetActor->GetActorRotation().Yaw : InTrackTargetSpace == ETrackTargetSpace::Local ? InYawOffset : InYawOffset - InTargetActor->GetActorRotation().Yaw;
 		TrackPitchOffset = InPitchOffset == -1.f ? TargetCameraRotation.Pitch - InTargetActor->GetActorRotation().Pitch : InTrackTargetSpace == ETrackTargetSpace::Local ? InPitchOffset : InPitchOffset - InTargetActor->GetActorRotation().Pitch;
 		TrackDistance = InDistance == -1.f ? TargetCameraDistance : InDistance;
@@ -536,7 +538,7 @@ void ACameraModule::SetCameraLocation(FVector InLocation, bool bInstant)
 	if(bInstant)
 	{
 		CurrentCameraLocation = TargetCameraLocation;
-		CurrentCamera->SetActorLocation(TargetCameraLocation);
+		CurrentCamera->SetCameraLocation(TargetCameraLocation);
 	}
 	StopDoCameraLocation();
 }
@@ -553,10 +555,10 @@ void ACameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEase
 		CameraDoMoveLocation = CurrentCameraLocation;
 		CameraDoMoveEaseType = InEaseType;
 	}
-	else if(CurrentCamera && CurrentCamera->IsA<ACameraPawnBase>())
+	else if(CurrentCamera && CurrentCamera->IsA<ACameraActorBase>())
 	{
 		CurrentCameraLocation = TargetCameraLocation;
-		CurrentCamera->SetActorLocation(TargetCameraLocation);
+		CurrentCamera->SetCameraLocation(TargetCameraLocation);
 	}
 }
 

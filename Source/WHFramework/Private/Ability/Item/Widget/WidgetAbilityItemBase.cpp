@@ -24,26 +24,26 @@ void UWidgetAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 	Item = FAbilityItem::Empty;
 }
 
-void UWidgetAbilityItemBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate_Implementation(InOwner, InParams);
+	Super::OnCreate(InOwner, InParams);
 }
 
-void UWidgetAbilityItemBase::OnInitialize_Implementation(const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnInitialize(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
 		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
 	}
-	Super::OnInitialize_Implementation(InParams);
+	Super::OnInitialize(InParams);
 }
 
-void UWidgetAbilityItemBase::OnRefresh_Implementation()
+void UWidgetAbilityItemBase::OnRefresh()
 {
-	Super::OnRefresh_Implementation();
+	Super::OnRefresh();
 }
 
-void UWidgetAbilityItemBase::OnDestroy_Implementation()
+void UWidgetAbilityItemBase::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }

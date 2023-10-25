@@ -15,9 +15,9 @@ UEventManagerBase::UEventManagerBase()
 
 void UEventManagerBase::OnInitialize_Implementation()
 {
-	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_InitGame>(this, FName("OnInitPlay"));
-	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_StartGame>(this, FName("OnBeginPlay"));
-	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnEndPlay"));
+	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_InitGame>(this, FName("OnInitGame"));
+	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_StartGame>(this, FName("OnStartGame"));
+	UEventModuleBPLibrary::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnExitGame"));
 }
 
 void UEventManagerBase::OnInitGame_Implementation(UObject* InSender, UEventHandle_InitGame* InEventHandle)

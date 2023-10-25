@@ -7,14 +7,14 @@ UWidgetAbilityInventoryBase::UWidgetAbilityInventoryBase(const FObjectInitialize
 
 }
 
-void UWidgetAbilityInventoryBase::OnInitialize_Implementation(UObject* InOwner)
+void UWidgetAbilityInventoryBase::OnInitialize(UObject* InOwner)
 {
-	Super::OnInitialize_Implementation(InOwner);
+	Super::OnInitialize(InOwner);
 }
 
-void UWidgetAbilityInventoryBase::OnRefresh_Implementation()
+void UWidgetAbilityInventoryBase::OnRefresh()
 {
-	Super::OnRefresh_Implementation();
+	Super::OnRefresh();
 }
 
 UAbilityInventoryBase* UWidgetAbilityInventoryBase::GetInventory() const

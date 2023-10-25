@@ -10,7 +10,7 @@
 #include "InputModule.generated.h"
 
 class UInputMappingContext;
-class UInputAction;
+class UInputActionBase;
 class UEnhancedInputComponent;
 
 UCLASS()
@@ -78,7 +78,7 @@ public:
 	// InputMappings
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InputMappings|Context")
-	TMap<FName, UInputMappingContext*> ActionMappings;
+	TArray<UInputMappingContext*> ActionContexts;
 
 	UPROPERTY(EditAnywhere, Category = "InputMappings|Key")
 	TMap<FName, FInputKeyMapping> KeyMappings;
@@ -88,11 +88,13 @@ protected:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void BindActionMapping(const FName InActionName, UInputAction* InInputAction, UEnhancedInputComponent* InInputComponent);
+	void OnBindAction(UEnhancedInputComponent* InInputComponent, UInputActionBase* InInputAction);
 
 public:
 	UFUNCTION(BlueprintPure)
-	TMap<FName, UInputMappingContext*>& GetActionMappings() { return ActionMappings; }
+	TArray<UInputMappingContext*>& GetActionContexts() { return ActionContexts; }
+
+	TArray<FEnhancedActionKeyMapping*> GetActionMappingsByName(const FName InActionName);
 
 	UFUNCTION(BlueprintPure)
 	TMap<FName, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }

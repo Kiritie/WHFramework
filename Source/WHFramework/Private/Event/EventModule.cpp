@@ -10,6 +10,7 @@
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Common/CommonBPLibrary.h"
+#include "Event/Handle/Common/EventHandle_InitGame.h"
 #include "ObjectPool/ObjectPoolModuleBPLibrary.h"
 #include "Net/UnrealNetwork.h"
 
@@ -49,6 +50,8 @@ void AEventModule::OnInitialize_Implementation()
 		EventManager = UObjectPoolModuleBPLibrary::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
 		EventManager->OnInitialize();
 	}
+	
+	BroadcastEvent<UEventHandle_InitGame>(EEventNetType::Single, this);
 }
 
 void AEventModule::OnPreparatory_Implementation(EPhase InPhase)

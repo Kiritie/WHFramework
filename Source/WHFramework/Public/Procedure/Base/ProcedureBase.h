@@ -10,7 +10,7 @@
 
 #include "ProcedureBase.generated.h"
 
-class ACameraPawnBase;
+class ACameraActorBase;
 /**
  * 流程基类
  */
@@ -42,12 +42,14 @@ public:
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
 	void K2_OnStateChanged(EProcedureState InProcedureState);
+	UFUNCTION()
 	virtual void OnStateChanged(EProcedureState InProcedureState);
 	/**
 	 * 流程初始化
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
+	UFUNCTION()
 	virtual void OnInitialize();
 	/**
 	 * 流程进入
@@ -55,18 +57,21 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
 	void K2_OnEnter(UProcedureBase* InLastProcedure);
+	UFUNCTION()
 	virtual void OnEnter(UProcedureBase* InLastProcedure);
 	/**
 	 * 流程帧刷新
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 	/**
 	* 流程指引
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
 	void K2_OnGuide();
+	UFUNCTION()
 	virtual void OnGuide();
 	/**
 	 * 流程离开
@@ -74,6 +79,7 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
 	void K2_OnLeave(UProcedureBase* InNextProcedure);
+	UFUNCTION()
 	virtual void OnLeave(UProcedureBase* InNextProcedure);
 
 public:
@@ -156,7 +162,7 @@ public:
 	ETrackTargetMode TrackTargetMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	ACameraPawnBase* CameraViewPawn;
+	ACameraActorBase* CameraViewPawn;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	EProcedureCameraViewMode CameraViewMode;

@@ -27,12 +27,12 @@ void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 	CooldownTimerHandle = FTimerHandle();
 }
 
-void UWidgetAbilityInventorySlotBase::OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate_Implementation(InOwner, InParams);
+	Super::OnCreate(InOwner, InParams);
 }
 
-void UWidgetAbilityInventorySlotBase::OnInitialize_Implementation(const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
@@ -55,12 +55,12 @@ void UWidgetAbilityInventorySlotBase::OnInitialize_Implementation(const TArray<F
 			OwnerSlot->OnInventorySlotCanceled.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnCanceled);
 		}
 	}
-	Super::OnInitialize_Implementation(InParams);
+	Super::OnInitialize(InParams);
 }
 
-void UWidgetAbilityInventorySlotBase::OnRefresh_Implementation()
+void UWidgetAbilityInventorySlotBase::OnRefresh()
 {
-	Super::OnRefresh_Implementation();
+	Super::OnRefresh();
 	
 	if(!OwnerSlot) return;
 
@@ -81,9 +81,9 @@ void UWidgetAbilityInventorySlotBase::OnRefresh_Implementation()
 	}
 }
 
-void UWidgetAbilityInventorySlotBase::OnDestroy_Implementation()
+void UWidgetAbilityInventorySlotBase::OnDestroy()
 {
-	Super::OnDestroy_Implementation();
+	Super::OnDestroy();
 }
 
 bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

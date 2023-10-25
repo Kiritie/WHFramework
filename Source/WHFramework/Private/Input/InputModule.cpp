@@ -17,6 +17,8 @@
 #include "InputMappingContext.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Input/Base/InputActionBase.h"
+#include "SaveGame/Module/InputSaveGame.h"
 
 IMPLEMENTATION_MODULE(AInputModule)
 
@@ -24,10 +26,24 @@ IMPLEMENTATION_MODULE(AInputModule)
 AInputModule::AInputModule()
 {
 	ModuleName = FName("InputModule");
+
+	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
 	AddKeyShortcut(FName("CameraPanMove"), FKey("MiddleMouseButton"));
 	AddKeyShortcut(FName("CameraRotate"));
 	AddKeyShortcut(FName("CameraZoom"));
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/IMC_CameraMovement.IMC_CameraMovement'"));
+	if(CameraMovementMapping.Succeeded())
+	{
+		ActionContexts.Add(CameraMovementMapping.Object);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> PlayerMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/IMC_PlayerMovement.IMC_PlayerMovement'"));
+	if(PlayerMovementMapping.Succeeded())
+	{
+		ActionContexts.Add(PlayerMovementMapping.Object);
+	}
 
 	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchPressed)));
 	AddTouchMapping(FInputTouchMapping(IE_Released, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchReleased)));
@@ -70,16 +86,16 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 		ApplyKeyMappings();
 		ApplyTouchMappings();
 		
-		for(auto& Iter1 : ActionMappings)
+		for(auto& Iter1 : ActionContexts)
 		{
 			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetPlayerController()->GetLocalPlayer()))
 			{
-				Subsystem->AddMappingContext(Iter1.Value, 0);
+				Subsystem->AddMappingContext(Iter1, 0);
 			}
-			for(auto& Iter2 : Iter1.Value->GetMappings())
+			for(auto& Iter2 : Iter1->GetMappings())
 			{
 				const auto InputAction = const_cast<UInputAction*>(Iter2.Action.Get());
-				BindActionMapping(InputAction->GetFName(), InputAction, Cast<UEnhancedInputComponent>(GetPlayerController()->InputComponent));
+				OnBindAction(Cast<UEnhancedInputComponent>(GetPlayerController()->InputComponent), Cast<UInputActionBase>(InputAction));
 			}
 		}
 	}
@@ -143,11 +159,11 @@ void AInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 	}
 
-	for(auto& Iter : SaveData.ActionMappings)
+	for(int32 i = 0; i < SaveData.ActionMappings.Num(); i++)
 	{
-		if(ActionMappings.Contains(Iter.Key))
+		if(ActionContexts.IsValidIndex(i))
 		{
-			const_cast<TArray<FEnhancedActionKeyMapping>&>(ActionMappings[Iter.Key]->GetMappings()) = Iter.Value.Mappings;
+			const_cast<TArray<FEnhancedActionKeyMapping>&>(ActionContexts[i]->GetMappings()) = SaveData.ActionMappings[i].Mappings;
 		}
 	}
 
@@ -177,12 +193,9 @@ FSaveData* AInputModule::ToData()
 		}
 	}
 
-	for(auto& Iter : ActionMappings)
+	for(int32 i = 0; i < ActionContexts.Num(); i++)
 	{
-		if(SaveData.ActionMappings.Contains(Iter.Key))
-		{
-			SaveData.ActionMappings[Iter.Key].Mappings = Iter.Value->GetMappings();
-		}
+		SaveData.ActionMappings.EmplaceAt_GetRef(i).Mappings = ActionContexts[i]->GetMappings();
 	}
 
 	for(auto& Iter : KeyMappings)
@@ -221,52 +234,68 @@ void AInputModule::RemoveKeyShortcut(const FName InName)
 	}
 }
 
-void AInputModule::BindActionMapping_Implementation(const FName InActionName, UInputAction* InInputAction, UEnhancedInputComponent* InInputComponent)
+void AInputModule::OnBindAction_Implementation(UEnhancedInputComponent* InInputComponent, UInputActionBase* InInputAction)
 {
-	if(InActionName == TEXT("TurnCamera"))
+	if(InInputAction->ActionName == TEXT("TurnCamera"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::TurnCamera);
 	}
-	if(InActionName == TEXT("LookUpCamera"))
+	else if(InInputAction->ActionName == TEXT("LookUpCamera"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::LookUpCamera);
 	}
-	if(InActionName == TEXT("PanHCamera"))
+	else if(InInputAction->ActionName == TEXT("PanHCamera"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::PanHCamera);
 	}
-	if(InActionName == TEXT("PanVCamera"))
+	else if(InInputAction->ActionName == TEXT("PanVCamera"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::PanVCamera);
 	}
-	if(InActionName == TEXT("ZoomCamera"))
+	else if(InInputAction->ActionName == TEXT("ZoomCamera"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::ZoomCamera);
 	}
-	if(InActionName == TEXT("TurnPlayer"))
+	else if(InInputAction->ActionName == TEXT("TurnPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::TurnPlayer);
 	}
-	if(InActionName == TEXT("MoveHPlayer"))
+	else if(InInputAction->ActionName == TEXT("MoveHPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveHPlayer);
 	}
-	if(InActionName == TEXT("MoveVPlayer"))
+	else if(InInputAction->ActionName == TEXT("MoveVPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveVPlayer);
 	}
-	if(InActionName == TEXT("MoveForwardPlayer"))
+	else if(InInputAction->ActionName == TEXT("MoveForwardPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveForwardPlayer);
 	}
-	if(InActionName == TEXT("MoveRightPlayer"))
+	else if(InInputAction->ActionName == TEXT("MoveRightPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveRightPlayer);
 	}
-	if(InActionName == TEXT("MoveUpPlayer"))
+	else if(InInputAction->ActionName == TEXT("MoveUpPlayer"))
 	{
 		InInputComponent->BindAction(InInputAction, ETriggerEvent::Triggered, this, &AInputModule::MoveUpPlayer);
 	}
+}
+
+TArray<FEnhancedActionKeyMapping*> AInputModule::GetActionMappingsByName(const FName InActionName)
+{
+	TArray<FEnhancedActionKeyMapping*> Mappings;
+	for(auto Iter1 : ActionContexts)
+	{
+		for(auto& Iter2 : Iter1->GetMappings())
+		{
+			if(Cast<UInputActionBase>(Iter2.Action)->ActionName == InActionName)
+			{
+				Mappings.Add(&const_cast<FEnhancedActionKeyMapping&>(Iter2));
+			}
+		}
+	}
+	return Mappings;
 }
 
 void AInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
@@ -360,7 +389,7 @@ void AInputModule::ZoomCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(!GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
+	if(GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
 	{
 		ACameraModule::Get()->AddCameraDistanceInput(-InValue.Get<float>());
 	}

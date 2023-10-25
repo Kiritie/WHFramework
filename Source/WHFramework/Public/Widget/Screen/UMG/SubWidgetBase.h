@@ -28,18 +28,22 @@ public:
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
 	void K2_OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
+	UFUNCTION()
 	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize(const TArray<FParameter>& InParams);
+	UFUNCTION()
 	virtual void OnInitialize(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
 	void K2_OnDestroy();
+	UFUNCTION()
 	virtual void OnDestroy();
 
 public:

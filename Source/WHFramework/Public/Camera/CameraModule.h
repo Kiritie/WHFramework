@@ -13,7 +13,7 @@
 class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
-class ACameraPawnBase;
+class ACameraActorBase;
 class ACameraManagerBase;
 
 UCLASS()
@@ -61,23 +61,23 @@ protected:
 	/// Camera
 protected:
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	TArray<TSubclassOf<ACameraPawnBase>> CameraClasses;
+	TArray<TSubclassOf<ACameraActorBase>> CameraClasses;
 	
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	TArray<ACameraPawnBase*> Cameras;
+	TArray<ACameraActorBase*> Cameras;
 	
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	ACameraPawnBase* DefaultCamera;
+	ACameraActorBase* DefaultCamera;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
 	bool DefaultInstantSwitch;
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	ACameraPawnBase* CurrentCamera;
+	ACameraActorBase* CurrentCamera;
 
 private:
 	UPROPERTY(Transient)
-	TMap<FName, ACameraPawnBase*> CameraMap;
+	TMap<FName, ACameraActorBase*> CameraMap;
 
 public:
 	template<class T>
@@ -87,19 +87,19 @@ public:
 	}
 	
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = nullptr) const;
+	ACameraActorBase* GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
 	ACameraManagerBase* GetCurrentCameraManager();
 
 	template<class T>
-	T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
 		return Cast<T>(GetCameraByClass(InClass));
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass);
+	ACameraActorBase* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass);
 
 	template<class T>
 	T* GetCameraByName(const FName InName)
@@ -108,19 +108,19 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	ACameraPawnBase* GetCameraByName(const FName InName) const;
+	ACameraActorBase* GetCameraByName(const FName InName) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
+	void SwitchCamera(ACameraActorBase* InCamera, bool bInstant = false);
 
 	template<class T>
-	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
 		SwitchCameraByClass(InClass, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
+	void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	void SwitchCameraByName(const FName InName, bool bInstant = false);
@@ -249,6 +249,7 @@ private:
 	float CameraDoZoomDuration;
 	float CameraDoZoomDistance;
 	EEaseType CameraDoZoomEaseType;
+	FVector InitSocketOffset;
 	UPROPERTY()
 	AActor* TrackTargetActor;
 	FVector TrackLocationOffset;
@@ -268,7 +269,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);

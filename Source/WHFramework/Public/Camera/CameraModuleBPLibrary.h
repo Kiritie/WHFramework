@@ -10,7 +10,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
-class ACameraPawnBase;
+class ACameraActorBase;
 /**
  * 
  */
@@ -27,7 +27,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass = nullptr);
+	static ACameraActorBase* GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
 	static FVector GetCameraLocation(bool bReal = false);
@@ -39,13 +39,13 @@ public:
 	static float GetCameraDistance(bool bReal = false);
 
 	template<class T>
-	static T* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	static T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
 		return Cast<T>(GetCameraByClass(InClass));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass);
+	static ACameraActorBase* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass);
 
 	template<class T>
 	static T* GetCameraByName(const FName InName)
@@ -54,26 +54,26 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleBPLibrary")
-	static ACameraPawnBase* GetCameraByName(const FName InName);
+	static ACameraActorBase* GetCameraByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void SwitchCamera(ACameraPawnBase* InCamera, bool bInstant = false);
+	static void SwitchCamera(ACameraActorBase* InCamera, bool bInstant = false);
 
 	template<class T>
-	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraPawnBase> InClass = T::StaticClass())
+	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
 		SwitchCameraByClass(InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant = false);
+	static void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
-	static void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	static void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleBPLibrary")
 	static void EndTrackTarget(AActor* InTargetActor = nullptr);

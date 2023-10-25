@@ -25,13 +25,13 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate_Implementation(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
 
-	virtual void OnInitialize_Implementation(const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
 
-	virtual void OnRefresh_Implementation() override;
+	virtual void OnRefresh() override;
 
-	virtual void OnDestroy_Implementation() override;
+	virtual void OnDestroy() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

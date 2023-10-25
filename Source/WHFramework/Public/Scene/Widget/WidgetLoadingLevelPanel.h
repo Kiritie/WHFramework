@@ -21,7 +21,7 @@ public:
 
 	virtual void OnClose(bool bInstant) override;
 
-	virtual void OnRefresh_Implementation() override;
+	virtual void OnRefresh() override;
 
 protected:
 	UPROPERTY(BlueprintReadOnly)

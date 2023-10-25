@@ -21,6 +21,8 @@
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
                 "Engine",
+				"CommonUI",
+				"EnhancedInput",
 				"GameplayAbilities",
 				"ProceduralMeshComponent"
 			]
@@ -36,6 +38,14 @@
             "Name": "Paper2D",
             "Enabled": true
         },
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
 		{
 			"Name": "GameplayAbilities",
 			"Enabled": true

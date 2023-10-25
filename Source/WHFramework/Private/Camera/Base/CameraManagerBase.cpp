@@ -3,7 +3,7 @@
 #include "Camera/Base/CameraManagerBase.h"
 
 #include "Camera/CameraModuleBPLibrary.h"
-#include "Camera/Base/CameraPawnBase.h"
+#include "Camera/Base/CameraActorBase.h"
 
 ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

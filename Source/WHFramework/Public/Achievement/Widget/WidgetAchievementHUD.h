@@ -30,17 +30,17 @@ public:
 	UWidgetAchievementHUD(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void OnCreate_Implementation(UObject* InOwner) override;
+	virtual void OnCreate(UObject* InOwner) override;
 
-	virtual void OnInitialize_Implementation(UObject* InOwner) override;
+	virtual void OnInitialize(UObject* InOwner) override;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 
-	virtual void OnRefresh_Implementation() override;
+	virtual void OnRefresh() override;
 
-	virtual void OnDestroy_Implementation(bool bRecovery = false) override;
+	virtual void OnDestroy(bool bRecovery = false) override;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Achievement HUD")

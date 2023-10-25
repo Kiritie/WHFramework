@@ -90,7 +90,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 	}
 
 	switch(ProcedureGuideType)
@@ -267,7 +267,7 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleBPLibrary::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+				UCameraModuleBPLibrary::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 			}
 		}
 		else

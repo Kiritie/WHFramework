@@ -10,7 +10,7 @@
 
 #include "StepBase.generated.h"
 
-class ACameraPawnBase;
+class ACameraActorBase;
 /**
  * 步骤基类
  */
@@ -42,18 +42,21 @@ public:
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
 	void K2_OnStateChanged(EStepState InStepState);
+	UFUNCTION()
 	virtual void OnStateChanged(EStepState InStepState);
 	/**
 	 * 步骤初始化
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
+	UFUNCTION()
 	virtual void OnInitialize();
 	/**
 	 * 步骤还原
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRestore")
 	void K2_OnRestore();
+	UFUNCTION()
 	virtual void OnRestore();
 	/**
 	 * 步骤进入
@@ -61,36 +64,42 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
 	void K2_OnEnter(UStepBase* InLastStep);
+	UFUNCTION()
 	virtual void OnEnter(UStepBase* InLastStep);
 	/**
 	 * 步骤帧刷新
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 	/**
 	* 步骤指引
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
 	void K2_OnGuide();
+	UFUNCTION()
 	virtual void OnGuide();
 	/**
 	 * 步骤执行
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExecute")
 	void K2_OnExecute();
+	UFUNCTION()
 	virtual void OnExecute();
 	/**
 	 * 步骤完成
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnComplete")
 	void K2_OnComplete(EStepExecuteResult InStepExecuteResult);
+	UFUNCTION()
 	virtual void OnComplete(EStepExecuteResult InStepExecuteResult);
 	/**
 	 * 步骤离开
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
 	void K2_OnLeave();
+	UFUNCTION()
 	virtual void OnLeave();
 
 public:
@@ -199,7 +208,7 @@ public:
 	bool bTrackTarget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	ACameraPawnBase* CameraViewPawn;
+	ACameraActorBase* CameraViewPawn;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
 	EStepCameraViewMode CameraViewMode;

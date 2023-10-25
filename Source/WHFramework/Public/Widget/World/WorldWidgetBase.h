@@ -40,14 +40,17 @@ public:
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
 	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
+	UFUNCTION()
 	virtual void OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
 	void K2_OnDestroy(bool bRecovery = false);
+	UFUNCTION()
 	virtual void OnDestroy(bool bRecovery = false);
 
 public:

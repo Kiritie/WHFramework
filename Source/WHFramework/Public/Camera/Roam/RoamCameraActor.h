@@ -2,16 +2,16 @@
 
 #pragma once
 
-#include "Camera/Base/CameraPawnBase.h"
-#include "RoamCameraPawn.generated.h"
+#include "Camera/Base/CameraActorBase.h"
+#include "RoamCameraActor.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API ARoamCameraPawn : public ACameraPawnBase
+class WHFRAMEWORK_API ARoamCameraActor : public ACameraActorBase
 {
 	GENERATED_BODY()
 
 public:
-	ARoamCameraPawn();
+	ARoamCameraActor();
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")

@@ -10,7 +10,7 @@
 
 #include "TaskBase.generated.h"
 
-class ACameraPawnBase;
+class ACameraActorBase;
 /**
  * 任务基类
  */
@@ -42,18 +42,21 @@ public:
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
 	void K2_OnStateChanged(ETaskState InTaskState);
+	UFUNCTION()
 	virtual void OnStateChanged(ETaskState InTaskState);
 	/**
 	 * 任务初始化
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
+	UFUNCTION()
 	virtual void OnInitialize();
 	/**
 	 * 任务还原
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRestore")
 	void K2_OnRestore();
+	UFUNCTION()
 	virtual void OnRestore();
 	/**
 	 * 任务进入
@@ -61,36 +64,42 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
 	void K2_OnEnter(UTaskBase* InLastTask);
+	UFUNCTION()
 	virtual void OnEnter(UTaskBase* InLastTask);
 	/**
 	 * 任务帧刷新
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 	/**
 	* 任务指引
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
 	void K2_OnGuide();
+	UFUNCTION()
 	virtual void OnGuide();
 	/**
 	 * 任务执行
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExecute")
 	void K2_OnExecute();
+	UFUNCTION()
 	virtual void OnExecute();
 	/**
 	 * 任务完成
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnComplete")
 	void K2_OnComplete(ETaskExecuteResult InTaskExecuteResult);
+	UFUNCTION()
 	virtual void OnComplete(ETaskExecuteResult InTaskExecuteResult);
 	/**
 	 * 任务离开
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
 	void K2_OnLeave();
+	UFUNCTION()
 	virtual void OnLeave();
 
 public:

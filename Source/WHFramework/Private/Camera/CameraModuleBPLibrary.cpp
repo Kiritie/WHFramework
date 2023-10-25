@@ -6,7 +6,7 @@
 #include "Camera/CameraModule.h"
 #include "Camera/Base/CameraManagerBase.h"
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraPawnBase> InClass)
+ACameraActorBase* UCameraModuleBPLibrary::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -42,7 +42,7 @@ float UCameraModuleBPLibrary::GetCameraDistance(bool bReal)
 	return 0.f;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPawnBase> InClass)
+ACameraActorBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -51,7 +51,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByClass(TSubclassOf<ACameraPaw
 	return nullptr;
 }
 
-ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InName)
+ACameraActorBase* UCameraModuleBPLibrary::GetCameraByName(const FName InName)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -60,7 +60,7 @@ ACameraPawnBase* UCameraModuleBPLibrary::GetCameraByName(const FName InName)
 	return nullptr;
 }
 
-void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInstant)
+void UCameraModuleBPLibrary::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -68,7 +68,7 @@ void UCameraModuleBPLibrary::SwitchCamera(ACameraPawnBase* InCamera, bool bInsta
 	}
 }
 
-void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraPawnBase> InClass, bool bInstant)
+void UCameraModuleBPLibrary::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -84,11 +84,11 @@ void UCameraModuleBPLibrary::SwitchCameraByName(const FName InName, bool bInstan
 	}
 }
 
-void UCameraModuleBPLibrary::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
+void UCameraModuleBPLibrary::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
-		CameraModule->StartTrackTarget(InTargetActor, InTrackTargetMode, InTrackTargetSpace, InLocationOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, bInstant);
+		CameraModule->StartTrackTarget(InTargetActor, InTrackTargetMode, InTrackTargetSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, bInstant);
 	}
 }
 

@@ -1,17 +1,15 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Camera/Roam/RoamCameraPawn.h"
+#include "Camera/Roam/RoamCameraActor.h"
 
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraModule.h"
 #include "Components/SphereComponent.h"
 #include "Engine/CollisionProfile.h"
-#include "GameFramework/FloatingPawnMovement.h"
-#include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
-ARoamCameraPawn::ARoamCameraPawn()
+ARoamCameraActor::ARoamCameraActor()
 {
 	CameraName = FName("RoamCamera");
 
@@ -25,30 +23,27 @@ ARoamCameraPawn::ARoamCameraPawn()
 
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
-	
-	MovementComponent = CreateDefaultSubobject<UPawnMovementComponent, UFloatingPawnMovement>(FName("MovementComponent"));
-	MovementComponent->UpdatedComponent = Sphere;
 }
 
-void ARoamCameraPawn::MoveForward_Implementation(float InValue)
+void ARoamCameraActor::MoveForward_Implementation(float InValue)
 {
-	const FVector Direction = GetControlRotation().Vector();
+	const FVector Direction = GetActorRotation().Vector();
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraMovementInput(Direction, InValue);
 	}
 }
 
-void ARoamCameraPawn::MoveRight_Implementation(float InValue)
+void ARoamCameraActor::MoveRight_Implementation(float InValue)
 {
-	const FVector Direction = FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Y);
+	const FVector Direction = FRotationMatrix(GetActorRotation()).GetUnitAxis(EAxis::Y);
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
 		CameraModule->AddCameraMovementInput(Direction, InValue);
 	}
 }
 
-void ARoamCameraPawn::MoveUp_Implementation(float InValue)
+void ARoamCameraActor::MoveUp_Implementation(float InValue)
 {
 	if(ACameraModule* CameraModule = ACameraModule::Get())
 	{
@@ -56,7 +51,7 @@ void ARoamCameraPawn::MoveUp_Implementation(float InValue)
 	}
 }
 
-void ARoamCameraPawn::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
+void ARoamCameraActor::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
 {
 	Super::SetCameraCollisionMode(InCameraCollisionMode);
 

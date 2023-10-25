@@ -4,7 +4,7 @@
 #include "Character/CharacterModule.h"
 
 #include "Camera/CameraModuleBPLibrary.h"
-#include "Camera/Base/CameraPawnBase.h"
+#include "Camera/Base/CameraActorBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonBPLibrary.h"
@@ -130,7 +130,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 				CurrentCharacter = InCharacter;
 				PlayerController->Possess(InCharacter);
 				UCameraModuleBPLibrary::EndTrackTarget();
-				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
+				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector(-1.f), InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
 			}
 			else if(CurrentCharacter)
 			{

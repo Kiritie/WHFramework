@@ -22,14 +22,14 @@ UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectIni
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 }
 
-void UWidgetAchievementHUD::OnCreate_Implementation(UObject* InOwner)
+void UWidgetAchievementHUD::OnCreate(UObject* InOwner)
 {
-	Super::OnCreate_Implementation(InOwner);
+	Super::OnCreate(InOwner);
 }
 
-void UWidgetAchievementHUD::OnInitialize_Implementation(UObject* InOwner)
+void UWidgetAchievementHUD::OnInitialize(UObject* InOwner)
 {
-	Super::OnInitialize_Implementation(InOwner);
+	Super::OnInitialize(InOwner);
 }
 
 void UWidgetAchievementHUD::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
@@ -56,9 +56,9 @@ void UWidgetAchievementHUD::OnClose(bool bInstant)
 	Super::OnClose(bInstant);
 }
 
-void UWidgetAchievementHUD::OnRefresh_Implementation()
+void UWidgetAchievementHUD::OnRefresh()
 {
-	Super::OnRefresh_Implementation();
+	Super::OnRefresh();
 
 	if (Active.Num() < AAchievementModule::Get()->TotalOnScreen && !MovingUp)
 	{
@@ -94,9 +94,9 @@ void UWidgetAchievementHUD::OnRefresh_Implementation()
 	}
 }
 
-void UWidgetAchievementHUD::OnDestroy_Implementation(bool bRecovery)
+void UWidgetAchievementHUD::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy_Implementation(bRecovery);
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetAchievementHUD::ScheduleAchievementDisplay(FAchievementData Achievement, FAchievementStates State)
@@ -107,7 +107,7 @@ void UWidgetAchievementHUD::ScheduleAchievementDisplay(FAchievementData Achievem
 	}
 	else
 	{
-		FAchievementPackage TempPackage = FAchievementPackage();
+		FAchievementPackage TempPackage;
 		TempPackage.Data = Achievement;
 		TempPackage.State = State;
 		BackLog.Add(TempPackage);

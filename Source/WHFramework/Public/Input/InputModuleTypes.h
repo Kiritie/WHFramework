@@ -5,6 +5,7 @@
 
 #include "GameFramework/PlayerController.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "EnhancedActionKeyMapping.h"
 
 #include "InputModuleTypes.generated.h"
 
@@ -174,14 +175,14 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData()
 	{
-		ActionMappings = TMap<FName, FInputActionMappings>();
+		ActionMappings = TArray<FInputActionMappings>();
 		KeyShortcuts = TMap<FName, FKey>();
 		KeyMappings = TMap<FName, FKey>();
 	}
 
 public:
 	UPROPERTY()
-	TMap<FName, FInputActionMappings> ActionMappings;
+	TArray<FInputActionMappings> ActionMappings;
 
 	UPROPERTY()
 	TMap<FName, FKey> KeyShortcuts;
@@ -196,7 +197,9 @@ public:
 
 		for(auto& Iter : ActionMappings)
 		{
-			Iter.Value.MakeSaved();
+			Iter.MakeSaved();
 		}
 	}
+
+	virtual TArray<FEnhancedActionKeyMapping*> GetActionMappingsByName(const FName InActionName);
 };

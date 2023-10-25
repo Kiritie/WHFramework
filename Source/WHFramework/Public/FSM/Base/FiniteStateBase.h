@@ -32,6 +32,7 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
+	UFUNCTION()
 	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex);
 	/**
 	 * 状态进入验证
@@ -39,6 +40,7 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnterValidate")
 	bool K2_OnEnterValidate(UFiniteStateBase* InLastFiniteState);
+	UFUNCTION()
 	virtual bool OnEnterValidate(UFiniteStateBase* InLastFiniteState);
 	/**
 	 * 状态进入
@@ -46,12 +48,14 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
 	void K2_OnEnter(UFiniteStateBase* InLastFiniteState);
+	UFUNCTION()
 	virtual void OnEnter(UFiniteStateBase* InLastFiniteState);
 	/**
 	 * 状态帧刷新
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
+	UFUNCTION()
 	virtual void OnRefresh();
 	/**
 	 * 状态离开验证
@@ -59,6 +63,7 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeaveValidate")
 	bool K2_OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
+	UFUNCTION()
 	virtual bool OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
 	/**
 	 * 状态离开
@@ -66,12 +71,14 @@ public:
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
 	void K2_OnLeave(UFiniteStateBase* InNextFiniteState);
+	UFUNCTION()
 	virtual void OnLeave(UFiniteStateBase* InNextFiniteState);
 	/**
 	 * 状态终止
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
 	void K2_OnTermination();
+	UFUNCTION()
 	virtual void OnTermination();
 
 public:
