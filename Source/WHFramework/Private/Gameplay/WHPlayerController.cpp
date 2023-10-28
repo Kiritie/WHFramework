@@ -20,7 +20,7 @@
 AWHPlayerController::AWHPlayerController()
 {
 	PlayerCameraManagerClass = ACameraManagerBase::StaticClass();
-	
+
 	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(FName("WidgetInteractionComp"));
 	WidgetInteractionComp->SetupAttachment(RootComponent);
 

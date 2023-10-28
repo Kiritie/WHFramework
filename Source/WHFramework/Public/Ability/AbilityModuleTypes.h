@@ -7,6 +7,7 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
+#include "NativeGameplayTags.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -994,3 +995,8 @@ public:
 	UPROPERTY()
 	float CameraDistance;
 };
+
+namespace GameplayTags
+{
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Dead);
+}

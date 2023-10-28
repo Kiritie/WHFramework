@@ -71,7 +71,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DeadTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Dead);
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -99,7 +99,7 @@ void UAbilityCharacterState_Death::DeathEnd()
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DyingTag);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().DeadTag);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Dead);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(Character);
 }

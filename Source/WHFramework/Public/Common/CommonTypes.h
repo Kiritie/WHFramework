@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
+#include "NativeGameplayTags.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 #include "CommonTypes.generated.h"
@@ -120,3 +122,10 @@ for(auto& Item : Map) \
 	Expression \
 	Index++; \
 }
+
+namespace GameplayTags
+{
+	WHFRAMEWORK_API	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString = false);
+
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_TurnCamera);
+};

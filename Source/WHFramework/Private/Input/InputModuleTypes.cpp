@@ -3,8 +3,11 @@
 
 #include "Input/InputModuleTypes.h"
 
+#include "Input/InputModule.h"
 #include "Input/Base/InputActionBase.h"
 #include "Widgets/SViewport.h"
+#include "ICommonUIModule.h"
+#include "CommonUISettings.h"
 
 bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
@@ -43,11 +46,57 @@ TArray<FEnhancedActionKeyMapping*> FInputModuleSaveData::GetActionMappingsByName
 	{
 		for(auto& Iter2 : Iter1.Mappings)
 		{
-			if(static_cast<UInputActionBase*>(Iter2.Action)->ActionName == InActionName)
-			{
-				Mappings.Add(&Iter2);
-			}
+			// if(static_cast<UInputActionBase*>(Iter2.Action)->ActionTag == InActionName)
+			// {
+			// 	Mappings.Add(&Iter2);
+			// }
 		}
 	}
 	return Mappings;
 }
+
+bool FInputConfigMapping::CanBeActivated() const
+{
+	const FGameplayTagContainer& PlatformTraits = ICommonUIModule::GetSettings().GetPlatformTraits();
+
+	// If the current platform does NOT have all the dependent traits, then don't activate it
+	if (!DependentPlatformTraits.IsEmpty() && !PlatformTraits.HasAll(DependentPlatformTraits))
+	{
+		return false;
+	}
+
+	// If the platform has any of the excluded traits, then we shouldn't activate this config.
+	if (!ExcludedPlatformTraits.IsEmpty() && PlatformTraits.HasAny(ExcludedPlatformTraits))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool FInputConfigMapping::RegisterPair(const FInputConfigMapping& Pair)
+{
+	if (AInputModule* Settings = AInputModule::Get())
+	{
+		// Register the pair with the settings, but do not activate it yet
+		if (const UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
+		{
+			Settings->RegisterInputConfig(Pair.Type, LoadedConfig, false);
+			return true;
+		}	
+	}
+	
+	return false;
+}
+
+void FInputConfigMapping::UnregisterPair(const FInputConfigMapping& Pair)
+{
+	if (AInputModule* Settings = AInputModule::Get())
+	{
+		if (const UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
+		{
+			Settings->UnregisterInputConfig(LoadedConfig);
+		}
+	}
+}
+

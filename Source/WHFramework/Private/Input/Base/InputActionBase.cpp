@@ -5,5 +5,5 @@
 
 UInputActionBase::UInputActionBase()
 {
-	ActionName = NAME_None;
+	ActionTag = FGameplayTag::EmptyTag;
 }

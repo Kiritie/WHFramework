@@ -19,9 +19,7 @@ public class WHFramework : ModuleRules
 			{
 				"Core",
 				"CoreUObject",
-				"Engine",
-				"CommonUI",
-				"EnhancedInput"
+				"Engine"
 			});
 			
 		
@@ -36,6 +34,9 @@ public class WHFramework : ModuleRules
 				"Paper2D",
 				"SlateCore",
 				"InputCore",
+				"CommonUI",
+				"CommonInput",
+				"EnhancedInput",
 				"ApplicationCore",
 				"MediaAssets",
 				"AIModule",

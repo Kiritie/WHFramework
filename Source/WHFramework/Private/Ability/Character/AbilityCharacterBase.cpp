@@ -415,7 +415,7 @@ bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetCharacterData<UAbilityCharacterDataBase>().DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityCharacterBase::IsDying() const
