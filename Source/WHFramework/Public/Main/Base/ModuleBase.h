@@ -117,12 +117,12 @@ protected:
 	EModuleState ModuleState;
 	/// 自动运行
 	UPROPERTY(EditAnywhere)
-	bool bAutoRunModule;
+	bool bModuleAutoRun;
 	/// 自动保存
 	UPROPERTY(EditAnywhere)
-	bool bAutoSaveModule;
+	bool bModuleAutoSave;
 	/// 模块存档
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bAutoSaveModule == true"))
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	TSubclassOf<USaveGameBase> ModuleSaveGame;
 
 public:

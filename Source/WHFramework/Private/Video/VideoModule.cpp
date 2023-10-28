@@ -53,7 +53,7 @@ void AVideoModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Load();
 		}
@@ -85,7 +85,7 @@ void AVideoModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Save();
 		}

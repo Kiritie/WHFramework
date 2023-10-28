@@ -198,7 +198,7 @@ void ACameraModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Load();
 		}
@@ -305,7 +305,7 @@ void ACameraModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Save();
 		}

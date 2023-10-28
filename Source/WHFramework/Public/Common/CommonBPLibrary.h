@@ -8,6 +8,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Dom/JsonObject.h"
+#include "Gameplay/WHGameInstance.h"
 #include "Gameplay/WHPlayerController.h"
 
 #include "CommonBPLibrary.generated.h"
@@ -17,6 +18,7 @@ class AWHPlayerController;
 class AWHGameState;
 class AWHGameMode;
 class UWHGameInstance;
+class ULocalPlayer;
 /**
  * 
  */
@@ -354,7 +356,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonBPLibrary")
-	static APawn* GetPossessedPawnByID(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerID = 0);
+	static APawn* GetPossessedPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetLocalPossessedPawn()
@@ -390,7 +392,7 @@ public:
 		return nullptr;
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonBPLibrary")
-	static APawn* GetPlayerPawnByID(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerID = 0);
+	static APawn* GetPlayerPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetLocalPlayerPawn()
@@ -403,4 +405,19 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonBPLibrary")
 	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
+
+	UFUNCTION(BlueprintPure, Category = "CommonBPLibrary")
+	static TArray<ULocalPlayer*> GetLocalPlayers();
+
+	template<class T>
+	static T* GetLocalPlayer(int32 InPlayerID = 0)
+	{
+		if(GetLocalPlayers().IsValidIndex(InPlayerID))
+		{
+			return Cast<T>(GetLocalPlayers()[InPlayerID]);
+		}
+		return nullptr;
+	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonBPLibrary")
+	static ULocalPlayer* GetLocalPlayer(int32 InPlayerID = 0, TSubclassOf<ULocalPlayer> InClass = nullptr);
 };

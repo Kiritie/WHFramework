@@ -103,8 +103,3 @@ UAbilityItemDataBase& FActorSaveData::GetItemData() const
 {
 	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
 }
-
-namespace GameplayTags
-{
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Dead, "State.Vitality.Dead", "Dead");
-}

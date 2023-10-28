@@ -631,7 +631,7 @@ APawn* UCommonBPLibrary::GetPossessedPawn(TSubclassOf<APawn> InClass, int32 InPl
 	return nullptr;
 }
 
-APawn* UCommonBPLibrary::GetPossessedPawnByID(TSubclassOf<APawn> InClass, int32 InPlayerID)
+APawn* UCommonBPLibrary::GetPossessedPawnByID(int32 InPlayerID, TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 	{
@@ -658,7 +658,7 @@ APawn* UCommonBPLibrary::GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlaye
 	return nullptr;
 }
 
-APawn* UCommonBPLibrary::GetPlayerPawnByID(TSubclassOf<APawn> InClass, int32 InPlayerID)
+APawn* UCommonBPLibrary::GetPlayerPawnByID(int32 InPlayerID, TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
 	{
@@ -672,6 +672,20 @@ APawn* UCommonBPLibrary::GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
 	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 	{
 		return PlayerController->GetPlayerPawn();
+	}
+	return nullptr;
+}
+
+TArray<ULocalPlayer*> UCommonBPLibrary::GetLocalPlayers()
+{
+	return GetGameInstance()->GetLocalPlayers();
+}
+
+ULocalPlayer* UCommonBPLibrary::GetLocalPlayer(int32 InPlayerID, TSubclassOf<ULocalPlayer> InClass)
+{
+	if(GetLocalPlayers().IsValidIndex(InPlayerID))
+	{
+		return GetLocalPlayers()[InPlayerID];
 	}
 	return nullptr;
 }

@@ -179,7 +179,7 @@ void AVoxelModule::OnPreparatory_Implementation(EPhase InPhase)
 	{
 		if(bAutoGenerate)
 		{
-			if(bAutoSaveModule)
+			if(bModuleAutoSave)
 			{
 				Load();
 			}
@@ -222,7 +222,7 @@ void AVoxelModule::OnTermination_Implementation(EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Save();
 		}

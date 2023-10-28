@@ -15,8 +15,8 @@ AModuleBase::AModuleBase()
 
 	ModuleName = NAME_None;
 	ModuleState = EModuleState::None;
-	bAutoRunModule = true;
-	bAutoSaveModule = false;
+	bModuleAutoRun = true;
+	bModuleAutoSave = false;
 	ModuleSaveGame = nullptr;
 }
 
@@ -144,7 +144,7 @@ void AModuleBase::Termination_Implementation()
 
 bool AModuleBase::IsAutoRunModule() const
 {
-	return bAutoRunModule;
+	return bModuleAutoRun;
 }
 
 FName AModuleBase::GetModuleName() const

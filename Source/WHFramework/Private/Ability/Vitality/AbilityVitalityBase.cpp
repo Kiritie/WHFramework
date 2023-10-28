@@ -187,12 +187,12 @@ bool AAbilityVitalityBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResul
 
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityVitalityBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetVitalityData().DyingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
 bool AAbilityVitalityBase::SetLevelV(int32 InLevel)

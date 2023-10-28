@@ -28,7 +28,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
 	if(Killer)
 	{
@@ -54,8 +54,8 @@ void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DeadTag);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 }
 
 void UAbilityVitalityState_Death::OnTermination()
@@ -72,9 +72,9 @@ void UAbilityVitalityState_Death::DeathEnd()
 {
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 	
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Vitality->GetVitalityData().DyingTag);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 	
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(Vitality->GetVitalityData().DeadTag);
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(Vitality);
 }

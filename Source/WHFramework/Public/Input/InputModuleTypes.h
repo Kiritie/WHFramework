@@ -154,27 +154,6 @@ struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGame
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputActionMappings : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FInputActionMappings()
-	{
-		Mappings = TArray<FEnhancedActionKeyMapping>();
-	}
-
-	FORCEINLINE FInputActionMappings(TArray<FEnhancedActionKeyMapping> InMappings)
-	{
-		Mappings = InMappings;
-	}
-
-public:
-	UPROPERTY()
-	TArray<FEnhancedActionKeyMapping> Mappings;
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -182,14 +161,14 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData()
 	{
-		ActionMappings = TArray<FInputActionMappings>();
+		ActionMappings = TArray<FEnhancedActionKeyMapping>();
 		KeyShortcuts = TMap<FName, FKey>();
 		KeyMappings = TMap<FName, FKey>();
 	}
 
 public:
 	UPROPERTY()
-	TArray<FInputActionMappings> ActionMappings;
+	TArray<FEnhancedActionKeyMapping> ActionMappings;
 
 	UPROPERTY()
 	TMap<FName, FKey> KeyShortcuts;
@@ -201,14 +180,9 @@ public:
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
-
-		for(auto& Iter : ActionMappings)
-		{
-			Iter.MakeSaved();
-		}
 	}
 
-	virtual TArray<FEnhancedActionKeyMapping*> GetActionMappingsByName(const FName InActionName);
+	virtual TArray<FEnhancedActionKeyMapping> GetAllActionMappingByDisplayName(const FText InDisplayName);
 };
 
 class UPlayerMappableInputConfig;
@@ -245,7 +219,17 @@ struct FInputConfigMapping
 {
 	GENERATED_BODY()
 	
-	FInputConfigMapping() = default;
+	FInputConfigMapping()
+	{
+		Type = ECommonInputType::Count;
+		bShouldActivateAutomatically = true;
+	}
+	
+	FInputConfigMapping(const TSoftObjectPtr<UPlayerMappableInputConfig>& InConfig, ECommonInputType InType)
+		: Config(InConfig),
+		  Type(InType)
+	{
+	}
 	
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<UPlayerMappableInputConfig> Config;
@@ -256,7 +240,7 @@ struct FInputConfigMapping
 	 * input type is being used.
 	 */
 	UPROPERTY(EditAnywhere)
-	ECommonInputType Type = ECommonInputType::Count;
+	ECommonInputType Type;
 
 	/**
 	 * Container of platform traits that must be set in order for this input to be activated.
@@ -277,18 +261,8 @@ struct FInputConfigMapping
 	 * This is normally the desirable behavior
 	 */
 	UPROPERTY(EditAnywhere)
-	bool bShouldActivateAutomatically = true;
+	bool bShouldActivateAutomatically;
 
 	/** Returns true if this config pair can be activated based on the current platform traits and settings. */
 	bool CanBeActivated() const;
-	
-	/**
-	 * Registers the given config mapping with the local settings
-	 */
-	static bool RegisterPair(const FInputConfigMapping& Pair);
-
-	/**
-	 * Unregisters the given config mapping with the local settings
-	 */
-	static void UnregisterPair(const FInputConfigMapping& Pair);
 };

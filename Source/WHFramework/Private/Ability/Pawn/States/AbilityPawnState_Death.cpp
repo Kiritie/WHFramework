@@ -28,7 +28,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(Pawn->GetPawnData().DyingTag);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
 	if(Killer)
 	{
@@ -54,8 +54,8 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Pawn->GetPawnData().DyingTag);
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Pawn->GetPawnData().DeadTag);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 }
 
 void UAbilityPawnState_Death::OnTermination()
@@ -72,9 +72,9 @@ void UAbilityPawnState_Death::DeathEnd()
 {
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 	
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Pawn->GetPawnData().DyingTag);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 	
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(Pawn->GetPawnData().DeadTag);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 
 	UObjectPoolModuleBPLibrary::DespawnObject(Pawn);
 }

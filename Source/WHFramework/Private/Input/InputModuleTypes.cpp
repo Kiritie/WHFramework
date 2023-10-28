@@ -26,10 +26,10 @@ bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool b
 
 void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
 {
-	TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();
+	const TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();
 	if (ViewportWidget.IsValid())
 	{
-		TSharedRef<SViewport> ViewportWidgetRef = ViewportWidget.ToSharedRef();
+		const TSharedRef<SViewport> ViewportWidgetRef = ViewportWidget.ToSharedRef();
 		SlateOperations.UseHighPrecisionMouseMovement(ViewportWidgetRef);
 		SlateOperations.SetUserFocus(ViewportWidgetRef);
 		SlateOperations.LockMouseToWidget(ViewportWidgetRef);
@@ -39,17 +39,14 @@ void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewport
 	}
 }
 
-TArray<FEnhancedActionKeyMapping*> FInputModuleSaveData::GetActionMappingsByName(const FName InActionName)
+TArray<FEnhancedActionKeyMapping> FInputModuleSaveData::GetAllActionMappingByDisplayName(const FText InActionName)
 {
-	TArray<FEnhancedActionKeyMapping*> Mappings;
+	TArray<FEnhancedActionKeyMapping> Mappings;
 	for(auto& Iter1 : ActionMappings)
 	{
-		for(auto& Iter2 : Iter1.Mappings)
+		if(Iter1.PlayerMappableOptions.DisplayName.EqualTo(InActionName))
 		{
-			// if(static_cast<UInputActionBase*>(Iter2.Action)->ActionTag == InActionName)
-			// {
-			// 	Mappings.Add(&Iter2);
-			// }
+			Mappings.Add(Iter1);
 		}
 	}
 	return Mappings;
@@ -73,30 +70,3 @@ bool FInputConfigMapping::CanBeActivated() const
 
 	return true;
 }
-
-bool FInputConfigMapping::RegisterPair(const FInputConfigMapping& Pair)
-{
-	if (AInputModule* Settings = AInputModule::Get())
-	{
-		// Register the pair with the settings, but do not activate it yet
-		if (const UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
-		{
-			Settings->RegisterInputConfig(Pair.Type, LoadedConfig, false);
-			return true;
-		}	
-	}
-	
-	return false;
-}
-
-void FInputConfigMapping::UnregisterPair(const FInputConfigMapping& Pair)
-{
-	if (AInputModule* Settings = AInputModule::Get())
-	{
-		if (const UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
-		{
-			Settings->UnregisterInputConfig(LoadedConfig);
-		}
-	}
-}
-

@@ -11,8 +11,4 @@ UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 
 	InventoryData = FInventorySaveData();
 	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
-
-	// tags
-	// DeadTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dead");
-	// DyingTag = FGameplayTag::RequestGameplayTag("State.Vitality.Dying");
 }

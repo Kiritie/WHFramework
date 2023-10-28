@@ -23,7 +23,7 @@ class WHFRAMEWORK_API UAbilityTask_ServerWaitForClientTargetData : public UAbili
 	virtual void Activate() override;
 
 	UFUNCTION()
-	void OnTargetDataReplicatedCallback(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag ActivationTag);
+	void OnTargetDataReplicatedCallback(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag Activation);
 
 protected:
 	virtual void OnDestroy(bool AbilityEnded) override;

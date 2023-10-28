@@ -30,23 +30,4 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FInventorySaveData InventoryData;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag DeadTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag DyingTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag ActiveTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag FallingTag;
-				
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag WalkingTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tags")
-	FGameplayTag JumpingTag;
 };

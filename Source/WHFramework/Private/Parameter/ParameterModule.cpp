@@ -45,7 +45,7 @@ void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Load();
 		}
@@ -73,7 +73,7 @@ void AParameterModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Save();
 		}

@@ -38,19 +38,4 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
 	static void UpdateGlobalInputMode();
-
-	//////////////////////////////////////////////////////////////////////////
-	// InputBinds
-public:
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void BindInputKey(const FKey Key, const EInputEvent KeyEvent, const FInputActionHandlerDynamicSignature& Delegate);
-
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void BindInputAction(const FName ActionName, const EInputEvent KeyEvent, const FInputActionHandlerDynamicSignature& Delegate);
-
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void BindInputAxis(const FName AxisName, const FInputAxisHandlerDynamicSignature& Delegate);
-
-	UFUNCTION(BlueprintCallable, Category = "InputModuleBPLibrary")
-	static void BindInputTouch(const EInputEvent KeyEvent, const FInputTouchHandlerDynamicSignature& Delegate);
 };

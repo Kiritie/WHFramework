@@ -285,12 +285,12 @@ void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetPawnData().DeadTag) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityPawnBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GetPawnData().DyingTag);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
 bool AAbilityPawnBase::SetLevelV(int32 InLevel)

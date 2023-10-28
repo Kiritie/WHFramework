@@ -597,7 +597,7 @@ public:
 		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
 
 		TimeSeconds = -1.f;
-		SecondsOfDay = 600.f;
+		SecondsOfDay = 1200.f;
 	}
 
 public:

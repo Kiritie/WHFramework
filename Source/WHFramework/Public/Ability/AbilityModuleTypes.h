@@ -995,8 +995,3 @@ public:
 	UPROPERTY()
 	float CameraDistance;
 };
-
-namespace GameplayTags
-{
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Dead);
-}

@@ -14,7 +14,7 @@ IMPLEMENTATION_MODULE(ASaveGameModule)
 ASaveGameModule::ASaveGameModule()
 {
 	ModuleName = FName("SaveGameModule");
-	bAutoSaveModule = true;
+	bModuleAutoSave = true;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 
 	UserIndex = 0;
@@ -48,7 +48,7 @@ void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Load();
 		}
@@ -76,14 +76,14 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			Save();
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(bAutoSaveModule)
+		if(bModuleAutoSave)
 		{
 			for(auto& Iter1 : SaveGameInfos)
 			{

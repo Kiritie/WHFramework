@@ -27,7 +27,7 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Active);
 
 	Character->Execute_SetActorVisible(Character, true);
 	Character->ResetData();
@@ -47,7 +47,7 @@ void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(Character->GetCharacterData<UAbilityCharacterDataBase>().ActiveTag);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Active);
 }
 
 void UAbilityCharacterState_Default::OnTermination()
