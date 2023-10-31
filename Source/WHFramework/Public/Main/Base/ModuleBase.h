@@ -8,12 +8,17 @@
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "ModuleBase.generated.h"
 
+class USaveGameBase;
+class UModuleNetworkComponentBase;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
 UCLASS()
 class WHFRAMEWORK_API AModuleBase : public AWHActor, public ISaveDataInterface
 {
 	GENERATED_BODY()
+
+	friend class AWHPlayerController;
 	
 public:	
 	// ParamSets default values for this actor's properties
@@ -124,6 +129,9 @@ protected:
 	/// 模块存档
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	TSubclassOf<USaveGameBase> ModuleSaveGame;
+	/// 模块网络组件
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UModuleNetworkComponentBase> ModuleNetworkComponent;
 
 public:
 	UPROPERTY(BlueprintAssignable)
@@ -145,6 +153,26 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	EModuleState GetModuleState() const;
+	/**
+	* 获取模块存档
+	*/
+	template<class T>
+	static T* GetModuleSaveGame()
+	{
+		return Cast<T>(GetModuleSaveGame());
+	}
+	UFUNCTION(BlueprintPure)
+	USaveGameBase* GetModuleSaveGame() const;
+	/**
+	* 获取模块网络组件
+	*/
+	template<class T>
+	T* GetModuleNetworkComponent()
+	{
+		return Cast<T>(GetModuleNetworkComponent());
+	}
+	UFUNCTION(BlueprintPure)
+	UModuleNetworkComponentBase* GetModuleNetworkComponent() const;
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

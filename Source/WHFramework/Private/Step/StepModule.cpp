@@ -9,6 +9,7 @@
 #include "Event/EventModuleBPLibrary.h"
 #include "Event/Handle/Step/EventHandle_EndStep.h"
 #include "Event/Handle/Step/EventHandle_StartStep.h"
+#include "Step/StepModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(AStepModule)
 
@@ -16,6 +17,8 @@ IMPLEMENTATION_MODULE(AStepModule)
 AStepModule::AStepModule()
 {
 	ModuleName = FName("StepModule");
+
+	ModuleNetworkComponent = UStepModuleNetworkComponent::StaticClass();
 
 	bAutoStartFirst = false;
 

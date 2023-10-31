@@ -3,6 +3,7 @@
 
 #include "Camera/CameraModule.h"
 
+#include "Camera/CameraModuleNetworkComponent.h"
 #include "Camera/Base/CameraManagerBase.h"
 #include "Camera/Roam/RoamCameraActor.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -24,6 +25,8 @@ ACameraModule::ACameraModule()
 	ModuleName = FName("CameraModule");
 
 	ModuleSaveGame = UCameraSaveGame::StaticClass();
+
+	ModuleNetworkComponent = UCameraModuleNetworkComponent::StaticClass();
 
 	DefaultCamera = nullptr;
 	DefaultInstantSwitch = false;

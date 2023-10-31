@@ -8,6 +8,7 @@
 #include "Character/CharacterModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Procedure/ProcedureModuleBPLibrary.h"
+#include "Procedure/ProcedureModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(AProcedureModule)
 
@@ -15,6 +16,8 @@ IMPLEMENTATION_MODULE(AProcedureModule)
 AProcedureModule::AProcedureModule()
 {
 	ModuleName = FName("ProcedureModule");
+
+	ModuleNetworkComponent = UProcedureModuleNetworkComponent::StaticClass();
 
 	Procedures = TArray<UProcedureBase*>();
 	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();

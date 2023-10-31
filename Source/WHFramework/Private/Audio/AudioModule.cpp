@@ -25,6 +25,8 @@ AAudioModule::AAudioModule()
 
 	ModuleSaveGame = UAudioSaveGame::StaticClass();
 	
+	ModuleNetworkComponent = UAudioModuleNetworkComponent::StaticClass();
+
 	static ConstructorHelpers::FObjectFinder<USoundMix> GlobalSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Global.SCM_Global'"));
 	if(GlobalSoundMixFinder.Succeeded())
 	{
@@ -180,7 +182,7 @@ void AAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMultic
 		{
 			MultiPlaySound2D(InSound, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySound2DMulticast(InSound, InVolume);
 		}
@@ -202,7 +204,7 @@ void AAudioModule::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, 
 		{
 			MultiPlaySoundAtLocation(InSound, InLocation, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySoundAtLocationMulticast(InSound, InLocation, InVolume);
 		}
@@ -234,7 +236,7 @@ FSingleSoundHandle AAudioModule::PlaySingleSound2D(USoundBase* InSound, float In
 		{
 			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySingleSound2DMulticast(Handle, InSound, InVolume);
 		}
@@ -253,7 +255,7 @@ FSingleSoundHandle AAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSou
 		{
 			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySingleSound2DMulticast(Handle, InSound, InVolume);
 		}
@@ -280,7 +282,7 @@ FSingleSoundHandle AAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, 
 		{
 			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySingleSoundAtLocationMulticast(Handle, InSound, InLocation, InVolume);
 		}
@@ -299,7 +301,7 @@ FSingleSoundHandle AAudioModule::PlaySingleSoundAtLocationWithDelegate(USoundBas
 		{
 			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerPlaySingleSoundAtLocationMulticast(Handle, InSound, InLocation, InVolume);
 		}
@@ -325,7 +327,7 @@ void AAudioModule::StopSingleSound(const FSingleSoundHandle& InHandle, bool bMul
 		{
 			MultiStopSingleSound(InHandle);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerStopSingleSoundMulticast(InHandle);
 		}
@@ -347,7 +349,7 @@ void AAudioModule::SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool
 		{
 			MultiSetSingleSoundPaused(InHandle, bPaused);
 		}
-		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAudioModuleNetworkComponent>())
+		else if(UAudioModuleNetworkComponent* AudioModuleNetworkComponent = GetModuleNetworkComponent<UAudioModuleNetworkComponent>())
 		{
 			AudioModuleNetworkComponent->ServerSetSingleSoundPausedMulticast(InHandle, bPaused);
 		}

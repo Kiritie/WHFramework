@@ -290,13 +290,13 @@ void AMainModule::UnPauseModules_Implementation()
 	}
 }
 
-UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor)
+UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass)
 {
-	if(Get(bInEditor) && Get(bInEditor)->IsValidLowLevel())
+	if(Get(false) && Get(false)->IsValidLowLevel())
 	{
-		if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
+		if(const AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
 		{
-			return PlayerController->GetModuleNetCompByClass(InModuleNetworkComponentClass);
+			return Cast<UModuleNetworkComponentBase>(PlayerController->GetComponentByClass(InClass));
 		}
 	}
 	return nullptr;

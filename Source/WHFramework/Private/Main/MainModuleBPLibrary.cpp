@@ -121,7 +121,7 @@ AModuleBase* UMainModuleBPLibrary::GetModuleByName(const FName InName, bool bInE
 	return AMainModule::GetModuleByName<AModuleBase>(InName, bInEditor);
 }
 
-UModuleNetworkComponentBase* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor)
+UModuleNetworkComponentBase* UMainModuleBPLibrary::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InClass)
 {
-	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(bInEditor, InModuleNetworkComponentClass);
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(InClass);
 }

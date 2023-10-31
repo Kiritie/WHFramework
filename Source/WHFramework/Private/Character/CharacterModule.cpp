@@ -5,6 +5,7 @@
 
 #include "Camera/CameraModuleBPLibrary.h"
 #include "Camera/Base/CameraActorBase.h"
+#include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonBPLibrary.h"
@@ -17,6 +18,8 @@ IMPLEMENTATION_MODULE(ACharacterModule)
 ACharacterModule::ACharacterModule()
 {
 	ModuleName = FName("CharacterModule");
+
+	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
 	Characters = TArray<ACharacterBase*>();
 	CharacterMap = TMap<FName, ACharacterBase*>();

@@ -18,6 +18,7 @@ AModuleBase::AModuleBase()
 	bModuleAutoRun = true;
 	bModuleAutoSave = false;
 	ModuleSaveGame = nullptr;
+	ModuleNetworkComponent = nullptr;
 }
 
 #if WITH_EDITOR
@@ -155,6 +156,16 @@ FName AModuleBase::GetModuleName() const
 EModuleState AModuleBase::GetModuleState() const
 {
 	return ModuleState;
+}
+
+USaveGameBase* AModuleBase::GetModuleSaveGame() const
+{
+	return USaveGameModuleBPLibrary::GetSaveGame(ModuleSaveGame);
+}
+
+UModuleNetworkComponentBase* AModuleBase::GetModuleNetworkComponent() const
+{
+	return UMainModuleBPLibrary::GetModuleNetworkComponentByClass(ModuleNetworkComponent);
 }
 
 void AModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

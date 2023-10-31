@@ -6,6 +6,7 @@
 #include "SocketSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
+#include "Network/NetworkModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(ANetworkModule)
 
@@ -13,6 +14,8 @@ IMPLEMENTATION_MODULE(ANetworkModule)
 ANetworkModule::ANetworkModule()
 {
 	ModuleName = FName("NetworkModule");
+
+	ModuleNetworkComponent = UNetworkModuleNetworkComponent::StaticClass();
 
 	bLocalMode = false;
 	ServerURL = TEXT("");

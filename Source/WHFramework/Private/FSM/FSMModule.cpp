@@ -3,6 +3,7 @@
 
 #include "FSM/FSMModule.h"
 
+#include "FSM/FSMModuleNetworkComponent.h"
 #include "FSM/Components/FSMComponent.h"
 		
 IMPLEMENTATION_MODULE(AFSMModule)
@@ -11,6 +12,8 @@ IMPLEMENTATION_MODULE(AFSMModule)
 AFSMModule::AFSMModule()
 {
 	ModuleName = FName("FSMModule");
+
+	ModuleNetworkComponent = UFSMModuleNetworkComponent::StaticClass();
 
 	GroupMap = TMap<FName, FFSMGroupInfo>();
 }

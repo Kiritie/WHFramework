@@ -45,42 +45,6 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UWidgetInteractionComponent* WidgetInteractionComp;
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UAudioModuleNetworkComponent* AudioModuleNetComp;
-	
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UCameraModuleNetworkComponent* CameraModuleNetComp;
-	
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UCharacterModuleNetworkComponent* CharacterModuleNetComp;
-	
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UEventModuleNetworkComponent* EventModuleNetComp;
-	
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UVideoModuleNetworkComponent* VideoModuleNetComp;
-		
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UNetworkModuleNetworkComponent* NetworkModuleNetComp;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UProcedureModuleNetworkComponent* ProcedureModuleNetComp;
-
-private:
-	UPROPERTY(Transient)
-	TMap<TSubclassOf<UModuleNetworkComponentBase>, UModuleNetworkComponentBase*> ModuleNetCompMap;
-	
-public:
-	template<class T>
-	T* GetModuleNetCompByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(ModuleNetCompMap.Contains(InClass))
-		{
-			return Cast<T>(ModuleNetCompMap[InClass]);
-		}
-		return nullptr;
-	}
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Inherits
 protected:

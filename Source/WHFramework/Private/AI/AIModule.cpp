@@ -3,12 +3,16 @@
 
 #include "AI/AIModule.h"
 
+#include "AI/AIModuleNetworkComponent.h"
+
 IMPLEMENTATION_MODULE(AAIModule)
 
 // Sets default values
 AAIModule::AAIModule()
 {
 	ModuleName = FName("AIModule");
+
+	ModuleNetworkComponent = UAIModuleNetworkComponent::StaticClass();
 }
 
 AAIModule::~AAIModule()

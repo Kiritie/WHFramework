@@ -8,6 +8,7 @@
 #include "Character/CharacterModuleTypes.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/TaskSaveGame.h"
+#include "Task/TaskModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(ATaskModule)
 
@@ -15,7 +16,10 @@ IMPLEMENTATION_MODULE(ATaskModule)
 ATaskModule::ATaskModule()
 {
 	ModuleName = FName("TaskModule");
+	
 	ModuleSaveGame = UTaskSaveGame::StaticClass();
+
+	ModuleNetworkComponent = UTaskModuleNetworkComponent::StaticClass();
 
 	bAutoEnterFirst = false;
 

@@ -198,12 +198,13 @@ public:
 	* 通过类型获取模块网络组件
 	*/
 	template<class T>
-	static T* GetModuleNetworkComponentByClass(bool bInEditor = false, TSubclassOf<T> InModuleNetworkComponentClass = T::StaticClass())
+	static T* GetModuleNetworkComponentByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetModuleNetworkComponentByClass(InModuleNetworkComponentClass, bInEditor));
+		return Cast<T>(GetModuleNetworkComponent(InClass));
 	}
-	
-	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor = false);
+
+protected:
+	static UModuleNetworkComponentBase* GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass);
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

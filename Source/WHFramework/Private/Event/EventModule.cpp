@@ -21,6 +21,8 @@ AEventModule::AEventModule()
 {
 	ModuleName = FName("EventModule");
 	
+	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
+
 	EventManagerClass = UEventManagerBase::StaticClass();
 }
 
@@ -186,7 +188,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventN
 	{
 		case EEventNetType::Client:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InClass, InParams);
 				return;
@@ -194,7 +196,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventN
 		}
 		case EEventNetType::Server:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InClass, InParams);
 				return;
@@ -202,7 +204,7 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventN
 		}
 		case EEventNetType::Multicast:
 		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UEventModuleNetworkComponent>())
+			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
 			{
 				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InClass, InParams);
 				return;

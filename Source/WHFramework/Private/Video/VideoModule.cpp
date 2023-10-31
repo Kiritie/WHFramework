@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleBPLibrary.h"
 #include "SaveGame/Module/VideoSaveGame.h"
+#include "Video/VideoModuleNetworkComponent.h"
 #include "Video/MediaPlayer/MediaPlayerBase.h"
 
 IMPLEMENTATION_MODULE(AVideoModule)
@@ -16,7 +17,10 @@ IMPLEMENTATION_MODULE(AVideoModule)
 AVideoModule::AVideoModule()
 {
 	ModuleName = FName("VideoModule");
+	
 	ModuleSaveGame = UVideoSaveGame::StaticClass();
+
+	ModuleNetworkComponent = UVideoModuleNetworkComponent::StaticClass();
 
 	MediaPlayers = TArray<AMediaPlayerBase*>();
 

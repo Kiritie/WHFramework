@@ -2,20 +2,13 @@
 
 #include "Gameplay/WHPlayerController.h"
 
-#include "Audio/AudioModuleNetworkComponent.h"
-#include "Camera/CameraModuleNetworkComponent.h"
 #include "Camera/Base/CameraManagerBase.h"
-#include "Character/CharacterModuleNetworkComponent.h"
 #include "Components/WidgetInteractionComponent.h"
-#include "Event/EventModuleNetworkComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Common/CommonBPLibrary.h"
-#include "Input/InputModule.h"
 #include "Kismet/GameplayStatics.h"
-#include "Video/VideoModuleNetworkComponent.h"
-#include "Network/NetworkModuleNetworkComponent.h"
+#include "Main/MainModule.h"
 #include "Procedure/ProcedureModule.h"
-#include "Procedure/ProcedureModuleNetworkComponent.h"
 
 AWHPlayerController::AWHPlayerController()
 {
@@ -23,29 +16,6 @@ AWHPlayerController::AWHPlayerController()
 
 	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(FName("WidgetInteractionComp"));
 	WidgetInteractionComp->SetupAttachment(RootComponent);
-
-	ModuleNetCompMap = TMap<TSubclassOf<UModuleNetworkComponentBase>, UModuleNetworkComponentBase*>();
-	
-	AudioModuleNetComp = CreateDefaultSubobject<UAudioModuleNetworkComponent>(FName("AudioModuleNetComp"));
-	ModuleNetCompMap.Add(UAudioModuleNetworkComponent::StaticClass(), AudioModuleNetComp);
-	
-	CameraModuleNetComp = CreateDefaultSubobject<UCameraModuleNetworkComponent>(FName("CameraModuleNetComp"));
-	ModuleNetCompMap.Add(UCameraModuleNetworkComponent::StaticClass(), CameraModuleNetComp);
-	
-	CharacterModuleNetComp = CreateDefaultSubobject<UCharacterModuleNetworkComponent>(FName("CharacterModuleNetComp"));
-	ModuleNetCompMap.Add(UCharacterModuleNetworkComponent::StaticClass(), CharacterModuleNetComp);
-	
-	EventModuleNetComp = CreateDefaultSubobject<UEventModuleNetworkComponent>(FName("EventModuleNetComp"));
-	ModuleNetCompMap.Add(UEventModuleNetworkComponent::StaticClass(), EventModuleNetComp);
-	
-	VideoModuleNetComp = CreateDefaultSubobject<UVideoModuleNetworkComponent>(FName("VideoModuleNetComp"));
-	ModuleNetCompMap.Add(UVideoModuleNetworkComponent::StaticClass(), VideoModuleNetComp);
-	
-	NetworkModuleNetComp = CreateDefaultSubobject<UNetworkModuleNetworkComponent>(FName("NetworkModuleNetComp"));
-	ModuleNetCompMap.Add(UNetworkModuleNetworkComponent::StaticClass(), NetworkModuleNetComp);
-	
-	ProcedureModuleNetComp = CreateDefaultSubobject<UProcedureModuleNetworkComponent>(FName("ProcedureModuleNetComp"));
-	ModuleNetCompMap.Add(UProcedureModuleNetworkComponent::StaticClass(), ProcedureModuleNetComp);
 }
 
 void AWHPlayerController::OnInitialize_Implementation()
@@ -55,7 +25,14 @@ void AWHPlayerController::OnInitialize_Implementation()
 
 void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
 {
-	
+	for(const auto Iter : AMainModule::Get()->GetAllModule())
+	{
+		if(Iter->ModuleNetworkComponent)
+		{
+			UModuleNetworkComponentBase* NetworkComponent = NewObject<UModuleNetworkComponentBase>(this, Iter->ModuleNetworkComponent, *FString::Printf(TEXT("%sNetworkComp"), *Iter->ModuleName.ToString()));
+			NetworkComponent->RegisterComponent();
+		}
+	}
 }
 
 void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)

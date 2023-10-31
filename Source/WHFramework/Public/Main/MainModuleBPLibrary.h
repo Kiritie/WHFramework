@@ -69,5 +69,5 @@ public:
 	static AModuleBase* GetModuleByName(const FName InName, bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleBPLibrary")
-	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InModuleNetworkComponentClass, bool bInEditor = false);
+	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InClass);
 };
