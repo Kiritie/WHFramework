@@ -3,7 +3,6 @@
 
 #include "Input/InputModuleTypes.h"
 
-#include "Input/InputModule.h"
 #include "Input/Base/InputActionBase.h"
 #include "Widgets/SViewport.h"
 #include "ICommonUIModule.h"

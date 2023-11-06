@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "UObject/Interface.h"
 #include "WHPlayerInterface.generated.h"
 
 // This class does not need to be modified.

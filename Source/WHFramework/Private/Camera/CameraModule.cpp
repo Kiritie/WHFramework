@@ -132,11 +132,14 @@ void ACameraModule::OnGenerate()
 	for(auto Iter : RemoveList)
 	{
 		Cameras.Remove(Iter);
-		if(DefaultCamera == Iter)
+		if(Iter)
 		{
-			DefaultCamera = nullptr;
+			if(DefaultCamera == Iter)
+			{
+				DefaultCamera = nullptr;
+			}
+			Iter->Destroy();
 		}
-		Iter->Destroy();
 	}
 
 	// 生成新的Camera
@@ -404,9 +407,10 @@ void ACameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 			{
 				GetPlayerController()->SetViewTarget(InCamera);
 			}
+			InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
-			InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
+			SetCameraDistance(InitCameraDistance);
 		}
 		else if(CurrentCamera)
 		{

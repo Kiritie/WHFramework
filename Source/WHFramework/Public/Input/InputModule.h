@@ -9,7 +9,6 @@
 
 #include "InputModule.generated.h"
 
-class UPlayerMappableInputConfig;
 class UInputComponentBase;
 class UPlayerMappableInputConfig;
 class UInputActionBase;
