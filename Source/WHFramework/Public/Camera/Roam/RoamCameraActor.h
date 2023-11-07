@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Camera/Base/CameraActorBase.h"
+#include "Gameplay/WHPlayerInterface.h"
 #include "RoamCameraActor.generated.h"
 
 UCLASS()
@@ -13,16 +14,12 @@ class WHFRAMEWORK_API ARoamCameraActor : public ACameraActorBase
 public:
 	ARoamCameraActor();
 
+public:
+	virtual void OnInitialize_Implementation() override;
+
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class USphereComponent* Sphere;
-
-protected:
-	virtual void MoveForward_Implementation(float InValue) override;
-
-	virtual void MoveRight_Implementation(float InValue) override;
-
-	virtual void MoveUp_Implementation(float InValue) override;
 
 public:
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode) override;

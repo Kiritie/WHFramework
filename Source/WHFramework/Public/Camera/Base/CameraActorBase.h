@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
-#include "Gameplay/WHPlayerInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraActorBase.generated.h"
 
@@ -11,7 +10,7 @@ class UCameraComponent;
 class USpringArmComponent;
 
 UCLASS()
-class WHFRAMEWORK_API ACameraActorBase : public AWHActor, public IWHPlayerInterface
+class WHFRAMEWORK_API ACameraActorBase : public AWHActor
 {
 	GENERATED_BODY()
 

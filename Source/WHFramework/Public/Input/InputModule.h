@@ -79,7 +79,7 @@ public:
 	// InputMappings
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputSteups|Config")
-	TArray<FInputConfigMapping> ConfigMapping;
+	TArray<FInputConfigMapping> ConfigMappings;
 
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Key")
 	TMap<FName, FInputKeyMapping> KeyMappings;
@@ -88,7 +88,7 @@ protected:
 	TArray<FInputTouchMapping> TouchMappings;
 	
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Config")
-	TArray<FLoadedInputConfigMapping> RegisteredConfigMapping;
+	TArray<FLoadedInputConfigMapping> RegisteredConfigMappings;
 	
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Config")
 	TMap<FName, FKey> CustomKeyMappings;
@@ -101,7 +101,7 @@ protected:
 	void OnBindAction(UInputComponentBase* InInputComponent, UPlayerMappableInputConfig* InInputConfig);
 
 public:
-	TArray<FInputConfigMapping>& GetConfigMapping() { return ConfigMapping; }
+	TArray<FInputConfigMapping>& GetConfigMappings() { return ConfigMappings; }
 
 	UFUNCTION(BlueprintPure)
 	TMap<FName, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
@@ -143,7 +143,7 @@ public:
 	const UPlayerMappableInputConfig* GetInputConfigByName(FName InConfigName) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FLoadedInputConfigMapping>& GetAllRegisteredConfigMapping() { return RegisteredConfigMapping; }
+	TArray<FLoadedInputConfigMapping>& GetAllRegisteredConfigMapping() { return RegisteredConfigMappings; }
 
 	UFUNCTION(BlueprintPure)
 	TArray<FLoadedInputConfigMapping> GetRegisteredConfigMappingOfType(ECommonInputType InType);
@@ -183,6 +183,15 @@ protected:
 
 	UFUNCTION()
 	virtual void ZoomCamera(const FInputActionValue& InValue);
+	
+	UFUNCTION()
+	virtual void MoveForwardCamera(const FInputActionValue& InValue);
+
+	UFUNCTION()
+	virtual void MoveRightCamera(const FInputActionValue& InValue);
+
+	UFUNCTION()
+	virtual void MoveUpCamera(const FInputActionValue& InValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// PlayerInputs

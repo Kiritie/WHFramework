@@ -40,7 +40,10 @@ AInputModule::AInputModule()
 	static ConstructorHelpers::FObjectFinder<UPlayerMappableInputConfig> CameraMovementMapping(TEXT("/Script/EnhancedInput.PlayerMappableInputConfig'/WHFramework/Input/DataAssets/PMIC_MouseAndKeyboard.PMIC_MouseAndKeyboard'"));
 	if(CameraMovementMapping.Succeeded())
 	{
-		ConfigMapping.Add(FInputConfigMapping(CameraMovementMapping.Object, ECommonInputType::MouseAndKeyboard));
+		auto ConfigMapping = FInputConfigMapping(CameraMovementMapping.Object, ECommonInputType::MouseAndKeyboard);
+		ConfigMapping.bShouldActivateAutomatically = true;
+		ConfigMapping.Type = ECommonInputType::Count;
+		ConfigMappings.Add(ConfigMapping);
 	}
 
 	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchPressed)));
@@ -86,7 +89,7 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 		
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetPlayerController()->GetLocalPlayer()))
 		{
-			for (const auto& Iter : ConfigMapping)
+			for (const auto& Iter : ConfigMappings)
 			{
 				if (UPlayerMappableInputConfig* InputConfig = Iter.Config.LoadSynchronous())
 				{
@@ -99,6 +102,11 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 						if(UInputComponentBase* InputComp = Cast<UInputComponentBase>(GetPlayerController()->InputComponent))
 						{
 							OnBindAction(InputComp, InputConfig);
+						}
+						else
+						{
+							ensureEditor(true);
+							WHLog(FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
 						}
 					}
 				}
@@ -324,7 +332,7 @@ const UInputActionBase* AInputModule::FindInputActionForTag(const FGameplayTag& 
 			}
 		}
 	}
-	for (const auto& Iter1 : RegisteredConfigMapping)
+	for (const auto& Iter1 : RegisteredConfigMappings)
 	{
 		for(const auto Iter2 : Iter1.Config->GetMappingContexts())
 		{
@@ -353,10 +361,10 @@ void AInputModule::RegisterInputConfig(ECommonInputType InType, const UPlayerMap
 {
 	if (InConfig)
 	{
-		const int32 Index = RegisteredConfigMapping.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
+		const int32 Index = RegisteredConfigMappings.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
 		if (Index == INDEX_NONE)
 		{
-			RegisteredConfigMapping.Add(FLoadedInputConfigMapping(InConfig, InType, bIsActive));
+			RegisteredConfigMappings.Add(FLoadedInputConfigMapping(InConfig, InType, bIsActive));
 		}
 	}
 }
@@ -365,10 +373,10 @@ int32 AInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InCo
 {
 	if (InConfig)
 	{
-		const int32 Index = RegisteredConfigMapping.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
+		const int32 Index = RegisteredConfigMappings.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
 		if (Index != INDEX_NONE)
 		{
-			RegisteredConfigMapping.RemoveAt(Index);
+			RegisteredConfigMappings.RemoveAt(Index);
 			return 1;
 		}
 			
@@ -378,7 +386,7 @@ int32 AInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InCo
 
 const UPlayerMappableInputConfig* AInputModule::GetInputConfigByName(FName InConfigName) const
 {
-	for (const auto& Iter : RegisteredConfigMapping)
+	for (const auto& Iter : RegisteredConfigMappings)
 	{
 		if (Iter.Config->GetConfigName() == InConfigName)
 		{
@@ -394,11 +402,11 @@ TArray<FLoadedInputConfigMapping> AInputModule::GetRegisteredConfigMappingOfType
 
 	if (InType == ECommonInputType::Count)
 	{
-		ReturnValues = RegisteredConfigMapping;
+		ReturnValues = RegisteredConfigMappings;
 	}
 	else
 	{
-		for (const auto& Iter : RegisteredConfigMapping)
+		for (const auto& Iter : RegisteredConfigMappings)
 		{
 			if (Iter.Type == InType)
 			{
@@ -412,7 +420,7 @@ TArray<FLoadedInputConfigMapping> AInputModule::GetRegisteredConfigMappingOfType
 TArray<FEnhancedActionKeyMapping> AInputModule::GetAllPlayerMappableActionKeyMappings()
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const auto& Iter1 : RegisteredConfigMapping)
+	for (const auto& Iter1 : RegisteredConfigMappings)
 	{
 		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
 		{
@@ -432,7 +440,7 @@ TArray<FEnhancedActionKeyMapping> AInputModule::GetAllPlayerMappableActionKeyMap
 TArray<FName> AInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, int32 InPlayerID)
 {
 	TArray<FName> ReturnValues;
-	for (const auto& Iter2 : RegisteredConfigMapping)
+	for (const auto& Iter2 : RegisteredConfigMappings)
 	{
 		if (Iter2.Type == ECommonInputType::MouseAndKeyboard)
 		{
@@ -464,7 +472,7 @@ TArray<FName> AInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, in
 TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByName(const FName InName, int32 InPlayerID)
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const auto& Iter1 : RegisteredConfigMapping)
+	for (const auto& Iter1 : RegisteredConfigMappings)
 	{
 		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
 		{
@@ -487,7 +495,7 @@ TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByName(const 
 TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByDisplayName(const FText InDisplayName, int32 InPlayerID)
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const FLoadedInputConfigMapping& Iter1 : RegisteredConfigMapping)
+	for (const FLoadedInputConfigMapping& Iter1 : RegisteredConfigMappings)
 	{
 		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
 		{
@@ -570,6 +578,29 @@ void AInputModule::ZoomCamera(const FInputActionValue& InValue)
 	}
 }
 
+void AInputModule::MoveForwardCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f) return;
+
+	const FVector Direction = ACameraModule::Get()->GetCurrentCameraRotation().Vector();
+	ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+}
+
+void AInputModule::MoveRightCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f) return;
+
+	const FVector Direction = FRotationMatrix(ACameraModule::Get()->GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
+	ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+}
+
+void AInputModule::MoveUpCamera(const FInputActionValue& InValue)
+{
+	if(InValue.Get<float>() == 0.f) return;
+
+	ACameraModule::Get()->AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
+}
+
 void AInputModule::TurnPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
@@ -608,6 +639,10 @@ void AInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
 	{
 		IWHPlayerInterface::Execute_MoveForward(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
+	else
+	{
+		MoveForwardCamera(InValue);
+	}
 }
 
 void AInputModule::MoveRightPlayer(const FInputActionValue& InValue)
@@ -618,6 +653,10 @@ void AInputModule::MoveRightPlayer(const FInputActionValue& InValue)
 	{
 		IWHPlayerInterface::Execute_MoveRight(GetPlayerController()->GetPawn(), InValue.Get<float>());
 	}
+	else
+	{
+		MoveRightCamera(InValue);
+	}
 }
 
 void AInputModule::MoveUpPlayer(const FInputActionValue& InValue)
@@ -627,6 +666,10 @@ void AInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
 		IWHPlayerInterface::Execute_MoveUp(GetPlayerController()->GetPawn(), InValue.Get<float>());
+	}
+	else
+	{
+		MoveUpCamera(InValue);
 	}
 }
 

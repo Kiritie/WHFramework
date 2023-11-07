@@ -16,39 +16,22 @@ ARoamCameraActor::ARoamCameraActor()
 	Sphere = CreateDefaultSubobject<USphereComponent>(FName("Sphere"));
 	Sphere->InitSphereRadius(35.0f);
 	Sphere->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
+	Sphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RootComponent = Sphere;
 	
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
+	CameraBoom->bDoCollisionTest = false;
 
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
 }
 
-void ARoamCameraActor::MoveForward_Implementation(float InValue)
+void ARoamCameraActor::OnInitialize_Implementation()
 {
-	const FVector Direction = GetActorRotation().Vector();
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		CameraModule->AddCameraMovementInput(Direction, InValue);
-	}
-}
+	Super::OnInitialize_Implementation();
 
-void ARoamCameraActor::MoveRight_Implementation(float InValue)
-{
-	const FVector Direction = FRotationMatrix(GetActorRotation()).GetUnitAxis(EAxis::Y);
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		CameraModule->AddCameraMovementInput(Direction, InValue);
-	}
-}
-
-void ARoamCameraActor::MoveUp_Implementation(float InValue)
-{
-	if(ACameraModule* CameraModule = ACameraModule::Get())
-	{
-		CameraModule->AddCameraMovementInput(FVector::UpVector, InValue);
-	}
+	SetCameraCollisionMode(CameraCollisionMode);
 }
 
 void ARoamCameraActor::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)

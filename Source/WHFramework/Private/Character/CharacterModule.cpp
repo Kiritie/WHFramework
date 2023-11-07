@@ -133,7 +133,7 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 				CurrentCharacter = InCharacter;
 				PlayerController->Possess(InCharacter);
 				UCameraModuleBPLibrary::EndTrackTarget();
-				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector(-1.f), InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
+				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
 			}
 			else if(CurrentCharacter)
 			{
