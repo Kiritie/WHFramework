@@ -35,7 +35,7 @@ ACameraModule::ACameraModule()
 	Cameras = TArray<ACameraActorBase*>();
 	CameraMap = TMap<FName, ACameraActorBase*>();
 	CurrentCamera = nullptr;
-		
+
 	bCameraControlAble = true;
 
 	bCameraMoveAble = true;
@@ -81,6 +81,7 @@ ACameraModule::ACameraModule()
 	CameraDoZoomDistance = 0.f;
 	CameraDoZoomEaseType = EEaseType::Linear;
 
+	bTrackAllowControl = false;
 	TrackTargetActor = nullptr;
 	TrackLocationOffset = FVector::ZeroVector;
 	TrackYawOffset = 0.f;
@@ -88,12 +89,16 @@ ACameraModule::ACameraModule()
 	TrackDistance = 0.f;
 	TrackTargetMode = ETrackTargetMode::LocationOnly;
 
+	bIsControllingMove = false;
+	bIsControllingRotate = false;
+	bIsControllingZoom = false;
+
 	PlayerController = nullptr;
 
 	CurrentCameraLocation = FVector::ZeroVector;
 	CurrentCameraRotation = FRotator::ZeroRotator;
 	CurrentCameraDistance = 0.f;
-	
+
 	TargetCameraLocation = FVector::ZeroVector;
 	TargetCameraRotation = FRotator::ZeroRotator;
 	TargetCameraDistance = 0.f;
