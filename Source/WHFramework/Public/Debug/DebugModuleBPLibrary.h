@@ -6,19 +6,20 @@
 #include "DebugModuleBPLibrary.generated.h"
 
 UENUM(BlueprintType)
-enum class EDebugMode : uint8
+enum EDebugMode : int
 {
-	All,
-	Screen,
-	Console
+	EM_All,
+	EM_Screen,
+	EM_Console
 };
 
 UENUM(BlueprintType)
-enum EDebugCategory : uint8
+enum EDebugCategory : int
 {
 	EDC_Default,
 	EDC_Editor,
 	EDC_Controller,
+	EDC_Achievement,
 	EDC_Ability,
 	EDC_Asset,
 	EDC_Audio,
@@ -44,7 +45,7 @@ enum EDebugCategory : uint8
 };
 
 UENUM(BlueprintType)
-enum EDebugVerbosity : uint8
+enum EDebugVerbosity : int
 {
 	EDV_Log,
 	EDV_Warning,
@@ -86,22 +87,22 @@ class WHFRAMEWORK_API UDebugModuleBPLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void Ensure(bool Expression = true);
+	static bool Ensure(bool Expression);
 	
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void EnsureMsgf(const FString& Message, bool Expression = true);
+	static bool EnsureMsgf(bool Expression, const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
 		
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void EnsureEditor(bool Expression = true);
+	static bool EnsureEditor(bool Expression);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void EnsureEditorMsgf(const FString& Message, bool Expression = true);
+	static bool EnsureEditorMsgf(bool Expression, const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
 	static void LogMessage(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleBPLibrary")
-	static void DebugMessage(const FString& Message, EDebugMode Mode = EDebugMode::Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true);
+	static void DebugMessage(const FString& Message, EDebugMode Mode = EM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int Key = -1, bool bNewerOnTop = true);
 
 	UFUNCTION(BlueprintPure, Category = "DebugModuleBPLibrary")
 	static FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory);

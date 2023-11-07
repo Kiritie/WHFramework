@@ -77,7 +77,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	ProcedureState = EProcedureState::Entered;
 	OnStateChanged(ProcedureState);
 
-	WHDebug(FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()), EDebugMode::All, EDC_Procedure, EDV_Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()), EM_All, EDC_Procedure, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastProcedure);
 
@@ -138,7 +138,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 		UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
 	}
 
-	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDebugMode::All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave(InNextProcedure);
 

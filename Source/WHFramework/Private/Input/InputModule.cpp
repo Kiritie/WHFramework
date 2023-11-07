@@ -105,8 +105,7 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 						}
 						else
 						{
-							ensureEditor(true);
-							WHLog(FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
+							WHEnsureEditorMsgf(true, FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
 						}
 					}
 				}

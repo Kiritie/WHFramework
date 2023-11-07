@@ -263,8 +263,7 @@ bool AWebRequestModule::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, E
 	}
 	else
 	{
-		ensureEditor(true);
-		WHLog(FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest, EDV_Warning);
+		WHEnsureEditorMsgf(true, FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest, EDV_Warning);
 	}
 	return false;
 }

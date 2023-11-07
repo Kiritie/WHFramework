@@ -356,10 +356,10 @@ FText UCommonBPLibrary::GetInputActionKeyCodeByName(const FString& InInputAction
 
 bool UCommonBPLibrary::ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params)
 {
-	if (ensureEditor(InObject))
+	if (WHEnsureEditor(InObject))
 	{
 		UFunction* Func = InObject->FindFunction(InFuncName);
-		if (ensureEditorMsgf(Func, TEXT("错误的函数调用, %s 对应函数名称 : %s ,并不存在"), *InObject->GetName(), *InFuncName.ToString()))
+		if (WHEnsureEditorMsgf(Func, FString::Printf(TEXT("错误的函数调用, %s 对应函数名称 : %s ,并不存在"), *InObject->GetName(), *InFuncName.ToString())))
 		{
 			InObject->ProcessEvent(Func, Params);
 			return true;
@@ -452,7 +452,7 @@ UTexture2D* UCommonBPLibrary::CompositeTextures(const TArray<UTexture2D*>& InTex
     const int32 SizeX = InTexSize.X;
     const int32 SizeY = InTexSize.Y;
 
-	if(ensureEditorMsgf(SizeX > 0 && SizeY > 0 &&
+	if(WHEnsureEditorMsgf(SizeX > 0 && SizeY > 0 &&
 		(SizeX % PixelFormatInfo.BlockSizeX) == 0 &&
 		(SizeY % PixelFormatInfo.BlockSizeY) == 0, TEXT("Invalid size and/or pixel format for new texture")))
 	{

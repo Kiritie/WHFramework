@@ -15,8 +15,7 @@ UAssetManagerBase& UAssetManagerBase::Get()
 	{
 		return *Instance;
 	}
-	ensureEditor(true);
-	WHLog(FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDC_Asset, EDV_Error);
+	WHEnsureEditorMsgf(true, FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDC_Asset, EDV_Error);
 	return UReferencePoolModuleBPLibrary::GetReference<UAssetManagerBase>();
 }
 

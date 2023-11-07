@@ -461,7 +461,7 @@ public:
 		if (InStep)
 		{
 			UFunction* Func = InStep->FindFunction(InFuncName);
-			if (ensureEditor(Func))
+			if (WHEnsureEditor(Func))
 			{
 				OnExecuteDelegate.Add(FOnExecuteStepTaskDelegate::FDelegate::CreateUFunction(InStep, InFuncName, Vars...));
 			}

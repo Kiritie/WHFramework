@@ -124,7 +124,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
-	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EDebugMode::All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastTask);
 
@@ -281,7 +281,7 @@ void UTaskBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WHDebug(FString::Printf(TEXT("%s任务: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *TaskDisplayName.ToString()), EDebugMode::All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("%s任务: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *TaskDisplayName.ToString()), EM_All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave();
 

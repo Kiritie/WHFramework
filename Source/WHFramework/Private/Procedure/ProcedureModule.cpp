@@ -129,7 +129,7 @@ void AProcedureModule::SwitchProcedureByIndex(int32 InIndex)
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InIndex), EDebugMode::All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InIndex), EM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
 	}
 }
 
@@ -141,7 +141,7 @@ void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClas
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InClass ? *InClass->GetName() : TEXT("None")), EDebugMode::All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InClass ? *InClass->GetName() : TEXT("None")), EM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
 	}
 }
 

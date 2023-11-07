@@ -314,7 +314,7 @@ void ASceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 bool ASceneModule::HasSceneActor(FGuid InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(InID)) return true;
-	ensureEditor(!bEnsured);
+	WHEnsureEditor(!bEnsured);
 	return false;
 }
 
@@ -354,7 +354,7 @@ bool ASceneModule::RemoveSceneActor(AActor* InActor)
 bool ASceneModule::HasTargetPointByName(FName InName, bool bEnsured) const
 {
 	if(TargetPoints.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	WHEnsureEditor(!bEnsured);
 	return false;
 }
 
@@ -390,7 +390,7 @@ void ASceneModule::RemoveTargetPointByName(FName InName)
 bool ASceneModule::HasScenePointByName(FName InName, bool bEnsured) const
 {
 	if(ScenePoints.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	WHEnsureEditor(!bEnsured);
 	return false;
 }
 
@@ -433,7 +433,7 @@ bool ASceneModule::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InCla
 bool ASceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
 {
 	if(PhysicsVolumes.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	WHEnsureEditor(!bEnsured);
 	return false;
 }
 

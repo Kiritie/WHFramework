@@ -926,7 +926,7 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 bool AVoxelChunk::HasSceneActor(FGuid InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(InID)) return true;
-	ensureEditor(!bEnsured);
+	WHEnsureEditor(!bEnsured);
 	return false;
 }
 
