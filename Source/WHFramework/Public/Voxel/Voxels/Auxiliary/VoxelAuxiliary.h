@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Common/Base/WHActor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 

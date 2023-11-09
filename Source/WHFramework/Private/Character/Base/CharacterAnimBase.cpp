@@ -6,7 +6,7 @@
 #include "Character/Base/CharacterBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 
 UCharacterAnimBase::UCharacterAnimBase()
 {
@@ -37,7 +37,7 @@ void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 
 	ACharacterBase* Character = Cast<ACharacterBase>(TryGetPawnOwner());
 
-	if(!Character || !UCommonBPLibrary::IsPlaying()) return;
+	if(!Character || !UCommonStatics::IsPlaying()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	

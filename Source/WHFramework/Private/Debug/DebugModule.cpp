@@ -3,14 +3,15 @@
 
 #include "Debug/DebugModule.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 
-IMPLEMENTATION_MODULE(ADebugModule)
+IMPLEMENTATION_MODULE(UDebugModule)
 
 // Sets default values
-ADebugModule::ADebugModule()
+UDebugModule::UDebugModule()
 {
 	ModuleName = FName("DebugModule");
+	ModuleDisplayName = FText::FromString(TEXT("Debug Module"));
 
 	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
 	DON_WITHINDEX(FindObject<UEnum>(nullptr, TEXT("/Script/WHFramework.EDebugCategory"))->NumEnums() - 2, i, 
@@ -18,54 +19,54 @@ ADebugModule::ADebugModule()
 	)
 }
 
-ADebugModule::~ADebugModule()
+UDebugModule::~UDebugModule()
 {
-	TERMINATION_MODULE(ADebugModule)
+	TERMINATION_MODULE(UDebugModule)
 }
 
 #if WITH_EDITOR
-void ADebugModule::OnGenerate()
+void UDebugModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void ADebugModule::OnDestroy()
+void UDebugModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void ADebugModule::OnInitialize_Implementation()
+void UDebugModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void ADebugModule::OnPreparatory_Implementation(EPhase InPhase)
+void UDebugModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void ADebugModule::OnRefresh_Implementation(float DeltaSeconds)
+void UDebugModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void ADebugModule::OnPause_Implementation()
+void UDebugModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void ADebugModule::OnUnPause_Implementation()
+void UDebugModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void ADebugModule::OnTermination_Implementation(EPhase InPhase)
+void UDebugModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-FDebugCategoryState ADebugModule::GetDebugCategoryState(EDebugCategory InCategory) const
+FDebugCategoryState UDebugModule::GetDebugCategoryState(EDebugCategory InCategory) const
 {
 	if(DebugCategoryStates.Contains(InCategory))
 	{
@@ -74,7 +75,7 @@ FDebugCategoryState ADebugModule::GetDebugCategoryState(EDebugCategory InCategor
 	return FDebugCategoryState();
 }
 
-void ADebugModule::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
+void UDebugModule::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
 {
 	if(DebugCategoryStates.Contains(InCategory))
 	{

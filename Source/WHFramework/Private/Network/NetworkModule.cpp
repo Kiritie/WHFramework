@@ -8,12 +8,13 @@
 #include "Main/MainModule.h"
 #include "Network/NetworkModuleNetworkComponent.h"
 
-IMPLEMENTATION_MODULE(ANetworkModule)
+IMPLEMENTATION_MODULE(UNetworkModule)
 
 // ParamSets default values
-ANetworkModule::ANetworkModule()
+UNetworkModule::UNetworkModule()
 {
 	ModuleName = FName("NetworkModule");
+	ModuleDisplayName = FText::FromString(TEXT("Network Module"));
 
 	ModuleNetworkComponent = UNetworkModuleNetworkComponent::StaticClass();
 
@@ -22,59 +23,59 @@ ANetworkModule::ANetworkModule()
 	ServerPort = 7777;
 }
 
-ANetworkModule::~ANetworkModule()
+UNetworkModule::~UNetworkModule()
 {
-	TERMINATION_MODULE(ANetworkModule)
+	TERMINATION_MODULE(UNetworkModule)
 }
 
 #if WITH_EDITOR
-void ANetworkModule::OnGenerate()
+void UNetworkModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void ANetworkModule::OnDestroy()
+void UNetworkModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void ANetworkModule::OnInitialize_Implementation()
+void UNetworkModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void ANetworkModule::OnPreparatory_Implementation(EPhase InPhase)
+void UNetworkModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void ANetworkModule::OnRefresh_Implementation(float DeltaSeconds)
+void UNetworkModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void ANetworkModule::OnPause_Implementation()
+void UNetworkModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void ANetworkModule::OnUnPause_Implementation()
+void UNetworkModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void ANetworkModule::OnTermination_Implementation(EPhase InPhase)
+void UNetworkModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-FString ANetworkModule::GetServerURL() const
+FString UNetworkModule::GetServerURL() const
 {
 	return FString::Printf(TEXT("%s:%d"), *(!bLocalMode ? ServerURL : TEXT("127.0.0.1")), ServerPort);
 }
 
-FString ANetworkModule::GetServerLocalURL() const
+FString UNetworkModule::GetServerLocalURL() const
 {
 	FString LocalIP = TEXT("");
 
@@ -89,7 +90,7 @@ FString ANetworkModule::GetServerLocalURL() const
 	return LocalIP;
 }
 
-FString ANetworkModule::GetServerLocalIP() const
+FString UNetworkModule::GetServerLocalIP() const
 {
 	FString LocalIP = TEXT("");
 
@@ -104,7 +105,7 @@ FString ANetworkModule::GetServerLocalIP() const
 	return LocalIP;
 }
 
-int32 ANetworkModule::GetServerLocalPort() const
+int32 UNetworkModule::GetServerLocalPort() const
 {
 	int32 LocalPort = 0;
 
@@ -119,7 +120,7 @@ int32 ANetworkModule::GetServerLocalPort() const
 	return LocalPort;
 }
 
-bool ANetworkModule::ConnectServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
+bool UNetworkModule::ConnectServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
 {
 	if(!InServerURL.IsEmpty()) ServerURL = InServerURL;
 	
@@ -132,7 +133,7 @@ bool ANetworkModule::ConnectServer(const FString& InServerURL, int32 InServerPor
 	return true;
 }
 
-bool ANetworkModule::DisconnectServer(const FString& InLevelName)
+bool UNetworkModule::DisconnectServer(const FString& InLevelName)
 {
 	if(InLevelName.IsEmpty()) return false;
 	

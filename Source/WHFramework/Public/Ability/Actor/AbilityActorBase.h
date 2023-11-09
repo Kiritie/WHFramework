@@ -7,6 +7,7 @@
 #include "AbilityActorInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 

@@ -107,12 +107,12 @@ void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 
 void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
 {
-	//UWidgetModuleBPLibrary::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant);
+	//UWidgetModuleStatics::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant);
 }
 
 void SSlateWidgetBase::Close(bool bInstant)
 {
-	//UWidgetModuleBPLibrary::CloseSlateWidget<SSlateWidgetBase>(bInstant);
+	//UWidgetModuleStatics::CloseSlateWidget<SSlateWidgetBase>(bInstant);
 }
 
 void SSlateWidgetBase::Toggle(bool bInstant)
@@ -144,7 +144,7 @@ void SSlateWidgetBase::Refresh()
 
 void SSlateWidgetBase::Destroy(bool bRecovery)
 {
-	//UWidgetModuleBPLibrary::DestroySlateWidget<SSlateWidgetBase>();
+	//UWidgetModuleStatics::DestroySlateWidget<SSlateWidgetBase>();
 }
 
 void SSlateWidgetBase::FinishOpen(bool bInstant)
@@ -176,7 +176,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 		default: break;
 	}
 
-	if(AInputModule* InputModule = AInputModule::Get())
+	if(UInputModule* InputModule = UInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}

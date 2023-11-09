@@ -61,7 +61,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	class AProcedureModule* ProcedureModule;
+	class UProcedureModule* ProcedureModule;
 	
 	TSharedPtr<FTabManager> TabManager;
 	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;

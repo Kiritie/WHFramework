@@ -2,12 +2,12 @@
 
 #include "Ability/Actor/AbilityActorBase.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/BoxComponent.h"
 
@@ -179,7 +179,7 @@ void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)
@@ -197,7 +197,7 @@ void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttrib
 
 UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
 }
 
 UAttributeSetBase* AAbilityActorBase::GetAttributeSet() const

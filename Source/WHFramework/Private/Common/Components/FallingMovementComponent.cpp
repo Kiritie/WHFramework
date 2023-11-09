@@ -2,7 +2,7 @@
 
 #include "Common/Components/FallingMovementComponent.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 UFallingMovementComponent::UFallingMovementComponent(const FObjectInitializer& ObjectInitializer)
@@ -37,7 +37,7 @@ void UFallingMovementComponent::TickComponent(float DeltaTime, enum ELevelTick T
 	FVector RayStart = GetOwner()->GetActorLocation();
 	FVector RayEnd = FVector(RayStart.X, RayStart.Y, 0.f);
 	FVector Extents = GetOwner()->GetComponentsBoundingBox(true, true).GetExtent();
-	if(UKismetSystemLibrary::BoxTraceSingle(this, RayStart, RayEnd, Extents, GetOwner()->GetActorRotation(), UCommonBPLibrary::GetGameTraceType(TraceChannel), false, {}, EDrawDebugTrace::None, HitResult, true))
+	if(UKismetSystemLibrary::BoxTraceSingle(this, RayStart, RayEnd, Extents, GetOwner()->GetActorRotation(), UCommonStatics::GetGameTraceType(TraceChannel), false, {}, EDrawDebugTrace::None, HitResult, true))
 	{
 		FVector DeltaLocation = FMath::VInterpConstantTo(GetOwner()->GetActorLocation(), HitResult.Location, DeltaTime, FallingSpeed) - GetOwner()->GetActorLocation();
 		MoveUpdatedComponent(DeltaLocation, GetOwner()->GetActorRotation(), false);

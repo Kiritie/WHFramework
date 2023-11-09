@@ -6,7 +6,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Scene/SceneModuleBPLibrary.h"
+#include "Scene/SceneModuleStatics.h"
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
 {
@@ -43,7 +43,7 @@ void UWidgetLoadingLevelPanel::OnRefresh()
 {
 	Super::OnRefresh();
 
-	const float Progress = USceneModuleBPLibrary::GetAsyncLoadLevelProgress(LoadingLevelPath);
+	const float Progress = USceneModuleStatics::GetAsyncLoadLevelProgress(LoadingLevelPath);
 	if(Progress > LoadProgress)
 	{
 		LoadProgress = Progress;

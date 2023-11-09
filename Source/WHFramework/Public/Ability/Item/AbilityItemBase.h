@@ -4,6 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
 

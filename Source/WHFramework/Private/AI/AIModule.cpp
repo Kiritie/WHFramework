@@ -5,64 +5,65 @@
 
 #include "AI/AIModuleNetworkComponent.h"
 
-IMPLEMENTATION_MODULE(AAIModule)
+IMPLEMENTATION_MODULE(UAIModule)
 
 // Sets default values
-AAIModule::AAIModule()
+UAIModule::UAIModule()
 {
 	ModuleName = FName("AIModule");
+	ModuleDisplayName = FText::FromString(TEXT("AI Module"));
 
 	ModuleNetworkComponent = UAIModuleNetworkComponent::StaticClass();
 }
 
-AAIModule::~AAIModule()
+UAIModule::~UAIModule()
 {
-	TERMINATION_MODULE(AAIModule)
+	TERMINATION_MODULE(UAIModule)
 }
 
 #if WITH_EDITOR
-void AAIModule::OnGenerate()
+void UAIModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AAIModule::OnDestroy()
+void UAIModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AAIModule::OnInitialize_Implementation()
+void UAIModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AAIModule::OnPreparatory_Implementation(EPhase InPhase)
+void UAIModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void AAIModule::OnRefresh_Implementation(float DeltaSeconds)
+void UAIModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AAIModule::OnPause_Implementation()
+void UAIModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AAIModule::OnUnPause_Implementation()
+void UAIModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AAIModule::OnTermination_Implementation(EPhase InPhase)
+void UAIModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void AAIModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UAIModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 }

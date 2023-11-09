@@ -1,7 +1,7 @@
 #include "Ability/Item/AbilityItemDataBase.h"
 
 #include "Ability/AbilityModule.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
 
 UAbilityItemDataBase::UAbilityItemDataBase()
@@ -44,5 +44,5 @@ void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, 
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return (EAbilityItemType)UCommonBPLibrary::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
+	return (EAbilityItemType)UCommonStatics::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
 }

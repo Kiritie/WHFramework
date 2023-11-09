@@ -3,7 +3,7 @@
 
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Math/MathBPLibrary.h"
+#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -156,12 +156,12 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].MaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].MaterialInst);
 				break;
 			}
 			case EVoxelMeshNature::Preview:
 			{
-				SetMaterial(InSectionIndex, AVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].UnlitMaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].UnlitMaterialInst);
 				break;
 			}
 		}
@@ -275,7 +275,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, Vers, (int32)InFacing, UMathBPLibrary::DirectionToVector(InFacing, InVoxelItem.Angle));
+	BuildFace(InVoxelItem, Vers, (int32)InFacing, UMathStatics::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
@@ -284,9 +284,9 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
-	const FVoxelRenderData& RenderData = AVoxelModule::Get()->GetWorldData().RenderDatas[VoxelData.Transparency];
-	const FVector Scale = UMathBPLibrary::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
-	const FVector Offset = CenterOffset + UMathBPLibrary::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
+	const FVoxelRenderData& RenderData = UVoxelModule::Get()->GetWorldData().RenderDatas[VoxelData.Transparency];
+	const FVector Scale = UMathStatics::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
+	const FVector Offset = CenterOffset + UMathStatics::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
 	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X,
 		(1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
@@ -294,7 +294,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathBPLibrary::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * AVoxelModule::Get()->GetWorldData().BlockSize);
+		Vertices.Add((InVoxelItem.Index.ToVector() + UMathStatics::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get()->GetWorldData().BlockSize);
 	}
 
 	UVs.Add(FVector2D(UVCorner.X, UVCorner.Y + UVSpan.Y));

@@ -454,7 +454,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewTask && OldTask)
 				{
-					UCommonBPLibrary::ExportPropertiesToObject(OldTask, NewTask);
+					UCommonStatics::ExportPropertiesToObject(OldTask, NewTask);
 					if(OldTask->ParentTask)
 					{
 						OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;

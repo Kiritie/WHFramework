@@ -1,6 +1,6 @@
 #include "Ability/AbilityModuleTypes.h"
 
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlot.h"
@@ -51,7 +51,7 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 
 UAbilityItemDataBase& FAbilityItemData::GetItemData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
 }
 
 bool FGameplayEffectContainerSpec::HasValidTargets() const
@@ -101,5 +101,5 @@ FAbilityItems FInventorySlots::GetItems()
 
 UAbilityItemDataBase& FActorSaveData::GetItemData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
 }

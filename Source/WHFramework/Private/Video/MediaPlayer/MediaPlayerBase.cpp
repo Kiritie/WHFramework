@@ -4,7 +4,7 @@
 #include "Video/MediaPlayer/MediaPlayerBase.h"
 
 #include "Main/MainModule.h"
-#include "Video/VideoModuleBPLibrary.h"
+#include "Video/VideoModuleStatics.h"
 #include "Video/VideoModuleNetworkComponent.h"
 
 AMediaPlayerBase::AMediaPlayerBase()

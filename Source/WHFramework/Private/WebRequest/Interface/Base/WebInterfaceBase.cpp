@@ -3,7 +3,7 @@
 
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "WebRequest/Handle/Base/WebRequestHandleBase.h"
 
 UWebInterfaceBase::UWebInterfaceBase()
@@ -19,7 +19,7 @@ void UWebInterfaceBase::OnDespawn_Implementation(bool bRecovery)
 	OnWebRequestComplete.Clear();
 	for(auto& Iter : HandleMap)
 	{
-		 UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
+		 UObjectPoolModuleStatics::DespawnObject(Iter.Value);
 	}
 	HandleMap.Empty();
 }
@@ -34,7 +34,7 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray
 	UWebRequestHandleBase* WebRequestHandle;
 	if(!HandleMap.Contains(InResult.Content))
 	{
-		WebRequestHandle = UObjectPoolModuleBPLibrary::SpawnObject<UWebRequestHandleBase>(nullptr, HandleClass);
+		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(nullptr, HandleClass);
 		HandleMap.Add(InResult.Content, WebRequestHandle);
 	}
 	else
@@ -52,5 +52,5 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray
 
 FString UWebInterfaceBase::GetFullUrl() const
 {
-	return FullUrl.IsEmpty() ? UWebRequestModuleBPLibrary::GetWebServerURL() + Url : FullUrl;
+	return FullUrl.IsEmpty() ? UWebRequestModuleStatics::GetWebServerURL() + Url : FullUrl;
 }

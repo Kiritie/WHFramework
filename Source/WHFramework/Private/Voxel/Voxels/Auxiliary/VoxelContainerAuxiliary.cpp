@@ -4,7 +4,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelContainerAuxiliary.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/Datas/VoxelContainerData.h"
@@ -72,7 +72,7 @@ void AVoxelContainerAuxiliary::OnDiscardItem(const FAbilityItem& InItem, bool bI
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
-	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AVoxelContainerAuxiliary::OnSelectItem(const FAbilityItem& InItem)

@@ -2,7 +2,7 @@
 
 #include "Common/Base/WHActor.h"
 
-#include "Scene/SceneModuleBPLibrary.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
 AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
@@ -54,7 +54,7 @@ void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 
 	Execute_SetActorVisible(this, true);
 	
-	USceneModuleBPLibrary::AddSceneActor(this);
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void AWHActor::OnDespawn_Implementation(bool bRecovery)
@@ -63,7 +63,7 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 
 	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	
-	USceneModuleBPLibrary::RemoveSceneActor(this);
+	USceneModuleStatics::RemoveSceneActor(this);
 	if(Container)
 	{
 		Container->RemoveSceneActor(this);

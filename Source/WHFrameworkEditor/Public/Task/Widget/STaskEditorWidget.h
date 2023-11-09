@@ -68,7 +68,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	class ATaskModule* TaskModule;
+	class UTaskModule* TaskModule;
 	
 	TSharedPtr<FTabManager> TabManager;
 	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;

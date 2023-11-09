@@ -4,7 +4,7 @@
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
@@ -32,7 +32,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	ProcedureModule = AProcedureModule::Get(!UCommonBPLibrary::IsPlaying());
+	ProcedureModule = UProcedureModule::Get(!UCommonStatics::IsPlaying());
 
 	if(ProcedureModule)
 	{
@@ -172,7 +172,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 		
-		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonStatics::IsPlaying());
 	}
 	else
 	{
@@ -219,7 +219,7 @@ void SProcedureEditorWidget::OnReset()
 
 void SProcedureEditorWidget::OnRefresh()
 {
-	ProcedureModule = AProcedureModule::Get(!bPreviewMode);
+	ProcedureModule = UProcedureModule::Get(!bPreviewMode);
 	if(ProcedureModule)
 	{
 		if(ListWidget)

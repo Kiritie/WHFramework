@@ -5,7 +5,7 @@
 
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Datas/VoxelData.h"
 
@@ -22,7 +22,7 @@ void AAbilityPickUpVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	Super::LoadData(InSaveData, InPhase);
 
 	const FVector Range = Item.GetData<UVoxelData>().GetRange();
-	BoxComponent->SetBoxExtent(Range * AVoxelModule::Get()->GetWorldData().BlockSize * 0.15f);
+	BoxComponent->SetBoxExtent(Range * UVoxelModule::Get()->GetWorldData().BlockSize * 0.15f);
 
 	MeshComponent->CreateVoxel(Item);
 }

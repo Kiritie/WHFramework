@@ -7,7 +7,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "TimerManager.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 
 // Sets default values
@@ -77,7 +77,7 @@ void AAbilitySkillRemoteBase::OnHitTarget(AActor* InTarget, const FHitResult& In
 {
 	Super::OnHitTarget(InTarget, InHitResult);
 
-	UObjectPoolModuleBPLibrary::DespawnObject(this);
+	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
 void AAbilitySkillRemoteBase::ClearHitTargets()

@@ -5,43 +5,44 @@
 #include "Parameter/ParameterModule.h"
 
 #include "Net/UnrealNetwork.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/ParameterSaveGame.h"
 		
-IMPLEMENTATION_MODULE(AParameterModule)
+IMPLEMENTATION_MODULE(UParameterModule)
 
 // ParamSets default values
-AParameterModule::AParameterModule()
+UParameterModule::UParameterModule()
 {
 	ModuleName = FName("ParameterModule");
+	ModuleDisplayName = FText::FromString(TEXT("Parameter Module"));
 	ModuleSaveGame = UParameterSaveGame::StaticClass();
 }
 
-AParameterModule::~AParameterModule()
+UParameterModule::~UParameterModule()
 {
-	TERMINATION_MODULE(AParameterModule)
+	TERMINATION_MODULE(UParameterModule)
 }
 
 #if WITH_EDITOR
-void AParameterModule::OnGenerate()
+void UParameterModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AParameterModule::OnDestroy()
+void UParameterModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AParameterModule::OnInitialize_Implementation()
+void UParameterModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
+void UParameterModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -52,24 +53,24 @@ void AParameterModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AParameterModule::OnRefresh_Implementation(float DeltaSeconds)
+void UParameterModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AParameterModule::OnPause_Implementation()
+void UParameterModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AParameterModule::OnUnPause_Implementation()
+void UParameterModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AParameterModule::OnTermination_Implementation(EPhase InPhase)
+void UParameterModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -80,14 +81,14 @@ void AParameterModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FParameterModuleSaveData>();
 
 	Parameters = SaveData.Parameters;
 }
 
-FSaveData* AParameterModule::ToData()
+FSaveData* UParameterModule::ToData()
 {
 	static FParameterModuleSaveData SaveData;
 	SaveData = FParameterModuleSaveData();
@@ -96,269 +97,269 @@ FSaveData* AParameterModule::ToData()
 	return &SaveData;
 }
 
-bool AParameterModule::HasParameter(FName InName, bool bEnsured) const
+bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.HasParameter(InName, bEnsured);
 }
 
-void AParameterModule::AddParameter(FName InName, FParameter InParameter)
+void UParameterModule::AddParameter(FName InName, FParameter InParameter)
 {
 	Parameters.AddParameter(InName, InParameter);
 }
 
-void AParameterModule::SetParameter(FName InName, FParameter InParameter)
+void UParameterModule::SetParameter(FName InName, FParameter InParameter)
 {
 	Parameters.SetParameter(InName, InParameter);
 }
 
-FParameter AParameterModule::GetParameter(FName InName, bool bEnsured) const
+FParameter UParameterModule::GetParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetParameter(InName, bEnsured);
 }
 
-TArray<FParameter> AParameterModule::GetParameters(FName InName, bool bEnsured) const
+TArray<FParameter> UParameterModule::GetParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetParameters(InName, bEnsured);
 }
 
-void AParameterModule::RemoveParameter(FName InName)
+void UParameterModule::RemoveParameter(FName InName)
 {
 	Parameters.RemoveParameter(InName);
 }
 
-void AParameterModule::RemoveParameters(FName InName)
+void UParameterModule::RemoveParameters(FName InName)
 {
 	Parameters.RemoveParameters(InName);
 }
 
-void AParameterModule::ClearAllParameter()
+void UParameterModule::ClearAllParameter()
 {
 	Parameters.ClearAllParameter();
 }
 
-void AParameterModule::AddIntegerParameter(FName InName, int32 InValue)
+void UParameterModule::AddIntegerParameter(FName InName, int32 InValue)
 {
 	Parameters.AddIntegerParameter(InName, InValue);
 }
 
-void AParameterModule::SetIntegerParameter(FName InName, int32 InValue)
+void UParameterModule::SetIntegerParameter(FName InName, int32 InValue)
 {
 	Parameters.SetIntegerParameter(InName, InValue);
 }
 
-int32 AParameterModule::GetIntegerParameter(FName InName, bool bEnsured) const
+int32 UParameterModule::GetIntegerParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetIntegerParameter(InName, bEnsured);
 }
 
-TArray<int32> AParameterModule::GetIntegerParameters(FName InName, bool bEnsured) const
+TArray<int32> UParameterModule::GetIntegerParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetIntegerParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddFloatParameter(FName InName, float InValue)
+void UParameterModule::AddFloatParameter(FName InName, float InValue)
 {
 	Parameters.AddFloatParameter(InName, InValue);
 }
 
-void AParameterModule::SetFloatParameter(FName InName, float InValue)
+void UParameterModule::SetFloatParameter(FName InName, float InValue)
 {
 	Parameters.SetFloatParameter(InName, InValue);
 }
 
-float AParameterModule::GetFloatParameter(FName InName, bool bEnsured) const
+float UParameterModule::GetFloatParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetFloatParameter(InName, bEnsured);
 }
 
-TArray<float> AParameterModule::GetFloatParameters(FName InName, bool bEnsured) const
+TArray<float> UParameterModule::GetFloatParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetFloatParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddStringParameter(FName InName, const FString& InValue)
+void UParameterModule::AddStringParameter(FName InName, const FString& InValue)
 {
 	Parameters.AddStringParameter(InName, InValue);
 }
 
-void AParameterModule::SetStringParameter(FName InName, const FString& InValue)
+void UParameterModule::SetStringParameter(FName InName, const FString& InValue)
 {
 	Parameters.SetStringParameter(InName, InValue);
 }
 
-FString AParameterModule::GetStringParameter(FName InName, bool bEnsured) const
+FString UParameterModule::GetStringParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetStringParameter(InName, bEnsured);
 }
 
-TArray<FString> AParameterModule::GetStringParameters(FName InName, bool bEnsured) const
+TArray<FString> UParameterModule::GetStringParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetStringParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddTextParameter(FName InName, const FText InValue)
+void UParameterModule::AddTextParameter(FName InName, const FText InValue)
 {
 	Parameters.AddTextParameter(InName, InValue);
 }
 
-void AParameterModule::SetTextParameter(FName InName, const FText InValue)
+void UParameterModule::SetTextParameter(FName InName, const FText InValue)
 {
 	Parameters.SetTextParameter(InName, InValue);
 }
 
-FText AParameterModule::GetTextParameter(FName InName, bool bEnsured) const
+FText UParameterModule::GetTextParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetTextParameter(InName, bEnsured);
 }
 
-TArray<FText> AParameterModule::GetTextParameters(FName InName, bool bEnsured) const
+TArray<FText> UParameterModule::GetTextParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetTextParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddBooleanParameter(FName InName, bool InValue)
+void UParameterModule::AddBooleanParameter(FName InName, bool InValue)
 {
 	Parameters.AddBooleanParameter(InName, InValue);
 }
 
-void AParameterModule::SetBooleanParameter(FName InName, bool InValue)
+void UParameterModule::SetBooleanParameter(FName InName, bool InValue)
 {
 	Parameters.SetBooleanParameter(InName, InValue);
 }
 
-bool AParameterModule::GetBooleanParameter(FName InName, bool bEnsured) const
+bool UParameterModule::GetBooleanParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetBooleanParameter(InName, bEnsured);
 }
 
-TArray<bool> AParameterModule::GetBooleanParameters(FName InName, bool bEnsured) const
+TArray<bool> UParameterModule::GetBooleanParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetBooleanParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddVectorParameter(FName InName, FVector InValue)
+void UParameterModule::AddVectorParameter(FName InName, FVector InValue)
 {
 	Parameters.AddVectorParameter(InName, InValue);
 }
 
-void AParameterModule::SetVectorParameter(FName InName, FVector InValue)
+void UParameterModule::SetVectorParameter(FName InName, FVector InValue)
 {
 	Parameters.SetVectorParameter(InName, InValue);
 }
 
-FVector AParameterModule::GetVectorParameter(FName InName, bool bEnsured) const
+FVector UParameterModule::GetVectorParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetVectorParameter(InName, bEnsured);
 }
 
-TArray<FVector> AParameterModule::GetVectorParameters(FName InName, bool bEnsured) const
+TArray<FVector> UParameterModule::GetVectorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetVectorParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddRotatorParameter(FName InName, FRotator InValue)
+void UParameterModule::AddRotatorParameter(FName InName, FRotator InValue)
 {
 	Parameters.AddRotatorParameter(InName, InValue);
 }
 
-void AParameterModule::SetRotatorParameter(FName InName, FRotator InValue)
+void UParameterModule::SetRotatorParameter(FName InName, FRotator InValue)
 {
 	Parameters.SetRotatorParameter(InName, InValue);
 }
 
-FRotator AParameterModule::GetRotatorParameter(FName InName, bool bEnsured) const
+FRotator UParameterModule::GetRotatorParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetRotatorParameter(InName, bEnsured);
 }
 
-TArray<FRotator> AParameterModule::GetRotatorParameters(FName InName, bool bEnsured) const
+TArray<FRotator> UParameterModule::GetRotatorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetRotatorParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddColorParameter(FName InName, const FColor& InValue)
+void UParameterModule::AddColorParameter(FName InName, const FColor& InValue)
 {
 	Parameters.AddColorParameter(InName, InValue);
 }
 
-void AParameterModule::SetColorParameter(FName InName, const FColor& InValue)
+void UParameterModule::SetColorParameter(FName InName, const FColor& InValue)
 {
 	Parameters.SetColorParameter(InName, InValue);
 }
 
-FColor AParameterModule::GetColorParameter(FName InName, bool bEnsured) const
+FColor UParameterModule::GetColorParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetColorParameter(InName, bEnsured);
 }
 
-TArray<FColor> AParameterModule::GetColorParameters(FName InName, bool bEnsured) const
+TArray<FColor> UParameterModule::GetColorParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetColorParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddClassParameter(FName InName, UClass* InValue)
+void UParameterModule::AddClassParameter(FName InName, UClass* InValue)
 {
 	Parameters.AddClassParameter(InName, InValue);
 }
 
-void AParameterModule::SetClassParameter(FName InName, UClass* InValue)
+void UParameterModule::SetClassParameter(FName InName, UClass* InValue)
 {
 	Parameters.SetClassParameter(InName, InValue);
 }
 
-UClass* AParameterModule::GetClassParameter(FName InName, bool bEnsured) const
+UClass* UParameterModule::GetClassParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetClassParameter(InName, bEnsured);
 }
 
-TArray<UClass*> AParameterModule::GetClassParameters(FName InName, bool bEnsured) const
+TArray<UClass*> UParameterModule::GetClassParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetClassParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddObjectParameter(FName InName, UObject* InValue)
+void UParameterModule::AddObjectParameter(FName InName, UObject* InValue)
 {
 	Parameters.AddObjectParameter(InName, InValue);
 }
 
-void AParameterModule::SetObjectParameter(FName InName, UObject* InValue)
+void UParameterModule::SetObjectParameter(FName InName, UObject* InValue)
 {
 	Parameters.SetObjectParameter(InName, InValue);
 }
 
-UObject* AParameterModule::GetObjectParameter(FName InName, bool bEnsured) const
+UObject* UParameterModule::GetObjectParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetObjectParameter(InName, bEnsured);
 }
 
-TArray<UObject*> AParameterModule::GetObjectParameters(FName InName, bool bEnsured) const
+TArray<UObject*> UParameterModule::GetObjectParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetObjectParameters(InName, bEnsured);
 }
 
-void AParameterModule::AddPointerParameter(FName InName, void* InValue)
+void UParameterModule::AddPointerParameter(FName InName, void* InValue)
 {
 	Parameters.AddPointerParameter(InName, InValue);
 }
 
-void AParameterModule::SetPointerParameter(FName InName, void* InValue)
+void UParameterModule::SetPointerParameter(FName InName, void* InValue)
 {
 	Parameters.SetPointerParameter(InName, InValue);
 }
 
-void* AParameterModule::GetPointerParameter(FName InName, bool bEnsured) const
+void* UParameterModule::GetPointerParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.GetPointerParameter(InName, bEnsured);
 }
 
-TArray<void*> AParameterModule::GetPointerParameters(FName InName, bool bEnsured) const
+TArray<void*> UParameterModule::GetPointerParameters(FName InName, bool bEnsured) const
 {
 	return Parameters.GetPointerParameters(InName, bEnsured);
 }
 
-void AParameterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UParameterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AParameterModule, Parameters);
+	DOREPLIFETIME(UParameterModule, Parameters);
 }

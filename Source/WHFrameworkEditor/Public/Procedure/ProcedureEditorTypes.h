@@ -16,7 +16,7 @@ public:
 	const UClass* IncludeParentClass;
 	const UClass* UnIncludeParentClass;
 	
-	AProcedureModule* ProcedureModule;
+	UProcedureModule* ProcedureModule;
 
 	virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs ) override
 	{

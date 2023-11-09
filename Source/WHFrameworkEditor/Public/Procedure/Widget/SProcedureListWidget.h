@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SProcedureListWidget) {}
 
-		SLATE_ARGUMENT(class AProcedureModule*, ProcedureModule)
+		SLATE_ARGUMENT(class UProcedureModule*, ProcedureModule)
 
 	SLATE_END_ARGS()
 
@@ -54,7 +54,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	AProcedureModule* ProcedureModule;
+	UProcedureModule* ProcedureModule;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

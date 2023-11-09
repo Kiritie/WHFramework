@@ -21,7 +21,7 @@ void UCameraSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	ACameraModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UCameraModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UCameraSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,5 +33,5 @@ void UCameraSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(ACameraModule::Get()->GetSaveData(true));
+	SetSaveData(UCameraModule::Get()->GetSaveData(true));
 }

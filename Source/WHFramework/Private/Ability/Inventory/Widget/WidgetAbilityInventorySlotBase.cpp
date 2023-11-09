@@ -5,7 +5,7 @@
 #include "Ability/Inventory/Slot/AbilityInventorySlot.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Item/Widget/WidgetAbilityItemBase.h"
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
@@ -129,7 +129,7 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetAbilityItemBase>({ &GetItem() }, UAssetModuleBPLibrary::GetStaticClass(FName("DragItem")));
+		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetAbilityItemBase>({ &GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
 	}
 }
 

@@ -6,14 +6,13 @@
 #include "GameFramework/Actor.h"
 #include "Common/CommonTypes.h"
 #include "Main/Base/ModuleBase.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "VoxelModule.generated.h"
 
+class AVoxelCapture;
 class AVoxelChunk;
 class UVoxelData;
 class ACharacterBase;
 class UWorldTimerComponent;
-class USceneCaptureComponent2D;
 class UWorldWeatherComponent;
 class AVoxelEntityPreview;
 
@@ -21,7 +20,7 @@ class AVoxelEntityPreview;
  * 体素模块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelModule : public AModuleBase
+class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 	GENERATED_BODY()
 
@@ -31,12 +30,12 @@ class WHFRAMEWORK_API AVoxelModule : public AModuleBase
 	friend class AsyncTask_LoadChunkMap;
 	friend class AsyncTask_SaveChunkData;
 		
-	GENERATED_MODULE(AVoxelModule)
+	GENERATED_MODULE(UVoxelModule)
 
 public:	
-	AVoxelModule();
+	UVoxelModule();
 
-	~AVoxelModule();
+	~UVoxelModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -47,23 +46,23 @@ public:
 	virtual void OnDestroy() override;
 #endif
 
-	virtual void OnInitialize_Implementation() override;
+	virtual void OnInitialize() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
-	virtual void OnPause_Implementation() override;
+	virtual void OnPause() override;
 
-	virtual void OnUnPause_Implementation() override;
+	virtual void OnUnPause() override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Components
+	// Capture
 protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	USceneCaptureComponent2D* VoxelsCapture;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Capture")
+	AVoxelCapture* VoxelCapture;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel

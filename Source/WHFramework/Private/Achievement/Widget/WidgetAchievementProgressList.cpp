@@ -15,8 +15,8 @@ UWidgetAchievementProgressList::UWidgetAchievementProgressList(const FObjectInit
 
 void UWidgetAchievementProgressList::UpdateList()
 {
-	TArray<FAchievementStates> States = AAchievementModule::Get()->States;
-	TArray<FAchievementData> Data = AAchievementModule::Get()->Achievements;
+	TArray<FAchievementStates> States = UAchievementModule::Get()->States;
+	TArray<FAchievementData> Data = UAchievementModule::Get()->Achievements;
 	int32 InList = 0;
 	
 	ListView->ClearChildren();
@@ -29,8 +29,8 @@ void UWidgetAchievementProgressList::UpdateList()
 		{
 			if(!Data[i].Spoiler || States[i].Achieved)
 			{
-				UWidgetAchievement* Temp = CreateWidget<UWidgetAchievement>(UGameplayStatics::GetPlayerController(GetWorld(), 0), AAchievementModule::Get()->AchievementWidgetClass);
-				Temp->SetValue(AAchievementModule::Get()->Achievements[i], States[i], true);
+				UWidgetAchievement* Temp = CreateWidget<UWidgetAchievement>(UGameplayStatics::GetPlayerController(GetWorld(), 0), UAchievementModule::Get()->AchievementWidgetClass);
+				Temp->SetValue(UAchievementModule::Get()->Achievements[i], States[i], true);
 				ListView->AddChild(Temp);
 			}
 			else

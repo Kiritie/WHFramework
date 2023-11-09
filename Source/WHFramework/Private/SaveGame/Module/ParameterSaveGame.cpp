@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/ParameterSaveGame.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Parameter/ParameterModule.h"
 
 UParameterSaveGame::UParameterSaveGame()
@@ -22,7 +22,7 @@ void UParameterSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	AParameterModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UParameterModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UParameterSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -34,5 +34,5 @@ void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AParameterModule::Get()->GetSaveData(true));
+	SetSaveData(UParameterModule::Get()->GetSaveData(true));
 }

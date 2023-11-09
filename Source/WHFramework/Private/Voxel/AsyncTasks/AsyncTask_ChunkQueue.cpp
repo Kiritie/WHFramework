@@ -3,7 +3,7 @@
 
 #include "Voxel/AsyncTasks/AsyncTask_ChunkQueue.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 
 AsyncTask_ChunkQueue::AsyncTask_ChunkQueue(TArray<FIndex> InQueue, TFunction<void(FIndex, int32)> InFunc, int32 InStage)
 {

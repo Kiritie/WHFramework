@@ -7,15 +7,16 @@
 #include "Procedure/Base/ProcedureBase.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Procedure/ProcedureModuleBPLibrary.h"
+#include "Procedure/ProcedureModuleStatics.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 
-IMPLEMENTATION_MODULE(AProcedureModule)
+IMPLEMENTATION_MODULE(UProcedureModule)
 
 // ParamSets default values
-AProcedureModule::AProcedureModule()
+UProcedureModule::UProcedureModule()
 {
 	ModuleName = FName("ProcedureModule");
+	ModuleDisplayName = FText::FromString(TEXT("Procedure Module"));
 
 	ModuleNetworkComponent = UProcedureModuleNetworkComponent::StaticClass();
 
@@ -28,18 +29,18 @@ AProcedureModule::AProcedureModule()
 	CurrentProcedure = nullptr;
 }
 
-AProcedureModule::~AProcedureModule()
+UProcedureModule::~UProcedureModule()
 {
-	TERMINATION_MODULE(AProcedureModule)
+	TERMINATION_MODULE(UProcedureModule)
 }
 
 #if WITH_EDITOR
-void AProcedureModule::OnGenerate()
+void UProcedureModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AProcedureModule::OnDestroy()
+void UProcedureModule::OnDestroy()
 {
 	Super::OnDestroy();
 
@@ -47,14 +48,14 @@ void AProcedureModule::OnDestroy()
 }
 #endif
 
-void AProcedureModule::OnInitialize_Implementation()
+void UProcedureModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
+void UProcedureModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 	
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -79,9 +80,9 @@ void AProcedureModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
+void UProcedureModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 
 	if(CurrentProcedure)
 	{
@@ -92,22 +93,22 @@ void AProcedureModule::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AProcedureModule::OnPause_Implementation()
+void UProcedureModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AProcedureModule::OnUnPause_Implementation()
+void UProcedureModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AProcedureModule::OnTermination_Implementation(EPhase InPhase)
+void UProcedureModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void AProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
+void UProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 {
 	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Entered)
 	{
@@ -121,7 +122,7 @@ void AProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 	}
 }
 
-void AProcedureModule::SwitchProcedureByIndex(int32 InIndex)
+void UProcedureModule::SwitchProcedureByIndex(int32 InIndex)
 {
 	if(HasProcedureByIndex(InIndex))
 	{
@@ -133,7 +134,7 @@ void AProcedureModule::SwitchProcedureByIndex(int32 InIndex)
 	}
 }
 
-void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+void UProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
 	if(HasProcedureByClass<UProcedureBase>(InClass))
 	{
@@ -145,7 +146,7 @@ void AProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClas
 	}
 }
 
-void AProcedureModule::SwitchFirstProcedure()
+void UProcedureModule::SwitchFirstProcedure()
 {
 	if(FirstProcedure)
 	{
@@ -153,7 +154,7 @@ void AProcedureModule::SwitchFirstProcedure()
 	}
 }
 
-void AProcedureModule::SwitchLastProcedure()
+void UProcedureModule::SwitchLastProcedure()
 {
 	if(CurrentProcedure && CurrentProcedure->ProcedureIndex > 0)
 	{
@@ -161,7 +162,7 @@ void AProcedureModule::SwitchLastProcedure()
 	}
 }
 
-void AProcedureModule::SwitchNextProcedure()
+void UProcedureModule::SwitchNextProcedure()
 {
 	if(CurrentProcedure && CurrentProcedure->ProcedureIndex < Procedures.Num() - 1)
 	{
@@ -169,7 +170,7 @@ void AProcedureModule::SwitchNextProcedure()
 	}
 }
 
-void AProcedureModule::GuideCurrentProcedure()
+void UProcedureModule::GuideCurrentProcedure()
 {
 	if(CurrentProcedure)
 	{
@@ -177,7 +178,7 @@ void AProcedureModule::GuideCurrentProcedure()
 	}
 }
 
-void AProcedureModule::ClearAllProcedure()
+void UProcedureModule::ClearAllProcedure()
 {
 	for(auto Iter : Procedures)
 	{
@@ -198,39 +199,38 @@ void AProcedureModule::ClearAllProcedure()
 	Modify();
 }
 
-bool AProcedureModule::HasProcedureByIndex(int32 InIndex) const
+bool UProcedureModule::HasProcedureByIndex(int32 InIndex) const
 {
 	return Procedures.IsValidIndex(InIndex);
 }
 
-UProcedureBase* AProcedureModule::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass) const
+UProcedureBase* UProcedureModule::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass) const
 {
 	return GetProcedureByIndex<UProcedureBase>(InIndex);
 }
 
-bool AProcedureModule::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
+bool UProcedureModule::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
 {
 	return HasProcedureByClass<UProcedureBase>(InClass);
 }
 
-UProcedureBase* AProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
+UProcedureBase* UProcedureModule::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass) const
 {
 	return GetProcedureByClass<UProcedureBase>(InClass);
 }
 
-bool AProcedureModule::IsCurrentProcedure(UProcedureBase* InProcedure) const
+bool UProcedureModule::IsCurrentProcedure(UProcedureBase* InProcedure) const
 {
 	return InProcedure == CurrentProcedure;
 }
 
-bool AProcedureModule::IsCurrentProcedureIndex(int32 InIndex) const
+bool UProcedureModule::IsCurrentProcedureIndex(int32 InIndex) const
 {
 	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InIndex;
 }
 
 #if WITH_EDITOR
-
-void AProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
+void UProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
 	for (int32 i = 0; i < Procedures.Num(); i++)
@@ -241,7 +241,7 @@ void AProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& 
 	}
 }
 
-void AProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
+void UProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	for (int32 i = 0; i < Procedures.Num(); i++)
 	{

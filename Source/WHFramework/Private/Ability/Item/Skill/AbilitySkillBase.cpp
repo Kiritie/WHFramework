@@ -9,7 +9,7 @@
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 AAbilitySkillBase::AAbilitySkillBase()
 {
@@ -39,7 +39,7 @@ void AAbilitySkillBase::Initialize_Implementation(AActor* InOwnerActor, const FA
 	SetActorRotation(GetOwnerActor<AAbilityCharacterBase>()->GetActorRotation());
 
 	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this](){
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
+		UObjectPoolModuleStatics::DespawnObject(this);
 	}, DurationTime, false);
 }
 

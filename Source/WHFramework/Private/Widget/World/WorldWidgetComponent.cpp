@@ -3,9 +3,9 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
-#include "Common/CommonBPLibrary.h"
-#include "Widget/WidgetModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
+#include "Common/CommonStatics.h"
+#include "Widget/WidgetModuleStatics.h"
 
 UWorldWidgetComponent::UWorldWidgetComponent()
 {
@@ -50,7 +50,7 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UCommonBPLibrary::IsPlaying())
+	if(UCommonStatics::IsPlaying())
 	{
 		DestroyWorldWidget();
 	}
@@ -60,11 +60,11 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if(!UCommonBPLibrary::IsPlaying()) return;
+	if(!UCommonStatics::IsPlaying()) return;
 	
 	if(bOrientCamera)
 	{
-		SetWorldRotation(UCameraModuleBPLibrary::GetCameraRotation(true));
+		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
 		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
 	}
 	else
@@ -213,7 +213,7 @@ void UWorldWidgetComponent::CreateWorldWidget()
 			}
 			case EWidgetSpace::Screen:
 			{
-				SetWorldWidget(UWidgetModuleBPLibrary::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, &WidgetParams, WorldWidgetClass));
+				SetWorldWidget(UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, &WidgetParams, WorldWidgetClass));
 				break;
 			}
 		}
@@ -233,7 +233,7 @@ void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery)
 			}
 			case EWidgetSpace::Screen:
 			{
-				UWidgetModuleBPLibrary::DestroyWorldWidget(WorldWidget, bRecovery);
+				UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery);
 				WorldWidget = nullptr;
 				break;
 			}

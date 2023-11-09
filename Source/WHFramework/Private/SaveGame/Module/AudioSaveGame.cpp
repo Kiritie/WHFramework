@@ -21,7 +21,7 @@ void UAudioSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	AAudioModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UAudioModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UAudioSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,5 +33,5 @@ void UAudioSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AAudioModule::Get()->GetSaveData(true));
+	SetSaveData(UAudioModule::Get()->GetSaveData(true));
 }

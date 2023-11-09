@@ -3,14 +3,14 @@
 
 #include "Step/Base/StepBase.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Step/EventHandle_CompleteStep.h"
 #include "Event/Handle/Step/EventHandle_EnterStep.h"
 #include "Event/Handle/Step/EventHandle_ExecuteStep.h"
 #include "Event/Handle/Step/EventHandle_LeaveStep.h"
 #include "Step/StepModule.h"
-#include "Step/StepModuleBPLibrary.h"
+#include "Step/StepModuleStatics.h"
 
 UStepBase::UStepBase()
 {
@@ -75,7 +75,7 @@ void UStepBase::OnUnGenerate()
 {
 	if(bFirstStep)
 	{
-		if(AStepModule* StepModule = AStepModule::Get(true))
+		if(UStepModule* StepModule = UStepModule::Get(true))
 		{
 			if(StepModule->GetFirstStep() == this)
 			{
@@ -149,7 +149,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	K2_OnEnter(InLastStep);
 
-	UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
+	UCameraModuleStatics::SwitchCamera(CameraViewPawn);
 
 	ResetCameraView();
 
@@ -163,7 +163,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -291,10 +291,10 @@ void UStepBase::OnExecute()
 
 	if(bTrackTarget && OperationTarget)
 	{
-		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget);
+		UCameraModuleStatics::StartTrackTarget(OperationTarget);
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -337,12 +337,12 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 	if(bTrackTarget && OperationTarget)
 	{
-		UCameraModuleBPLibrary::EndTrackTarget();
+		UCameraModuleStatics::EndTrackTarget();
 	}
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -368,7 +368,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -402,17 +402,17 @@ void UStepBase::GetCameraView()
 {
 	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
 	else
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch;
+		CameraViewOffset = UCameraModuleStatics::GetCameraLocation();
+		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch;
 	}
-	CameraViewDistance = UCameraModuleBPLibrary::GetCameraDistance();
+	CameraViewDistance = UCameraModuleStatics::GetCameraDistance();
 
 	Modify();
 }
@@ -461,23 +461,23 @@ void UStepBase::ResetCameraView()
 	{
 		case EStepCameraViewMode::Instant:
 		{
-			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, true);
-			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, true);
+			UCameraModuleStatics::SetCameraLocation(CameraLocation, true);
+			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, true);
 			break;
 		}
 		case EStepCameraViewMode::Smooth:
 		{
-			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, false);
-			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, false);
+			UCameraModuleStatics::SetCameraLocation(CameraLocation, false);
+			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, false);
 			break;
 		}
 		case EStepCameraViewMode::Duration:
 		{
-			UCameraModuleBPLibrary::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleBPLibrary::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleBPLibrary::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
 			break;
 		}
 		default: break;
@@ -493,7 +493,7 @@ EStepExecuteType UStepBase::GetStepExecuteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AStepModule::Get())
+		if(UStepModule* StepModule = UStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepExecuteType() != EStepExecuteType::None)
 			{
@@ -508,7 +508,7 @@ EStepLeaveType UStepBase::GetStepLeaveType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AStepModule::Get())
+		if(UStepModule* StepModule = UStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepLeaveType() != EStepLeaveType::None)
 			{
@@ -523,7 +523,7 @@ EStepCompleteType UStepBase::GetStepCompleteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(AStepModule* StepModule = AStepModule::Get())
+		if(UStepModule* StepModule = UStepModule::Get())
 		{
 			if(StepModule->GetGlobalStepCompleteType() != EStepCompleteType::None)
 			{
@@ -546,37 +546,37 @@ bool UStepBase::IsParentOf(UStepBase* InStep) const
 
 void UStepBase::Restore()
 {
-	UStepModuleBPLibrary::RestoreStep(this);
+	UStepModuleStatics::RestoreStep(this);
 }
 
 void UStepBase::Enter()
 {
-	UStepModuleBPLibrary::EnterStep(this);
+	UStepModuleStatics::EnterStep(this);
 }
 
 void UStepBase::Refresh()
 {
-	UStepModuleBPLibrary::RefreshStep(this);
+	UStepModuleStatics::RefreshStep(this);
 }
 
 void UStepBase::Guide()
 {
-	UStepModuleBPLibrary::GuideStep(this);
+	UStepModuleStatics::GuideStep(this);
 }
 
 void UStepBase::Execute()
 {
-	UStepModuleBPLibrary::ExecuteStep(this);
+	UStepModuleStatics::ExecuteStep(this);
 }
 
 void UStepBase::Complete(EStepExecuteResult InStepExecuteResult)
 {
-	UStepModuleBPLibrary::CompleteStep(this, InStepExecuteResult);
+	UStepModuleStatics::CompleteStep(this, InStepExecuteResult);
 }
 
 void UStepBase::Leave()
 {
-	UStepModuleBPLibrary::LeaveStep(this);
+	UStepModuleStatics::LeaveStep(this);
 }
 
 bool UStepBase::HasSubStep(bool bIgnoreMerge) const
@@ -743,7 +743,7 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bFirstStep))
 		{
-			if(AStepModule* StepModule = AStepModule::Get(true))
+			if(UStepModule* StepModule = UStepModule::Get(true))
 			{
 				if(bFirstStep)
 				{

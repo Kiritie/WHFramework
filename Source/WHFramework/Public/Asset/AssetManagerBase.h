@@ -4,7 +4,7 @@
 
 #include "AssetModuleTypes.h"
 #include "Engine/AssetManager.h"
-#include "ReferencePool/ReferencePoolModuleBPLibrary.h"
+#include "ReferencePool/ReferencePoolModuleStatics.h"
 #include "Primary/PrimaryAssetBase.h"
 #include "AssetManagerBase.generated.h"
 
@@ -48,7 +48,7 @@ public:
 		}
 		else
 		{
-			return UReferencePoolModuleBPLibrary::GetReference<T>();
+			return UReferencePoolModuleStatics::GetReference<T>();
 		}
 	}
 

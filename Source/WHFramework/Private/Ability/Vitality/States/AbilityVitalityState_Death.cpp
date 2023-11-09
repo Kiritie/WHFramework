@@ -5,7 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 {
@@ -76,5 +76,5 @@ void UAbilityVitalityState_Death::DeathEnd()
 	
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 
-	UObjectPoolModuleBPLibrary::DespawnObject(Vitality);
+	UObjectPoolModuleStatics::DespawnObject(Vitality);
 }

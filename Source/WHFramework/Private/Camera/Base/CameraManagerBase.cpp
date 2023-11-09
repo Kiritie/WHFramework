@@ -2,7 +2,7 @@
 
 #include "Camera/Base/CameraManagerBase.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Camera/Base/CameraActorBase.h"
 
 ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializer)
@@ -12,9 +12,9 @@ ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializ
 
 void ACameraManagerBase::SetViewTarget(AActor* NewViewTarget, FViewTargetTransitionParams TransitionParams)
 {
-	if(UCameraModuleBPLibrary::GetCurrentCamera())
+	if(UCameraModuleStatics::GetCurrentCamera())
 	{
-		NewViewTarget = UCameraModuleBPLibrary::GetCurrentCamera();
+		NewViewTarget = UCameraModuleStatics::GetCurrentCamera();
 	}
 	Super::SetViewTarget(NewViewTarget, TransitionParams);
 }

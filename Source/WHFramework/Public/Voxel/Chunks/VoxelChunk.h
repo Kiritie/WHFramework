@@ -9,7 +9,7 @@
 #include "VoxelChunk.generated.h"
 
 class IVoxelAgentInterface;
-class AVoxelModule;
+class UVoxelModule;
 class ACharacterBase;
 class UVoxel;
 class AAbilityPickUpBase;
@@ -24,7 +24,7 @@ class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInter
 {
 	GENERATED_BODY()
 
-	friend class AVoxelModule;
+	friend class UVoxelModule;
 
 public:	
 	// Sets default values for this actor's properties

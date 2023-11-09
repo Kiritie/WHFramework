@@ -3,7 +3,9 @@
 #pragma once
 
 #include "UObject/UObjectGlobals.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Main/MainModuleStatics.h"
+
+#include "MainModuleTypes.generated.h"
 
 UENUM(BlueprintType)
 enum class EModuleState : uint8
@@ -57,7 +59,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!Instance) \
 		{ \
-			Instance = UCommonBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			Instance = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
 												}, false); \
 		} \
@@ -67,13 +69,13 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!InstanceEditor) \
 		{ \
-			InstanceEditor = UCommonBPLibrary::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			InstanceEditor = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
                              					}, true); \
 		} \
 		return InstanceEditor; \
 	} \
-} \
+}
 
 #define IMPLEMENTATION_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
@@ -84,7 +86,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!Instance) \
 		{ \
-			Instance = Cast<ModuleClass>(UMainModuleBPLibrary::GetModuleByClass(ModuleClass::StaticClass(), false)); \
+			Instance = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), false)); \
 		} \
 		return Instance; \
 	} \
@@ -92,8 +94,19 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 	{ \
 		if(!InstanceEditor) \
 		{ \
-			InstanceEditor = Cast<ModuleClass>(UMainModuleBPLibrary::GetModuleByClass(ModuleClass::StaticClass(), true)); \
+			InstanceEditor = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), true)); \
 		} \
 		return InstanceEditor; \
 	} \
-} \
+}
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FModuleListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FModuleListItemStates()
+	{
+	}
+};

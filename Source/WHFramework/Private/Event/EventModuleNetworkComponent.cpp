@@ -4,7 +4,7 @@
 #include "Event/EventModuleNetworkComponent.h"
 
 #include "Event/EventModule.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 
 UEventModuleNetworkComponent::UEventModuleNetworkComponent()
 {
@@ -14,7 +14,7 @@ UEventModuleNetworkComponent::UEventModuleNetworkComponent()
 bool UEventModuleNetworkComponent::ClientBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams) { return true; }
 void UEventModuleNetworkComponent::ClientBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(AEventModule* EventModule = AEventModule::Get())
+	if(UEventModule* EventModule = UEventModule::Get())
 	{
 		EventModule->BroadcastEvent(InClass, EEventNetType::Single, InSender, InParams);
 	}
@@ -23,7 +23,7 @@ void UEventModuleNetworkComponent::ClientBroadcastEvent_Implementation(UObject* 
 bool UEventModuleNetworkComponent::ServerBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams) { return true; }
 void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(AEventModule* EventModule = AEventModule::Get())
+	if(UEventModule* EventModule = UEventModule::Get())
 	{
 		EventModule->BroadcastEvent(InClass, EEventNetType::Single, InSender, InParams);
 	}
@@ -32,7 +32,7 @@ void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* 
 bool UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams) { return true; }
 void UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(AEventModule* EventModule = AEventModule::Get())
+	if(UEventModule* EventModule = UEventModule::Get())
 	{
 		EventModule->MultiBroadcastEvent(InClass, InSender, InParams);
 	}

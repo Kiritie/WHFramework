@@ -384,7 +384,7 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewProcedure && OldProcedure)
 				{
-					UCommonBPLibrary::ExportPropertiesToObject(OldProcedure, NewProcedure);
+					UCommonStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
 					ProcedureModule->GetProcedures().EmplaceAt(OldProcedure->ProcedureIndex, NewProcedure);
 					ProcedureModule->GetProcedureMap().Remove(OldProcedure->GetClass());
 					ProcedureModule->GetProcedureMap().Add(OldProcedure->GetClass(), OldProcedure);

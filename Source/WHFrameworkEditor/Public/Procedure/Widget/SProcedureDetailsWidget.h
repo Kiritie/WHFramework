@@ -8,7 +8,7 @@
 #include "Widget/SEditorWidgetBase.h"
 
 class SProcedureListWidget;
-class AProcedureModule;
+class UProcedureModule;
 /**
  * 
  */
@@ -19,7 +19,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SProcedureDetailsWidget) {}
 
-		SLATE_ARGUMENT(AProcedureModule*, ProcedureModule)
+		SLATE_ARGUMENT(UProcedureModule*, ProcedureModule)
 
 		SLATE_ARGUMENT(TSharedPtr<SProcedureListWidget>, ListWidget)
 
@@ -44,7 +44,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	AProcedureModule* ProcedureModule;
+	UProcedureModule* ProcedureModule;
 
 	TSharedPtr<SProcedureListWidget> ListWidget;
 

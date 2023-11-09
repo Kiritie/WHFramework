@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/TaskSaveGame.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Task/TaskModule.h"
 
 UTaskSaveGame::UTaskSaveGame()
@@ -22,7 +22,7 @@ void UTaskSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	ATaskModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UTaskModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UTaskSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -34,5 +34,5 @@ void UTaskSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(ATaskModule::Get()->GetSaveData(true));
+	SetSaveData(UTaskModule::Get()->GetSaveData(true));
 }

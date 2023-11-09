@@ -7,61 +7,62 @@
 #include "Engine/TargetPoint.h"
 #include "Main/MainModule.h"
 		
-IMPLEMENTATION_MODULE(AAnimationModule)
+IMPLEMENTATION_MODULE(UAnimationModule)
 
-AAnimationModule::AAnimationModule()
+UAnimationModule::UAnimationModule()
 {
 	ModuleName = FName("AnimationModule");
+	ModuleDisplayName = FText::FromString(TEXT("Animation Module"));
 }
 
-AAnimationModule::~AAnimationModule()
+UAnimationModule::~UAnimationModule()
 {
-	TERMINATION_MODULE(AAnimationModule)
+	TERMINATION_MODULE(UAnimationModule)
 }
 
 #if WITH_EDITOR
-void AAnimationModule::OnGenerate()
+void UAnimationModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AAnimationModule::OnDestroy()
+void UAnimationModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AAnimationModule::OnInitialize_Implementation()
+void UAnimationModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AAnimationModule::OnPreparatory_Implementation(EPhase InPhase)
+void UAnimationModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void AAnimationModule::OnRefresh_Implementation(float DeltaSeconds)
+void UAnimationModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AAnimationModule::OnPause_Implementation()
+void UAnimationModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AAnimationModule::OnUnPause_Implementation()
+void UAnimationModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AAnimationModule::OnTermination_Implementation(EPhase InPhase)
+void UAnimationModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void AAnimationModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void UAnimationModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform, bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut,float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
@@ -149,7 +150,7 @@ void AAnimationModule::MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint,
 	}
 }
 
-void AAnimationModule::RotatorActorTo(AActor* InActor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void UAnimationModule::RotatorActorTo(AActor* InActor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
@@ -205,7 +206,7 @@ void AAnimationModule::RotatorActorTo(AActor* InActor, FRotator InRotator, float
 	}
 }
 
-void AAnimationModule::ScaleActorTo(AActor* InActor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
+void UAnimationModule::ScaleActorTo(AActor* InActor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World  = GEngine->GetWorldFromContextObject(InActor, EGetWorldErrorMode::LogAndReturnNull))
 	{
@@ -261,7 +262,7 @@ void AAnimationModule::ScaleActorTo(AActor* InActor, FVector InScale, float Appl
 	}	
 }
 
-void AAnimationModule::CancelableDelay(UObject* InWorldContext, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo)
+void UAnimationModule::CancelableDelay(UObject* InWorldContext, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo)
 {
 	if (UWorld* World = GEngine->GetWorldFromContextObject(InWorldContext, EGetWorldErrorMode::LogAndReturnNull))
 	{

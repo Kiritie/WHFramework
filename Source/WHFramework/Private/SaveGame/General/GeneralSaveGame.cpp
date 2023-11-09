@@ -2,11 +2,11 @@
 
 #include "SaveGame/General/GeneralSaveGame.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
-#include "Common/CommonBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
+#include "Common/CommonStatics.h"
 #include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModule.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 
 UGeneralSaveGame::UGeneralSaveGame()
 {
@@ -32,5 +32,5 @@ void UGeneralSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 
-	SetSaveData(ASaveGameModule::Get()->GetSaveData(true));
+	SetSaveData(USaveGameModule::Get()->GetSaveData(true));
 }

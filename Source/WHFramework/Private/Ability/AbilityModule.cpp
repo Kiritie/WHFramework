@@ -20,82 +20,83 @@
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Common/CommonBPLibrary.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
+#include "Common/CommonStatics.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 		
-IMPLEMENTATION_MODULE(AAbilityModule)
+IMPLEMENTATION_MODULE(UAbilityModule)
 
 // Sets default values
-AAbilityModule::AAbilityModule()
+UAbilityModule::UAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
+	ModuleDisplayName = FText::FromString(TEXT("Ability Module"));
 }
 
-AAbilityModule::~AAbilityModule()
+UAbilityModule::~UAbilityModule()
 {
-	TERMINATION_MODULE(AAbilityModule)
+	TERMINATION_MODULE(UAbilityModule)
 }
 
 #if WITH_EDITOR
-void AAbilityModule::OnGenerate()
+void UAbilityModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AAbilityModule::OnDestroy()
+void UAbilityModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AAbilityModule::OnInitialize_Implementation()
+void UAbilityModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 
-	UAssetModuleBPLibrary::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
+	UAssetModuleStatics::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
 }
 
-void AAbilityModule::OnPreparatory_Implementation(EPhase InPhase)
+void UAbilityModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		DON_WITHINDEX(UCommonBPLibrary::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
-			if(i > 0) UAssetModuleBPLibrary::RegisterPrimaryAssetType(*UCommonBPLibrary::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
+		DON_WITHINDEX(UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
+			if(i > 0) UAssetModuleStatics::RegisterPrimaryAssetType(*UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
 		);
 	}
 }
 
-void AAbilityModule::OnRefresh_Implementation(float DeltaSeconds)
+void UAbilityModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AAbilityModule::OnPause_Implementation()
+void UAbilityModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AAbilityModule::OnUnPause_Implementation()
+void UAbilityModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AAbilityModule::OnTermination_Implementation(EPhase InPhase)
+void UAbilityModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-ECollisionChannel AAbilityModule::GetPickUpTraceChannel() const
+ECollisionChannel UAbilityModule::GetPickUpTraceChannel() const
 {
 	return ECC_MAX;
 }
 
-AAbilityPickUpBase* AAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
 	if(!InItem.IsValid()) return nullptr;
 
@@ -106,7 +107,7 @@ AAbilityPickUpBase* AAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 	return SpawnAbilityPickUp(&SaveData, InContainer);
 }
 
-AAbilityPickUpBase* AAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
 	
@@ -115,27 +116,27 @@ AAbilityPickUpBase* AAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 	{
 		case EAbilityItemType::Voxel:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpVoxel>();
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpVoxel>();
 			break;
 		}
 		case EAbilityItemType::Prop:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpProp>(nullptr, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpProp>(nullptr, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Equip:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpEquip>(nullptr, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpEquip>(nullptr, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Skill:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpSkill>(nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpSkill>(nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Raw:
 		{
-			PickUp = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPickUpRaw>(nullptr, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpRaw>(nullptr, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
 			break;
 		}
 		default: break;
@@ -152,10 +153,10 @@ AAbilityPickUpBase* AAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 	return PickUp;
 }
 
-AAbilityActorBase* AAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityActorBase* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AAbilityActorBase* Actor = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityActorBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	if(AAbilityActorBase* Actor = UObjectPoolModuleStatics::SpawnObject<AAbilityActorBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityActorDataBase>().Class))
 	{
 		Actor->LoadSaveData(InSaveData);
 		if(InContainer)
@@ -167,10 +168,10 @@ AAbilityActorBase* AAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISce
 	return nullptr;
 }
 
-AAbilityVitalityBase* AAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityVitalityBase* UAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityVitalityBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
+	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleStatics::SpawnObject<AAbilityVitalityBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
 	{
 		Vitality->LoadSaveData(InSaveData);
 		if(InContainer)
@@ -182,10 +183,10 @@ AAbilityVitalityBase* AAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData
 	return nullptr;
 }
 
-AAbilityPawnBase* AAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPawnBase* UAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
-	if(AAbilityPawnBase* Pawn = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityPawnBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
+	if(AAbilityPawnBase* Pawn = UObjectPoolModuleStatics::SpawnObject<AAbilityPawnBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
 	{
 		Pawn->LoadSaveData(InSaveData);
 		Pawn->SpawnDefaultController();
@@ -198,10 +199,10 @@ AAbilityPawnBase* AAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, IScene
 	return nullptr;
 }
 
-AAbilityCharacterBase* AAbilityModule::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityCharacterBase* UAbilityModule::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	if(AAbilityCharacterBase* Character = UObjectPoolModuleBPLibrary::SpawnObject<AAbilityCharacterBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
+	if(AAbilityCharacterBase* Character = UObjectPoolModuleStatics::SpawnObject<AAbilityCharacterBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
 	{
 		Character->LoadSaveData(InSaveData);
 		Character->SpawnDefaultController();

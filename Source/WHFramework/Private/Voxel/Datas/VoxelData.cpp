@@ -1,6 +1,6 @@
 #include "Voxel/Datas/VoxelData.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()
@@ -37,12 +37,12 @@ bool UVoxelData::HasPartData(FIndex InIndex) const
 
 UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 {
-	if(!bMainPart) return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
+	if(!bMainPart) return UReferencePoolModuleStatics::GetReference<UVoxelData>();
 
 	if(InIndex == FIndex::ZeroIndex) return *this;
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
-	return UReferencePoolModuleBPLibrary::GetReference<UVoxelData>();
+	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
 }
 
 FVector UVoxelData::GetRange(ERightAngle InAngle) const
@@ -59,7 +59,7 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 		}
 		Range += PartRange;
 	}
-	Range = UMathBPLibrary::RotatorVector(Range, InAngle, true, true);
+	Range = UMathStatics::RotatorVector(Range, InAngle, true, true);
 	return Range;
 }
 

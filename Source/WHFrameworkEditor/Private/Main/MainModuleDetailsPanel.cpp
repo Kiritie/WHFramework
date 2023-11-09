@@ -3,7 +3,6 @@
 #include "Main/MainModuleDetailsPanel.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
-#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -15,6 +14,7 @@
 
 #include "ScopedTransaction.h"
 #include "Main/MainModule.h"
+#include "Widgets/Layout/SWrapBox.h"
 
 FMainModuleDetailsPanel::FMainModuleDetailsPanel() {}
 
@@ -27,7 +27,7 @@ void FMainModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayou
 {
 	SelectedObjectsList = DetailLayoutBuilder.GetSelectedObjects();
 
-	TSharedRef<IPropertyHandle> ModuleClassesProperty = DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(AMainModule, ModuleClasses));
+	TSharedRef<IPropertyHandle> ModuleClassesProperty = DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(AMainModule, Modules));
 
 	DetailLayoutBuilder.AddCustomRowToCategory(ModuleClassesProperty, FText::GetEmpty())
 		.WholeRowContent()
@@ -37,38 +37,14 @@ void FMainModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayou
 			+SWrapBox::Slot()
 			[
 				SNew(SButton)
-				.Text(FText::FromString(TEXT("Generate Modules")))
-				.OnClicked_Raw(this, &FMainModuleDetailsPanel::OnClickGenerateModulesButton)
-			]
-			+SWrapBox::Slot()
-			[
-				SNew(SButton)
-				.Text(FText::FromString(TEXT("Destroy Modules")))
-				.OnClicked_Raw(this, &FMainModuleDetailsPanel::OnClickDestroyModulesButton)
+				.Text(FText::FromString(TEXT("Open Module Editor")))
+				.OnClicked_Raw(this, &FMainModuleDetailsPanel::OnClickOpenModuleEditorButton)
 			]
 		];
 }
 
-FReply FMainModuleDetailsPanel::OnClickGenerateModulesButton()
+FReply FMainModuleDetailsPanel::OnClickOpenModuleEditorButton()
 {
-	if(SelectedObjectsList.IsValidIndex(0))
-	{
-		if(AMainModule* MainModule = Cast<AMainModule>(SelectedObjectsList[0]))
-		{
-			MainModule->GenerateModules();
-		}
-	}
-	return FReply::Handled();
-}
-
-FReply FMainModuleDetailsPanel::OnClickDestroyModulesButton()
-{
-	if(SelectedObjectsList.IsValidIndex(0))
-	{
-		if(AMainModule* MainModule = Cast<AMainModule>(SelectedObjectsList[0]))
-		{
-			MainModule->DestroyModules();
-		}
-	}
+	FGlobalTabmanager::Get()->TryInvokeTab(FName("ModuleEditor"));
 	return FReply::Handled();
 }

@@ -3,17 +3,16 @@
 
 #include "Main/Base/ModuleBase.h"
 
+#include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 
 // Sets default values
-AModuleBase::AModuleBase()
+UModuleBase::UModuleBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
-
-	bReplicates = true;
-
 	ModuleName = NAME_None;
+	ModuleDisplayName = FText::GetEmpty();
+	ModuleDescription = FText::GetEmpty();
 	ModuleState = EModuleState::None;
 	bModuleAutoRun = true;
 	bModuleAutoSave = false;
@@ -22,98 +21,98 @@ AModuleBase::AModuleBase()
 }
 
 #if WITH_EDITOR
-void AModuleBase::OnGenerate()
+void UModuleBase::OnGenerate()
 {
 	
 }
 
-void AModuleBase::OnDestroy()
+void UModuleBase::OnDestroy()
 {
 	
 }
 #endif
 
-void AModuleBase::OnInitialize_Implementation()
+void UModuleBase::OnInitialize()
 {
-	
+	K2_OnInitialize();
 }
 
-void AModuleBase::OnPreparatory_Implementation(EPhase InPhase)
+void UModuleBase::OnPreparatory(EPhase InPhase)
 {
-	
+	K2_OnPreparatory(InPhase);
 }
 
-void AModuleBase::OnRefresh_Implementation(float DeltaSeconds)
+void UModuleBase::OnPause()
 {
-	
+	K2_OnPause();
 }
 
-void AModuleBase::OnTermination_Implementation(EPhase InPhase)
+void UModuleBase::OnUnPause()
 {
-	
+	K2_OnUnPause();
 }
 
-void AModuleBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UModuleBase::OnRefresh(float DeltaSeconds)
+{
+	K2_OnRefresh(DeltaSeconds);
+}
+
+void UModuleBase::OnTermination(EPhase InPhase)
+{
+	K2_OnTermination(InPhase);
+}
+
+void UModuleBase::OnStateChanged(EModuleState InModuleState)
+{
+	K2_OnStateChanged(InModuleState);
+	OnModuleStateChanged.Broadcast(InModuleState);
+}
+
+void UModuleBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 }
 
-void AModuleBase::UnloadData(EPhase InPhase)
+void UModuleBase::UnloadData(EPhase InPhase)
 {
 	ISaveDataInterface::UnloadData(InPhase);
 }
 
-FSaveData* AModuleBase::ToData()
+FSaveData* UModuleBase::ToData()
 {
 	return nullptr;
 }
 
-void AModuleBase::OnReset_Implementation()
+void UModuleBase::OnReset_Implementation()
 {
 	
 }
 
-void AModuleBase::Load_Implementation()
+void UModuleBase::Load_Implementation()
 {
-	USaveGameModuleBPLibrary::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+	USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0);
 }
 
-void AModuleBase::Save_Implementation()
+void UModuleBase::Save_Implementation()
 {
-	USaveGameModuleBPLibrary::SaveSaveGame(ModuleSaveGame, 0, true);
+	USaveGameModuleStatics::SaveSaveGame(ModuleSaveGame, 0, true);
 }
 
-void AModuleBase::OnPause_Implementation()
-{
-	
-}
-
-void AModuleBase::OnUnPause_Implementation()
-{
-	
-}
-
-void AModuleBase::OnStateChanged_Implementation(EModuleState InModuleState)
-{
-	OnModuleStateChanged.Broadcast(InModuleState);
-}
-
-void AModuleBase::Run_Implementation()
+void UModuleBase::Run_Implementation()
 {
 	if(ModuleState == EModuleState::None)
 	{
 		ModuleState = EModuleState::Running;
 		OnStateChanged(ModuleState);
-		Execute_OnPreparatory(this, EPhase::Final);
+		OnPreparatory(EPhase::Final);
 	}
 }
 
-void AModuleBase::Reset_Implementation()
+void UModuleBase::Reset_Implementation()
 {
-	Super::Reset();
 	Execute_OnReset(this);
 }
 
-void AModuleBase::Pause_Implementation()
+void UModuleBase::Pause_Implementation()
 {
 	if(ModuleState != EModuleState::Paused)
 	{
@@ -123,7 +122,7 @@ void AModuleBase::Pause_Implementation()
 	}
 }
 
-void AModuleBase::UnPause_Implementation()
+void UModuleBase::UnPause_Implementation()
 {
 	if(ModuleState == EModuleState::Paused)
 	{
@@ -133,44 +132,100 @@ void AModuleBase::UnPause_Implementation()
 	}
 }
 
-void AModuleBase::Termination_Implementation()
+void UModuleBase::Termination_Implementation()
 {
 	if(ModuleState != EModuleState::Terminated)
 	{
 		ModuleState = EModuleState::Terminated;
 		OnStateChanged(ModuleState);
-		Execute_OnTermination(this, EPhase::Final);
+		OnTermination(EPhase::Final);
 	}
 }
 
-bool AModuleBase::IsAutoRunModule() const
+bool UModuleBase::IsAutoRunModule() const
 {
 	return bModuleAutoRun;
 }
 
-FName AModuleBase::GetModuleName() const
+FName UModuleBase::GetModuleName() const
 {
 	return ModuleName;
 }
 
-EModuleState AModuleBase::GetModuleState() const
+FText UModuleBase::GetModuleDisplayName() const
+{
+	return ModuleDisplayName;
+}
+
+FText UModuleBase::GetModuleDescription() const
+{
+	return ModuleDescription;
+}
+
+EModuleState UModuleBase::GetModuleState() const
 {
 	return ModuleState;
 }
 
-USaveGameBase* AModuleBase::GetModuleSaveGame() const
+AMainModule* UModuleBase::GetOwner() const
 {
-	return USaveGameModuleBPLibrary::GetSaveGame(ModuleSaveGame);
+	return Cast<AMainModule>(GetOuter());
 }
 
-UModuleNetworkComponentBase* AModuleBase::GetModuleNetworkComponent() const
+USaveGameBase* UModuleBase::GetModuleSaveGame() const
 {
-	return UMainModuleBPLibrary::GetModuleNetworkComponentByClass(ModuleNetworkComponent);
+	return USaveGameModuleStatics::GetSaveGame(ModuleSaveGame);
 }
 
-void AModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+UModuleNetworkComponentBase* UModuleBase::GetModuleNetworkComponent() const
+{
+	return UMainModuleStatics::GetModuleNetworkComponentByClass(ModuleNetworkComponent);
+}
+
+void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AModuleBase, ModuleState);
+	DOREPLIFETIME(UModuleBase, ModuleState);
 }
+
+int32 UModuleBase::GetModuleIndex() const
+{
+	return GetOwner()->GetModules().IndexOfByKey(this);
+}
+
+void UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)
+{
+	OutModuleListItem->Module = this;
+}
+
+void UModuleBase::UpdateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)
+{
+	OutModuleListItem->Module = this;
+}
+
+#if WITH_EDITOR
+bool UModuleBase::CanEditChange(const FProperty* InProperty) const
+{
+	if(InProperty)
+	{
+		FString PropertyName = InProperty->GetName();
+
+		return true;
+	}
+
+	return Super::CanEditChange(InProperty);
+}
+
+void UModuleBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	FProperty* Property = PropertyChangedEvent.MemberProperty;
+
+	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
+	{
+		auto PropertyName = Property->GetFName();
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif

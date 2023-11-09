@@ -4,47 +4,48 @@
 #include "SaveGame/SaveGameModule.h"
 
 #include "Kismet/GameplayStatics.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Base/SaveGameBase.h"
 #include "SaveGame/General/GeneralSaveGame.h"
 		
-IMPLEMENTATION_MODULE(ASaveGameModule)
+IMPLEMENTATION_MODULE(USaveGameModule)
 
 // ParamSets default values
-ASaveGameModule::ASaveGameModule()
+USaveGameModule::USaveGameModule()
 {
 	ModuleName = FName("SaveGameModule");
+	ModuleDisplayName = FText::FromString(TEXT("Save Game Module"));
 	bModuleAutoSave = true;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 
 	UserIndex = 0;
 }
 
-ASaveGameModule::~ASaveGameModule()
+USaveGameModule::~USaveGameModule()
 {
-	TERMINATION_MODULE(ASaveGameModule)
+	TERMINATION_MODULE(USaveGameModule)
 }
 
 #if WITH_EDITOR
-void ASaveGameModule::OnGenerate()
+void USaveGameModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void ASaveGameModule::OnDestroy()
+void USaveGameModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void ASaveGameModule::OnInitialize_Implementation()
+void USaveGameModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
+void USaveGameModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -55,24 +56,24 @@ void ASaveGameModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void ASaveGameModule::OnRefresh_Implementation(float DeltaSeconds)
+void USaveGameModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void ASaveGameModule::OnPause_Implementation()
+void USaveGameModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void ASaveGameModule::OnUnPause_Implementation()
+void USaveGameModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
+void USaveGameModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -106,7 +107,7 @@ void ASaveGameModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void USaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FGeneralSaveData>();
 	for(auto& Iter1 : SaveData.SaveGameDatas)
@@ -122,7 +123,7 @@ void ASaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* ASaveGameModule::ToData()
+FSaveData* USaveGameModule::ToData()
 {
 	static FGeneralSaveData SaveData;
 	SaveData = FGeneralSaveData();
@@ -147,12 +148,12 @@ FSaveData* ASaveGameModule::ToData()
 	return &SaveData;
 }
 
-FString ASaveGameModule::GetSlotName(FName InSaveName, int32 InIndex) const
+FString USaveGameModule::GetSlotName(FName InSaveName, int32 InIndex) const
 {
 	return InIndex != 0 ? FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex) : FString::Printf(TEXT("SaveGame_%s"), *InSaveName.ToString());
 }
 
-bool ASaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
+bool USaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
 {
 	if(!InClass) return false;
 
@@ -169,12 +170,12 @@ bool ASaveGameModule::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIn
 	return UGameplayStatics::DoesSaveGameExist(GetSlotName(SaveName, InIndex), UserIndex);
 }
 
-FName ASaveGameModule::GetSaveName(TSubclassOf<USaveGameBase> InClass) const
+FName USaveGameModule::GetSaveName(TSubclassOf<USaveGameBase> InClass) const
 {
 	return InClass.GetDefaultObject()->GetSaveName();
 }
 
-int32 ASaveGameModule::GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass) const
+int32 USaveGameModule::GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass) const
 {
 	if(!InClass) return -1;
 
@@ -187,14 +188,14 @@ int32 ASaveGameModule::GetValidSaveIndex(TSubclassOf<USaveGameBase> InClass) con
 	return SaveIndex;
 }
 
-int32 ASaveGameModule::GetActiveSaveIndex(TSubclassOf<USaveGameBase> InClass) const
+int32 USaveGameModule::GetActiveSaveIndex(TSubclassOf<USaveGameBase> InClass) const
 {
 	if(!InClass) return -1;
 
 	return GetSaveGameInfo(InClass).ActiveIndex;
 }
 
-FSaveGameInfo ASaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass) const
+FSaveGameInfo USaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass) const
 {
 	if(!InClass) FSaveGameInfo();
 
@@ -206,7 +207,7 @@ FSaveGameInfo ASaveGameModule::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClas
 	return FSaveGameInfo();
 }
 
-USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
+USaveGameBase* USaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex) const
 {
 	if(!InClass) return nullptr;
 
@@ -222,14 +223,14 @@ USaveGameBase* ASaveGameModule::GetSaveGame(TSubclassOf<USaveGameBase> InClass, 
 	return nullptr;
 }
 
-TArray<USaveGameBase*> ASaveGameModule::GetSaveGames(TSubclassOf<USaveGameBase> InClass) const
+TArray<USaveGameBase*> USaveGameModule::GetSaveGames(TSubclassOf<USaveGameBase> InClass) const
 {
 	if(!InClass) return TArray<USaveGameBase*>();
 
 	return GetSaveGameInfo(InClass).SaveGames;
 }
 
-USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+USaveGameBase* USaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
 	if(!InClass) return nullptr;
 		
@@ -255,17 +256,17 @@ USaveGameBase* ASaveGameModule::CreateSaveGame(TSubclassOf<USaveGameBase> InClas
 	return nullptr;
 }
 
-USaveGameBase* ASaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+USaveGameBase* USaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
 	return HasSaveGame(InClass, InIndex) ? GetSaveGame(InClass, InIndex) : CreateSaveGame(InClass, InIndex, InPhase);
 }
 
-USaveGameBase* ASaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+USaveGameBase* USaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::HasSaveGame(InClass, InIndex) ? USaveGameModuleBPLibrary::LoadSaveGame(InClass, InIndex, EPhase::Primary) : USaveGameModuleBPLibrary::CreateSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModuleStatics::HasSaveGame(InClass, InIndex) ? USaveGameModuleStatics::LoadSaveGame(InClass, InIndex, EPhase::Primary) : USaveGameModuleStatics::CreateSaveGame(InClass, InIndex, InPhase);
 }
 
-bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
+bool USaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
 {
 	if(!InClass) return false;
 
@@ -288,7 +289,7 @@ bool ASaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InI
 	return false;
 }
 
-bool ASaveGameModule::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh)
+bool USaveGameModule::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh)
 {
 	if(!InClass) return false;
 	
@@ -304,7 +305,7 @@ bool ASaveGameModule::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRe
 	return bIsAllSaved;
 }
 
-bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
+bool USaveGameModule::SaveAllSaveGame(bool bRefresh)
 {
 	bool bIsAllSaved = true;
 	for(auto Iter1 : SaveGameInfos)
@@ -320,7 +321,7 @@ bool ASaveGameModule::SaveAllSaveGame(bool bRefresh)
 	return bIsAllSaved;
 }
 
-USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+USaveGameBase* USaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
 	if(!InClass) return nullptr;
 
@@ -352,7 +353,7 @@ USaveGameBase* ASaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	return nullptr;
 }
 
-bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+bool USaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
 	if(!InClass) return false;
 
@@ -381,7 +382,7 @@ bool ASaveGameModule::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 I
 	return false;
 }
 
-bool ASaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
+bool USaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
 	if(!InClass) return false;
 
@@ -394,7 +395,7 @@ bool ASaveGameModule::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 In
 	return false;
 }
 
-bool ASaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
+bool USaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
 	if(!InClass) return false;
 
@@ -407,7 +408,7 @@ bool ASaveGameModule::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 
 	return false;
 }
 
-bool ASaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
+bool USaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
 	if(!InClass) return false;
 
@@ -436,7 +437,7 @@ bool ASaveGameModule::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 
 	return false;
 }
 
-void ASaveGameModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void USaveGameModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 }

@@ -6,17 +6,18 @@
 #include "Main/MainModule.h"
 #include "Step/Base/StepBase.h"
 #include "Character/CharacterModuleTypes.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Step/EventHandle_EndStep.h"
 #include "Event/Handle/Step/EventHandle_StartStep.h"
 #include "Step/StepModuleNetworkComponent.h"
 
-IMPLEMENTATION_MODULE(AStepModule)
+IMPLEMENTATION_MODULE(UStepModule)
 
 // ParamSets default values
-AStepModule::AStepModule()
+UStepModule::UStepModule()
 {
 	ModuleName = FName("StepModule");
+	ModuleDisplayName = FText::FromString(TEXT("Step Module"));
 
 	ModuleNetworkComponent = UStepModuleNetworkComponent::StaticClass();
 
@@ -34,18 +35,18 @@ AStepModule::AStepModule()
 	GlobalStepCompleteType = EStepCompleteType::None;
 }
 
-AStepModule::~AStepModule()
+UStepModule::~UStepModule()
 {
-	TERMINATION_MODULE(AStepModule)
+	TERMINATION_MODULE(UStepModule)
 }
 
 #if WITH_EDITOR
-void AStepModule::OnGenerate()
+void UStepModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AStepModule::OnDestroy()
+void UStepModule::OnDestroy()
 {
 	Super::OnDestroy();
 
@@ -53,14 +54,14 @@ void AStepModule::OnDestroy()
 }
 #endif
 
-void AStepModule::OnInitialize_Implementation()
+void UStepModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AStepModule::OnPreparatory_Implementation(EPhase InPhase)
+void UStepModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -85,9 +86,9 @@ void AStepModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
+void UStepModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 
 	if(StepModuleState == EStepModuleState::Running)
 	{
@@ -126,19 +127,19 @@ void AStepModule::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AStepModule::OnPause_Implementation()
+void UStepModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AStepModule::OnUnPause_Implementation()
+void UStepModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AStepModule::OnTermination_Implementation(EPhase InPhase)
+void UStepModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -146,7 +147,7 @@ void AStepModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
+void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
 	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA<UStepBase>() ? FirstStep->StepIndex : -1;
 	if(InRootStepIndex != -1)
@@ -156,7 +157,7 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
 			}
 
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
@@ -185,7 +186,7 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleBPLibrary::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
 			}
 		
 			if(bSkipSteps)
@@ -217,12 +218,12 @@ void AStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 	}
 }
 
-void AStepModule::EndStep(bool bRestoreSteps)
+void UStepModule::EndStep(bool bRestoreSteps)
 {
 	if(StepModuleState == EStepModuleState::Running)
 	{
 		StepModuleState = EStepModuleState::Ended;
-		UEventModuleBPLibrary::BroadcastEvent<UEventHandle_EndStep>(EEventNetType::Single, this);
+		UEventModuleStatics::BroadcastEvent<UEventHandle_EndStep>(EEventNetType::Single, this);
 	}
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)
@@ -246,7 +247,7 @@ void AStepModule::EndStep(bool bRestoreSteps)
 	}
 }
 
-void AStepModule::RestoreStep(UStepBase* InStep)
+void UStepModule::RestoreStep(UStepBase* InStep)
 {
 	if(InStep && InStep->GetStepState() != EStepState::None)
 	{
@@ -254,7 +255,7 @@ void AStepModule::RestoreStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::EnterStep(UStepBase* InStep)
+void UStepModule::EnterStep(UStepBase* InStep)
 {
 	
 	if(InStep->ParentStep && !InStep->ParentStep->IsEntered())
@@ -280,7 +281,7 @@ void AStepModule::EnterStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::RefreshStep(UStepBase* InStep)
+void UStepModule::RefreshStep(UStepBase* InStep)
 {
 	if(InStep && InStep->GetStepState() == EStepState::Executing)
 	{
@@ -288,7 +289,7 @@ void AStepModule::RefreshStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::GuideStep(UStepBase* InStep)
+void UStepModule::GuideStep(UStepBase* InStep)
 {
 	if(InStep && InStep->IsEntered())
 	{
@@ -296,7 +297,7 @@ void AStepModule::GuideStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::ExecuteStep(UStepBase* InStep)
+void UStepModule::ExecuteStep(UStepBase* InStep)
 {
 	if(InStep && InStep->GetStepState() == EStepState::Entered)
 	{
@@ -304,7 +305,7 @@ void AStepModule::ExecuteStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecuteResult)
+void UStepModule::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecuteResult)
 {
 	if(!InStep) return;
 	
@@ -318,7 +319,7 @@ void AStepModule::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecu
 	}
 }
 
-void AStepModule::LeaveStep(UStepBase* InStep)
+void UStepModule::LeaveStep(UStepBase* InStep)
 {
 	if(!InStep) return;
 	
@@ -339,7 +340,7 @@ void AStepModule::LeaveStep(UStepBase* InStep)
 	}
 }
 
-void AStepModule::ClearAllStep()
+void UStepModule::ClearAllStep()
 {
 	for(auto Iter : RootSteps)
 	{
@@ -360,7 +361,7 @@ void AStepModule::ClearAllStep()
 	Modify();
 }
 
-bool AStepModule::IsAllStepCompleted()
+bool UStepModule::IsAllStepCompleted()
 {
 	for(auto Iter : RootSteps)
 	{
@@ -372,7 +373,7 @@ bool AStepModule::IsAllStepCompleted()
 	return true;
 }
 
-void AStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteType)
+void UStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteType)
 {
 	if(GlobalStepExecuteType != InGlobalStepExecuteType)
 	{
@@ -384,7 +385,7 @@ void AStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteT
 	}
 }
 
-void AStepModule::SetGlobalStepCompleteType(EStepCompleteType InGlobalStepCompleteType)
+void UStepModule::SetGlobalStepCompleteType(EStepCompleteType InGlobalStepCompleteType)
 {
 	if(GlobalStepCompleteType != InGlobalStepCompleteType)
 	{
@@ -396,7 +397,7 @@ void AStepModule::SetGlobalStepCompleteType(EStepCompleteType InGlobalStepComple
 	}
 }
 
-void AStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
+void UStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
 {
 	if(GlobalStepLeaveType != InGlobalStepLeaveType)
 	{
@@ -409,7 +410,7 @@ void AStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
 }
 
 #if WITH_EDITOR
-void AStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+void UStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
 {
 	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
 	for (int32 i = 0; i < RootSteps.Num(); i++)
@@ -420,7 +421,7 @@ void AStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepLis
 	}
 }
 
-void AStepModule::UpdateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+void UStepModule::UpdateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
 {
 	for (int32 i = 0; i < RootSteps.Num(); i++)
 	{

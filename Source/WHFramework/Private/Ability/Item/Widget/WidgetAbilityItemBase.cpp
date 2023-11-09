@@ -2,7 +2,7 @@
 
 #include "Ability/Item/Widget/WidgetAbilityItemBase.h"
 
-#include "Widget/WidgetModuleBPLibrary.h"
+#include "Widget/WidgetModuleStatics.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 
 UWidgetAbilityItemBase::UWidgetAbilityItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)

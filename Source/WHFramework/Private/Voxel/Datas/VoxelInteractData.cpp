@@ -1,6 +1,6 @@
 #include "Voxel/Datas/VoxelInteractData.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Voxel/Voxels/VoxelInteract.h"
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 

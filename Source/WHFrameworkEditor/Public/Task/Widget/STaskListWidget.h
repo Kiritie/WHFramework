@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(STaskListWidget) {}
 
-		SLATE_ARGUMENT(class ATaskModule*, TaskModule)
+		SLATE_ARGUMENT(class UTaskModule*, TaskModule)
 
 	SLATE_END_ARGS()
 
@@ -54,7 +54,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	ATaskModule* TaskModule;
+	UTaskModule* TaskModule;
 
 	UTaskBase* CopiedTask;
 

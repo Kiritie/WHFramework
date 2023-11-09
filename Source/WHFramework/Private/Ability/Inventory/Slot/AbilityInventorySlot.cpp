@@ -2,7 +2,7 @@
 
 #include "Ability/Inventory/Slot/AbilityInventorySlot.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"

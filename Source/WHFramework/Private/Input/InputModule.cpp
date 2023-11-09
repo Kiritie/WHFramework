@@ -4,16 +4,16 @@
 #include "Input/InputModule.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Input/EventHandle_ChangeInputMode.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Input/InputManager.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
-#include "Main/MainModuleBPLibrary.h"
+#include "Main/MainModuleStatics.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -24,12 +24,13 @@
 #include "PlayerMappableInputConfig.h"
 #include "Debug/DebugModuleTypes.h"
 
-IMPLEMENTATION_MODULE(AInputModule)
+IMPLEMENTATION_MODULE(UInputModule)
 
 // Sets default values
-AInputModule::AInputModule()
+UInputModule::UInputModule()
 {
 	ModuleName = FName("InputModule");
+	ModuleDisplayName = FText::FromString(TEXT("Input Module"));
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
@@ -46,9 +47,9 @@ AInputModule::AInputModule()
 		ConfigMappings.Add(ConfigMapping);
 	}
 
-	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchPressed)));
-	AddTouchMapping(FInputTouchMapping(IE_Released, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchReleased)));
-	AddTouchMapping(FInputTouchMapping(IE_Repeat, FInputTouchHandlerSignature::CreateUObject(this, &AInputModule::TouchMoved)));
+	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchPressed)));
+	AddTouchMapping(FInputTouchMapping(IE_Released, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchReleased)));
+	AddTouchMapping(FInputTouchMapping(IE_Repeat, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchMoved)));
 
 	TouchInputRate = 1.f;
 	TouchPressedCount = 0;
@@ -56,31 +57,31 @@ AInputModule::AInputModule()
 	TouchPinchValuePrevious = -1.f;
 }
 
-AInputModule::~AInputModule()
+UInputModule::~UInputModule()
 {
-	TERMINATION_MODULE(AInputModule)
+	TERMINATION_MODULE(UInputModule)
 }
 
 #if WITH_EDITOR
-void AInputModule::OnGenerate()
+void UInputModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AInputModule::OnDestroy()
+void UInputModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AInputModule::OnInitialize_Implementation()
+void UInputModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
+void UInputModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -103,10 +104,6 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 						{
 							OnBindAction(InputComp, InputConfig);
 						}
-						else
-						{
-							WHEnsureEditorMsgf(true, FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
-						}
 					}
 				}
 			}
@@ -125,31 +122,31 @@ void AInputModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AInputModule::OnRefresh_Implementation(float DeltaSeconds)
+void UInputModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AInputModule::OnReset_Implementation()
+void UInputModule::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 
 	TouchPressedCount = 0;
 }
 
-void AInputModule::OnPause_Implementation()
+void UInputModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AInputModule::OnUnPause_Implementation()
+void UInputModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AInputModule::OnTermination_Implementation(EPhase InPhase)
+void UInputModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -160,7 +157,7 @@ void AInputModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FInputModuleSaveData>();
 
@@ -186,12 +183,12 @@ void AInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-void AInputModule::UnloadData(EPhase InPhase)
+void UInputModule::UnloadData(EPhase InPhase)
 {
 	CustomKeyMappings.Empty();
 }
 
-FSaveData* AInputModule::ToData()
+FSaveData* UInputModule::ToData()
 {
 	static FInputModuleSaveData SaveData;
 	SaveData = FInputModuleSaveData();
@@ -217,7 +214,7 @@ FSaveData* AInputModule::ToData()
 	return &SaveData;
 }
 
-FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const
+FInputKeyShortcut UInputModule::GetKeyShortcutByName(const FName InName) const
 {
 	if(KeyShortcuts.Contains(InName))
 	{
@@ -226,7 +223,7 @@ FInputKeyShortcut AInputModule::GetKeyShortcutByName(const FName InName) const
 	return FInputKeyShortcut();
 }
 
-void AInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
+void UInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
 {
 	if(!KeyShortcuts.Contains(InName))
 	{
@@ -234,7 +231,7 @@ void AInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& I
 	}
 }
 
-void AInputModule::RemoveKeyShortcut(const FName InName)
+void UInputModule::RemoveKeyShortcut(const FName InName)
 {
 	if(KeyShortcuts.Contains(InName))
 	{
@@ -242,22 +239,22 @@ void AInputModule::RemoveKeyShortcut(const FName InName)
 	}
 }
 
-void AInputModule::OnBindAction_Implementation(UInputComponentBase* InInputComponent, UPlayerMappableInputConfig* InInputConfig)
+void UInputModule::OnBindAction_Implementation(UInputComponentBase* InInputComponent, UPlayerMappableInputConfig* InInputConfig)
 {
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &AInputModule::TurnCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &AInputModule::LookUpCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &AInputModule::PanHCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &AInputModule::PanVCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &AInputModule::ZoomCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &AInputModule::TurnPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &AInputModule::MoveHPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &AInputModule::MoveVPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &AInputModule::MoveForwardPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &AInputModule::MoveRightPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &AInputModule::MoveUpPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
+	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
 }
 
-void AInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
+void UInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
 {
 	if(!KeyMappings.Contains(InName))
 	{
@@ -265,7 +262,7 @@ void AInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InK
 	}
 }
 
-void AInputModule::RemoveKeyMapping(const FName InName)
+void UInputModule::RemoveKeyMapping(const FName InName)
 {
 	if(KeyMappings.Contains(InName))
 	{
@@ -273,7 +270,7 @@ void AInputModule::RemoveKeyMapping(const FName InName)
 	}
 }
 
-void AInputModule::ApplyKeyMappings()
+void UInputModule::ApplyKeyMappings()
 {
 	GetPlayerController()->InputComponent->KeyBindings.Empty();
 	for(auto& Iter : KeyMappings)
@@ -284,7 +281,7 @@ void AInputModule::ApplyKeyMappings()
 	}
 }
 
-void AInputModule::ApplyTouchMappings()
+void UInputModule::ApplyTouchMappings()
 {
 	GetPlayerController()->InputComponent->TouchBindings.Empty();
 	for(auto& Iter : TouchMappings)
@@ -295,12 +292,12 @@ void AInputModule::ApplyTouchMappings()
 	}
 }
 
-void AInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
+void UInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
 {
 	TouchMappings.Add(InKeyMapping);
 }
 
-void AInputModule::SetControllerPlatform(const FName InControllerPlatform)
+void UInputModule::SetControllerPlatform(const FName InControllerPlatform)
 {
 	if (ControllerPlatform != InControllerPlatform)
 	{
@@ -313,7 +310,7 @@ void AInputModule::SetControllerPlatform(const FName InControllerPlatform)
 	}
 }
 
-const UInputActionBase* AInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, const UPlayerMappableInputConfig* InConfig, bool bLogNotFound) const
+const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, const UPlayerMappableInputConfig* InConfig, bool bLogNotFound) const
 {
 	if (InConfig)
 	{
@@ -356,7 +353,7 @@ const UInputActionBase* AInputModule::FindInputActionForTag(const FGameplayTag& 
 	return nullptr;
 }
 
-void AInputModule::RegisterInputConfig(ECommonInputType InType, const UPlayerMappableInputConfig* InConfig, const bool bIsActive)
+void UInputModule::RegisterInputConfig(ECommonInputType InType, const UPlayerMappableInputConfig* InConfig, const bool bIsActive)
 {
 	if (InConfig)
 	{
@@ -368,7 +365,7 @@ void AInputModule::RegisterInputConfig(ECommonInputType InType, const UPlayerMap
 	}
 }
 
-int32 AInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InConfig)
+int32 UInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InConfig)
 {
 	if (InConfig)
 	{
@@ -383,7 +380,7 @@ int32 AInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InCo
 	return INDEX_NONE;
 }
 
-const UPlayerMappableInputConfig* AInputModule::GetInputConfigByName(FName InConfigName) const
+const UPlayerMappableInputConfig* UInputModule::GetInputConfigByName(FName InConfigName) const
 {
 	for (const auto& Iter : RegisteredConfigMappings)
 	{
@@ -395,7 +392,7 @@ const UPlayerMappableInputConfig* AInputModule::GetInputConfigByName(FName InCon
 	return nullptr;
 }
 
-TArray<FLoadedInputConfigMapping> AInputModule::GetRegisteredConfigMappingOfType(ECommonInputType InType)
+TArray<FLoadedInputConfigMapping> UInputModule::GetRegisteredConfigMappingOfType(ECommonInputType InType)
 {
 	TArray<FLoadedInputConfigMapping> ReturnValues;
 
@@ -416,7 +413,7 @@ TArray<FLoadedInputConfigMapping> AInputModule::GetRegisteredConfigMappingOfType
 	return ReturnValues;
 }
 
-TArray<FEnhancedActionKeyMapping> AInputModule::GetAllPlayerMappableActionKeyMappings()
+TArray<FEnhancedActionKeyMapping> UInputModule::GetAllPlayerMappableActionKeyMappings()
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
 	for (const auto& Iter1 : RegisteredConfigMappings)
@@ -436,7 +433,7 @@ TArray<FEnhancedActionKeyMapping> AInputModule::GetAllPlayerMappableActionKeyMap
 	return ReturnValues;
 }
 
-TArray<FName> AInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, int32 InPlayerID)
+TArray<FName> UInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, int32 InPlayerID)
 {
 	TArray<FName> ReturnValues;
 	for (const auto& Iter2 : RegisteredConfigMappings)
@@ -468,7 +465,7 @@ TArray<FName> AInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, in
 	return ReturnValues;
 }
 
-TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByName(const FName InName, int32 InPlayerID)
+TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionMappingByName(const FName InName, int32 InPlayerID)
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
 	for (const auto& Iter1 : RegisteredConfigMappings)
@@ -491,7 +488,7 @@ TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByName(const 
 	return ReturnValues;
 }
 
-TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByDisplayName(const FText InDisplayName, int32 InPlayerID)
+TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionMappingByDisplayName(const FText InDisplayName, int32 InPlayerID)
 {
 	TArray<FEnhancedActionKeyMapping> ReturnValues;
 	for (const FLoadedInputConfigMapping& Iter1 : RegisteredConfigMappings)
@@ -514,93 +511,93 @@ TArray<FEnhancedActionKeyMapping> AInputModule::GetAllActionMappingByDisplayName
 	return ReturnValues;
 }
 
-void AInputModule::AddOrUpdateCustomKeyboardBindings(const FName InName, const FKey InKey, int32 InPlayerID)
+void UInputModule::AddOrUpdateCustomKeyboardBindings(const FName InName, const FKey InKey, int32 InPlayerID)
 {
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(UCommonBPLibrary::GetLocalPlayer(InPlayerID)))
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(UCommonStatics::GetLocalPlayer(InPlayerID)))
 	{
 		Subsystem->AddPlayerMappedKeyInSlot(InName, InKey);
 		CustomKeyMappings.Emplace(InName, InKey);
 	}
 }
 
-void AInputModule::TurnCamera(const FInputActionValue& InValue)
+void UInputModule::TurnCamera(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || ACameraModule::Get()->IsControllingMove()) return;
+	if(InValue.Get<float>() == 0.f || UCameraModule::Get()->IsControllingMove()) return;
 
 	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
 	{
-		ACameraModule::Get()->AddCameraRotationInput(InValue.Get<float>(), 0.f);
+		UCameraModule::Get()->AddCameraRotationInput(InValue.Get<float>(), 0.f);
 	}
 }
 
-void AInputModule::LookUpCamera(const FInputActionValue& InValue)
+void UInputModule::LookUpCamera(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || ACameraModule::Get()->IsControllingMove()) return;
+	if(InValue.Get<float>() == 0.f || UCameraModule::Get()->IsControllingMove()) return;
 
 	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
 	{
-		ACameraModule::Get()->AddCameraRotationInput(0.f, ACameraModule::Get()->IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
+		UCameraModule::Get()->AddCameraRotationInput(0.f, UCameraModule::Get()->IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
 	}
 }
 
-void AInputModule::PanHCamera(const FInputActionValue& InValue)
+void UInputModule::PanHCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
+		UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
-void AInputModule::PanVCamera(const FInputActionValue& InValue)
+void UInputModule::PanVCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
+		UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
-void AInputModule::ZoomCamera(const FInputActionValue& InValue)
+void UInputModule::ZoomCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
 	if(GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
 	{
-		ACameraModule::Get()->AddCameraDistanceInput(-InValue.Get<float>());
+		UCameraModule::Get()->AddCameraDistanceInput(-InValue.Get<float>());
 	}
 }
 
-void AInputModule::MoveForwardCamera(const FInputActionValue& InValue)
+void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	const FVector Direction = ACameraModule::Get()->GetCurrentCameraRotation().Vector();
-	ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+	const FVector Direction = UCameraModule::Get()->GetCurrentCameraRotation().Vector();
+	UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 }
 
-void AInputModule::MoveRightCamera(const FInputActionValue& InValue)
+void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	const FVector Direction = FRotationMatrix(ACameraModule::Get()->GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	ACameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+	const FVector Direction = FRotationMatrix(UCameraModule::Get()->GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
+	UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
 }
 
-void AInputModule::MoveUpCamera(const FInputActionValue& InValue)
+void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	ACameraModule::Get()->AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
+	UCameraModule::Get()->AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
 }
 
-void AInputModule::TurnPlayer(const FInputActionValue& InValue)
+void UInputModule::TurnPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -610,7 +607,7 @@ void AInputModule::TurnPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::MoveHPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveHPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -620,7 +617,7 @@ void AInputModule::MoveHPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::MoveVPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveVPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -630,7 +627,7 @@ void AInputModule::MoveVPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -644,7 +641,7 @@ void AInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::MoveRightPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveRightPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -658,7 +655,7 @@ void AInputModule::MoveRightPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::MoveUpPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -672,7 +669,7 @@ void AInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void AInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
@@ -707,7 +704,7 @@ void AInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocati
 	}
 }
 
-void AInputModule::TouchPressedImpl()
+void UInputModule::TouchPressedImpl()
 {
 	TouchPressedCount++;
 
@@ -715,28 +712,28 @@ void AInputModule::TouchPressedImpl()
 	TouchPinchValuePrevious = -1.f;
 }
 
-void AInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
 		case ETouchIndex::Touch1:
 		{
 			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &AInputModule::TouchReleasedImpl, InTouchIndex);
+			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
 			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle1, TimerDelegate, 0.15f, false);
 			break;
 		}
 		case ETouchIndex::Touch2:
 		{
 			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &AInputModule::TouchReleasedImpl, InTouchIndex);
+			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
 			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle2, TimerDelegate, 0.15f, false);
 			break;
 		}
 		case ETouchIndex::Touch3:
 		{
 			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &AInputModule::TouchReleasedImpl, InTouchIndex);
+			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
 			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle3, TimerDelegate, 0.15f, false);
 			break;
 		}
@@ -744,7 +741,7 @@ void AInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocat
 	}
 }
 
-void AInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
+void UInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 {
 	TouchPressedCount--;
 	if(TouchPressedCount < 0)
@@ -776,7 +773,7 @@ void AInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 	}
 }
 
-void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	if(TouchPressedCount <= 0) return;
 	
@@ -789,7 +786,7 @@ void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			ACameraModule::Get()->AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
+			UCameraModule::Get()->AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
@@ -808,7 +805,7 @@ void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
 		if(TouchPinchValuePrevious != -1.f)
 		{
-			UCameraModuleBPLibrary::AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
+			UCameraModuleStatics::AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
 		}
 		TouchPinchValuePrevious = TouchCurrentPinchValue;
 	}
@@ -824,22 +821,22 @@ void AInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 			const FRotator Rotation = GetPlayerController()->GetControlRotation();
 			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
-			ACameraModule::Get()->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (ACameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f));
+			UCameraModule::Get()->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f));
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
 }
 
-AWHPlayerController* AInputModule::GetPlayerController()
+AWHPlayerController* UInputModule::GetPlayerController()
 {
 	if(!PlayerController)
 	{
-		PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>();
+		PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
 	}
 	return PlayerController;
 }
 
-void AInputModule::UpdateInputMode()
+void UInputModule::UpdateInputMode()
 {
 	EInputMode InputMode = EInputMode::None;
 	for (const auto Iter : AMainModule::GetAllModule())
@@ -855,7 +852,7 @@ void AInputModule::UpdateInputMode()
 	SetGlobalInputMode(InputMode);
 }
 
-void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
+void UInputModule::SetGlobalInputMode(EInputMode InInputMode)
 {
 	if(GlobalInputMode != InInputMode)
 	{
@@ -894,6 +891,6 @@ void AInputModule::SetGlobalInputMode(EInputMode InInputMode)
 			}
 			default: break;
 		}
-		UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { &GlobalInputMode });
+		UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { &GlobalInputMode });
 	}
 }

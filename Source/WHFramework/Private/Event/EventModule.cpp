@@ -5,60 +5,61 @@
 
 #include "Main/MainModule.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/EventModuleNetworkComponent.h"
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Event/Handle/Common/EventHandle_InitGame.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Net/UnrealNetwork.h"
 
-IMPLEMENTATION_MODULE(AEventModule)
+IMPLEMENTATION_MODULE(UEventModule)
 
 // ParamSets default values
-AEventModule::AEventModule()
+UEventModule::UEventModule()
 {
 	ModuleName = FName("EventModule");
-	
+	ModuleDisplayName = FText::FromString(TEXT("Event Module"));
+
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
 
 	EventManagerClass = UEventManagerBase::StaticClass();
 }
 
-AEventModule::~AEventModule()
+UEventModule::~UEventModule()
 {
-	TERMINATION_MODULE(AEventModule)
+	TERMINATION_MODULE(UEventModule)
 }
 
 #if WITH_EDITOR
-void AEventModule::OnGenerate()
+void UEventModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AEventModule::OnDestroy()
+void UEventModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AEventModule::OnInitialize_Implementation()
+void UEventModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 	
 	if(EventManagerClass)
 	{
-		EventManager = UObjectPoolModuleBPLibrary::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
+		EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
 		EventManager->OnInitialize();
 	}
 	
 	BroadcastEvent<UEventHandle_InitGame>(EEventNetType::Single, this);
 }
 
-void AEventModule::OnPreparatory_Implementation(EPhase InPhase)
+void UEventModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -66,24 +67,24 @@ void AEventModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AEventModule::OnRefresh_Implementation(float DeltaSeconds)
+void UEventModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AEventModule::OnPause_Implementation()
+void UEventModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AEventModule::OnUnPause_Implementation()
+void UEventModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AEventModule::OnTermination_Implementation(EPhase InPhase)
+void UEventModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -91,7 +92,7 @@ void AEventModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
+void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
@@ -123,17 +124,17 @@ void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 	}
 }
 
-void AEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
 	SubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
 }
 
-void AEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
+void UEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	SubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }
 
-void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
+void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
@@ -160,22 +161,22 @@ void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObje
 	}
 }
 
-void AEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
+void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
 	UnsubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
 }
 
-void AEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
+void UEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	UnsubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }
 
-void AEventModule::UnsubscribeAllEvent()
+void UEventModule::UnsubscribeAllEvent()
 {
 	EventHandleInfos.Empty();
 }
 
-void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	if(!InClass) return;
 
@@ -216,16 +217,16 @@ void AEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventN
 	EventHandleInfos[InClass].EventHandleDelegate.ExecuteIfBound(InClass, InSender, InParams);
 }
 
-void AEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	BroadcastEvent(InClass, EEventNetType::Single, InSender, InParams);
 }
 
-void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
 	if(!EventHandleInfos.Contains(InClass)) return;
 	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleBPLibrary::SpawnObject<UEventHandleBase>(nullptr, InClass))
+	if(UEventHandleBase* EventHandle = UObjectPoolModuleStatics::SpawnObject<UEventHandleBase>(nullptr, InClass))
 	{
 		EventHandle->Fill(InParams);
 		
@@ -240,20 +241,20 @@ void AEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{
-				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonBPLibrary::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
+				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonStatics::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
 					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDC_Event);
 				}
 			}
 		}
 
-		UObjectPoolModuleBPLibrary::DespawnObject(EventHandle);
+		UObjectPoolModuleStatics::DespawnObject(EventHandle);
 	}
 }
 
-void AEventModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UEventModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	DOREPLIFETIME(AEventModule, EventManager);
+	DOREPLIFETIME(UEventModule, EventManager);
 }

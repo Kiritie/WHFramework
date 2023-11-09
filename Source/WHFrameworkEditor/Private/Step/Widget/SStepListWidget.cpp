@@ -453,7 +453,7 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 				if(NewStep && OldStep)
 				{
-					UCommonBPLibrary::ExportPropertiesToObject(OldStep, NewStep);
+					UCommonStatics::ExportPropertiesToObject(OldStep, NewStep);
 					if(OldStep->ParentStep)
 					{
 						OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;

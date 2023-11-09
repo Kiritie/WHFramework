@@ -1,6 +1,6 @@
-﻿#pragma once
+#pragma once
 
-#include "DebugModuleBPLibrary.h"
+#include "DebugModuleStatics.h"
 
 // 默认
 DEFINE_LOG_CATEGORY_STATIC(WH_Default, Log, All);
@@ -56,17 +56,24 @@ DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
 
 // 断言实现
-#define WH_ENSURE_IMPL(Capture, InExpression, InFormat, ...) \
-(LIKELY(!!(InExpression)) || (([Capture] () ->bool \
+#define WH_ENSUREEDITOR_IMPL(Capture, Always, InExpression, InFormat) \
+(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
 { \
-	return false; \
-})()))
+static bool bExecuted = false; \
+return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
+}) && [] () { PLATFORM_BREAK(); return false; } ()))
 
-#if WITH_EDITOR
-	#define ensureEditor(InExpression) ensureAlways(InExpression)
-#else
-	#define ensureEditor(InExpression) WH_ENSURE_IMPL( , InExpression, TEXT(""))
-#endif
+#define WH_ENSUREEDITORMSGF_IMPL(Capture, Always, InExpression, InFormat, Message, Category, Verbosity) \
+(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
+{ \
+static bool bExecuted = false; \
+WHLog(Message, Category, Verbosity); \
+return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
+}) && [] () { PLATFORM_BREAK(); return false; } ()))
+
+#define ensureEditor(InExpression) WH_ENSUREEDITOR_IMPL ( , true, InExpression, TEXT(""))
+
+#define ensureEditorMsgf(InExpression, Message, Category, Verbosity) WH_ENSUREEDITORMSGF_IMPL ( , true, InExpression, TEXT(""), Message, Category, Verbosity)
 
 /*
  * 打印日志
@@ -76,7 +83,7 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
  */
 FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log)
 {
-	UDebugModuleBPLibrary::LogMessage(Message, Category, Verbosity);
+ UDebugModuleStatics::LogMessage(Message, Category, Verbosity);
 }
 
 /*
@@ -92,51 +99,5 @@ FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDC_Def
  */
 FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
 {
-	UDebugModuleBPLibrary::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
-}
-
-/*
- * 断言
- * @param Expression 表达式
- */
-template<typename T>
-FORCEINLINE bool WHEnsure(T Expression)
-{
-	return UDebugModuleBPLibrary::Ensure((bool)Expression);
-}
-	
-/*
- * 断言打印
- * @param Expression 表达式
- * @param Message 消息内容
- * @param Category 调试类别
- * @param Verbosity 调试级别
- */
-template<typename T>
-FORCEINLINE bool WHEnsureMsgf(T Expression, const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log)
-{
-	return UDebugModuleBPLibrary::EnsureMsgf((bool)Expression, Message, Category, Verbosity);
-}
-		
-/*
- * Editor断言
- * @param Expression 表达式
- */
-template<typename T>
-FORCEINLINE bool WHEnsureEditor(T Expression)
-{
-	return UDebugModuleBPLibrary::EnsureEditor((bool)Expression);
-}
-
-/*
- * Editor断言打印
- * @param Expression 表达式
- * @param Message 消息内容
- * @param Category 调试类别
- * @param Verbosity 调试级别
- */
-template<typename T>
-FORCEINLINE bool WHEnsureEditorMsgf(T Expression, const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log)
-{
-	return UDebugModuleBPLibrary::EnsureEditorMsgf((bool)Expression, Message, Category, Verbosity);
+ UDebugModuleStatics::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
 }

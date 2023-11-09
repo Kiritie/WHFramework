@@ -8,13 +8,13 @@
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Death.h"
 #include "Ability/Pawn/States/AbilityPawnState_Default.h"
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonBPLibrary.h"
-#include "Scene/SceneModuleBPLibrary.h"
+#include "Common/CommonStatics.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/Pawn/AbilityPawnInventoryBase.h"
 
 AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) :
@@ -94,7 +94,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(const TArray<FParameter>& InParams
 		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
 	}
 
-	USceneModuleBPLibrary::AddSceneActor(this);
+	USceneModuleStatics::AddSceneActor(this);
 
 	InitializeAbilitySystem();
 
@@ -263,7 +263,7 @@ void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
 	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
 	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleBPLibrary::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
 void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
@@ -332,7 +332,7 @@ float AAbilityPawnBase::GetHalfHeight() const
 
 UAbilityPawnDataBase& AAbilityPawnBase::GetPawnData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityPawnDataBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityPawnDataBase>(AssetID);
 }
 
 UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const
@@ -357,7 +357,7 @@ UAbilityInventoryBase* AAbilityPawnBase::GetInventory() const
 
 bool AAbilityPawnBase::IsPlayer() const
 {
-	return UCommonBPLibrary::GetPlayerPawn() == this;
+	return UCommonStatics::GetPlayerPawn() == this;
 }
 
 bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
@@ -385,7 +385,7 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -394,7 +394,7 @@ void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDam
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
 	if (GetHealth() <= 0.f)
 	{

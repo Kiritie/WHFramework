@@ -3,21 +3,22 @@
 
 #include "Video/VideoModule.h"
 
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Net/UnrealNetwork.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/VideoSaveGame.h"
 #include "Video/VideoModuleNetworkComponent.h"
 #include "Video/MediaPlayer/MediaPlayerBase.h"
 
-IMPLEMENTATION_MODULE(AVideoModule)
+IMPLEMENTATION_MODULE(UVideoModule)
 
 // Sets default values
-AVideoModule::AVideoModule()
+UVideoModule::UVideoModule()
 {
 	ModuleName = FName("VideoModule");
-	
+	ModuleDisplayName = FText::FromString(TEXT("Video Module"));
+
 	ModuleSaveGame = UVideoSaveGame::StaticClass();
 
 	ModuleNetworkComponent = UVideoModuleNetworkComponent::StaticClass();
@@ -27,33 +28,33 @@ AVideoModule::AVideoModule()
 	GlobalVideoQuality = EVideoQuality::Epic;
 }
 
-AVideoModule::~AVideoModule()
+UVideoModule::~UVideoModule()
 {
-	TERMINATION_MODULE(AVideoModule)
+	TERMINATION_MODULE(UVideoModule)
 }
 
 #if WITH_EDITOR
-void AVideoModule::OnGenerate()
+void UVideoModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AVideoModule::OnDestroy()
+void UVideoModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AVideoModule::OnInitialize_Implementation()
+void UVideoModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 
-	UAssetModuleBPLibrary::AddStaticObject(FName("EVideoQuality"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVideoQuality")));
+	UAssetModuleStatics::AddStaticObject(FName("EVideoQuality"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVideoQuality")));
 }
 
-void AVideoModule::OnPreparatory_Implementation(EPhase InPhase)
+void UVideoModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -68,24 +69,24 @@ void AVideoModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AVideoModule::OnRefresh_Implementation(float DeltaSeconds)
+void UVideoModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AVideoModule::OnPause_Implementation()
+void UVideoModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AVideoModule::OnUnPause_Implementation()
+void UVideoModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AVideoModule::OnTermination_Implementation(EPhase InPhase)
+void UVideoModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -96,7 +97,7 @@ void AVideoModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVideoModuleSaveData>();
 
@@ -115,12 +116,12 @@ void AVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	ApplyVideoQualitySettings();
 }
 
-void AVideoModule::UnloadData(EPhase InPhase)
+void UVideoModule::UnloadData(EPhase InPhase)
 {
 	Super::UnloadData(InPhase);
 }
 
-FSaveData* AVideoModule::ToData()
+FSaveData* UVideoModule::ToData()
 {
 	static FVideoModuleSaveData SaveData;
 	SaveData = FVideoModuleSaveData();
@@ -140,7 +141,7 @@ FSaveData* AVideoModule::ToData()
 	return &SaveData;
 }
 
-void AVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)
+void UVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)
 {
 	if(!MediaPlayers.Contains(InMediaPlayer))
 	{
@@ -148,7 +149,7 @@ void AVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)
 	}
 }
 
-void AVideoModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
+void UVideoModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
 {
 	if(MediaPlayers.Contains(InMediaPlayer))
 	{
@@ -156,12 +157,12 @@ void AVideoModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
 	}
 }
 
-void AVideoModule::RemoveMediaPlayerFromListByName(const FName InName)
+void UVideoModule::RemoveMediaPlayerFromListByName(const FName InName)
 {
 	RemoveMediaPlayerFromList(GetMediaPlayerByName(InName));
 }
 
-AMediaPlayerBase* AVideoModule::GetMediaPlayerByName(const FName InName) const
+AMediaPlayerBase* UVideoModule::GetMediaPlayerByName(const FName InName) const
 {
 	for (auto Iter : MediaPlayers)
 	{
@@ -173,7 +174,7 @@ AMediaPlayerBase* AVideoModule::GetMediaPlayerByName(const FName InName) const
 	return nullptr;
 }
 
-void AVideoModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast)
+void UVideoModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
@@ -181,7 +182,7 @@ void AVideoModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieN
 	}
 }
 
-void AVideoModule::PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
+void UVideoModule::PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
@@ -189,7 +190,7 @@ void AVideoModule::PlayMovieWithDelegate(const FName InName, const FName InMovie
 	}
 }
 
-void AVideoModule::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast)
+void UVideoModule::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
@@ -197,12 +198,12 @@ void AVideoModule::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMu
 	}
 }
 
-void AVideoModule::ApplyVideoQualitySettings()
+void UVideoModule::ApplyVideoQualitySettings()
 {
 	GetGameUserSettings()->ApplySettings(false);
 }
 
-void AVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
 {
 	GlobalVideoQuality = InQuality;
 
@@ -222,134 +223,134 @@ void AVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
 	}
 }
 
-void AVideoModule::SetViewDistanceQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetViewDistanceQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetViewDistanceQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetViewDistanceQuality() const
+EVideoQuality UVideoModule::GetViewDistanceQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetViewDistanceQuality();
 }
 
-void AVideoModule::SetShadowQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetShadowQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetShadowQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetShadowQuality() const
+EVideoQuality UVideoModule::GetShadowQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetShadowQuality();
 }
 
-void AVideoModule::SetGlobalIlluminationQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetGlobalIlluminationQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetGlobalIlluminationQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetGlobalIlluminationQuality() const
+EVideoQuality UVideoModule::GetGlobalIlluminationQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetGlobalIlluminationQuality();
 }
 
-void AVideoModule::SetReflectionQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetReflectionQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetReflectionQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetReflectionQuality() const
+EVideoQuality UVideoModule::GetReflectionQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetReflectionQuality();
 }
 
-void AVideoModule::SetAntiAliasingQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetAntiAliasingQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetAntiAliasingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetAntiAliasingQuality() const
+EVideoQuality UVideoModule::GetAntiAliasingQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetAntiAliasingQuality();
 }
 
-void AVideoModule::SetTextureQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetTextureQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetTextureQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetTextureQuality() const
+EVideoQuality UVideoModule::GetTextureQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetTextureQuality();
 }
 
-void AVideoModule::SetVisualEffectQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetVisualEffectQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetVisualEffectQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetVisualEffectQuality() const
+EVideoQuality UVideoModule::GetVisualEffectQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetVisualEffectQuality();
 }
 
-void AVideoModule::SetPostProcessingQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetPostProcessingQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetPostProcessingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetPostProcessingQuality() const
+EVideoQuality UVideoModule::GetPostProcessingQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetPostProcessingQuality();
 }
 
-void AVideoModule::SetFoliageQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetFoliageQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetFoliageQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetFoliageQuality() const
+EVideoQuality UVideoModule::GetFoliageQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetFoliageQuality();
 }
 
-void AVideoModule::SetShadingQuality(EVideoQuality InQuality, bool bApply)
+void UVideoModule::SetShadingQuality(EVideoQuality InQuality, bool bApply)
 {
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetShadingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality AVideoModule::GetShadingQuality() const
+EVideoQuality UVideoModule::GetShadingQuality() const
 {
 	return (EVideoQuality)GetGameUserSettings()->GetShadingQuality();
 }
 
-UGameUserSettings* AVideoModule::GetGameUserSettings() const
+UGameUserSettings* UVideoModule::GetGameUserSettings() const
 {
 	return GEngine->GetGameUserSettings();
 }
 
-void AVideoModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UVideoModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AVideoModule, MediaPlayers);
+	DOREPLIFETIME(UVideoModule, MediaPlayers);
 }

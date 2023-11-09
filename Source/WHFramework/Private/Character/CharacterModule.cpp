@@ -3,21 +3,22 @@
 
 #include "Character/CharacterModule.h"
 
-#include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Camera/Base/CameraActorBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
 		
-IMPLEMENTATION_MODULE(ACharacterModule)
+IMPLEMENTATION_MODULE(UCharacterModule)
 
 // Sets default values
-ACharacterModule::ACharacterModule()
+UCharacterModule::UCharacterModule()
 {
 	ModuleName = FName("CharacterModule");
+	ModuleDisplayName = FText::FromString(TEXT("Character Module"));
 
 	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
@@ -29,28 +30,28 @@ ACharacterModule::ACharacterModule()
 	CurrentCharacter = nullptr;
 }
 
-ACharacterModule::~ACharacterModule()
+UCharacterModule::~UCharacterModule()
 {
-	TERMINATION_MODULE(ACharacterModule)
+	TERMINATION_MODULE(UCharacterModule)
 }
 
 #if WITH_EDITOR
-void ACharacterModule::OnGenerate()
+void UCharacterModule::OnGenerate()
 {
 	Super::OnGenerate();
 
 }
 
-void ACharacterModule::OnDestroy()
+void UCharacterModule::OnDestroy()
 {
 	Super::OnDestroy();
 
 }
 #endif
 
-void ACharacterModule::OnInitialize_Implementation()
+void UCharacterModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 
 	for(auto Iter : Characters)
 	{
@@ -61,9 +62,9 @@ void ACharacterModule::OnInitialize_Implementation()
 	}
 }
 
-void ACharacterModule::OnPreparatory_Implementation(EPhase InPhase)
+void UCharacterModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -74,27 +75,27 @@ void ACharacterModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void ACharacterModule::OnRefresh_Implementation(float DeltaSeconds)
+void UCharacterModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void ACharacterModule::OnPause_Implementation()
+void UCharacterModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void ACharacterModule::OnUnPause_Implementation()
+void UCharacterModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void ACharacterModule::OnTermination_Implementation(EPhase InPhase)
+void UCharacterModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void ACharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
+void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 {
 	if(!Characters.Contains(InCharacter))
 	{
@@ -106,7 +107,7 @@ void ACharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 	}
 }
 
-void ACharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
+void UCharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 {
 	if(Characters.Contains(InCharacter))
 	{
@@ -118,11 +119,11 @@ void ACharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 	}
 }
 
-void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
 	if(!CurrentCharacter || CurrentCharacter != InCharacter)
 	{
-		if(AWHPlayerController* PlayerController = UCommonBPLibrary::GetPlayerController<AWHPlayerController>())
+		if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
 		{
 			if(InCharacter)
 			{
@@ -132,8 +133,8 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 				}
 				CurrentCharacter = InCharacter;
 				PlayerController->Possess(InCharacter);
-				UCameraModuleBPLibrary::EndTrackTarget();
-				UCameraModuleBPLibrary::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
+				UCameraModuleStatics::EndTrackTarget();
+				UCameraModuleStatics::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
 			}
 			else if(CurrentCharacter)
 			{
@@ -148,40 +149,40 @@ void ACharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 	}
 }
 
-void ACharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
 {
 	SwitchCharacter(GetCharacterByClass(InClass), bResetCamera, bInstant);
 }
 
-void ACharacterModule::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
 {
 	SwitchCharacter(GetCharacterByName(InName), bResetCamera, bInstant);
 }
 
-bool ACharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
+bool UCharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
-	if(!InClass) return nullptr;
+	if(!InClass) return false;
 	
 	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
 	return HasCharacterByName(CharacterName);
 }
 
-bool ACharacterModule::HasCharacterByName(FName InName) const
+bool UCharacterModule::HasCharacterByName(FName InName) const
 {
 	return CharacterMap.Contains(InName);
 }
 
-ACharacterBase* ACharacterModule::GetCurrentCharacter() const
+ACharacterBase* UCharacterModule::GetCurrentCharacter() const
 {
 	return CurrentCharacter;
 }
 
-ACharacterBase* ACharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const
+ACharacterBase* UCharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const
 {
 	return CurrentCharacter;
 }
 
-ACharacterBase* ACharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
+ACharacterBase* UCharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
 	if(!InClass) return nullptr;
 	
@@ -189,7 +190,7 @@ ACharacterBase* ACharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase
 	return GetCharacterByName(CharacterName);
 }
 
-ACharacterBase* ACharacterModule::GetCharacterByName(FName InName) const
+ACharacterBase* UCharacterModule::GetCharacterByName(FName InName) const
 {
 	for (auto Iter : Characters)
 	{
@@ -201,9 +202,9 @@ ACharacterBase* ACharacterModule::GetCharacterByName(FName InName) const
 	return nullptr;
 }
 
-void ACharacterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UCharacterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ACharacterModule, Characters);
+	DOREPLIFETIME(UCharacterModule, Characters);
 }

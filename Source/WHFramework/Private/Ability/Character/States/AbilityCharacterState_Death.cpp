@@ -7,7 +7,7 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 
@@ -101,5 +101,5 @@ void UAbilityCharacterState_Death::DeathEnd()
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 
-	UObjectPoolModuleBPLibrary::DespawnObject(Character);
+	UObjectPoolModuleStatics::DespawnObject(Character);
 }

@@ -5,7 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
 #include "Ability/Pawn/AbilityPawnDataBase.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
 {
@@ -76,5 +76,5 @@ void UAbilityPawnState_Death::DeathEnd()
 	
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
 
-	UObjectPoolModuleBPLibrary::DespawnObject(Pawn);
+	UObjectPoolModuleStatics::DespawnObject(Pawn);
 }

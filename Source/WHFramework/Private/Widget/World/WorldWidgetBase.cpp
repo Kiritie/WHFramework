@@ -4,12 +4,12 @@
 #include "Widget/World/WorldWidgetBase.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
-#include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Widget/WidgetModule.h"
-#include "Widget/WidgetModuleBPLibrary.h"
+#include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetComponent.h"
 #include "Widget/World/WorldWidgetContainer.h"
 
@@ -82,7 +82,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInf
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	
-	if(AInputModule* InputModule = AInputModule::Get())
+	if(UInputModule* InputModule = UInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}
@@ -94,7 +94,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInf
 
 	if(GetWidgetSpace() == EWidgetSpace::Screen && !IsInViewport())
 	{
-		if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
+		if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
 		{
 			if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
 			{
@@ -136,7 +136,7 @@ void UWorldWidgetBase::OnRefresh()
 
 void UWorldWidgetBase::OnDestroy(bool bRecovery)
 {
-	if(UWorldWidgetContainer* Container = UWidgetModuleBPLibrary::GetWorldWidgetContainer())
+	if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
 	{
 		Container->RemoveWorldWidget(this);
 	}
@@ -146,12 +146,12 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 
-	if(AInputModule* InputModule = AInputModule::Get())
+	if(UInputModule* InputModule = UInputModule::Get())
 	{
 		InputModule->UpdateInputMode();
 	}
 
-	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
 	K2_OnDestroy(bRecovery);
 }
@@ -165,7 +165,7 @@ void UWorldWidgetBase::Refresh_Implementation()
 
 void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 {
-	UWidgetModuleBPLibrary::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
+	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
 }
 
 void UWorldWidgetBase::RefreshVisibility_Implementation()
@@ -176,7 +176,7 @@ void UWorldWidgetBase::RefreshVisibility_Implementation()
 	{
 		const auto OwnerActor = Cast<AActor>(OwnerObject);
 		const FVector Location = BindInfo.SceneComp ? (BindInfo.SocketName.IsNone() ? BindInfo.SceneComp->GetComponentLocation() : BindInfo.SceneComp->GetSocketLocation(BindInfo.SocketName)) + BindInfo.Location : BindInfo.Location;
-		bShow = (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonBPLibrary::IsInScreenViewport(Location)) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleBPLibrary::GetCameraLocation(true)) < WidgetShowDistance);
+		bShow = (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location)) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
 	}
 	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
@@ -187,7 +187,7 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 	{
 		FVector2D ScreenPos;
 		const FVector Location = InBindInfo.SceneComp ? (InBindInfo.SocketName.IsNone() ? InBindInfo.SceneComp->GetComponentLocation() : InBindInfo.SceneComp->GetSocketLocation(InBindInfo.SocketName)) + InBindInfo.Location : InBindInfo.Location;
-		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonBPLibrary::GetPlayerController(), Location, ScreenPos, false))
+		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false))
 		{
 			CanvasPanelSlot->SetPosition(ScreenPos);
 		}

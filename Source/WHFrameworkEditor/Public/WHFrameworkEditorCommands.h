@@ -19,6 +19,8 @@ public:
 	virtual void RegisterCommands() override;
 
 public:
+	TSharedPtr< FUICommandInfo > OpenModuleEditorWindow;
+	
 	TSharedPtr< FUICommandInfo > OpenProcedureEditorWindow;
 
 	TSharedPtr< FUICommandInfo > OpenStepEditorWindow;

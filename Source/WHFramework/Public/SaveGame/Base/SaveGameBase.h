@@ -15,7 +15,7 @@ class WHFRAMEWORK_API USaveGameBase : public USaveGame
 {
 	GENERATED_BODY()
 
-	friend class ASaveGameModule;
+	friend class USaveGameModule;
 
 public:
 	USaveGameBase();

@@ -8,7 +8,7 @@
 #include "Widget/SEditorWidgetBase.h"
 
 class STaskListWidget;
-class ATaskModule;
+class UTaskModule;
 /**
  * 
  */
@@ -19,7 +19,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(STaskDetailsWidget) {}
 
-		SLATE_ARGUMENT(ATaskModule*, TaskModule)
+		SLATE_ARGUMENT(UTaskModule*, TaskModule)
 
 		SLATE_ARGUMENT(TSharedPtr<STaskListWidget>, ListWidget)
 
@@ -44,7 +44,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	ATaskModule* TaskModule;
+	UTaskModule* TaskModule;
 
 	TSharedPtr<STaskListWidget> ListWidget;
 

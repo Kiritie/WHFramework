@@ -4,8 +4,8 @@
 #include "FSM/Components/FSMComponent.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "FSM/FSMModuleBPLibrary.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "FSM/FSMModuleStatics.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 // ParamSets default values
 UFSMComponent::UFSMComponent()
@@ -38,7 +38,7 @@ void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UCommonBPLibrary::IsPlaying())
+	if(UCommonStatics::IsPlaying())
 	{
 		OnTermination();
 	}
@@ -53,7 +53,7 @@ void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 
 void UFSMComponent::OnInitialize()
 {
-	UFSMModuleBPLibrary::RegisterFSM(this);
+	UFSMModuleStatics::RegisterFSM(this);
 	
 	for(auto& Iter : States)
 	{
@@ -62,7 +62,7 @@ void UFSMComponent::OnInitialize()
 			const FName StateName = Iter->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 			if(!StateMap.Contains(StateName))
 			{
-				if(UFiniteStateBase* FiniteState = UObjectPoolModuleBPLibrary::SpawnObject<UFiniteStateBase>(nullptr, Iter))
+				if(UFiniteStateBase* FiniteState = UObjectPoolModuleStatics::SpawnObject<UFiniteStateBase>(nullptr, Iter))
 				{
 					FiniteState->OnInitialize(this, StateMap.Num());
 					StateMap.Add(StateName, FiniteState);
@@ -89,14 +89,14 @@ void UFSMComponent::OnRefresh()
 
 void UFSMComponent::OnTermination()
 {
-	UFSMModuleBPLibrary::UnregisterFSM(this);
+	UFSMModuleStatics::UnregisterFSM(this);
 	
 	for(auto& Iter : StateMap)
 	{
 		if(Iter.Value)
 		{
 			Iter.Value->OnTermination();
-			UObjectPoolModuleBPLibrary::DespawnObject(Iter.Value);
+			UObjectPoolModuleStatics::DespawnObject(Iter.Value);
 		}
 	}
 	
@@ -219,7 +219,7 @@ bool UFSMComponent::TerminateState(UFiniteStateBase* InState)
 	{
 		StateMap.Remove(InState->GetStateName());
 		InState->OnTermination();
-		UObjectPoolModuleBPLibrary::DespawnObject(InState);
+		UObjectPoolModuleStatics::DespawnObject(InState);
 		bSuccess = true;
 	}
 	const auto TempStates = GetStates();

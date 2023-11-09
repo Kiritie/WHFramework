@@ -21,7 +21,7 @@ void UAchievementSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	AAchievementModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UAchievementModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UAchievementSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,5 +33,5 @@ void UAchievementSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AAchievementModule::Get()->GetSaveData(true));
+	SetSaveData(UAchievementModule::Get()->GetSaveData(true));
 }

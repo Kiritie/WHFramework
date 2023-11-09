@@ -4,7 +4,7 @@
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/AbilityModuleTypes.h"
-#include "ReferencePool/ReferencePoolModuleBPLibrary.h"
+#include "ReferencePool/ReferencePoolModuleStatics.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 :	Exp(0.f),
@@ -66,12 +66,12 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 
 		if(Data.EvaluatedData.Attribute.GetName().StartsWith("Physics"))
 		{
-			UReferencePoolModuleBPLibrary::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), EDamageType::Physics, HitResult, SourceTags);
+			UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), EDamageType::Physics, HitResult, SourceTags);
 			SetPhysicsDamage(0.f);
 		}
 		else if(Data.EvaluatedData.Attribute.GetName().StartsWith("Magic"))
 		{
-			UReferencePoolModuleBPLibrary::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), EDamageType::Magic, HitResult, SourceTags);
+			UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), EDamageType::Magic, HitResult, SourceTags);
 			SetMagicDamage(0.f);
 		}
 	}

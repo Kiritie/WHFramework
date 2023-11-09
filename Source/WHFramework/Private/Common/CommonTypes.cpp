@@ -3,7 +3,7 @@
 
 #include "Common/CommonTypes.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
 
 #if WITH_EDITOR
@@ -16,7 +16,7 @@ bool GIsSimulating = false;
 
 UObject* GetWorldContext(bool bInEditor)
 {
-	return UCommonBPLibrary::GetWorldContext(bInEditor);
+	return UCommonStatics::GetWorldContext(bInEditor);
 }
 
 namespace GameplayTags

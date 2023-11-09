@@ -3,7 +3,7 @@
 
 #include "Voxel/Voxels/VoxelInteract.h"
 
-#include "Audio/AudioModuleBPLibrary.h"
+#include "Audio/AudioModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -103,7 +103,7 @@ void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
 	}
 }
 
@@ -125,6 +125,6 @@ void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());
 	}
 }

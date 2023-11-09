@@ -1,12 +1,12 @@
 #include "Asset/AssetModuleTypes.h"
 
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 
 FAbilityItem FAbilityItem::Empty = FAbilityItem();
 
 UAbilityItemDataBase& FAbilityItem::GetData(bool bLogWarning) const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID, bLogWarning);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID, bLogWarning);
 }
 
 void FDataTableRowBase::OnInitializeRow(const FName& InRowName)

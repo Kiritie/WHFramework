@@ -4,13 +4,13 @@
 #include "Procedure/Base/ProcedureBase.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/CameraModuleBPLibrary.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
 #include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
 #include "Procedure/ProcedureModule.h"
-#include "Procedure/ProcedureModuleBPLibrary.h"
+#include "Procedure/ProcedureModuleStatics.h"
 
 UProcedureBase::UProcedureBase()
 {
@@ -50,7 +50,7 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(AProcedureModule* ProcedureModule = AProcedureModule::Get(true))
+		if(UProcedureModule* ProcedureModule = UProcedureModule::Get(true))
 		{
 			if(ProcedureModule->GetFirstProcedure() == this)
 			{
@@ -83,14 +83,14 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	if(CameraViewPawn)
 	{
-		UCameraModuleBPLibrary::SwitchCamera(CameraViewPawn);
+		UCameraModuleStatics::SwitchCamera(CameraViewPawn);
 	}
 
 	ResetCameraView();
 
 	if(bTrackTarget)
 	{
-		UCameraModuleBPLibrary::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 	}
 
 	switch(ProcedureGuideType)
@@ -103,7 +103,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {this});
 }
 
 void UProcedureBase::OnRefresh()
@@ -135,14 +135,14 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
+		UCameraModuleStatics::EndTrackTarget(OperationTarget);
 	}
 
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {this});
 }
 
 void UProcedureBase::Guide()
@@ -155,17 +155,17 @@ void UProcedureBase::Guide()
 
 void UProcedureBase::SwitchLast()
 {
-	UProcedureModuleBPLibrary::SwitchLastProcedure();
+	UProcedureModuleStatics::SwitchLastProcedure();
 }
 
 void UProcedureBase::SwitchNext()
 {
-	UProcedureModuleBPLibrary::SwitchNextProcedure();
+	UProcedureModuleStatics::SwitchNextProcedure();
 }
 
 bool UProcedureBase::IsCurrent()
 {
-	return UProcedureModuleBPLibrary::IsCurrentProcedure(this);
+	return UProcedureModuleStatics::IsCurrentProcedure(this);
 }
 
 #if WITH_EDITOR
@@ -173,17 +173,17 @@ void UProcedureBase::GetCameraView()
 {
 	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
+		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - OperationTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
 	}
 	else
 	{
-		CameraViewOffset = UCameraModuleBPLibrary::GetCameraLocation();
-		CameraViewYaw = UCameraModuleBPLibrary::GetCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleBPLibrary::GetCameraRotation().Pitch;
+		CameraViewOffset = UCameraModuleStatics::GetCameraLocation();
+		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw;
+		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch;
 	}
-	CameraViewDistance = UCameraModuleBPLibrary::GetCameraDistance();
+	CameraViewDistance = UCameraModuleStatics::GetCameraDistance();
 
 	Modify();
 }
@@ -232,23 +232,23 @@ void UProcedureBase::ResetCameraView()
 	{
 		case EProcedureCameraViewMode::Instant:
 		{
-			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, true);
-			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, true);
+			UCameraModuleStatics::SetCameraLocation(CameraLocation, true);
+			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
+			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, true);
 			break;
 		}
 		case EProcedureCameraViewMode::Smooth:
 		{
-			UCameraModuleBPLibrary::SetCameraLocation(CameraLocation, false);
-			UCameraModuleBPLibrary::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-			UCameraModuleBPLibrary::SetCameraDistance(CameraViewDistance, false);
+			UCameraModuleStatics::SetCameraLocation(CameraLocation, false);
+			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
+			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, false);
 			break;
 		}
 		case EProcedureCameraViewMode::Duration:
 		{
-			UCameraModuleBPLibrary::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleBPLibrary::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleBPLibrary::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
+			UCameraModuleStatics::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
 			break;
 		}
 		default: break;
@@ -267,14 +267,14 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleBPLibrary::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+				UCameraModuleStatics::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
 			}
 		}
 		else
 		{
 			if(bTrackTarget)
 			{
-				UCameraModuleBPLibrary::EndTrackTarget(OperationTarget);
+				UCameraModuleStatics::EndTrackTarget(OperationTarget);
 			}
 		}
 	}
@@ -317,7 +317,7 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{
-			if(AProcedureModule* ProcedureModule = AProcedureModule::Get(true))
+			if(UProcedureModule* ProcedureModule = UProcedureModule::Get(true))
 			{
 				if(bFirstProcedure)
 				{

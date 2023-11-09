@@ -5,7 +5,7 @@
 
 #include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Task/TaskEditor.h"
 #include "Task/TaskModule.h"
 #include "Task/Widget/STaskDetailsWidget.h"
@@ -34,7 +34,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	TaskModule = ATaskModule::Get(!UCommonBPLibrary::IsPlaying());
+	TaskModule = UTaskModule::Get(!UCommonStatics::IsPlaying());
 
 	if(TaskModule)
 	{
@@ -181,7 +181,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 
-		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonStatics::IsPlaying());
 	}
 	else
 	{
@@ -246,7 +246,7 @@ void STaskEditorWidget::OnReset()
 
 void STaskEditorWidget::OnRefresh()
 {
-	TaskModule = ATaskModule::Get(!bPreviewMode);
+	TaskModule = UTaskModule::Get(!bPreviewMode);
 	if(TaskModule)
 	{
 		if(ListWidget)

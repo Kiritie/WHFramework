@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
+#include "Common/Base/WHActor.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraActorBase.generated.h"
 

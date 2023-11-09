@@ -3,9 +3,9 @@
 
 #include "Voxel/VoxelModuleTypes.h"
 
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
@@ -24,7 +24,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk*
 }
 
 FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData)
-	: FVoxelItem(UVoxelModuleBPLibrary::VoxelTypeToAssetID(InVoxelType), InIndex, InOwner, InData)
+	: FVoxelItem(UVoxelModuleStatics::VoxelTypeToAssetID(InVoxelType), InIndex, InOwner, InData)
 {
 }
 
@@ -32,8 +32,8 @@ FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
 	InSaveData.ParseIntoArray(DataStrs, TEXT("|"));
-	ID = UVoxelModuleBPLibrary::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
-	Index = UVoxelModuleBPLibrary::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
+	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
+	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
 	Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
 	if(DataStrs.IsValidIndex(3))
 	{
@@ -97,7 +97,7 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 
 FString FVoxelItem::ToSaveData(bool bRefresh) const
 {
-	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleBPLibrary::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
+	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
 }
 
 bool FVoxelItem::IsValid() const
@@ -172,25 +172,25 @@ FVector FVoxelItem::GetLocation(bool bWorldSpace) const
 
 UVoxel& FVoxelItem::GetVoxel() const
 {
-	return UVoxelModuleBPLibrary::GetVoxel(*this);
+	return UVoxelModuleStatics::GetVoxel(*this);
 }
 
 AVoxelChunk* FVoxelItem::GetOwner() const
 {
 	if(Owner) return Owner;
-	return UVoxelModuleBPLibrary::FindChunkByIndex(Index);
+	return UVoxelModuleStatics::FindChunkByIndex(Index);
 }
 
 UVoxelData& FVoxelItem::GetVoxelData(bool bLogWarning) const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UVoxelData>(ID, bLogWarning);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(ID, bLogWarning);
 }
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
 	if(AVoxelChunk* chunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
 	{
-		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - AVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
 		Point = InHitResult.ImpactPoint;
 		Normal = InHitResult.ImpactNormal;
 	}

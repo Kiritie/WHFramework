@@ -5,64 +5,65 @@
 
 #include "ReferencePool/ReferencePool.h"
 		
-IMPLEMENTATION_MODULE(AReferencePoolModule)
+IMPLEMENTATION_MODULE(UReferencePoolModule)
 
 // Sets default values
-AReferencePoolModule::AReferencePoolModule()
+UReferencePoolModule::UReferencePoolModule()
 {
 	ModuleName = FName("ReferencePoolModule");
+	ModuleDisplayName = FText::FromString(TEXT("Reference Pool Module"));
 
 	ReferencePools = TMap<TSubclassOf<UObject>, UReferencePool*>();
 }
 
-AReferencePoolModule::~AReferencePoolModule()
+UReferencePoolModule::~UReferencePoolModule()
 {
-	TERMINATION_MODULE(AReferencePoolModule)
+	TERMINATION_MODULE(UReferencePoolModule)
 }
 
 #if WITH_EDITOR
-void AReferencePoolModule::OnGenerate()
+void UReferencePoolModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AReferencePoolModule::OnDestroy()
+void UReferencePoolModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AReferencePoolModule::OnInitialize_Implementation()
+void UReferencePoolModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AReferencePoolModule::OnPreparatory_Implementation(EPhase InPhase)
+void UReferencePoolModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void AReferencePoolModule::OnRefresh_Implementation(float DeltaSeconds)
+void UReferencePoolModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AReferencePoolModule::OnPause_Implementation()
+void UReferencePoolModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AReferencePoolModule::OnUnPause_Implementation()
+void UReferencePoolModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AReferencePoolModule::OnTermination_Implementation(EPhase InPhase)
+void UReferencePoolModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void AReferencePoolModule::ClearAllReference()
+void UReferencePoolModule::ClearAllReference()
 {
 	for (auto Iter : ReferencePools)
 	{

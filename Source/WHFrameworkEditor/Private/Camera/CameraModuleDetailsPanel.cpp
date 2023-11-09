@@ -56,7 +56,7 @@ FReply FCameraModuleDetailsPanel::OnClickCopyCameraParamsButton()
 {
 	if(SelectedObjectsList.IsValidIndex(0))
 	{
-		if(ACameraModule* CameraModule = Cast<ACameraModule>(SelectedObjectsList[0]))
+		if(UCameraModule* CameraModule = Cast<UCameraModule>(SelectedObjectsList[0]))
 		{
 			FCameraParams CameraParams;
 			CameraParams.CameraLocation = CameraModule->GetCurrentCameraLocation();

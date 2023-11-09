@@ -22,8 +22,7 @@ public:
 	// End of IDetailCustomization interface
 	
 protected:
-	FReply OnClickGenerateModulesButton();
-	FReply OnClickDestroyModulesButton();
+	FReply OnClickOpenModuleEditorButton();
 
 private:
 	TArray< TWeakObjectPtr< UObject > > SelectedObjectsList;

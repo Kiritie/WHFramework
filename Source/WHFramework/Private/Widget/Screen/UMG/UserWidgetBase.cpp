@@ -6,10 +6,10 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModule.h"
-#include "Widget/WidgetModuleBPLibrary.h"
-#include "Input/InputModuleBPLibrary.h"
+#include "Widget/WidgetModuleStatics.h"
+#include "Input/InputModuleStatics.h"
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -73,7 +73,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner)
 {
 	if(ParentName != NAME_None)
 	{
-		ParentWidget = UWidgetModuleBPLibrary::GetUserWidgetByName<UUserWidgetBase>(ParentName);
+		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
 		if(ParentWidget)
 		{
 			ParentWidget->AddChild(this);
@@ -82,12 +82,12 @@ void UUserWidgetBase::OnCreate(UObject* InOwner)
 	
 	for(const auto& Iter : ChildNames)
 	{
-		if(UWidgetModuleBPLibrary::HasUserWidgetClassByName(Iter))
+		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
 		{
-			const UUserWidgetBase* DefaultObject = UWidgetModuleBPLibrary::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
+			const UUserWidgetBase* DefaultObject = UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
 			if(DefaultObject->ParentName != NAME_None && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
 			{
-				UWidgetModuleBPLibrary::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
+				UWidgetModuleStatics::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
 			}
 		}
 	}
@@ -176,16 +176,16 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
 	}
 
-	UInputModuleBPLibrary::UpdateGlobalInputMode();
+	UInputModuleStatics::UpdateGlobalInputMode();
 
 	for(auto Iter : ChildNames)
 	{
-		if(UWidgetModuleBPLibrary::HasUserWidgetClassByName(Iter))
+		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
 		{
-			const UUserWidgetBase* DefaultObject = Cast<UUserWidgetBase>(UWidgetModuleBPLibrary::GetUserWidgetClassByName(Iter)->GetDefaultObject());
+			const UUserWidgetBase* DefaultObject = Cast<UUserWidgetBase>(UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject());
 			if(DefaultObject->ParentName != NAME_None && DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen)
 			{
-				UWidgetModuleBPLibrary::OpenUserWidgetByName(Iter);
+				UWidgetModuleStatics::OpenUserWidgetByName(Iter);
 			}
 		}
 	}
@@ -241,13 +241,13 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 		ParentWidget->RemoveChild(this);
 	}
 
-	UInputModuleBPLibrary::UpdateGlobalInputMode();
+	UInputModuleStatics::UpdateGlobalInputMode();
 
 	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 
-	UObjectPoolModuleBPLibrary::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
 	K2_OnDestroy(bRecovery);
 }
@@ -261,17 +261,17 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
+	UWidgetModuleStatics::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
 {
-	UWidgetModuleBPLibrary::OpenUserWidget(GetClass(), InParams, bInstant);
+	UWidgetModuleStatics::OpenUserWidget(GetClass(), InParams, bInstant);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
 {
-	UWidgetModuleBPLibrary::CloseUserWidget<UUserWidgetBase>(bInstant, GetClass());
+	UWidgetModuleStatics::CloseUserWidget<UUserWidgetBase>(bInstant, GetClass());
 }
 
 void UUserWidgetBase::Toggle(bool bInstant)
@@ -302,7 +302,7 @@ void UUserWidgetBase::Refresh()
 
 void UUserWidgetBase::Destroy(bool bRecovery)
 {
-	UWidgetModuleBPLibrary::DestroyUserWidget<UUserWidgetBase>(bRecovery, GetClass());
+	UWidgetModuleStatics::DestroyUserWidget<UUserWidgetBase>(bRecovery, GetClass());
 }
 
 void UUserWidgetBase::FinishOpen(bool bInstant)
@@ -371,12 +371,12 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
-	UInputModuleBPLibrary::UpdateGlobalInputMode();
+	UInputModuleStatics::UpdateGlobalInputMode();
 }
 
 USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(USubWidgetBase* SubWidget = UObjectPoolModuleBPLibrary::SpawnObject<USubWidgetBase>(nullptr, InClass))
+	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;
@@ -390,7 +390,7 @@ bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, 
 
 	InWidget->OnDestroy();
 
-	UObjectPoolModuleBPLibrary::DespawnObject(InWidget, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(InWidget, bRecovery);
 	return true;
 }
 

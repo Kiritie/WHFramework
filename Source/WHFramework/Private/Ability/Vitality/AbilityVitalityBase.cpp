@@ -7,10 +7,10 @@
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
-#include "Asset/AssetModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonBPLibrary.h"
-#include "Scene/SceneModuleBPLibrary.h"
+#include "Common/CommonStatics.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
@@ -224,7 +224,7 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
@@ -242,7 +242,7 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)
 		{
-			USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -251,7 +251,7 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleBPLibrary::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
 	if (GetHealth() <= 0.f)
 	{

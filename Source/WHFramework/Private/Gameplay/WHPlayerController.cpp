@@ -5,10 +5,11 @@
 #include "Camera/Base/CameraManagerBase.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
+#include "Debug/DebugModuleTypes.h"
+#include "Input/Components/InputComponentBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
-#include "Procedure/ProcedureModule.h"
 
 AWHPlayerController::AWHPlayerController()
 {
@@ -81,6 +82,8 @@ void AWHPlayerController::OnUnPossess()
 void AWHPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
+
+	ensureEditorMsgf(InputComponent->IsA<UInputComponentBase>(), FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
 }
 
 void AWHPlayerController::Tick(float DeltaSeconds) 
@@ -105,7 +108,7 @@ bool AWHPlayerController::RaycastSingleFromAimPoint(float InRayDistance, ECollis
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonStatics::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }
@@ -122,7 +125,7 @@ bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, EC
 		TArray<AActor*> ignoreActors = InIgnoreActors;
 		ignoreActors.AddUnique(GetPawn());
 		ignoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonBPLibrary::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, rayStart, rayEnd, UCommonStatics::GetGameTraceType(InGameTraceChannel), false, ignoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }

@@ -7,6 +7,7 @@
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
+#include "Common/Base/WHActor.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"

@@ -4,7 +4,7 @@
 
 #include "Common/Base/WHObject.h"
 #include "UObject/Object.h"
-#include "WebRequest/WebRequestModuleBPLibrary.h"
+#include "WebRequest/WebRequestModuleStatics.h"
 #include "WebRequest/WebRequestModuleTypes.h"
 #include "WebInterfaceBase.generated.h"
 

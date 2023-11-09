@@ -3,7 +3,7 @@
 
 #include "Voxel/Voxels/Entity/VoxelEntity.h"
 
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -57,7 +57,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			if(!Auxiliary)
 			{
-				Auxiliary = UObjectPoolModuleBPLibrary::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass);
+				Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, VoxelData.AuxiliaryClass);
 				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
 			}
@@ -87,6 +87,6 @@ void AVoxelEntity::DestroyAuxiliary()
 	if(!Auxiliary) return;
 	
 	Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	UObjectPoolModuleBPLibrary::DespawnObject(Auxiliary);
+	UObjectPoolModuleStatics::DespawnObject(Auxiliary);
 	Auxiliary = nullptr;
 }

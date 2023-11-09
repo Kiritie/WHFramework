@@ -12,8 +12,8 @@ void UWidgetAchievementProgressDetails::UpdateDetails()
 	AchievementProgressBar->SetFillColorAndOpacity(ProgressBarColour);
 	Title->SetVisibility(TitleText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 
-	int32 TotalAchieved = AAchievementModule::Get()->GetAchievedAchievementCount();
-	int32 Total = AAchievementModule::Get()->Achievements.Num();
+	int32 TotalAchieved = UAchievementModule::Get()->GetAchievedAchievementCount();
+	int32 Total = UAchievementModule::Get()->Achievements.Num();
 	float Progress = (float)TotalAchieved / (float)Total;
 
 	FString ProgressString = UKismetTextLibrary::Conv_DoubleToText(Progress * 100, ERoundingMode::HalfFromZero, false, false, 1, 324, 0, TotalProgressMaxDecimalPlaces).ToString();

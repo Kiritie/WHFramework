@@ -5,7 +5,7 @@
 
 #include "SlateOptMacros.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Step/Widget/SStepEditorWidget.h"
 #include "Step/Widget/SStepListWidget.h"
 
@@ -38,7 +38,7 @@ void SStepToolbarWidget::Construct(const FArguments& InArgs)
 				FExecuteAction::CreateRaw(this, &SStepToolbarWidget::OnPreviewModeToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return UCommonBPLibrary::IsPlaying();
+					return UCommonStatics::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;

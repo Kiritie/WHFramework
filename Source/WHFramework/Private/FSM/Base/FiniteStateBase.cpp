@@ -3,11 +3,11 @@
 #include "FSM/Base/FiniteStateBase.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/FiniteState/EventHandle_EnterFiniteState.h"
 #include "Event/Handle/FiniteState/EventHandle_LeaveFiniteState.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
@@ -16,10 +16,10 @@ UFiniteStateBase::UFiniteStateBase()
 	FSM = nullptr;
 
 	const UFunction* OnEnterValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnEnterValidate")));
-	bHasBlueprintOnEnterValidate = UCommonBPLibrary::IsImplementedInBlueprint(OnEnterValidateFunction);
+	bHasBlueprintOnEnterValidate = UCommonStatics::IsImplementedInBlueprint(OnEnterValidateFunction);
 
 	const UFunction* OnLeaveValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnLeaveValidate")));
-	bHasBlueprintOnLeaveValidate = UCommonBPLibrary::IsImplementedInBlueprint(OnLeaveValidateFunction);
+	bHasBlueprintOnLeaveValidate = UCommonStatics::IsImplementedInBlueprint(OnLeaveValidateFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -55,7 +55,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	K2_OnEnter(InLastFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
 }
 
 void UFiniteStateBase::OnRefresh()
@@ -78,7 +78,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	K2_OnLeave(InNextFiniteState);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), EEventNetType::Single, this, {this, FSM});
 }
 
 void UFiniteStateBase::OnTermination()

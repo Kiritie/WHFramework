@@ -4,12 +4,12 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
 #include "Ability/AbilityModule.h"
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Common/Components/FallingMovementComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 AAbilityPickUpBase::AAbilityPickUpBase()
 {
@@ -33,7 +33,7 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	FallingComponent->TraceChannel = UAbilityModuleBPLibrary::GetPickUpTraceChannel();
+	FallingComponent->TraceChannel = UAbilityModuleStatics::GetPickUpTraceChannel();
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
@@ -70,7 +70,7 @@ void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 {
 	if(InPicker && InPicker->OnPickUp(this))
 	{
-		UObjectPoolModuleBPLibrary::DespawnObject(this);
+		UObjectPoolModuleStatics::DespawnObject(this);
 	}
 }
 

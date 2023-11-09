@@ -61,7 +61,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	class AStepModule* StepModule;
+	class UStepModule* StepModule;
 	
 	TSharedPtr<FTabManager> TabManager;
 	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;

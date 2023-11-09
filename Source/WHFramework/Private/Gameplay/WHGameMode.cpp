@@ -11,6 +11,8 @@ AWHGameMode::AWHGameMode()
 	PrimaryActorTick.bCanEverTick = true;
 
 	DefaultPawnClass = nullptr;
+	PlayerControllerClass = AWHPlayerController::StaticClass();
+	GameStateClass = AWHGameState::StaticClass();
 }
 
 void AWHGameMode::OnInitialize_Implementation()
@@ -25,14 +27,7 @@ void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		if(InPhase != EPhase::Final)
-		{
-			MainModule->Execute_OnPreparatory(MainModule, InPhase);
-		}
-		else if(MainModule->IsAutoRunModule())
-		{
-			MainModule->Run();
-		}
+		MainModule->Execute_OnPreparatory(MainModule, InPhase);
 	}
 }
 
@@ -40,10 +35,7 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		if(MainModule->GetModuleState() == EModuleState::Running)
-		{
-			MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
-		}
+		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
 	}
 }
 

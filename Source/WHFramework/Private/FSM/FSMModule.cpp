@@ -6,66 +6,67 @@
 #include "FSM/FSMModuleNetworkComponent.h"
 #include "FSM/Components/FSMComponent.h"
 		
-IMPLEMENTATION_MODULE(AFSMModule)
+IMPLEMENTATION_MODULE(UFSMModule)
 
 // ParamSets default values
-AFSMModule::AFSMModule()
+UFSMModule::UFSMModule()
 {
 	ModuleName = FName("FSMModule");
+	ModuleDisplayName = FText::FromString(TEXT("FSM Module"));
 
 	ModuleNetworkComponent = UFSMModuleNetworkComponent::StaticClass();
 
 	GroupMap = TMap<FName, FFSMGroupInfo>();
 }
 
-AFSMModule::~AFSMModule()
+UFSMModule::~UFSMModule()
 {
-	TERMINATION_MODULE(AFSMModule)
+	TERMINATION_MODULE(UFSMModule)
 }
 
 #if WITH_EDITOR
-void AFSMModule::OnGenerate()
+void UFSMModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AFSMModule::OnDestroy()
+void UFSMModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AFSMModule::OnInitialize_Implementation()
+void UFSMModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AFSMModule::OnPreparatory_Implementation(EPhase InPhase)
+void UFSMModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void AFSMModule::OnRefresh_Implementation(float DeltaSeconds)
+void UFSMModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AFSMModule::OnPause_Implementation()
+void UFSMModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AFSMModule::OnUnPause_Implementation()
+void UFSMModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AFSMModule::OnTermination_Implementation(EPhase InPhase)
+void UFSMModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 }
 
-void AFSMModule::RegisterFSM(UFSMComponent* InFSM)
+void UFSMModule::RegisterFSM(UFSMComponent* InFSM)
 {
 	if(!HasGroup(InFSM->GroupName)) GroupMap.Add(InFSM->GroupName);
 
@@ -75,7 +76,7 @@ void AFSMModule::RegisterFSM(UFSMComponent* InFSM)
 	}
 }
 
-void AFSMModule::UnregisterFSM(UFSMComponent* InFSM)
+void UFSMModule::UnregisterFSM(UFSMComponent* InFSM)
 {
 	if(!HasGroup(InFSM->GroupName)) return;
 
@@ -85,7 +86,7 @@ void AFSMModule::UnregisterFSM(UFSMComponent* InFSM)
 	}
 }
 
-void AFSMModule::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex)
+void UFSMModule::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex)
 {
 	if(!HasGroup(InGroupName)) return;
 
@@ -95,7 +96,7 @@ void AFSMModule::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateI
 	}
 }
 
-void AFSMModule::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass)
+void UFSMModule::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass)
 {
 	if(!HasGroup(InGroupName)) return;
 
@@ -105,7 +106,7 @@ void AFSMModule::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UF
 	}
 }
 
-void AFSMModule::SwitchGroupDefaultState(const FName InGroupName)
+void UFSMModule::SwitchGroupDefaultState(const FName InGroupName)
 {
 	if(!HasGroup(InGroupName)) return;
 
@@ -115,7 +116,7 @@ void AFSMModule::SwitchGroupDefaultState(const FName InGroupName)
 	}
 }
 
-void AFSMModule::SwitchGroupFinalState(const FName InGroupName)
+void UFSMModule::SwitchGroupFinalState(const FName InGroupName)
 {
 	if(!HasGroup(InGroupName)) return;
 
@@ -125,7 +126,7 @@ void AFSMModule::SwitchGroupFinalState(const FName InGroupName)
 	}
 }
 
-void AFSMModule::SwitchGroupLastState(const FName InGroupName)
+void UFSMModule::SwitchGroupLastState(const FName InGroupName)
 {
 	if(!HasGroup(InGroupName)) return;
 
@@ -135,7 +136,7 @@ void AFSMModule::SwitchGroupLastState(const FName InGroupName)
 	}
 }
 
-void AFSMModule::SwitchGroupNextState(const FName InGroupName)
+void UFSMModule::SwitchGroupNextState(const FName InGroupName)
 {
 	if(!HasGroup(InGroupName)) return;
 

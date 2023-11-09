@@ -5,9 +5,8 @@
 #include "Common/Targeting/TargetingAgentInterface.h"
 #include "Components/WidgetComponent.h"
 #include "EngineUtils.h"
+#include "Camera/CameraComponent.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Engine/Classes/Camera/CameraComponent.h"
-#include "Engine/Public/TimerManager.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -27,16 +26,14 @@ void UTargetingComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	OwnerActor = GetOwner();
-	if (!OwnerActor)
+	if (!ensureEditorMsgf(OwnerActor, FString::Printf(TEXT("[%s] TargetingComponent: Cannot get Owner reference ..."), *GetName()), EDC_Ability, EDV_Error))
 	{
-		WHLog(FString::Printf(TEXT("[%s] TargetingComponent: Cannot get Owner reference ..."), *GetName()), EDC_Ability, EDV_Error);
 		return;
 	}
 
 	OwnerPawn = Cast<APawn>(OwnerActor);
-	if (!ensure(OwnerPawn))
+	if (!ensureEditorMsgf(OwnerPawn, FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Ability, EDV_Error))
 	{
-		WHLog(FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Ability, EDV_Error);
 		return;
 	}
 

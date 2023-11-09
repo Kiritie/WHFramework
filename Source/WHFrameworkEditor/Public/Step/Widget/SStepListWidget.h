@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SStepListWidget) {}
 
-		SLATE_ARGUMENT(class AStepModule*, StepModule)
+		SLATE_ARGUMENT(class UStepModule*, StepModule)
 
 	SLATE_END_ARGS()
 
@@ -54,7 +54,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	AStepModule* StepModule;
+	UStepModule* StepModule;
 
 	UStepBase* CopiedStep;
 

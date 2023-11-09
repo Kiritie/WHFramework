@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Camera/Base/CameraActorBase.h"
-#include "Gameplay/WHPlayerInterface.h"
 #include "RoamCameraActor.generated.h"
 
 UCLASS()

@@ -15,16 +15,16 @@ class UInputActionBase;
 class UEnhancedInputComponent;
 
 UCLASS()
-class WHFRAMEWORK_API AInputModule : public AModuleBase, public IInputManager
+class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManager
 {
 	GENERATED_BODY()
 			
-	GENERATED_MODULE(AInputModule)
+	GENERATED_MODULE(UInputModule)
 
 public:	
-	AInputModule();
+	UInputModule();
 
-	~AInputModule();
+	~UInputModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -35,19 +35,19 @@ public:
 	virtual void OnDestroy() override;
 #endif
 	
-	virtual void OnInitialize_Implementation() override;
+	virtual void OnInitialize() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual void OnReset_Implementation() override;
 
-	virtual void OnPause_Implementation() override;
+	virtual void OnPause() override;
 
-	virtual void OnUnPause_Implementation() override;
+	virtual void OnUnPause() override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;

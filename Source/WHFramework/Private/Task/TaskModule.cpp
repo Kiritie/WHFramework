@@ -6,17 +6,18 @@
 #include "Main/MainModule.h"
 #include "Task/Base/TaskBase.h"
 #include "Character/CharacterModuleTypes.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/TaskSaveGame.h"
 #include "Task/TaskModuleNetworkComponent.h"
 
-IMPLEMENTATION_MODULE(ATaskModule)
+IMPLEMENTATION_MODULE(UTaskModule)
 
 // ParamSets default values
-ATaskModule::ATaskModule()
+UTaskModule::UTaskModule()
 {
 	ModuleName = FName("TaskModule");
-	
+	ModuleDisplayName = FText::FromString(TEXT("Task Module"));
+
 	ModuleSaveGame = UTaskSaveGame::StaticClass();
 
 	ModuleNetworkComponent = UTaskModuleNetworkComponent::StaticClass();
@@ -30,18 +31,18 @@ ATaskModule::ATaskModule()
 	TaskMap = TMap<FString, UTaskBase*>();
 }
 
-ATaskModule::~ATaskModule()
+UTaskModule::~UTaskModule()
 {
-	TERMINATION_MODULE(ATaskModule)
+	TERMINATION_MODULE(UTaskModule)
 }
 
 #if WITH_EDITOR
-void ATaskModule::OnGenerate()
+void UTaskModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void ATaskModule::OnDestroy()
+void UTaskModule::OnDestroy()
 {
 	Super::OnDestroy();
 
@@ -49,14 +50,14 @@ void ATaskModule::OnDestroy()
 }
 #endif
 
-void ATaskModule::OnInitialize_Implementation()
+void UTaskModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
+void UTaskModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -88,9 +89,9 @@ void ATaskModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void ATaskModule::OnRefresh_Implementation(float DeltaSeconds)
+void UTaskModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 
 	if(CurrentTask)
 	{
@@ -126,19 +127,19 @@ void ATaskModule::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void ATaskModule::OnPause_Implementation()
+void UTaskModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void ATaskModule::OnUnPause_Implementation()
+void UTaskModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void ATaskModule::OnTermination_Implementation(EPhase InPhase)
+void UTaskModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -149,7 +150,7 @@ void ATaskModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void ATaskModule::Serialize(FArchive& Ar)
+void UTaskModule::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
@@ -166,7 +167,7 @@ void ATaskModule::Serialize(FArchive& Ar)
 	}
 }
 
-void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
@@ -183,7 +184,7 @@ void ATaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-void ATaskModule::UnloadData(EPhase InPhase)
+void UTaskModule::UnloadData(EPhase InPhase)
 {
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -199,7 +200,7 @@ void ATaskModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FSaveData* ATaskModule::ToData()
+FSaveData* UTaskModule::ToData()
 {
 	static FTaskModuleSaveData SaveData;
 	SaveData = FTaskModuleSaveData();
@@ -211,7 +212,7 @@ FSaveData* ATaskModule::ToData()
 	return &SaveData;
 }
 
-void ATaskModule::RestoreTask(UTaskBase* InTask)
+void UTaskModule::RestoreTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->GetTaskState() != ETaskState::None)
 	{
@@ -219,7 +220,7 @@ void ATaskModule::RestoreTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::EnterTask(UTaskBase* InTask)
+void UTaskModule::EnterTask(UTaskBase* InTask)
 {
 	if(!InTask || InTask->TaskEnterType == ETaskEnterType::None) return;
 
@@ -247,7 +248,7 @@ void ATaskModule::EnterTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::RefreshTask(UTaskBase* InTask)
+void UTaskModule::RefreshTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->GetTaskState() == ETaskState::Executing)
 	{
@@ -255,7 +256,7 @@ void ATaskModule::RefreshTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::GuideTask(UTaskBase* InTask)
+void UTaskModule::GuideTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->IsEntered())
 	{
@@ -263,7 +264,7 @@ void ATaskModule::GuideTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::ExecuteTask(UTaskBase* InTask)
+void UTaskModule::ExecuteTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->GetTaskState() == ETaskState::Entered)
 	{
@@ -271,7 +272,7 @@ void ATaskModule::ExecuteTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
+void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
 {
 	if(!InTask) return;
 
@@ -293,7 +294,7 @@ void ATaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 	}
 }
 
-void ATaskModule::LeaveTask(UTaskBase* InTask)
+void UTaskModule::LeaveTask(UTaskBase* InTask)
 {
 	if(!InTask) return;
 	
@@ -307,7 +308,7 @@ void ATaskModule::LeaveTask(UTaskBase* InTask)
 	}
 }
 
-void ATaskModule::ClearAllTask()
+void UTaskModule::ClearAllTask()
 {
 	for(auto Iter : RootTasks)
 	{
@@ -328,7 +329,7 @@ void ATaskModule::ClearAllTask()
 	Modify();
 }
 
-bool ATaskModule::IsAllTaskCompleted()
+bool UTaskModule::IsAllTaskCompleted()
 {
 	for(auto Iter : RootTasks)
 	{
@@ -340,7 +341,7 @@ bool ATaskModule::IsAllTaskCompleted()
 	return true;
 }
 
-UTaskBase* ATaskModule::GetCurrentRootTask() const
+UTaskBase* UTaskModule::GetCurrentRootTask() const
 {
 	if(CurrentTask)
 	{
@@ -350,7 +351,7 @@ UTaskBase* ATaskModule::GetCurrentRootTask() const
 }
 
 #if WITH_EDITOR
-void ATaskModule::GenerateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
+void UTaskModule::GenerateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
 {
 	OutTaskListItems = TArray<TSharedPtr<FTaskListItem>>();
 	for (int32 i = 0; i < RootTasks.Num(); i++)
@@ -361,7 +362,7 @@ void ATaskModule::GenerateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskLis
 	}
 }
 
-void ATaskModule::UpdateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
+void UTaskModule::UpdateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
 {
 	for (int32 i = 0; i < RootTasks.Num(); i++)
 	{

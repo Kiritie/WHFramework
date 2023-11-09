@@ -7,7 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "Input/InputManager.h"
 #include "Input/InputModule.h"
-#include "ObjectPool/ObjectPoolModuleBPLibrary.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Widget/Screen/Slate/SSlateWidgetBase.h"
@@ -17,16 +17,16 @@
 #include "WidgetModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API AWidgetModule : public AModuleBase, public IInputManager
+class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManager
 {
 	GENERATED_BODY()
 			
-	GENERATED_MODULE(AWidgetModule)
+	GENERATED_MODULE(UWidgetModule)
 
 public:	
-	AWidgetModule();
+	UWidgetModule();
 
-	~AWidgetModule();
+	~UWidgetModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -37,17 +37,17 @@ public:
 	virtual void OnDestroy() override;
 #endif
 	
-	virtual void OnInitialize_Implementation() override;
+	virtual void OnInitialize() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
-	virtual void OnPause_Implementation() override;
+	virtual void OnPause() override;
 
-	virtual void OnUnPause_Implementation() override;
+	virtual void OnUnPause() override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination(EPhase InPhase) override;
 
 	////////////////////////////////////////////////////
 	// UserWidget
@@ -163,7 +163,7 @@ public:
 		
 		if(!UserWidgetClassMap.Contains(InName))
 		{
-			WHEnsureEditorMsgf(true, FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
 			return nullptr;
 		}
 
@@ -171,7 +171,7 @@ public:
 		
 		if(!HasUserWidgetByName(InName))
 		{
-			UserWidget = UObjectPoolModuleBPLibrary::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InName]);
+			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
 				AllUserWidgets.Add(InName, UserWidget);
@@ -591,11 +591,11 @@ public:
 	{
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
-			WHEnsureEditorMsgf(true, FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
 			return nullptr;
 		}
 		
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleBPLibrary::SpawnObject<UWorldWidgetBase>(nullptr, WorldWidgetClassMap[InName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, WorldWidgetClassMap[InName]))
 		{
 			if(!AllWorldWidgets.Contains(InName))
 			{

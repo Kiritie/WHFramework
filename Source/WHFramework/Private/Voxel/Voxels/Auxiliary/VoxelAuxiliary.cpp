@@ -33,12 +33,12 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			case EVoxelMeshNature::Chunk:
 			{
-				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
+				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModule::Get()->GetWorldData().BlockSize * 0.5f);
 				break;
 			}
 			case EVoxelMeshNature::Vitality:
 			{
-				SetActorRelativeLocation(FVector(0.f, 0.f, VoxelItem.GetRange().Z * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f));
+				SetActorRelativeLocation(FVector(0.f, 0.f, VoxelItem.GetRange().Z * UVoxelModule::Get()->GetWorldData().BlockSize * 0.5f));
 				break;
 			}
 			default: break;

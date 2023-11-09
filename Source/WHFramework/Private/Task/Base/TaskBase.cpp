@@ -3,14 +3,14 @@
 
 #include "Task/Base/TaskBase.h"
 
-#include "Event/EventModuleBPLibrary.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Task/EventHandle_CompleteTask.h"
 #include "Event/Handle/Task/EventHandle_EnterTask.h"
 #include "Event/Handle/Task/EventHandle_ExecuteTask.h"
 #include "Event/Handle/Task/EventHandle_LeaveTask.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Task/TaskModule.h"
-#include "Task/TaskModuleBPLibrary.h"
+#include "Task/TaskModuleStatics.h"
 
 UTaskBase::UTaskBase()
 {
@@ -60,7 +60,7 @@ void UTaskBase::OnUnGenerate()
 {
 	if(bFirstTask)
 	{
-		if(ATaskModule* TaskModule = ATaskModule::Get(true))
+		if(UTaskModule* TaskModule = UTaskModule::Get(true))
 		{
 			if(TaskModule->GetFirstTask() == this)
 			{
@@ -138,7 +138,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 		default: break;
 	}
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_EnterTask::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubTask)
 	{
@@ -216,7 +216,7 @@ void UTaskBase::OnExecute()
 
 	K2_OnExecute();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_ExecuteTask::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(TaskState != ETaskState::Completed)
 	{
@@ -259,7 +259,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	
 	K2_OnComplete(InTaskExecuteResult);
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
@@ -285,7 +285,7 @@ void UTaskBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleBPLibrary::BroadcastEvent(UEventHandle_LeaveTask::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveTask::StaticClass(), EEventNetType::Single, this, {this});
 
 	if(bMergeSubTask)
 	{
@@ -350,37 +350,37 @@ bool UTaskBase::IsParentOf(UTaskBase* InTask) const
 
 void UTaskBase::Restore()
 {
-	UTaskModuleBPLibrary::RestoreTask(this);
+	UTaskModuleStatics::RestoreTask(this);
 }
 
 void UTaskBase::Enter()
 {
-	UTaskModuleBPLibrary::EnterTask(this);
+	UTaskModuleStatics::EnterTask(this);
 }
 
 void UTaskBase::Refresh()
 {
-	UTaskModuleBPLibrary::RefreshTask(this);
+	UTaskModuleStatics::RefreshTask(this);
 }
 
 void UTaskBase::Guide()
 {
-	UTaskModuleBPLibrary::GuideTask(this);
+	UTaskModuleStatics::GuideTask(this);
 }
 
 void UTaskBase::Execute()
 {
-	UTaskModuleBPLibrary::ExecuteTask(this);
+	UTaskModuleStatics::ExecuteTask(this);
 }
 
 void UTaskBase::Complete(ETaskExecuteResult InTaskExecuteResult)
 {
-	UTaskModuleBPLibrary::CompleteTask(this, InTaskExecuteResult);
+	UTaskModuleStatics::CompleteTask(this, InTaskExecuteResult);
 }
 
 void UTaskBase::Leave()
 {
-	UTaskModuleBPLibrary::LeaveTask(this);
+	UTaskModuleStatics::LeaveTask(this);
 }
 
 void UTaskBase::Serialize(FArchive& Ar)
@@ -582,7 +582,7 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, bFirstTask))
 		{
-			if(ATaskModule* TaskModule = ATaskModule::Get(true))
+			if(UTaskModule* TaskModule = UTaskModule::Get(true))
 			{
 				if(bFirstTask)
 				{

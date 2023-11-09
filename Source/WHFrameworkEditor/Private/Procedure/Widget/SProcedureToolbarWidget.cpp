@@ -37,7 +37,7 @@ void SProcedureToolbarWidget::Construct(const FArguments& InArgs)
 				FExecuteAction::CreateRaw(this, &SProcedureToolbarWidget::OnPreviewModeToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return UCommonBPLibrary::IsPlaying();
+					return UCommonStatics::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;

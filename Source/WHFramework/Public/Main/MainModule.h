@@ -2,13 +2,14 @@
 
 #pragma once
 
-#include "Base/ModuleNetworkComponentBase.h"
 #include "Base/ModuleBase.h"
+#include "Base/ModuleNetworkComponentBase.h"
+#include "Common/Base/WHActor.h"
 
 #include "MainModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API AMainModule : public AModuleBase
+class WHFRAMEWORK_API AMainModule : public AWHActor
 {
 #if WITH_EDITOR
 	friend class FMainModuleDetailsPanel;
@@ -28,9 +29,9 @@ public:
 	/// Module
 public:
 #if WITH_EDITOR
-	virtual void OnGenerate() override;
+	virtual void OnGenerate();
 
-	virtual void OnDestroy() override;
+	virtual void OnDestroy();
 #endif
 	
 	virtual void OnInitialize_Implementation() override;
@@ -39,19 +40,18 @@ public:
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnPause_Implementation() override;
-
-	virtual void OnUnPause_Implementation() override;
-
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+protected:
+	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Modules
 public:	
 #if WITH_EDITOR
-	virtual void GenerateModules();
+	void GenerateModules();
     
-	virtual void DestroyModules();
+	void DestroyModules();
 #endif
 
 	UFUNCTION(BlueprintNativeEvent)
@@ -61,16 +61,16 @@ public:
     void UnPauseModules();
 
 protected:
-	/// 模块类
-	UPROPERTY(EditAnywhere)
-	TArray<TSubclassOf<AModuleBase>> ModuleClasses;
 	/// 模块列表
-	UPROPERTY(EditAnywhere, Replicated)
-	TArray<AModuleBase*> ModuleRefs;
+	UPROPERTY(VisibleAnywhere)
+	TArray<UModuleBase*> Modules;
 	UPROPERTY()
-	TMap<FName, AModuleBase*> ModuleMap;
+	TMap<FName, UModuleBase*> ModuleMap;
 
 public:
+	TArray<UModuleBase*>& GetModules() { return Modules; }
+
+	TMap<FName, UModuleBase*>& GetModuleMap() { return ModuleMap; }
 	/**
 	 * 通过类型运行模块
 	 */
@@ -87,7 +87,7 @@ public:
 	*/
 	static void RunModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
+		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
 		{
 			Module->Run();
 		}
@@ -108,7 +108,7 @@ public:
 	*/
 	static void ResetModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
+		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
 		{
 			Module->Reset();
 		}
@@ -129,7 +129,7 @@ public:
 	*/
 	static void PauseModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
+		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
 		{
 			Module->Pause();
 		}
@@ -150,7 +150,7 @@ public:
 	*/
 	static void UnPauseModuleByName(const FName InName)
 	{
-		if(AModuleBase* Module = GetModuleByName<AModuleBase>(InName))
+		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
 		{
 			Module->UnPause();
 		}
@@ -160,14 +160,14 @@ public:
 	/**
 	* 获取所有模块
 	*/
-	static TArray<AModuleBase*> GetAllModule(bool bInEditor = false)
+	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
 	{
 		AMainModule* MainModule = Get(bInEditor);
 		if(MainModule && MainModule->IsValidLowLevel())
 		{
-			return MainModule->ModuleRefs;
+			return MainModule->Modules;
 		}
-		return TArray<AModuleBase*>();
+		return TArray<UModuleBase*>();
 	}
 	/**
 	 * 通过类型获取模块
@@ -208,4 +208,13 @@ protected:
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Editor
+public:
+	#if WITH_EDITOR
+	void GenerateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
+
+	void UpdateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
+	#endif
 };

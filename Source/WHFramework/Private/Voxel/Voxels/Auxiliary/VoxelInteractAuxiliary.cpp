@@ -37,13 +37,13 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			Interaction->AddInteractAction(Iter);
 		}
 		Interaction->SetInteractable(VoxelItem.Owner != nullptr);
-		Interaction->SetBoxExtent(VoxelItem.GetRange() * AVoxelModule::Get()->GetWorldData().BlockSize * FVector(1.f, 1.f, 0.5f));
+		Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get()->GetWorldData().BlockSize * FVector(1.f, 1.f, 0.5f));
 	}
 }
 
 bool AVoxelInteractAuxiliary::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
-	switch (InInteractAction)
+	switch ((EVoxelInteractAction)InInteractAction)
 	{
 		case EVoxelInteractAction::Open:
 		{
@@ -81,7 +81,7 @@ void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInte
 {
 	if(!bPassivity) return;
 	
-	switch (InInteractAction)
+	switch ((EVoxelInteractAction)InInteractAction)
 	{
 		case EVoxelInteractAction::Open:
 		{

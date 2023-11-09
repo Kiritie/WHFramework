@@ -4,39 +4,40 @@
 #include "Asset/AssetModule.h"
 #include "Asset/AssetModuleTypes.h"
 		
-IMPLEMENTATION_MODULE(AAssetModule)
+IMPLEMENTATION_MODULE(UAssetModule)
 
 // Sets default values
-AAssetModule::AAssetModule()
+UAssetModule::UAssetModule()
 {
 	ModuleName = FName("AssetModule");
+	ModuleDisplayName = FText::FromString(TEXT("Asset Module"));
 }
 
-AAssetModule::~AAssetModule()
+UAssetModule::~UAssetModule()
 {
-	TERMINATION_MODULE(AAssetModule)
+	TERMINATION_MODULE(UAssetModule)
 }
 
 #if WITH_EDITOR
-void AAssetModule::OnGenerate()
+void UAssetModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AAssetModule::OnDestroy()
+void UAssetModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AAssetModule::OnInitialize_Implementation()
+void UAssetModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AAssetModule::OnPreparatory_Implementation(EPhase InPhase)
+void UAssetModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -75,24 +76,24 @@ void AAssetModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AAssetModule::OnRefresh_Implementation(float DeltaSeconds)
+void UAssetModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AAssetModule::OnPause_Implementation()
+void UAssetModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AAssetModule::OnUnPause_Implementation()
+void UAssetModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AAssetModule::OnTermination_Implementation(EPhase InPhase)
+void UAssetModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -100,17 +101,17 @@ void AAssetModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AAssetModule::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
+void UAssetModule::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
 {
 	StaticClasses.Add(InName, InStaticClass);
 }
 
-UClass* AAssetModule::GetStaticClass(const FName InName)
+UClass* UAssetModule::GetStaticClass(const FName InName)
 {
 	return StaticClasses[InName].LoadedClass;
 }
 
-UClass* AAssetModule::FindClass(const FString& InName, bool bExactClass)
+UClass* UAssetModule::FindClass(const FString& InName, bool bExactClass)
 {
 	if(!ClassMappings.Contains(InName))
 	{
@@ -119,7 +120,7 @@ UClass* AAssetModule::FindClass(const FString& InName, bool bExactClass)
 	return ClassMappings[InName];
 }
 
-UClass* AAssetModule::LoadClass(UClass* InClass, const FString& InName)
+UClass* UAssetModule::LoadClass(UClass* InClass, const FString& InName)
 {
 	if(!ClassMappings.Contains(InName))
 	{
@@ -128,17 +129,17 @@ UClass* AAssetModule::LoadClass(UClass* InClass, const FString& InName)
 	return ClassMappings[InName];
 }
 
-void AAssetModule::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
+void UAssetModule::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
 {
 	StaticObjects.Add(InName, InStaticObject);
 }
 
-UObject* AAssetModule::GetStaticObject(UClass* InClass, const FName InName)
+UObject* UAssetModule::GetStaticObject(UClass* InClass, const FName InName)
 {
 	return StaticObjects[InName].LoadedObject;
 }
 
-UObject* AAssetModule::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
+UObject* UAssetModule::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
 {
 	if(!ObjectMappings.Contains(InName))
 	{
@@ -147,7 +148,7 @@ UObject* AAssetModule::FindObject(UClass* InClass, const FString& InName, bool b
 	return ObjectMappings[InName];
 }
 
-UObject* AAssetModule::LoadObject(UClass* InClass, const FString& InName)
+UObject* UAssetModule::LoadObject(UClass* InClass, const FString& InName)
 {
 	if(!ObjectMappings.Contains(InName))
 	{
@@ -156,7 +157,7 @@ UObject* AAssetModule::LoadObject(UClass* InClass, const FString& InName)
 	return ObjectMappings[InName];
 }
 
-UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
+UEnum* UAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
 {
 	if(EnumMappings.Contains(InEnumName))
 	{
@@ -174,7 +175,7 @@ UEnum* AAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValu
 	return FindObject<UEnum>(InEnumName, bExactClass);
 }
 
-UEnum* AAssetModule::FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
+UEnum* UAssetModule::FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
 {
 	if(EnumMappings.Contains(InEnumName))
 	{
@@ -192,7 +193,7 @@ UEnum* AAssetModule::FindEnumByAuthoredName(const FString& InEnumName, const FSt
 	return FindObject<UEnum>(InEnumName, bExactClass);
 }
 
-UEnum* AAssetModule::FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
+UEnum* UAssetModule::FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
 {
 	if(EnumMappings.Contains(InEnumName))
 	{
@@ -213,7 +214,7 @@ UEnum* AAssetModule::FindEnumByDisplayName(const FString& InEnumName, const FStr
 	return FindObject<UEnum>(InEnumName, bExactClass);
 }
 
-void AAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
+void UAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
 	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
 	if(!Mappings.EnumNames.Contains(InOtherName))
@@ -222,7 +223,7 @@ void AAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOt
 	}
 }
 
-void AAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
+void UAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
 	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
 	if(Mappings.EnumNames.Contains(InOtherName))
@@ -231,12 +232,12 @@ void AAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& I
 	}
 }
 
-bool AAssetModule::HasDataAsset(FName InName) const
+bool UAssetModule::HasDataAsset(FName InName) const
 {
 	return DataAssetMap.Contains(InName);
 }
 
-UDataAssetBase* AAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName) const
+UDataAssetBase* UAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName) const
 {
 	if(!InClass) return nullptr;
 	
@@ -245,7 +246,7 @@ UDataAssetBase* AAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, 
 	return GetDataAsset<UDataAssetBase>(InName);
 }
 
-UDataAssetBase* AAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+UDataAssetBase* UAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
 {
 	if(!InClass) return nullptr;
 
@@ -254,7 +255,7 @@ UDataAssetBase* AAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InClas
 	return CreateDataAsset<UDataAssetBase>(InName);
 }
 
-bool AAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+bool UAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
 {
 	if(!InClass) return false;
 
@@ -263,7 +264,7 @@ bool AAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName In
 	return RemoveDataAsset<UDataAssetBase>(InName);
 }
 
-void AAssetModule::RemoveAllDataAsset()
+void UAssetModule::RemoveAllDataAsset()
 {
 	for (auto Iter : DataAssetMap)
 	{
@@ -273,7 +274,7 @@ void AAssetModule::RemoveAllDataAsset()
 	DataAssetMap.Empty();
 }
 
-bool AAssetModule::AddDataTable(UDataTable* InDataTable)
+bool UAssetModule::AddDataTable(UDataTable* InDataTable)
 {
 	if(!InDataTable) return false;
 		
@@ -285,7 +286,7 @@ bool AAssetModule::AddDataTable(UDataTable* InDataTable)
 	return false;
 }
 
-bool AAssetModule::RemoveDataTable(UDataTable* InDataTable)
+bool UAssetModule::RemoveDataTable(UDataTable* InDataTable)
 {
 	if(!InDataTable) return false;
 		
@@ -297,7 +298,7 @@ bool AAssetModule::RemoveDataTable(UDataTable* InDataTable)
 	return false;
 }
 
-void AAssetModule::RemoveAllDataTable()
+void UAssetModule::RemoveAllDataTable()
 {
 	DataTableMap.Empty();
 }

@@ -4,7 +4,7 @@
 
 #include "WebRequest/WebRequestModuleTypes.h"
 
-#include "WebRequest/WebRequestModuleBPLibrary.h"
+#include "WebRequest/WebRequestModuleStatics.h"
 
 FString FWebContent::ToString()
 {

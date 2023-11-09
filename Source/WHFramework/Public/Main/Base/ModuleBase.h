@@ -3,18 +3,19 @@
 #pragma once
 
 
-#include "Common/Base/WHActor.h"
+#include "Common/Base/WHObject.h"
 #include "Main/MainModuleTypes.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "ModuleBase.generated.h"
 
+class AMainModule;
 class USaveGameBase;
 class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
 UCLASS()
-class WHFRAMEWORK_API AModuleBase : public AWHActor, public ISaveDataInterface
+class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -22,7 +23,7 @@ class WHFRAMEWORK_API AModuleBase : public AWHActor, public ISaveDataInterface
 	
 public:	
 	// ParamSets default values for this actor's properties
-	AModuleBase();
+	UModuleBase();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -37,14 +38,55 @@ public:
 	*/
 	virtual void OnDestroy();
 #endif
-	
-	virtual void OnInitialize_Implementation() override;
-
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
-
-	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
-
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	/**
+	* 当初始化
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize();
+	UFUNCTION()
+	virtual void OnInitialize();
+	/**
+	* 当准备
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPreparatory")
+	void K2_OnPreparatory(EPhase InPhase);
+	UFUNCTION()
+	virtual void OnPreparatory(EPhase InPhase);
+	/**
+	* 当暂停
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPause")
+	void K2_OnPause();
+	UFUNCTION()
+	virtual void OnPause();
+	/**
+	* 当恢复
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnUnPause")
+	void K2_OnUnPause();
+	UFUNCTION()
+	virtual void OnUnPause();
+	/**
+	* 当暂停
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh(float DeltaSeconds);
+	UFUNCTION()
+	virtual void OnRefresh(float DeltaSeconds);
+	/**
+	* 当暂停
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
+	void K2_OnTermination(EPhase InPhase);
+	UFUNCTION()
+	virtual void OnTermination(EPhase InPhase);
+	/**
+	* 当状态改变
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
+	void K2_OnStateChanged(EModuleState InModuleState);
+	UFUNCTION()
+	virtual void OnStateChanged(EModuleState InModuleState);
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
@@ -53,28 +95,8 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
-protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
-
 public:
 	virtual void OnReset_Implementation() override;
-
-public:
-	/**
-	* 当暂停
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnPause();
-	/**
-	* 当恢复
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnUnPause();
-	/**
-	* 当状态改变
-	*/
-	UFUNCTION(BlueprintNativeEvent)
-	void OnStateChanged(EModuleState InModuleState);
 
 public:
 	/**
@@ -117,6 +139,12 @@ protected:
 	/// 模块名称
 	UPROPERTY(EditDefaultsOnly)
 	FName ModuleName;
+	/// 模块显示名称
+	UPROPERTY(EditAnywhere)
+	FText ModuleDisplayName;
+	/// 模块描述
+	UPROPERTY(EditAnywhere, meta = (MultiLine = "true"))
+	FText ModuleDescription;
 	/// 模块状态
 	UPROPERTY(VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
@@ -149,10 +177,25 @@ public:
 	UFUNCTION(BlueprintPure)
 	FName GetModuleName() const;
 	/**
+	* 获取模块显示名称
+	*/
+	UFUNCTION(BlueprintPure)
+	FText GetModuleDisplayName() const;
+	/**
+	* 获取模块描述
+	*/
+	UFUNCTION(BlueprintPure)
+	FText GetModuleDescription() const;
+	/**
 	* 获取模块状态
 	*/
 	UFUNCTION(BlueprintPure)
 	EModuleState GetModuleState() const;
+	/**
+	* 获取拥有者
+	*/
+	UFUNCTION(BlueprintPure)
+	AMainModule* GetOwner() const;
 	/**
 	* 获取模块存档
 	*/
@@ -176,4 +219,53 @@ public:
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ModuleListItem
+public:
+	UPROPERTY()
+	FModuleListItemStates ModuleListItemStates;
+public:
+	/**
+	* 构建流程列表项
+	*/
+	virtual int32 GetModuleIndex() const;
+	/**
+	* 构建流程列表项
+	*/
+	virtual void GenerateListItem(TSharedPtr<struct FModuleListItem> OutModuleListItem);
+	/**
+	* 更新流程列表项
+	*/
+	virtual void UpdateListItem(TSharedPtr<struct FModuleListItem> OutModuleListItem);
+
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* InProperty) const override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+};
+
+/**
+ * 流程列表项
+ */ 
+struct FModuleListItem : public TSharedFromThis<FModuleListItem>
+{
+public:
+	FModuleListItem()
+	{
+		Module = nullptr;
+	}
+
+	UModuleBase* Module;
+
+public:
+	FModuleListItemStates& GetStates() const
+	{
+		return Module->ModuleListItemStates;
+	}
+
+	int32 GetModuleIndex() const
+	{
+		return Module->GetModuleIndex();
+	}
 };

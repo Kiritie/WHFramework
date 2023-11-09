@@ -4,17 +4,18 @@
 
 #include "Achievement/Widget/WidgetAchievement.h"
 #include "Achievement/Widget/WidgetAchievementHUD.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/AchievementSaveGame.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Widget/WidgetModuleBPLibrary.h"
+#include "Widget/WidgetModuleStatics.h"
 
-IMPLEMENTATION_MODULE(AAchievementModule)
+IMPLEMENTATION_MODULE(UAchievementModule)
 
 // Sets default values
-AAchievementModule::AAchievementModule()
+UAchievementModule::UAchievementModule()
 {
 	ModuleName = FName("AchievementModule");
+	ModuleDisplayName = FText::FromString(TEXT("Achievement Module"));
 	ModuleSaveGame = UAchievementSaveGame::StaticClass();
 	
 	static ConstructorHelpers::FClassFinder<UWidgetAchievement> AchievementWidgetClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Achievement/Blueprints/Widget/WBP_Achievement.WBP_Achievement_C'"));
@@ -33,33 +34,33 @@ AAchievementModule::AAchievementModule()
 	}
 }
 
-AAchievementModule::~AAchievementModule()
+UAchievementModule::~UAchievementModule()
 {
-	TERMINATION_MODULE(AAchievementModule)
+	TERMINATION_MODULE(UAchievementModule)
 }
 
 #if WITH_EDITOR
-void AAchievementModule::OnGenerate()
+void UAchievementModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AAchievementModule::OnDestroy()
+void UAchievementModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AAchievementModule::OnInitialize_Implementation()
+void UAchievementModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 
 	States.SetNum(Achievements.Num());
 }
 
-void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
+void UAchievementModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 	
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -70,24 +71,24 @@ void AAchievementModule::OnPreparatory_Implementation(EPhase InPhase)
 	}
 }
 
-void AAchievementModule::OnRefresh_Implementation(float DeltaSeconds)
+void UAchievementModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AAchievementModule::OnPause_Implementation()
+void UAchievementModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AAchievementModule::OnUnPause_Implementation()
+void UAchievementModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AAchievementModule::OnTermination_Implementation(EPhase InPhase)
+void UAchievementModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -98,7 +99,7 @@ void AAchievementModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FAchievementModuleSaveData>();
 
@@ -106,7 +107,7 @@ void AAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	TotalUnlocked = SaveData.TotalUnlocked;
 }
 
-void AAchievementModule::UnloadData(EPhase InPhase)
+void UAchievementModule::UnloadData(EPhase InPhase)
 {
 	Super::UnloadData(InPhase);
 
@@ -114,7 +115,7 @@ void AAchievementModule::UnloadData(EPhase InPhase)
 	TotalUnlocked = 0;
 }
 
-FSaveData* AAchievementModule::ToData()
+FSaveData* UAchievementModule::ToData()
 {
 	static FAchievementModuleSaveData SaveData;
 	SaveData = FAchievementModuleSaveData();
@@ -124,18 +125,18 @@ FSaveData* AAchievementModule::ToData()
 	return &SaveData;
 }
 
-bool AAchievementModule::IsAchievementExists(FName InKey) const
+bool UAchievementModule::IsAchievementExists(FName InKey) const
 {
 	AchievementStorageData Temp = GetAchievementLocation(InKey);
 	return Temp.Index != -1;
 }
 
-int32 AAchievementModule::GetAchievedAchievementCount() const
+int32 UAchievementModule::GetAchievedAchievementCount() const
 {
 	return TotalUnlocked;
 }
 
-float AAchievementModule::GetAchievedAchievementPercentage() const
+float UAchievementModule::GetAchievedAchievementPercentage() const
 {
 	if (States.Num() == 0)
 	{
@@ -144,7 +145,7 @@ float AAchievementModule::GetAchievedAchievementPercentage() const
 	return (float)GetAchievedAchievementCount() / States.Num() * 100;
 }
 
-void AAchievementModule::GetAchievementState(FName InKey, bool &OutFoundAchievement, FAchievementData &OutData, FAchievementStates& OutState) const
+void UAchievementModule::GetAchievementState(FName InKey, bool &OutFoundAchievement, FAchievementData &OutData, FAchievementStates& OutState) const
 {
 	OutFoundAchievement = false;
 	AchievementStorageData i = GetAchievementLocation(InKey);
@@ -159,7 +160,7 @@ void AAchievementModule::GetAchievementState(FName InKey, bool &OutFoundAchievem
 }
 
 
-void AAchievementModule::UnlockAchievement(FName InKey)
+void UAchievementModule::UnlockAchievement(FName InKey)
 {
 	AchievementStorageData i = GetAchievementLocation(InKey);
 	if(i.Index == -1)
@@ -182,7 +183,7 @@ void AAchievementModule::UnlockAchievement(FName InKey)
 	}
 }
 
-void AAchievementModule::SetAchievementProgress(FName InKey, float InProgress)
+void UAchievementModule::SetAchievementProgress(FName InKey, float InProgress)
 {
 	AchievementStorageData i = GetAchievementLocation(InKey);
 	if (i.Index == -1)
@@ -204,7 +205,7 @@ void AAchievementModule::SetAchievementProgress(FName InKey, float InProgress)
 	}
 }
 
-void AAchievementModule::AddAchievementProgress(FName InKey, float InProgress)
+void UAchievementModule::AddAchievementProgress(FName InKey, float InProgress)
 {
 	AchievementStorageData i = GetAchievementLocation(InKey);
 	if (i.Index == -1)
@@ -227,13 +228,13 @@ void AAchievementModule::AddAchievementProgress(FName InKey, float InProgress)
 	}
 }
 
-void AAchievementModule::DisplayProgress(FAchievementData InAchievement, int32 InIndex)
+void UAchievementModule::DisplayProgress(FAchievementData InAchievement, int32 InIndex)
 {
 	if((bShowAchievementUnlocks && States[InIndex].Achieved) || (bShowAchievementProgress && !States[InIndex].Achieved))
 	{
 		if (!InAchievement.Spoiler || States[InIndex].Achieved)
 		{
-			if (UWidgetAchievementHUD* HUD = UWidgetModuleBPLibrary::GetUserWidget<UWidgetAchievementHUD>())
+			if (UWidgetAchievementHUD* HUD = UWidgetModuleStatics::GetUserWidget<UWidgetAchievementHUD>())
 			{
 				if (InAchievement.Progress && States[InIndex].Progress < InAchievement.ProgressGoal)
 				{
@@ -262,7 +263,7 @@ void AAchievementModule::DisplayProgress(FAchievementData InAchievement, int32 I
 	}
 }
 
-AchievementStorageData AAchievementModule::GetAchievementLocation(FName InKey) const
+AchievementStorageData UAchievementModule::GetAchievementLocation(FName InKey) const
 {
 	AchievementStorageData location = AchievementStorageData();
 	for(int32 i = 0; i < Achievements.Num(); i++)
@@ -276,17 +277,17 @@ AchievementStorageData AAchievementModule::GetAchievementLocation(FName InKey) c
 	return location;
 }
 
-bool AAchievementModule::IsRightOfScreen() const
+bool UAchievementModule::IsRightOfScreen() const
 {
 	return ScreenLocation == EAchievementSceenLocation::TOP_RIGHT || ScreenLocation == EAchievementSceenLocation::BOTTOM_RIGHT;
 }
 
-bool AAchievementModule::IsBottomOfScreen() const
+bool UAchievementModule::IsBottomOfScreen() const
 {
 	return ScreenLocation == EAchievementSceenLocation::BOTTOM_LEFT || ScreenLocation == EAchievementSceenLocation::BOTTOM_RIGHT;
 }
 
-TArray<TSharedPtr<FName>> AAchievementModule::GetComboBoxNames()
+TArray<TSharedPtr<FName>> UAchievementModule::GetComboBoxNames()
 {
 	TArray<TSharedPtr<FName>> NameList;
 	for(FAchievementData i : Achievements)

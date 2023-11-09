@@ -3,13 +3,13 @@
 
 #include "Voxel/Voxels/Voxel.h"
 
-#include "Ability/AbilityModuleBPLibrary.h"
+#include "Ability/AbilityModuleStatics.h"
 #include "Asset/AssetManagerBase.h"
-#include "Audio/AudioModuleBPLibrary.h"
+#include "Audio/AudioModuleStatics.h"
 #include "Voxel/Datas/VoxelData.h"
-#include "Math/MathBPLibrary.h"
+#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -20,12 +20,12 @@ UVoxel::UVoxel()
 
 UVoxel& UVoxel::GetEmpty()
 {
-	return UReferencePoolModuleBPLibrary::GetReference<UVoxelEmpty>();
+	return UReferencePoolModuleStatics::GetReference<UVoxelEmpty>();
 }
 
 UVoxel& UVoxel::GetUnknown()
 {
-	return UReferencePoolModuleBPLibrary::GetReference<UVoxelUnknown>();
+	return UReferencePoolModuleStatics::GetReference<UVoxelUnknown>();
 }
 
 void UVoxel::OnReset_Implementation()
@@ -54,7 +54,7 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 	
 	if(GetData().bMainPart)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
 	}
 }
 
@@ -64,8 +64,8 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	
 	if(GetData().bMainPart)
 	{
-		UAudioModuleBPLibrary::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleBPLibrary::SpawnAbilityPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * AVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, GetOwner());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
+		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get()->GetWorldData().BlockSize * 0.5f, GetOwner());
 	}
 	if(GetOwner())
 	{
@@ -73,13 +73,13 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		ITER_ARRAY({ EVoxelType::Water }, WaterType,
 			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
 			{
-				VoxelItems.Emplace(GetIndex(), UVoxelModuleBPLibrary::VoxelTypeToAssetID(WaterType));
+				VoxelItems.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxel(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
+		if(GetOwner()->HasVoxel(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
 		{
-			VoxelItems.Emplace(UMathBPLibrary::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
+			VoxelItems.Emplace(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
 		}
 		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
 	}

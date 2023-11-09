@@ -7,62 +7,63 @@
 #include "ObjectPool/Actor/ActorPool.h"
 #include "ObjectPool/Widget/WidgetPool.h"
 
-IMPLEMENTATION_MODULE(AObjectPoolModule)
+IMPLEMENTATION_MODULE(UObjectPoolModule)
 
 // Sets default values
-AObjectPoolModule::AObjectPoolModule()
+UObjectPoolModule::UObjectPoolModule()
 {
 	ModuleName = FName("ObjectPoolModule");
+	ModuleDisplayName = FText::FromString(TEXT("Object Pool Module"));
 
 	DefaultLimit = 100;
 	ObjectPools = TMap<TSubclassOf<UObject>, UObjectPool*>();
 }
 
-AObjectPoolModule::~AObjectPoolModule()
+UObjectPoolModule::~UObjectPoolModule()
 {
-	TERMINATION_MODULE(AObjectPoolModule)
+	TERMINATION_MODULE(UObjectPoolModule)
 }
 
 #if WITH_EDITOR
-void AObjectPoolModule::OnGenerate()
+void UObjectPoolModule::OnGenerate()
 {
 	Super::OnGenerate();
 }
 
-void AObjectPoolModule::OnDestroy()
+void UObjectPoolModule::OnDestroy()
 {
 	Super::OnDestroy();
 }
 #endif
 
-void AObjectPoolModule::OnInitialize_Implementation()
+void UObjectPoolModule::OnInitialize()
 {
-	Super::OnInitialize_Implementation();
+	Super::OnInitialize();
 }
 
-void AObjectPoolModule::OnPreparatory_Implementation(EPhase InPhase)
+void UObjectPoolModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory(InPhase);
 }
 
-void AObjectPoolModule::OnRefresh_Implementation(float DeltaSeconds)
+void UObjectPoolModule::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh_Implementation(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void AObjectPoolModule::OnPause_Implementation()
+void UObjectPoolModule::OnPause()
 {
-	Super::OnPause_Implementation();
+	Super::OnPause();
 }
 
-void AObjectPoolModule::OnUnPause_Implementation()
+void UObjectPoolModule::OnUnPause()
 {
-	Super::OnUnPause_Implementation();
+	Super::OnUnPause();
 }
 
-void AObjectPoolModule::OnTermination_Implementation(EPhase InPhase)
+void UObjectPoolModule::OnTermination(EPhase InPhase)
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -70,12 +71,12 @@ void AObjectPoolModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-bool AObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
+bool UObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
 {
 	return ObjectPools.Contains(InType);
 }
 
-UObjectPool* AObjectPoolModule::GetPool(TSubclassOf<UObject> InType) const
+UObjectPool* UObjectPoolModule::GetPool(TSubclassOf<UObject> InType) const
 {
 	if(HasPool(InType))
 	{
@@ -84,7 +85,7 @@ UObjectPool* AObjectPoolModule::GetPool(TSubclassOf<UObject> InType) const
 	return nullptr;
 }
 
-UObjectPool* AObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
+UObjectPool* UObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
 {
 	if(!InType || HasPool(InType)) return nullptr;
 	
@@ -107,7 +108,7 @@ UObjectPool* AObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
 	return ObjectPool;
 }
 
-void AObjectPoolModule::DestroyPool(TSubclassOf<UObject> InType)
+void UObjectPoolModule::DestroyPool(TSubclassOf<UObject> InType)
 {
 	if(!InType || !HasPool(InType)) return;
 
@@ -115,7 +116,7 @@ void AObjectPoolModule::DestroyPool(TSubclassOf<UObject> InType)
 	ObjectPools.Remove(InType);
 }
 
-bool AObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
+bool UObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return false;
 
@@ -126,7 +127,7 @@ bool AObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 	return false;
 }
 
-UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
+UObject* UObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass()) || ModuleState == EModuleState::Terminated) return nullptr;
 
@@ -134,7 +135,7 @@ UObject* AObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArra
 	return ObjectPool->Spawn(InParams);
 }
 
-void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
+void UObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 {
 	if(!InObject || ModuleState == EModuleState::Terminated) return;
 
@@ -145,7 +146,7 @@ void AObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
 	ObjectPool->Despawn(InObject, bRecovery);
 }
 
-void AObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
+void UObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
 {
 	for(auto Iter : InObjects)
 	{
@@ -153,7 +154,7 @@ void AObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecover
 	}
 }
 
-void AObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
+void UObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
 
@@ -163,7 +164,7 @@ void AObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
 	}
 }
 
-void AObjectPoolModule::ClearAllObject()
+void UObjectPoolModule::ClearAllObject()
 {
 	for (auto Iter : ObjectPools)
 	{

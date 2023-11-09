@@ -1,7 +1,7 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "SaveGame/Base/SaveGameBase.h"
-#include "SaveGame/SaveGameModuleBPLibrary.h"
+#include "SaveGame/SaveGameModuleStatics.h"
 
 USaveGameBase::USaveGameBase()
 {
@@ -45,35 +45,35 @@ void USaveGameBase::OnDestroy_Implementation()
 
 bool USaveGameBase::Save(bool bRefresh)
 {
-	return USaveGameModuleBPLibrary::SaveSaveGame(GetClass(), SaveIndex, bRefresh);
+	return USaveGameModuleStatics::SaveSaveGame(GetClass(), SaveIndex, bRefresh);
 }
 
 bool USaveGameBase::Load(EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::LoadSaveGame(GetClass(), SaveIndex, InPhase) != nullptr;
+	return USaveGameModuleStatics::LoadSaveGame(GetClass(), SaveIndex, InPhase) != nullptr;
 }
 
 bool USaveGameBase::Unload(EPhase InPhase)
 {
-	return USaveGameModuleBPLibrary::UnloadSaveGame(GetClass(), SaveIndex, InPhase);
+	return USaveGameModuleStatics::UnloadSaveGame(GetClass(), SaveIndex, InPhase);
 }
 
 bool USaveGameBase::Reset()
 {
-	return USaveGameModuleBPLibrary::ResetSaveGame(GetClass(), SaveIndex);
+	return USaveGameModuleStatics::ResetSaveGame(GetClass(), SaveIndex);
 }
 
 bool USaveGameBase::Refresh()
 {
-	return USaveGameModuleBPLibrary::RefreshSaveGame(GetClass(), SaveIndex);
+	return USaveGameModuleStatics::RefreshSaveGame(GetClass(), SaveIndex);
 }
 
 bool USaveGameBase::Destroy()
 {
-	return USaveGameModuleBPLibrary::DestroySaveGame(GetClass(), SaveIndex);
+	return USaveGameModuleStatics::DestroySaveGame(GetClass(), SaveIndex);
 }
 
 bool USaveGameBase::IsActived() const
 {
-	return USaveGameModuleBPLibrary::GetSaveGameInfo(GetClass()).ActiveIndex == SaveIndex;
+	return USaveGameModuleStatics::GetSaveGameInfo(GetClass()).ActiveIndex == SaveIndex;
 }

@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/InputSaveGame.h"
 
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Input/InputModule.h"
 
 UInputSaveGame::UInputSaveGame()
@@ -22,7 +22,7 @@ void UInputSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	AInputModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UInputModule::Get()->LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UInputSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -34,5 +34,5 @@ void UInputSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(AInputModule::Get()->GetSaveData(true));
+	SetSaveData(UInputModule::Get()->GetSaveData(true));
 }

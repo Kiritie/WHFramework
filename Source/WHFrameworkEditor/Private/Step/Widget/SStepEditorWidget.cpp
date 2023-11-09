@@ -4,7 +4,7 @@
 #include "Step/Widget/SStepEditorWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Common/CommonBPLibrary.h"
+#include "Common/CommonStatics.h"
 #include "Step/StepModule.h"
 #include "Step/Widget/SStepDetailsWidget.h"
 #include "Step/Widget/SStepListWidget.h"
@@ -32,7 +32,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	StepModule = AStepModule::Get(!UCommonBPLibrary::IsPlaying());
+	StepModule = UStepModule::Get(!UCommonStatics::IsPlaying());
 
 	if(StepModule)
 	{
@@ -172,7 +172,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 		
-		SetIsPreviewMode(UCommonBPLibrary::IsPlaying());
+		SetIsPreviewMode(UCommonStatics::IsPlaying());
 	}
 	else
 	{
@@ -220,7 +220,7 @@ void SStepEditorWidget::OnReset()
 
 void SStepEditorWidget::OnRefresh()
 {
-	StepModule = AStepModule::Get(!bPreviewMode);
+	StepModule = UStepModule::Get(!bPreviewMode);
 	if(StepModule)
 	{
 		if(ListWidget)

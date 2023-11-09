@@ -6,21 +6,21 @@
 #include "AIController.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
-#include "Asset/AssetModuleBPLibrary.h"
-#include "Audio/AudioModuleBPLibrary.h"
+#include "Asset/AssetModuleStatics.h"
+#include "Audio/AudioModuleStatics.h"
 #include "Camera/CameraComponent.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterAnimBase.h"
 #include "Character/Base/CharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Scene/SceneModuleBPLibrary.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
 #include "Perception/AISense_Sight.h"
 #include "Tasks/AITask_MoveTo.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleBPLibrary.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
@@ -75,7 +75,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
 
-	if(AVoxelChunk* Chunk = UVoxelModuleBPLibrary::FindChunkByLocation(GetActorLocation()))
+	if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
 	{
 		Chunk->AddSceneActor(this);
 	}
@@ -132,7 +132,7 @@ void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
 	}
 
-	USceneModuleBPLibrary::AddSceneActor(this);
+	USceneModuleStatics::AddSceneActor(this);
 
 	Execute_SetActorVisible(this, true);
 }
@@ -143,7 +143,7 @@ void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
 
 	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 
-	USceneModuleBPLibrary::RemoveSceneActor(this);
+	USceneModuleStatics::RemoveSceneActor(this);
 	if(Container)
 	{
 		Container->RemoveSceneActor(this);
@@ -222,12 +222,12 @@ bool ACharacterBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	SoundHandle = UAudioModuleBPLibrary::PlaySingleSoundAtLocation(InSound, GetActorLocation(), InVolume, bMulticast);
+	SoundHandle = UAudioModuleStatics::PlaySingleSoundAtLocation(InSound, GetActorLocation(), InVolume, bMulticast);
 }
 
 void ACharacterBase::StopSound(bool bMulticast)
 {
-	UAudioModuleBPLibrary::StopSingleSound(SoundHandle, bMulticast);
+	UAudioModuleStatics::StopSingleSound(SoundHandle, bMulticast);
 }
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
@@ -394,7 +394,7 @@ void ACharacterBase::MultiStopAIMove_Implementation()
 
 UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
 {
-	return UAssetModuleBPLibrary::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
 }
 
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const

@@ -8,7 +8,7 @@
 #include "Widget/SEditorWidgetBase.h"
 
 class SStepListWidget;
-class AStepModule;
+class UStepModule;
 /**
  * 
  */
@@ -19,7 +19,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SStepDetailsWidget) {}
 
-		SLATE_ARGUMENT(AStepModule*, StepModule)
+		SLATE_ARGUMENT(UStepModule*, StepModule)
 
 		SLATE_ARGUMENT(TSharedPtr<SStepListWidget>, ListWidget)
 
@@ -44,7 +44,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	AStepModule* StepModule;
+	UStepModule* StepModule;
 
 	TSharedPtr<SStepListWidget> ListWidget;
 
