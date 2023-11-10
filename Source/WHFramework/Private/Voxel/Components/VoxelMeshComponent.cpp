@@ -156,12 +156,12 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 			case EVoxelMeshNature::Entity:
 			case EVoxelMeshNature::Vitality:
 			{
-				SetMaterial(InSectionIndex, UVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].MaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().RenderDatas[Transparency].MaterialInst);
 				break;
 			}
 			case EVoxelMeshNature::Preview:
 			{
-				SetMaterial(InSectionIndex, UVoxelModule::Get()->GetWorldData().RenderDatas[Transparency].UnlitMaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().RenderDatas[Transparency].UnlitMaterialInst);
 				break;
 			}
 		}
@@ -284,7 +284,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
-	const FVoxelRenderData& RenderData = UVoxelModule::Get()->GetWorldData().RenderDatas[VoxelData.Transparency];
+	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().RenderDatas[VoxelData.Transparency];
 	const FVector Scale = UMathStatics::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
 	const FVector Offset = CenterOffset + UMathStatics::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
@@ -294,7 +294,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathStatics::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get()->GetWorldData().BlockSize);
+		Vertices.Add((InVoxelItem.Index.ToVector() + UMathStatics::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get().GetWorldData().BlockSize);
 	}
 
 	UVs.Add(FVector2D(UVCorner.X, UVCorner.Y + UVSpan.Y));

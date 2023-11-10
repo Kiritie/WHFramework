@@ -20,6 +20,7 @@ class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataInterface
 	GENERATED_BODY()
 
 	friend class AWHPlayerController;
+	friend class AMainModule;
 	
 public:	
 	// ParamSets default values for this actor's properties
@@ -53,6 +54,13 @@ public:
 	UFUNCTION()
 	virtual void OnPreparatory(EPhase InPhase);
 	/**
+	* 当重置
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset();
+	UFUNCTION()
+	virtual void OnReset();
+	/**
 	* 当暂停
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPause")
@@ -67,7 +75,7 @@ public:
 	UFUNCTION()
 	virtual void OnUnPause();
 	/**
-	* 当暂停
+	* 当刷新
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh(float DeltaSeconds);
@@ -94,9 +102,6 @@ protected:
 	virtual void UnloadData(EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
-
-public:
-	virtual void OnReset_Implementation() override;
 
 public:
 	/**
@@ -148,6 +153,9 @@ protected:
 	/// 模块状态
 	UPROPERTY(VisibleAnywhere, Replicated)
 	EModuleState ModuleState;
+	/// 模块索引
+	UPROPERTY(VisibleAnywhere)
+	int32 ModuleIndex;
 	/// 自动运行
 	UPROPERTY(EditAnywhere)
 	bool bModuleAutoRun;
@@ -192,10 +200,15 @@ public:
 	UFUNCTION(BlueprintPure)
 	EModuleState GetModuleState() const;
 	/**
-	* 获取拥有者
+	* 获取模块索引
 	*/
 	UFUNCTION(BlueprintPure)
-	AMainModule* GetOwner() const;
+	int32 GetModuleIndex() const;
+	/**
+	* 获取模块拥有者
+	*/
+	UFUNCTION(BlueprintPure)
+	AMainModule* GetModuleOwner() const;
 	/**
 	* 获取模块存档
 	*/
@@ -226,10 +239,6 @@ public:
 	UPROPERTY()
 	FModuleListItemStates ModuleListItemStates;
 public:
-	/**
-	* 构建流程列表项
-	*/
-	virtual int32 GetModuleIndex() const;
 	/**
 	* 构建流程列表项
 	*/

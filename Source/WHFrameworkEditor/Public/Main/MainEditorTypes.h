@@ -2,6 +2,7 @@
 
 #pragma once
 #include "ClassViewerFilter.h"
+#include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
 
 #define GENERATED_EDITOR_MODULE(ModuleClass) \
@@ -44,6 +45,6 @@ public:
 private:
 	bool IsClassAllowedHelper(const UClass* InClass)
 	{
-		return InClass != IncludeParentClass && InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass) && !MainModule->GetModuleMap().Contains(InClass->GetDefaultObject<UModuleBase>()->GetModuleName());
+		return InClass != IncludeParentClass && InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass) && !MainModule->GetModuleMap().Contains(InClass->GetDefaultObject<UModuleBase>()->GetModuleName()) && UCommonStatics::GetClassChildren(InClass).IsEmpty();
 	}
 };

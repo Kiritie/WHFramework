@@ -7,7 +7,6 @@
 #include "IImageWrapperModule.h"
 #include "ImageUtils.h"
 #include "Asset/AssetModuleStatics.h"
-#include "Character/Base/CharacterBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
 #include "GameFramework/InputSettings.h"
@@ -45,7 +44,7 @@ float UCommonStatics::GetDeltaSeconds()
 
 void UCommonStatics::SetTimeScale(float TimeScale)
 {
-	return UGameplayStatics::SetGlobalTimeDilation(GetWorldContext(), TimeScale);
+	UGameplayStatics::SetGlobalTimeDilation(GetWorldContext(), TimeScale);
 }
 
 void UCommonStatics::PauseGame(EPauseMode PauseMode)
@@ -368,13 +367,13 @@ bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncNam
 	return false;
 }
 
-TArray<UClass*> UCommonStatics::GetAllChildClasses(UClass* InClass, bool bIncludeSelf)
+TArray<UClass*> UCommonStatics::GetClassChildren(const UClass* InClass, bool bIncludeSelf)
 {
 	TArray<UClass*> ReturnValues;
 	for (TObjectIterator<UClass> Iter; Iter; ++Iter)
 	{
 		UClass* Class = *Iter;
-		if (Class->IsChildOf(UModuleBase::StaticClass()) && (bIncludeSelf || Class != InClass))
+		if (Class->IsChildOf(InClass) && (bIncludeSelf || Class != InClass))
 		{
 			ReturnValues.Add(Class);
 		}

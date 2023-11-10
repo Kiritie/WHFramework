@@ -10,10 +10,10 @@ class FAchievementEditor : public FModuleEditorBase
 	
 public:
 	/* Called when the module is loaded */
-	virtual void StartupModule() override;
+	virtual void OnInitialize() override;
 
 	/* Called when the module is unloaded */
-	virtual void ShutdownModule() override;
+	virtual void OnTermination() override;
 
 protected:
 	TSharedPtr<FAchievementPinFactory> BlueprintGraphPanelPinFactory;

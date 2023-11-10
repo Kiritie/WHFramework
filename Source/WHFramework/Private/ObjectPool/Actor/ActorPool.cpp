@@ -22,7 +22,7 @@ UObject* UActorPool::OnSpawn(UObject* InObject)
 
 void UActorPool::OnDespawn(UObject* InObject, bool bRecovery)
 {
-	if(!bRecovery && UObjectPoolModule::Get()->GetModuleState() != EModuleState::Terminated)
+	if(!bRecovery && UObjectPoolModule::Get().GetModuleState() != EModuleState::Terminated)
 	{
 		if(AActor* Actor = Cast<AActor>(InObject))
 		{

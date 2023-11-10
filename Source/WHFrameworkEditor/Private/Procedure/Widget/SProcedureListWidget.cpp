@@ -7,6 +7,7 @@
 #include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "Common/CommonStatics.h"
 #include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
 #include "Procedure/ProcedureBlueprintFactory.h"
 #include "Procedure/ProcedureEditorTypes.h"

@@ -8,478 +8,272 @@
 
 bool UParameterModuleStatics::HasGlobalParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->HasParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return false;
+	return UParameterModule::Get().HasParameter(InName, bEnsured);
 }
 
 void UParameterModuleStatics::AddGlobalParameter(FName InName, FParameter InParameter)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddParameter(InName, InParameter);
-	}
+		UParameterModule::Get().AddParameter(InName, InParameter);
 }
 
 void UParameterModuleStatics::SetGlobalParameter(FName InName, FParameter InParameter)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetParameter(InName, InParameter);
-	}
+	UParameterModule::Get().SetParameter(InName, InParameter);
 }
 
 FParameter UParameterModuleStatics::GetGlobalParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return FParameter();
+	return UParameterModule::Get().GetParameter(InName, bEnsured);
 }
 
 TArray<FParameter> UParameterModuleStatics::GetGlobalParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FParameter>();
+	return UParameterModule::Get().GetParameters(InName, bEnsured);
 }
 
 void UParameterModuleStatics::RemoveGlobalParameter(FName InName)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->RemoveParameter(InName);
-	}
+	UParameterModule::Get().RemoveParameter(InName);
 }
 
 void UParameterModuleStatics::RemoveGlobalParameters(FName InName)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->RemoveParameters(InName);
-	}
+	UParameterModule::Get().RemoveParameters(InName);
 }
 
 void UParameterModuleStatics::ClearAllGlobalParameter()
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->ClearAllParameter();
-	}
+	UParameterModule::Get().ClearAllParameter();
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalIntegerParameter(FName InName, int32 InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddIntegerParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddIntegerParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalIntegerParameter(FName InName, int32 InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetIntegerParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetIntegerParameter(InName, InValue);
 }
 
 int32 UParameterModuleStatics::GetGlobalIntegerParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetIntegerParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return 0;
+	return UParameterModule::Get().GetIntegerParameter(InName, bEnsured);
 }
 
 TArray<int32> UParameterModuleStatics::GetGlobalIntegerParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetIntegerParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<int32>();
+	return UParameterModule::Get().GetIntegerParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalFloatParameter(FName InName, float InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddFloatParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddFloatParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalFloatParameter(FName InName, float InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetFloatParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetFloatParameter(InName, InValue);
 }
 
 float UParameterModuleStatics::GetGlobalFloatParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetFloatParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return 0.f;
+	return UParameterModule::Get().GetFloatParameter(InName, bEnsured);
 }
 
 TArray<float> UParameterModuleStatics::GetGlobalFloatParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetFloatParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<float>();
+	return UParameterModule::Get().GetFloatParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalStringParameter(FName InName, const FString& InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddStringParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddStringParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalStringParameter(FName InName, const FString& InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetStringParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetStringParameter(InName, InValue);
 }
 
 FString UParameterModuleStatics::GetGlobalStringParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetStringParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TEXT("");
+	return UParameterModule::Get().GetStringParameter(InName, bEnsured);
 }
 
 TArray<FString> UParameterModuleStatics::GetGlobalStringParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetStringParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FString>();
+	return UParameterModule::Get().GetStringParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalTextParameter(FName InName, const FText InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddTextParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddTextParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalTextParameter(FName InName, const FText InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetTextParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetTextParameter(InName, InValue);
 }
 
 FText UParameterModuleStatics::GetGlobalTextParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetTextParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return FText::GetEmpty();
+	return UParameterModule::Get().GetTextParameter(InName, bEnsured);
 }
 
 TArray<FText> UParameterModuleStatics::GetGlobalTextParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetTextParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FText>();
+	return UParameterModule::Get().GetTextParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalBooleanParameter(FName InName, bool InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddBooleanParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddBooleanParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalBooleanParameter(FName InName, bool InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetBooleanParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetBooleanParameter(InName, InValue);
 }
 
 bool UParameterModuleStatics::GetGlobalBooleanParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetBooleanParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return false;
+	return UParameterModule::Get().GetBooleanParameter(InName, bEnsured);
 }
 
 TArray<bool> UParameterModuleStatics::GetGlobalBooleanParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetBooleanParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<bool>();
+	return UParameterModule::Get().GetBooleanParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalVectorParameter(FName InName, FVector InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddVectorParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddVectorParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalVectorParameter(FName InName, FVector InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetVectorParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetVectorParameter(InName, InValue);
 }
 
 FVector UParameterModuleStatics::GetGlobalVectorParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetVectorParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return FVector();
+	return UParameterModule::Get().GetVectorParameter(InName, bEnsured);
 }
 
 TArray<FVector> UParameterModuleStatics::GetGlobalVectorParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetVectorParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FVector>();
+	return UParameterModule::Get().GetVectorParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalRotatorParameter(FName InName, FRotator InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddRotatorParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddRotatorParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalRotatorParameter(FName InName, FRotator InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetRotatorParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetRotatorParameter(InName, InValue);
 }
 
 FRotator UParameterModuleStatics::GetGlobalRotatorParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetRotatorParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return FRotator();
+	return UParameterModule::Get().GetRotatorParameter(InName, bEnsured);
 }
 
 TArray<FRotator> UParameterModuleStatics::GetGlobalRotatorParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetRotatorParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FRotator>();
+	return UParameterModule::Get().GetRotatorParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalColorParameter(FName InName, const FColor& InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddColorParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddColorParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalColorParameter(FName InName, const FColor& InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetColorParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetColorParameter(InName, InValue);
 }
 
 FColor UParameterModuleStatics::GetGlobalColorParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetColorParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return FColor();
+	return UParameterModule::Get().GetColorParameter(InName, bEnsured);
 }
 
 TArray<FColor> UParameterModuleStatics::GetGlobalColorParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetColorParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<FColor>();
+	return UParameterModule::Get().GetColorParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalClassParameter(FName InName, UClass* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddClassParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddClassParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalClassParameter(FName InName, UClass* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetClassParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetClassParameter(InName, InValue);
 }
 
 UClass* UParameterModuleStatics::GetGlobalClassParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetClassParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return nullptr;
+	return UParameterModule::Get().GetClassParameter(InName, bEnsured);
 }
 
 TArray<UClass*> UParameterModuleStatics::GetGlobalClassParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetClassParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<UClass*>();
+	return UParameterModule::Get().GetClassParameters(InName, bEnsured);
 }
 
 //////////////////////////////////////////////////////////////////////////
 void UParameterModuleStatics::AddGlobalObjectParameter(FName InName, UObject* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddObjectParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddObjectParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetGlobalObjectParameter(FName InName, UObject* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetObjectParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetObjectParameter(InName, InValue);
 }
 
 UObject* UParameterModuleStatics::GetGlobalObjectParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetObjectParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return nullptr;
+	return UParameterModule::Get().GetObjectParameter(InName, bEnsured);
 }
 
 TArray<UObject*> UParameterModuleStatics::GetGlobalObjectParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetObjectParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<UObject*>();
+	return UParameterModule::Get().GetObjectParameters(InName, bEnsured);
 }
 
 void UParameterModuleStatics::AddPointerParameter(FName InName, void* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->AddPointerParameter(InName, InValue);
-	}
+	UParameterModule::Get().AddPointerParameter(InName, InValue);
 }
 
 void UParameterModuleStatics::SetPointerParameter(FName InName, void* InValue)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		ParameterModule->SetPointerParameter(InName, InValue);
-	}
+	UParameterModule::Get().SetPointerParameter(InName, InValue);
 }
 
 void* UParameterModuleStatics::GetPointerParameter(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetPointerParameter(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return nullptr;
+	return UParameterModule::Get().GetPointerParameter(InName, bEnsured);
 }
 
 TArray<void*> UParameterModuleStatics::GetPointerParameters(FName InName, bool bEnsured)
 {
-	if(UParameterModule* ParameterModule = UParameterModule::Get())
-	{
-		return ParameterModule->GetPointerParameters(InName, bEnsured);
-	}
-	ensureEditor(!bEnsured);
-	return TArray<void*>();
+	return UParameterModule::Get().GetPointerParameters(InName, bEnsured);
 }
 
 FParameter UParameterModuleStatics::MakeIntegerParameter(int32 InValue)

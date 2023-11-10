@@ -19,8 +19,8 @@ bool IVoxelAgentInterface::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResu
 
 	FVoxelItem VoxelItem = GetGenerateVoxelID();
 	VoxelItem.Owner = Chunk;
-	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModule::Get()->GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
-	const float Angle = (GetVoxelAgentLocation() - (VoxelItem.GetLocation() + UVoxelModule::Get()->GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw;
+	VoxelItem.Index = Chunk->LocationToIndex(InVoxelHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InVoxelHitResult.Normal)) + FIndex(InVoxelHitResult.Normal);
+	const float Angle = (GetVoxelAgentLocation() - (VoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw;
 	VoxelItem.Angle = (ERightAngle)FMath::RoundToInt((Angle >= 0.f ? Angle : (360.f + Angle)) / 90.f);
 	
 	TArray<AActor*> IgnoreActors;

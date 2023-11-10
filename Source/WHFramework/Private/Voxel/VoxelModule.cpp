@@ -13,7 +13,7 @@
 #include "Main/MainModuleStatics.h"
 #include "Math/MathStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "Scene/Components/WorldTimerComponent.h"
+#include "Scene/Object/WorldTimer.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -108,7 +108,7 @@ void UVoxelModule::OnGenerate()
 	if(!VoxelCapture)
 	{
 		TArray<AActor*> ChildActors;
-		GetOwner()->GetAttachedActors(ChildActors);
+		GetModuleOwner()->GetAttachedActors(ChildActors);
 		if(ChildActors.Num() > 0)
 		{
 			VoxelCapture = Cast<AVoxelCapture>(ChildActors[0]);
@@ -122,7 +122,7 @@ void UVoxelModule::OnGenerate()
 		if(VoxelCapture)
 		{
 			VoxelCapture->SetActorLabel(TEXT("VoxelCapture"));
-			VoxelCapture->AttachToActor(GetOwner(), FAttachmentTransformRules::KeepWorldTransform);
+			VoxelCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
 		}
 	}
 	if(VoxelCapture)

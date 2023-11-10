@@ -68,7 +68,7 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 	const auto State = GetDebugCategoryState(Category);
 	switch (Mode)
 	{
-		case EM_All:
+		case EDM_All:
 		{
 			if(State.bEnableScreenLog)
 			{
@@ -80,7 +80,7 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 			}
 			break;
 		}
-		case EM_Screen:
+		case EDM_Screen:
 		{
 			if(State.bEnableScreenLog)
 			{
@@ -88,7 +88,7 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 			}
 			break;
 		}
-		case EM_Console:
+		case EDM_Console:
 		{
 			if(State.bEnableConsoleLog)
 			{
@@ -101,17 +101,10 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 
 FDebugCategoryState UDebugModuleStatics::GetDebugCategoryState(EDebugCategory InCategory)
 {
-	if(UDebugModule::Get())
-	{
-		return UDebugModule::Get()->GetDebugCategoryState(InCategory);
-	}
-	return FDebugCategoryState();
+	return UDebugModule::Get().GetDebugCategoryState(InCategory);
 }
 
 void UDebugModuleStatics::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
 {
-	if(UDebugModule::Get())
-	{
-		UDebugModule::Get()->SetDebugCategoryState(InCategory, InState);
-	}
+	UDebugModule::Get().SetDebugCategoryState(InCategory, InState);
 }

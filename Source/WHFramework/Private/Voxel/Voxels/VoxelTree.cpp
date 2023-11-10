@@ -81,7 +81,7 @@ FString UVoxelTree::BuildData(EVoxelTreePart InTreePart)
 			{
 				const auto& TreeData = GetData<UVoxelTreeData>();
 				
-				const FRandomStream& RandomStream = UVoxelModule::Get()->GetWorldData().RandomStream;
+				const FRandomStream& RandomStream = UVoxelModule::Get().GetWorldData().RandomStream;
 				TreeHeight = RandomStream.RandRange(TreeData.TreeHeight.X, TreeData.TreeHeight.Y);
 				LeavesHeight = RandomStream.RandRange(TreeData.LeavesHeight.X, TreeData.LeavesHeight.Y);
 				LeavesWidth = RandomStream.FRand() < 0.5f ? TreeData.LeavesWidth.X : TreeData.LeavesWidth.Y;

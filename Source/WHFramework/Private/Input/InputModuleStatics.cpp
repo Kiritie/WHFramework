@@ -8,43 +8,25 @@
 
 int32 UInputModuleStatics::GetTouchPressedCount()
 {
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		return InputModule->GetTouchPressedCount();
-	}
-	return 0;
+	return UInputModule::Get().GetTouchPressedCount();
 }
 
 FInputKeyShortcut UInputModuleStatics::GetKeyShortcutByName(const FName InName)
 {
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		return InputModule->GetKeyShortcutByName(InName);
-	}
-	return FInputKeyShortcut();
+	return UInputModule::Get().GetKeyShortcutByName(InName);
 }
 
 EInputMode UInputModuleStatics::GetGlobalInputMode()
 {
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		return InputModule->GetGlobalInputMode();
-	}
-	return EInputMode::None;
+	return UInputModule::Get().GetGlobalInputMode();
 }
 
 void UInputModuleStatics::SetGlobalInputMode(EInputMode InInputMode)
 {
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		InputModule->SetGlobalInputMode(InInputMode);
-	}
+	UInputModule::Get().SetGlobalInputMode(InInputMode);
 }
 
 void UInputModuleStatics::UpdateGlobalInputMode()
 {
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		InputModule->UpdateInputMode();
-	}
+	UInputModule::Get().UpdateInputMode();
 }

@@ -7,213 +7,125 @@
 
 void UAudioModuleStatics::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->PlaySound2D(InSound, InVolume, bMulticast);
-	}
+	UAudioModule::Get().PlaySound2D(InSound, InVolume, bMulticast);
 }
 
 void UAudioModuleStatics::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast);
-	}
+	UAudioModule::Get().PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast);
 }
 
 FSingleSoundInfo UAudioModuleStatics::GetSingleSoundInfo(const FSingleSoundHandle& InHandle)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetSingleSoundInfo(InHandle);
-	}
-	return FSingleSoundInfo();
+	return UAudioModule::Get().GetSingleSoundInfo(InHandle);
 }
 
 FSingleSoundHandle UAudioModuleStatics::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->PlaySingleSound2D(InSound, InVolume, bMulticast);
-	}
-	return FSingleSoundHandle();
+	return UAudioModule::Get().PlaySingleSound2D(InSound, InVolume, bMulticast);
 }
 
 FSingleSoundHandle UAudioModuleStatics::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinish, InVolume, bMulticast);
-	}
-	return FSingleSoundHandle();
+	return UAudioModule::Get().PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinish, InVolume, bMulticast);
 }
 
 FSingleSoundHandle UAudioModuleStatics::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
-	}
-	return FSingleSoundHandle();
+	return UAudioModule::Get().PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
 }
 
 FSingleSoundHandle UAudioModuleStatics::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinish, InLocation, InVolume, bMulticast);
-	}
-	return FSingleSoundHandle();
+	return UAudioModule::Get().PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinish, InLocation, InVolume, bMulticast);
 }
 
 void UAudioModuleStatics::StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->StopSingleSound(InHandle, bMulticast);
-	}
+	UAudioModule::Get().StopSingleSound(InHandle, bMulticast);
 }
 
 void UAudioModuleStatics::SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetSingleSoundPaused(InHandle, bPaused, bMulticast);
-	}
+	UAudioModule::Get().SetSingleSoundPaused(InHandle, bPaused, bMulticast);
 }
 
 float UAudioModuleStatics::GetGlobalSoundVolume()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetGlobalSoundVolume();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetGlobalSoundVolume();
 }
 
 void UAudioModuleStatics::SetGlobalSoundVolume(float InVolume, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetGlobalSoundVolume(InVolume, InFadeInTime);
-	}
+	UAudioModule::Get().SetGlobalSoundVolume(InVolume, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetGlobalSoundPitch()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetGlobalSoundPitch();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetGlobalSoundPitch();
 }
 
 void UAudioModuleStatics::SetGlobalSoundPitch(float InPitch, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetGlobalSoundPitch(InPitch, InFadeInTime);
-	}
+	UAudioModule::Get().SetGlobalSoundPitch(InPitch, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetBackgroundSoundVolume()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetBackgroundSoundVolume();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetBackgroundSoundVolume();
 }
 
 void UAudioModuleStatics::SetBackgroundSoundVolume(float InVolume, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetBackgroundSoundVolume(InVolume, InFadeInTime);
-	}
+	UAudioModule::Get().SetBackgroundSoundVolume(InVolume, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetBackgroundSoundPitch()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetBackgroundSoundPitch();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetBackgroundSoundPitch();
 }
 
 void UAudioModuleStatics::SetBackgroundSoundPitch(float InPitch, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetBackgroundSoundPitch(InPitch, InFadeInTime);
-	}
+	UAudioModule::Get().SetBackgroundSoundPitch(InPitch, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetEnvironmentSoundVolume()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetEnvironmentSoundVolume();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetEnvironmentSoundVolume();
 }
 
 void UAudioModuleStatics::SetEnvironmentSoundVolume(float InVolume, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetEnvironmentSoundVolume(InVolume, InFadeInTime);
-	}
+	UAudioModule::Get().SetEnvironmentSoundVolume(InVolume, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetEnvironmentSoundPitch()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetEnvironmentSoundPitch();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetEnvironmentSoundPitch();
 }
 
 void UAudioModuleStatics::SetEnvironmentSoundPitch(float InPitch, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetEnvironmentSoundPitch(InPitch, InFadeInTime);
-	}
+	UAudioModule::Get().SetEnvironmentSoundPitch(InPitch, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetEffectSoundVolume()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetEffectSoundVolume();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetEffectSoundVolume();
 }
 
 void UAudioModuleStatics::SetEffectSoundVolume(float InVolume, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetEffectSoundVolume(InVolume, InFadeInTime);
-	}
+	UAudioModule::Get().SetEffectSoundVolume(InVolume, InFadeInTime);
 }
 
 float UAudioModuleStatics::GetEffectSoundPitch()
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		return AudioModule->GetEffectSoundPitch();
-	}
-	return 0.f;
+	return UAudioModule::Get().GetEffectSoundPitch();
 }
 
 void UAudioModuleStatics::SetEffectSoundPitch(float InPitch, float InFadeInTime)
 {
-	if(UAudioModule* AudioModule = UAudioModule::Get())
-	{
-		AudioModule->SetEffectSoundPitch(InPitch, InFadeInTime);
-	}
+	UAudioModule::Get().SetEffectSoundPitch(InPitch, InFadeInTime);
 }

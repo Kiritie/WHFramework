@@ -19,21 +19,13 @@ public:
 	template<class T>
 	static T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-		{
-			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
-		}
-		return nullptr;
+		return UObjectPoolModule::Get().SpawnObject<T>(InParams, InType);
 	}
 
 	template<class T>
 	static T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-		{
-			return ObjectPoolModule->SpawnObject<T>(InParams, InType);
-		}
-		return nullptr;
+		return UObjectPoolModule::Get().SpawnObject<T>(InParams, InType);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleStatics")
@@ -57,10 +49,7 @@ public:
 	template<class T>
 	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-		{
-			ObjectPoolModule->ClearObject<T>(InType);
-		}
+		UObjectPoolModule::Get().ClearObject<T>(InType);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")

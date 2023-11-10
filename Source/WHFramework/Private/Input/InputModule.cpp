@@ -122,16 +122,16 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
+void UInputModule::OnReset()
+{
+	Super::OnReset();
+
+	TouchPressedCount = 0;
+}
+
 void UInputModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
-}
-
-void UInputModule::OnReset_Implementation()
-{
-	Super::OnReset_Implementation();
-
-	TouchPressedCount = 0;
 }
 
 void UInputModule::OnPause()
@@ -522,21 +522,21 @@ void UInputModule::AddOrUpdateCustomKeyboardBindings(const FName InName, const F
 
 void UInputModule::TurnCamera(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get()->IsControllingMove()) return;
+	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
 	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
 	{
-		UCameraModule::Get()->AddCameraRotationInput(InValue.Get<float>(), 0.f);
+		UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>(), 0.f);
 	}
 }
 
 void UInputModule::LookUpCamera(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get()->IsControllingMove()) return;
+	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
 	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
 	{
-		UCameraModule::Get()->AddCameraRotationInput(0.f, UCameraModule::Get()->IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
+		UCameraModule::Get().AddCameraRotationInput(0.f, UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
 	}
 }
 
@@ -547,8 +547,8 @@ void UInputModule::PanHCamera(const FInputActionValue& InValue)
 	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
+		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
@@ -559,8 +559,8 @@ void UInputModule::PanVCamera(const FInputActionValue& InValue)
 	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f);
-		UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
+		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }
 
@@ -570,7 +570,7 @@ void UInputModule::ZoomCamera(const FInputActionValue& InValue)
 
 	if(GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
 	{
-		UCameraModule::Get()->AddCameraDistanceInput(-InValue.Get<float>());
+		UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>());
 	}
 }
 
@@ -578,23 +578,23 @@ void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	const FVector Direction = UCameraModule::Get()->GetCurrentCameraRotation().Vector();
-	UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 }
 
 void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	const FVector Direction = FRotationMatrix(UCameraModule::Get()->GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get()->AddCameraMovementInput(Direction, InValue.Get<float>());
+	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 }
 
 void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	UCameraModule::Get()->AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
+	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
 }
 
 void UInputModule::TurnPlayer(const FInputActionValue& InValue)
@@ -786,7 +786,7 @@ void UInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			UCameraModule::Get()->AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
+			UCameraModule::Get().AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
@@ -821,7 +821,7 @@ void UInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation
 			const FRotator Rotation = GetPlayerController()->GetControlRotation();
 			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
-			UCameraModule::Get()->AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (UCameraModule::Get()->IsReverseCameraPanMove() ? -1.f : 1.f));
+			UCameraModule::Get().AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f));
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}

@@ -38,63 +38,35 @@ bool UAbilityModuleStatics::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> 
 
 ECollisionChannel UAbilityModuleStatics::GetPickUpTraceChannel()
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->GetPickUpTraceChannel();
-	}
-	return ECC_MAX;
+	return UAbilityModule::Get().GetPickUpTraceChannel();
 }
 
 AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityPickUp(InItem, InLocation, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityPickUp(InItem, InLocation, InContainer);
 }
 
 AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityPickUp(InSaveData, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer);
 }
 
 AAbilityActorBase* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityActor(InSaveData, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
 }
 
 AAbilityCharacterBase* UAbilityModuleStatics::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityCharacter(InSaveData, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityCharacter(InSaveData, InContainer);
 }
 
 AAbilityPawnBase* UAbilityModuleStatics::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityPawn(InSaveData, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityPawn(InSaveData, InContainer);
 }
 
 AAbilityVitalityBase* UAbilityModuleStatics::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
-	if(UAbilityModule* AbilityModule = UAbilityModule::Get())
-	{
-		return AbilityModule->SpawnAbilityVitality(InSaveData, InContainer);
-	}
-	return nullptr;
+	return UAbilityModule::Get().SpawnAbilityVitality(InSaveData, InContainer);
 }

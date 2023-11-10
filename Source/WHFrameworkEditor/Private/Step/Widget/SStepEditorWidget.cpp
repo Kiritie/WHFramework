@@ -3,8 +3,10 @@
 
 #include "Step/Widget/SStepEditorWidget.h"
 
+#include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
 #include "Common/CommonStatics.h"
+#include "Step/StepEditor.h"
 #include "Step/StepModule.h"
 #include "Step/Widget/SStepDetailsWidget.h"
 #include "Step/Widget/SStepListWidget.h"
@@ -32,7 +34,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	StepModule = UStepModule::Get(!UCommonStatics::IsPlaying());
+	StepModule = &UStepModule::Get(!UCommonStatics::IsPlaying());
 
 	if(StepModule)
 	{
@@ -140,6 +142,13 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("FileMenuLabel", "File"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &SStepEditorWidget::HandlePullDownFileMenu),
+			"File"
+		);
+		
+		MenuBarBuilder.AddPullDownMenu(
 			LOCTEXT("WindowMenuLabel", "Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateSP(this, &SStepEditorWidget::HandlePullDownWindowMenu),
@@ -199,6 +208,17 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 	}
 }
 
+void SStepEditorWidget::OnBindCommands()
+{
+	SEditorWidgetBase::OnBindCommands();
+
+	WidgetCommands->MapAction(
+		FStepEditorCommands::Get().Save,
+		FExecuteAction::CreateSP(this, &SStepEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &SStepEditorWidget::CanSave)
+	);
+}
+
 void SStepEditorWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
@@ -212,6 +232,12 @@ void SStepEditorWidget::OnCreate()
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SStepEditorWidget::OnBlueprintCompiled);
 }
 
+void SStepEditorWidget::OnSave()
+{
+	SEditorWidgetBase::OnSave();
+
+	FLevelEditorActionCallbacks::Save();
+}
 
 void SStepEditorWidget::OnReset()
 {
@@ -220,7 +246,7 @@ void SStepEditorWidget::OnReset()
 
 void SStepEditorWidget::OnRefresh()
 {
-	StepModule = UStepModule::Get(!bPreviewMode);
+	StepModule = &UStepModule::Get(!bPreviewMode);
 	if(StepModule)
 	{
 		if(ListWidget)
@@ -354,6 +380,11 @@ TSharedRef<SDockTab> SStepEditorWidget::SpawnStatusWidgetTab(const FSpawnTabArgs
 			StatusWidget.ToSharedRef()
 		];
 	return SpawnedTab;
+}
+
+void SStepEditorWidget::HandlePullDownFileMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.AddMenuEntry(FStepEditorCommands::Get().Save);
 }
 
 void SStepEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)

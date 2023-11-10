@@ -75,12 +75,9 @@ void UStepBase::OnUnGenerate()
 {
 	if(bFirstStep)
 	{
-		if(UStepModule* StepModule = UStepModule::Get(true))
+		if(UStepModule::Get(true).GetFirstStep() == this)
 		{
-			if(StepModule->GetFirstStep() == this)
-			{
-				StepModule->SetFirstStep(nullptr);
-			}
+			UStepModule::Get(true).SetFirstStep(nullptr);
 		}
 	}
 }
@@ -145,7 +142,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	StepExecuteResult = EStepExecuteResult::None;
 
-	WHDebug(FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()), EM_All, EDC_Step, EDV_Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()), EDM_All, EDC_Step, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastStep);
 
@@ -364,7 +361,7 @@ void UStepBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EM_All, EDC_Step, EDV_Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EDM_All, EDC_Step, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave();
 
@@ -493,12 +490,9 @@ EStepExecuteType UStepBase::GetStepExecuteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(UStepModule* StepModule = UStepModule::Get())
+		if(UStepModule::Get().GetGlobalStepExecuteType() != EStepExecuteType::None)
 		{
-			if(StepModule->GetGlobalStepExecuteType() != EStepExecuteType::None)
-			{
-				return StepModule->GetGlobalStepExecuteType();
-			}
+			return UStepModule::Get().GetGlobalStepExecuteType();
 		}
 	}
 	return StepExecuteType;
@@ -508,12 +502,9 @@ EStepLeaveType UStepBase::GetStepLeaveType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(UStepModule* StepModule = UStepModule::Get())
+		if(UStepModule::Get().GetGlobalStepLeaveType() != EStepLeaveType::None)
 		{
-			if(StepModule->GetGlobalStepLeaveType() != EStepLeaveType::None)
-			{
-				return StepModule->GetGlobalStepLeaveType();
-			}
+			return UStepModule::Get().GetGlobalStepLeaveType();
 		}
 	}
 	return StepLeaveType;
@@ -523,12 +514,9 @@ EStepCompleteType UStepBase::GetStepCompleteType() const
 {
 	if(!HasSubStep(false))
 	{
-		if(UStepModule* StepModule = UStepModule::Get())
+		if(UStepModule::Get().GetGlobalStepCompleteType() != EStepCompleteType::None)
 		{
-			if(StepModule->GetGlobalStepCompleteType() != EStepCompleteType::None)
-			{
-				return StepModule->GetGlobalStepCompleteType();
-			}
+			return UStepModule::Get().GetGlobalStepCompleteType();
 		}
 	}
 	return StepCompleteType;
@@ -743,20 +731,17 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bFirstStep))
 		{
-			if(UStepModule* StepModule = UStepModule::Get(true))
+			if(bFirstStep)
 			{
-				if(bFirstStep)
+				if(UStepModule::Get(true).GetFirstStep())
 				{
-					if(StepModule->GetFirstStep())
-					{
-						StepModule->GetFirstStep()->bFirstStep = false;
-					}
-					StepModule->SetFirstStep(this);
+					UStepModule::Get(true).GetFirstStep()->bFirstStep = false;
 				}
-				else if(StepModule->GetFirstStep() == this)
-				{
-					StepModule->SetFirstStep(nullptr);
-				}
+				UStepModule::Get(true).SetFirstStep(this);
+			}
+			else if(UStepModule::Get(true).GetFirstStep() == this)
+			{
+				UStepModule::Get(true).SetFirstStep(nullptr);
 			}
 		}
 	}

@@ -251,7 +251,7 @@ void SModuleListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
-						.IsEnabled_Lambda([this](){ return MainModule->GetAllModule().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return MainModule->GetModules().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnClearAllModuleItemButtonClicked)
 					]
@@ -515,9 +515,9 @@ void SModuleListWidget::ListSelectionChanged(TSharedPtr<FModuleListItem> ListIte
 TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const
 {
 	TArray<UClass*> ReturnValues;
-	for (auto Iter : UCommonStatics::GetAllChildClasses(UModuleBase::StaticClass()))
+	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass()))
 	{
-		if (!MainModule->GetModuleMap().Contains(Iter->GetDefaultObject<UModuleBase>()->GetModuleName()))
+		if (!MainModule->GetModuleMap().Contains(Iter->GetDefaultObject<UModuleBase>()->GetModuleName()) && UCommonStatics::GetClassChildren(Iter).IsEmpty())
 		{
 			ReturnValues.Add(Iter);
 		}

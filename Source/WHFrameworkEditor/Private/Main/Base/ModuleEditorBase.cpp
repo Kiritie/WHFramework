@@ -6,11 +6,29 @@ FModuleEditorBase::~FModuleEditorBase()
 {
 }
 
-void FModuleEditorBase::StartupModule()
+void FModuleEditorBase::OnInitialize()
 {
 }
 
-void FModuleEditorBase::ShutdownModule()
+void FModuleEditorBase::OnTermination()
+{
+}
+
+void FModuleEditorBase::RegisterSettings(ISettingsModule* InSettingsModule)
+{
+	
+}
+
+void FModuleEditorBase::UnRegisterSettings()
+{
+}
+
+bool FModuleEditorBase::HandleSettingsSaved()
+{
+	return false;
+}
+
+void FModuleEditorBase::RegisterAssetTypeAction(IAssetTools& AssetTools, TSharedRef<IAssetTypeActions> Action)
 {
 }
 

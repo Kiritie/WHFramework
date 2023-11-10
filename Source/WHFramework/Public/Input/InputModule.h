@@ -39,9 +39,9 @@ public:
 
 	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnReset() override;
 
-	virtual void OnReset_Implementation() override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual void OnPause() override;
 

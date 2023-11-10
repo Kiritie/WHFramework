@@ -4,14 +4,14 @@
 
 IMPLEMENTATION_EDITOR_MODULE(FAchievementEditor)
 
-void FAchievementEditor::StartupModule()
+void FAchievementEditor::OnInitialize()
 {
 	//Register achievement combo Box pin Factory
 	BlueprintGraphPanelPinFactory = MakeShareable(new FAchievementPinFactory());
 	FEdGraphUtilities::RegisterVisualPinFactory(BlueprintGraphPanelPinFactory);
 }
 
-void FAchievementEditor::ShutdownModule()
+void FAchievementEditor::OnTermination()
 {
 	//Unregister achievement combo Box pin Factory
 	FEdGraphUtilities::UnregisterVisualPinFactory(BlueprintGraphPanelPinFactory);

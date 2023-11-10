@@ -22,7 +22,7 @@ void UInputSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	UInputModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UInputModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UInputSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -34,5 +34,5 @@ void UInputSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(UInputModule::Get()->GetSaveData(true));
+	SetSaveData(UInputModule::Get().GetSaveData(true));
 }

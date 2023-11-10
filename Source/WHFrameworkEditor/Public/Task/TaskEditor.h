@@ -13,9 +13,9 @@ class FTaskEditor : public FModuleEditorBase
 	GENERATED_EDITOR_MODULE(FTaskEditor)
 	
 public:
-	virtual void StartupModule() override;
+	virtual void OnInitialize() override;
 
-	virtual void ShutdownModule() override;
+	virtual void OnTermination() override;
 
 	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
 	
@@ -24,7 +24,8 @@ private:
 	
 	TSharedRef<class SDockTab> OnSpawnTaskEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
 
-private:
+public:
+	bool bPreviewMode;
 	TSharedPtr<STaskEditorWidget> TaskEditorWidget;
 };
 
@@ -32,7 +33,7 @@ class FTaskEditorCommands : public TCommands<FTaskEditorCommands>
 {	  
 public:
 	FTaskEditorCommands()
-		: TCommands<FTaskEditorCommands>(TEXT("MWTaskEditorCommands"),    // Context name for fast lookup
+		: TCommands<FTaskEditorCommands>(TEXT("TaskEditorCommands"),    // Context name for fast lookup
 			NSLOCTEXT(
 			"Task", "TaskEditor", "TaskEditor Commands"),    // Localized context name for displaying
 			NAME_None,

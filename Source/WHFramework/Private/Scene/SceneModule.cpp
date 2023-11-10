@@ -11,8 +11,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Scene/Components/WorldTimerComponent.h"
-#include "Scene/Components/WorldWeatherComponent.h"
+#include "Scene/Object/WorldTimer.h"
+#include "Scene/Object/WorldWeather.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
@@ -26,15 +26,15 @@ USceneModule::USceneModule()
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 
-	static ConstructorHelpers::FClassFinder<UWorldTimerComponent> WorldTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BPC_WorldTimer.BPC_WorldTimer_C'"));
+	static ConstructorHelpers::FClassFinder<UWorldTimer> WorldTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BP_WorldTimer.BP_WorldTimer_C'"));
 	if(WorldTimerClass.Succeeded())
 	{
-		WorldTimer = Cast<UWorldTimerComponent>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
+		WorldTimer = Cast<UWorldTimer>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
 	}
-	static ConstructorHelpers::FClassFinder<UWorldWeatherComponent> WeatherTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BPC_WorldWeather.BPC_WorldWeather_C'"));
+	static ConstructorHelpers::FClassFinder<UWorldWeather> WeatherTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BP_WorldWeather.BP_WorldWeather_C'"));
 	if(WeatherTimerClass.Succeeded())
 	{                                                                                          
-		WorldWeather = Cast<UWorldWeatherComponent>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));
+		WorldWeather = Cast<UWorldWeather>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));
 	}
 
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();

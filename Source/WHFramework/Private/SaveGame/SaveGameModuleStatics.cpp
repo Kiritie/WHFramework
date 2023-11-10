@@ -7,161 +7,90 @@
 
 int32 USaveGameModuleStatics::GetUserIndex()
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetUserIndex();
-	}
-	return -1;
+	return USaveGameModule::Get().GetUserIndex();
 }
 
 void USaveGameModuleStatics::SetUserIndex(int32 InUserIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		SaveGameModule->SetUserIndex(InUserIndex);
-	}
+	USaveGameModule::Get().SetUserIndex(InUserIndex);
 }
 
 FString USaveGameModuleStatics::GetSaveSlotName(FName InSaveName, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetSlotName(InSaveName, InIndex);
-	}
-	return TEXT("");
+	return USaveGameModule::Get().GetSlotName(InSaveName, InIndex);
 }
 
 bool USaveGameModuleStatics::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->HasSaveGame(InClass, InIndex);
-	}
-	return false;
+	return USaveGameModule::Get().HasSaveGame(InClass, InIndex);
 }
 
 FSaveGameInfo USaveGameModuleStatics::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetSaveGameInfo(InClass);
-	}
-	return FSaveGameInfo();
+	return USaveGameModule::Get().GetSaveGameInfo(InClass);
 }
 
 USaveGameBase* USaveGameModuleStatics::GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetSaveGame(InClass, InIndex);
-	}
-	return nullptr;
+	return USaveGameModule::Get().GetSaveGame(InClass, InIndex);
 }
 
 TArray<USaveGameBase*> USaveGameModuleStatics::GetSaveGames(TSubclassOf<USaveGameBase> InClass)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetSaveGames(InClass);
-	}
-	return TArray<USaveGameBase*>();
+	return USaveGameModule::Get().GetSaveGames(InClass);
 }
 
 USaveGameBase* USaveGameModuleStatics::CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->CreateSaveGame(InClass, InIndex, InPhase);
-	}
-	return nullptr;
+	return USaveGameModule::Get().CreateSaveGame(InClass, InIndex, InPhase);
 }
 
 USaveGameBase* USaveGameModuleStatics::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->GetOrCreateSaveGame(InClass, InIndex);
-	}
-	return nullptr;
+	return USaveGameModule::Get().GetOrCreateSaveGame(InClass, InIndex);
 }
 
 USaveGameBase* USaveGameModuleStatics::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->LoadOrCreateSaveGame(InClass, InIndex, InPhase);
-	}
-	return nullptr;
+	return USaveGameModule::Get().LoadOrCreateSaveGame(InClass, InIndex, InPhase);
 }
 
 bool USaveGameModuleStatics::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->SaveSaveGame(InClass, InIndex, bRefresh);
-	}
-	return false;
+	return USaveGameModule::Get().SaveSaveGame(InClass, InIndex, bRefresh);
 }
 
 bool USaveGameModuleStatics::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->SaveSaveGames(InClass, bRefresh);
-	}
-	return false;
+	return USaveGameModule::Get().SaveSaveGames(InClass, bRefresh);
 }
 
 bool USaveGameModuleStatics::SaveAllSaveGame(bool bRefresh)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->SaveAllSaveGame(bRefresh);
-	}
-	return false;
+	return USaveGameModule::Get().SaveAllSaveGame(bRefresh);
 }
 
 USaveGameBase* USaveGameModuleStatics::LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->LoadSaveGame(InClass, InIndex, InPhase);
-	}
-	return nullptr;
+	return USaveGameModule::Get().LoadSaveGame(InClass, InIndex, InPhase);
 }
 
 bool USaveGameModuleStatics::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->UnloadSaveGame(InClass, InIndex, InPhase);
-	}
-	return false;
+	return USaveGameModule::Get().UnloadSaveGame(InClass, InIndex, InPhase);
 }
 
 bool USaveGameModuleStatics::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->ResetSaveGame(InClass, InIndex);
-	}
-	return false;
+	return USaveGameModule::Get().ResetSaveGame(InClass, InIndex);
 }
 
 bool USaveGameModuleStatics::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->RefreshSaveGame(InClass, InIndex);
-	}
-	return false;
+	return USaveGameModule::Get().RefreshSaveGame(InClass, InIndex);
 }
 
 bool USaveGameModuleStatics::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
 {
-	if(USaveGameModule* SaveGameModule = USaveGameModule::Get())
-	{
-		return SaveGameModule->DestroySaveGame(InClass, InIndex);
-	}
-	return false;
+	return USaveGameModule::Get().DestroySaveGame(InClass, InIndex);
 }

@@ -235,7 +235,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Class
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static TArray<UClass*> GetAllChildClasses(UClass* InClass, bool bIncludeSelf = false);
+	static TArray<UClass*> GetClassChildren(const UClass* InClass, bool bIncludeSelf = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Texture

@@ -18,8 +18,13 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
+protected:
+	virtual void OnBindCommands() override;
+
 public:
 	virtual void OnCreate() override;
+
+	virtual void OnSave() override;
 
 	virtual void OnReset() override;
 
@@ -47,7 +52,9 @@ protected:
 	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
 
 	TSharedRef<SDockTab> SpawnStatusWidgetTab(const FSpawnTabArgs& Args);
-	
+		
+	void HandlePullDownFileMenu(FMenuBuilder& MenuBuilder);
+
 	void HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder);
 
 	//////////////////////////////////////////////////////////////////////////

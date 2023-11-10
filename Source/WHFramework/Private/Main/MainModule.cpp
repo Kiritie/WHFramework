@@ -80,7 +80,7 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 void AMainModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
-
+	
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
 		if(Modules[i] && Modules[i]->IsValidLowLevel())
@@ -153,12 +153,9 @@ void AMainModule::UnPauseModules_Implementation()
 
 UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass)
 {
-	if(Get(false) && Get(false)->IsValidLowLevel())
+	if(const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
 	{
-		if(const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
-		{
-			return Cast<UModuleNetworkComponentBase>(PlayerController->GetComponentByClass(InClass));
-		}
+		return Cast<UModuleNetworkComponentBase>(PlayerController->GetComponentByClass(InClass));
 	}
 	return nullptr;
 }
@@ -186,6 +183,7 @@ void AMainModule::UpdateListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleL
 {
 	for (int32 i = 0; i < Modules.Num(); i++)
 	{
+		Modules[i]->ModuleIndex = i;
 		Modules[i]->UpdateListItem(OutModuleListItems[i]);
 	}
 }

@@ -18,15 +18,16 @@ static const FName ProcedureEditorTabName("ProcedureEditor");
 
 IMPLEMENTATION_EDITOR_MODULE(FProcedureEditor)
 
-void FProcedureEditor::StartupModule()
+void FProcedureEditor::OnInitialize()
 {
+	FProcedureEditorCommands::Register();
 	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FProcedureEditor::OnSpawnProcedureEditorTab))
 		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FProcedureEditor::ShutdownModule()
+void FProcedureEditor::OnTermination()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ProcedureEditorTabName);
 }
@@ -50,6 +51,11 @@ TSharedRef<SDockTab> FProcedureEditor::OnSpawnProcedureEditorTab(const FSpawnTab
 	[
 		SAssignNew(ProcedureEditorWidget, SProcedureEditorWidget)
 	];
+}
+
+void FProcedureEditorCommands::RegisterCommands()
+{
+	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 }
 
 /////////////////////////////////////////////////////

@@ -66,13 +66,11 @@ void FWHFrameworkEditorModule::StartupModule()
 	// Register commands
 	FWHFrameworkEditorCommands::Register();
 
-	FTaskEditorCommands::Register();
-
-	FModuleEditor::Get().StartupModule();
-	FAchievementEditor::Get().StartupModule();
-	FProcedureEditor::Get().StartupModule();
-	FStepEditor::Get().StartupModule();
-	FTaskEditor::Get().StartupModule();
+	FModuleEditor::Get().OnInitialize();
+	FAchievementEditor::Get().OnInitialize();
+	FProcedureEditor::Get().OnInitialize();
+	FStepEditor::Get().OnInitialize();
+	FTaskEditor::Get().OnInitialize();
 
 	PluginCommands = MakeShareable(new FUICommandList);
 
@@ -152,11 +150,11 @@ void FWHFrameworkEditorModule::ShutdownModule()
 
 	FWHFrameworkEditorCommands::Unregister();
 
-	FModuleEditor::Get().ShutdownModule();
-	FAchievementEditor::Get().ShutdownModule();
-	FProcedureEditor::Get().ShutdownModule();
-	FStepEditor::Get().ShutdownModule();
-	FTaskEditor::Get().ShutdownModule();
+	FModuleEditor::Get().OnTermination();
+	FAchievementEditor::Get().OnTermination();
+	FProcedureEditor::Get().OnTermination();
+	FStepEditor::Get().OnTermination();
+	FTaskEditor::Get().OnTermination();
 
 	// Unregister asset type actions
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))

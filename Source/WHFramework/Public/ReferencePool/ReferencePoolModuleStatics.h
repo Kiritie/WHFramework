@@ -19,48 +19,31 @@ public:
 	template<class T>
 	static bool HasReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-		{
-			return ReferencePoolModule->HasReference<T>(InType);
-		}
-		return false;
+		return UReferencePoolModule::Get().HasReference<T>(InType);
 	}
 
 	template<class T>
 	static void CreateReference(UObject* InObject = nullptr, TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-		{
-			ReferencePoolModule->CreateReference<T>(InObject, InType);
-		}
+		UReferencePoolModule::Get().CreateReference<T>(InObject, InType);
 	}
 
 	template<class T>
 	static T& GetReference(bool bReset = false, TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-		{
-			return ReferencePoolModule->GetReference<T>(bReset, InType);
-		}
-		return *NewObject<T>(GetTransientPackage(), InType);
+		return UReferencePoolModule::Get().GetReference<T>(bReset, InType);
 	}
 
 	template<class T>
 	static void ResetReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-		{
-			ReferencePoolModule->ResetReference<T>(InType);
-		}
+		UReferencePoolModule::Get().ResetReference<T>(InType);
 	}
 
 	template<class T>
 	static void ClearReference(TSubclassOf<T> InType = T::StaticClass())
 	{
-		if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-		{
-			ReferencePoolModule->ClearReference<T>(InType);
-		}
+		UReferencePoolModule::Get().ClearReference<T>(InType);
 	}
 
 	static void ClearAllReference();

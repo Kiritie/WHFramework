@@ -26,7 +26,7 @@ void AWHPlayerController::OnInitialize_Implementation()
 
 void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
 {
-	for(const auto Iter : AMainModule::Get()->GetAllModule())
+	for(const auto Iter : AMainModule::GetAllModule())
 	{
 		if(Iter->ModuleNetworkComponent)
 		{

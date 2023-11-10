@@ -98,24 +98,13 @@ public:
 	template<class T>
 	static T* GetDataAsset(FName InName = NAME_None)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataAsset<T>(InName);
-		}
-		return nullptr;
+		return UAssetModule::Get().GetDataAsset<T>(InName);
 	}
 	
 	template<class T>
 	static T& GetDataAssetRef(FName InName = NAME_None)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataAssetRef<T>(InName);
-		}
-		else
-		{
-			return UReferencePoolModuleStatics::GetReference<T>();
-		}
+		return UAssetModule::Get().GetDataAssetRef<T>(InName);
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
@@ -124,11 +113,7 @@ public:
 	template<class T>
 	static T* CreateDataAsset(FName InName = NAME_None)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->CreateDataAsset<T>(InName);
-		}
-		return nullptr;
+		return UAssetModule::Get().CreateDataAsset<T>(InName);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
@@ -137,11 +122,7 @@ public:
 	template<class T>
 	static bool RemoveDataAsset(FName InName = NAME_None)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->RemoveDataAsset<T>(InName);
-		}
-		return false;
+		return UAssetModule::Get().RemoveDataAsset<T>(InName);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
@@ -162,81 +143,49 @@ public:
 	template<class T>
 	static bool GetDataTableRow(int32 InRowIndex, T& OutRow)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataTableRow<T>(InRowIndex, OutRow);
-		}
-		return false;
+		return UAssetModule::Get().GetDataTableRow<T>(InRowIndex, OutRow);
 	}
 
 	template<class T>
 	static bool GetDataTableRow(FName InRowName, T& OutRow)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataTableRow<T>(InRowName, OutRow);
-		}
-		return false;
+		return UAssetModule::Get().GetDataTableRow<T>(InRowName, OutRow);
 	}
 
 	template<class T>
 	static bool GetDataTableRow(UDataTable* InDataTable, int32 InRowIndex, T& OutRow)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataTableRow<T>(InDataTable, InRowIndex, OutRow);
-		}
-		return false;
+		return UAssetModule::Get().GetDataTableRow<T>(InDataTable, InRowIndex, OutRow);
 	}
 
 	template<class T>
 	static bool GetDataTableRow(UDataTable* InDataTable, FName InRowName, T& OutRow)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->GetDataTableRow<T>(InDataTable, InRowName, OutRow);
-		}
-		return false;
+		return UAssetModule::Get().GetDataTableRow<T>(InDataTable, InRowName, OutRow);
 	}
 
 	template<class T>
 	static bool ReadDataTable(TArray<T>& OutRows)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->ReadDataTable<T>(OutRows);
-		}
-		return false;
+		return UAssetModule::Get().ReadDataTable<T>(OutRows);
 	}
 
 	template<class T>
 	static bool ReadDataTable(UDataTable* InDataTable, TArray<T>& OutRows)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->ReadDataTable<T>(InDataTable, OutRows);
-		}
-		return false;
+		return UAssetModule::Get().ReadDataTable<T>(InDataTable, OutRows);
 	}
 
 	template<class T>
 	static bool ReadDataTable(TMap<FName, T>& OutRows)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->ReadDataTable<T>(OutRows);
-		}
-		return false;
+		return UAssetModule::Get().ReadDataTable<T>(OutRows);
 	}
 
 	template<class T>
 	static bool ReadDataTable(UDataTable* InDataTable, TMap<FName, T>& OutRows)
 	{
-		if(UAssetModule* AssetModule = UAssetModule::Get())
-		{
-			return AssetModule->ReadDataTable<T>(InDataTable, OutRows);
-		}
-		return false;
+		return UAssetModule::Get().ReadDataTable<T>(InDataTable, OutRows);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")

@@ -8,9 +8,9 @@
 UENUM(BlueprintType)
 enum EDebugMode : int
 {
-	EM_All,
-	EM_Screen,
-	EM_Console
+	EDM_All,
+	EDM_Screen,
+	EDM_Console
 };
 
 UENUM(BlueprintType)
@@ -96,7 +96,7 @@ public:
 	static void LogMessage(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static void DebugMessage(const FString& Message, EDebugMode Mode = EM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int Key = -1, bool bNewerOnTop = true);
+	static void DebugMessage(const FString& Message, EDebugMode Mode = EDM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int Key = -1, bool bNewerOnTop = true);
 
 	UFUNCTION(BlueprintPure, Category = "DebugModuleStatics")
 	static FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory);

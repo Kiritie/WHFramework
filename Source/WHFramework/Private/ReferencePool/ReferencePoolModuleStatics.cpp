@@ -7,8 +7,5 @@
 
 void UReferencePoolModuleStatics::ClearAllReference()
 {
-	if(UReferencePoolModule* ReferencePoolModule = UReferencePoolModule::Get())
-	{
-		ReferencePoolModule->ClearAllReference();
-	}
+	UReferencePoolModule::Get().ClearAllReference();
 }

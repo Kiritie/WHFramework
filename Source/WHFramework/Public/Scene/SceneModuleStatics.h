@@ -8,8 +8,8 @@
 
 #include "SceneModuleStatics.generated.h"
 
-class UWorldWeatherComponent;
-class UWorldTimerComponent;
+class UWorldWeather;
+class UWorldTimer;
 class APhysicsVolumeBase;
 class APhysicsVolume;
 /**
@@ -24,10 +24,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static UWorldTimerComponent* GetWorldTimer();
+	static UWorldTimer* GetWorldTimer();
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static UWorldWeatherComponent* GetWorldWeather();
+	static UWorldWeather* GetWorldWeather();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level

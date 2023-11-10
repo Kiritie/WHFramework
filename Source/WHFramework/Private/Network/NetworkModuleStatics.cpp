@@ -11,98 +11,57 @@
 
 bool UNetworkModuleStatics::IsNetworkLocalMode()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->IsLocalMode();
-	}
-	return false;
+	return UNetworkModule::Get().IsLocalMode();
 }
 
 void UNetworkModuleStatics::SetNetworkLocalMode(bool bInLocalMode)
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		NetworkModule->SetLocalMode(bInLocalMode);
-	}
+	UNetworkModule::Get().SetLocalMode(bInLocalMode);
 }
 
 FString UNetworkModuleStatics::GetNetworkServerURL()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->GetServerURL();
-	}
-	return TEXT("");
+	return UNetworkModule::Get().GetServerURL();
 }
 
 void UNetworkModuleStatics::SetNetworkServerURL(const FString& InServerURL)
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		NetworkModule->SetServerURL(InServerURL);
-	}
+	UNetworkModule::Get().SetServerURL(InServerURL);
 }
 
 int32 UNetworkModuleStatics::GetNetworkServerPort()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->GetServerPort();
-	}
-	return 0;
+	return UNetworkModule::Get().GetServerPort();
 }
 
 void UNetworkModuleStatics::SetNetworkServerPort(int32 InServerPort)
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		NetworkModule->SetServerPort(InServerPort);
-	}
+	UNetworkModule::Get().SetServerPort(InServerPort);
 }
 
 FString UNetworkModuleStatics::GetServerLocalURL()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->GetServerLocalURL();
-	}
-	return TEXT("");
+	return UNetworkModule::Get().GetServerLocalURL();
 }
 
 FString UNetworkModuleStatics::GetServerLocalIP()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->GetServerLocalIP();
-	}
-	return TEXT("");
+	return UNetworkModule::Get().GetServerLocalIP();
 }
 
 int32 UNetworkModuleStatics::GetServerLocalPort()
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->GetServerLocalPort();
-	}
-	return 0;
+	return UNetworkModule::Get().GetServerLocalPort();
 }
 
 bool UNetworkModuleStatics::ConnectNetworkServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->ConnectServer(InServerURL, InServerPort, InOptions);
-	}
-	return false;
+	return UNetworkModule::Get().ConnectServer(InServerURL, InServerPort, InOptions);
 }
 
 bool UNetworkModuleStatics::DisconnectNetworkServer(const FString& InLevelName)
 {
-	if(UNetworkModule* NetworkModule = UNetworkModule::Get())
-	{
-		return NetworkModule->DisconnectServer(InLevelName);
-	}
-	return false;
+	return UNetworkModule::Get().DisconnectServer(InLevelName);
 }
 
 void UNetworkModuleStatics::ServerExecuteActorFunc(AActor* InActor, FName InFuncName)

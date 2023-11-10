@@ -2,6 +2,8 @@
 
 #include "Common/Base/WHObject.h"
 
+#include "Debug/DebugModuleTypes.h"
+
 UWHObject::UWHObject()
 {
 	
@@ -17,13 +19,9 @@ void UWHObject::OnDespawn_Implementation(bool bRecovery)
 	
 }
 
-void UWHObject::OnReset_Implementation()
-{
-}
-
 UWorld* UWHObject::GetWorld() const
 {
-	if (!HasAnyFlags(RF_ClassDefaultObject) && ensureMsgf(GetOuter(), TEXT("UWHObject: %s has a null OuterPrivate in UWHObject::GetWorld()"), *GetFullName())
+	if (!HasAnyFlags(RF_ClassDefaultObject) && ensureEditorMsgf(GetOuter(), FString::Printf(TEXT("UWHObject: %s has a null OuterPrivate in UWHObject::GetWorld()"), *GetFullName()), EDC_Default, EDV_Error)
 		&& !GetOuter()->HasAnyFlags(RF_BeginDestroyed) && !GetOuter()->IsUnreachable())
 	{
 		if (const ULevel* Level = GetTypedOuter<ULevel>())

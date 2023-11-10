@@ -5,41 +5,25 @@
 
 UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
 {
-	if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-	{
-		return ObjectPoolModule->SpawnObject(InType, InParams);
-	}
-	return nullptr;
+	return UObjectPoolModule::Get().SpawnObject(InType, InParams);
 }
 
 void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, bool bRecovery)
 {
-	if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-	{
-		ObjectPoolModule->DespawnObject(InObject, bRecovery);
-	}
+	UObjectPoolModule::Get().DespawnObject(InObject, bRecovery);
 }
 
 void UObjectPoolModuleStatics::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
 {
-	if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-	{
-		ObjectPoolModule->DespawnObjects(InObjects, bRecovery);
-	}
+	UObjectPoolModule::Get().DespawnObjects(InObjects, bRecovery);
 }
 
 void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InType)
 {
-	if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-	{
-		ObjectPoolModule->ClearObject(InType);
-	}
+	UObjectPoolModule::Get().ClearObject(InType);
 }
 
 void UObjectPoolModuleStatics::ClearAllObject()
 {
-	if(UObjectPoolModule* ObjectPoolModule = UObjectPoolModule::Get())
-	{
-		ObjectPoolModule->ClearAllObject();
-	}
+	UObjectPoolModule::Get().ClearAllObject();
 }

@@ -32,5 +32,5 @@ void UGeneralSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 
-	SetSaveData(USaveGameModule::Get()->GetSaveData(true));
+	SetSaveData(USaveGameModule::Get().GetSaveData(true));
 }

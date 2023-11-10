@@ -66,10 +66,12 @@ UObject* UModuleBlueprintFactory::FactoryCreateNew(UClass* Class, UObject* InPar
 				{
 					int32 NodePositionY = 0;
 					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnInitialize")), UModuleBase::StaticClass(), NodePositionY);
-					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnEnter")), UModuleBase::StaticClass(), NodePositionY);
+					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnPreparatory")), UModuleBase::StaticClass(), NodePositionY);
+					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnReset")), UModuleBase::StaticClass(), NodePositionY);
+					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnPause")), UModuleBase::StaticClass(), NodePositionY);
+					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnUnPause")), UModuleBase::StaticClass(), NodePositionY);
 					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnRefresh")), UModuleBase::StaticClass(), NodePositionY);
-					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnGuide")), UModuleBase::StaticClass(), NodePositionY);
-					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnLeave")), UModuleBase::StaticClass(), NodePositionY);
+					FKismetEditorUtilities::AddDefaultEventNode(NewBP, NewGraph, FName(TEXT("K2_OnTermination")), UModuleBase::StaticClass(), NodePositionY);
 				}
 			}
 		}

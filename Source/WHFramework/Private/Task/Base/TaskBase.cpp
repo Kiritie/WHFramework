@@ -9,6 +9,7 @@
 #include "Event/Handle/Task/EventHandle_ExecuteTask.h"
 #include "Event/Handle/Task/EventHandle_LeaveTask.h"
 #include "Common/CommonStatics.h"
+#include "Debug/DebugModuleTypes.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleStatics.h"
 
@@ -60,12 +61,9 @@ void UTaskBase::OnUnGenerate()
 {
 	if(bFirstTask)
 	{
-		if(UTaskModule* TaskModule = UTaskModule::Get(true))
+		if(UTaskModule::Get(true).GetFirstTask() == this)
 		{
-			if(TaskModule->GetFirstTask() == this)
-			{
-				TaskModule->SetFirstTask(nullptr);
-			}
+			UTaskModule::Get(true).SetFirstTask(nullptr);
 		}
 	}
 }
@@ -124,7 +122,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
-	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastTask);
 
@@ -281,7 +279,7 @@ void UTaskBase::OnLeave()
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
-	WHDebug(FString::Printf(TEXT("%s任务: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *TaskDisplayName.ToString()), EM_All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("%s任务: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave();
 
@@ -582,20 +580,17 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, bFirstTask))
 		{
-			if(UTaskModule* TaskModule = UTaskModule::Get(true))
+			if(bFirstTask)
 			{
-				if(bFirstTask)
+				if(UTaskModule::Get(true).GetFirstTask())
 				{
-					if(TaskModule->GetFirstTask())
-					{
-						TaskModule->GetFirstTask()->bFirstTask = false;
-					}
-					TaskModule->SetFirstTask(this);
+					UTaskModule::Get(true).GetFirstTask()->bFirstTask = false;
 				}
-				else if(TaskModule->GetFirstTask() == this)
-				{
-					TaskModule->SetFirstTask(nullptr);
-				}
+				UTaskModule::Get(true).SetFirstTask(this);
+			}
+			else if(UTaskModule::Get(true).GetFirstTask() == this)
+			{
+				UTaskModule::Get(true).SetFirstTask(nullptr);
 			}
 		}
 	}

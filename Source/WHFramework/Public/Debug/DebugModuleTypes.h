@@ -83,7 +83,7 @@ return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_AD
  */
 FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log)
 {
- UDebugModuleStatics::LogMessage(Message, Category, Verbosity);
+	UDebugModuleStatics::LogMessage(Message, Category, Verbosity);
 }
 
 /*
@@ -97,7 +97,7 @@ FORCEINLINE void WHLog(const FString& Message, EDebugCategory Category = EDC_Def
  * @param Key 调试ID
  * @param bNewerOnTop 不更新在顶部
  */
-FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
+FORCEINLINE void WHDebug(const FString& Message, EDebugMode Mode = EDM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int32 Key = -1, bool bNewerOnTop = true)
 {
- UDebugModuleStatics::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
+	UDebugModuleStatics::DebugMessage(Message, Mode, Category, Verbosity, DisplayColor, Duration, Key, bNewerOnTop);
 }

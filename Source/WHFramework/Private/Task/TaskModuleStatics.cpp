@@ -8,83 +8,50 @@
 
 UTaskBase* UTaskModuleStatics::GetCurrentTask()
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		return TaskModule->GetCurrentTask();
-	}
-	return nullptr;
+	return UTaskModule::Get().GetCurrentTask();
 }
 
 UTaskBase* UTaskModuleStatics::GetCurrentRootTask()
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		return TaskModule->GetCurrentRootTask();
-	}
-	return nullptr;
+	return UTaskModule::Get().GetCurrentRootTask();
 }
 
 UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		return TaskModule->GetTaskByGUID(InTaskGUID);
-	}
-	return nullptr;
+	return UTaskModule::Get().GetTaskByGUID(InTaskGUID);
 }
 
 void UTaskModuleStatics::RestoreTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->RestoreTask(InTask);
-	}
+	UTaskModule::Get().RestoreTask(InTask);
 }
 
 void UTaskModuleStatics::EnterTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->EnterTask(InTask);
-	}
+	UTaskModule::Get().EnterTask(InTask);
 }
 
 void UTaskModuleStatics::RefreshTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->RefreshTask(InTask);
-	}
+	UTaskModule::Get().RefreshTask(InTask);
 }
 
 void UTaskModuleStatics::GuideTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->GuideTask(InTask);
-	}
+	UTaskModule::Get().GuideTask(InTask);
 }
 
 void UTaskModuleStatics::ExecuteTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->ExecuteTask(InTask);
-	}
+	UTaskModule::Get().ExecuteTask(InTask);
 }
 
 void UTaskModuleStatics::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->CompleteTask(InTask, InTaskExecuteResult);
-	}
+	UTaskModule::Get().CompleteTask(InTask, InTaskExecuteResult);
 }
 
 void UTaskModuleStatics::LeaveTask(UTaskBase* InTask)
 {
-	if(UTaskModule* TaskModule = UTaskModule::Get())
-	{
-		TaskModule->LeaveTask(InTask);
-	}
+	UTaskModule::Get().LeaveTask(InTask);
 }

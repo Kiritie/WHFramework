@@ -7,64 +7,40 @@
 
 void UFSMModuleStatics::RegisterFSM(UFSMComponent* InFSM)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->RegisterFSM(InFSM);
-	}
+	UFSMModule::Get().RegisterFSM(InFSM);
 }
 
 void UFSMModuleStatics::UnregisterFSM(UFSMComponent* InFSM)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->UnregisterFSM(InFSM);
-	}
+	UFSMModule::Get().UnregisterFSM(InFSM);
 }
 
 void UFSMModuleStatics::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupStateByIndex(InGroupName, InStateIndex);
-	}
+	UFSMModule::Get().SwitchGroupStateByIndex(InGroupName, InStateIndex);
 }
 
 void UFSMModuleStatics::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupStateByClass(InGroupName, InStateClass);
-	}
+	UFSMModule::Get().SwitchGroupStateByClass(InGroupName, InStateClass);
 }
 
 void UFSMModuleStatics::SwitchGroupDefaultState(const FName InGroupName)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupDefaultState(InGroupName);
-	}
+	UFSMModule::Get().SwitchGroupDefaultState(InGroupName);
 }
 
 void UFSMModuleStatics::SwitchGroupFinalState(const FName InGroupName)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupFinalState(InGroupName);
-	}
+	UFSMModule::Get().SwitchGroupFinalState(InGroupName);
 }
 
 void UFSMModuleStatics::SwitchGroupLastState(const FName InGroupName)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupLastState(InGroupName);
-	}
+	UFSMModule::Get().SwitchGroupLastState(InGroupName);
 }
 
 void UFSMModuleStatics::SwitchGroupNextState(const FName InGroupName)
 {
-	if(UFSMModule* FSMModule = UFSMModule::Get())
-	{
-		FSMModule->SwitchGroupNextState(InGroupName);
-	}
+	UFSMModule::Get().SwitchGroupNextState(InGroupName);
 }

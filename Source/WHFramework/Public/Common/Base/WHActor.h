@@ -6,7 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
-#include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "WHActor.generated.h"
 
@@ -59,7 +58,7 @@ protected:
  * 
  */
 UCLASS(hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking, Physics, LevelInstance))
-class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface, public IReferencePoolInterface
+class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
@@ -88,11 +87,6 @@ public:
 	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ReferencePool
-public:
-	virtual void OnReset_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor

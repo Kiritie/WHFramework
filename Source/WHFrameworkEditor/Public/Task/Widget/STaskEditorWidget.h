@@ -18,7 +18,7 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-public:
+protected:
 	virtual void OnBindCommands() override;
 
 public:

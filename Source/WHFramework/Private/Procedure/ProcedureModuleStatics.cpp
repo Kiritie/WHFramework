@@ -7,119 +7,70 @@
 
 UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->GetCurrentProcedure();
-	}
-	return nullptr;
+	return UProcedureModule::Get().GetCurrentProcedure();
 }
 
 bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->HasProcedureByIndex(InIndex);
-	}
-	return false;
+	return UProcedureModule::Get().HasProcedureByIndex(InIndex);
 }
 
 UProcedureBase* UProcedureModuleStatics::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->GetProcedureByIndex(InIndex, InClass);
-	}
-	return nullptr;
+	return UProcedureModule::Get().GetProcedureByIndex(InIndex, InClass);
 }
 
 bool UProcedureModuleStatics::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->HasProcedureByClass(InClass);
-	}
-	return false;
+	return UProcedureModule::Get().HasProcedureByClass(InClass);
 }
 
 UProcedureBase* UProcedureModuleStatics::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->GetProcedureByClass(InClass);
-	}
-	return nullptr;
+	return UProcedureModule::Get().GetProcedureByClass(InClass);
 }
 
 bool UProcedureModuleStatics::IsCurrentProcedure(UProcedureBase* InProcedure)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->IsCurrentProcedure(InProcedure);
-	}
-	return false;
+	return UProcedureModule::Get().IsCurrentProcedure(InProcedure);
 }
 
 bool UProcedureModuleStatics::IsCurrentProcedureIndex(int32 InIndex)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		return ProcedureModule->IsCurrentProcedureIndex(InIndex);
-	}
-	return false;
+	return UProcedureModule::Get().IsCurrentProcedureIndex(InIndex);
 }
 
 void UProcedureModuleStatics::SwitchProcedure(UProcedureBase* InProcedure)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchProcedure(InProcedure);
-	}
+	UProcedureModule::Get().SwitchProcedure(InProcedure);
 }
 
 void UProcedureModuleStatics::SwitchProcedureByIndex(int32 InIndex)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchProcedureByIndex(InIndex);
-	}
+	UProcedureModule::Get().SwitchProcedureByIndex(InIndex);
 }
 
 void UProcedureModuleStatics::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchProcedureByClass(InClass);
-	}
+	UProcedureModule::Get().SwitchProcedureByClass(InClass);
 }
 
 void UProcedureModuleStatics::SwitchFirstProcedure()
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchFirstProcedure();
-	}
+	UProcedureModule::Get().SwitchFirstProcedure();
 }
 
 void UProcedureModuleStatics::SwitchLastProcedure()
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchLastProcedure();
-	}
+	UProcedureModule::Get().SwitchLastProcedure();
 }
 
 void UProcedureModuleStatics::SwitchNextProcedure()
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->SwitchNextProcedure();
-	}
+	UProcedureModule::Get().SwitchNextProcedure();
 }
 
 void UProcedureModuleStatics::GuideCurrentProcedure()
 {
-	if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-	{
-		ProcedureModule->GuideCurrentProcedure();
-	}
+	UProcedureModule::Get().GuideCurrentProcedure();
 }

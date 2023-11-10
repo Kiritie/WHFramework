@@ -97,12 +97,12 @@ TArray<UModuleBase*> UMainModuleStatics::GetAllModule(bool bInEditor)
 
 UModuleBase* UMainModuleStatics::GetModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor)
 {
-	return AMainModule::GetModuleByClass(bInEditor, InClass);
+	return &AMainModule::GetModuleByClass(bInEditor, InClass);
 }
 
 UModuleBase* UMainModuleStatics::GetModuleByName(const FName InName, bool bInEditor)
 {
-	return AMainModule::GetModuleByName<UModuleBase>(InName, bInEditor);
+	return &AMainModule::GetModuleByName<UModuleBase>(InName, bInEditor);
 }
 
 UModuleNetworkComponentBase* UMainModuleStatics::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InClass)

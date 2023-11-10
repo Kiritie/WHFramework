@@ -18,15 +18,16 @@ static const FName TaskEditorTabName("TaskEditor");
 
 IMPLEMENTATION_EDITOR_MODULE(FTaskEditor)
 
-void FTaskEditor::StartupModule()
+void FTaskEditor::OnInitialize()
 {
+	FTaskEditorCommands::Register();
 	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TaskEditorTabName, FOnSpawnTab::CreateRaw(this, &FTaskEditor::OnSpawnTaskEditorTab))
 		.SetDisplayName(LOCTEXT("FTaskEditorTabTitle", "Task Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FTaskEditor::ShutdownModule()
+void FTaskEditor::OnTermination()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TaskEditorTabName);
 }

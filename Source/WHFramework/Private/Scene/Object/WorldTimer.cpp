@@ -1,15 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Scene/Components/WorldTimerComponent.h"
+#include "Scene/Object/WorldTimer.h"
 
 #include "Engine/DirectionalLight.h"
 #include "Engine/World.h"
 #include "Kismet/KismetMathLibrary.h"
 
-UWorldTimerComponent::UWorldTimerComponent()
+UWorldTimer::UWorldTimer()
 {
-	PrimaryComponentTick.bCanEverTick = false;
-	
 	SkyLight = nullptr;
 	SunLight = nullptr;
 
@@ -21,20 +19,25 @@ UWorldTimerComponent::UWorldTimerComponent()
 	CurrentSeconds = 0;
 }
 
-void UWorldTimerComponent::BeginPlay()
+void UWorldTimer::OnSpawn_Implementation(const TArray<FParameter>& InParams)
 {
-	Super::BeginPlay();
+	Super::OnSpawn_Implementation(InParams);
 
 	UpdateTimer();
 }
 
-void UWorldTimerComponent::InitializeTimer(float InSecondsOfDay, float InTimeSeconds)
+void UWorldTimer::OnDespawn_Implementation(bool bRecovery)
+{
+	Super::OnDespawn_Implementation(bRecovery);
+}
+
+void UWorldTimer::InitializeTimer(float InSecondsOfDay, float InTimeSeconds)
 {
 	SecondsOfDay = InSecondsOfDay;
 	SetCurrentTime(InTimeSeconds);
 }
 
-void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)
+void UWorldTimer::UpdateTimer(float DeltaSeconds)
 {
 	TimeSeconds += DeltaSeconds;
 
@@ -55,7 +58,7 @@ void UWorldTimerComponent::UpdateTimer(float DeltaSeconds)
 	TimeSeconds += DeltaSeconds;
 }
 
-void UWorldTimerComponent::SetCurrentTime(float InTimeSeconds, bool bUpdateTimer /*= true*/)
+void UWorldTimer::SetCurrentTime(float InTimeSeconds, bool bUpdateTimer /*= true*/)
 {
 	TimeSeconds = InTimeSeconds != -1.f ? InTimeSeconds : GetSunriseTime();
 	if (bUpdateTimer)
@@ -64,17 +67,17 @@ void UWorldTimerComponent::SetCurrentTime(float InTimeSeconds, bool bUpdateTimer
 	}
 }
 
-float UWorldTimerComponent::GetSunriseTime() const
+float UWorldTimer::GetSunriseTime() const
 {
 	return (SecondsOfDay / 4) * 1.5f;
 }
 
-float UWorldTimerComponent::GetNoonTime() const
+float UWorldTimer::GetNoonTime() const
 {
 	return (SecondsOfDay / 4) * 2.f;
 }
 
-float UWorldTimerComponent::GetSunsetTime() const
+float UWorldTimer::GetSunsetTime() const
 {
 	return (SecondsOfDay / 4) * 3.5f;
 }

@@ -82,10 +82,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInf
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		InputModule->UpdateInputMode();
-	}
+	UInputModule::Get().UpdateInputMode();
 
 	if(InBindInfo.SceneComp && InBindInfo.SceneComp->IsA<UWorldWidgetComponent>())
 	{
@@ -146,10 +143,7 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		InputModule->UpdateInputMode();
-	}
+	UInputModule::Get().UpdateInputMode();
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 

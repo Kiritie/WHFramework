@@ -12,8 +12,8 @@ class AVoxelCapture;
 class AVoxelChunk;
 class UVoxelData;
 class ACharacterBase;
-class UWorldTimerComponent;
-class UWorldWeatherComponent;
+class UWorldTimer;
+class UWorldWeather;
 class AVoxelEntityPreview;
 
 /**

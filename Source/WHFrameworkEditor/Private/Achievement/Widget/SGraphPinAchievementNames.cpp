@@ -20,5 +20,5 @@ void SGraphPinAchievementNames::Construct(const FArguments& InArgs, UEdGraphPin*
 void SGraphPinAchievementNames::RegenList()
 {
 	NameList.Empty();
-	NameList = UAchievementModule::Get()->GetComboBoxNames();
+	NameList = UAchievementModule::Get().GetComboBoxNames();
 }

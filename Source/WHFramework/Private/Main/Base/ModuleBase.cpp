@@ -14,6 +14,7 @@ UModuleBase::UModuleBase()
 	ModuleDisplayName = FText::GetEmpty();
 	ModuleDescription = FText::GetEmpty();
 	ModuleState = EModuleState::None;
+	ModuleIndex = 0;
 	bModuleAutoRun = true;
 	bModuleAutoSave = false;
 	ModuleSaveGame = nullptr;
@@ -40,6 +41,11 @@ void UModuleBase::OnInitialize()
 void UModuleBase::OnPreparatory(EPhase InPhase)
 {
 	K2_OnPreparatory(InPhase);
+}
+
+void UModuleBase::OnReset()
+{
+	K2_OnReset();
 }
 
 void UModuleBase::OnPause()
@@ -82,11 +88,6 @@ FSaveData* UModuleBase::ToData()
 	return nullptr;
 }
 
-void UModuleBase::OnReset_Implementation()
-{
-	
-}
-
 void UModuleBase::Load_Implementation()
 {
 	USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0);
@@ -109,7 +110,7 @@ void UModuleBase::Run_Implementation()
 
 void UModuleBase::Reset_Implementation()
 {
-	Execute_OnReset(this);
+	OnReset();
 }
 
 void UModuleBase::Pause_Implementation()
@@ -167,7 +168,7 @@ EModuleState UModuleBase::GetModuleState() const
 	return ModuleState;
 }
 
-AMainModule* UModuleBase::GetOwner() const
+AMainModule* UModuleBase::GetModuleOwner() const
 {
 	return Cast<AMainModule>(GetOuter());
 }
@@ -191,7 +192,7 @@ void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 
 int32 UModuleBase::GetModuleIndex() const
 {
-	return GetOwner()->GetModules().IndexOfByKey(this);
+	return ModuleIndex;
 }
 
 void UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)

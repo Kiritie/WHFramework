@@ -50,12 +50,9 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(UProcedureModule* ProcedureModule = UProcedureModule::Get(true))
+		if(UProcedureModule::Get(true).GetFirstProcedure() == this)
 		{
-			if(ProcedureModule->GetFirstProcedure() == this)
-			{
-				ProcedureModule->SetFirstProcedure(nullptr);
-			}
+			UProcedureModule::Get(true).SetFirstProcedure(nullptr);
 		}
 	}
 }
@@ -77,7 +74,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	ProcedureState = EProcedureState::Entered;
 	OnStateChanged(ProcedureState);
 
-	WHDebug(FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()), EM_All, EDC_Procedure, EDV_Log, FColor::Cyan, 5.f);
+	WHDebug(FString::Printf(TEXT("进入流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter(InLastProcedure);
 
@@ -138,7 +135,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 		UCameraModuleStatics::EndTrackTarget(OperationTarget);
 	}
 
-	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
+	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave(InNextProcedure);
 
@@ -317,20 +314,17 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{
-			if(UProcedureModule* ProcedureModule = UProcedureModule::Get(true))
+			if(bFirstProcedure)
 			{
-				if(bFirstProcedure)
+				if(UProcedureModule::Get(true).GetFirstProcedure())
 				{
-					if(ProcedureModule->GetFirstProcedure())
-					{
-						ProcedureModule->GetFirstProcedure()->bFirstProcedure = false;
-					}
-					ProcedureModule->SetFirstProcedure(this);
+					UProcedureModule::Get(true).GetFirstProcedure()->bFirstProcedure = false;
 				}
-				else if(ProcedureModule->GetFirstProcedure() == this)
-				{
-					ProcedureModule->SetFirstProcedure(nullptr);
-				}
+				UProcedureModule::Get(true).SetFirstProcedure(this);
+			}
+			else if(UProcedureModule::Get(true).GetFirstProcedure() == this)
+			{
+				UProcedureModule::Get(true).SetFirstProcedure(nullptr);
 			}
 		}
 	}

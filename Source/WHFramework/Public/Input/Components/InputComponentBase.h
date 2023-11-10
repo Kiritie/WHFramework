@@ -27,7 +27,7 @@ public:
 	void BindInputAction(const UPlayerMappableInputConfig* InputConfig, const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bLogIfNotFound = true)
 	{
 		check(InputConfig);
-		if (const UInputActionBase* InputAction = UInputModule::Get()->FindInputActionForTag(InputTag, InputConfig, bLogIfNotFound))
+		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, InputConfig, bLogIfNotFound))
 		{
 			BindAction(InputAction, TriggerEvent, Object, Func);
 		}

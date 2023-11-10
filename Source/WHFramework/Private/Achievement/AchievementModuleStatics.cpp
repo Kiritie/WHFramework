@@ -7,59 +7,35 @@
 
 bool UAchievementModuleStatics::IsAchievementExists(FName InKey)
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		return AchievementModule->IsAchievementExists(InKey);
-	}
-	return false;
+	return UAchievementModule::Get().IsAchievementExists(InKey);
 }
 
 int32 UAchievementModuleStatics::GetAchievedAchievementCount()
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		return AchievementModule->GetAchievedAchievementCount();
-	}
-	return 0;
+	return UAchievementModule::Get().GetAchievedAchievementCount();
 }
 
 float UAchievementModuleStatics::GetAchievedAchievementPercentage()
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		return AchievementModule->GetAchievedAchievementPercentage();
-	}
-	return 0.f;
+	return UAchievementModule::Get().GetAchievedAchievementPercentage();
 }
 
 void UAchievementModuleStatics::GetAchievementState(FName InKey, bool& OutFoundAchievement, FAchievementData& OutData, FAchievementStates& OutState)
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		AchievementModule->GetAchievementState(InKey, OutFoundAchievement, OutData, OutState);
-	}
+	UAchievementModule::Get().GetAchievementState(InKey, OutFoundAchievement, OutData, OutState);
 }
 
 void UAchievementModuleStatics::UnlockAchievement(FName InKey)
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		AchievementModule->UnlockAchievement(InKey);
-	}
+	UAchievementModule::Get().UnlockAchievement(InKey);
 }
 
 void UAchievementModuleStatics::SetAchievementProgress(FName InKey, float InProgress)
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		AchievementModule->SetAchievementProgress(InKey, InProgress);
-	}
+	UAchievementModule::Get().SetAchievementProgress(InKey, InProgress);
 }
 
 void UAchievementModuleStatics::AddAchievementProgress(FName InKey, float InProgress)
 {
-	if(UAchievementModule* AchievementModule = UAchievementModule::Get())
-	{
-		AchievementModule->AddAchievementProgress(InKey, InProgress);
-	}
+	UAchievementModule::Get().AddAchievementProgress(InKey, InProgress);
 }

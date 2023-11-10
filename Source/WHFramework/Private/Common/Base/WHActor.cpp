@@ -72,11 +72,6 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 	Container = nullptr;
 }
 
-void AWHActor::OnReset_Implementation()
-{
-	
-}
-
 void AWHActor::SetActorVisible_Implementation(bool bInVisible)
 {
 	bVisible = bInVisible;

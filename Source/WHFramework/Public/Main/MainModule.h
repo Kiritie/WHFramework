@@ -77,20 +77,14 @@ public:
 	template<class T>
 	static void RunModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Run();
-		}
+		GetModuleByClass<T>(false, InClass).Run();
 	}
 	/**
 	* 通过名称运行模块
 	*/
 	static void RunModuleByName(const FName InName)
 	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Run();
-		}
+		GetModuleByName<UModuleBase>(InName).Run();
 	}
 	/**
 	 * 通过类型重置模块
@@ -98,20 +92,14 @@ public:
 	template<class T>
 	static void ResetModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Reset();
-		}
+		GetModuleByClass<T>(false, InClass).Reset();
 	}
 	/**
 	* 通过名称重置模块
 	*/
 	static void ResetModuleByName(const FName InName)
 	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Reset();
-		}
+		GetModuleByName<UModuleBase>(InName).Reset();
 	}
 	/**
 	 * 通过类型暂停模块
@@ -119,20 +107,14 @@ public:
 	template<class T>
 	static void PauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Pause();
-		}
+		GetModuleByClass<T>(false, InClass).Pause();
 	}
 	/**
 	* 通过名称暂停模块
 	*/
 	static void PauseModuleByName(const FName InName)
 	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Pause();
-		}
+		GetModuleByName<UModuleBase>(InName).Pause();
 	}
 	/**
 	 * 通过类型取消暂停模块
@@ -140,20 +122,14 @@ public:
 	template<class T>
 	static void UnPauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
 	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->UnPause();
-		}
+		GetModuleByClass<T>(false, InClass).UnPause();
 	}
 	/**
 	* 通过名称取消暂停模块
 	*/
 	static void UnPauseModuleByName(const FName InName)
 	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->UnPause();
-		}
+		GetModuleByName<UModuleBase>(InName).UnPause();
 	}
 
 public:
@@ -162,18 +138,13 @@ public:
 	*/
 	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
 	{
-		AMainModule* MainModule = Get(bInEditor);
-		if(MainModule && MainModule->IsValidLowLevel())
-		{
-			return MainModule->Modules;
-		}
-		return TArray<UModuleBase*>();
+		return Get(bInEditor)->GetModules();
 	}
 	/**
 	 * 通过类型获取模块
 	 */
 	template<class T>
-	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
+	static T& GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
 	{
 		const FName ModuleName = InClass.GetDefaultObject()->GetModuleName();
 		return GetModuleByName<T>(ModuleName, bInEditor);
@@ -182,17 +153,14 @@ public:
 	* 通过名称获取模块
 	*/
 	template<class T>
-	static T* GetModuleByName(const FName InName, bool bInEditor = false)
+	static T& GetModuleByName(const FName InName, bool bInEditor = false)
 	{
-		AMainModule* MainModule = Get(bInEditor);
-		if(MainModule && MainModule->IsValidLowLevel())
+		if(Get(bInEditor)->ModuleMap.Contains(InName))
 		{
-			if(MainModule->ModuleMap.Contains(InName))
-			{
-				return Cast<T>(MainModule->ModuleMap[InName]);
-			}
+			return static_cast<T&>(*Get(bInEditor)->ModuleMap[InName]);
 		}
-		return nullptr;
+		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
+		return *NewObject<T>();
 	}
 	/**
 	* 通过类型获取模块网络组件

@@ -18,17 +18,29 @@ static const FName ModuleEditorTabName("ModuleEditor");
 
 IMPLEMENTATION_EDITOR_MODULE(FModuleEditor)
 
-void FModuleEditor::StartupModule()
+void FModuleEditor::OnInitialize()
 {
+	FModuleEditorCommands::Register();
 	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ModuleEditorTabName, FOnSpawnTab::CreateRaw(this, &FModuleEditor::OnSpawnModuleEditorTab))
 		.SetDisplayName(LOCTEXT("FModuleEditorTabTitle", "Module Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FModuleEditor::ShutdownModule()
+void FModuleEditor::OnTermination()
 {
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ModuleEditorTabName);
+}
+
+void FModuleEditor::RegisterSettings(ISettingsModule* InSettingsModule)
+{
+}
+
+void FModuleEditor::UnRegisterSettings()
+{
+}
+
+void FModuleEditor::RegisterAssetTypeAction(IAssetTools& AssetTools, TSharedRef<IAssetTypeActions> Action)
+{
 }
 
 void FModuleEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
@@ -50,6 +62,11 @@ TSharedRef<SDockTab> FModuleEditor::OnSpawnModuleEditorTab(const FSpawnTabArgs& 
 	[
 		SAssignNew(ModuleEditorWidget, SModuleEditorWidget)
 	];
+}
+
+void FModuleEditorCommands::RegisterCommands()
+{
+	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 }
 
 /////////////////////////////////////////////////////

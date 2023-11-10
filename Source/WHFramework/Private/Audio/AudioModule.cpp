@@ -179,7 +179,7 @@ void UAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMultic
 {
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySound2D(InSound, InVolume);
 		}
@@ -201,7 +201,7 @@ void UAudioModule::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, 
 {
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySoundAtLocation(InSound, InLocation, InVolume);
 		}
@@ -233,7 +233,7 @@ FSingleSoundHandle UAudioModule::PlaySingleSound2D(USoundBase* InSound, float In
 	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
@@ -252,7 +252,7 @@ FSingleSoundHandle UAudioModule::PlaySingleSound2DWithDelegate(USoundBase* InSou
 	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySingleSound2D(Handle, InSound, InVolume);
 		}
@@ -279,7 +279,7 @@ FSingleSoundHandle UAudioModule::PlaySingleSoundAtLocation(USoundBase* InSound, 
 	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
 		}
@@ -298,7 +298,7 @@ FSingleSoundHandle UAudioModule::PlaySingleSoundAtLocationWithDelegate(USoundBas
 	const FSingleSoundHandle Handle(SingleSoundHandle++);
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiPlaySingleSoundAtLocation(Handle, InSound, InLocation, InVolume);
 		}
@@ -324,7 +324,7 @@ void UAudioModule::StopSingleSound(const FSingleSoundHandle& InHandle, bool bMul
 {
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiStopSingleSound(InHandle);
 		}
@@ -346,7 +346,7 @@ void UAudioModule::SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool
 {
 	if(bMulticast)
 	{
-		if(GetOwner()->HasAuthority())
+		if(GetModuleOwner()->HasAuthority())
 		{
 			MultiSetSingleSoundPaused(InHandle, bPaused);
 		}

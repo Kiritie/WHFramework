@@ -13,10 +13,17 @@ class FModuleEditor : public FModuleEditorBase
 	GENERATED_EDITOR_MODULE(FModuleEditor)
 	
 public:
-	virtual void StartupModule() override;
+	virtual void OnInitialize() override;
 
-	virtual void ShutdownModule() override;
+	virtual void OnTermination() override;
 
+public:
+	virtual void RegisterSettings(ISettingsModule* InSettingsModule) override;
+
+	virtual void UnRegisterSettings() override;
+
+	virtual void RegisterAssetTypeAction(IAssetTools& AssetTools, TSharedRef<IAssetTypeActions> Action) override;
+	
 	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
 
 private:
@@ -26,6 +33,24 @@ private:
 
 private:
 	TSharedPtr<SModuleEditorWidget> ModuleEditorWidget;
+};
+
+class FModuleEditorCommands : public TCommands<FModuleEditorCommands>
+{	  
+public:
+	FModuleEditorCommands()
+		: TCommands<FModuleEditorCommands>(TEXT("ModuleEditorCommands"),    // Context name for fast lookup
+			NSLOCTEXT(
+			"Module", "ModuleEditor", "ModuleEditor Commands"),    // Localized context name for displaying
+			NAME_None,
+			FName("EditorStyle")    // Icon Style Set
+			)
+	{}
+
+	TSharedPtr<FUICommandInfo> Save;
+public:
+
+	virtual void RegisterCommands() override;
 };
 
 //////////////////////////////////////////////////////////////////////////

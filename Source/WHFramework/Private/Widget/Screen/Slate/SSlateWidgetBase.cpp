@@ -176,10 +176,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 		default: break;
 	}
 
-	if(UInputModule* InputModule = UInputModule::Get())
-	{
-		InputModule->UpdateInputMode();
-	}
+	UInputModule::Get().UpdateInputMode();
 }
 
 void SSlateWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)

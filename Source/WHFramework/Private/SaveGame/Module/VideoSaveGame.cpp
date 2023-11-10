@@ -21,7 +21,7 @@ void UVideoSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	UVideoModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UVideoModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UVideoSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,5 +33,5 @@ void UVideoSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 	
-	SetSaveData(UVideoModule::Get()->GetSaveData(true));
+	SetSaveData(UVideoModule::Get().GetSaveData(true));
 }

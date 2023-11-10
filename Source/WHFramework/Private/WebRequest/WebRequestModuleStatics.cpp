@@ -7,149 +7,85 @@
 
 bool UWebRequestModuleStatics::IsWebLocalMode()
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->IsLocalMode();
-	}
-	return false;
+	return UWebRequestModule::Get().IsLocalMode();
 }
 
 void UWebRequestModuleStatics::SetWebLocalMode(bool bInLocalMode)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		WebRequestModule->SetLocalMode(bInLocalMode);
-	}
+	UWebRequestModule::Get().SetLocalMode(bInLocalMode);
 }
 
 FString UWebRequestModuleStatics::GetWebServerURL()
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->GetServerURL();
-	}
-	return TEXT("");
+	return UWebRequestModule::Get().GetServerURL();
 }
 
 void UWebRequestModuleStatics::SetWebServerURL(const FString& InServerURL)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		WebRequestModule->SetServerURL(InServerURL);
-	}
+	UWebRequestModule::Get().SetServerURL(InServerURL);
 }
 
 int32 UWebRequestModuleStatics::GetWebServerPort()
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->GetServerPort();
-	}
-	return 0;
+	return UWebRequestModule::Get().GetServerPort();
 }
 
 void UWebRequestModuleStatics::SetWebServerPort(int32 InServerPort)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		WebRequestModule->SetServerPort(InServerPort);
-	}
+	UWebRequestModule::Get().SetServerPort(InServerPort);
 }
 
 bool UWebRequestModuleStatics::HasWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->HasWebInterface(InClass);
-	}
-	return false;
+	return UWebRequestModule::Get().HasWebInterface(InClass);
 }
 
 UWebInterfaceBase* UWebRequestModuleStatics::GetWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->GetWebInterface(InClass);
-	}
-	return nullptr;
+	return UWebRequestModule::Get().GetWebInterface(InClass);
 }
 
 UWebInterfaceBase* UWebRequestModuleStatics::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->CreateWebInterface(InClass);
-	}
-	return nullptr;
+	return UWebRequestModule::Get().CreateWebInterface(InClass);
 }
 
 bool UWebRequestModuleStatics::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->RegisterWebInterface(InClass, InOnRequestComplete);
-	}
-	return false;
+	return UWebRequestModule::Get().RegisterWebInterface(InClass, InOnRequestComplete);
 }
 
 bool UWebRequestModuleStatics::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->UnRegisterWebInterface(InClass, InOnRequestComplete);
-	}
-	return false;
+	return UWebRequestModule::Get().UnRegisterWebInterface(InClass, InOnRequestComplete);
 }
 
 bool UWebRequestModuleStatics::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->UnRegisterAllWebInterface(InClass);
-	}
-	return false;
+	return UWebRequestModule::Get().UnRegisterAllWebInterface(InClass);
 }
 
 bool UWebRequestModuleStatics::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->ClearWebInterface(InClass);
-	}
-	return false;
+	return UWebRequestModule::Get().ClearWebInterface(InClass);
 }
 
 void UWebRequestModuleStatics::ClearAllWebInterface()
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		WebRequestModule->ClearAllWebInterface();
-	}
+	UWebRequestModule::Get().ClearAllWebInterface();
 }
 
 bool UWebRequestModuleStatics::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
-	}
-	return false;
+	return UWebRequestModule::Get().SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
 }
 
 bool UWebRequestModuleStatics::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
-	}
-	return false;
+	return UWebRequestModule::Get().SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
 }
 
 bool UWebRequestModuleStatics::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	if(UWebRequestModule* WebRequestModule = UWebRequestModule::Get())
-	{
-		return WebRequestModule->K2_SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
-	}
-	return false;
+	return UWebRequestModule::Get().K2_SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
 }

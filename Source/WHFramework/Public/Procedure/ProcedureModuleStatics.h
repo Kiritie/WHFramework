@@ -34,11 +34,7 @@ public:
 	template<class T>
 	static T* GetProcedureByIndex(int32 InIndex)
 	{
-		if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-		{
-			return ProcedureModule->GetProcedureByIndex<T>(InIndex);
-		}
-		return nullptr;
+		return UProcedureModule::Get().GetProcedureByIndex<T>(InIndex);
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByIndex", DeterminesOutputType = "InIndex"))
 	static UProcedureBase* GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass);
@@ -46,11 +42,7 @@ public:
 	template<class T>
 	static bool HasProcedureByClass()
 	{
-		if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-		{
-			return ProcedureModule->HasProcedureByClass<T>(T::StaticClass());
-		}
-		return nullptr;
+		return UProcedureModule::Get().HasProcedureByClass<T>(T::StaticClass());
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasProcedureByClass"))
 	static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass);
@@ -58,11 +50,7 @@ public:
 	template<class T>
 	static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
 	{
-		if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-		{
-			return ProcedureModule->GetProcedureByClass<T>(InClass);
-		}
-		return nullptr;
+		return UProcedureModule::Get().GetProcedureByClass<T>(InClass);
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InClass"))
 	static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass);
@@ -82,11 +70,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
 	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass)
 	{
-		if(UProcedureModule* ProcedureModule = UProcedureModule::Get())
-		{
-			return ProcedureModule->IsCurrentProcedureClass(InClass);
-		}
-		return false;
+		return UProcedureModule::Get().IsCurrentProcedureClass(InClass);
 	}
 
 public:

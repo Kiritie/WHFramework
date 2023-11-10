@@ -19,7 +19,7 @@ void AWHGameMode::OnInitialize_Implementation()
 {
 	if(AMainModule* MainModule = AMainModule::Get())
 	{
-		MainModule->Execute_OnInitialize(MainModule);
+		Execute_OnInitialize(MainModule);
 	}
 }
 

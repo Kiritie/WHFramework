@@ -13,9 +13,9 @@ class FProcedureEditor : public FModuleEditorBase
 	GENERATED_EDITOR_MODULE(FProcedureEditor)
 	
 public:
-	virtual void StartupModule() override;
+	virtual void OnInitialize() override;
 
-	virtual void ShutdownModule() override;
+	virtual void OnTermination() override;
 
 	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
 
@@ -26,6 +26,24 @@ private:
 
 private:
 	TSharedPtr<SProcedureEditorWidget> ProcedureEditorWidget;
+};
+
+class FProcedureEditorCommands : public TCommands<FProcedureEditorCommands>
+{	  
+public:
+	FProcedureEditorCommands()
+		: TCommands<FProcedureEditorCommands>(TEXT("ProcedureEditorCommands"),    // Context name for fast lookup
+			NSLOCTEXT(
+			"Procedure", "ProcedureEditor", "ProcedureEditor Commands"),    // Localized context name for displaying
+			NAME_None,
+			FName("EditorStyle")    // Icon Style Set
+			)
+	{}
+
+	TSharedPtr<FUICommandInfo> Save;
+public:
+
+	virtual void RegisterCommands() override;
 };
 
 //////////////////////////////////////////////////////////////////////////

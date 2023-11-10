@@ -21,7 +21,7 @@ void UVoxelSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
 
-	UVoxelModule::Get()->LoadSaveData(GetSaveData(), InPhase);
+	UVoxelModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UVoxelSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,5 +33,5 @@ void UVoxelSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
 
-	SetSaveData(UVoxelModule::Get()->GetSaveData(true));
+	SetSaveData(UVoxelModule::Get().GetSaveData(true));
 }

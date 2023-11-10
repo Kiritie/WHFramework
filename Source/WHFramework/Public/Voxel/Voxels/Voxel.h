@@ -10,14 +10,13 @@
 
 class IVoxelAgentInterface;
 class AVoxelChunk;
-class IVoxelAgentInterface;
 class UVoxelData;
 
 /**
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UWHObject
+class WHFRAMEWORK_API UVoxel : public UWHObject, public IReferencePoolInterface
 {
 private:
 	GENERATED_BODY()

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"

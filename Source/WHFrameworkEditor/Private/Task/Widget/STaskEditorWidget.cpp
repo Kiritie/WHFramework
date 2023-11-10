@@ -34,7 +34,7 @@ void STaskEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	TaskModule = UTaskModule::Get(!UCommonStatics::IsPlaying());
+	TaskModule = &UTaskModule::Get(!UCommonStatics::IsPlaying());
 
 	if(TaskModule)
 	{
@@ -246,7 +246,7 @@ void STaskEditorWidget::OnReset()
 
 void STaskEditorWidget::OnRefresh()
 {
-	TaskModule = UTaskModule::Get(!bPreviewMode);
+	TaskModule = &UTaskModule::Get(!bPreviewMode);
 	if(TaskModule)
 	{
 		if(ListWidget)

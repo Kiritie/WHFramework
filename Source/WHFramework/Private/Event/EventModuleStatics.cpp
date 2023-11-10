@@ -8,64 +8,40 @@
 
 void UEventModuleStatics::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->SubscribeEvent(InClass, InOwner, InFuncName);
-	}
+	UEventModule::Get().SubscribeEvent(InClass, InOwner, InFuncName);
 }
 
 void UEventModuleStatics::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->SubscribeEvent(InClass, InDelegate);
-	}
+	UEventModule::Get().SubscribeEvent(InClass, InDelegate);
 }
 
 void UEventModuleStatics::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->SubscribeEventByDelegate(InClass, InDelegate);
-	}
+	UEventModule::Get().SubscribeEventByDelegate(InClass, InDelegate);
 }
 
 void UEventModuleStatics::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->UnsubscribeEvent(InClass, InOwner, InFuncName);
-	}
+	UEventModule::Get().UnsubscribeEvent(InClass, InOwner, InFuncName);
 }
 
 void UEventModuleStatics::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->UnsubscribeEvent(InClass, InDelegate);
-	}
+	UEventModule::Get().UnsubscribeEvent(InClass, InDelegate);
 }
 
 void UEventModuleStatics::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->UnsubscribeEventByDelegate(InClass, InDelegate);
-	}
+	UEventModule::Get().UnsubscribeEventByDelegate(InClass, InDelegate);
 }
 
 void UEventModuleStatics::UnsubscribeAllEvent()
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->UnsubscribeAllEvent();
-	}
+	UEventModule::Get().UnsubscribeAllEvent();
 }
 
 void UEventModuleStatics::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	if(UEventModule* EventModule = UEventModule::Get())
-	{
-		EventModule->BroadcastEvent(InClass, InNetType, InSender, InParams);
-	}
+	UEventModule::Get().BroadcastEvent(InClass, InNetType, InSender, InParams);
 }

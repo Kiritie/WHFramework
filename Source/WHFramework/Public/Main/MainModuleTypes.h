@@ -4,6 +4,7 @@
 
 #include "UObject/UObjectGlobals.h"
 #include "Main/MainModuleStatics.h"
+#include "Debug/DebugModuleTypes.h"
 
 #include "MainModuleTypes.generated.h"
 
@@ -28,7 +29,7 @@ protected: \
 	static ModuleClass* Instance; \
 	static ModuleClass* InstanceEditor; \
 public: \
-	static ModuleClass* Get(bool bInEditor = false); \
+	static ModuleClass& Get(bool bInEditor = false); \
 
 #define TERMINATION_MAIN_MODULE(ModuleClass) \
 	if(ModuleClass::Instance == this) \
@@ -63,6 +64,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
 												}, false); \
 		} \
+		ensureEditorMsgf(Instance, TEXT("Failed to get main module"), EDC_Default, EDV_Error); \
 		return Instance; \
 	} \
 	else \
@@ -73,6 +75,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
                              					}, true); \
 		} \
+		ensureEditorMsgf(InstanceEditor, TEXT("Failed to get main module"), EDC_Default, EDV_Error); \
 		return InstanceEditor; \
 	} \
 }
@@ -80,7 +83,7 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 #define IMPLEMENTATION_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
-ModuleClass* ModuleClass::Get(bool bInEditor) \
+ModuleClass& ModuleClass::Get(bool bInEditor) \
 { \
 	if(!bInEditor) \
 	{ \
@@ -88,7 +91,8 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 		{ \
 			Instance = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), false)); \
 		} \
-		return Instance; \
+		ensureEditorMsgf(Instance, FString::Printf(TEXT("Failed to get module, module name: %s"), *ModuleClass::StaticClass()->GetDefaultObject<UModuleBase>()->GetModuleName().ToString()), EDC_Default, EDV_Error); \
+		return Instance ? *Instance : *NewObject<ModuleClass>(); \
 	} \
 	else \
 	{ \
@@ -96,7 +100,8 @@ ModuleClass* ModuleClass::Get(bool bInEditor) \
 		{ \
 			InstanceEditor = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), true)); \
 		} \
-		return InstanceEditor; \
+		ensureEditorMsgf(Instance, FString::Printf(TEXT("Failed to get module, module name: %s"), *ModuleClass::StaticClass()->GetDefaultObject<UModuleBase>()->GetModuleName().ToString()), EDC_Default, EDV_Error); \
+		return InstanceEditor ? *InstanceEditor : *NewObject<ModuleClass>(); \
 	} \
 }
 

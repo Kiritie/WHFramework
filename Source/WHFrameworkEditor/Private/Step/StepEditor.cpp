@@ -18,15 +18,16 @@ IMPLEMENTATION_EDITOR_MODULE(FStepEditor)
 
 static const FName StepEditorTabName("StepEditor");
 
-void FStepEditor::StartupModule()
+void FStepEditor::OnInitialize()
 {
+	FStepEditorCommands::Register();
 	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StepEditorTabName, FOnSpawnTab::CreateRaw(this, &FStepEditor::OnSpawnStepEditorTab))
 		.SetDisplayName(LOCTEXT("FStepEditorTabTitle", "Step Editor"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FStepEditor::ShutdownModule()
+void FStepEditor::OnTermination()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(StepEditorTabName);
 }
@@ -50,6 +51,11 @@ TSharedRef<SDockTab> FStepEditor::OnSpawnStepEditorTab(const FSpawnTabArgs& Spaw
 	[
 		SAssignNew(StepEditorWidget, SStepEditorWidget)
 	];
+}
+
+void FStepEditorCommands::RegisterCommands()
+{
+	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 }
 
 /////////////////////////////////////////////////////

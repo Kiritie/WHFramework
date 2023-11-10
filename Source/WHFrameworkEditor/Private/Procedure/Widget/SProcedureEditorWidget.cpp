@@ -3,8 +3,10 @@
 
 #include "Procedure/Widget/SProcedureEditorWidget.h"
 
+#include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
 #include "Common/CommonStatics.h"
+#include "Procedure/ProcedureEditor.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
@@ -32,7 +34,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	ProcedureModule = UProcedureModule::Get(!UCommonStatics::IsPlaying());
+	ProcedureModule = &UProcedureModule::Get(!UCommonStatics::IsPlaying());
 
 	if(ProcedureModule)
 	{
@@ -140,6 +142,13 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("FileMenuLabel", "File"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &SProcedureEditorWidget::HandlePullDownFileMenu),
+			"File"
+		);
+		
+		MenuBarBuilder.AddPullDownMenu(
 			LOCTEXT("WindowMenuLabel", "Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateSP(this, &SProcedureEditorWidget::HandlePullDownWindowMenu),
@@ -199,6 +208,17 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 	}
 }
 
+void SProcedureEditorWidget::OnBindCommands()
+{
+	SEditorWidgetBase::OnBindCommands();
+
+	WidgetCommands->MapAction(
+		FProcedureEditorCommands::Get().Save,
+		FExecuteAction::CreateSP(this, &SProcedureEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &SProcedureEditorWidget::CanSave)
+	);
+}
+
 void SProcedureEditorWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
@@ -212,6 +232,13 @@ void SProcedureEditorWidget::OnCreate()
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SProcedureEditorWidget::OnBlueprintCompiled);
 }
 
+void SProcedureEditorWidget::OnSave()
+{
+	SEditorWidgetBase::OnSave();
+
+	FLevelEditorActionCallbacks::Save();
+}
+
 void SProcedureEditorWidget::OnReset()
 {
 	SEditorWidgetBase::OnReset();
@@ -219,7 +246,7 @@ void SProcedureEditorWidget::OnReset()
 
 void SProcedureEditorWidget::OnRefresh()
 {
-	ProcedureModule = UProcedureModule::Get(!bPreviewMode);
+	ProcedureModule = &UProcedureModule::Get(!bPreviewMode);
 	if(ProcedureModule)
 	{
 		if(ListWidget)
@@ -353,6 +380,11 @@ TSharedRef<SDockTab> SProcedureEditorWidget::SpawnStatusWidgetTab(const FSpawnTa
 			StatusWidget.ToSharedRef()
 		];
 	return SpawnedTab;
+}
+
+void SProcedureEditorWidget::HandlePullDownFileMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.AddMenuEntry(FProcedureEditorCommands::Get().Save);
 }
 
 void SProcedureEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)

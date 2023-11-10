@@ -3,9 +3,11 @@
 
 #include "Main/Widget/SModuleEditorWidget.h"
 
+#include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
 #include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
+#include "Main/ModuleEditor.h"
 #include "Main/Widget/SModuleDetailsWidget.h"
 #include "Main/Widget/SModuleListWidget.h"
 #include "Main/Widget/SModuleStatusWidget.h"
@@ -138,6 +140,13 @@ void SModuleEditorWidget::Construct(const FArguments& InArgs)
 
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
+			LOCTEXT("FileMenuLabel", "File"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownFileMenu),
+			"File"
+		);
+		
+		MenuBarBuilder.AddPullDownMenu(
 			LOCTEXT("WindowMenuLabel", "Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownWindowMenu),
@@ -197,6 +206,17 @@ void SModuleEditorWidget::Construct(const FArguments& InArgs)
 	}
 }
 
+void SModuleEditorWidget::OnBindCommands()
+{
+	SEditorWidgetBase::OnBindCommands();
+
+	WidgetCommands->MapAction(
+		FModuleEditorCommands::Get().Save,
+		FExecuteAction::CreateSP(this, &SModuleEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &SModuleEditorWidget::CanSave)
+	);
+}
+
 void SModuleEditorWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
@@ -208,6 +228,13 @@ void SModuleEditorWidget::OnCreate()
 	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SModuleEditorWidget::OnMapOpened);
 
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SModuleEditorWidget::OnBlueprintCompiled);
+}
+
+void SModuleEditorWidget::OnSave()
+{
+	SEditorWidgetBase::OnSave();
+
+	FLevelEditorActionCallbacks::Save();
 }
 
 void SModuleEditorWidget::OnReset()
@@ -351,6 +378,11 @@ TSharedRef<SDockTab> SModuleEditorWidget::SpawnStatusWidgetTab(const FSpawnTabAr
 			StatusWidget.ToSharedRef()
 		];
 	return SpawnedTab;
+}
+
+void SModuleEditorWidget::HandlePullDownFileMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.AddMenuEntry(FModuleEditorCommands::Get().Save);
 }
 
 void SModuleEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)

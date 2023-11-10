@@ -10,8 +10,8 @@
 
 #include "SceneModule.generated.h"
 
-class UWorldWeatherComponent;
-class UWorldTimerComponent;
+class UWorldWeather;
+class UWorldTimer;
 /**
  * 
  */
@@ -52,16 +52,16 @@ public:
 	// Components
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UWorldTimerComponent* WorldTimer;
+	UWorldTimer* WorldTimer;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UWorldWeatherComponent* WorldWeather;
+	UWorldWeather* WorldWeather;
 public:
 	UFUNCTION(BlueprintPure)
-	UWorldTimerComponent* GetWorldTimer() const { return WorldTimer; }
+	UWorldTimer* GetWorldTimer() const { return WorldTimer; }
 
 	UFUNCTION(BlueprintPure)
-	UWorldWeatherComponent* GetWorldWeather() const { return WorldWeather; }
+	UWorldWeather* GetWorldWeather() const { return WorldWeather; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level

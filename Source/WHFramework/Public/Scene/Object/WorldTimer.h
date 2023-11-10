@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Components/ActorComponent.h"
-#include "WorldTimerComponent.generated.h"
+#include "Common/Base/WHObject.h"
+#include "WorldTimer.generated.h"
 
 class ASkyLight;
 class ADirectionalLight;
@@ -11,41 +11,45 @@ class ADirectionalLight;
 /**
  * ʱ��������
  */
-UCLASS(Blueprintable, meta = (BlueprintSpawnableComponent))
-class WHFRAMEWORK_API UWorldTimerComponent : public UActorComponent
+UCLASS(Blueprintable, DefaultToInstanced)
+class WHFRAMEWORK_API UWorldTimer : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
-	UWorldTimerComponent();
+	UWorldTimer();
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	ASkyLight* SkyLight;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	ADirectionalLight* SunLight;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	float TimeSeconds;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	float SecondsOfDay;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	int32 CurrentDay;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	int32 CurrentHour;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	int32 CurrentMinute;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
 	int32 CurrentSeconds;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Object
+public:
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
 		
-protected:
-	virtual void BeginPlay() override;
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	UFUNCTION(BlueprintCallable)

@@ -33,9 +33,9 @@ void AVoxelTorchAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			const auto& VoxelData = VoxelItem.GetVoxelData<UVoxelTorchData>();
 			EffectComponent->SetTemplate(VoxelData.EffectAsset);
 			EffectComponent->SetRelativeScale3D(VoxelData.EffectScale);
-			EffectComponent->SetRelativeLocation(VoxelData.EffectOffset * UVoxelModule::Get()->GetWorldData().BlockSize);
+			EffectComponent->SetRelativeLocation(VoxelData.EffectOffset * UVoxelModule::Get().GetWorldData().BlockSize);
 		
-			LightComponent->SetRelativeLocation(FVector::UpVector * VoxelItem.GetVoxelData().GetRange().Z * 0.5f * UVoxelModule::Get()->GetWorldData().BlockSize);
+			LightComponent->SetRelativeLocation(FVector::UpVector * VoxelItem.GetVoxelData().GetRange().Z * 0.5f * UVoxelModule::Get().GetWorldData().BlockSize);
 		}
 	}
 }

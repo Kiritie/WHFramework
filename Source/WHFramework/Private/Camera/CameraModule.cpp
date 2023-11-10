@@ -117,7 +117,7 @@ void UCameraModule::OnGenerate()
 
 	// 获取场景Camera
 	TArray<AActor*> ChildActors;
-	GetOwner()->GetAttachedActors(ChildActors);
+	GetModuleOwner()->GetAttachedActors(ChildActors);
 	for(auto Iter : ChildActors)
 	{
 		if(auto Camera = Cast<ACameraActorBase>(Iter))
@@ -169,7 +169,7 @@ void UCameraModule::OnGenerate()
 			if(ACameraActorBase* CameraPawn = GetWorld()->SpawnActor<ACameraActorBase>(Class, ActorSpawnParameters))
 			{
 				CameraPawn->SetActorLabel(CameraPawn->GetCameraName().ToString());
-				CameraPawn->AttachToActor(GetOwner(), FAttachmentTransformRules::KeepWorldTransform);
+				CameraPawn->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
 				Cameras.Add(CameraPawn);
 			}
 		}
