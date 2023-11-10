@@ -7,21 +7,18 @@
 UVideoSaveGame::UVideoSaveGame()
 {
 	SaveName = FName("Video");
+
+	ModuleClass = UVideoModule::StaticClass();
 }
 
 void UVideoSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
-
-	Refresh();
-	SetDefaultData(GetSaveData());
 }
 
 void UVideoSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
-
-	UVideoModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UVideoSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -32,6 +29,4 @@ void UVideoSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UVideoSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-	
-	SetSaveData(UVideoModule::Get().GetSaveData(true));
 }

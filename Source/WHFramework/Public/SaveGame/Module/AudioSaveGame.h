@@ -3,15 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ModuleSaveGame.h"
 #include "Audio/AudioModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 #include "AudioSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAudioSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UAudioSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 	

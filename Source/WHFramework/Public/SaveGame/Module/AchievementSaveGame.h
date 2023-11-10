@@ -3,15 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ModuleSaveGame.h"
 #include "Achievement/AchievementModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 #include "AchievementSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAchievementSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UAchievementSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 	

@@ -7,21 +7,18 @@
 UVoxelSaveGame::UVoxelSaveGame()
 {
 	SaveName = FName("Voxel");
+
+	ModuleClass = UVoxelModule::StaticClass();
 }
 
 void UVoxelSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
-
-	Refresh();
-	SetDefaultData(GetSaveData());
 }
 
 void UVoxelSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
-
-	UVoxelModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UVoxelSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -32,6 +29,4 @@ void UVoxelSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UVoxelSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-
-	SetSaveData(UVoxelModule::Get().GetSaveData(true));
 }

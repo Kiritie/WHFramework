@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "ModuleSaveGame.h"
 #include "Task/TaskModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 
 #include "TaskSaveGame.generated.h"
 
@@ -11,7 +11,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UTaskSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UTaskSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 

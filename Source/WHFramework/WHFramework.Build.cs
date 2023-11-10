@@ -9,8 +9,6 @@ public class WHFramework : ModuleRules
 		bLegacyPublicIncludePaths = false;
 
 		ShadowVariableWarningLevel = WarningLevel.Error;
-		
-		DefaultBuildSettings = BuildSettingsVersion.V2;
 
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		

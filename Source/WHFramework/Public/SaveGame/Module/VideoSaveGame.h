@@ -3,15 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ModuleSaveGame.h"
 #include "Video/VideoModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 #include "VideoSaveGame.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UVideoSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UVideoSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 	

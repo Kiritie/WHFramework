@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "ModuleSaveGame.h"
 #include "Voxel/VoxelModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 
 #include "VoxelSaveGame.generated.h"
 
@@ -11,7 +11,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UVoxelSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 

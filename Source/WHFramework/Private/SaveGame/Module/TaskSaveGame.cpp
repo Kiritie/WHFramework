@@ -8,21 +8,18 @@
 UTaskSaveGame::UTaskSaveGame()
 {
 	SaveName = FName("Task");
+
+	ModuleClass = UTaskModule::StaticClass();
 }
 
 void UTaskSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
-
-	Refresh();
-	SetDefaultData(GetSaveData());
 }
 
 void UTaskSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
-
-	UTaskModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UTaskSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,6 +30,4 @@ void UTaskSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UTaskSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-	
-	SetSaveData(UTaskModule::Get().GetSaveData(true));
 }

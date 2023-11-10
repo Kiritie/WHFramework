@@ -7,21 +7,18 @@
 UCameraSaveGame::UCameraSaveGame()
 {
 	SaveName = FName("Camera");
+
+	ModuleClass = UCameraModule::StaticClass();
 }
 
 void UCameraSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
-
-	Refresh();
-	SetDefaultData(GetSaveData());
 }
 
 void UCameraSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
-
-	UCameraModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UCameraSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -32,6 +29,4 @@ void UCameraSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UCameraSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-	
-	SetSaveData(UCameraModule::Get().GetSaveData(true));
 }

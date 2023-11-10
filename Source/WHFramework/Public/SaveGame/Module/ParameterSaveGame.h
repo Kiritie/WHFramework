@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "ModuleSaveGame.h"
 #include "Parameter/ParameterModuleTypes.h"
-#include "SaveGame/Base/SaveGameBase.h"
 
 #include "ParameterSaveGame.generated.h"
 
@@ -11,7 +11,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UParameterSaveGame : public USaveGameBase
+class WHFRAMEWORK_API UParameterSaveGame : public UModuleSaveGame
 {
 	GENERATED_BODY()
 

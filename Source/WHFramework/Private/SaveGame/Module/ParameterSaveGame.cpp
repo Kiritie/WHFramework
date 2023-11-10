@@ -8,21 +8,18 @@
 UParameterSaveGame::UParameterSaveGame()
 {
 	SaveName = FName("Parameter");
+
+	ModuleClass = UParameterModule::StaticClass();
 }
 
 void UParameterSaveGame::OnCreate_Implementation(int32 InIndex)
 {
 	Super::OnCreate_Implementation(InIndex);
-
-	Refresh();
-	SetDefaultData(GetSaveData());
 }
 
 void UParameterSaveGame::OnLoad_Implementation(EPhase InPhase)
 {
 	Super::OnLoad_Implementation(InPhase);
-
-	UParameterModule::Get().LoadSaveData(GetSaveData(), InPhase);
 }
 
 void UParameterSaveGame::OnUnload_Implementation(EPhase InPhase)
@@ -33,6 +30,4 @@ void UParameterSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UParameterSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-	
-	SetSaveData(UParameterModule::Get().GetSaveData(true));
 }
