@@ -32,7 +32,7 @@ void SModuleEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	MainModule = AMainModule::Get(!UCommonStatics::IsPlaying());
+	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying());
 
 	if(MainModule)
 	{
@@ -244,7 +244,7 @@ void SModuleEditorWidget::OnReset()
 
 void SModuleEditorWidget::OnRefresh()
 {
-	MainModule = AMainModule::Get(!bPreviewMode);
+	MainModule = AMainModule::GetPtr(!bPreviewMode);
 	if(MainModule)
 	{
 		if(ListWidget)

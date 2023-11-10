@@ -594,7 +594,7 @@ bool UCommonStatics::IsImplementedInBlueprint(const UFunction* Func)
 
 UObject* UCommonStatics::GetWorldContext(bool bInEditor)
 {
-	return AMainModule::Get(bInEditor);
+	return AMainModule::GetPtr(bInEditor);
 }
 
 UWHGameInstance* UCommonStatics::GetGameInstance(TSubclassOf<UWHGameInstance> InClass)

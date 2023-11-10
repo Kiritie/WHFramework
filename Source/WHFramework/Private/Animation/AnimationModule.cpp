@@ -29,6 +29,8 @@ void UAnimationModule::OnGenerate()
 void UAnimationModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UAnimationModule)
 }
 #endif
 

@@ -33,6 +33,8 @@ void UFSMModule::OnGenerate()
 void UFSMModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UFSMModule)
 }
 #endif
 

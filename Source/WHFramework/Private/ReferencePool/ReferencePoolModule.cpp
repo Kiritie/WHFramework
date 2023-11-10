@@ -30,6 +30,8 @@ void UReferencePoolModule::OnGenerate()
 void UReferencePoolModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UReferencePoolModule)
 }
 #endif
 

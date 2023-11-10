@@ -44,6 +44,8 @@ void UProcedureModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UProcedureModule)
+
 	ClearAllProcedure();
 }
 #endif

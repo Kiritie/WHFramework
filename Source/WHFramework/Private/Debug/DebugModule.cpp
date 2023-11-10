@@ -33,6 +33,8 @@ void UDebugModule::OnGenerate()
 void UDebugModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UDebugModule)
 }
 #endif
 

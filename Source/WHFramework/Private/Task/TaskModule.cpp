@@ -46,6 +46,8 @@ void UTaskModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UTaskModule)
+
 	ClearAllTask();
 }
 #endif

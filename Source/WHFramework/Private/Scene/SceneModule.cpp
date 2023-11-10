@@ -81,6 +81,8 @@ void USceneModule::OnGenerate()
 void USceneModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(USceneModule)
 }
 #endif
 

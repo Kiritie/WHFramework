@@ -17,15 +17,15 @@ AWHGameMode::AWHGameMode()
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-	if(AMainModule* MainModule = AMainModule::Get())
+	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{
-		Execute_OnInitialize(MainModule);
+		MainModule->Execute_OnInitialize(MainModule);
 	}
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::Get())
+	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{
 		MainModule->Execute_OnPreparatory(MainModule, InPhase);
 	}
@@ -33,7 +33,7 @@ void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule* MainModule = AMainModule::Get())
+	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{
 		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
 	}
@@ -41,7 +41,7 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::Get())
+	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{
 		MainModule->Execute_OnTermination(MainModule, InPhase);
 	}

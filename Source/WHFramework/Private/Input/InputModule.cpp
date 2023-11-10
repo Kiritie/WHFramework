@@ -71,6 +71,8 @@ void UInputModule::OnGenerate()
 void UInputModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UInputModule)
 }
 #endif
 

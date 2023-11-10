@@ -137,6 +137,8 @@ void UVoxelModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UVoxelModule)
+
 	if(VoxelCapture)
 	{
 		VoxelCapture->Destroy();

@@ -41,6 +41,8 @@ void UEventModule::OnGenerate()
 void UEventModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UEventModule)
 }
 #endif
 

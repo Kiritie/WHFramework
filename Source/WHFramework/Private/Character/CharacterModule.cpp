@@ -39,13 +39,13 @@ UCharacterModule::~UCharacterModule()
 void UCharacterModule::OnGenerate()
 {
 	Super::OnGenerate();
-
 }
 
 void UCharacterModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UCharacterModule)
 }
 #endif
 

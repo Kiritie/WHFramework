@@ -86,6 +86,8 @@ UAudioModule::~UAudioModule()
 void UAudioModule::OnGenerate()
 {
 	Super::OnGenerate();
+
+	TERMINATION_MODULE(UAudioModule)
 }
 
 void UAudioModule::OnDestroy()

@@ -48,6 +48,8 @@ void UAchievementModule::OnGenerate()
 void UAchievementModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UAchievementModule)
 }
 #endif
 

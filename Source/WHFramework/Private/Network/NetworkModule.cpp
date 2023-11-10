@@ -37,6 +37,8 @@ void UNetworkModule::OnGenerate()
 void UNetworkModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UNetworkModule)
 }
 #endif
 

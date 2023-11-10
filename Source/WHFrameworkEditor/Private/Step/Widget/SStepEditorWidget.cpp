@@ -34,7 +34,7 @@ void SStepEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	StepModule = &UStepModule::Get(!UCommonStatics::IsPlaying());
+	StepModule = UStepModule::GetPtr(!UCommonStatics::IsPlaying());
 
 	if(StepModule)
 	{
@@ -246,7 +246,7 @@ void SStepEditorWidget::OnReset()
 
 void SStepEditorWidget::OnRefresh()
 {
-	StepModule = &UStepModule::Get(!bPreviewMode);
+	StepModule = UStepModule::GetPtr(!bPreviewMode);
 	if(StepModule)
 	{
 		if(ListWidget)

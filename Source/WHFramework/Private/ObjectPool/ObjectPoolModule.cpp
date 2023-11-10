@@ -33,6 +33,8 @@ void UObjectPoolModule::OnGenerate()
 void UObjectPoolModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UObjectPoolModule)
 }
 #endif
 

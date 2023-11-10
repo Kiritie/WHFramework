@@ -182,6 +182,8 @@ void UCameraModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UCameraModule)
+
 	for(const auto Camera : Cameras)
 	{
 		if(Camera)

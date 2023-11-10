@@ -40,6 +40,8 @@ void UWebRequestModule::OnGenerate()
 void UWebRequestModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UWebRequestModule)
 }
 #endif
 

@@ -32,6 +32,8 @@ void UParameterModule::OnGenerate()
 void UParameterModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UParameterModule)
 }
 #endif
 

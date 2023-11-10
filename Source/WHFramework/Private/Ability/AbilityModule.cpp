@@ -49,6 +49,8 @@ void UAbilityModule::OnGenerate()
 void UAbilityModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UAbilityModule)
 }
 #endif
 

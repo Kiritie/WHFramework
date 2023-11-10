@@ -27,6 +27,8 @@ void UAssetModule::OnGenerate()
 void UAssetModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UAssetModule)
 }
 #endif
 

@@ -35,6 +35,8 @@ void USaveGameModule::OnGenerate()
 void USaveGameModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(USaveGameModule)
 }
 #endif
 

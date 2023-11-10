@@ -34,7 +34,7 @@ void SProcedureEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
 
-	ProcedureModule = &UProcedureModule::Get(!UCommonStatics::IsPlaying());
+	ProcedureModule = UProcedureModule::GetPtr(!UCommonStatics::IsPlaying());
 
 	if(ProcedureModule)
 	{
@@ -246,7 +246,7 @@ void SProcedureEditorWidget::OnReset()
 
 void SProcedureEditorWidget::OnRefresh()
 {
-	ProcedureModule = &UProcedureModule::Get(!bPreviewMode);
+	ProcedureModule = UProcedureModule::GetPtr(!bPreviewMode);
 	if(ProcedureModule)
 	{
 		if(ListWidget)

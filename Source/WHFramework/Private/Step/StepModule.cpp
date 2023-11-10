@@ -50,6 +50,8 @@ void UStepModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	TERMINATION_MODULE(UStepModule)
+
 	ClearAllStep();
 }
 #endif

@@ -50,6 +50,8 @@ void UWidgetModule::OnGenerate()
 void UWidgetModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UWidgetModule)
 }
 #endif
 

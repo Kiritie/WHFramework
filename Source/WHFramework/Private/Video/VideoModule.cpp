@@ -42,6 +42,8 @@ void UVideoModule::OnGenerate()
 void UVideoModule::OnDestroy()
 {
 	Super::OnDestroy();
+
+	TERMINATION_MODULE(UVideoModule)
 }
 #endif
 

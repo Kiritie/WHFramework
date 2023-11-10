@@ -76,7 +76,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
 	static void PauseGame(EPauseMode PauseMode = EPauseMode::Default);
 	/*
-	 * 取消暂停游戏
+	 * 恢复游戏
 	 */
 	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
 	static void UnPauseGame(EPauseMode PauseMode = EPauseMode::Default);
