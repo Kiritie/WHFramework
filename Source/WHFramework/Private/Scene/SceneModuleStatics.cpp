@@ -35,12 +35,12 @@ float USceneModuleStatics::GetAsyncUnloadLevelProgress(FName InLevelPath)
 	return USceneModule::Get().GetAsyncUnloadLevelProgress(InLevelPath);
 }
 
-bool USceneModuleStatics::HasSceneActor(FGuid InID, bool bEnsured)
+bool USceneModuleStatics::HasSceneActor(const FString& InID, bool bEnsured)
 {
 	return USceneModule::Get().HasSceneActor(InID, bEnsured);
 }
 
-AActor* USceneModuleStatics::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured)
+AActor* USceneModuleStatics::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured)
 {
 	return USceneModule::Get().GetSceneActor(InID, InClass, bEnsured);
 }

@@ -923,18 +923,18 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 	return bSuccess;
 }
 
-bool AVoxelChunk::HasSceneActor(FGuid InID, bool bEnsured) const
+bool AVoxelChunk::HasSceneActor(const FString& InID, bool bEnsured) const
 {
-	if(SceneActorMap.Contains(InID)) return true;
+	if(SceneActorMap.Contains(FGuid(InID))) return true;
 	ensureEditor(!bEnsured);
 	return false;
 }
 
-AActor* AVoxelChunk::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured) const
+AActor* AVoxelChunk::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
 	if(HasSceneActor(InID, bEnsured))
 	{
-		return SceneActorMap[InID];
+		return SceneActorMap[FGuid(InID)];
 	}
 	return nullptr;
 }

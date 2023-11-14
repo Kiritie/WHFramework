@@ -2,11 +2,11 @@
 
 #include "Setting/Widget/Page/WidgetInputSettingPageBase.h"
 
-#include "Asset/AssetModuleStatics.h"
 #include "Input/InputModule.h"
 #include "Input/Base/PlayerMappableKeyProfileBase.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/SettingSaveGame.h"
+#include "Setting/SettingModule.h"
 #include "Setting/SettingModuleTypes.h"
 #include "Setting/Widget/Item/WidgetKeySettingItemBase.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -33,7 +33,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner)
 		{
 			if(!SettingItems.Contains(Mapping.GetMappingName()))
 			{
-				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Mapping.GetDisplayName() }, UAssetModuleStatics::GetStaticClass(FName("KeySettingItem")));
+				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Mapping.GetDisplayName() }, USettingModule::Get().GetKeySettingItemClass());
 				AddSettingItem(Mapping.GetMappingName(), SettingItem, Mapping.GetDisplayCategory());
 			}
 		}
@@ -111,8 +111,14 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 		TArray<FParameter> Values = Iter.Value->GetValues();
 		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if((!Mappings.IsValidIndex(i) && !Values[i].GetStringValue().Equals(TEXT("None"))) ||
-				*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
+			if(!Mappings.IsValidIndex(i))
+			{
+				if(!Values[i].GetStringValue().Equals(TEXT("None")))
+				{
+					return true;
+				}
+			}
+			else if(*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
 			{
 				return true;
 			}

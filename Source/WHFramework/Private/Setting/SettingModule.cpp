@@ -8,6 +8,7 @@
 #include "SaveGame/Module/SettingSaveGame.h"
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
+#include "Setting/Widget/Item/WidgetFloatSettingItemBase.h"
 #include "Video/VideoModule.h"
 
 IMPLEMENTATION_MODULE(USettingModule)
@@ -21,6 +22,38 @@ USettingModule::USettingModule()
 	ModuleSaveGame = USettingSaveGame::StaticClass();
 	
 	ModuleNetworkComponent = USettingModuleNetworkComponent::StaticClass();
+		
+	static ConstructorHelpers::FClassFinder<UWidgetSettingItemCategoryBase> SettingItemCategoryClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_SettingItemCategory.WBP_SettingItemCategory_C'"));
+	if(SettingItemCategoryClassHelper.Succeeded())
+	{
+		SettingItemCategoryClass = SettingItemCategoryClassHelper.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<UWidgetFloatSettingItemBase> FloatSettingItemClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_FloatSettingItem.WBP_FloatSettingItem_C'"));
+	if(FloatSettingItemClassHelper.Succeeded())
+	{
+		FloatSettingItemClass = FloatSettingItemClassHelper.Class;
+	}
+	static ConstructorHelpers::FClassFinder<UWidgetBoolSettingItemBase> BoolSettingItemClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_BoolSettingItem.WBP_BoolSettingItem_C'"));
+	if(BoolSettingItemClassHelper.Succeeded())
+	{
+		BoolSettingItemClass = BoolSettingItemClassHelper.Class;
+	}
+	static ConstructorHelpers::FClassFinder<UWidgetEnumSettingItemBase> EnumSettingItemClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_EnumSettingItem.WBP_EnumSettingItem_C'"));
+	if(EnumSettingItemClassHelper.Succeeded())
+	{
+		EnumSettingItemClass = EnumSettingItemClassHelper.Class;
+	}
+	static ConstructorHelpers::FClassFinder<UWidgetTextSettingItemBase> TextSettingItemClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_TextSettingItem.WBP_TextSettingItem_C'"));
+	if(TextSettingItemClassHelper.Succeeded())
+	{
+		TextSettingItemClass = TextSettingItemClassHelper.Class;
+	}
+	static ConstructorHelpers::FClassFinder<UWidgetKeySettingItemBase> KeySettingItemClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_KeySettingItem.WBP_KeySettingItem_C'"));
+	if(KeySettingItemClassHelper.Succeeded())
+	{
+		KeySettingItemClass = KeySettingItemClassHelper.Class;
+	}
 }
 
 USettingModule::~USettingModule()

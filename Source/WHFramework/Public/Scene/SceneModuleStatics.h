@@ -46,16 +46,16 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Actor
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static bool HasSceneActor(FGuid InID, bool bEnsured = true);
+	static bool HasSceneActor(const FString& InID, bool bEnsured = true);
 
 	template<class T>
-	static T* GetSceneActor(FGuid InID, bool bEnsured = true)
+	static T* GetSceneActor(const FString& InID, bool bEnsured = true)
 	{
 		return Cast<T>(GetSceneActor(InID, nullptr, bEnsured));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleStatics")
-	static AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
+	static AActor* GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static bool AddSceneActor(AActor* InActor);

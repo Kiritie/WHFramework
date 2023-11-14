@@ -8,11 +8,18 @@
 
 #include "SettingModule.generated.h"
 
+class UWidgetSettingItemCategoryBase;
+class UWidgetKeySettingItemBase;
+class UWidgetTextSettingItemBase;
+class UWidgetEnumSettingItemBase;
+class UWidgetBoolSettingItemBase;
+class UWidgetFloatSettingItemBase;
+
 UCLASS()
 class WHFRAMEWORK_API USettingModule : public UModuleBase
 {
 	GENERATED_BODY()
-		
+
 	GENERATED_MODULE(USettingModule)
 
 public:	
@@ -48,6 +55,44 @@ protected:
 	virtual void UnloadData(EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetSettingItemCategoryBase> SettingItemCategoryClass;
+
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetFloatSettingItemBase> FloatSettingItemClass;
+
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetBoolSettingItemBase> BoolSettingItemClass;
+
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetEnumSettingItemBase> EnumSettingItemClass;
+
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetTextSettingItemBase> TextSettingItemClass;
+
+	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	TSubclassOf<UWidgetKeySettingItemBase> KeySettingItemClass;
+
+public:
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetSettingItemCategoryBase> GetSettingItemCategoryClass() const { return SettingItemCategoryClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetFloatSettingItemBase> GetFloatSettingItemClass() const { return FloatSettingItemClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetBoolSettingItemBase> GetBoolSettingItemClass() const { return BoolSettingItemClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetEnumSettingItemBase> GetEnumSettingItemClass() const { return EnumSettingItemClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetTextSettingItemBase> GetTextSettingItemClass() const { return TextSettingItemClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetKeySettingItemBase> GetKeySettingItemClass() const { return KeySettingItemClass; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

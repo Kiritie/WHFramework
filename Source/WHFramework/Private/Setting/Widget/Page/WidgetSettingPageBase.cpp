@@ -5,6 +5,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
+#include "Setting/SettingModule.h"
 #include "Setting/Widget/Item/WidgetSettingItemBase.h"
 #include "Setting/Widget/Item/WidgetSettingItemCategoryBase.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -86,7 +87,7 @@ void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, U
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
 	{
 		LastCategory = InCategory;
-		if(UScrollBoxSlot* ScrollBoxSlot = Cast<UScrollBoxSlot>(ContentBox->AddChild(CreateSubWidget<UWidgetSettingItemCategoryBase>({ InCategory }, UAssetModuleStatics::GetStaticClass(FName("SettingItemCategory"))))))
+		if(UScrollBoxSlot* ScrollBoxSlot = Cast<UScrollBoxSlot>(ContentBox->AddChild(CreateSubWidget<UWidgetSettingItemCategoryBase>({ InCategory }, USettingModule::Get().GetSettingItemCategoryClass()))))
 		{
 			ScrollBoxSlot->SetPadding(FMargin(2.5f, 0.f));
 		}

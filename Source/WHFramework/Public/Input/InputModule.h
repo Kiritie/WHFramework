@@ -49,6 +49,11 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnBindAction")
+	void K2_OnBindAction(UInputComponentBase* InInputComponent);
+	UFUNCTION()
+	virtual void OnBindAction(UInputComponentBase* InInputComponent);
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -97,10 +102,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Context")
 	TMap<FName, FKey> CustomKeyMappings;
 
-protected:
-	UFUNCTION(BlueprintNativeEvent)
-	void OnBindAction(UInputComponentBase* InInputComponent, UInputMappingContext* InInputContext);
-
 public:
 	TArray<FInputContextMapping>& GetContextMappings() { return ContextMappings; }
 
@@ -126,7 +127,7 @@ public:
 	void ApplyTouchMappings();
 	
 	UFUNCTION(BlueprintPure)
-	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, UInputMappingContext* InInputContext = nullptr, bool bLogNotFound = true) const;
+	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound = true) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);

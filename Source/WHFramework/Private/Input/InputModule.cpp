@@ -111,10 +111,10 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 					FModifyContextOptions Options = {};
 					Options.bIgnoreAllPressedKeysUntilRelease = false;
 					Subsystem->AddMappingContext(IMC, Iter.Priority, Options);
-					OnBindAction(Component, IMC);
 				}
 			}
 		}
+		OnBindAction(Component);
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
@@ -162,6 +162,23 @@ void UInputModule::OnTermination(EPhase InPhase)
 			Save();
 		}
 	}
+}
+
+void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
+{
+	K2_OnBindAction(InInputComponent);
+
+	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -259,21 +276,6 @@ void UInputModule::RemoveKeyShortcut(const FName InName)
 	}
 }
 
-void UInputModule::OnBindAction_Implementation(UInputComponentBase* InInputComponent, UInputMappingContext* InInputContext)
-{
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
-	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
-}
-
 void UInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
 {
 	if(!KeyMappings.Contains(InName))
@@ -317,21 +319,8 @@ void UInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
 	TouchMappings.Add(InKeyMapping);
 }
 
-const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, UInputMappingContext* InInputContext, bool bLogNotFound) const
+const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound) const
 {
-	if (InInputContext)
-	{
-		for(auto Iter : InInputContext->GetMappings())
-		{
-			if(const auto InputAction = Cast<UInputActionBase>(Iter.Action))
-			{
-				if(InputAction->ActionTag == InInputTag)
-				{
-					return InputAction;
-				}
-			}
-		}
-	}
 	for (const auto& Iter1 : ContextMappings)
 	{
 		if(UInputMappingContext* IMC = Iter1.InputMapping.Get())

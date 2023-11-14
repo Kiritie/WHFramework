@@ -22,9 +22,9 @@ class WHFRAMEWORK_API ISceneContainerInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool HasSceneActor(FGuid InID, bool bEnsured = true) const = 0;
+	virtual bool HasSceneActor(const FString& InID, bool bEnsured = true) const = 0;
 
-	virtual AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const = 0;
+	virtual AActor* GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass = nullptr, bool bEnsured = true) const = 0;
 
 	virtual bool AddSceneActor(AActor* InActor) = 0;
 

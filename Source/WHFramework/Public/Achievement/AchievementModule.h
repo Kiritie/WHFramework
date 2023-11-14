@@ -58,33 +58,24 @@ protected:
 	virtual FSaveData* ToData() override;
 
 public:
-	//Miscellaneous
-	/**Returns true if an achievement is found in the list.*/
 	UFUNCTION(BlueprintPure, Category="Achievements")
 	bool IsAchievementExists(FName InKey) const;
 
-	/**Returns the total number of achievements which have been unlocked.*/
 	UFUNCTION(BlueprintPure, Category = "Achievements")
 	int32 GetAchievedAchievementCount() const;
 
-	/**Returns the current percentage of unlocked achievements.*/
 	UFUNCTION(BlueprintPure, Category = "Achievements")
 	float GetAchievedAchievementPercentage() const;
 
-	/***/
 	UFUNCTION(BlueprintPure, Category = "Achievements")
 	void GetAchievementState(FName InKey, bool& OutFoundAchievement, FAchievementData& OutData, FAchievementStates& OutState) const;
 
-	//Unlocking/Progress
-	/**Fully unlocks a progress or goal achievement.*/
 	UFUNCTION(BlueprintCallable, Category = "Achievements")
 	void UnlockAchievement(FName InKey);
 
-	/**Set the progress of an achievement to a specific value.*/
 	UFUNCTION(BlueprintCallable, Category = "Achievements")
 	void SetAchievementProgress(FName InKey, float InProgress);
 
-	/**Adds the input amount of progress to an achievement. Clamps achievement progress to its max value.*/
 	UFUNCTION(BlueprintCallable, Category = "Achievements")
 	void AddAchievementProgress(FName InKey, float InProgress);
 

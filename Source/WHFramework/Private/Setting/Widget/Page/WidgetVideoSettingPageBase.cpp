@@ -3,9 +3,9 @@
 #include "Setting/Widget/Page/WidgetVideoSettingPageBase.h"
 
 
-#include "Asset/AssetModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/SettingSaveGame.h"
+#include "Setting/SettingModule.h"
 #include "Setting/Widget/Item/WidgetEnumSettingItemBase.h"
 #include "Video/VideoModule.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -26,37 +26,37 @@ void UWidgetVideoSettingPageBase::OnCreate(UObject* InOwner)
 {
 	Super::OnCreate(InOwner);
 
-	SettingItem_GlobalVideoQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality") }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_GlobalVideoQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality") }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("GlobalVideoQuality"), SettingItem_GlobalVideoQuality, FText::FromString(TEXT("预设")));
 
-	SettingItem_ViewDistanceQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_ViewDistanceQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("ViewDistanceQuality"), SettingItem_ViewDistanceQuality, FText::FromString(TEXT("视距")));
 
-	SettingItem_ShadowQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_ShadowQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("ShadowQuality"), SettingItem_ShadowQuality, FText::FromString(TEXT("阴影")));
 
-	SettingItem_GlobalIlluminationQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_GlobalIlluminationQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("GlobalIlluminationQuality"), SettingItem_GlobalIlluminationQuality, FText::FromString(TEXT("光照")));
 
-	SettingItem_ReflectionQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_ReflectionQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("ReflectionQuality"), SettingItem_ReflectionQuality, FText::FromString(TEXT("反射")));
 
-	SettingItem_AntiAliasingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_AntiAliasingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("AntiAliasingQuality"), SettingItem_AntiAliasingQuality, FText::FromString(TEXT("抗锯齿")));
 
-	SettingItem_TextureQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_TextureQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("TextureQuality"), SettingItem_TextureQuality, FText::FromString(TEXT("贴图")));
 
-	SettingItem_VisualEffectQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_VisualEffectQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("VisualEffectQuality"), SettingItem_VisualEffectQuality, FText::FromString(TEXT("视效")));
 
-	SettingItem_PostProcessingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_PostProcessingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("PostProcessingQuality"), SettingItem_PostProcessingQuality, FText::FromString(TEXT("后处理")));
 
-	SettingItem_FoliageQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_FoliageQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("FoliageQuality"), SettingItem_FoliageQuality, FText::FromString(TEXT("植被")));
 
-	SettingItem_ShadingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, UAssetModuleStatics::GetStaticClass(FName("EnumSettingItem")));
+	SettingItem_ShadingQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("ShadingQuality"), SettingItem_ShadingQuality, FText::FromString(TEXT("遮蔽")));
 }
 

@@ -2,10 +2,10 @@
 
 #include "Setting/Widget/Page/WidgetCameraSettingPageBase.h"
 
-#include "Asset/AssetModuleStatics.h"
 #include "Camera/CameraModule.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/SettingSaveGame.h"
+#include "Setting/SettingModule.h"
 #include "Setting/Widget/Item/WidgetBoolSettingItemBase.h"
 #include "Setting/Widget/Item/WidgetFloatSettingItemBase.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -26,37 +26,37 @@ void UWidgetCameraSettingPageBase::OnCreate(UObject* InOwner)
 {
 	Super::OnCreate(InOwner);
 	
-	SettingItem_CameraMoveRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("移动速度")), 100.f, 500.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraMoveRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("移动速度")), 100.f, 500.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraMoveRate"), SettingItem_CameraMoveRate, FText::FromString(TEXT("移动")));
 
-	SettingItem_SmoothCameraMove = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑移动")) }, UAssetModuleStatics::GetStaticClass(FName("BoolSettingItem")));
+	SettingItem_SmoothCameraMove = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑移动")) }, USettingModule::Get().GetBoolSettingItemClass());
 	AddSettingItem(FName("SmoothCameraMove"), SettingItem_SmoothCameraMove, FText::FromString(TEXT("移动")));
 
-	SettingItem_CameraMoveSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraMoveSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraMoveSpeed"), SettingItem_CameraMoveSpeed, FText::FromString(TEXT("移动")));
 
-	SettingItem_ReverseCameraPitch = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("垂直反转")) }, UAssetModuleStatics::GetStaticClass(FName("BoolSettingItem")));
+	SettingItem_ReverseCameraPitch = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("垂直反转")) }, USettingModule::Get().GetBoolSettingItemClass());
 	AddSettingItem(FName("ReverseCameraPitch"), SettingItem_ReverseCameraPitch, FText::FromString(TEXT("旋转")));
 
-	SettingItem_CameraTurnRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("水平速度")), 30.f, 150.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraTurnRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("水平速度")), 30.f, 150.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraTurnRate"), SettingItem_CameraTurnRate, FText::FromString(TEXT("旋转")));
 
-	SettingItem_CameraLookUpRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("垂直速度")), 30.f, 150.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraLookUpRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("垂直速度")), 30.f, 150.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraLookUpRate"), SettingItem_CameraLookUpRate, FText::FromString(TEXT("旋转")));
 
-	SettingItem_SmoothCameraRotate = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑旋转")) }, UAssetModuleStatics::GetStaticClass(FName("BoolSettingItem")));
+	SettingItem_SmoothCameraRotate = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑旋转")) }, USettingModule::Get().GetBoolSettingItemClass());
 	AddSettingItem(FName("SmoothCameraRotate"), SettingItem_SmoothCameraRotate, FText::FromString(TEXT("旋转")));
 
-	SettingItem_CameraRotateSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraRotateSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraRotateSpeed"), SettingItem_CameraRotateSpeed, FText::FromString(TEXT("旋转")));
 
-	SettingItem_CameraZoomRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("缩放速度")), 50.f, 300.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraZoomRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("缩放速度")), 50.f, 300.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraZoomRate"), SettingItem_CameraZoomRate, FText::FromString(TEXT("缩放")));
 
-	SettingItem_SmoothCameraZoom = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑缩放")) }, UAssetModuleStatics::GetStaticClass(FName("BoolSettingItem")));
+	SettingItem_SmoothCameraZoom = CreateSubWidget<UWidgetBoolSettingItemBase>({ FText::FromString(TEXT("平滑缩放")) }, USettingModule::Get().GetBoolSettingItemClass());
 	AddSettingItem(FName("SmoothCameraZoom"), SettingItem_SmoothCameraZoom, FText::FromString(TEXT("缩放")));
 
-	SettingItem_CameraZoomSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
+	SettingItem_CameraZoomSpeed = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("平滑速度")), 1.f, 10.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraZoomSpeed"), SettingItem_CameraZoomSpeed, FText::FromString(TEXT("缩放")));
 }
 

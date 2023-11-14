@@ -137,15 +137,15 @@ protected:
 	TMap<FGuid, AActor*> SceneActorMap;
 
 public:
-	virtual bool HasSceneActor(FGuid InID, bool bEnsured) const override;
+	virtual bool HasSceneActor(const FString& InID, bool bEnsured) const override;
 
 	template<class T>
-	T* GetSceneActor(FGuid InID, bool bEnsured = true) const
+	T* GetSceneActor(const FString& InID, bool bEnsured = true) const
 	{
 		return Cast<T>(GetSceneActor(InID, nullptr, bEnsured));
 	}
 
-	virtual AActor* GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured) const override;
+	virtual AActor* GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const override;
 	
 	virtual bool AddSceneActor(AActor* InActor) override;
 

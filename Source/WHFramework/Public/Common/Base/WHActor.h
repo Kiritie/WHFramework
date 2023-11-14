@@ -91,17 +91,17 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	FGuid ActorID;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Actor")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	
 public:
 	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
 
-	virtual void SetActorID_Implementation(FGuid InActorID) override { ActorID = InActorID; }
+	virtual void SetActorID_Implementation(const FString& InID) override { ActorID = FGuid(InID); }
 
 	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
 

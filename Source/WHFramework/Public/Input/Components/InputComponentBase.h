@@ -24,12 +24,23 @@ public:
 
 public:
 	template<class UserClass, typename FuncType>
-	void BindInputAction(UInputMappingContext* InInputContext, const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bLogIfNotFound = true)
+	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bLogIfNotFound = true)
 	{
-		check(InInputContext);
-		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, InInputContext, bLogIfNotFound))
+		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bLogIfNotFound))
 		{
 			BindAction(InputAction, TriggerEvent, Object, Func);
+		}
+	}
+	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InputTag"))
+	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, const FEnhancedInputActionHandlerDynamicSignature& Delegate, bool bLogIfNotFound = true)
+	{
+		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bLogIfNotFound))
+		{
+			TUniquePtr<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>> AB = MakeUnique<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>>(InputAction, TriggerEvent);
+			AB->Delegate.BindDelegate(const_cast<UObject*>(Delegate.GetUObject()), Delegate.GetFunctionName());
+			AB->Delegate.SetShouldFireWithEditorScriptGuard(ShouldFireDelegatesInEditor());
+			const_cast<TArray<TUniquePtr<FEnhancedInputActionEventBinding>>&>(GetActionEventBindings()).Add(MoveTemp(AB));
 		}
 	}
 	

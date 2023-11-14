@@ -21,7 +21,7 @@ protected:
 	UCommonTextBlock* Txt_Title;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Default")
+	UPROPERTY(EditAnywhere, Category = "Content")
 	FText ButtonText;
 
 public:

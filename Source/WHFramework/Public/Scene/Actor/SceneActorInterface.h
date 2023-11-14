@@ -26,7 +26,7 @@ public:
 	FGuid GetActorID() const;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
-	void SetActorID(FGuid InID);
+	void SetActorID(const FString& InID);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> GetContainer() const;

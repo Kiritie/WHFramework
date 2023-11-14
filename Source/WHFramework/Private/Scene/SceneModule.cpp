@@ -1,7 +1,6 @@
 
 #include "Scene/SceneModule.h"
 
-#include "Components/CanvasPanelSlot.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/TargetPoint.h"
@@ -314,18 +313,18 @@ void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { InLevelPath.ToString() });
 }
 
-bool USceneModule::HasSceneActor(FGuid InID, bool bEnsured) const
+bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const
 {
-	if(SceneActorMap.Contains(InID)) return true;
+	if(SceneActorMap.Contains(FGuid(InID))) return true;
 	ensureEditor(!bEnsured);
 	return false;
 }
 
-AActor* USceneModule::GetSceneActor(FGuid InID, TSubclassOf<AActor> InClass, bool bEnsured) const
+AActor* USceneModule::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
 	if(HasSceneActor(InID, bEnsured))
 	{
-		return SceneActorMap[InID];
+		return SceneActorMap[FGuid(InID)];
 	}
 	return nullptr;
 }
