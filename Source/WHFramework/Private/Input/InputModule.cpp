@@ -18,11 +18,11 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Input/Base/InputActionBase.h"
-#include "Input/Components/InputComponentBase.h"
 #include "SaveGame/Module/InputSaveGame.h"
-#include "CommonInputSubsystem.h"
-#include "PlayerMappableInputConfig.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Input/InputModuleStatics.h"
+#include "Input/Base/InputUserSettingsBase.h"
+#include "Input/Components/InputComponentBase.h"
 
 IMPLEMENTATION_MODULE(UInputModule)
 
@@ -38,13 +38,20 @@ UInputModule::UInputModule()
 	AddKeyShortcut(FName("CameraRotate"));
 	AddKeyShortcut(FName("CameraZoom"));
 
-	static ConstructorHelpers::FObjectFinder<UPlayerMappableInputConfig> CameraMovementMapping(TEXT("/Script/EnhancedInput.PlayerMappableInputConfig'/WHFramework/Input/DataAssets/PMIC_MouseAndKeyboard.PMIC_MouseAndKeyboard'"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
 	if(CameraMovementMapping.Succeeded())
 	{
-		auto ConfigMapping = FInputConfigMapping(CameraMovementMapping.Object, ECommonInputType::MouseAndKeyboard);
-		ConfigMapping.bShouldActivateAutomatically = true;
-		ConfigMapping.Type = ECommonInputType::Count;
-		ConfigMappings.Add(ConfigMapping);
+		FInputContextMapping ContextMapping;
+		ContextMapping.InputMapping = CameraMovementMapping.Object;
+		ContextMappings.Add(ContextMapping);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> PlayerMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterMovement.IMC_CharacterMovement'"));
+	if(PlayerMovementMapping.Succeeded())
+	{
+		FInputContextMapping ContextMapping;
+		ContextMapping.InputMapping = PlayerMovementMapping.Object;
+		ContextMappings.Add(ContextMapping);
 	}
 
 	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchPressed)));
@@ -89,24 +96,22 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 	{
 		ApplyKeyMappings();
 		ApplyTouchMappings();
-		
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetPlayerController()->GetLocalPlayer()))
+
+		UEnhancedInputLocalPlayerSubsystem* Subsystem = UInputModuleStatics::GetInputSubsystem();
+		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
+		UInputComponentBase* Component = UInputModuleStatics::GetInputComponent<UInputComponentBase>();
+
+		for (const auto& Iter : ContextMappings)
 		{
-			for (const auto& Iter : ConfigMappings)
+			if (UInputMappingContext* IMC = Iter.InputMapping.Get())
 			{
-				if (UPlayerMappableInputConfig* InputConfig = Iter.Config.LoadSynchronous())
+				if (Iter.bRegisterWithSettings)
 				{
-					RegisterInputConfig(Iter.Type, InputConfig, false);
-					if (Iter.bShouldActivateAutomatically && Iter.CanBeActivated())
-					{
-						FModifyContextOptions Options = {};
-						Options.bIgnoreAllPressedKeysUntilRelease = false;
-						Subsystem->AddPlayerMappableConfig(InputConfig, Options);
-						if(UInputComponentBase* InputComp = Cast<UInputComponentBase>(GetPlayerController()->InputComponent))
-						{
-							OnBindAction(InputComp, InputConfig);
-						}
-					}
+					Settings->RegisterInputMappingContext(IMC);
+					FModifyContextOptions Options = {};
+					Options.bIgnoreAllPressedKeysUntilRelease = false;
+					Subsystem->AddMappingContext(IMC, Iter.Priority, Options);
+					OnBindAction(Component, IMC);
 				}
 			}
 		}
@@ -171,10 +176,9 @@ void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 	}
 
-	for(auto& Iter : SaveData.ActionMappings)
-	{
-		AddOrUpdateCustomKeyboardBindings(Iter.PlayerMappableOptions.Name, Iter.Key);
-	}
+	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
+
+	UCommonStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
 
 	for(auto& Iter : SaveData.KeyMappings)
 	{
@@ -192,6 +196,10 @@ void UInputModule::UnloadData(EPhase InPhase)
 
 FSaveData* UInputModule::ToData()
 {
+	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
+
+	if(!Settings) return nullptr;
+	
 	static FInputModuleSaveData SaveData;
 	SaveData = FInputModuleSaveData();
 
@@ -202,8 +210,8 @@ FSaveData* UInputModule::ToData()
 			SaveData.KeyShortcuts[Iter.Key] = Iter.Value.Key;
 		}
 	}
-	
-	SaveData.ActionMappings = GetAllPlayerMappableActionKeyMappings();
+
+	UCommonStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
 
 	for(auto& Iter : KeyMappings)
 	{
@@ -241,19 +249,19 @@ void UInputModule::RemoveKeyShortcut(const FName InName)
 	}
 }
 
-void UInputModule::OnBindAction_Implementation(UInputComponentBase* InInputComponent, UPlayerMappableInputConfig* InInputConfig)
+void UInputModule::OnBindAction_Implementation(UInputComponentBase* InInputComponent, UInputMappingContext* InInputContext)
 {
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
-	InInputComponent->BindInputAction(InInputConfig, GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
+	InInputComponent->BindInputAction(InInputContext, GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
 }
 
 void UInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
@@ -299,44 +307,28 @@ void UInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
 	TouchMappings.Add(InKeyMapping);
 }
 
-void UInputModule::SetControllerPlatform(const FName InControllerPlatform)
+const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, UInputMappingContext* InInputContext, bool bLogNotFound) const
 {
-	if (ControllerPlatform != InControllerPlatform)
+	if (InInputContext)
 	{
-		ControllerPlatform = InControllerPlatform;
-
-		if (UCommonInputSubsystem* InputSubsystem = UCommonInputSubsystem::Get(GetPlayerController()->GetLocalPlayer()))
+		for(auto Iter : InInputContext->GetMappings())
 		{
-			InputSubsystem->SetGamepadInputType(ControllerPlatform);
-		}
-	}
-}
-
-const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, const UPlayerMappableInputConfig* InConfig, bool bLogNotFound) const
-{
-	if (InConfig)
-	{
-		for(const auto Iter1 : InConfig->GetMappingContexts())
-		{
-			for(auto Iter2 : Iter1.Key->GetMappings())
+			if(const auto InputAction = Cast<UInputActionBase>(Iter.Action))
 			{
-				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
+				if(InputAction->ActionTag == InInputTag)
 				{
-					if(InputAction->ActionTag == InInputTag)
-					{
-						return InputAction;
-					}
+					return InputAction;
 				}
 			}
 		}
 	}
-	for (const auto& Iter1 : RegisteredConfigMappings)
+	for (const auto& Iter1 : ContextMappings)
 	{
-		for(const auto Iter2 : Iter1.Config->GetMappingContexts())
+		if(UInputMappingContext* IMC = Iter1.InputMapping.Get())
 		{
-			for(auto Iter3 : Iter2.Key->GetMappings())
+			for(auto Iter2 : IMC->GetMappings())
 			{
-				if(const auto InputAction = Cast<UInputActionBase>(Iter3.Action))
+				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
 				{
 					if(InputAction->ActionTag == InInputTag)
 					{
@@ -355,170 +347,61 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 	return nullptr;
 }
 
-void UInputModule::RegisterInputConfig(ECommonInputType InType, const UPlayerMappableInputConfig* InConfig, const bool bIsActive)
+TArray<FPlayerKeyMapping> UInputModule::GetAllMappablePlayerKeyMappings(int32 InPlayerIndex)
 {
-	if (InConfig)
+	TArray<FPlayerKeyMapping> Mappings;
+	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
+	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
 	{
-		const int32 Index = RegisteredConfigMappings.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
-		if (Index == INDEX_NONE)
+		for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
 		{
-			RegisteredConfigMappings.Add(FLoadedInputConfigMapping(InConfig, InType, bIsActive));
-		}
-	}
-}
-
-int32 UInputModule::UnregisterInputConfig(const UPlayerMappableInputConfig* InConfig)
-{
-	if (InConfig)
-	{
-		const int32 Index = RegisteredConfigMappings.IndexOfByPredicate( [&InConfig](const FLoadedInputConfigMapping& Pair) { return Pair.Config == InConfig; } );
-		if (Index != INDEX_NONE)
-		{
-			RegisteredConfigMappings.RemoveAt(Index);
-			return 1;
-		}
-			
-	}
-	return INDEX_NONE;
-}
-
-const UPlayerMappableInputConfig* UInputModule::GetInputConfigByName(FName InConfigName) const
-{
-	for (const auto& Iter : RegisteredConfigMappings)
-	{
-		if (Iter.Config->GetConfigName() == InConfigName)
-		{
-			return Iter.Config;
-		}
-	}
-	return nullptr;
-}
-
-TArray<FLoadedInputConfigMapping> UInputModule::GetRegisteredConfigMappingOfType(ECommonInputType InType)
-{
-	TArray<FLoadedInputConfigMapping> ReturnValues;
-
-	if (InType == ECommonInputType::Count)
-	{
-		ReturnValues = RegisteredConfigMappings;
-	}
-	else
-	{
-		for (const auto& Iter : RegisteredConfigMappings)
-		{
-			if (Iter.Type == InType)
+			if (Iter2.Value.HasAnyMappings())
 			{
-				ReturnValues.Emplace(Iter);
+				for (const FPlayerKeyMapping& Mapping : Iter2.Value.Mappings)
+				{
+					Mappings.Add(Mapping);
+				}
 			}
 		}
 	}
-	return ReturnValues;
+	return Mappings;
 }
 
-TArray<FEnhancedActionKeyMapping> UInputModule::GetAllPlayerMappableActionKeyMappings()
+TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
 {
-	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const auto& Iter1 : RegisteredConfigMappings)
+	TArray<FPlayerKeyMapping> Mappings;
+	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
+	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
 	{
-		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
+		for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
 		{
-			for(auto Iter2 : Iter1.Config->GetPlayerMappableKeys())
+			if (Iter2.Value.HasAnyMappings())
 			{
-				if (CustomKeyMappings.Contains(Iter2.GetMappingName()))
+				for (const FPlayerKeyMapping& Mapping : Iter2.Value.Mappings)
 				{
-					Iter2.Key = CustomKeyMappings[Iter2.GetMappingName()];
-				}
-				ReturnValues.Add(Iter2);
-			}
-		}
-	}
-	return ReturnValues;
-}
-
-TArray<FName> UInputModule::GetAllActionMappingNamesFromKey(const FKey InKey, int32 InPlayerID)
-{
-	TArray<FName> ReturnValues;
-	for (const auto& Iter2 : RegisteredConfigMappings)
-	{
-		if (Iter2.Type == ECommonInputType::MouseAndKeyboard)
-		{
-			for (const auto& Mapping : Iter2.Config->GetPlayerMappableKeys())
-			{
-				FName MappingName(Mapping.PlayerMappableOptions.DisplayName.ToString());
-				FName ActionName = Mapping.PlayerMappableOptions.Name;
-				
-				if (const FKey* MappingKey = CustomKeyMappings.Find(ActionName))
-				{
-					if (*MappingKey == InKey)
+					if (Mapping.GetMappingName() == InName)
 					{
-						ReturnValues.Add(MappingName);
-					}
-				}
-				else
-				{
-					if (Mapping.Key == InKey)
-					{
-						ReturnValues.Add(MappingName);
+						Mappings.Add(Mapping);
 					}
 				}
 			}
 		}
 	}
-	return ReturnValues;
+	return Mappings;
 }
 
-TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionMappingByName(const FName InName, int32 InPlayerID)
+void UInputModule::AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
-	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const auto& Iter1 : RegisteredConfigMappings)
+	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
+	if (!InKey.IsGamepadKey())
 	{
-		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
-		{
-			for (auto Iter2 : Iter1.Config->GetPlayerMappableKeys())
-			{
-				if(Iter2.GetMappingName() == InName)
-				{
-					if (CustomKeyMappings.Contains(Iter2.GetMappingName()))
-					{
-						Iter2.Key = CustomKeyMappings[Iter2.GetMappingName()];
-					}
-					ReturnValues.Add(Iter2);
-				}
-			}
-		}
-	}
-	return ReturnValues;
-}
-
-TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionMappingByDisplayName(const FText InDisplayName, int32 InPlayerID)
-{
-	TArray<FEnhancedActionKeyMapping> ReturnValues;
-	for (const FLoadedInputConfigMapping& Iter1 : RegisteredConfigMappings)
-	{
-		if (Iter1.Type == ECommonInputType::MouseAndKeyboard)
-		{
-			for (auto Iter2 : Iter1.Config->GetPlayerMappableKeys())
-			{
-				if(Iter2.PlayerMappableOptions.DisplayName.EqualTo(InDisplayName))
-				{
-					if (CustomKeyMappings.Contains(Iter2.GetMappingName()))
-					{
-						Iter2.Key = CustomKeyMappings[Iter2.GetMappingName()];
-					}
-					ReturnValues.Add(Iter2);
-				}
-			}
-		}
-	}
-	return ReturnValues;
-}
-
-void UInputModule::AddOrUpdateCustomKeyboardBindings(const FName InName, const FKey InKey, int32 InPlayerID)
-{
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(UCommonStatics::GetLocalPlayer(InPlayerID)))
-	{
-		Subsystem->AddPlayerMappedKeyInSlot(InName, InKey);
-		CustomKeyMappings.Emplace(InName, InKey);
+		FMapPlayerKeyArgs Args = {};
+		Args.MappingName = InName;
+		Args.Slot = (EPlayerMappableKeySlot)InSlot;
+		Args.NewKey = InKey;
+	
+		FGameplayTagContainer FailureReason;
+		Settings->MapPlayerKey(Args, FailureReason);
 	}
 }
 

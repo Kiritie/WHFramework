@@ -18,7 +18,7 @@ class AWHPlayerController;
 class AWHGameState;
 class AWHGameMode;
 class UWHGameInstance;
-class ULocalPlayer;
+class UWHLocalPlayer;
 /**
  * 
  */
@@ -277,7 +277,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static UObject* GetWorldContext(bool bInEditor = false);
+	static const UObject* GetWorldContext(bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static UWorld* GetCurrentWorld(bool bInEditor = false)
@@ -293,7 +293,7 @@ public:
 	template<class T>
 	static T* GetGameInstance()
 	{
-		return Cast<T>(UGameplayStatics::GetGameInstance(GetWorldContext()));
+		return Cast<T>(GetGameInstance());
 	}
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameInstance", DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
@@ -301,7 +301,7 @@ public:
 	template<class T>
 	static T* GetGameMode()
 	{
-		return Cast<T>(UGameplayStatics::GetGameMode(GetWorldContext()));
+		return Cast<T>(GetGameMode());
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
@@ -317,84 +317,64 @@ public:
 	template<class T>
 	static T* GetPlayerController(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex));
+		return Cast<T>(GetPlayerController(InPlayerIndex));
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static AWHPlayerController* GetPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerIndex = 0);
+	static AWHPlayerController* GetPlayerController(int32 InPlayerIndex = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerControllerByID(int32 InPlayerID = 0)
 	{
-		return Cast<T>(UGameplayStatics::GetPlayerControllerFromID(GetWorldContext(), InPlayerID));
+		return Cast<T>(GetPlayerControllerByID(InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static AWHPlayerController* GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass = nullptr, int32 InPlayerID = 0);
+	static AWHPlayerController* GetPlayerControllerByID(int32 InPlayerID = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
-	static T* GetLocalPlayerController()
+	static T* GetLocalPlayerController(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(GetLocalPlayerController(T::StaticClass()));
+		return Cast<T>(GetLocalPlayerController(InPlayerIndex));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static AWHPlayerController* GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass = nullptr);
+	static AWHPlayerController* GetLocalPlayerController(int32 InPlayerIndex = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	template<class T>
 	static T* GetPossessedPawn(int32 InPlayerIndex = 0)
 	{
-		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-		{
-			return PlayerController->GetPawn<T>();
-		}
-		return nullptr;
+		return Cast<T>(GetPossessedPawn(InPlayerIndex));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static APawn* GetPossessedPawn(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerIndex = 0);
+	static APawn* GetPossessedPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetPossessedPawnByID(int32 InPlayerID = 0)
 	{
-		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-		{
-			return PlayerController->GetPawn<T>();
-		}
-		return nullptr;
+		return Cast<T>(GetPossessedPawnByID(InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static APawn* GetPossessedPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
-	static T* GetLocalPossessedPawn()
+	static T* GetLocalPossessedPawn(int32 InPlayerIndex = 0)
 	{
-		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-		{
-			return PlayerController->GetPawn<T>();
-		}
-		return nullptr;
+		return Cast<T>(GetLocalPossessedPawn(InPlayerIndex));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static APawn* GetLocalPossessedPawn(TSubclassOf<APawn> InClass = nullptr);
+	static APawn* GetLocalPossessedPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerPawn(int32 InPlayerIndex = 0)
 	{
-		if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
+		return Cast<T>(GetPlayerPawn(InPlayerIndex));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static APawn* GetPlayerPawn(TSubclassOf<APawn> InClass = nullptr, int32 InPlayerIndex = 0);
+	static APawn* GetPlayerPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
 
 	template<class T>
 	static T* GetPlayerPawnByID(int32 InPlayerID = 0)
 	{
-		if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
+		return Cast<T>(GetPlayerPawnByID(InPlayerID));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static APawn* GetPlayerPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
@@ -412,17 +392,16 @@ public:
 	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static TArray<ULocalPlayer*> GetLocalPlayers();
+	static TArray<UWHLocalPlayer*> GetLocalPlayers();
 
 	template<class T>
-	static T* GetLocalPlayer(int32 InPlayerID = 0)
+	static T* GetLocalPlayer(int32 InPlayerIndex = 0)
 	{
-		if(GetLocalPlayers().IsValidIndex(InPlayerID))
-		{
-			return Cast<T>(GetLocalPlayers()[InPlayerID]);
-		}
-		return nullptr;
+		return Cast<T>(GetLocalPlayer(InPlayerIndex));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
-	static ULocalPlayer* GetLocalPlayer(int32 InPlayerID = 0, TSubclassOf<ULocalPlayer> InClass = nullptr);
+	static UWHLocalPlayer* GetLocalPlayer(int32 InPlayerIndex = 0, TSubclassOf<UWHLocalPlayer> InClass = nullptr);
+
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static int32 GetLocalPlayerNum();
 };

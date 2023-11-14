@@ -7,7 +7,6 @@
 #include "ModuleSaveGame.generated.h"
 
 class UModuleBase;
-class UArchiveSaveGame;
 
 /**
  * 常模块数据存取类

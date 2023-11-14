@@ -6,13 +6,7 @@ public class WHFrameworkEditor : ModuleRules
 {
 	public WHFrameworkEditor(ReadOnlyTargetRules Target) : base(Target)
 	{
-		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
 		bLegacyPublicIncludePaths = false;
-
-		ShadowVariableWarningLevel = WarningLevel.Error;
-		
-		DefaultBuildSettings = BuildSettingsVersion.V2;
 
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		

@@ -76,7 +76,7 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 
 //////////////////////////////////////////////////////////////////////////
 // Functions
-extern UObject* GetWorldContext(bool bInEditor = false);
+extern const UObject* GetWorldContext(bool bInEditor = false);
 
 //////////////////////////////////////////////////////////////////////////
 // MACROS

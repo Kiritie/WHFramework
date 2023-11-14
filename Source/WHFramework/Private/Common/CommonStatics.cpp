@@ -16,6 +16,7 @@
 #include "Common/CommonTypes.h"
 #include "Event/Handle/Common/EventHandle_PauseGame.h"
 #include "Event/Handle/Common/EventHandle_UnPauseGame.h"
+#include "Gameplay/WHLocalPlayer.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
@@ -105,8 +106,7 @@ ETraceTypeQuery UCommonStatics::GetGameTraceType(ECollisionChannel InTraceChanne
 
 bool UCommonStatics::IsInScreenViewport(const FVector& InWorldLocation)
 {
-	const APlayerController* PC = GetPlayerController();
-	const ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
+	const UWHLocalPlayer* LP = GetLocalPlayer();
 	if (LP && LP->ViewportClient)
 	{
 		// get the projection data
@@ -592,7 +592,7 @@ bool UCommonStatics::IsImplementedInBlueprint(const UFunction* Func)
 	return Func && ensure(Func->GetOuter()) && Func->GetOuter()->IsA(UBlueprintGeneratedClass::StaticClass());
 }
 
-UObject* UCommonStatics::GetWorldContext(bool bInEditor)
+const UObject* UCommonStatics::GetWorldContext(bool bInEditor)
 {
 	return AMainModule::GetPtr(bInEditor);
 }
@@ -612,30 +612,27 @@ AWHGameState* UCommonStatics::GetGameState(TSubclassOf<AWHGameState> InClass)
 	return Cast<AWHGameState>(UGameplayStatics::GetGameState(GetWorldContext()));
 }
 
-AWHPlayerController* UCommonStatics::GetPlayerController(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerIndex)
+AWHPlayerController* UCommonStatics::GetPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
 {
 	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex));
 }
 
-AWHPlayerController* UCommonStatics::GetPlayerControllerByID(TSubclassOf<AWHPlayerController> InClass, int32 InPlayerID)
+AWHPlayerController* UCommonStatics::GetPlayerControllerByID(int32 InPlayerID, TSubclassOf<AWHPlayerController> InClass)
 {
 	return Cast<AWHPlayerController>(UGameplayStatics::GetPlayerControllerFromID(GetWorldContext(), InPlayerID));
 }
 
-AWHPlayerController* UCommonStatics::GetLocalPlayerController(TSubclassOf<AWHPlayerController> InClass)
+AWHPlayerController* UCommonStatics::GetLocalPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
 {
-	for(auto Iter = GetCurrentWorld()->GetPlayerControllerIterator(); Iter; ++Iter)
+	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
+	if(LocalPlayers.IsValidIndex(InPlayerIndex))
 	{
-		AWHPlayerController* PlayerController = Cast<AWHPlayerController>(Iter->Get());
-		if(PlayerController && PlayerController->IsLocalController())
-		{
-			return PlayerController;
-		}
+		return Cast<AWHPlayerController>(LocalPlayers[InPlayerIndex]->GetPlayerController(GetCurrentWorld()));
 	}
 	return nullptr;
 }
 
-APawn* UCommonStatics::GetPossessedPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
+APawn* UCommonStatics::GetPossessedPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
@@ -653,7 +650,7 @@ APawn* UCommonStatics::GetPossessedPawnByID(int32 InPlayerID, TSubclassOf<APawn>
 	return nullptr;
 }
 
-APawn* UCommonStatics::GetLocalPossessedPawn(TSubclassOf<APawn> InClass)
+APawn* UCommonStatics::GetLocalPossessedPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
 	{
@@ -662,7 +659,7 @@ APawn* UCommonStatics::GetLocalPossessedPawn(TSubclassOf<APawn> InClass)
 	return nullptr;
 }
 
-APawn* UCommonStatics::GetPlayerPawn(TSubclassOf<APawn> InClass, int32 InPlayerIndex)
+APawn* UCommonStatics::GetPlayerPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
 {
 	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
 	{
@@ -689,16 +686,30 @@ APawn* UCommonStatics::GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
 	return nullptr;
 }
 
-TArray<ULocalPlayer*> UCommonStatics::GetLocalPlayers()
+TArray<UWHLocalPlayer*> UCommonStatics::GetLocalPlayers()
 {
-	return GetGameInstance()->GetLocalPlayers();
+	TArray<UWHLocalPlayer*> LocalPlayers;
+	for(auto Iter : GetGameInstance()->GetLocalPlayers())
+	{
+		if(UWHLocalPlayer* LocalPlayer = Cast<UWHLocalPlayer>(Iter))
+		{
+			LocalPlayers.Add(LocalPlayer);
+		}
+	}
+	return LocalPlayers;
 }
 
-ULocalPlayer* UCommonStatics::GetLocalPlayer(int32 InPlayerID, TSubclassOf<ULocalPlayer> InClass)
+UWHLocalPlayer* UCommonStatics::GetLocalPlayer(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
-	if(GetLocalPlayers().IsValidIndex(InPlayerID))
+	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
+	if(LocalPlayers.IsValidIndex(InPlayerIndex))
 	{
-		return GetLocalPlayers()[InPlayerID];
+		return LocalPlayers[InPlayerIndex];
 	}
 	return nullptr;
+}
+
+int32 UCommonStatics::GetLocalPlayerNum()
+{
+	return GetLocalPlayers().Num();
 }

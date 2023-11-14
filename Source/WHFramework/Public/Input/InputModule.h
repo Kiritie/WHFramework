@@ -10,7 +10,7 @@
 #include "InputModule.generated.h"
 
 class UInputComponentBase;
-class UPlayerMappableInputConfig;
+class UInputMappingContext;
 class UInputActionBase;
 class UEnhancedInputComponent;
 
@@ -78,8 +78,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMappings
 protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Config")
-	TArray<FInputConfigMapping> ConfigMappings;
+	UPROPERTY(EditAnywhere, Category = "InputSteups|Context")
+	TArray<FInputContextMapping> ContextMappings;
 
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Key")
 	TMap<FName, FInputKeyMapping> KeyMappings;
@@ -87,21 +87,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Touch")
 	TArray<FInputTouchMapping> TouchMappings;
 	
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Config")
-	TArray<FLoadedInputConfigMapping> RegisteredConfigMappings;
-	
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Config")
+	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Context")
 	TMap<FName, FKey> CustomKeyMappings;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Config")
-	FName ControllerPlatform;
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnBindAction(UInputComponentBase* InInputComponent, UPlayerMappableInputConfig* InInputConfig);
+	void OnBindAction(UInputComponentBase* InInputComponent, UInputMappingContext* InInputContext);
 
 public:
-	TArray<FInputConfigMapping>& GetConfigMappings() { return ConfigMappings; }
+	TArray<FInputContextMapping>& GetContextMappings() { return ContextMappings; }
 
 	UFUNCTION(BlueprintPure)
 	TMap<FName, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
@@ -125,43 +119,16 @@ public:
 	void ApplyTouchMappings();
 	
 	UFUNCTION(BlueprintPure)
-	FName GetControllerPlatform() const { return ControllerPlatform; }
+	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, UInputMappingContext* InInputContext = nullptr, bool bLogNotFound = true) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FPlayerKeyMapping> GetAllMappablePlayerKeyMappings(int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure)
+	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintCallable)
-	void SetControllerPlatform(const FName InControllerPlatform);
-	
-	UFUNCTION(BlueprintPure)
-	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, const UPlayerMappableInputConfig* InConfig = nullptr, bool bLogNotFound = true) const;
-
-	UFUNCTION(BlueprintCallable)
-	void RegisterInputConfig(ECommonInputType InType, const UPlayerMappableInputConfig* InConfig, const bool bIsActive);
-	
-	UFUNCTION(BlueprintCallable)
-	int32 UnregisterInputConfig(const UPlayerMappableInputConfig* InConfig);
-
-	UFUNCTION(BlueprintPure)
-	const UPlayerMappableInputConfig* GetInputConfigByName(FName InConfigName) const;
-
-	UFUNCTION(BlueprintPure)
-	TArray<FLoadedInputConfigMapping>& GetAllRegisteredConfigMapping() { return RegisteredConfigMappings; }
-
-	UFUNCTION(BlueprintPure)
-	TArray<FLoadedInputConfigMapping> GetRegisteredConfigMappingOfType(ECommonInputType InType);
-
-	UFUNCTION(BlueprintPure)
-	TArray<FEnhancedActionKeyMapping> GetAllPlayerMappableActionKeyMappings();
-
-	UFUNCTION(BlueprintPure)
-	TArray<FName> GetAllActionMappingNamesFromKey(const FKey InKey, int32 InPlayerID = 0);
-
-	UFUNCTION(BlueprintPure)
-	TArray<FEnhancedActionKeyMapping> GetAllActionMappingByName(const FName InName, int32 InPlayerID = 0);
-
-	UFUNCTION(BlueprintPure)
-	TArray<FEnhancedActionKeyMapping> GetAllActionMappingByDisplayName(const FText InDisplayName, int32 InPlayerID = 0);
-
-	UFUNCTION(BlueprintCallable)
-	void AddOrUpdateCustomKeyboardBindings(const FName InName, const FKey InKey, int32 InPlayerID = 0);
+	void AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure)
 	const TMap<FName, FKey>& GetAllCustomKeyMappings() const { return CustomKeyMappings; }

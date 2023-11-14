@@ -110,7 +110,7 @@ FSaveData* USettingModule::ToData()
 	SaveData.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
 	SaveData.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
 	SaveData.CameraData = UCameraModule::Get().GetSaveDataRef<FCameraModuleSaveData>(true);
-	SaveData.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(true);
+	SaveData.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(false);
 	
 	return &SaveData;
 }

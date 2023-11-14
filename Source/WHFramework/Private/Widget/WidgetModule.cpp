@@ -58,6 +58,16 @@ void UWidgetModule::OnDestroy()
 void UWidgetModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	for(auto& Iter : UserWidgetClasses)
+	{
+		if(!Iter) continue;
+		const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+		if(!UserWidgetClassMap.Contains(WidgetName))
+		{
+			UserWidgetClassMap.Add(WidgetName, Iter);
+		}
+	}
 }
 
 void UWidgetModule::OnPreparatory(EPhase InPhase)
@@ -69,11 +79,6 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 		for(auto& Iter : UserWidgetClasses)
 		{
 			if(!Iter) continue;
-			const FName WidgetName = Iter->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
-			if(!UserWidgetClassMap.Contains(WidgetName))
-			{
-				UserWidgetClassMap.Add(WidgetName, Iter);
-			}
 			const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
 			if(DefaultObject->GetParentName() == NAME_None)
 			{

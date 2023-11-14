@@ -26,16 +26,16 @@ void UWidgetAudioSettingPageBase::OnCreate(UObject* InOwner)
 	Super::OnCreate(InOwner);
 
 	SettingItem_GlobalSoundVolume = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
-	AddSettingItem(SettingItem_GlobalSoundVolume, FText::FromString(TEXT("全局")));
+	AddSettingItem(FName("GlobalSoundVolume"), SettingItem_GlobalSoundVolume, FText::FromString(TEXT("全局")));
 
 	SettingItem_BackgroundSoundVolume = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
-	AddSettingItem(SettingItem_BackgroundSoundVolume, FText::FromString(TEXT("背景")));
+	AddSettingItem(FName("BackgroundSoundVolume"), SettingItem_BackgroundSoundVolume, FText::FromString(TEXT("背景")));
 
 	SettingItem_EnvironmentSoundVolume = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
-	AddSettingItem(SettingItem_EnvironmentSoundVolume, FText::FromString(TEXT("环境")));
+	AddSettingItem(FName("EnvironmentSoundVolume"), SettingItem_EnvironmentSoundVolume, FText::FromString(TEXT("环境")));
 
 	SettingItem_EffectSoundVolume = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, UAssetModuleStatics::GetStaticClass(FName("FloatSettingItem")));
-	AddSettingItem(SettingItem_EffectSoundVolume, FText::FromString(TEXT("音效")));
+	AddSettingItem(FName("EffectSoundVolume"), SettingItem_EffectSoundVolume, FText::FromString(TEXT("音效")));
 }
 
 void UWidgetAudioSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)

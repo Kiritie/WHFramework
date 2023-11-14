@@ -14,7 +14,7 @@ bool GIsPlaying = true;
 
 bool GIsSimulating = false;
 
-UObject* GetWorldContext(bool bInEditor)
+const UObject* GetWorldContext(bool bInEditor)
 {
 	return UCommonStatics::GetWorldContext(bInEditor);
 }

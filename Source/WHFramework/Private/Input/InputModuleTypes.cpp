@@ -3,10 +3,7 @@
 
 #include "Input/InputModuleTypes.h"
 
-#include "Input/Base/InputActionBase.h"
 #include "Widgets/SViewport.h"
-#include "ICommonUIModule.h"
-#include "CommonUISettings.h"
 
 bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
@@ -36,36 +33,4 @@ void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewport
 		GameViewportClient.SetIgnoreInput(true);
 		GameViewportClient.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
 	}
-}
-
-TArray<FEnhancedActionKeyMapping> FInputModuleSaveData::GetAllActionMappingByDisplayName(const FText InActionName)
-{
-	TArray<FEnhancedActionKeyMapping> Mappings;
-	for(auto& Iter1 : ActionMappings)
-	{
-		if(Iter1.PlayerMappableOptions.DisplayName.EqualTo(InActionName))
-		{
-			Mappings.Add(Iter1);
-		}
-	}
-	return Mappings;
-}
-
-bool FInputConfigMapping::CanBeActivated() const
-{
-	const FGameplayTagContainer& PlatformTraits = ICommonUIModule::GetSettings().GetPlatformTraits();
-
-	// If the current platform does NOT have all the dependent traits, then don't activate it
-	if (!DependentPlatformTraits.IsEmpty() && !PlatformTraits.HasAll(DependentPlatformTraits))
-	{
-		return false;
-	}
-
-	// If the platform has any of the excluded traits, then we shouldn't activate this config.
-	if (!ExcludedPlatformTraits.IsEmpty() && PlatformTraits.HasAny(ExcludedPlatformTraits))
-	{
-		return false;
-	}
-
-	return true;
 }

@@ -29,5 +29,5 @@ void UInputSaveGame::OnUnload_Implementation(EPhase InPhase)
 
 void UInputSaveGame::OnRefresh_Implementation()
 {
-	Super::OnRefresh_Implementation();
+	SetSaveData(AMainModule::GetModuleByClass(false, ModuleClass)->GetSaveData(true));
 }

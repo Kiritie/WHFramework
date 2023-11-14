@@ -59,7 +59,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void AddSettingItem(UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
+	void AddSettingItem(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
 
 	UFUNCTION(BlueprintNativeEvent)
 	void ClearSettingItems();
@@ -79,5 +79,5 @@ protected:
 	FText LastCategory;
 
 	UPROPERTY()
-	TArray<UWidgetSettingItemBase*> SettingItems;
+	TMap<FName, UWidgetSettingItemBase*> SettingItems;
 };

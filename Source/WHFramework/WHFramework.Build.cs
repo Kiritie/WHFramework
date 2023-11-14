@@ -8,8 +8,6 @@ public class WHFramework : ModuleRules
 	{
 		bLegacyPublicIncludePaths = false;
 
-		ShadowVariableWarningLevel = WarningLevel.Error;
-
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
 		PublicDependencyModuleNames.AddRange(

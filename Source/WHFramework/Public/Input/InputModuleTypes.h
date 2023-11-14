@@ -5,11 +5,11 @@
 
 #include "GameFramework/PlayerController.h"
 #include "SaveGame/SaveGameModuleTypes.h"
-#include "EnhancedActionKeyMapping.h"
-#include "CommonInputTypeEnum.h"
-#include "GameplayTagContainer.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 
 #include "InputModuleTypes.generated.h"
+
+class UPlayerMappableKeyProfileBase;
 
 /**
 * 输入模式
@@ -75,6 +75,32 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TArray<FKey> Auxs;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputContextMapping
+{
+	GENERATED_BODY()
+
+public:
+	FInputContextMapping()
+	{
+		InputMapping = nullptr;
+		Priority = 0;
+		bRegisterWithSettings = true;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, Category="Input", meta=(AssetBundles="Client,Server"))
+	TSoftObjectPtr<UInputMappingContext> InputMapping;
+
+	// Higher priority input mappings will be prioritized over mappings with a lower priority.
+	UPROPERTY(EditAnywhere, Category="Input")
+	int32 Priority;
+	
+	/** If true, then this mapping context will be registered with the settings when this game feature action is registered. */
+	UPROPERTY(EditAnywhere, Category="Input")
+	bool bRegisterWithSettings;
 };
 
 USTRUCT(BlueprintType)
@@ -161,15 +187,11 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData()
 	{
-		ActionMappings = TArray<FEnhancedActionKeyMapping>();
 		KeyShortcuts = TMap<FName, FKey>();
 		KeyMappings = TMap<FName, FKey>();
 	}
 
 public:
-	UPROPERTY()
-	TArray<FEnhancedActionKeyMapping> ActionMappings;
-
 	UPROPERTY()
 	TMap<FName, FKey> KeyShortcuts;
 
@@ -181,88 +203,4 @@ public:
 	{
 		Super::MakeSaved();
 	}
-
-	virtual TArray<FEnhancedActionKeyMapping> GetAllActionMappingByDisplayName(const FText InDisplayName);
-};
-
-class UPlayerMappableInputConfig;
-
-/** A container to organize loaded player mappable configs to their CommonUI input type */
-USTRUCT(BlueprintType)
-struct FLoadedInputConfigMapping
-{
-	GENERATED_BODY()
-
-	FLoadedInputConfigMapping() = default;
-	FLoadedInputConfigMapping(const UPlayerMappableInputConfig* InConfig, ECommonInputType InType, const bool InIsActive)
-		: Config(InConfig)
-		, Type(InType)
-		, bIsActive(InIsActive)
-	{}
-
-	/** The player mappable input config that should be applied to the Enhanced Input subsystem */
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TObjectPtr<const UPlayerMappableInputConfig> Config = nullptr;
-
-	/** The type of device that this mapping config should be applied to */
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	ECommonInputType Type = ECommonInputType::Count;
-
-	/** If this config is currently active. A config is marked as active when it's owning GFA is active */
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	bool bIsActive = false;
-};
-
-/** A container to organize potentially unloaded player mappable configs to their CommonUI input type */
-USTRUCT()
-struct FInputConfigMapping
-{
-	GENERATED_BODY()
-	
-	FInputConfigMapping()
-	{
-		Type = ECommonInputType::Count;
-		bShouldActivateAutomatically = true;
-	}
-	
-	FInputConfigMapping(const TSoftObjectPtr<UPlayerMappableInputConfig>& InConfig, ECommonInputType InType)
-		: Config(InConfig),
-		  Type(InType)
-	{
-	}
-	
-	UPROPERTY(EditAnywhere)
-	TSoftObjectPtr<UPlayerMappableInputConfig> Config;
-
-	/**
-	 * The type of config that this is. Useful for filtering out configs by the current input device
-	 * for things like the settings screen, or if you only want to apply this config when a certain
-	 * input type is being used.
-	 */
-	UPROPERTY(EditAnywhere)
-	ECommonInputType Type;
-
-	/**
-	 * Container of platform traits that must be set in order for this input to be activated.
-	 * 
-	 * If the platform does not have one of the traits specified it can still be registered, but cannot
-	 * be activated. 
-	 */
-	UPROPERTY(EditAnywhere)
-	FGameplayTagContainer DependentPlatformTraits;
-
-	/**
-	 * If the current platform has any of these traits, then this config will not be actived.
-	 */
-	UPROPERTY(EditAnywhere)
-	FGameplayTagContainer ExcludedPlatformTraits;
-
-	/** If true, then this input config will be activated when it's associated Game Feature is activated.
-	 * This is normally the desirable behavior
-	 */
-	UPROPERTY(EditAnywhere)
-	bool bShouldActivateAutomatically;
-
-	/** Returns true if this config pair can be activated based on the current platform traits and settings. */
-	bool CanBeActivated() const;
 };

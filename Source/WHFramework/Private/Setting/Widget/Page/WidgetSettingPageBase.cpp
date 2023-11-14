@@ -77,10 +77,8 @@ FSaveData* UWidgetSettingPageBase::GetDefaultSaveData() const
 	return nullptr;
 }
 
-void UWidgetSettingPageBase::AddSettingItem_Implementation(UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
+void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
 {
-	if(SettingItems.Contains(InSettingItem)) return;
-	
 	InSettingItem->OnValueChanged.RemoveAll(this);
 	InSettingItem->OnValueChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValueChange);
 	InSettingItem->OnValuesChanged.RemoveAll(this);
@@ -97,7 +95,7 @@ void UWidgetSettingPageBase::AddSettingItem_Implementation(UWidgetSettingItemBas
 	{
 		ScrollBoxSlot->SetPadding(FMargin(2.5f));
 	}
-	SettingItems.Add(InSettingItem);
+	SettingItems.Add(InName, InSettingItem);
 }
 
 void UWidgetSettingPageBase::ClearSettingItems_Implementation()
