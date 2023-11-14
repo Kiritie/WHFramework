@@ -27,7 +27,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner)
 {
 	Super::OnCreate(InOwner);
 
-	for (const auto& Mapping : UInputModule::Get().GetAllMappablePlayerKeyMappings())
+	for (const auto& Mapping : UInputModule::Get().GetAllPlayerKeyMappings())
 	{
 		if (Mapping.GetMappingName() != NAME_None && !Mapping.GetDisplayName().IsEmpty())
 		{
@@ -46,7 +46,7 @@ void UWidgetInputSettingPageBase::OnOpen(const TArray<FParameter>& InParams, boo
 	
 	for(auto& Iter1 : SettingItems)
 	{
-		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetAllPlayerKeyMappingsByName(Iter1.Key);
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter1.Key);
 		TArray<FParameter> Values;
 		for(auto& Iter2 : Mappings)
 		{
@@ -62,13 +62,13 @@ void UWidgetInputSettingPageBase::OnApply()
 
 	for(auto& Iter : SettingItems)
 	{
-		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetAllPlayerKeyMappingsByName(Iter.Key);
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter.Key);
 		TArray<FParameter> Values = Iter.Value->GetValues();
-		for(int32 i = 0; i < Mappings.Num(); i++)
+		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if(*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
+			if(!Mappings.IsValidIndex(i) || *Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
 			{
-				UInputModule::Get().AddOrUpdateCustomKeyBindings(Mappings[i].GetMappingName(), *Values[i].GetStringValue(), GetOwningLocalPlayer()->GetLocalPlayerIndex());
+				UInputModule::Get().AddOrUpdateCustomKeyBindings(Iter.Key, *Values[i].GetStringValue(), i);
 			}
 		}
 	}
@@ -80,7 +80,7 @@ void UWidgetInputSettingPageBase::OnReset()
 
 	for(auto& Iter : SettingItems)
 	{
-		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetAllPlayerKeyMappingsByName(Iter.Key);
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter.Key);
 		TArray<FParameter> Values = Iter.Value->GetValues();
 		for(int32 i = 0; i < Mappings.Num(); i++)
 		{
@@ -107,11 +107,12 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 {
 	for(auto& Iter : SettingItems)
 	{
-		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetAllPlayerKeyMappingsByName(Iter.Key);
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter.Key);
 		TArray<FParameter> Values = Iter.Value->GetValues();
-		for(int32 i = 0; i < Mappings.Num(); i++)
+		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if(*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
+			if((!Mappings.IsValidIndex(i) && !Values[i].GetStringValue().Equals(TEXT("None"))) ||
+				*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
 			{
 				return true;
 			}
@@ -124,7 +125,7 @@ bool UWidgetInputSettingPageBase::CanReset_Implementation() const
 {
 	for(auto& Iter : SettingItems)
 	{
-		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetAllPlayerKeyMappingsByName(Iter.Key);
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter.Key);
 		for(int32 i = 0; i < Mappings.Num(); i++)
 		{
 			if(Mappings[i].GetCurrentKey() != Mappings[i].GetDefaultKey())

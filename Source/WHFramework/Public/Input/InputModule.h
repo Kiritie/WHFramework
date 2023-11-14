@@ -54,7 +54,14 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
+	virtual void RefreshData();
+
 	virtual FSaveData* ToData() override;
+
+	virtual FSaveData* GetData() override;
+
+protected:
+	FInputModuleSaveData LocalSaveData;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
@@ -122,10 +129,10 @@ public:
 	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, UInputMappingContext* InInputContext = nullptr, bool bLogNotFound = true) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FPlayerKeyMapping> GetAllMappablePlayerKeyMappings(int32 InPlayerIndex = 0);
+	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure)
-	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
+	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintCallable)
 	void AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);

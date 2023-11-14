@@ -112,7 +112,7 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* GetData() const override { return WorldData; }
+	virtual FSaveData* GetData() override { return WorldData; }
 
 	virtual FSaveData* ToData() override;
 

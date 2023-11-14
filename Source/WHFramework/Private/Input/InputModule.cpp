@@ -187,6 +187,8 @@ void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			KeyMappings[Iter.Key].Key = Iter.Value;
 		}
 	}
+
+	RefreshData();
 }
 
 void UInputModule::UnloadData(EPhase InPhase)
@@ -194,12 +196,13 @@ void UInputModule::UnloadData(EPhase InPhase)
 	CustomKeyMappings.Empty();
 }
 
+void UInputModule::RefreshData()
+{
+	LocalSaveData = GetSaveDataRef<FInputModuleSaveData>(true);
+}
+
 FSaveData* UInputModule::ToData()
 {
-	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
-
-	if(!Settings) return nullptr;
-	
 	static FInputModuleSaveData SaveData;
 	SaveData = FInputModuleSaveData();
 
@@ -210,6 +213,8 @@ FSaveData* UInputModule::ToData()
 			SaveData.KeyShortcuts[Iter.Key] = Iter.Value.Key;
 		}
 	}
+
+	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
 	UCommonStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
 
@@ -222,6 +227,11 @@ FSaveData* UInputModule::ToData()
 	}
 
 	return &SaveData;
+}
+
+FSaveData* UInputModule::GetData()
+{
+	return &LocalSaveData;
 }
 
 FInputKeyShortcut UInputModule::GetKeyShortcutByName(const FName InName) const
@@ -347,7 +357,7 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 	return nullptr;
 }
 
-TArray<FPlayerKeyMapping> UInputModule::GetAllMappablePlayerKeyMappings(int32 InPlayerIndex)
+TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FPlayerKeyMapping> Mappings;
 	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
@@ -367,25 +377,25 @@ TArray<FPlayerKeyMapping> UInputModule::GetAllMappablePlayerKeyMappings(int32 In
 	return Mappings;
 }
 
-TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
+TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
 {
 	TArray<FPlayerKeyMapping> Mappings;
 	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
 	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
 	{
-		for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
+		if(Iter1.Value->GetPlayerMappingRows().Contains(InName))
 		{
-			if (Iter2.Value.HasAnyMappings())
+			for (const FPlayerKeyMapping& Iter2 : Iter1.Value->GetPlayerMappingRows()[InName].Mappings)
 			{
-				for (const FPlayerKeyMapping& Mapping : Iter2.Value.Mappings)
-				{
-					if (Mapping.GetMappingName() == InName)
-					{
-						Mappings.Add(Mapping);
-					}
-				}
+				Mappings.Add(Iter2);
 			}
 		}
+	}
+	if(Mappings.Num() > 1)
+	{
+		Mappings.Sort([](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B){
+			return A.GetSlot() < B.GetSlot();
+		});
 	}
 	return Mappings;
 }
@@ -402,6 +412,8 @@ void UInputModule::AddOrUpdateCustomKeyBindings(const FName InName, const FKey I
 	
 		FGameplayTagContainer FailureReason;
 		Settings->MapPlayerKey(Args, FailureReason);
+
+		RefreshData();
 	}
 }
 
