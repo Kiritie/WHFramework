@@ -7,10 +7,19 @@
 
 #include "WHPlayerController.generated.h"
 
+class IInteractionAgentInterface;
 class IWHPlayerInterface;
 class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerPawnChanged, class APawn*, InPlayerPawn);
+
+UENUM(BlueprintType)
+enum class EInteractionRaycastMode : uint8
+{
+	None,
+	FromAimPosition,
+	FromMousePosition
+};
 
 /**
  * 
@@ -62,11 +71,56 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	
 	//////////////////////////////////////////////////////////////////////////
+	/// Interaction
+protected:
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	EInteractionRaycastMode InteractionRaycastMode;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float InteractionDistance;
+
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "Interaction")
+	TScriptInterface<IInteractionAgentInterface> HoveringInteraction;
+
+	UPROPERTY(VisibleAnywhere, Category = "Interaction")
+	TScriptInterface<IInteractionAgentInterface> SelectedInteraction;
+
+protected:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnRefreshInteraction();
+
+public:
+	UFUNCTION(BlueprintPure)
+	EInteractionRaycastMode GetInteractionRaycastMode() const { return InteractionRaycastMode; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetInteractionRaycastMode(EInteractionRaycastMode InInteractionRaycastMode) { InteractionRaycastMode = InInteractionRaycastMode; }
+	
+	UFUNCTION(BlueprintPure)
+	virtual TScriptInterface<IInteractionAgentInterface> GetHoveringInteraction() { return HoveringInteraction; }
+	
+	UFUNCTION(BlueprintPure)
+	virtual TScriptInterface<IInteractionAgentInterface> GetSelectedInteraction() { return SelectedInteraction; }
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Raycast
 public:
-	virtual bool RaycastSingleFromAimPoint(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InIgnoreActors"))
+	virtual bool RaycastSingleFromScreenPosition(FVector2D InScreenPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
-	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult) const;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InIgnoreActors"))
+	virtual bool RaycastSingleFromViewportPosition(FVector2D InViewportPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InIgnoreActors"))
+	virtual bool RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InIgnoreActors"))
+	virtual bool RaycastSingleFromAimPosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FVector2D GetAnimPosition() const { return FVector2D(0.5f); }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player

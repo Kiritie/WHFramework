@@ -113,16 +113,12 @@ bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 	{
 		FString PropertyName = InProperty->GetName();
 
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WidgetClass) ||
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Space) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WidgetClass) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, DrawSize) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Pivot))
 		{
 			return false;
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bBindToSelf))
-		{
-			return Space == EWidgetSpace::Screen;
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bDrawAtDesiredSize) ||
@@ -189,6 +185,7 @@ void UWorldWidgetComponent::RefreshParams()
 	{
 		if(UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
 		{
+			Space = DefaultObject->GetWidgetSpace();
 			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
 			Pivot = DefaultObject->GetWidgetAlignment();
 			if(WidgetParams.Num() != DefaultObject->GetWidgetParams().Num())

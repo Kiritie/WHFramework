@@ -136,15 +136,6 @@ FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForHandle(FGame
 	return FGameplayAbilitySpec();
 }
 
-FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForGEHandle(FActiveGameplayEffectHandle GEHandle)
-{
-	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromGEHandle(GEHandle))
-	{
-		return *Spec;
-	}
-	return FGameplayAbilitySpec();
-}
-
 FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForClass(TSubclassOf<UGameplayAbility> AbilityClass)
 {
 	if(FGameplayAbilitySpec* Spec = FindAbilitySpecFromClass(AbilityClass))

@@ -18,7 +18,8 @@ public class WHFramework : ModuleRules
 				"Engine",
 				"CommonUI",
 				"CommonInput",
-				"EnhancedInput"
+				"EnhancedInput",
+				"GameplayAbilities",
 			});
 			
 		
@@ -42,7 +43,6 @@ public class WHFramework : ModuleRules
 				"ImageWriteQueue",
 				"GameplayTags",
 				"GameplayTasks",
-				"GameplayAbilities",
 				"ProceduralMeshComponent"
 			});
 	}

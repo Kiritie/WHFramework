@@ -21,12 +21,14 @@ enum class EInputMode : uint8
 	None,
 	/// 游戏模式
 	GameOnly,
-	/// UI模式
-	UIOnly,
+	/// 游戏模式_不隐藏光标
+	GameOnly_NotHideCursor,
 	/// 游戏和UI模式
 	GameAndUI,
 	/// 游戏和UI模式_不隐藏光标
-	GameAndUI_NotHideCursor
+	GameAndUI_NotHideCursor,
+	/// UI模式
+	UIOnly
 };
 
 UENUM(BlueprintType)
@@ -49,14 +51,21 @@ public:
 		Auxs = TArray<FKey>();
 	}
 
-	FInputKeyShortcut(const FKey& InKey)
-		: Key(InKey),
+	FInputKeyShortcut(const FText& InDisplayName)
+		: DisplayName(InDisplayName)
+	{
+	}
+
+	FInputKeyShortcut(const FText& InDisplayName, const FKey& InKey)
+		: DisplayName(InDisplayName),
+		  Key(InKey),
 		  Auxs({})
 	{
 	}
 
-	FInputKeyShortcut(const FKey& InKey, const TArray<FKey>& InAuxs)
-		: Key(InKey),
+	FInputKeyShortcut(const FText& InDisplayName, const FKey& InKey, const TArray<FKey>& InAuxs)
+		: DisplayName(InDisplayName),
+		  Key(InKey),
 		  Auxs(InAuxs)
 	{
 	}
@@ -66,10 +75,20 @@ public:
 	{
 		return Key.IsValid();
 	}
-	
+		
+	bool IsPressed(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
+		
+	bool IsReleased(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
+
 	bool IsPressing(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
 
 public:
+	UPROPERTY(EditAnywhere)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere)
+	FText Category;
+
 	UPROPERTY(EditAnywhere)
 	FKey Key;
 
@@ -91,8 +110,8 @@ public:
 	}
 
 public:
-	UPROPERTY(EditAnywhere, Category="Input", meta=(AssetBundles="Client,Server"))
-	TSoftObjectPtr<UInputMappingContext> InputMapping;
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputMappingContext* InputMapping;
 
 	// Higher priority input mappings will be prioritized over mappings with a lower priority.
 	UPROPERTY(EditAnywhere, Category="Input")
@@ -171,6 +190,14 @@ protected:
 	virtual void ApplyInputMode(class FReply& SlateOperations, class UGameViewportClient& GameViewportClient) const override;
 };
 
+struct WHFRAMEWORK_API FInputModeGameOnly_NotHideCursor : public FInputModeGameOnly
+{
+	FInputModeGameOnly_NotHideCursor()
+	{
+		bConsumeCaptureMouseDown = false;
+	}
+};
+
 struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGameAndUI
 {
 	FInputModeGameAndUI_NotHideCursor()
@@ -187,18 +214,23 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData()
 	{
-		KeyShortcuts = TMap<FName, FKey>();
+		KeyShortcuts = TMap<FName, FInputKeyShortcut>();
 		KeyMappings = TMap<FName, FKey>();
 	}
 
 public:
 	UPROPERTY()
-	TMap<FName, FKey> KeyShortcuts;
+	TMap<FName, FInputKeyShortcut> KeyShortcuts;
 
 	UPROPERTY()
 	TMap<FName, FKey> KeyMappings;
 
 public:
+	virtual bool IsValid() const override
+	{
+		return !Datas.IsEmpty();
+	}
+	
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();

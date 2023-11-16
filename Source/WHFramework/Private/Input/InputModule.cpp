@@ -34,9 +34,11 @@ UInputModule::UInputModule()
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
-	AddKeyShortcut(FName("CameraPanMove"));
-	AddKeyShortcut(FName("CameraRotate"));
-	AddKeyShortcut(FName("CameraZoom"));
+	AddKeyShortcut(FName("InteractSelect"), FText::FromString("Interact Select"));
+	
+	AddKeyShortcut(FName("CameraPanMove"), FText::FromString("Camera Pan Move"));
+	AddKeyShortcut(FName("CameraRotate"), FText::FromString("Camera Rotate"));
+	AddKeyShortcut(FName("CameraZoom"), FText::FromString("Camera Zoom"));
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
 	if(CameraMovementMapping.Succeeded())
@@ -62,6 +64,8 @@ UInputModule::UInputModule()
 	TouchPressedCount = 0;
 	TouchLocationPrevious = FVector2D(-1.f, -1.f);
 	TouchPinchValuePrevious = -1.f;
+
+	NativeInputMode = EInputMode::GameOnly;
 }
 
 UInputModule::~UInputModule()
@@ -103,15 +107,12 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 
 		for (const auto& Iter : ContextMappings)
 		{
-			if (UInputMappingContext* IMC = Iter.InputMapping.Get())
+			if (Iter.bRegisterWithSettings)
 			{
-				if (Iter.bRegisterWithSettings)
-				{
-					Settings->RegisterInputMappingContext(IMC);
-					FModifyContextOptions Options = {};
-					Options.bIgnoreAllPressedKeysUntilRelease = false;
-					Subsystem->AddMappingContext(IMC, Iter.Priority, Options);
-				}
+				Settings->RegisterInputMappingContext(Iter.InputMapping);
+				FModifyContextOptions Options = {};
+				Options.bIgnoreAllPressedKeysUntilRelease = false;
+				Subsystem->AddMappingContext(Iter.InputMapping, Iter.Priority, Options);
 			}
 		}
 		OnBindAction(Component);
@@ -184,28 +185,24 @@ void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FInputModuleSaveData>();
-
-	for(auto& Iter : SaveData.KeyShortcuts)
+	if(SaveData.IsSaved())
 	{
-		if(KeyShortcuts.Contains(Iter.Key))
+		KeyShortcuts = SaveData.KeyShortcuts;
+
+		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
+
+		UCommonStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
+
+		for(auto& Iter : SaveData.KeyMappings)
 		{
-			KeyShortcuts[Iter.Key].Key = Iter.Value;
+			if(KeyMappings.Contains(Iter.Key))
+			{
+				KeyMappings[Iter.Key].Key = Iter.Value;
+			}
 		}
+
+		RefreshData();
 	}
-
-	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
-
-	UCommonStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
-
-	for(auto& Iter : SaveData.KeyMappings)
-	{
-		if(KeyMappings.Contains(Iter.Key))
-		{
-			KeyMappings[Iter.Key].Key = Iter.Value;
-		}
-	}
-
-	RefreshData();
 }
 
 void UInputModule::UnloadData(EPhase InPhase)
@@ -223,13 +220,7 @@ FSaveData* UInputModule::ToData()
 	static FInputModuleSaveData SaveData;
 	SaveData = FInputModuleSaveData();
 
-	for(auto& Iter : KeyShortcuts)
-	{
-		if(SaveData.KeyShortcuts.Contains(Iter.Key))
-		{
-			SaveData.KeyShortcuts[Iter.Key] = Iter.Value.Key;
-		}
-	}
+	SaveData.KeyShortcuts = KeyShortcuts;
 
 	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
@@ -248,6 +239,10 @@ FSaveData* UInputModule::ToData()
 
 FSaveData* UInputModule::GetData()
 {
+	if(!LocalSaveData.IsValid())
+	{
+		LocalSaveData = ToData()->CastRef<FInputModuleSaveData>();
+	}
 	return &LocalSaveData;
 }
 
@@ -323,7 +318,7 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 {
 	for (const auto& Iter1 : ContextMappings)
 	{
-		if(UInputMappingContext* IMC = Iter1.InputMapping.Get())
+		if(UInputMappingContext* IMC = Iter1.InputMapping)
 		{
 			for(auto Iter2 : IMC->GetMappings())
 			{
@@ -346,6 +341,32 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 	return nullptr;
 }
 
+TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
+{
+	TArray<FEnhancedActionKeyMapping> Mappings;
+	for (const auto& Iter1 : ContextMappings)
+	{
+		for(auto& Iter2 : Iter1.InputMapping->GetMappings())
+		{
+			Mappings.Add(Iter2);
+		}
+	}
+	return Mappings;
+}
+
+TArray<FName> UInputModule::GetAllActionKeyMappingNames(int32 InPlayerIndex)
+{
+	TArray<FName> MappingNames;
+	for (const auto& Iter1 : ContextMappings)
+	{
+		for(auto& Iter2 : Iter1.InputMapping->GetMappings())
+		{
+			MappingNames.Add(Iter2.GetMappingName());
+		}
+	}
+	return MappingNames;
+}
+
 TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FPlayerKeyMapping> Mappings;
@@ -362,6 +383,14 @@ TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIn
 				}
 			}
 		}
+	}
+	if(Mappings.Num() > 1)
+	{
+		const TArray<FName> MappingNames = GetAllActionKeyMappingNames(InPlayerIndex);
+		Mappings.Sort([MappingNames](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B){
+			if(A.GetMappingName() == B.GetMappingName()) return A.GetSlot() < B.GetSlot();
+			return MappingNames.IndexOfByKey(A.GetMappingName()) < MappingNames.IndexOfByKey(B.GetMappingName());
+		});
 	}
 	return Mappings;
 }
@@ -724,15 +753,16 @@ AWHPlayerController* UInputModule::GetPlayerController()
 
 void UInputModule::UpdateInputMode()
 {
+	TArray<IInputManager*> InputManagers = AMainModule::GetAllModule<IInputManager>();
+	// InputManagers.Sort([](const IInputManager& A, const IInputManager& B){
+	// 	return A.GetNativeInputPriority() < B.GetNativeInputPriority();
+	// });
 	EInputMode InputMode = EInputMode::None;
-	for (const auto Iter : AMainModule::GetAllModule())
+	for (const auto Iter : InputManagers)
 	{
-		if(const IInputManager* InputManager = Cast<IInputManager>(Iter))
+		if ((int32)Iter->GetNativeInputMode() > (int32)InputMode)
 		{
-			if ((int32)InputManager->GetNativeInputMode() > (int32)InputMode)
-			{
-				InputMode = InputManager->GetNativeInputMode();
-			}
+			InputMode = Iter->GetNativeInputMode();
 		}
 	}
 	SetGlobalInputMode(InputMode);
@@ -757,9 +787,9 @@ void UInputModule::SetGlobalInputMode(EInputMode InInputMode)
 				GetPlayerController()->bShowMouseCursor = false;
 				break;
 			}
-			case EInputMode::UIOnly:
+			case EInputMode::GameOnly_NotHideCursor:
 			{
-				GetPlayerController()->SetInputMode(FInputModeUIOnly());
+				GetPlayerController()->SetInputMode(FInputModeGameOnly_NotHideCursor());
 				GetPlayerController()->bShowMouseCursor = true;
 				break;
 			}
@@ -772,6 +802,12 @@ void UInputModule::SetGlobalInputMode(EInputMode InInputMode)
 			case EInputMode::GameAndUI_NotHideCursor:
 			{
 				GetPlayerController()->SetInputMode(FInputModeGameAndUI_NotHideCursor());
+				GetPlayerController()->bShowMouseCursor = true;
+				break;
+			}
+			case EInputMode::UIOnly:
+			{
+				GetPlayerController()->SetInputMode(FInputModeUIOnly());
 				GetPlayerController()->bShowMouseCursor = true;
 				break;
 			}

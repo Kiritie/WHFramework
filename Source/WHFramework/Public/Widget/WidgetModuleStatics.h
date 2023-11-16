@@ -184,12 +184,6 @@ public:
 	{
 		return UWidgetModule::Get().GetSlateWidget<T>();
 	}
-	
-	template<class T>
-	static bool InitializeSlateWidget(UObject* InOwner)
-	{
-		return UWidgetModule::Get().InitializeSlateWidget<T>(InOwner);
-	}
 
 	template<class T>
 	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false)

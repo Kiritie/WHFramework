@@ -8,7 +8,7 @@
 
 #include "MainModule.generated.h"
 
-UCLASS()
+UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking, Physics, LevelInstance))
 class WHFRAMEWORK_API AMainModule : public AWHActor
 {
 #if WITH_EDITOR
@@ -165,6 +165,19 @@ public:
 	/**
 	* 获取所有模块
 	*/
+	template<class T>
+	static TArray<T*> GetAllModule(bool bInEditor = false)
+	{
+		TArray<T*> Modules;
+		for(auto Iter : GetAllModule(bInEditor))
+		{
+			if(T* Module = Cast<T>(Iter))
+			{
+				Modules.Add(Module);
+			}
+		}
+		return Modules;
+	}
 	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
 	{
 		if(AMainModule* MainModule = GetPtr(bInEditor))

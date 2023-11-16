@@ -4,7 +4,6 @@
 
 
 #include "Main/Base/ModuleBase.h"
-#include "GameFramework/Actor.h"
 #include "Input/InputManager.h"
 #include "Input/InputModule.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -391,17 +390,6 @@ public:
 	}
 
 	template<class T>
-	bool InitializeSlateWidget(UObject* InOwner)
-	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(InOwner)))
-		{
-			SlateWidget->OnInitialize(InOwner);
-			return true;
-		}
-		return false;
-	}
-
-	template<class T>
 	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(nullptr)))
@@ -658,5 +646,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 public:
+	virtual int32 GetNativeInputPriority() const override { return 1; }
+	
 	virtual EInputMode GetNativeInputMode() const override;
 };

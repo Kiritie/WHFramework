@@ -3,15 +3,25 @@
 #pragma once
 
 #include "CommonButtonBase.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "WidgetButtonBase.generated.h"
 
 class UCommonTextBlock;
 
 UCLASS(Abstract, BlueprintType, Blueprintable)
-class WHFRAMEWORK_API UWidgetButtonBase : public UCommonButtonBase
+class WHFRAMEWORK_API UWidgetButtonBase : public UCommonButtonBase, public IObjectPoolInterface
 {
 	GENERATED_BODY()
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Object
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void NativeOnCurrentTextStyleChanged() override;

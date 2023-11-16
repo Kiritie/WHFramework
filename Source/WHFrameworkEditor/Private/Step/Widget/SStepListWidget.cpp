@@ -537,7 +537,7 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 
 	if(bRegenerate)
 	{
-		StepModule->GenerateListItem(StepListItems);
+		StepModule->GenerateStepListItem(StepListItems);
 		for(auto Iter : StepListItems)
 		{
 			SetTreeItemExpansionRecursive(Iter);
@@ -545,7 +545,7 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 	}
 	else
 	{
-		StepModule->UpdateListItem(StepListItems);
+		StepModule->UpdateStepListItem(StepListItems);
 	}
 	TreeView->ClearSelection();
 	TreeView->RequestTreeRefresh();

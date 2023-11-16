@@ -457,11 +457,11 @@ void SProcedureListWidget::UpdateListView(bool bRegenerate)
 
 	if(bRegenerate)
 	{
-		ProcedureModule->GenerateListItem(ProcedureListItems);
+		ProcedureModule->GenerateProcedureListItem(ProcedureListItems);
 	}
 	else
 	{
-		ProcedureModule->UpdateListItem(ProcedureListItems);
+		ProcedureModule->UpdateProcedureListItem(ProcedureListItems);
 	}
 
 	ListView->ClearSelection();

@@ -5,19 +5,49 @@
 
 #include "Widgets/SViewport.h"
 
+bool FInputKeyShortcut::IsPressed(APlayerController* InPlayerController, bool bAllowInvalid) const
+{
+	if(!IsValid() && bAllowInvalid) return true;
+	bool ReturnValue = InPlayerController->WasInputKeyJustPressed(Key);
+	for(auto& Iter : Auxs)
+	{
+		if(!InPlayerController->WasInputKeyJustPressed(Iter))
+		{
+			ReturnValue = false;
+			break;
+		}
+	}
+	return ReturnValue;
+}
+
+bool FInputKeyShortcut::IsReleased(APlayerController* InPlayerController, bool bAllowInvalid) const
+{
+	if(!IsValid() && bAllowInvalid) return true;
+	bool ReturnValue = InPlayerController->WasInputKeyJustReleased(Key);
+	for(auto& Iter : Auxs)
+	{
+		if(!InPlayerController->WasInputKeyJustReleased(Iter))
+		{
+			ReturnValue = false;
+			break;
+		}
+	}
+	return ReturnValue;
+}
+
 bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
 	if(!IsValid() && bAllowInvalid) return true;
-	bool bPressing = InPlayerController->IsInputKeyDown(Key);
+	bool ReturnValue = InPlayerController->IsInputKeyDown(Key);
 	for(auto& Iter : Auxs)
 	{
 		if(!InPlayerController->IsInputKeyDown(Iter))
 		{
-			bPressing = false;
+			ReturnValue = false;
 			break;
 		}
 	}
-	return bPressing;
+	return ReturnValue;
 }
 
 void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const

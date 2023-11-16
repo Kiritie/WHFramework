@@ -7,17 +7,22 @@
 #include "ISettingsSection.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "ToolMenus.h"
+#include "UnrealEdGlobals.h"
 #include "WHFrameworkEditorCommands.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Achievement/AchievementEditor.h"
 #include "Camera/CameraModuleDetailsPanel.h"
+#include "Character/Base/CharacterBase.h"
+#include "Editor/UnrealEdEngine.h"
 #include "FSM/FiniteStateBlueprintActions.h"
 #include "FSM/FSMComponentDetailsPanel.h"
+#include "Gameplay/WHGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModuleDetailsPanel.h"
 #include "Main/ModuleBlueprintActions.h"
 #include "Main/ModuleEditor.h"
 #include "Main/ModuleEditorSettings.h"
+#include "Preferences/UnrealEdOptions.h"
 #include "Procedure/ProcedureBlueprintActions.h"
 #include "Procedure/ProcedureDetailsPanel.h"
 #include "Procedure/ProcedureEditor.h"
@@ -55,6 +60,8 @@ void FWHFrameworkEditorModule::StartupModule()
 		FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
 	}
 	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &FWHFrameworkEditorModule::OnEndPIE);
+
+	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWHFrameworkEditorModule::OnPostEngineInit);
 
 	// Register settings
 	RegisterSettings();
@@ -193,6 +200,45 @@ void FWHFrameworkEditorModule::ShutdownModule()
 	}
 
 	CreatedAssetTypeActions.Empty();
+}
+
+void FWHFrameworkEditorModule::OnPostEngineInit()
+{
+	// 加载依赖模块..
+	// FModuleManager::Get().LoadModuleChecked("WHFramework");
+
+	if(GUnrealEd)
+	{
+		// 自定义蓝图创建会话的默认选择类对象.
+		GUnrealEd->GetUnrealEdOptions()->OnGetNewAssetDefaultClasses().BindRaw(this, &FWHFrameworkEditorModule::GetiVisualClassPickers);
+	}
+	
+	// RegisterCustomClassLayout(UIVWindowSetting::StaticClass(), FOnGetDetailCustomizationInstance::CreateStatic(&FIVWindowSettingDetailCustomization::MakeInstance));
+}
+
+const TArray<FClassPickerDefaults>& FWHFrameworkEditorModule::GetiVisualClassPickers()
+{
+	if(ClassPickers.IsEmpty())
+	{
+		auto ClassPickerFunc = [this](const UClass* Class)
+		{
+			const FSoftClassPath ClassPath(Class);
+			const FSoftClassPath AssetClassPath(UBlueprint::StaticClass());
+			ClassPickers.Add(FClassPickerDefaults(ClassPath.ToString(), AssetClassPath.ToString()));
+		};
+	
+		ClassPickerFunc(AActor::StaticClass());
+
+		ClassPickerFunc(AWHActor::StaticClass());
+		ClassPickerFunc(APawn::StaticClass());
+		ClassPickerFunc(ACharacterBase::StaticClass());
+		ClassPickerFunc(AWHPlayerController::StaticClass());
+		ClassPickerFunc(AWHGameMode::StaticClass());
+		ClassPickerFunc(UActorComponent::StaticClass());
+		ClassPickerFunc(USceneComponent::StaticClass());
+	}
+	
+	return ClassPickers;
 }
 
 void FWHFrameworkEditorModule::RegisterMenus()

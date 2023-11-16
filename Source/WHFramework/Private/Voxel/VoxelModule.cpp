@@ -760,13 +760,13 @@ bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const
 bool UVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	FHitResult HitResult;
-	if(const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController())
+	if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController())
 	{
 		switch (InRaycastType)
 		{
 			case EVoxelRaycastType::FromAimPoint:
 			{
-				PlayerController->RaycastSingleFromAimPoint(InDistance, GetVoxelTraceChannel(), InIgnoreActors, HitResult);
+				PlayerController->RaycastSingleFromViewportPosition(FVector2D(0.5f), InDistance, GetVoxelTraceChannel(), InIgnoreActors, HitResult);
 				break;
 			}
 			case EVoxelRaycastType::FromMousePosition:

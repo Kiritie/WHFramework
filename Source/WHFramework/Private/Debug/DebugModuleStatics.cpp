@@ -6,77 +6,77 @@
 #include "Debug/DebugModule.h"
 #include "Debug/DebugModuleTypes.h"
 
-bool UDebugModuleStatics::EnsureEditor(bool Expression)
+bool UDebugModuleStatics::EnsureEditor(bool InExpression)
 {
-	return ensureEditor(Expression);
+	return ensureEditor(InExpression);
 }
 
-bool UDebugModuleStatics::EnsureEditorMsgf(bool Expression, const FString& Message, EDebugCategory Category, EDebugVerbosity Verbosity)
+bool UDebugModuleStatics::EnsureEditorMsgf(bool InExpression, const FString& InMessage, EDebugCategory InCategory, EDebugVerbosity InVerbosity)
 {
-	return ensureEditorMsgf(Expression, Message, Category, Verbosity);
+	return ensureEditorMsgf(InExpression, InMessage, InCategory, InVerbosity);
 }
 
-void UDebugModuleStatics::LogMessage(const FString& Message, EDebugCategory Category, EDebugVerbosity Verbosity)
+void UDebugModuleStatics::LogMessage(const FString& InMessage, EDebugCategory InCategory, EDebugVerbosity InVerbosity)
 {
-	if(!GetDebugCategoryState(Category).bEnableConsoleLog) return;
+	if(!GetDebugCategoryState(InCategory).bEnableConsoleLog) return;
 
 	#define LOG_CASE(Category, Verbosity) \
 	case EDC_##Category: \
 	{ \
 		switch (Verbosity) \
 		{ \
-			case EDV_Log: UE_LOG(WH_##Category, Log, TEXT("%s"), *Message); break; \
-			case EDV_Warning: UE_LOG(WH_##Category, Warning, TEXT("%s"), *Message); break; \
-			case EDV_Error: UE_LOG(WH_##Category, Error, TEXT("%s"), *Message); break; \
+			case EDV_Log: UE_LOG(WH_##Category, Log, TEXT("%s"), *InMessage); break; \
+			case EDV_Warning: UE_LOG(WH_##Category, Warning, TEXT("%s"), *InMessage); break; \
+			case EDV_Error: UE_LOG(WH_##Category, Error, TEXT("%s"), *InMessage); break; \
 		} \
 		break; \
 	}
 
-	switch(Category)
+	switch(InCategory)
 	{
-		LOG_CASE(Default, Verbosity)
-		LOG_CASE(Editor, Verbosity)
-		LOG_CASE(Controller, Verbosity)
-		LOG_CASE(Ability, Verbosity)
-		LOG_CASE(Achievement, Verbosity)
-		LOG_CASE(Asset, Verbosity)
-		LOG_CASE(Audio, Verbosity)
-		LOG_CASE(Camera, Verbosity)
-		LOG_CASE(Character, Verbosity)
-		LOG_CASE(Event, Verbosity)
-		LOG_CASE(FSM, Verbosity)
-		LOG_CASE(Input, Verbosity)
-		LOG_CASE(LatentAction, Verbosity)
-		LOG_CASE(Media, Verbosity)
-		LOG_CASE(Network, Verbosity)
-		LOG_CASE(ObjectPool, Verbosity)
-		LOG_CASE(Parameter, Verbosity)
-		LOG_CASE(Procedure, Verbosity)
-		LOG_CASE(ReferencePool, Verbosity)
-		LOG_CASE(SaveGame, Verbosity)
-		LOG_CASE(Scene, Verbosity)
-		LOG_CASE(Step, Verbosity)
-		LOG_CASE(Task, Verbosity)
-		LOG_CASE(Voxel, Verbosity)
-		LOG_CASE(WebRequest, Verbosity)
-		LOG_CASE(Widget, Verbosity)
+		LOG_CASE(Default, InVerbosity)
+		LOG_CASE(Editor, InVerbosity)
+		LOG_CASE(Controller, InVerbosity)
+		LOG_CASE(Ability, InVerbosity)
+		LOG_CASE(Achievement, InVerbosity)
+		LOG_CASE(Asset, InVerbosity)
+		LOG_CASE(Audio, InVerbosity)
+		LOG_CASE(Camera, InVerbosity)
+		LOG_CASE(Character, InVerbosity)
+		LOG_CASE(Event, InVerbosity)
+		LOG_CASE(FSM, InVerbosity)
+		LOG_CASE(Input, InVerbosity)
+		LOG_CASE(LatentAction, InVerbosity)
+		LOG_CASE(Media, InVerbosity)
+		LOG_CASE(Network, InVerbosity)
+		LOG_CASE(ObjectPool, InVerbosity)
+		LOG_CASE(Parameter, InVerbosity)
+		LOG_CASE(Procedure, InVerbosity)
+		LOG_CASE(ReferencePool, InVerbosity)
+		LOG_CASE(SaveGame, InVerbosity)
+		LOG_CASE(Scene, InVerbosity)
+		LOG_CASE(Step, InVerbosity)
+		LOG_CASE(Task, InVerbosity)
+		LOG_CASE(Voxel, InVerbosity)
+		LOG_CASE(WebRequest, InVerbosity)
+		LOG_CASE(Widget, InVerbosity)
 	}
 }
 
-void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, EDebugCategory Category, EDebugVerbosity Verbosity, const FColor& DisplayColor, float Duration, int32 Key, bool bNewerOnTop)
+void UDebugModuleStatics::DebugMessage(const FString& InMessage, EDebugMode InMode, EDebugCategory InCategory, EDebugVerbosity InVerbosity, const FLinearColor InDisplayColor, float InDuration, int32 InKey, bool bNewerOnTop)
 {
-	const auto State = GetDebugCategoryState(Category);
-	switch (Mode)
+	const auto State = GetDebugCategoryState(InCategory);
+	switch (InMode)
 	{
 		case EDM_All:
 		{
 			if(State.bEnableScreenLog)
 			{
-				GEngine->AddOnScreenDebugMessage(Key, Duration, DisplayColor, Message, bNewerOnTop);
+				GEngine->AddOnScreenDebugMessage(InKey, InDuration, InDisplayColor.ToFColor(false), InMessage, bNewerOnTop);
 			}
 			if(State.bEnableConsoleLog)
 			{
-				LogMessage(Message, Category, Verbosity);
+				LogMessage(InMessage, InCategory, InVerbosity);
 			}
 			break;
 		}
@@ -84,7 +84,7 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 		{
 			if(State.bEnableScreenLog)
 			{
-				GEngine->AddOnScreenDebugMessage(Key, Duration, DisplayColor, Message, bNewerOnTop);
+				GEngine->AddOnScreenDebugMessage(InKey, InDuration, InDisplayColor.ToFColor(false), InMessage, bNewerOnTop);
 			}
 			break;
 		}
@@ -92,7 +92,7 @@ void UDebugModuleStatics::DebugMessage(const FString& Message, EDebugMode Mode, 
 		{
 			if(State.bEnableConsoleLog)
 			{
-				LogMessage(Message, Category, Verbosity);
+				LogMessage(InMessage, InCategory, InVerbosity);
 			}
 			break;
 		}

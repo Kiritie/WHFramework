@@ -16,6 +16,7 @@
 UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	WidgetName = NAME_None;
+	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;

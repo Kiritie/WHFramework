@@ -538,7 +538,7 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 
 	if(bRegenerate)
 	{
-		TaskModule->GenerateListItem(TaskListItems);
+		TaskModule->GenerateTaskListItem(TaskListItems);
 		for(auto Iter : TaskListItems)
 		{
 			SetTreeItemExpansionRecursive(Iter);
@@ -546,7 +546,7 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 	}
 	else
 	{
-		TaskModule->UpdateListItem(TaskListItems);
+		TaskModule->UpdateTaskListItem(TaskListItems);
 	}
 	TreeView->ClearSelection();
 	TreeView->RequestTreeRefresh();

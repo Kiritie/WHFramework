@@ -208,9 +208,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
-	#if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+#if WITH_EDITOR
+	virtual void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
 
-	void UpdateListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-	#endif
+	virtual void UpdateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+#endif
 };

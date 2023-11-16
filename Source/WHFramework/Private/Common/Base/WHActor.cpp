@@ -17,7 +17,7 @@ AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
 
 void AWHActor::OnInitialize_Implementation()
 {
-	
+	Execute_SetActorVisible(this, bVisible);
 }
 
 void AWHActor::OnPreparatory_Implementation(EPhase InPhase)

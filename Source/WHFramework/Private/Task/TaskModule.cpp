@@ -353,7 +353,7 @@ UTaskBase* UTaskModule::GetCurrentRootTask() const
 }
 
 #if WITH_EDITOR
-void UTaskModule::GenerateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
+void UTaskModule::GenerateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
 {
 	OutTaskListItems = TArray<TSharedPtr<FTaskListItem>>();
 	for (int32 i = 0; i < RootTasks.Num(); i++)
@@ -364,7 +364,7 @@ void UTaskModule::GenerateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskLis
 	}
 }
 
-void UTaskModule::UpdateListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
+void UTaskModule::UpdateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
 {
 	for (int32 i = 0; i < RootTasks.Num(); i++)
 	{

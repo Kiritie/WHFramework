@@ -412,7 +412,7 @@ void UStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
 }
 
 #if WITH_EDITOR
-void UStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+void UStepModule::GenerateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
 {
 	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
 	for (int32 i = 0; i < RootSteps.Num(); i++)
@@ -423,7 +423,7 @@ void UStepModule::GenerateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepLis
 	}
 }
 
-void UStepModule::UpdateListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+void UStepModule::UpdateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
 {
 	for (int32 i = 0; i < RootSteps.Num(); i++)
 	{

@@ -80,20 +80,23 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
-	
-	UPROPERTY(EditDefaultsOnly)
-	int32 WidgetZOrder;
 
 	UPROPERTY(EditDefaultsOnly)
+	EWidgetSpace WidgetSpace;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen"))
+	int32 WidgetZOrder;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen"))
 	FAnchors WidgetAnchors;
 
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoSize;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::World && bWidgetAutoSize == false"))
 	FVector2D WidgetDrawSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen && bWidgetAutoSize == false"))
 	FMargin WidgetOffsets;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -169,8 +172,10 @@ public:
 		return Cast<T>(OwnerObject);
 	}
 
-	UFUNCTION(BlueprintPure)
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
+	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InOwnerClass) const { return OwnerObject; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }

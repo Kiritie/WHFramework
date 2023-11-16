@@ -68,6 +68,22 @@ void UWidgetModule::OnInitialize()
 			UserWidgetClassMap.Add(WidgetName, Iter);
 		}
 	}
+
+	for(auto Iter : WorldWidgetClasses)
+	{
+		if(!Iter) return;
+		const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
+		if(!WorldWidgetClassMap.Contains(WidgetName))
+		{
+			WorldWidgetClassMap.Add(WidgetName, Iter);
+		}
+	}
+
+	WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
+	if(WorldWidgetContainer)
+	{
+		WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
+	}
 }
 
 void UWidgetModule::OnPreparatory(EPhase InPhase)
@@ -391,35 +407,32 @@ void UWidgetModule::ClearAllWorldWidget()
 
 EInputMode UWidgetModule::GetNativeInputMode() const
 {
-	EInputMode TmpInputMode = EInputMode::None;
+	EInputMode InputMode = EInputMode::None;
     for (const auto& Iter : AllUserWidgets)
     {
-    	if(!Iter.Value) continue;
-        const UUserWidgetBase* UserWidget = Iter.Value;
-    	if (UserWidget && (UserWidget->GetWidgetState() == EScreenWidgetState::Opening || UserWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)UserWidget->GetWidgetInputMode() > (int32)TmpInputMode)
+    	if (Iter.Value && (Iter.Value->GetWidgetState() == EScreenWidgetState::Opening || Iter.Value->GetWidgetState() == EScreenWidgetState::Opened) &&
+    		(int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
     	{
-    		TmpInputMode = UserWidget->GetWidgetInputMode();
+    		InputMode = Iter.Value->GetWidgetInputMode();
     	}
     }
 	for (const auto& Iter : AllSlateWidgets)
 	{
-		if(!Iter.Value) continue;
-		const TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && (SlateWidget->GetWidgetState() == EScreenWidgetState::Opening || SlateWidget->GetWidgetState() == EScreenWidgetState::Opened) && (int32)SlateWidget->GetWidgetInputMode() > (int32)TmpInputMode)
+		if (Iter.Value && (Iter.Value->GetWidgetState() == EScreenWidgetState::Opening || Iter.Value->GetWidgetState() == EScreenWidgetState::Opened) &&
+			(int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
 		{
-			TmpInputMode = SlateWidget->GetWidgetInputMode();
+			InputMode = Iter.Value->GetWidgetInputMode();
 		}
 	}
 	for (const auto& Iter1 : AllWorldWidgets)
 	{
 		for (const auto& Iter2 : Iter1.Value.WorldWidgets)
 		{
-			const UWorldWidgetBase* WorldWidget = Iter2;
-			if (WorldWidget && (int32)WorldWidget->GetWidgetInputMode() > (int32)TmpInputMode)
+			if (Iter2 && (int32)Iter2->GetWidgetInputMode() > (int32)InputMode)
 			{
-				TmpInputMode = WorldWidget->GetWidgetInputMode();
+				InputMode = Iter2->GetWidgetInputMode();
 			}
 		}
 	}
-	return TmpInputMode;
+	return InputMode;
 }

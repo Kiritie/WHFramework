@@ -39,5 +39,21 @@ public:
 	virtual bool CanReset_Implementation() const override;
 
 protected:
+	UFUNCTION(BlueprintNativeEvent)
+	void AddShortcutSettingItem(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
+	
+	UFUNCTION(BlueprintNativeEvent)
+	void AddMappingSettingItem(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
+	
+	virtual void ClearSettingItems_Implementation() override;
+
+protected:
 	virtual FSaveData* GetDefaultSaveData() const override;
+
+protected:
+	UPROPERTY()
+	TMap<FName, UWidgetSettingItemBase*> ShortcutSettingItems;
+
+	UPROPERTY()
+	TMap<FName, UWidgetSettingItemBase*> MappingSettingItems;
 };

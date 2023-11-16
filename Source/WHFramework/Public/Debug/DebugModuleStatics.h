@@ -87,16 +87,16 @@ class WHFRAMEWORK_API UDebugModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static bool EnsureEditor(bool Expression);
+	static bool EnsureEditor(bool InExpression);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static bool EnsureEditorMsgf(bool Expression, const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
+	static bool EnsureEditorMsgf(bool InExpression, const FString& InMessage, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static void LogMessage(const FString& Message, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log);
+	static void LogMessage(const FString& InMessage, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log);
 
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static void DebugMessage(const FString& Message, EDebugMode Mode = EDM_Screen, EDebugCategory Category = EDC_Default, EDebugVerbosity Verbosity = EDV_Log, const FColor& DisplayColor = FColor::Cyan, float Duration = 1.5f, int Key = -1, bool bNewerOnTop = true);
+	static void DebugMessage(const FString& InMessage, EDebugMode InMode = EDM_Screen, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log, const FLinearColor InDisplayColor = FLinearColor(0,255,255), float InDuration = 1.5f, int InKey = -1, bool bNewerOnTop = true);
 
 	UFUNCTION(BlueprintPure, Category = "DebugModuleStatics")
 	static FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory);

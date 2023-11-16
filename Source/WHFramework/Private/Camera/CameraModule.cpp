@@ -419,7 +419,7 @@ void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 			InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
-			SetCameraDistance(InitCameraDistance);
+			SetCameraDistance(InitCameraDistance, bInstant);
 		}
 		else if(CurrentCamera)
 		{

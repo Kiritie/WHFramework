@@ -130,6 +130,12 @@ public:
 	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound = true) const;
 
 	UFUNCTION(BlueprintPure)
+	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure)
+	TArray<FName> GetAllActionKeyMappingNames(int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure)
 	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure)
@@ -255,7 +261,9 @@ public:
 	virtual void SetGlobalInputMode(EInputMode InInputMode);
 
 	UFUNCTION(BlueprintPure)
-	EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
+	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
+
+	virtual int32 GetNativeInputPriority() const override { return 0; }
 
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 };

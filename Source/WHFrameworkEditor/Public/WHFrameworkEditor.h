@@ -7,16 +7,22 @@
 
 #include "Modules/ModuleManager.h"
 
+struct FClassPickerDefaults;
 class FToolBarBuilder;
 class FMenuBuilder;
 
 class FWHFrameworkEditorModule : public IModuleInterface
 {
 public:
-
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+	void OnPostEngineInit();
+
+	const TArray<FClassPickerDefaults>& GetiVisualClassPickers();
+
+	TArray<FClassPickerDefaults> ClassPickers;
 
 private:
 	void RegisterMenus();

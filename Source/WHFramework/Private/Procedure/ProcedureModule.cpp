@@ -232,7 +232,7 @@ bool UProcedureModule::IsCurrentProcedureIndex(int32 InIndex) const
 }
 
 #if WITH_EDITOR
-void UProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
+void UProcedureModule::GenerateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
 	for (int32 i = 0; i < Procedures.Num(); i++)
@@ -243,7 +243,7 @@ void UProcedureModule::GenerateListItem(TArray<TSharedPtr<FProcedureListItem>>& 
 	}
 }
 
-void UProcedureModule::UpdateListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
+void UProcedureModule::UpdateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
 {
 	for (int32 i = 0; i < Procedures.Num(); i++)
 	{

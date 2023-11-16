@@ -23,5 +23,7 @@ class WHFRAMEWORK_API IInputManager
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual int32 GetNativeInputPriority() const = 0;
+		
 	virtual EInputMode GetNativeInputMode() const = 0;
 };

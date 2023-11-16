@@ -38,6 +38,29 @@ protected:
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) = 0;
 
 protected:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void OnBeginHover();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void OnHovering();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void OnEndHover();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void OnSelected();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void OnUnSelected();
+
+public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void IsHovering();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void IsSelected();
+
+protected:
 	TArray<IInteractionAgentInterface*> OverlappingAgents;
 	
 	IInteractionAgentInterface* InteractingAgent;

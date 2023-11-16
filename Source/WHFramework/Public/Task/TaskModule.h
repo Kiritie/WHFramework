@@ -152,9 +152,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
-	#if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+#if WITH_EDITOR
+	virtual void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
 
-	void UpdateListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
-	#endif
+	virtual void UpdateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+#endif
 };

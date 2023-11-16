@@ -92,9 +92,6 @@ public:
 			
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForHandle(FGameplayAbilitySpecHandle Handle);
-	
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
-	virtual FGameplayAbilitySpec FindAbilitySpecForGEHandle(FActiveGameplayEffectHandle Handle);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForClass(TSubclassOf<UGameplayAbility> AbilityClass);

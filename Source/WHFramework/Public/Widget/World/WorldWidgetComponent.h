@@ -30,7 +30,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	bool bOrientCamera;
 
-	UPROPERTY(EditAnywhere, Category = "UserInterface")
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "Space == EWidgetSpace::Screen"), Category = "UserInterface")
 	bool bBindToSelf;
 
 	UPROPERTY(EditAnywhere, Category = "UserInterface")

@@ -196,9 +196,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
-	#if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
+#if WITH_EDITOR
+	virtual void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
-	void UpdateListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
-	#endif
+	virtual void UpdateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
+#endif
 };
