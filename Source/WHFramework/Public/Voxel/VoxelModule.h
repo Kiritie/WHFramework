@@ -61,7 +61,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Capture
 protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Capture")
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
 	AVoxelCapture* VoxelCapture;
 
 	//////////////////////////////////////////////////////////////////////////

@@ -24,6 +24,8 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
+	virtual void NativePreConstruct() override;
+	
 	virtual void NativeOnCurrentTextStyleChanged() override;
 	
 protected:
@@ -34,10 +36,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Content")
 	FText ButtonText;
 
+	UPROPERTY(EditAnywhere, Category = "Content")
+	FText Title;
+
 public:
 	UFUNCTION(BlueprintPure)
-	FText GetButtonText() const { return ButtonText; }
+	FText GetTitle() const { return Title; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetButtonText(const FText InButtonText);
+	void SetTitle(const FText InTitle);
+
+	UFUNCTION(BlueprintCallable)
+	void SetMinWidth(int32 InValue);
+
+	UFUNCTION(BlueprintCallable)
+	void SetMinHeight(int32 InValue);
 };

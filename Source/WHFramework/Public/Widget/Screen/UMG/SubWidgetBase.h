@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include "UserWidgetBase.h"
 #include "Blueprint/UserWidget.h"
+#include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 
 #include "SubWidgetBase.generated.h"
@@ -68,7 +70,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return Owner; }
+	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputType(Owner, InClass); }
 
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter>& GetParams() { return Params; }

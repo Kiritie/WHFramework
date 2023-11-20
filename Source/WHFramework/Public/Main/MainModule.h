@@ -8,7 +8,7 @@
 
 #include "MainModule.generated.h"
 
-UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, Networking, Physics, LevelInstance))
+UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cooking, Hidden, Hlod, Networking, Physics, LevelInstance))
 class WHFRAMEWORK_API AMainModule : public AWHActor
 {
 #if WITH_EDITOR

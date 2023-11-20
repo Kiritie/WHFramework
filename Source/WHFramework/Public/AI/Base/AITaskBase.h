@@ -3,6 +3,7 @@
 #pragma once
 
 #include "BehaviorTree/BTTaskNode.h"
+#include "Common/CommonTypes.h"
 #include "AITaskBase.generated.h"
 
 class AAIControllerBase;
@@ -54,5 +55,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return Cast<APawn>(Agent); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputType(Cast<APawn>(Agent), InClass); }
 };

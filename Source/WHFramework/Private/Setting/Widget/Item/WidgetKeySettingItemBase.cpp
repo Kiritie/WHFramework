@@ -56,7 +56,7 @@ void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)
 void UWidgetKeySettingItemBase::OnKeySelected(FKey InKey, UWidgetPressAnyKeyPanelBase* InPressAnyKeyPanel)
 {
 	InPressAnyKeyPanel->OnKeySelected.RemoveAll(this);
-	Btn_Values[InPressAnyKeyPanel->GetWidgetParams()[0].GetIntegerValue()]->SetButtonText(FText::FromString(InKey.ToString()));
+	Btn_Values[InPressAnyKeyPanel->GetWidgetParams()[0].GetIntegerValue()]->SetTitle(FText::FromString(InKey.ToString()));
 	if(OnValuesChanged.IsBound())
 	{
 		OnValuesChanged.Broadcast(this, GetValues());
@@ -74,7 +74,7 @@ TArray<FParameter> UWidgetKeySettingItemBase::GetValues() const
 	TArray<FParameter> Values;
 	for(int32 i = 0; i < Btn_Values.Num(); i++)
 	{
-		Values.Add(Btn_Values[i]->GetButtonText().ToString());
+		Values.Add(Btn_Values[i]->GetTitle().ToString());
 	}
 	return Values;
 }
@@ -83,7 +83,7 @@ void UWidgetKeySettingItemBase::SetValues(const TArray<FParameter>& InValues)
 {
 	for(int32 i = 0; i < InValues.Num(); i++)
 	{
-		Btn_Values[i]->SetButtonText(FText::FromString(InValues[i].GetStringValue()));
+		Btn_Values[i]->SetTitle(FText::FromString(InValues[i].GetStringValue()));
 	}
 	Super::SetValues(InValues);
 }

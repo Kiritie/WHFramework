@@ -24,6 +24,6 @@ public:
 		return Cast<T>(GetOwningActorFromActorInfo());
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
-	AAbilityVitalityBase* GetOwnerVitality(TSubclassOf<AAbilityVitalityBase> InOwnerClass = nullptr) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AAbilityVitalityBase* GetOwnerVitality(TSubclassOf<AAbilityVitalityBase> InClass = nullptr) const;
 };

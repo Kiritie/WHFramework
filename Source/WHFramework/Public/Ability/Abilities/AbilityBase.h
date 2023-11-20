@@ -188,6 +188,6 @@ public:
 		return Cast<T>(GetOwningActorFromActorInfo());
 	}
 	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
-	AActor* GetOwnerActor(TSubclassOf<AActor> InOwnerClass = nullptr) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
 };

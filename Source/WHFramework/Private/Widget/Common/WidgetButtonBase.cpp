@@ -13,6 +13,16 @@ void UWidgetButtonBase::OnDespawn_Implementation(bool bRecovery)
 	IObjectPoolInterface::OnDespawn_Implementation(bRecovery);
 }
 
+void UWidgetButtonBase::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	if(Txt_Title)
+	{
+		Txt_Title->SetText(Title);
+	}
+}
+
 void UWidgetButtonBase::NativeOnCurrentTextStyleChanged()
 {
 	Super::NativeOnCurrentTextStyleChanged();
@@ -23,11 +33,21 @@ void UWidgetButtonBase::NativeOnCurrentTextStyleChanged()
 	}
 }
 
-void UWidgetButtonBase::SetButtonText(const FText InButtonText)
+void UWidgetButtonBase::SetTitle(const FText InTitle)
 {
-	ButtonText = InButtonText;
+	Title = InTitle;
 	if(Txt_Title)
 	{
-		Txt_Title->SetText(ButtonText);
+		Txt_Title->SetText(Title);
 	}
+}
+
+void UWidgetButtonBase::SetMinWidth(int32 InValue)
+{
+	MinWidth = InValue;
+}
+
+void UWidgetButtonBase::SetMinHeight(int32 InValue)
+{
+	MinHeight = InValue;
 }

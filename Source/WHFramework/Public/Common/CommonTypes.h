@@ -78,6 +78,17 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 // Functions
 extern const UObject* GetWorldContext(bool bInEditor = false);
 
+template<class T>
+extern T* GetDeterminesOutputType(T* Value, UClass* Class)
+{
+	if(!Value) return nullptr;
+	if(!Class || Value->IsA(Class))
+	{
+		return Value;
+	}
+	return nullptr;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // MACROS
 #define PHASEC(A, B) \

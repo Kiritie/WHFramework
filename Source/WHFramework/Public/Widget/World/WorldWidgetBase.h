@@ -4,6 +4,7 @@
 
 
 #include "Blueprint/UserWidget.h"
+#include "Common/CommonTypes.h"
 #include "Components/WidgetComponent.h"
 #include "Input/InputModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
@@ -174,8 +175,8 @@ public:
 
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
-	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InOwnerClass) const { return OwnerObject; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputType(OwnerObject, InClass); }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }

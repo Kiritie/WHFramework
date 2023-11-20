@@ -7,7 +7,6 @@
 #include "Procedure/Base/ProcedureBase.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Procedure/ProcedureModuleStatics.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(UProcedureModule)
@@ -112,15 +111,23 @@ void UProcedureModule::OnTermination(EPhase InPhase)
 
 void UProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 {
-	if(InProcedure && InProcedure->GetProcedureState() != EProcedureState::Entered)
+	if(InProcedure)
 	{
-		if(CurrentProcedure)
+		if(InProcedure->GetProcedureState() != EProcedureState::Entered)
 		{
-			CurrentProcedure->OnLeave(InProcedure);
+			if(CurrentProcedure)
+			{
+				CurrentProcedure->OnLeave(InProcedure);
+			}
+			UProcedureBase* LastProcedure = CurrentProcedure;
+			CurrentProcedure = InProcedure;
+			InProcedure->OnEnter(LastProcedure);
 		}
-		UProcedureBase* LastProcedure = CurrentProcedure;
-		CurrentProcedure = InProcedure;
-		InProcedure->OnEnter(LastProcedure);
+	}
+	else if(CurrentProcedure)
+	{
+		CurrentProcedure->OnLeave(nullptr);
+		CurrentProcedure = nullptr;
 	}
 }
 

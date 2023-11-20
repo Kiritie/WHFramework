@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/CommonTypes.h"
 #include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
@@ -182,8 +183,8 @@ public:
 	{
 		return Cast<T>(CurrentState);
 	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateClass"))
-	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InStateClass = nullptr) const { return CurrentState; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InClass = nullptr) const { return GetDeterminesOutputType(CurrentState, InClass); }
 	/**
 	* 获取状态列表
 	*/
@@ -204,6 +205,6 @@ public:
 		return Cast<T>(GetAgent());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
-	AActor* GetAgent(TSubclassOf<AActor> InAgentClass = nullptr) const { return GetOwner(); }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const { return GetDeterminesOutputType(GetOwner(), InClass); }
 };

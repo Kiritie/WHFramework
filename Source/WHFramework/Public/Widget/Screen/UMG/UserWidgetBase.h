@@ -4,6 +4,7 @@
 
 
 #include "Blueprint/UserWidget.h"
+#include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Widget/Interfaces/ScreenWidgetInterface.h"
 
@@ -148,7 +149,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InClass) const
 	{
-		return Cast<UUserWidgetBase>(GetChild(InIndex));
+		return GetDeterminesOutputType(Cast<UUserWidgetBase>(GetChild(InIndex)), InClass);
 	}
 
 	IScreenWidgetInterface* GetChild(int32 InIndex) const override
@@ -328,8 +329,8 @@ public:
 
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InOwnerClass"))
-	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InOwnerClass) const { return OwnerObject; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputType(OwnerObject, InClass); }
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 

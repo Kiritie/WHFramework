@@ -324,7 +324,7 @@ AActor* USceneModule::GetSceneActor(const FString& InID, TSubclassOf<AActor> InC
 {
 	if(HasSceneActor(InID, bEnsured))
 	{
-		return SceneActorMap[FGuid(InID)];
+		return GetDeterminesOutputType(SceneActorMap[FGuid(InID)], InClass);
 	}
 	return nullptr;
 }

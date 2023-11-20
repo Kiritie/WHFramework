@@ -5,6 +5,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "AI/AIModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "AIBlackboardBase.generated.h"
 
 class IAIAgentInterface;
@@ -58,5 +59,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return Cast<APawn>(Agent); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputType(Cast<APawn>(Agent), InClass); }
 };

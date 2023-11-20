@@ -203,7 +203,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InParams", DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleStatics")
 	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning);
+		return GetDeterminesOutputType(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning), InPrimaryAssetClass);
 	}
 	
 	template<class T>
@@ -215,7 +215,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadEntityAsset"), Category = "AssetModuleStatics")
 	static UPrimaryAssetBase* K2_LoadEntityAsset(const TScriptInterface<IPrimaryEntityInterface>& InPrimaryEntity, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bLogWarning);
+		return GetDeterminesOutputType(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bLogWarning), InPrimaryAssetClass);
 	}
 
 	template<class T>

@@ -8,7 +8,7 @@ UVitalityAbilityBase::UVitalityAbilityBase()
 	
 }
 
-AAbilityVitalityBase* UVitalityAbilityBase::GetOwnerVitality(TSubclassOf<AAbilityVitalityBase> InOwnerClass) const
+AAbilityVitalityBase* UVitalityAbilityBase::GetOwnerVitality(TSubclassOf<AAbilityVitalityBase> InClass) const
 {
 	return Cast<AAbilityVitalityBase>(GetOwningActorFromActorInfo());
 }

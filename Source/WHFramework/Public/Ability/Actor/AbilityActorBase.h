@@ -132,8 +132,8 @@ public:
 		return Cast<T>(GetInteractingAgent());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
-	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputType(Cast<AActor>(GetInteractingAgent()), InClass); }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
 	

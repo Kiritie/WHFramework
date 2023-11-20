@@ -181,7 +181,7 @@ public:
 		return Cast<T>(CurrentProcedure);
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr) const { return CurrentProcedure; }
+	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr) const { return GetDeterminesOutputType(CurrentProcedure, InClass); }
 	/**
 	* 获取流程列表
 	*/

@@ -4,6 +4,7 @@
 
 
 #include "ParameterModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "ParameterModuleStatics.generated.h"
 
@@ -290,7 +291,7 @@ public:
 	static void SetClassValue(UPARAM(ref) FParameter& InParameter, UClass* InClassValue) { InParameter.SetClassValue(InClassValue); }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ParameterModuleStatics")
-	static UObject* GetObjectValue(UPARAM(ref) FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return InParameter.GetObjectValue(); }
+	static UObject* GetObjectValue(UPARAM(ref) FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return GetDeterminesOutputType(InParameter.GetObjectValue(), InClass); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetObjectValue(UPARAM(ref) FParameter& InParameter, UObject* InObjectValue) { InParameter.SetObjectValue(InObjectValue); }

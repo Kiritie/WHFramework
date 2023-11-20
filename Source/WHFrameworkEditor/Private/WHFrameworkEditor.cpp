@@ -210,7 +210,7 @@ void FWHFrameworkEditorModule::OnPostEngineInit()
 	if(GUnrealEd)
 	{
 		// 自定义蓝图创建会话的默认选择类对象.
-		GUnrealEd->GetUnrealEdOptions()->OnGetNewAssetDefaultClasses().BindRaw(this, &FWHFrameworkEditorModule::GetiVisualClassPickers);
+		// GUnrealEd->GetUnrealEdOptions()->OnGetNewAssetDefaultClasses().BindRaw(this, &FWHFrameworkEditorModule::GetiVisualClassPickers);
 	}
 	
 	// RegisterCustomClassLayout(UIVWindowSetting::StaticClass(), FOnGetDetailCustomizationInstance::CreateStatic(&FIVWindowSettingDetailCustomization::MakeInstance));
@@ -227,8 +227,6 @@ const TArray<FClassPickerDefaults>& FWHFrameworkEditorModule::GetiVisualClassPic
 			ClassPickers.Add(FClassPickerDefaults(ClassPath.ToString(), AssetClassPath.ToString()));
 		};
 	
-		ClassPickerFunc(AActor::StaticClass());
-
 		ClassPickerFunc(AWHActor::StaticClass());
 		ClassPickerFunc(APawn::StaticClass());
 		ClassPickerFunc(ACharacterBase::StaticClass());
