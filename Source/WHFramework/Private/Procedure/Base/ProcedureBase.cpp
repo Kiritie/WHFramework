@@ -100,7 +100,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), this, {this});
 }
 
 void UProcedureBase::OnRefresh()
@@ -139,7 +139,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), this, {this});
 }
 
 void UProcedureBase::Guide()

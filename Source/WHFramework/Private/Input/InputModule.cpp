@@ -813,6 +813,6 @@ void UInputModule::SetGlobalInputMode(EInputMode InInputMode)
 			}
 			default: break;
 		}
-		UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), EEventNetType::Multicast, this, { &GlobalInputMode });
+		UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
 	}
 }

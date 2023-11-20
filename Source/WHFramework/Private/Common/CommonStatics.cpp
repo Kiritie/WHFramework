@@ -68,7 +68,7 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_PauseGame>(EEventNetType::Single, nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<UEventHandle_PauseGame>(nullptr, { (int32)PauseMode } );
 }
 
 void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
@@ -91,7 +91,7 @@ void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UnPauseGame>(EEventNetType::Single, nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UnPauseGame>(nullptr, { (int32)PauseMode } );
 }
 
 void UCommonStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)

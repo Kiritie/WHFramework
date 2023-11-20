@@ -297,7 +297,7 @@ void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 	{
 		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { InLevelPath.ToString() });
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
 }
 
 void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
@@ -310,7 +310,7 @@ void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncU
 	{
 		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), EEventNetType::Multicast, this, { InLevelPath.ToString() });
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
 }
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const

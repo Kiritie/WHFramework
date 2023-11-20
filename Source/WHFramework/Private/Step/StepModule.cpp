@@ -159,7 +159,7 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), this, {InRootStepIndex});
 			}
 
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
@@ -188,7 +188,7 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), EEventNetType::Single, this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent(UEventHandle_StartStep::StaticClass(), this, {InRootStepIndex});
 			}
 		
 			if(bSkipSteps)
@@ -225,7 +225,7 @@ void UStepModule::EndStep(bool bRestoreSteps)
 	if(StepModuleState == EStepModuleState::Running)
 	{
 		StepModuleState = EStepModuleState::Ended;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_EndStep>(EEventNetType::Single, this);
+		UEventModuleStatics::BroadcastEvent<UEventHandle_EndStep>(this);
 	}
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)

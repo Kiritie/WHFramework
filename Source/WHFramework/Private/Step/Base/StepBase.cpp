@@ -160,7 +160,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -291,7 +291,7 @@ void UStepBase::OnExecute()
 		UCameraModuleStatics::StartTrackTarget(OperationTarget);
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), this, {this});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -339,7 +339,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), this, {this});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -365,7 +365,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), EEventNetType::Single, this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), this, {this});
 
 	if(bMergeSubStep)
 	{

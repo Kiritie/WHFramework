@@ -272,12 +272,12 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldMode::StaticClass(), EEventNetType::Single, this, {&WorldMode});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldMode::StaticClass(), this, {&WorldMode});
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldState::StaticClass(), EEventNetType::Single, this, {&WorldState});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldState::StaticClass(), this, {&WorldState});
 }
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const

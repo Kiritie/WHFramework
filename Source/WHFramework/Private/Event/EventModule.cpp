@@ -56,7 +56,7 @@ void UEventModule::OnInitialize()
 		EventManager->OnInitialize();
 	}
 	
-	BroadcastEvent<UEventHandle_InitGame>(EEventNetType::Single, this);
+	BroadcastEvent<UEventHandle_InitGame>(this);
 }
 
 void UEventModule::OnPreparatory(EPhase InPhase)
@@ -65,7 +65,7 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		BroadcastEvent<UEventHandle_StartGame>(EEventNetType::Single, this);
+		BroadcastEvent<UEventHandle_StartGame>(this);
 	}
 }
 
@@ -90,7 +90,7 @@ void UEventModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		BroadcastEvent<UEventHandle_ExitGame>(EEventNetType::Single, this);
+		BroadcastEvent<UEventHandle_ExitGame>(this);
 	}
 }
 
@@ -178,7 +178,7 @@ void UEventModule::UnsubscribeAllEvent()
 	EventHandleInfos.Empty();
 }
 
-void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventNetType InNetType, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType)
 {
 	if(!InClass) return;
 
@@ -219,9 +219,16 @@ void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, EEventN
 	EventHandleInfos[InClass].EventHandleDelegate.ExecuteIfBound(InClass, InSender, InParams);
 }
 
+void UEventModule::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType)
+{
+	TArray<FParameter> Params;
+	InHandle->Pack(Params);
+	BroadcastEvent(InHandle->GetClass(), InSender, Params, InNetType);
+}
+
 void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
 {
-	BroadcastEvent(InClass, EEventNetType::Single, InSender, InParams);
+	BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single);
 }
 
 void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
