@@ -23,6 +23,8 @@ public:
 
 protected:
 	FReply OnOnClickOpenProcedureEditorButton();
+	
+	FReply OnOnClickClearAllProcedure();
 
 private:
 	TArray< TWeakObjectPtr< UObject > > SelectedObjectsList;

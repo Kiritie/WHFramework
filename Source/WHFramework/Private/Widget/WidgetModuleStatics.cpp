@@ -28,14 +28,14 @@ UUserWidgetBase* UWidgetModuleStatics::GetUserWidgetByName(FName InName, TSubcla
 	return UWidgetModule::Get().GetUserWidgetByName(InName, InClass);
 }
 
-UUserWidgetBase* UWidgetModuleStatics::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
+UUserWidgetBase* UWidgetModuleStatics::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return UWidgetModule::Get().CreateUserWidget(InClass, InOwner);
+	return UWidgetModule::Get().CreateUserWidget(InClass, InOwner, InParams);
 }
 
-UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByName(FName InName, UObject* InOwner)
+UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return UWidgetModule::Get().CreateUserWidgetByName(InName, InOwner);
+	return UWidgetModule::Get().CreateUserWidgetByName(InName, InOwner, InParams);
 }
 
 bool UWidgetModuleStatics::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant)

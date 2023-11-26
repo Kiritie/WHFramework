@@ -5,7 +5,6 @@
 
 UEventHandle_CompleteTask::UEventHandle_CompleteTask()
 {
-	EventType = EEventType::Multicast;
 	Task = nullptr;
 }
 

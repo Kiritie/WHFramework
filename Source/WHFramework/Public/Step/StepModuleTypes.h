@@ -67,22 +67,6 @@ enum class EStepTaskState : uint8
 	Completed
 };
 
-UENUM(BlueprintType)
-enum class EStepCameraViewMode : uint8
-{
-	None,
-	Instant,
-	Smooth,
-	Duration
-};
-
-UENUM(BlueprintType)
-enum class EStepCameraViewSpace : uint8
-{
-	Local,
-	World
-};
-
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FStepListItemStates
 {

@@ -126,7 +126,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ApplyTouchMappings();
 	
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InInputTag"))
 	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound = true) const;
 
 	UFUNCTION(BlueprintPure)

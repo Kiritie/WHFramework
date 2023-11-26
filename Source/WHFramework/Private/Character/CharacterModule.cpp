@@ -4,7 +4,7 @@
 #include "Character/CharacterModule.h"
 
 #include "Camera/CameraModuleStatics.h"
-#include "Camera/Base/CameraActorBase.h"
+#include "Camera/Actor/CameraActorBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
@@ -134,7 +134,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 				CurrentCharacter = InCharacter;
 				PlayerController->Possess(InCharacter);
 				UCameraModuleStatics::EndTrackTarget();
-				UCameraModuleStatics::StartTrackTarget(InCharacter, ETrackTargetMode::LocationAndRotationOnce, ETrackTargetSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
+				UCameraModuleStatics::StartTrackTarget(InCharacter, ECameraTrackMode::LocationAndRotationOnce, ECameraViewSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, true, bInstant);
 			}
 			else if(CurrentCharacter)
 			{

@@ -20,6 +20,8 @@ class WHFRAMEWORK_API UProcedureModule : public UModuleBase
 		
 	GENERATED_MODULE(UProcedureModule)
 
+	friend class FProcedureModuleDetailsPanel;
+
 public:
 	// ParamSets default values for this actor's properties
 	UProcedureModule();
@@ -181,7 +183,7 @@ public:
 		return Cast<T>(CurrentProcedure);
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr) const { return GetDeterminesOutputType(CurrentProcedure, InClass); }
+	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr) const { return GetDeterminesOutputObject(CurrentProcedure, InClass); }
 	/**
 	* 获取流程列表
 	*/

@@ -5,7 +5,7 @@
 
 UEventHandle_LeaveTask::UEventHandle_LeaveTask()
 {
-	EventType = EEventType::Multicast;
+
 }
 
 void UEventHandle_LeaveTask::OnDespawn_Implementation(bool bRecovery)

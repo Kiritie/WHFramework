@@ -45,6 +45,11 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
+protected:
+	virtual void BeginPlay() override;
+	
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Modules
 public:	

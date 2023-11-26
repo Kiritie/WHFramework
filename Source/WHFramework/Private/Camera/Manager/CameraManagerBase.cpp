@@ -1,9 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Camera/Base/CameraManagerBase.h"
+#include "Camera/Manager/CameraManagerBase.h"
 
 #include "Camera/CameraModuleStatics.h"
-#include "Camera/Base/CameraActorBase.h"
+#include "Camera/Actor/CameraActorBase.h"
 
 ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

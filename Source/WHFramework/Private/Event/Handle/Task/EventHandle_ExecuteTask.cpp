@@ -7,7 +7,7 @@
 
 UEventHandle_ExecuteTask::UEventHandle_ExecuteTask()
 {
-	EventType = EEventType::Multicast;
+
 }
 
 void UEventHandle_ExecuteTask::OnDespawn_Implementation(bool bRecovery)

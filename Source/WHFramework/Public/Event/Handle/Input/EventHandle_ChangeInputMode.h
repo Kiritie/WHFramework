@@ -18,13 +18,13 @@ class WHFRAMEWORK_API UEventHandle_ChangeInputMode : public UEventHandleBase
 
 public:
 	UEventHandle_ChangeInputMode();
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	EInputMode InputMode;
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	EInputMode InputMode;
 };

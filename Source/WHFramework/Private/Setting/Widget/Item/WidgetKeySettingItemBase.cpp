@@ -4,7 +4,7 @@
 
 #include "Setting/Widget/Misc/WidgetPressAnyKeyPanelBase.h"
 #include "Widget/WidgetModuleStatics.h"
-#include "Widget/Common/WidgetButtonBase.h"
+#include "Widget/Common/CommonButton.h"
 
 UWidgetKeySettingItemBase::UWidgetKeySettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {

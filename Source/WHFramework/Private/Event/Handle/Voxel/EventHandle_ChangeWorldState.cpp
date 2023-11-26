@@ -5,8 +5,6 @@
 
 UEventHandle_ChangeWorldState::UEventHandle_ChangeWorldState()
 {
-	EventType = EEventType::Multicast;
-
 	WorldState = EVoxelWorldState::None;
 }
 

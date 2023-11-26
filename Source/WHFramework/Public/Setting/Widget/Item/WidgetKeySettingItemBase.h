@@ -5,7 +5,7 @@
 
 #include "WidgetKeySettingItemBase.generated.h"
 
-class UWidgetButtonBase;
+class UCommonButton;
 class UEditableTextBox;
 class UWidgetPressAnyKeyPanelBase;
 /**
@@ -47,5 +47,5 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
-	TArray<UWidgetButtonBase*> Btn_Values;
+	TArray<UCommonButton*> Btn_Values;
 };

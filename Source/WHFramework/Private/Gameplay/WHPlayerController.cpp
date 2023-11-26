@@ -2,7 +2,7 @@
 
 #include "Gameplay/WHPlayerController.h"
 
-#include "Camera/Base/CameraManagerBase.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Common/CommonStatics.h"
@@ -168,14 +168,14 @@ void AWHPlayerController::OnRefreshInteraction_Implementation()
 			}
 			else if(SelectedInteraction != HoveringInteraction)
 			{
-				IInteractionAgentInterface::Execute_OnUnSelected(SelectedInteraction.GetObject());
+				IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
 				SelectedInteraction = HoveringInteraction;
 				IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
 			}
 		}
 		else if(SelectedInteraction.GetObject())
 		{
-			IInteractionAgentInterface::Execute_OnUnSelected(SelectedInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
 			SelectedInteraction = nullptr;
 		}
 	}

@@ -5,8 +5,6 @@
 
 UEventHandle_DestroyVoxel::UEventHandle_DestroyVoxel()
 {
-	EventType = EEventType::Multicast;
-
 	VoxelItem = FVoxelItem();
 }
 

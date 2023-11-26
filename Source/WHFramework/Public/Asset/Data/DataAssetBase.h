@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
 #include "Dom/JsonObject.h"
 #include "DataAssetBase.generated.h"
@@ -26,9 +27,9 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
-	FName DataAssetName;
+	FGameplayTag DataAssetTag;
 	
 public:
 	UFUNCTION(BlueprintPure)
-	FName GetDataAssetName() const { return DataAssetName; }
+	FGameplayTag GetDataAssetTag() const { return DataAssetTag; }
 };

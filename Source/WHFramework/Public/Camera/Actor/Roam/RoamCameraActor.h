@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Camera/Base/CameraActorBase.h"
+#include "Camera/Actor/CameraActorBase.h"
 #include "RoamCameraActor.generated.h"
 
 UCLASS()

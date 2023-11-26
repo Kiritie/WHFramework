@@ -5,7 +5,6 @@
 
 UEventHandle_EnterStep::UEventHandle_EnterStep()
 {
-	EventType = EEventType::Multicast;
 	Step = nullptr;
 }
 

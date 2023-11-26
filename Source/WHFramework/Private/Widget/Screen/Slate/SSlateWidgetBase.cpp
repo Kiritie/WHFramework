@@ -42,12 +42,12 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-void SSlateWidgetBase::OnCreate(UObject* InOwner)
+void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }
 
-void SSlateWidgetBase::OnInitialize(UObject* InOwner)
+void SSlateWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
 }
@@ -101,6 +101,21 @@ void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
+void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams)
+{
+	Init(InOwner, InParams ? *InParams : TArray<FParameter>());
+}
+
+void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	if(OwnerObject != InOwner || !InOwner)
+	{
+		OwnerObject = InOwner;
+
+		OnInitialize(InOwner, InParams);
+	}
+}
+
 void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 }
@@ -129,7 +144,7 @@ void SSlateWidgetBase::Toggle(bool bInstant)
 	}
 }
 
-void SSlateWidgetBase::Reset()
+void SSlateWidgetBase::Reset(bool bResetOwner)
 {
 	OnReset();
 }
@@ -145,6 +160,11 @@ void SSlateWidgetBase::Refresh()
 void SSlateWidgetBase::Destroy(bool bRecovery)
 {
 	//UWidgetModuleStatics::DestroySlateWidget<SSlateWidgetBase>();
+}
+
+bool SSlateWidgetBase::CanOpen() const
+{
+	return true;
 }
 
 void SSlateWidgetBase::FinishOpen(bool bInstant)

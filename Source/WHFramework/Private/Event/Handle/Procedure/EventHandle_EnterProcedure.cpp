@@ -7,7 +7,6 @@
 
 UEventHandle_EnterProcedure::UEventHandle_EnterProcedure()
 {
-	EventType = EEventType::Multicast;
 	Procedure = nullptr;
 }
 

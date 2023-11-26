@@ -5,7 +5,7 @@
 
 UEventHandle_InitGame::UEventHandle_InitGame()
 {
-	EventType = EEventType::Multicast;
+
 }
 
 void UEventHandle_InitGame::OnDespawn_Implementation(bool bRecovery)

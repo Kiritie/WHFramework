@@ -43,17 +43,17 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
-	void K2_OnCreate(UObject* InOwner = nullptr);
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnCreate")
+	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnCreate(UObject* InOwner = nullptr) override;
+	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	void K2_OnInitialize(UObject* InOwner = nullptr);
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnInitialize")
+	void K2_OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnInitialize(UObject* InOwner = nullptr) override;
+	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnOpen")
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnOpen")
 	void K2_OnOpen(const TArray<FParameter>& InParams, bool bInstant = false);
 	UFUNCTION()
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
@@ -84,32 +84,41 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
-	void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
-	UFUNCTION(BlueprintCallable)
-	void Close(bool bInstant = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	void Toggle(bool bInstant = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	void Reset() override;
-
-	UFUNCTION(BlueprintCallable)
-	void Refresh() override;
-
-	UFUNCTION(BlueprintCallable)
-	void Destroy(bool bRecovery = false) override;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Close(bool bInstant = false) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Toggle(bool bInstant = false) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Reset(bool bResetOwner = false) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Refresh() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Destroy(bool bRecovery = false) override;
+	
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	bool CanOpen() const override;
+
 protected:
 	UFUNCTION(BlueprintCallable)
-	void FinishOpen(bool bInstant) override;
+	virtual void FinishOpen(bool bInstant) override;
 
 	UFUNCTION(BlueprintCallable)
-	void FinishClose(bool bInstant) override;
+	virtual void FinishClose(bool bInstant) override;
 
 public:
 	template<class T>
@@ -149,7 +158,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InClass) const
 	{
-		return GetDeterminesOutputType(Cast<UUserWidgetBase>(GetChild(InIndex)), InClass);
+		return GetDeterminesOutputObject(Cast<UUserWidgetBase>(GetChild(InIndex)), InClass);
 	}
 
 	IScreenWidgetInterface* GetChild(int32 InIndex) const override
@@ -330,7 +339,7 @@ public:
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputType(OwnerObject, InClass); }
+	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputObject(OwnerObject, InClass); }
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
 

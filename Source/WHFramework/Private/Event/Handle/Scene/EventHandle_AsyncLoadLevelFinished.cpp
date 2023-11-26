@@ -5,8 +5,6 @@
 
 UEventHandle_AsyncLoadLevelFinished::UEventHandle_AsyncLoadLevelFinished()
 {
-	EventType = EEventType::Multicast;
-
 	LevelPath = NAME_None;
 }
 

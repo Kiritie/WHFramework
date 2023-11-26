@@ -334,5 +334,5 @@ void UAbilityBase::MontageStopForAllMeshes(float OverrideBlendOutTime)
 
 AActor* UAbilityBase::GetOwnerActor(TSubclassOf<AActor> InClass /*= nullptr*/) const
 {
-	return GetDeterminesOutputType(GetOwningActorFromActorInfo(), InClass);
+	return GetDeterminesOutputObject(GetOwningActorFromActorInfo(), InClass);
 }

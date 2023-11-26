@@ -24,10 +24,7 @@ UWorld* UWHObject::GetWorld() const
 	if (!HasAnyFlags(RF_ClassDefaultObject) && ensureEditorMsgf(GetOuter(), FString::Printf(TEXT("UWHObject: %s has a null OuterPrivate in UWHObject::GetWorld()"), *GetFullName()), EDC_Default, EDV_Error)
 		&& !GetOuter()->HasAnyFlags(RF_BeginDestroyed) && !GetOuter()->IsUnreachable())
 	{
-		if (const ULevel* Level = GetTypedOuter<ULevel>())
-		{
-			return Level->OwningWorld;
-		}
+		return GetOuter()->GetWorld();
 	}
 	return nullptr;
 }

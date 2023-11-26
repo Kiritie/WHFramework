@@ -159,34 +159,13 @@ public:
 	bool bTrackTarget;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bTrackTarget == true"), Category = "Operation Target")
-	ETrackTargetMode TrackTargetMode;
+	ECameraTrackMode TrackTargetMode;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	ACameraActorBase* CameraViewPawn;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	EProcedureCameraViewMode CameraViewMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	EProcedureCameraViewSpace CameraViewSpace;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EProcedureCameraViewMode::Duration"), Category = "Operation Target|Camera View")
-	EEaseType CameraViewEaseType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EProcedureCameraViewMode::Duration"), Category = "Operation Target|Camera View")
-	float CameraViewDuration;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	FVector CameraViewOffset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewYaw;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewPitch;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewDistance;
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera View
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target|Camera View")
+	FCameraViewParams CameraViewParams;
 
 public:
 #if WITH_EDITOR
@@ -197,7 +176,7 @@ public:
 	/**
 	* 设置摄像机视角
 	*/
-	void SetCameraView(FCameraParams InCameraParams);
+	void SetCameraView(const FCameraParams& InCameraParams);
 #endif
 	/**
 	* 还原摄像机视角

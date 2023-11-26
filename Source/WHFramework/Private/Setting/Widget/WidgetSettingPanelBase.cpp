@@ -23,9 +23,9 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 	SetIsFocusable(true);
 }
 
-void UWidgetSettingPanelBase::OnInitialize(UObject* InOwner)
+void UWidgetSettingPanelBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
 void UWidgetSettingPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)

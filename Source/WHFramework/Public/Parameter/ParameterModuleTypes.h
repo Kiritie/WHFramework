@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Json.h"
+#include "GameplayTagContainer.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "ParameterModuleTypes.generated.h"
@@ -115,13 +116,18 @@ enum class EParameterType : uint8
 	Integer,
 	Float,
 	String,
+	Name,
 	Text,
 	Boolean,
 	Vector,
 	Rotator,
 	Color,
+	Tag,
+	Tags,
 	Class,
+	ClassPtr,
 	Object,
+	ObjectPtr,
 	Pointer
 };
 
@@ -146,74 +152,101 @@ public:
 		PointerValue = nullptr;
 	}
 	
-	FParameter(int32 InIntegerValue)
+	FParameter(int32 InValue)
 	{
-		*this = MakeInteger(InIntegerValue);
+		*this = MakeInteger(InValue);
 	}
 	
-	FParameter(float InFloatValue)
+	FParameter(float InValue)
 	{
-		*this = MakeFloat(InFloatValue);
+		*this = MakeFloat(InValue);
 	}
 	
-	FParameter(double InFloatValue)
+	FParameter(double InValue)
 	{
-		*this = MakeFloat(InFloatValue);
+		*this = MakeFloat(InValue);
 	}
 	
-	FParameter(FString InStringValue)
+	FParameter(const FString& InValue)
 	{
-		*this = MakeString(InStringValue);
+		*this = MakeString(InValue);
 	}
 		
-	FParameter(FText InTextValue)
+	FParameter(const FText& InValue)
 	{
-		*this = MakeText(InTextValue);
+		*this = MakeText(InValue);
 	}
 
-	FParameter(bool InBooleanValue)
+	FParameter(bool InValue)
 	{
-		*this = MakeBoolean(InBooleanValue);
+		*this = MakeBoolean(InValue);
 	}
 	
-	FParameter(FVector InVectorValue)
+	FParameter(const FVector& InValue)
 	{
-		*this = MakeVector(InVectorValue);
+		*this = MakeVector(InValue);
 	}
 		
-	FParameter(FVector2D InVectorValue)
+	FParameter(FVector2D InValue)
 	{
-		*this = MakeVector(InVectorValue);
+		*this = MakeVector(InValue);
 	}
 
-	FParameter(FRotator InRotatorValue)
+	FParameter(const FRotator& InValue)
 	{
-		*this = MakeRotator(InRotatorValue);
+		*this = MakeRotator(InValue);
 	}
 	
-	FParameter(FColor InColorValue)
+	FParameter(FColor InValue)
 	{
-		*this = MakeColor(InColorValue);
+		*this = MakeColor(InValue);
 	}
 		
-	FParameter(FLinearColor InColorValue)
+	FParameter(FLinearColor InValue)
 	{
-		*this = MakeColor(InColorValue);
+		*this = MakeColor(InValue);
+	}
+		
+	FParameter(const FGameplayTag& InTagValue)
+	{
+		*this = MakeTag(InTagValue);
+	}
+		
+	FParameter(const FGameplayTagContainer& InTagsValue)
+	{
+		*this = MakeTags(InTagsValue);
 	}
 
-	FParameter(UClass* InClassValue)
+	FParameter(UClass* InValue)
 	{
-		*this = MakeClass(InClassValue);
+		*this = MakeClass(InValue);
 	}
 	
-	FParameter(UObject* InObjectValue)
+	FParameter(const TSoftClassPtr<UObject>& InValue)
 	{
-		*this = MakeObject(InObjectValue);
+		*this = MakeClassPtr(InValue);
+	}
+
+	template<class T>
+	FParameter(const TSoftClassPtr<T>& InValue)
+	{
+		*this = MakeClassPtr(InValue);
+	}
+
+	FParameter(UObject* InValue)
+	{
+		*this = MakeObject(InValue);
 	}
 	
-	FParameter(void* InPointerValue)
+	template<class T>
+	FParameter(const TSoftObjectPtr<T>& InValue)
 	{
-		*this = MakePointer(InPointerValue);
+		*this = MakeObjectPtr(InValue);
+	}
+
+	FParameter(void* InValue)
+	{
+		*this = MakePointer(InValue);
 	}
 
 	friend bool operator==(const FParameter& A, const FParameter& B)
@@ -223,13 +256,18 @@ public:
 			case EParameterType::Integer: return A.IntegerValue == B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue == B.FloatValue;
 			case EParameterType::String: return A.StringValue == B.StringValue;
+			case EParameterType::Name: return A.NameValue == B.NameValue;
 			case EParameterType::Text: return A.TextValue.EqualTo(B.TextValue);
 			case EParameterType::Boolean: return A.BooleanValue == B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue == B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue == B.RotatorValue;
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
+			case EParameterType::Tag: return A.TagValue == B.TagValue;
+			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
 			case EParameterType::Class: return A.ClassValue == B.ClassValue;
+			case EParameterType::ClassPtr: return A.ClassPtrValue == B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue == B.ObjectValue;
+			case EParameterType::ObjectPtr: return A.ObjectPtrValue == B.ObjectPtrValue;
 			case EParameterType::Pointer: return A.PointerValue == B.PointerValue;
 			default: ;
 		}
@@ -243,13 +281,18 @@ public:
 			case EParameterType::Integer: return A.IntegerValue != B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue != B.FloatValue;
 			case EParameterType::String: return A.StringValue != B.StringValue;
+			case EParameterType::Name: return A.NameValue != B.NameValue;
 			case EParameterType::Text: return !A.TextValue.EqualTo(B.TextValue);
 			case EParameterType::Boolean: return A.BooleanValue != B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue != B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue != B.RotatorValue;
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
+			case EParameterType::Tag: return A.TagValue != B.TagValue;
+			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
 			case EParameterType::Class: return A.ClassValue != B.ClassValue;
+			case EParameterType::ClassPtr: return A.ClassPtrValue != B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue != B.ObjectValue;
+			case EParameterType::ObjectPtr: return A.ObjectPtrValue != B.ObjectPtrValue;
 			case EParameterType::Pointer: return A.PointerValue != B.PointerValue;
 			default: ;
 		}
@@ -269,6 +312,9 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::String"))
 	FString StringValue;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Name"))
+	FName NameValue;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Text", MultiLine = "true"))
 	FText TextValue;
 
@@ -284,66 +330,119 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Color"))
 	FColor ColorValue;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Tag"))
+	FGameplayTag TagValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Tags"))
+	FGameplayTagContainer TagsValue;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Class"))
 	UClass* ClassValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::ClassPtr"))
+	TSoftClassPtr<UObject> ClassPtrValue;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Object"))
 	UObject* ObjectValue;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::ObjectPtr"))
+	TSoftObjectPtr<UObject> ObjectPtrValue;
+
 	void* PointerValue;
 
 public:
+	//////////////////////////////////////////////////////////////////////////
 	EParameterType GetParameterType() const { return ParameterType; }
 
 	void SetParameterType(EParameterType InParameterType) { ParameterType = InParameterType; }
 
+	//////////////////////////////////////////////////////////////////////////
 	int32 GetIntegerValue() const { return IntegerValue; }
 
-	void SetIntegerValue(int32 InIntegerValue) { IntegerValue = InIntegerValue; }
+	void SetIntegerValue(int32 InValue) { IntegerValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	float GetFloatValue() const { return FloatValue; }
 
-	void SetFloatValue(float InFloatValue) { FloatValue = InFloatValue; }
+	void SetFloatValue(float InValue) { FloatValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	FString GetStringValue() const { return StringValue; }
 
-	void SetStringValue(const FString& InStringValue) { StringValue = InStringValue; }
+	void SetStringValue(const FString& InValue) { StringValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
+	FName GetNameValue() const { return NameValue; }
+
+	void SetNameValue(const FName InValue) { NameValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	FText GetTextValue() const { return TextValue; }
 
-	void SetTextValue(const FText InTextValue) { TextValue = InTextValue; }
+	void SetTextValue(const FText InValue) { TextValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	bool GetBooleanValue() const { return BooleanValue; }
 
-	void SetBooleanValue(bool InBooleanValue) { BooleanValue = InBooleanValue; }
+	void SetBooleanValue(bool InValue) { BooleanValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	FVector GetVectorValue() const { return VectorValue; }
 
-	void SetVectorValue(const FVector2D& InVectorValue) { VectorValue = FVector(InVectorValue.X, InVectorValue.Y, 0.f); }
+	void SetVectorValue(const FVector2D& InValue) { VectorValue = FVector(InValue.X, InValue.Y, 0.f); }
 
-	void SetVectorValue(const FVector& InVectorValue) { VectorValue = InVectorValue; }
+	void SetVectorValue(const FVector& InValue) { VectorValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	FRotator GetRotatorValue() const { return RotatorValue; }
 
-	void SetRotatorValue(const FRotator& InRotatorValue) { RotatorValue = InRotatorValue; }
+	void SetRotatorValue(const FRotator& InValue) { RotatorValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
 	FColor GetColorValue() const { return ColorValue; }
 
-	void SetColorValue(const FColor& InColorValue) { ColorValue = InColorValue; }
+	void SetColorValue(const FColor& InValue) { ColorValue = InValue; }
 
-	void SetColorValue(const FLinearColor& InColorValue) { ColorValue = InColorValue.ToFColorSRGB(); }
+	void SetColorValue(const FLinearColor& InValue) { ColorValue = InValue.ToFColorSRGB(); }
 
+	//////////////////////////////////////////////////////////////////////////
+	FGameplayTag GetTagValue() const { return TagValue; }
+
+	void SetTagValue(const FGameplayTag& InTagValue) { TagValue = InTagValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FGameplayTagContainer GetTagsValue() const { return TagsValue; }
+
+	void SetTagsValue(const FGameplayTagContainer& InTagValue) { TagsValue = InTagValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	UClass* GetClassValue() const { return ClassValue; }
 
-	void SetClassValue(UClass* InClassValue) { ClassValue = InClassValue; }
+	void SetClassValue(UClass* InValue) { ClassValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
+	template<class T = UObject>
+	TSoftClassPtr<T> GetClassPtrValue() const { return ClassPtrValue.LoadSynchronous(); }
+
+	template<class T = UObject>
+	void SetClassPtrValue(const TSoftClassPtr<T>& InValue) { ClassPtrValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	UObject* GetObjectValue() const { return ObjectValue; }
 
 	template<class T>
 	T* GetObjectValue() const { return Cast<T>(ObjectValue); }
 
-	void SetObjectValue(UObject* InObjectValue) { ObjectValue = InObjectValue; }
+	void SetObjectValue(UObject* InValue) { ObjectValue = InValue; }
 
+	//////////////////////////////////////////////////////////////////////////
+	template<class T = UObject>
+	TSoftObjectPtr<T> GetObjectPtrValue() const { return ObjectPtrValue.LoadSynchronous(); }
+
+	template<class T = UObject>
+	void SetObjectPtrValue(const TSoftObjectPtr<T>& InValue) { ObjectPtrValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	void* GetPointerValue() const { return PointerValue; }
 
 	template<class T>
@@ -352,7 +451,7 @@ public:
 	template<class T>
 	T& GetPointerValueRef() const { return *GetPointerValue<T>(); }
 
-	void SetPointerValue(void* InPointerValue) { PointerValue = InPointerValue; }
+	void SetPointerValue(void* InValue) { PointerValue = InValue; }
 
 public:
 	static FParameter MakeInteger(int32 InValue)
@@ -376,6 +475,14 @@ public:
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::String;
 		Parameter.SetStringValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeName(const FName InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Name;
+		Parameter.SetNameValue(InValue);
 		return Parameter;
 	}
 
@@ -435,6 +542,22 @@ public:
 		return Parameter;
 	}
 
+	static FParameter MakeTag(const FGameplayTag& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Tag;
+		Parameter.SetTagValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeTags(const FGameplayTagContainer& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Tags;
+		Parameter.SetTagsValue(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakeClass(UClass* InValue)
 	{
 		FParameter Parameter = FParameter();
@@ -443,11 +566,29 @@ public:
 		return Parameter;
 	}
 
+	template<class T>
+	static FParameter MakeClassPtr(const TSoftClassPtr<T>& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::ClassPtr;
+		Parameter.SetClassPtrValue<T>(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakeObject(UObject* InValue)
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Object;
 		Parameter.SetObjectValue(InValue);
+		return Parameter;
+	}
+
+	template<class T>
+	static FParameter MakeObjectPtr(const TSoftObjectPtr<T>& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::ObjectPtr;
+		Parameter.SetObjectPtrValue<T>(InValue);
 		return Parameter;
 	}
 
@@ -499,119 +640,41 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	bool HasParameter(FName InName, bool bEnsured = true) const;
 
-	void AddParameter(FName InName, FParameter InParameter);
-
 	void SetParameter(FName InName, FParameter InParameter);
 
 	FParameter GetParameter(FName InName, bool bEnsured = true) const;
 
 	TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const;
 
-	//////////////////////////////////////////////////////////////////////////
 	void RemoveParameter(FName InName);
 
 	void RemoveParameters(FName InName);
 
 	void ClearAllParameter();
+};
 
-	//////////////////////////////////////////////////////////////////////////
-	void AddIntegerParameter(FName InName, int32 InValue);
+USTRUCT(BlueprintType)
+struct FParamData
+{
+	GENERATED_BODY()
 
-	void SetIntegerParameter(FName InName, int32 InValue);
+public:
+	virtual ~FParamData() = default;
 
-	int32 GetIntegerParameter(FName InName, bool bEnsured = true) const;
+	FParamData()
+	{
+	}
 
-	TArray<int32> GetIntegerParameters(FName InName, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	void AddFloatParameter(FName InName, float InValue);
-
-	void SetFloatParameter(FName InName, float InValue);
-
-	float GetFloatParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<float> GetFloatParameters(FName InName, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	void AddStringParameter(FName InName, FString InValue);
-
-	void SetStringParameter(FName InName, FString InValue);
-
-	FString GetStringParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<FString> GetStringParameters(FName InName, bool bEnsured = true) const;
+public:
+	virtual void FromParams(const TArray<FParameter>& InParams)
+	{
 		
-	//////////////////////////////////////////////////////////////////////////
-	void AddTextParameter(FName InName, FText InValue);
-
-	void SetTextParameter(FName InName, FText InValue);
-
-	FText GetTextParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<FText> GetTextParameters(FName InName, bool bEnsured = true) const;
-
-	//////////////////////////////////////////////////////////////////////////
-	void AddBooleanParameter(FName InName, bool InValue);
-
-	void SetBooleanParameter(FName InName, bool InValue);
-
-	bool GetBooleanParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<bool> GetBooleanParameters(FName InName, bool bEnsured = true) const;
+	}
 	
-	//////////////////////////////////////////////////////////////////////////
-	void AddVectorParameter(FName InName, FVector InValue);
-
-	void SetVectorParameter(FName InName, FVector InValue);
-
-	FVector GetVectorParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<FVector> GetVectorParameters(FName InName, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	void AddRotatorParameter(FName InName, FRotator InValue);
-
-	void SetRotatorParameter(FName InName, FRotator InValue);
-
-	FRotator GetRotatorParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<FRotator> GetRotatorParameters(FName InName, bool bEnsured = true) const;
-		
-	//////////////////////////////////////////////////////////////////////////
-	void AddColorParameter(FName InName, const FColor& InValue);
-
-	void SetColorParameter(FName InName, const FColor& InValue);
-
-	FColor GetColorParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<FColor> GetColorParameters(FName InName, bool bEnsured = true) const;
-
-	//////////////////////////////////////////////////////////////////////////
-	void AddClassParameter(FName InName, UClass* InValue);
-
-	void SetClassParameter(FName InName, UClass* InValue);
-
-	UClass* GetClassParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<UClass*> GetClassParameters(FName InName, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	void AddObjectParameter(FName InName, UObject* InValue);
-
-	void SetObjectParameter(FName InName, UObject* InValue);
-
-	UObject* GetObjectParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<UObject*> GetObjectParameters(FName InName, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	void AddPointerParameter(FName InName, void* InValue);
-
-	void SetPointerParameter(FName InName, void* InValue);
-
-	void* GetPointerParameter(FName InName, bool bEnsured = true) const;
-
-	TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true) const;
+	virtual TArray<FParameter> ToParams() const
+	{
+		return TArray<FParameter>();
+	}
 };
 
 USTRUCT(BlueprintType)

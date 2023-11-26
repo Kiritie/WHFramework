@@ -16,14 +16,14 @@ UWidgetAudioSettingPageBase::UWidgetAudioSettingPageBase(const FObjectInitialize
 	Title = FText::FromString(TEXT("音频"));
 }
 
-void UWidgetAudioSettingPageBase::OnInitialize(UObject* InOwner)
+void UWidgetAudioSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
-void UWidgetAudioSettingPageBase::OnCreate(UObject* InOwner)
+void UWidgetAudioSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 
 	SettingItem_GlobalSoundVolume = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("GlobalSoundVolume"), SettingItem_GlobalSoundVolume, FText::FromString(TEXT("全局")));

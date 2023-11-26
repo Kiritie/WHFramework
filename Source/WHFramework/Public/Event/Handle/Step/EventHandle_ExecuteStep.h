@@ -18,11 +18,11 @@ public:
 	UEventHandle_ExecuteStep();
 
 public:
-	UPROPERTY(BlueprintReadOnly)
-	class UStepBase* Step;
-
-public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	class UStepBase* Step;
 };

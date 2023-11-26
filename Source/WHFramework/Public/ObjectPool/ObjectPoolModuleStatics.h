@@ -21,7 +21,6 @@ public:
 	{
 		return UObjectPoolModule::Get().SpawnObject<T>(InParams, InType);
 	}
-
 	template<class T>
 	static T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
 	{
@@ -42,7 +41,6 @@ public:
 			DespawnObject(Iter, bRecovery);
 		}
 	}
-
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
 	static void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
 
@@ -51,7 +49,6 @@ public:
 	{
 		UObjectPoolModule::Get().ClearObject<T>(InType);
 	}
-
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
 	static void ClearObject(TSubclassOf<UObject> InType);
 

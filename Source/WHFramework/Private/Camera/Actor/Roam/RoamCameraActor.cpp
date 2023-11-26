@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Camera/Roam/RoamCameraActor.h"
+#include "Camera/Actor/Roam/RoamCameraActor.h"
 
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraModule.h"

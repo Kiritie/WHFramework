@@ -17,13 +17,13 @@ class WHFRAMEWORK_API UEventHandle_StartStep : public UEventHandleBase
 
 public:
 	UEventHandle_StartStep();
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	int32 RootStepIndex;
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	int32 RootStepIndex;
 };

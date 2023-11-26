@@ -4,7 +4,7 @@
 #include "Camera/CameraModuleStatics.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/Base/CameraManagerBase.h"
+#include "Camera/Manager/CameraManagerBase.h"
 
 ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass)
 {
@@ -51,7 +51,7 @@ void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bInstant)
 	UCameraModule::Get().SwitchCameraByName(InName, bInstant);
 }
 
-void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode, ETrackTargetSpace InTrackTargetSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
+void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode, ECameraViewSpace InTrackTargetSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
 {
 	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackTargetMode, InTrackTargetSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, bInstant);
 }
@@ -144,4 +144,24 @@ void UCameraModuleStatics::AddCameraRotationInput(float InYaw, float InPitch)
 void UCameraModuleStatics::AddCameraDistanceInput(float InValue)
 {
 	UCameraModule::Get().AddCameraDistanceInput(InValue);
+}
+
+void UCameraModuleStatics::SetCameraView(const FCameraViewData& InCameraViewData)
+{
+	UCameraModule::Get().SetCameraView(InCameraViewData);
+}
+
+void UCameraModuleStatics::SetCameraViewParams(const FCameraViewParams& InCameraViewParams)
+{
+	UCameraModule::Get().SetCameraViewParams(InCameraViewParams);
+}
+
+void UCameraModuleStatics::ResetCameraView()
+{
+	UCameraModule::Get().ResetCameraView();
+}
+
+void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint)
+{
+	UCameraModule::Get().SwitchCameraPoint(InCameraPoint);
 }

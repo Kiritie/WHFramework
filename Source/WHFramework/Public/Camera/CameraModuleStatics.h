@@ -73,7 +73,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewSpace InTrackTargetSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -128,4 +128,17 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void AddCameraDistanceInput(float InValue);
+
+public:
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetCameraView(const FCameraViewData& InCameraViewData);
+	
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
+	
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void ResetCameraView();
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint);
 };

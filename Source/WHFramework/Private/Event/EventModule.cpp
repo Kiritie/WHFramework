@@ -24,7 +24,8 @@ UEventModule::UEventModule()
 
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
 
-	EventManagerClass = UEventManagerBase::StaticClass();
+	EventManagers = TArray<TSubclassOf<UEventManagerBase>>();
+	EventManagerRefs = TMap<TSubclassOf<UEventManagerBase>, UEventManagerBase*>();
 }
 
 UEventModule::~UEventModule()
@@ -50,10 +51,13 @@ void UEventModule::OnInitialize()
 {
 	Super::OnInitialize();
 	
-	if(EventManagerClass)
+	for(auto Iter : EventManagers)
 	{
-		EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, EventManagerClass);
-		EventManager->OnInitialize();
+		if(UEventManagerBase* EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, Iter))
+		{
+			EventManager->OnInitialize();
+			EventManagerRefs.Add(Iter, EventManager);
+		}
 	}
 	
 	BroadcastEvent<UEventHandle_InitGame>(this);
@@ -62,6 +66,11 @@ void UEventModule::OnInitialize()
 void UEventModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
+
+	for(auto Iter : EventManagerRefs)
+	{
+		Iter.Value->OnPreparatory(InPhase);
+	}
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -72,6 +81,11 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 void UEventModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+
+	for(auto Iter : EventManagerRefs)
+	{
+		Iter.Value->OnRefresh(DeltaSeconds);
+	}
 }
 
 void UEventModule::OnPause()
@@ -87,6 +101,11 @@ void UEventModule::OnUnPause()
 void UEventModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+	
+	for(auto Iter : EventManagerRefs)
+	{
+		Iter.Value->OnTermination(InPhase);
+	}
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -221,9 +240,7 @@ void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 
 void UEventModule::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType)
 {
-	TArray<FParameter> Params;
-	InHandle->Pack(Params);
-	BroadcastEvent(InHandle->GetClass(), InSender, Params, InNetType);
+	BroadcastEvent(InHandle->GetClass(), InSender, InHandle->Pack(), InNetType);
 }
 
 void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
@@ -261,9 +278,18 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 	}
 }
 
+UEventManagerBase* UEventModule::GetEventManager(TSubclassOf<UEventManagerBase> InClass) const
+{
+	if(EventManagerRefs.Contains(InClass))
+	{
+		return EventManagerRefs[InClass];
+	}
+	return nullptr;
+}
+
 void UEventModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	DOREPLIFETIME(UEventModule, EventManager);
+	DOREPLIFETIME(UEventModule, EventManagerRefs);
 }

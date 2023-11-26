@@ -10,6 +10,10 @@
 
 #include "CameraModule.generated.h"
 
+class UEventHandle_SwitchCameraPoint;
+class ACameraPointBase;
+class UEventHandle_ResetCameraView;
+class UEventHandle_SetCameraView;
 class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
@@ -68,6 +72,9 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	ACameraActorBase* DefaultCamera;
+	
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera == nullptr"), Category = "Camera")
+	ACameraPointBase* DefaultCameraPoint;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
 	bool DefaultInstantSwitch;
@@ -86,7 +93,7 @@ public:
 		return Cast<T>(CurrentCamera);
 	}
 	
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	ACameraActorBase* GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
@@ -260,16 +267,22 @@ private:
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
 	bool bIsControllingZoom;
-	ETrackTargetMode TrackTargetMode;
+	ECameraTrackMode TrackTargetMode;
 	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 
 protected:
-	virtual void DoTrackTarget(bool bInstant = false);
+	virtual void DoTrackTarget(bool bInstant);
+	
+	virtual void DoTrackTargetLocation(bool bInstant);
+	
+	virtual void DoTrackTargetRotation(bool bInstant);
+	
+	virtual void DoTrackTargetDistance(bool bInstant);
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ETrackTargetMode InTrackTargetMode = ETrackTargetMode::LocationAndRotationAndDistanceOnce, ETrackTargetSpace InTrackTargetSpace = ETrackTargetSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewSpace InTrackTargetSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -324,6 +337,29 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void AddCameraDistanceInput(float InValue);
+
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraView(const FCameraViewData& InCameraViewData);
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void ResetCameraView();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SwitchCameraPoint(ACameraPointBase* InCameraPoint);
+	
+protected:
+	UFUNCTION()
+	void OnSetCameraView(UObject* InSender, UEventHandle_SetCameraView* InEventHandle);
+	
+	UFUNCTION()
+	void OnResetCameraView(UObject* InSender, UEventHandle_ResetCameraView* InEventHandle);
+	
+	UFUNCTION()
+	void OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCameraPoint* InEventHandle);
 
 public:
 	UFUNCTION(BlueprintPure)

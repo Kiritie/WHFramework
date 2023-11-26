@@ -204,35 +204,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	AActor* OperationTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "OperationTarget != nullptr"), Category = "Operation Target")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
 	bool bTrackTarget;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bTrackTarget == true"), Category = "Operation Target")
+	ECameraTrackMode TrackTargetMode;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	ACameraActorBase* CameraViewPawn;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	EStepCameraViewMode CameraViewMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	EStepCameraViewSpace CameraViewSpace;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
-	EEaseType CameraViewEaseType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == EStepCameraViewMode::Duration"), Category = "Operation Target|Camera View")
-	float CameraViewDuration;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	FVector CameraViewOffset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewYaw;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewPitch;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target|Camera View")
-	float CameraViewDistance;
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera View
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target|Camera View")
+	FCameraViewParams CameraViewParams;
 
 public:
 #if WITH_EDITOR
@@ -250,6 +232,11 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable)
 	void ResetCameraView();
+	/**
+	* 设置操作目标
+	*/
+	UFUNCTION(BlueprintCallable)
+	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide

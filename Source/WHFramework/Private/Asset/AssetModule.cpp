@@ -59,7 +59,7 @@ void UAssetModule::OnPreparatory(EPhase InPhase)
 		{
 			if(Iter)
 			{
-				DataAssetMap.Add(Iter->GetDataAssetName(), Iter);
+				DataAssetMap.Add(Iter->GetDataAssetTag(), Iter);
 			}
 		}
 		
@@ -234,36 +234,36 @@ void UAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& I
 	}
 }
 
-bool UAssetModule::HasDataAsset(FName InName) const
+bool UAssetModule::HasDataAsset(const FGameplayTag& InTag) const
 {
-	return DataAssetMap.Contains(InName);
+	return DataAssetMap.Contains(InTag);
 }
 
-UDataAssetBase* UAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName) const
+UDataAssetBase* UAssetModule::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag) const
 {
 	if(!InClass) return nullptr;
 	
-	if(InName.IsNone()) InName = InClass.GetDefaultObject()->GetDataAssetName();
+	const FGameplayTag& Tag = InTag.IsValid() ? InTag : InClass->GetDefaultObject<UDataAssetBase>()->GetDataAssetTag();
 
-	return GetDataAsset<UDataAssetBase>(InName);
+	return GetDataAsset<UDataAssetBase>(Tag);
 }
 
-UDataAssetBase* UAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+UDataAssetBase* UAssetModule::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
 	if(!InClass) return nullptr;
 
-	if(InName.IsNone()) InName = InClass.GetDefaultObject()->GetDataAssetName();
+	const FGameplayTag& Tag = InTag.IsValid() ? InTag : InClass->GetDefaultObject<UDataAssetBase>()->GetDataAssetTag();
 
-	return CreateDataAsset<UDataAssetBase>(InName);
+	return CreateDataAsset<UDataAssetBase>(Tag);
 }
 
-bool UAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+bool UAssetModule::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
 	if(!InClass) return false;
 
-	if(InName.IsNone()) InName = InClass.GetDefaultObject()->GetDataAssetName();
+	const FGameplayTag& Tag = InTag.IsValid() ? InTag : InClass->GetDefaultObject<UDataAssetBase>()->GetDataAssetTag();
 
-	return RemoveDataAsset<UDataAssetBase>(InName);
+	return RemoveDataAsset<UDataAssetBase>(Tag);
 }
 
 void UAssetModule::RemoveAllDataAsset()

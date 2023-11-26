@@ -5,8 +5,6 @@
 
 UEventHandle_ChangeInputMode::UEventHandle_ChangeInputMode()
 {
-	EventType = EEventType::Multicast;
-
 	InputMode = EInputMode::None;
 }
 

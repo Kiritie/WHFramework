@@ -76,22 +76,6 @@ enum class ETaskTaskState : uint8
 	Completed
 };
 
-UENUM(BlueprintType)
-enum class ETaskCameraViewMode : uint8
-{
-	None,
-	Instant,
-	Smooth,
-	Duration
-};
-
-UENUM(BlueprintType)
-enum class ETaskCameraViewSpace : uint8
-{
-	Local,
-	World
-};
-
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FTaskListItemStates
 {

@@ -17,13 +17,14 @@ class WHFRAMEWORK_API UEventHandle_ExitGame : public UEventHandleBase
 
 public:
 	UEventHandle_ExitGame();
-
-public:
-	bool bIsSimulating;
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsSimulating;
 };

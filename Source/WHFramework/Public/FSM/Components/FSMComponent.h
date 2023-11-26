@@ -184,7 +184,7 @@ public:
 		return Cast<T>(CurrentState);
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InClass = nullptr) const { return GetDeterminesOutputType(CurrentState, InClass); }
+	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InClass = nullptr) const { return GetDeterminesOutputObject(CurrentState, InClass); }
 	/**
 	* 获取状态列表
 	*/
@@ -206,5 +206,5 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const { return GetDeterminesOutputType(GetOwner(), InClass); }
+	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const { return GetDeterminesOutputObject(GetOwner(), InClass); }
 };

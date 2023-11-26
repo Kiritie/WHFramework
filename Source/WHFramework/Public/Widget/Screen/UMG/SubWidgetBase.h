@@ -70,7 +70,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputType(Owner, InClass); }
+	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputObject(Owner, InClass); }
 
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter>& GetParams() { return Params; }

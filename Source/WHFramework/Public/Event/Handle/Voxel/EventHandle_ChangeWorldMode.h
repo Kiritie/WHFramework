@@ -19,11 +19,11 @@ class WHFRAMEWORK_API UEventHandle_ChangeWorldMode : public UEventHandleBase
 
 public:
 	UEventHandle_ChangeWorldMode();
+	
+public:
+	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
 	UPROPERTY(BlueprintReadOnly)
 	EVoxelWorldMode WorldMode;
-	
-public:
-	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 };

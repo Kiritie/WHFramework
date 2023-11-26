@@ -18,14 +18,14 @@ UWidgetInputSettingPageBase::UWidgetInputSettingPageBase(const FObjectInitialize
 	Title = FText::FromString(TEXT("输入"));
 }
 
-void UWidgetInputSettingPageBase::OnInitialize(UObject* InOwner)
+void UWidgetInputSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
-void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner)
+void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 
 	for (const auto& Iter : UInputModule::Get().GetKeyShortcuts())
 	{

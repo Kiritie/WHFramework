@@ -111,6 +111,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject, bool bRecovery = true);
 
+	template<class T>
+	void DespawnObjects(TArray<T*> InObjects, bool bRecovery = true)
+	{
+		for(auto Iter : InObjects)
+		{
+			DespawnObject(Iter, bRecovery);
+		}
+	}
 	UFUNCTION(BlueprintCallable)
 	void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
 

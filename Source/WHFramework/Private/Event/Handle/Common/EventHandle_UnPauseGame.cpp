@@ -5,8 +5,6 @@
 
 UEventHandle_UnPauseGame::UEventHandle_UnPauseGame()
 {
-	EventType = EEventType::Multicast;
-
 	PauseMode = EPauseMode::Default;
 }
 

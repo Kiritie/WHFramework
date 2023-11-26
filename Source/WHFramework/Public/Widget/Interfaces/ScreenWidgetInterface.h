@@ -24,9 +24,9 @@ class WHFRAMEWORK_API IScreenWidgetInterface : public IBaseWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnCreate(UObject* InOwner = nullptr) = 0;
+	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
 
-	virtual void OnInitialize(UObject* InOwner = nullptr) = 0;
+	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
 	
@@ -37,6 +37,10 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
+	virtual void Init(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr) = 0;
+	
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
+
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
@@ -45,7 +49,10 @@ public:
 
 	virtual void Toggle(bool bInstant = false) = 0;
 
-	virtual void Reset() = 0;
+	virtual void Reset(bool bResetOwner = false) = 0;
+
+public:
+	virtual bool CanOpen() const = 0;
 
 protected:
 	virtual void FinishOpen(bool bInstant) = 0;

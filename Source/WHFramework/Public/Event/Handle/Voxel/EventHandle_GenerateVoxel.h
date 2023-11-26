@@ -19,11 +19,11 @@ class WHFRAMEWORK_API UEventHandle_GenerateVoxel : public UEventHandleBase
 
 public:
 	UEventHandle_GenerateVoxel();
+	
+public:
+	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
 	UPROPERTY(BlueprintReadOnly)
 	FVoxelItem VoxelItem;
-	
-public:
-	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
 };

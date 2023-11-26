@@ -17,13 +17,14 @@ public:
 	UEventHandle_LeaveFiniteState();
 
 public:
-	UPROPERTY(BlueprintReadOnly)
-	class UFiniteStateBase* State;
-	UPROPERTY(BlueprintReadOnly)
-	class UFSMComponent* FSM;
-
-public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	class UFiniteStateBase* State;
+	
+	UPROPERTY(BlueprintReadOnly)
+	class UFSMComponent* FSM;
 };

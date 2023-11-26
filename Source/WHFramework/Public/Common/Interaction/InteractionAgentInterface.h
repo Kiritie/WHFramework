@@ -51,7 +51,7 @@ protected:
 	void OnSelected();
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnUnSelected();
+	void OnDeselected();
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)

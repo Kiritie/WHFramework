@@ -5,7 +5,7 @@
 
 UEventHandle_LeaveProcedure::UEventHandle_LeaveProcedure()
 {
-	EventType = EEventType::Multicast;
+
 }
 
 void UEventHandle_LeaveProcedure::OnDespawn_Implementation(bool bRecovery)

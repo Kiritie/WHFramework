@@ -22,14 +22,14 @@ UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectIni
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 }
 
-void UWidgetAchievementHUD::OnCreate(UObject* InOwner)
+void UWidgetAchievementHUD::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 }
 
-void UWidgetAchievementHUD::OnInitialize(UObject* InOwner)
+void UWidgetAchievementHUD::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
 void UWidgetAchievementHUD::OnOpen(const TArray<FParameter>& InParams, bool bInstant)

@@ -11,26 +11,54 @@
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()
 {
+	EventsToHandle = TArray<TSubclassOf<UEventHandleBase>>();
 }
 
-void UEventManagerBase::OnInitialize_Implementation()
+void UEventManagerBase::OnInitialize()
 {
+	K2_OnInitialize();
+
+	for(const auto Iter : EventsToHandle)
+	{
+		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, FName("OnHandleEvent"));
+	}
+	
 	UEventModuleStatics::SubscribeEvent<UEventHandle_InitGame>(this, FName("OnInitGame"));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_StartGame>(this, FName("OnStartGame"));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnExitGame"));
 }
 
-void UEventManagerBase::OnInitGame_Implementation(UObject* InSender, UEventHandle_InitGame* InEventHandle)
+void UEventManagerBase::OnPreparatory(EPhase InPhase)
 {
-	
+	K2_OnPreparatory(InPhase);
 }
 
-void UEventManagerBase::OnStartGame_Implementation(UObject* InSender, UEventHandle_StartGame* InEventHandle)
+void UEventManagerBase::OnRefresh(float DeltaSeconds)
 {
-	
+	K2_OnRefresh(DeltaSeconds);
 }
 
-void UEventManagerBase::OnExitGame_Implementation(UObject* InSender, UEventHandle_ExitGame* InEventHandle)
+void UEventManagerBase::OnTermination(EPhase InPhase)
 {
-	
+	K2_OnTermination(InPhase);
+}
+
+void UEventManagerBase::OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle)
+{
+	K2_OnHandleEvent(InSender, InEventHandle);
+}
+
+void UEventManagerBase::OnInitGame(UObject* InSender, UEventHandle_InitGame* InEventHandle)
+{
+	K2_OnInitGame(InSender, InEventHandle);
+}
+
+void UEventManagerBase::OnStartGame(UObject* InSender, UEventHandle_StartGame* InEventHandle)
+{
+	K2_OnStartGame(InSender, InEventHandle);
+}
+
+void UEventManagerBase::OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle)
+{
+	K2_OnExitGame(InSender, InEventHandle);
 }

@@ -5,7 +5,7 @@
 
 #include "WidgetSettingPanelBase.generated.h"
 
-class UWidgetButtonBase;
+class UCommonButton;
 class UTextBlock;
 /**
  * 
@@ -19,7 +19,7 @@ public:
 	UWidgetSettingPanelBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
-	virtual void OnInitialize(UObject* InOwner) override;
+	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 

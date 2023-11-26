@@ -102,7 +102,7 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 				{
 					case EWidgetCreateType::AutoCreate:
 					{
-						CreateUserWidget<UUserWidgetBase>(nullptr, Iter);
+						CreateUserWidget<UUserWidgetBase>(nullptr, nullptr, Iter);
 						break;
 					}
 					case EWidgetCreateType::AutoCreateAndOpen:
@@ -227,14 +227,14 @@ UUserWidgetBase* UWidgetModule::GetUserWidgetByName(FName InName, TSubclassOf<UU
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner)
+UUserWidgetBase* UWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return CreateUserWidget<UUserWidgetBase>(InOwner, InClass);
+	return CreateUserWidget<UUserWidgetBase>(InOwner, &InParams, InClass);
 }
 
-UUserWidgetBase* UWidgetModule::CreateUserWidgetByName(FName InName, UObject* InOwner)
+UUserWidgetBase* UWidgetModule::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner);
+	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner, &InParams);
 }
 
 bool UWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams,  bool bInstant)

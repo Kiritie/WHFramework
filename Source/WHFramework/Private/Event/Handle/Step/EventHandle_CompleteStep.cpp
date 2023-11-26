@@ -7,7 +7,6 @@
 
 UEventHandle_CompleteStep::UEventHandle_CompleteStep()
 {
-	EventType = EEventType::Multicast;
 	Step = nullptr;
 }
 

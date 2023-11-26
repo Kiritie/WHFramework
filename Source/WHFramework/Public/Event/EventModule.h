@@ -122,14 +122,20 @@ protected:
 	/// Event Manager
 protected:
 	UPROPERTY(EditAnywhere, Category = "EventManager")
-	TSubclassOf<UEventManagerBase> EventManagerClass;
+	TArray<TSubclassOf<UEventManagerBase>> EventManagers;
 
 	UPROPERTY(Transient)
-	UEventManagerBase* EventManager;
+	TMap<TSubclassOf<UEventManagerBase>, UEventManagerBase*> EventManagerRefs;
 
 public:
-	UFUNCTION(BlueprintPure)
-	UEventManagerBase* GetEventManager() const { return EventManager; }
+	template<class T>
+	T* GetEventManager() const
+	{
+		return Cast<T>(GetEventManager(T::StaticClass()));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass) const;
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

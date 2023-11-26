@@ -8,6 +8,8 @@
 // Sets default values
 AVoxelCapture::AVoxelCapture()
 {
+	bIsSpatiallyLoaded = false;
+
 	Capture2D = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
 	Capture2D->SetupAttachment(RootComponent);
 	Capture2D->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));

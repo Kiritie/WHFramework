@@ -25,17 +25,8 @@ UProcedureBase::UProcedureBase()
 
 	OperationTarget = nullptr;
 	bTrackTarget = false;
-	TrackTargetMode = ETrackTargetMode::LocationOnly;
-
-	CameraViewPawn = nullptr;
-	CameraViewMode = EProcedureCameraViewMode::None;
-	CameraViewSpace = EProcedureCameraViewSpace::Local;
-	CameraViewEaseType = EEaseType::Linear;
-	CameraViewDuration = 1.f;
-	CameraViewOffset = FVector::ZeroVector;
-	CameraViewYaw = 0.f;
-	CameraViewPitch = 0.f;
-	CameraViewDistance = 0.f;
+	TrackTargetMode = ECameraTrackMode::LocationOnly;
+	CameraViewParams = FCameraViewParams();
 
 	ProcedureListItemStates = FProcedureListItemStates();
 }
@@ -78,16 +69,13 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	K2_OnEnter(InLastProcedure);
 
-	if(CameraViewPawn)
-	{
-		UCameraModuleStatics::SwitchCamera(CameraViewPawn);
-	}
-
 	ResetCameraView();
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
+			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 	}
 
 	switch(ProcedureGuideType)
@@ -168,38 +156,14 @@ bool UProcedureBase::IsCurrent()
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
-	{
-		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
-	}
-	else
-	{
-		CameraViewOffset = UCameraModuleStatics::GetCameraLocation();
-		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch;
-	}
-	CameraViewDistance = UCameraModuleStatics::GetCameraDistance();
+	CameraViewParams.GetCameraParams();
 
 	Modify();
 }
 
-void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
+void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 {
-	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
-	{
-		CameraViewOffset = InCameraParams.CameraLocation - OperationTarget->GetActorLocation();
-		CameraViewYaw = InCameraParams.CameraRotation.Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = InCameraParams.CameraRotation.Pitch - OperationTarget->GetActorRotation().Pitch;
-	}
-	else
-	{
-		CameraViewOffset = InCameraParams.CameraLocation;
-		CameraViewYaw = InCameraParams.CameraRotation.Yaw;
-		CameraViewPitch = InCameraParams.CameraRotation.Pitch;
-	}
-	CameraViewDistance = InCameraParams.CameraDistance;
+	CameraViewParams.SetCameraParams(InCameraParams);
 
 	Modify();
 }
@@ -207,49 +171,7 @@ void UProcedureBase::SetCameraView(FCameraParams InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	FVector CameraLocation;
-	float CameraYaw;
-	float CameraPitch;
-	float CameraDistance;
-	if(CameraViewSpace == EProcedureCameraViewSpace::Local && OperationTarget)
-	{
-		CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
-		CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
-		CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
-		CameraDistance = CameraViewDistance;
-	}
-	else
-	{
-		CameraLocation = CameraViewOffset;
-		CameraYaw = CameraViewYaw;
-		CameraPitch = CameraViewPitch;
-		CameraDistance = CameraViewDistance;
-	}
-	switch(CameraViewMode)
-	{
-		case EProcedureCameraViewMode::Instant:
-		{
-			UCameraModuleStatics::SetCameraLocation(CameraLocation, true);
-			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, true);
-			break;
-		}
-		case EProcedureCameraViewMode::Smooth:
-		{
-			UCameraModuleStatics::SetCameraLocation(CameraLocation, false);
-			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, false);
-			break;
-		}
-		case EProcedureCameraViewMode::Duration:
-		{
-			UCameraModuleStatics::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleStatics::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleStatics::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
-			break;
-		}
-		default: break;
-	}
+	UCameraModuleStatics::SetCameraViewParams(CameraViewParams);
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
@@ -264,7 +186,9 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleStatics::StartTrackTarget(InOperationTarget, TrackTargetMode, static_cast<ETrackTargetSpace>(CameraViewSpace), CameraViewOffset, FVector(-1.f), CameraViewYaw, CameraViewPitch, CameraViewDistance, true, CameraViewMode == EProcedureCameraViewMode::Instant);
+				UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+					CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
+					CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 			}
 		}
 		else
@@ -311,6 +235,11 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
 		auto PropertyName = Property->GetFName();
+		
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, OperationTarget))
+		{
+			CameraViewParams.CameraViewTarget = OperationTarget;
+		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{

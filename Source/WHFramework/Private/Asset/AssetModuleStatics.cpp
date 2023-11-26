@@ -70,24 +70,24 @@ void UAssetModuleStatics::RemoveEnumMapping(const FString& InEnumName, const FSt
 	return UAssetModule::Get().RemoveEnumMapping(InEnumName, InOtherName);
 }
 
-bool UAssetModuleStatics::HasDataAsset(FName InName)
+bool UAssetModuleStatics::HasDataAsset(const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().HasDataAsset(InName);
+	return UAssetModule::Get().HasDataAsset(InTag);
 }
 
-UDataAssetBase* UAssetModuleStatics::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+UDataAssetBase* UAssetModuleStatics::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().GetDataAsset(InClass, InName);
+	return UAssetModule::Get().GetDataAsset(InClass, InTag);
 }
 
-UDataAssetBase* UAssetModuleStatics::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+UDataAssetBase* UAssetModuleStatics::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().CreateDataAsset(InClass, InName);
+	return UAssetModule::Get().CreateDataAsset(InClass, InTag);
 }
 
-bool UAssetModuleStatics::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName)
+bool UAssetModuleStatics::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().RemoveDataAsset(InClass, InName);
+	return UAssetModule::Get().RemoveDataAsset(InClass, InTag);
 }
 
 void UAssetModuleStatics::RemoveAllDataAsset()

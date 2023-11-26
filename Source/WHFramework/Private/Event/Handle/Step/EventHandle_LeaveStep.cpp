@@ -5,7 +5,7 @@
 
 UEventHandle_LeaveStep::UEventHandle_LeaveStep()
 {
-	EventType = EEventType::Multicast;
+
 }
 
 void UEventHandle_LeaveStep::OnDespawn_Implementation(bool bRecovery)

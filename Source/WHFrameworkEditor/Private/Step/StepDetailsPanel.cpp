@@ -12,6 +12,7 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "DetailCategoryBuilder.h"
+#include "IDetailGroup.h"
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
@@ -25,37 +26,33 @@ TSharedRef<IDetailCustomization> FStepDetailsPanel::MakeInstance() { return Make
 void FStepDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuilder)
 {
 	SelectedObjectsList = DetailLayoutBuilder.GetSelectedObjects();
-
+	
 	IDetailCategoryBuilder& OperationTargetCategory = DetailLayoutBuilder.EditCategory(FName("Operation Target"));
-
+	
 	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UStepBase, OperationTarget)));
 	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UStepBase, bTrackTarget)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UStepBase, TrackTargetMode)));
 
-	TSharedRef<SWrapBox> CameraViewActionBox = SNew(SWrapBox).UseAllottedWidth(true);
-	CameraViewActionBox->AddSlot()
-	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Get Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FStepDetailsPanel::OnClickGetCameraViewButton))
-		]
+	IDetailGroup& CameraViewGroup = OperationTargetCategory.AddGroup(FName("Camera View"), FText::FromString(TEXT("Camera View")), false, false);
+	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UStepBase, CameraViewParams)));
 
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
+	CameraViewGroup.AddWidgetRow()
+		.WholeRowContent()
 		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Paste Camera View")))
-			.OnClicked(FOnClicked::CreateSP(this, &FStepDetailsPanel::OnClickPasteCameraViewButton))
-		]
-	];
-
-	OperationTargetCategory.AddCustomRow(FText::GetEmpty())
-		.ValueContent()
-		[
-			CameraViewActionBox
+			SNew(SWrapBox)
+			.UseAllottedWidth(true)
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Get Camera View")))
+				.OnClicked_Raw(this, &FStepDetailsPanel::OnClickGetCameraViewButton)
+			]
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Paste Camera View")))
+				.OnClicked_Raw(this, &FStepDetailsPanel::OnClickPasteCameraViewButton)
+			]
 		];
 }
 

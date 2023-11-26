@@ -17,14 +17,14 @@ UWidgetCameraSettingPageBase::UWidgetCameraSettingPageBase(const FObjectInitiali
 	Title = FText::FromString(TEXT("摄像机"));
 }
 
-void UWidgetCameraSettingPageBase::OnInitialize(UObject* InOwner)
+void UWidgetCameraSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
-void UWidgetCameraSettingPageBase::OnCreate(UObject* InOwner)
+void UWidgetCameraSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 	
 	SettingItem_CameraMoveRate = CreateSubWidget<UWidgetFloatSettingItemBase>({ FText::FromString(TEXT("移动速度")), 100.f, 1000.f, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	AddSettingItem(FName("CameraMoveRate"), SettingItem_CameraMoveRate, FText::FromString(TEXT("移动")));

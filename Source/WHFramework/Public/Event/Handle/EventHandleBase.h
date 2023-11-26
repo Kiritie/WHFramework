@@ -12,17 +12,13 @@
 /**
  * 
  */
-UCLASS(Blueprintable, BlueprintType, DefaultToInstanced)
+UCLASS(Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UEventHandleBase : public UWHObject
 {
 	GENERATED_BODY()
 	
 public:
 	UEventHandleBase();
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	EEventType EventType;
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
@@ -32,12 +28,16 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
-	bool Filter(UObject* InOwner, const FName InFuncName);
+	UFUNCTION(BlueprintNativeEvent)
+	bool Filter(UObject* InOwner, const FName InFuncName) const;
 
 	UFUNCTION(BlueprintNativeEvent)
 	void Fill(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void Pack(UPARAM(ref) TArray<FParameter>& OutParams);
+	TArray<FParameter> Pack() const;    
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	EEventType EventType;
 };

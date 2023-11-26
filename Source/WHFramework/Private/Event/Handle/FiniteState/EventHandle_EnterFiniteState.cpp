@@ -5,7 +5,6 @@
 
 UEventHandle_EnterFiniteState::UEventHandle_EnterFiniteState()
 {
-	EventType = EEventType::Multicast;
 	State = nullptr;
 }
 

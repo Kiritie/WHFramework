@@ -82,7 +82,7 @@ public:
 	UFUNCTION()
 	virtual void OnRefresh(float DeltaSeconds);
 	/**
-	* 当暂停
+	* 当销毁
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
 	void K2_OnTermination(EPhase InPhase);

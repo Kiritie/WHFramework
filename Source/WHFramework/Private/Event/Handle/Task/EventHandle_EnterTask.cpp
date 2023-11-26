@@ -5,7 +5,6 @@
 
 UEventHandle_EnterTask::UEventHandle_EnterTask()
 {
-	EventType = EEventType::Multicast;
 	Task = nullptr;
 }
 

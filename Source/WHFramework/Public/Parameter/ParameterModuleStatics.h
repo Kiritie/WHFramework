@@ -21,12 +21,9 @@ class WHFRAMEWORK_API UParameterModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	/// Parameter
+	/// Global Parameter
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static bool HasGlobalParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalParameter(FName InName, FParameter InParameter);
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetGlobalParameter(FName InName, FParameter InParameter);
@@ -47,156 +44,6 @@ public:
 	static void ClearAllGlobalParameter();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Integer
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalIntegerParameter(FName InName, int32 InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalIntegerParameter(FName InName, int32 InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static int32 GetGlobalIntegerParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<int32> GetGlobalIntegerParameters(FName InName, bool bEnsured = true);
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Float
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalFloatParameter(FName InName, float InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalFloatParameter(FName InName, float InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static float GetGlobalFloatParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<float> GetGlobalFloatParameters(FName InName, bool bEnsured = true);
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// String
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalStringParameter(FName InName, const FString& InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalStringParameter(FName InName, const FString& InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FString GetGlobalStringParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FString> GetGlobalStringParameters(FName InName, bool bEnsured = true);
-		
-	//////////////////////////////////////////////////////////////////////////
-	/// Text
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalTextParameter(FName InName, const FText InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalTextParameter(FName InName, const FText InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FText GetGlobalTextParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FText> GetGlobalTextParameters(FName InName, bool bEnsured = true);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Boolean
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalBooleanParameter(FName InName, bool InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalBooleanParameter(FName InName, bool InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static bool GetGlobalBooleanParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<bool> GetGlobalBooleanParameters(FName InName, bool bEnsured = true);
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Vector
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalVectorParameter(FName InName, FVector InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalVectorParameter(FName InName, FVector InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FVector GetGlobalVectorParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FVector> GetGlobalVectorParameters(FName InName, bool bEnsured = true);
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Rotator
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalRotatorParameter(FName InName, FRotator InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalRotatorParameter(FName InName, FRotator InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FRotator GetGlobalRotatorParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FRotator> GetGlobalRotatorParameters(FName InName, bool bEnsured = true);
-		
-	//////////////////////////////////////////////////////////////////////////
-	/// Color
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalColorParameter(FName InName, const FColor& InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalColorParameter(FName InName, const FColor& InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FColor GetGlobalColorParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FColor> GetGlobalColorParameters(FName InName, bool bEnsured = true);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Class
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalClassParameter(FName InName, UClass* InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalClassParameter(FName InName, UClass* InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static UClass* GetGlobalClassParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<UClass*> GetGlobalClassParameters(FName InName, bool bEnsured = true);
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// Object
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddGlobalObjectParameter(FName InName, UObject* InValue);
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetGlobalObjectParameter(FName InName, UObject* InValue);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static UObject* GetGlobalObjectParameter(FName InName, bool bEnsured = true);
-
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<UObject*> GetGlobalObjectParameters(FName InName, bool bEnsured = true);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Pointer
-	static void AddPointerParameter(FName InName, void* InValue);
-
-	static void SetPointerParameter(FName InName, void* InValue);
-
-	static void* GetPointerParameter(FName InName, bool bEnsured = true);
-
-	static TArray<void*> GetPointerParameters(FName InName, bool bEnsured = true);
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Parameter
 public:
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -206,10 +53,13 @@ public:
 	static FParameter MakeFloatParameter(float InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeStringParameter(FString InValue);
+	static FParameter MakeStringParameter(const FString& InValue);
 	
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeTextParameter(FText InValue);
+	static FParameter MakeNameParameter(const FName InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeTextParameter(const FText InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeBooleanParameter(bool InValue);
@@ -223,96 +73,151 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeColorParameter(FColor InValue);
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	static FParameter MakeTagParameter(const FGameplayTag& InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue);
+
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeClassParameter(UClass* InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeObjectParameter(UObject* InValue);
 
-public:
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static EParameterType GetParameterType(UPARAM(ref) FParameter& InParameter) { return InParameter.GetParameterType(); }
+	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue);
+
+public:
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static EParameterType GetParameterType(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetParameterType(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetParameterType(UPARAM(ref) FParameter& InParameter, EParameterType InParameterType) { InParameter.SetParameterType(InParameterType); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static int32 GetIntegerValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetIntegerValue(); }
+	static int32 GetIntegerValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetIntegerValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetIntegerValue(UPARAM(ref) FParameter& InParameter, int32 InIntegerValue) { InParameter.SetIntegerValue(InIntegerValue); }
+	static void SetIntegerValue(UPARAM(ref) FParameter& InParameter, int32 InValue) { InParameter.SetIntegerValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static float GetFloatValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetFloatValue(); }
+	static float GetFloatValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetFloatValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetFloatValue(UPARAM(ref) FParameter& InParameter, float InFloatValue) { InParameter.SetFloatValue(InFloatValue); }
+	static void SetFloatValue(UPARAM(ref) FParameter& InParameter, float InValue) { InParameter.SetFloatValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FString GetStringValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetStringValue(); }
+	static FString GetStringValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetStringValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetStringValue(UPARAM(ref) FParameter& InParameter, const FString& InStringValue) { InParameter.SetStringValue(InStringValue); }
+	static void SetStringValue(UPARAM(ref) FParameter& InParameter, const FString& InValue) { InParameter.SetStringValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FText GetTextValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetTextValue(); }
+	static FName GetNameValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetNameValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetTextValue(UPARAM(ref) FParameter& InParameter, const FText InTextValue) { InParameter.SetTextValue(InTextValue); }
+	static void SetNameValue(UPARAM(ref) FParameter& InParameter, const FName InValue) { InParameter.SetNameValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static bool GetBooleanValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetBooleanValue(); }
+	static FText GetTextValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetTextValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetBooleanValue(UPARAM(ref) FParameter& InParameter, bool InBooleanValue) { InParameter.SetBooleanValue(InBooleanValue); }
+	static void SetTextValue(UPARAM(ref) FParameter& InParameter, const FText InValue) { InParameter.SetTextValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FVector GetVectorValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetVectorValue(); }
+	static bool GetBooleanValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetBooleanValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetVectorValue(UPARAM(ref) FParameter& InParameter, const FVector& InVectorValue) { InParameter.SetVectorValue(InVectorValue); }
+	static void SetBooleanValue(UPARAM(ref) FParameter& InParameter, bool InValue) { InParameter.SetBooleanValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FRotator GetRotatorValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetRotatorValue(); }
+	static FVector GetVectorValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetVectorValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetRotatorValue(UPARAM(ref) FParameter& InParameter, const FRotator& InRotatorValue) { InParameter.SetRotatorValue(InRotatorValue); }
+	static void SetVectorValue(UPARAM(ref) FParameter& InParameter, const FVector& InValue) { InParameter.SetVectorValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FColor GetColorValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetColorValue(); }
+	static FRotator GetRotatorValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetRotatorValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetColorValue(UPARAM(ref) FParameter& InParameter, const FColor& InColorValue) { InParameter.SetColorValue(InColorValue); }
+	static void SetRotatorValue(UPARAM(ref) FParameter& InParameter, const FRotator& InValue) { InParameter.SetRotatorValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static UClass* GetClassValue(UPARAM(ref) FParameter& InParameter) { return InParameter.GetClassValue(); }
+	static FColor GetColorValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetColorValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetClassValue(UPARAM(ref) FParameter& InParameter, UClass* InClassValue) { InParameter.SetClassValue(InClassValue); }
+	static void SetColorValue(UPARAM(ref) FParameter& InParameter, const FColor& InValue) { InParameter.SetColorValue(InValue); }
 
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FGameplayTag GetTagValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetTagValue(); }
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	static void SetTagValue(UPARAM(ref) FParameter& InParameter, const FGameplayTag& InValue) { InParameter.SetTagValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FGameplayTagContainer GetTagsValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetTagsValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetTagsValue(UPARAM(ref) FParameter& InParameter, const FGameplayTagContainer& InValue) { InParameter.SetTagsValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static UClass* GetClassValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetClassValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetClassValue(UPARAM(ref) FParameter& InParameter, UClass* InValue) { InParameter.SetClassValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static TSoftClassPtr<UObject> GetClassPtrValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetClassPtrValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetClassPtrValue(UPARAM(ref) FParameter& InParameter, const TSoftClassPtr<UObject>& InValue) { InParameter.SetClassPtrValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ParameterModuleStatics")
-	static UObject* GetObjectValue(UPARAM(ref) FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return GetDeterminesOutputType(InParameter.GetObjectValue(), InClass); }
+	static UObject* GetObjectValue(UPARAM(ref) const FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return GetDeterminesOutputObject(InParameter.GetObjectValue(), InClass); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void SetObjectValue(UPARAM(ref) FParameter& InParameter, UObject* InObjectValue) { InParameter.SetObjectValue(InObjectValue); }
+	static void SetObjectValue(UPARAM(ref) FParameter& InParameter, UObject* InValue) { InParameter.SetObjectValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static TSoftObjectPtr<UObject> GetObjectPtrValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetObjectPtrValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetObjectPtrValue(UPARAM(ref) FParameter& InParameter, const TSoftObjectPtr<UObject>& InValue) { InParameter.SetObjectPtrValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameters
 public:
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static bool HasParameter(UPARAM(ref) FParameters& InParameters, FName InName, bool bEnsured = true) { return InParameters.HasParameter(InName, bEnsured); }
-
-	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
-	static void AddParameter(UPARAM(ref) FParameters& InParameters, FName InName, FParameter InParameter){ InParameters.AddParameter(InName, InParameter); }
+	static bool HasParameter(UPARAM(ref) const FParameters& InParameters, FName InName, bool bEnsured = true) { return InParameters.HasParameter(InName, bEnsured); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetParameter(UPARAM(ref) FParameters& InParameters, FName InName, FParameter InParameter){ InParameters.SetParameter(InName, InParameter); }
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter GetParameter(UPARAM(ref) FParameters& InParameters, FName InName, bool bEnsured = true){ return InParameters.GetParameter(InName, bEnsured); }
+	static FParameter GetParameter(UPARAM(ref) const FParameters& InParameters, FName InName, bool bEnsured = true){ return InParameters.GetParameter(InName, bEnsured); }
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static TArray<FParameter> GetParameters(UPARAM(ref) FParameters& InParameters, FName InName, bool bEnsured = true){ return InParameters.GetParameters(InName, bEnsured); }
+	static TArray<FParameter> GetParameters(UPARAM(ref) const FParameters& InParameters, FName InName, bool bEnsured = true){ return InParameters.GetParameters(InName, bEnsured); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void RemoveParameter(UPARAM(ref) FParameters& InParameters, FName InName){ InParameters.RemoveParameter(InName); }

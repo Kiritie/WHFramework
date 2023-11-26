@@ -4,7 +4,6 @@
 
 #include "Gameplay/WHGameState.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Main/MainModule.h"
 
 AWHGameMode::AWHGameMode()
 {
@@ -17,34 +16,22 @@ AWHGameMode::AWHGameMode()
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnInitialize(MainModule);
-	}
+	
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnPreparatory(MainModule, InPhase);
-	}
+	
 }
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
-	}
+	
 }
 
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnTermination(MainModule, InPhase);
-	}
+	
 }
 
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)

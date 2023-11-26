@@ -75,6 +75,16 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "EventModuleStatics")
 	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single);
 
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Broadcast Event"), Category = "EventModuleStatics")
 	static void BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType = EEventNetType::Single);
+
+public:
+	template<class T>
+	static T* GetEventManager()
+	{
+		return Cast<T>(GetEventManager(T::StaticClass()));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModuleStatics")
+	static UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass);
 };

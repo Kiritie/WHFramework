@@ -5,8 +5,6 @@
 
 UEventHandle_ExitGame::UEventHandle_ExitGame()
 {
-	EventType = EEventType::Multicast;
-
 	bIsSimulating = false;
 }
 

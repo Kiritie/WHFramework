@@ -67,7 +67,7 @@ UObject* UObjectPool::OnSpawn(UObject* InObject)
 {
 	if(!InObject)
 	{
-		InObject = NewObject<UObject>(GetTransientPackage(), Type);
+		InObject = NewObject<UObject>(this, Type);
 	}
 	else if(InObject->IsRooted())
 	{

@@ -89,9 +89,9 @@ UWidgetPressAnyKeyPanelBase::UWidgetPressAnyKeyPanelBase(const FObjectInitialize
 	WidgetInputMode = EInputMode::UIOnly;
 }
 
-void UWidgetPressAnyKeyPanelBase::OnInitialize(UObject* InOwner)
+void UWidgetPressAnyKeyPanelBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
 void UWidgetPressAnyKeyPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)

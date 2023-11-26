@@ -80,15 +80,21 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	static UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr);
+	
+	template<class T>
+	static T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{
+		return UWidgetModule::Get().CreateUserWidget<T>(InOwner, InParams, InClass);
+	}
 
 	template<class T>
-	static T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static T* CreateUserWidget(UObject* InOwner, const TArray<FParameter>& InParams, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().CreateUserWidget<T>(InOwner, InClass);
+		return CreateUserWidget<T>(InOwner, &InParams, InClass);
 	}
-	
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
+
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
+	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	template<class T>
 	static T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr)
@@ -96,8 +102,8 @@ public:
 		return UWidgetModule::Get().CreateUserWidgetByName<T>(InName, InOwner);
 	}
 	
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
+	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	template<class T>
 	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())

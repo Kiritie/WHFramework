@@ -12,6 +12,8 @@ IMPLEMENTATION_MAIN_MODULE(AMainModule)
 // ParamSets default values
 AMainModule::AMainModule()
 {
+	bIsSpatiallyLoaded = false;
+
 	Modules = TArray<UModuleBase*>();
 	ModuleMap = TMap<FName, UModuleBase*>();
 }
@@ -100,6 +102,24 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	{
 		ModuleMap.Empty();
 	}
+}
+
+void AMainModule::BeginPlay()
+{
+	Super::BeginPlay();
+
+	Execute_OnPreparatory(this, EPhase::Primary);
+	Execute_OnPreparatory(this, EPhase::Lesser);
+	Execute_OnPreparatory(this, EPhase::Final);
+}
+
+void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	Execute_OnTermination(this, EPhase::Primary);
+	Execute_OnTermination(this, EPhase::Lesser);
+	Execute_OnTermination(this, EPhase::Final);
 }
 
 #if WITH_EDITOR

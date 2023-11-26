@@ -25,16 +25,8 @@ UStepBase::UStepBase()
 
 	OperationTarget = nullptr;
 	bTrackTarget = false;
-
-	CameraViewPawn = nullptr;
-	CameraViewMode = EStepCameraViewMode::None;
-	CameraViewSpace = EStepCameraViewSpace::Local;
-	CameraViewEaseType = EEaseType::Linear;
-	CameraViewDuration = 1.f;
-	CameraViewOffset = FVector::ZeroVector;
-	CameraViewYaw = 0.f;
-	CameraViewPitch = 0.f;
-	CameraViewDistance = 0.f;
+	TrackTargetMode = ECameraTrackMode::LocationOnly;
+	CameraViewParams = FCameraViewParams();
 
 	StepExecuteCondition = EStepExecuteResult::None;
 	StepExecuteResult = EStepExecuteResult::None;
@@ -146,9 +138,14 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	K2_OnEnter(InLastStep);
 
-	UCameraModuleStatics::SwitchCamera(CameraViewPawn);
-
 	ResetCameraView();
+
+	if(bTrackTarget)
+	{
+		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
+			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
+	}
 
 	switch(StepGuideType)
 	{
@@ -359,6 +356,11 @@ void UStepBase::OnLeave()
 	StepState = EStepState::Leaved;
 	OnStateChanged(StepState);
 
+	if(bTrackTarget)
+	{
+		UCameraModuleStatics::EndTrackTarget(OperationTarget);
+	}
+
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
 	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EDM_All, EDC_Step, EDV_Log, FColor::Orange, 5.f);
@@ -397,38 +399,14 @@ bool UStepBase::IsSkipAble_Implementation() const
 #if WITH_EDITOR
 void UStepBase::GetCameraView()
 {
-	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
-	{
-		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - OperationTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - OperationTarget->GetActorRotation().Pitch;
-	}
-	else
-	{
-		CameraViewOffset = UCameraModuleStatics::GetCameraLocation();
-		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw;
-		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch;
-	}
-	CameraViewDistance = UCameraModuleStatics::GetCameraDistance();
+	CameraViewParams.GetCameraParams();
 
 	Modify();
 }
 
 void UStepBase::SetCameraView(FCameraParams InCameraParams)
 {
-	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
-	{
-		CameraViewOffset = InCameraParams.CameraLocation - OperationTarget->GetActorLocation();
-		CameraViewYaw = InCameraParams.CameraRotation.Yaw - OperationTarget->GetActorRotation().Yaw;
-		CameraViewPitch = InCameraParams.CameraRotation.Pitch - OperationTarget->GetActorRotation().Pitch;
-	}
-	else
-	{
-		CameraViewOffset = InCameraParams.CameraLocation;
-		CameraViewYaw = InCameraParams.CameraRotation.Yaw;
-		CameraViewPitch = InCameraParams.CameraRotation.Pitch;
-	}
-	CameraViewDistance = InCameraParams.CameraDistance;
+	CameraViewParams.SetCameraParams(InCameraParams);
 
 	Modify();
 }
@@ -436,49 +414,35 @@ void UStepBase::SetCameraView(FCameraParams InCameraParams)
 
 void UStepBase::ResetCameraView()
 {
-	FVector CameraLocation;
-	float CameraYaw;
-	float CameraPitch;
-	float CameraDistance;
-	if(CameraViewSpace == EStepCameraViewSpace::Local && OperationTarget)
+	UCameraModuleStatics::SetCameraViewParams(CameraViewParams);
+}
+
+void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
+{
+	if(StepState == EStepState::Entered)
 	{
-		CameraLocation = OperationTarget->GetActorLocation() + CameraViewOffset;
-		CameraYaw = OperationTarget->GetActorRotation().Yaw + CameraViewYaw;
-		CameraPitch = OperationTarget->GetActorRotation().Pitch + CameraViewPitch;
-		CameraDistance = CameraViewDistance;
-	}
-	else
-	{
-		CameraLocation = CameraViewOffset;
-		CameraYaw = CameraViewYaw;
-		CameraPitch = CameraViewPitch;
-		CameraDistance = CameraViewDistance;
-	}
-	switch(CameraViewMode)
-	{
-		case EStepCameraViewMode::Instant:
+		if(InOperationTarget)
 		{
-			UCameraModuleStatics::SetCameraLocation(CameraLocation, true);
-			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, true);
-			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, true);
-			break;
+			if(bResetCameraView)
+			{
+				ResetCameraView();
+			}
+			if(bTrackTarget)
+			{
+				UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+					CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
+					CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
+			}
 		}
-		case EStepCameraViewMode::Smooth:
+		else
 		{
-			UCameraModuleStatics::SetCameraLocation(CameraLocation, false);
-			UCameraModuleStatics::SetCameraRotation(CameraViewYaw, CameraViewPitch, false);
-			UCameraModuleStatics::SetCameraDistance(CameraViewDistance, false);
-			break;
+			if(bTrackTarget)
+			{
+				UCameraModuleStatics::EndTrackTarget(OperationTarget);
+			}
 		}
-		case EStepCameraViewMode::Duration:
-		{
-			UCameraModuleStatics::DoCameraLocation(CameraLocation, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleStatics::DoCameraRotation(CameraYaw, CameraPitch, CameraViewDuration, CameraViewEaseType);
-			UCameraModuleStatics::DoCameraDistance(CameraDistance, CameraViewDuration, CameraViewEaseType);
-			break;
-		}
-		default: break;
 	}
+	OperationTarget = InOperationTarget;
 }
 
 bool UStepBase::CheckStepCondition(UStepBase* InStep) const
@@ -714,6 +678,11 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
 		auto PropertyName = Property->GetFName();
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, OperationTarget))
+		{
+			CameraViewParams.CameraViewTarget = OperationTarget;
+		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, SubSteps) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bMergeSubStep))

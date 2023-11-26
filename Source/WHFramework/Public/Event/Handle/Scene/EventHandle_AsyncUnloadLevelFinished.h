@@ -18,13 +18,13 @@ class WHFRAMEWORK_API UEventHandle_AsyncUnloadLevelFinished : public UEventHandl
 
 public:
 	UEventHandle_AsyncUnloadLevelFinished();
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	FName LevelPath;
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FName LevelPath;
 };

@@ -11,10 +11,10 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
-#include "DetailCategoryBuilder.h"
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
+#include "Procedure/ProcedureModule.h"
 
 FProcedureModuleDetailsPanel::FProcedureModuleDetailsPanel() {}
 
@@ -27,25 +27,25 @@ void FProcedureModuleDetailsPanel::CustomizeDetails(IDetailLayoutBuilder& Detail
 {
 	SelectedObjectsList = DetailLayoutBuilder.GetSelectedObjects();
 
-	IDetailCategoryBuilder& ProcedureModuleCategory = DetailLayoutBuilder.EditCategory(FName("ProcedureModule"));
+	TSharedRef<IPropertyHandle> ModuleClassesProperty = DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureModule, bAutoSwitchFirst));
 
-	TSharedRef<SWrapBox> ProcedureModuleActionBox = SNew(SWrapBox).UseAllottedWidth(true);
-	ProcedureModuleActionBox->AddSlot()
-	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
+	DetailLayoutBuilder.AddCustomRowToCategory(ModuleClassesProperty, FText::GetEmpty())
+		.WholeRowContent()
 		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Open Procedure Editor")))
-			.OnClicked(FOnClicked::CreateSP(this, &FProcedureModuleDetailsPanel::OnOnClickOpenProcedureEditorButton))
-		]
-	];
-
-	ProcedureModuleCategory.AddCustomRow(FText::GetEmpty())
-		.ValueContent()
-		[
-			ProcedureModuleActionBox
+			SNew(SWrapBox)
+			.UseAllottedWidth(true)
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Open Procedure Editor")))
+				.OnClicked(FOnClicked::CreateSP(this, &FProcedureModuleDetailsPanel::OnOnClickOpenProcedureEditorButton))
+			]
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Clear All Procedure")))
+				.OnClicked(FOnClicked::CreateSP(this, &FProcedureModuleDetailsPanel::OnOnClickClearAllProcedure))
+			]
 		];
 }
 
@@ -53,5 +53,17 @@ FReply FProcedureModuleDetailsPanel::OnOnClickOpenProcedureEditorButton()
 {
 	FGlobalTabmanager::Get()->TryInvokeTab(FName("ProcedureEditor"));
 
+	return FReply::Handled();
+}
+
+FReply FProcedureModuleDetailsPanel::OnOnClickClearAllProcedure()
+{
+	for(auto Iter : SelectedObjectsList)
+	{
+		if(UProcedureModule* ProcedureModule = Cast<UProcedureModule>(Iter))
+		{
+			ProcedureModule->ClearAllProcedure();
+		}
+	}
 	return FReply::Handled();
 }

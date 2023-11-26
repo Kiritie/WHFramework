@@ -3,6 +3,7 @@
 
 #include "Common/CommonStatics.h"
 
+#include "BlueprintGameplayTagLibrary.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 #include "ImageUtils.h"
@@ -336,6 +337,28 @@ FText UCommonStatics::NumberToText(int32 InNumber, const TMap<int32, FString>& I
 	return FText::FromString(TextStr);
 }
 
+FGameplayTag UCommonStatics::NameToTag(const FName InName)
+{
+	return FGameplayTag::RequestGameplayTag(InName);
+}
+
+FName UCommonStatics::TagToName(const FGameplayTag& InTag)
+{
+	return UBlueprintGameplayTagLibrary::GetTagName(InTag);
+}
+
+int32 UCommonStatics::GetTagHierarchy(const FGameplayTag& InTag)
+{
+	const FString TagName = TagToName(InTag).ToString();
+	TArray<FString> TagNames;
+	return TagName.ParseIntoArray(TagNames, TEXT("."));
+}
+
+int32 UCommonStatics::GetTagIndexForContainer(const FGameplayTag& InTag, const FGameplayTagContainer& InTagContainer)
+{
+	return InTagContainer.GetGameplayTagArray().IndexOfByKey(InTag);
+}
+
 bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
 {
 	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
@@ -590,6 +613,16 @@ UTexture2D* UCommonStatics::CompositeTextures(const TArray<UTexture2D*>& InTextu
 bool UCommonStatics::IsImplementedInBlueprint(const UFunction* Func)
 {
 	return Func && ensure(Func->GetOuter()) && Func->GetOuter()->IsA(UBlueprintGeneratedClass::StaticClass());
+}
+
+FVector2f UCommonStatics::GetGeometryPosition(const FGeometry& InGeometry)
+{
+	return InGeometry.Position;
+}
+
+FVector2f UCommonStatics::GetGeometryAbsolutePosition(const FGeometry& InGeometry)
+{
+	return InGeometry.AbsolutePosition;
 }
 
 const UObject* UCommonStatics::GetWorldContext(bool bInEditor)

@@ -5,8 +5,6 @@
 
 UEventHandle_GenerateVoxel::UEventHandle_GenerateVoxel()
 {
-	EventType = EEventType::Multicast;
-
 	VoxelItem = FVoxelItem();
 }
 

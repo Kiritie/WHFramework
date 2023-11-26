@@ -18,14 +18,14 @@ UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectI
 	WidgetCreateType = EWidgetCreateType::AutoCreate;
 }
 
-void UWidgetSettingPageBase::OnInitialize(UObject* InOwner)
+void UWidgetSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
-void UWidgetSettingPageBase::OnCreate(UObject* InOwner)
+void UWidgetSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 }
 
 void UWidgetSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)

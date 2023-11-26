@@ -18,13 +18,14 @@ class WHFRAMEWORK_API UEventHandle_PauseGame : public UEventHandleBase
 
 public:
 	UEventHandle_PauseGame();
-	
-public:
-	EPauseMode PauseMode;
 
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+	
+public:
+	UPROPERTY(BlueprintReadOnly)
+	EPauseMode PauseMode;
 };

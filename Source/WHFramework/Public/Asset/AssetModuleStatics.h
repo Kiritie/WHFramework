@@ -92,41 +92,41 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// DataAsset
 public:
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static bool HasDataAsset(FName InName);
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static bool HasDataAsset(const FGameplayTag& InTag);
 
 	template<class T>
-	static T* GetDataAsset(FName InName = NAME_None)
+	static T* GetDataAsset(const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().GetDataAsset<T>(InName);
+		return UAssetModule::Get().GetDataAsset<T>(InTag);
 	}
 	
 	template<class T>
-	static T& GetDataAssetRef(FName InName = NAME_None)
+	static T& GetDataAssetRef(const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().GetDataAssetRef<T>(InName);
+		return UAssetModule::Get().GetDataAssetRef<T>(InTag);
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	template<class T>
-	static T* CreateDataAsset(FName InName = NAME_None)
+	static T* CreateDataAsset(const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().CreateDataAsset<T>(InName);
+		return UAssetModule::Get().CreateDataAsset<T>(InTag);
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	template<class T>
-	static bool RemoveDataAsset(FName InName = NAME_None)
+	static bool RemoveDataAsset(const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().RemoveDataAsset<T>(InName);
+		return UAssetModule::Get().RemoveDataAsset<T>(InTag);
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
 	static void RemoveAllDataAsset();
@@ -203,7 +203,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InParams", DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleStatics")
 	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
-		return GetDeterminesOutputType(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning), InPrimaryAssetClass);
+		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning), InPrimaryAssetClass);
 	}
 	
 	template<class T>
@@ -215,7 +215,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadEntityAsset"), Category = "AssetModuleStatics")
 	static UPrimaryAssetBase* K2_LoadEntityAsset(const TScriptInterface<IPrimaryEntityInterface>& InPrimaryEntity, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
 	{
-		return GetDeterminesOutputType(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bLogWarning), InPrimaryAssetClass);
+		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bLogWarning), InPrimaryAssetClass);
 	}
 
 	template<class T>

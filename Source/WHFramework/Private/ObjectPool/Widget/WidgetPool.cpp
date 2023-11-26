@@ -13,7 +13,7 @@ UObject* UWidgetPool::OnSpawn(UObject* InObject)
 {
 	if(!InObject)
 	{
-		InObject = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
+		InObject = CreateWidget<UUserWidget>(this->GetWorld(), Type.Get());
 	}
 	else if(InObject->IsRooted())
 	{

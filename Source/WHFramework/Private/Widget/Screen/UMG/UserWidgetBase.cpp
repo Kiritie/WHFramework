@@ -69,8 +69,10 @@ void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	
 }
 
-void UUserWidgetBase::OnCreate(UObject* InOwner)
+void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	WidgetParams = InParams;
+
 	if(ParentName != NAME_None)
 	{
 		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
@@ -97,19 +99,19 @@ void UUserWidgetBase::OnCreate(UObject* InOwner)
 		Iter->OnCreate(this, Iter->GetParams());
 	}
 
-	K2_OnCreate(InOwner);
+	K2_OnCreate(InOwner, InParams);
 }
 
-void UUserWidgetBase::OnInitialize(UObject* InOwner)
+void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	OwnerObject = InOwner;
-	
+	WidgetParams = InParams;
+
 	for(auto& Iter : ChildWidgets)
 	{
-		Iter->OnInitialize(InOwner);
+		Iter->OnInitialize(InOwner, InParams);
 	}
 
-	K2_OnInitialize(InOwner);
+	K2_OnInitialize(InOwner, InParams);
 }
 
 void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
@@ -259,6 +261,21 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 	K2_OnStateChanged(InWidgetState);
 }
 
+void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams)
+{
+	Init(InOwner, InParams ? *InParams : TArray<FParameter>());
+}
+
+void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	if(OwnerObject != InOwner || !InOwner)
+	{
+		OwnerObject = InOwner;
+
+		OnInitialize(InOwner, InParams);
+	}
+}
+
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
 	UWidgetModuleStatics::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
@@ -288,8 +305,12 @@ void UUserWidgetBase::Toggle(bool bInstant)
 	}
 }
 
-void UUserWidgetBase::Reset()
+void UUserWidgetBase::Reset(bool bResetOwner)
 {
+	if(bResetOwner)
+	{
+		OwnerObject = nullptr;
+	}
 	OnReset();
 }
 
@@ -303,6 +324,11 @@ void UUserWidgetBase::Refresh()
 void UUserWidgetBase::Destroy(bool bRecovery)
 {
 	UWidgetModuleStatics::DestroyUserWidget<UUserWidgetBase>(bRecovery, GetClass());
+}
+
+bool UUserWidgetBase::CanOpen_Implementation() const
+{
+	return true;
 }
 
 void UUserWidgetBase::FinishOpen(bool bInstant)

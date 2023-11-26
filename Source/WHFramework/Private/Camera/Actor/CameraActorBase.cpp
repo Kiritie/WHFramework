@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Camera/Base/CameraActorBase.h"
+#include "Camera/Actor/CameraActorBase.h"
 
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -10,6 +10,8 @@
 ACameraActorBase::ACameraActorBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	bIsSpatiallyLoaded = false;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);

@@ -142,28 +142,28 @@ protected:
 	TArray<UDataAssetBase*> DataAssets;
 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "DataAsset")
-	TMap<FName, UDataAssetBase*> DataAssetMap;
+	TMap<FGameplayTag, UDataAssetBase*> DataAssetMap;
 	
 public:
-	UFUNCTION(BlueprintPure)
-	bool HasDataAsset(FName InName) const;
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
+	bool HasDataAsset(const FGameplayTag& InTag) const;
 
 	template<class T>
-	T* GetDataAsset(FName InName = NAME_None) const
+	T* GetDataAsset(const FGameplayTag& InTag = FGameplayTag()) const
 	{
-		if(InName.IsNone()) InName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
+		const FGameplayTag& Tag = InTag.IsValid() ? InTag : Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetTag();
 
-		if(DataAssetMap.Contains(InName))
+		if(DataAssetMap.Contains(Tag))
 		{
-			return Cast<T>(DataAssetMap[InName]);
+			return Cast<T>(DataAssetMap[Tag]);
 		}
 		return nullptr;
 	}
 
 	template<class T>
-	T& GetDataAssetRef(FName InName = NAME_None) const
+	T& GetDataAssetRef(const FGameplayTag& InTag = FGameplayTag()) const
 	{
-		if(T* Asset = GetDataAsset<T>(InName))
+		if(T* Asset = GetDataAsset<T>(InTag))
 		{
 			return *Asset;
 		}
@@ -173,47 +173,47 @@ public:
 		}
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"))
+	UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag()) const;
 
 	template<class T>
-	T* CreateDataAsset(FName InName = NAME_None)
+	T* CreateDataAsset(const FGameplayTag& InTag = FGameplayTag())
 	{
-		if(InName.IsNone()) InName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
+		const FGameplayTag& Tag = InTag.IsValid() ? InTag : Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetTag();
 
 		if(UDataAssetBase* DataAsset = NewObject<UDataAssetBase>(this, T::StaticClass()))
 		{
-			if(!DataAssetMap.Contains(InName))
+			if(!DataAssetMap.Contains(Tag))
 			{
-				DataAssetMap.Add(InName, DataAsset);
+				DataAssetMap.Add(Tag, DataAsset);
 			}
 			return Cast<T>(DataAsset);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"))
+	UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	template<class T>
-	bool RemoveDataAsset(FName InName = NAME_None)
+	bool RemoveDataAsset(const FGameplayTag& InTag = FGameplayTag())
 	{
-		if(InName.IsNone()) InName = Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetName();
+		const FGameplayTag& Tag = InTag.IsValid() ? InTag : Cast<UDataAssetBase>(T::StaticClass()->GetDefaultObject())->GetDataAssetTag();
 
-		if(DataAssetMap.Contains(InName))
+		if(DataAssetMap.Contains(Tag))
 		{
-			if(UDataAssetBase* DataAsset = DataAssetMap[InName])
+			if(UDataAssetBase* DataAsset = DataAssetMap[Tag])
 			{
 				DataAsset->ConditionalBeginDestroy();
-				DataAssetMap.Remove(InName);
+				DataAssetMap.Remove(Tag);
 			}
 			return true;
 		}
 		return false;
 	}
 
-	UFUNCTION(BlueprintCallable)
-	bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, FName InName = NAME_None);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	UFUNCTION(BlueprintCallable)
 	void RemoveAllDataAsset();

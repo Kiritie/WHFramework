@@ -21,22 +21,6 @@ enum class EProcedureGuideType : uint8
 	TimerLoop
 };
 
-UENUM(BlueprintType)
-enum class EProcedureCameraViewMode : uint8
-{
-	None,
-	Instant,
-	Smooth,
-	Duration
-};
-
-UENUM(BlueprintType)
-enum class EProcedureCameraViewSpace : uint8
-{
-	Local,
-	World
-};
-
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FProcedureListItemStates
 {

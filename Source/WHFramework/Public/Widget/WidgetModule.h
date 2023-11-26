@@ -143,20 +143,20 @@ public:
 	UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr) const;
 
 	template<class T>
-	T* CreateUserWidget(UObject* InOwner = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass) return nullptr;
 		
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 		
-		return CreateUserWidgetByName<T>(WidgetName, InOwner);
+		return CreateUserWidgetByName<T>(WidgetName, InOwner, InParams);
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
+	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	template<class T>
-	T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr)
+	T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
 	{
 		if(InName.IsNone()) return nullptr;
 		
@@ -174,7 +174,7 @@ public:
 			if(UserWidget)
 			{
 				AllUserWidgets.Add(InName, UserWidget);
-				UserWidget->OnCreate();
+				UserWidget->OnCreate(InOwner, InParams ? * InParams : TArray<FParameter>());
 			}
 		}
 		else
@@ -182,15 +182,15 @@ public:
 			UserWidget = GetUserWidgetByName(InName);
 		}
 		
-		if(UserWidget && (UserWidget->GetOwnerObject() != InOwner || !InOwner))
+		if(UserWidget)
 		{
-			UserWidget->OnInitialize(InOwner);
+			UserWidget->Init(InOwner, InParams);
 		}
 		return Cast<T>(UserWidget);
 	}
 
-	UFUNCTION(BlueprintCallable)
-	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	template<class T>
 	bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -207,6 +207,7 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InName) ? GetUserWidgetByName<UUserWidgetBase>(InName) : CreateUserWidgetByName<UUserWidgetBase>(InName))
 		{
+			if(!UserWidget->CanOpen()) return false;
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening && UserWidget->GetWidgetState() != EScreenWidgetState::Opened)
 			{
 				if(!UserWidget->GetParentWidgetN())
@@ -373,12 +374,12 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateSlateWidget(UObject* InOwner)
+	TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = &SNew(T))
 		{
-			SlateWidget->OnCreate();
-			SlateWidget->OnInitialize(InOwner);
+			SlateWidget->OnCreate(InOwner, InParams ? *InParams : TArray<FParameter>());
+			SlateWidget->Init(InOwner, InParams);
 			// const FName WidgetName = typeid(SlateWidget).name();
 			// if(!AllSlateWidgets.Contains(WidgetName))
 			// {

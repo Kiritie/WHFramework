@@ -5,14 +5,17 @@
 #include "CommonButtonBase.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 
-#include "WidgetButtonBase.generated.h"
+#include "CommonButton.generated.h"
 
 class UCommonTextBlock;
 
 UCLASS(Abstract, BlueprintType, Blueprintable)
-class WHFRAMEWORK_API UWidgetButtonBase : public UCommonButtonBase, public IObjectPoolInterface
+class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
 {
 	GENERATED_BODY()
+
+public:
+	UCommonButton(const FObjectInitializer& ObjectInitializer);
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Object
@@ -27,6 +30,12 @@ public:
 	virtual void NativePreConstruct() override;
 	
 	virtual void NativeOnCurrentTextStyleChanged() override;
+
+	virtual void NativeOnClicked() override;
+
+	virtual void NativeOnSelected(bool bBroadcast) override;
+
+	virtual void NativeOnDeselected(bool bBroadcast) override;
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
@@ -38,6 +47,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Content")
 	FText Title;
+
+protected:
+	UPROPERTY(BlueprintReadOnly)
+	bool bClicked;
 
 public:
 	UFUNCTION(BlueprintPure)

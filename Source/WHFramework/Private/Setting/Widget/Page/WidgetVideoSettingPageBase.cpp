@@ -17,14 +17,14 @@ UWidgetVideoSettingPageBase::UWidgetVideoSettingPageBase(const FObjectInitialize
 	Title = FText::FromString(TEXT("视频"));
 }
 
-void UWidgetVideoSettingPageBase::OnInitialize(UObject* InOwner)
+void UWidgetVideoSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InOwner);
+	Super::OnInitialize(InOwner, InParams);
 }
 
-void UWidgetVideoSettingPageBase::OnCreate(UObject* InOwner)
+void UWidgetVideoSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner);
+	Super::OnCreate(InOwner, InParams);
 
 	SettingItem_GlobalVideoQuality = CreateSubWidget<UWidgetEnumSettingItemBase>({ FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality") }, USettingModule::Get().GetEnumSettingItemClass());
 	AddSettingItem(FName("GlobalVideoQuality"), SettingItem_GlobalVideoQuality, FText::FromString(TEXT("预设")));

@@ -17,13 +17,13 @@ class WHFRAMEWORK_API UEventHandle_CompleteTask : public UEventHandleBase
 
 public:
 	UEventHandle_CompleteTask();
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	class UTaskBase* Task;
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	class UTaskBase* Task;
 };

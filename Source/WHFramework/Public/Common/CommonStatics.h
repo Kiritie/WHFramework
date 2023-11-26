@@ -199,10 +199,10 @@ public:
 			
 	//////////////////////////////////////////////////////////////////////////
 	// String
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static FString BoolToString(bool InBool);
 
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static bool StringToBool(const FString& InString);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -213,11 +213,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool TextIsNumber(const FText& InText);
 
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static int32 TextToNumber(const FText& InText, TMap<int32, FString>& OutSymbols);
 
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
+				
+	//////////////////////////////////////////////////////////////////////////
+	// Tag
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	static FGameplayTag NameToTag(const FName InName);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag", CompactNodeTitle = "->"), Category = "CommonStatics")
+	static FName TagToName(const FGameplayTag& InTag);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
+	static int32 GetTagHierarchy(const FGameplayTag& InTag);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag,InTagContainer"), Category = "CommonStatics")
+	static int32 GetTagIndexForContainer(const FGameplayTag& InTag, const FGameplayTagContainer& InTagContainer);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Json
@@ -251,6 +265,14 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Blueprint
 	static bool IsImplementedInBlueprint(const UFunction* Func);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Widget
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FVector2f GetGeometryPosition(const FGeometry& InGeometry);
+	
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FVector2f GetGeometryAbsolutePosition(const FGeometry& InGeometry);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay

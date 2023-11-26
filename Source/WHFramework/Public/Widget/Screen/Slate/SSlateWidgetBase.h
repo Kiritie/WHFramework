@@ -22,9 +22,9 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
-	virtual void OnCreate(UObject* InOwner = nullptr) override;
+	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
 	
-	virtual void OnInitialize(UObject* InOwner = nullptr) override;
+	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
 	
@@ -39,6 +39,10 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams) override;
+
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
 	
 	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
@@ -47,11 +51,14 @@ public:
 
 	virtual void Toggle(bool bInstant) override;
 
-	virtual void Reset() override;
+	virtual void Reset(bool bResetOwner) override;
 
 	virtual void Refresh() override;
 
 	virtual void Destroy(bool bRecovery = false) override;
+
+public:
+	virtual bool CanOpen() const override;
 
 protected:
 	virtual void FinishOpen(bool bInstant) override;

@@ -5,7 +5,6 @@
 
 UEventHandle_StartStep::UEventHandle_StartStep()
 {
-	EventType = EEventType::Multicast;
 	RootStepIndex = -1;
 }
 

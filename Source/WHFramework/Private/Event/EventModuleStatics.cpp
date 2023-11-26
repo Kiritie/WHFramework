@@ -50,3 +50,8 @@ void UEventModuleStatics::BroadcastEventByHandle(UEventHandleBase* InHandle, UOb
 {
 	UEventModule::Get().BroadcastEventByHandle(InHandle, InSender, InNetType);
 }
+
+UEventManagerBase* UEventModuleStatics::GetEventManager(TSubclassOf<UEventManagerBase> InClass)
+{
+	return UEventModule::Get().GetEventManager(InClass);
+}
