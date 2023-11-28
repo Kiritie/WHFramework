@@ -59,7 +59,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	}
 }
 
-void UWorldWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }

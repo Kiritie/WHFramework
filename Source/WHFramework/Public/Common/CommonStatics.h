@@ -227,6 +227,12 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag", CompactNodeTitle = "->"), Category = "CommonStatics")
 	static FName TagToName(const FGameplayTag& InTag);
 
+	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	static FGameplayTag StringToTag(const FString& InString);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag", CompactNodeTitle = "->"), Category = "CommonStatics")
+	static FString TagToString(const FGameplayTag& InTag);
+
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
 	static int32 GetTagHierarchy(const FGameplayTag& InTag);
 
@@ -268,11 +274,14 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Widget
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FVector2f GetGeometryPosition(const FGeometry& InGeometry);
+	UFUNCTION(BlueprintPure, DisplayName = "Get Position", Category = "CommonStatics")
+	static FVector2D GetGeometryPosition(const FGeometry& InGeometry);
 	
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FVector2f GetGeometryAbsolutePosition(const FGeometry& InGeometry);
+	UFUNCTION(BlueprintPure, DisplayName = "Get Absolute Position", Category = "CommonStatics")
+	static FVector2D GetGeometryAbsolutePosition(const FGeometry& InGeometry);
+	
+	UFUNCTION(BlueprintPure, DisplayName = "Get Viewport Position", Category = "CommonStatics")
+	static FVector2D GetGeometryViewportPosition(const FGeometry& InGeometry);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay

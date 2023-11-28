@@ -9,9 +9,9 @@ UWidgetBoolSettingItemBase::UWidgetBoolSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetBoolSettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetBoolSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetBoolSettingItemBase::OnDespawn_Implementation(bool bRecovery)

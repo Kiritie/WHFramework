@@ -40,7 +40,7 @@ public:
 	/**
 	* 生成对象
 	*/
-	UObject* Spawn(const TArray<FParameter>& InParams);
+	UObject* Spawn(UObject* InOwner, const TArray<FParameter>& InParams);
 	/**
 	* 回收对象
 	* @param InObject 对象

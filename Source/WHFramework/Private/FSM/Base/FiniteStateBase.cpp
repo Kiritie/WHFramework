@@ -22,7 +22,7 @@ UFiniteStateBase::UFiniteStateBase()
 	bHasBlueprintOnLeaveValidate = UCommonStatics::IsImplementedInBlueprint(OnLeaveValidateFunction);
 }
 
-void UFiniteStateBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UFiniteStateBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }

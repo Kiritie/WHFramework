@@ -9,7 +9,7 @@ UWHObject::UWHObject()
 	
 }
 
-void UWHObject::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWHObject::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }

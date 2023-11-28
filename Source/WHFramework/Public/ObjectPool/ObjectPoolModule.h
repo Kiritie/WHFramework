@@ -96,17 +96,17 @@ public:
 	bool HasObject(TSubclassOf<UObject> InType);
 
 	template<class T>
-	T* SpawnObject(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	T* SpawnObject(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		return Cast<T>(SpawnObject(InType, InParams ? *InParams : TArray<FParameter>()));
+		return Cast<T>(SpawnObject(InType, InOwner, InParams ? *InParams : TArray<FParameter>()));
 	}
 	template<class T>
-	T* SpawnObject(const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
+	T* SpawnObject(UObject* InOwner, const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
 	{
-		return Cast<T>(SpawnObject(InType, InParams));
+		return Cast<T>(SpawnObject(InType, InOwner, InParams));
 	}
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
-	UObject* SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams);
+	UObject* SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
 	void DespawnObject(UObject* InObject, bool bRecovery = true);

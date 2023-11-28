@@ -10,9 +10,9 @@ UWidgetKeySettingItemBase::UWidgetKeySettingItemBase(const FObjectInitializer& O
 {
 }
 
-void UWidgetKeySettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetKeySettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetKeySettingItemBase::OnDespawn_Implementation(bool bRecovery)

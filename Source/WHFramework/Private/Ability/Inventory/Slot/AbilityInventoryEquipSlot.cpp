@@ -15,9 +15,9 @@ void UAbilityInventoryEquipSlot::OnInitialize(UAbilityInventoryBase* InInventory
 	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
-void UAbilityInventoryEquipSlot::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UAbilityInventoryEquipSlot::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UAbilityInventoryEquipSlot::OnDespawn_Implementation(bool bRecovery)

@@ -23,7 +23,7 @@ TArray<FParameter> UEventHandleBase::Pack_Implementation() const
 	return TArray<FParameter>();
 }
 
-void UEventHandleBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UEventHandleBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 }
 

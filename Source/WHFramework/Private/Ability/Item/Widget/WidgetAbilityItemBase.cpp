@@ -12,9 +12,9 @@ UWidgetAbilityItemBase::UWidgetAbilityItemBase(const FObjectInitializer& ObjectI
 	Item = FAbilityItem::Empty;
 }
 
-void UWidgetAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetAbilityItemBase::OnDespawn_Implementation(bool bRecovery)

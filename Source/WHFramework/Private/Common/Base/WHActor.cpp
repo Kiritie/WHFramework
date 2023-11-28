@@ -35,7 +35,7 @@ void AWHActor::OnTermination_Implementation(EPhase InPhase)
 	
 }
 
-void AWHActor::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
 	{

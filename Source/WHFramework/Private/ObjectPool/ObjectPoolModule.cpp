@@ -129,12 +129,12 @@ bool UObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 	return false;
 }
 
-UObject* UObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
+UObject* UObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass()) || ModuleState == EModuleState::Terminated) return nullptr;
 
 	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
-	return ObjectPool->Spawn(InParams);
+	return ObjectPool->Spawn(InOwner, InParams);
 }
 
 void UObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)

@@ -1,22 +1,20 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
+#include "Groups/CommonButtonGroupBase.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 
-#include "WHObject.generated.h"
+#include "CommonButtonGroup.generated.h"
 
-/**
- * 
- */
-UCLASS(Blueprintable, hidecategories = (Tick, Replication, Rendering, Collision, Actor, Input, LOD, Cooking, Hidden, WorldPartition, Hlod, DataLayers))
-class WHFRAMEWORK_API UWHObject : public UObject, public IObjectPoolInterface
+UCLASS(BlueprintType)
+class WHFRAMEWORK_API UCommonButtonGroup : public UCommonButtonGroupBase, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 
 public:
-	UWHObject();
-
+	UCommonButtonGroup();
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Object
 public:
@@ -25,7 +23,4 @@ public:
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-public:
-	virtual UWorld* GetWorld() const override;
 };

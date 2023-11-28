@@ -83,7 +83,7 @@ bool AAbilityPawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
 	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
-void AAbilityPawnBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

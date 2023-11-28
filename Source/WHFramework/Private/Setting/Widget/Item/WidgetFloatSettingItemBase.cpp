@@ -16,9 +16,9 @@ UWidgetFloatSettingItemBase::UWidgetFloatSettingItemBase(const FObjectInitialize
 	ScaleFactor = 1.f;
 }
 
-void UWidgetFloatSettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetFloatSettingItemBase::OnDespawn_Implementation(bool bRecovery)

@@ -9,16 +9,19 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	bClicked = false;
 }
 
-void UCommonButton::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }
 
 void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 {
+	bClicked = true;
 	SetIsSelected(false);
 	SetTitle(FText::GetEmpty());
 	bClicked = false;
+
+	RemoveFromParent();
 }
 
 void UCommonButton::NativePreConstruct()

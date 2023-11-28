@@ -9,9 +9,9 @@ UWidgetTextSettingItemBase::UWidgetTextSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetTextSettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetTextSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetTextSettingItemBase::OnDespawn_Implementation(bool bRecovery)

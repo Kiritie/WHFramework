@@ -31,9 +31,9 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void AAbilityVitalityBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityVitalityBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	FSM->SwitchDefaultState();
 }

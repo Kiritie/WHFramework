@@ -38,7 +38,7 @@ public:
 public:
 	virtual int32 GetLimit_Implementation() const override { return 0; }
 
-	virtual void OnSpawn_Implementation(const TArray<FParameter>& InParams) override;
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
@@ -52,21 +52,21 @@ public:
 	void K2_OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams);
 	UFUNCTION()
 	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset();
+	UFUNCTION()
+	virtual void OnReset() override;
 
 	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnOpen")
 	void K2_OnOpen(const TArray<FParameter>& InParams, bool bInstant = false);
 	UFUNCTION()
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
-	
+
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnClose")
 	void K2_OnClose(bool bInstant = false);
 	UFUNCTION()
 	virtual void OnClose(bool bInstant = false) override;
-
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
-	void K2_OnReset();
-	UFUNCTION()
-	virtual void OnReset() override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
@@ -84,15 +84,15 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
 
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Close(bool bInstant = false) override;

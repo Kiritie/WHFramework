@@ -39,14 +39,14 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce = false) override;
 
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
 	
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) override;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) override;
 	
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) override;
-	
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) override;
+
 	virtual void Close(bool bInstant = false) override;
 
 	virtual void Toggle(bool bInstant) override;

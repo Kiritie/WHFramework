@@ -26,7 +26,7 @@ void UAbilityInventorySlot::OnInitialize(UAbilityInventoryBase* InInventory, EAb
 	SplitType = InSplitType;
 }
 
-void UAbilityInventorySlot::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UAbilityInventorySlot::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }

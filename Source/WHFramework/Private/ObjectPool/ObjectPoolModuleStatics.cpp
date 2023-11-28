@@ -3,9 +3,9 @@
 
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
-UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, const TArray<FParameter>& InParams)
+UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return UObjectPoolModule::Get().SpawnObject(InType, InParams);
+	return UObjectPoolModule::Get().SpawnObject(InType, InOwner, InParams);
 }
 
 void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, bool bRecovery)

@@ -121,7 +121,7 @@ void ACharacterBase::Tick(float DeltaSeconds)
 	}
 }
 
-void ACharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

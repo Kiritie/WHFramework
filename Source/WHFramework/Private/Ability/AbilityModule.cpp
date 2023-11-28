@@ -123,22 +123,22 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 		}
 		case EAbilityItemType::Prop:
 		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpProp>(nullptr, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpProp>(nullptr, nullptr, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Equip:
 		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpEquip>(nullptr, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpEquip>(nullptr, nullptr, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Skill:
 		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpSkill>(nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpSkill>(nullptr, nullptr, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
 			break;
 		}
 		case EAbilityItemType::Raw:
 		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpRaw>(nullptr, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
+			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpRaw>(nullptr, nullptr, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
 			break;
 		}
 		default: break;
@@ -158,7 +158,7 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 AAbilityActorBase* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AAbilityActorBase* Actor = UObjectPoolModuleStatics::SpawnObject<AAbilityActorBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	if(AAbilityActorBase* Actor = UObjectPoolModuleStatics::SpawnObject<AAbilityActorBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityActorDataBase>().Class))
 	{
 		Actor->LoadSaveData(InSaveData);
 		if(InContainer)
@@ -173,7 +173,7 @@ AAbilityActorBase* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISce
 AAbilityVitalityBase* UAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleStatics::SpawnObject<AAbilityVitalityBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
+	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleStatics::SpawnObject<AAbilityVitalityBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
 	{
 		Vitality->LoadSaveData(InSaveData);
 		if(InContainer)
@@ -188,7 +188,7 @@ AAbilityVitalityBase* UAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData
 AAbilityPawnBase* UAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
-	if(AAbilityPawnBase* Pawn = UObjectPoolModuleStatics::SpawnObject<AAbilityPawnBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
+	if(AAbilityPawnBase* Pawn = UObjectPoolModuleStatics::SpawnObject<AAbilityPawnBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
 	{
 		Pawn->LoadSaveData(InSaveData);
 		Pawn->SpawnDefaultController();
@@ -204,7 +204,7 @@ AAbilityPawnBase* UAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, IScene
 AAbilityCharacterBase* UAbilityModule::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	if(AAbilityCharacterBase* Character = UObjectPoolModuleStatics::SpawnObject<AAbilityCharacterBase>({ &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
+	if(AAbilityCharacterBase* Character = UObjectPoolModuleStatics::SpawnObject<AAbilityCharacterBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
 	{
 		Character->LoadSaveData(InSaveData);
 		Character->SpawnDefaultController();

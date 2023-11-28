@@ -19,9 +19,9 @@ AAbilitySkillBase::AAbilitySkillBase()
 	HitTargets = TArray<AActor*>();
 }
 
-void AAbilitySkillBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilitySkillBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void AAbilitySkillBase::OnDespawn_Implementation(bool bRecovery)

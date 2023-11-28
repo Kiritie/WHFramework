@@ -19,9 +19,9 @@ UWorldTimer::UWorldTimer()
 	CurrentSeconds = 0;
 }
 
-void UWorldTimer::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWorldTimer::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	UpdateTimer();
 }

@@ -82,51 +82,51 @@ public:
 	static UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr);
 	
 	template<class T>
-	static T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().CreateUserWidget<T>(InOwner, InParams, InClass);
+		return UWidgetModule::Get().CreateUserWidget<T>(InOwner, InParams, bForce, InClass);
 	}
 
 	template<class T>
-	static T* CreateUserWidget(UObject* InOwner, const TArray<FParameter>& InParams, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static T* CreateUserWidget(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateUserWidget<T>(InOwner, &InParams, InClass);
+		return CreateUserWidget<T>(InOwner, &InParams, bForce, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams);
+	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
 
 	template<class T>
-	static T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr)
+	static T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false)
 	{
-		return UWidgetModule::Get().CreateUserWidgetByName<T>(InName, InOwner);
+		return UWidgetModule::Get().CreateUserWidgetByName<T>(InName, InOwner, InParams, bForce);
 	}
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams);
+	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
 
 	template<class T>
-	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().OpenUserWidget<T>(InParams, bInstant, InClass);
+		return UWidgetModule::Get().OpenUserWidget<T>(InParams, bInstant, bForce, InClass);
 	}
 
 	template<class T>
-	static bool OpenUserWidget(const TArray<FParameter>& InParams, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static bool OpenUserWidget(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return OpenUserWidget<T>(&InParams, bInstant, InClass);
+		return OpenUserWidget<T>(&InParams, bInstant, bForce, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false);
+	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
 
-	static bool OpenUserWidgetByName(FName InName, const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
+	static bool OpenUserWidgetByName(FName InName, const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false)
 	{
-		return UWidgetModule::Get().OpenUserWidgetByName(InName, InParams, bInstant);
+		return UWidgetModule::Get().OpenUserWidgetByName(InName, InParams, bInstant, bForce);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant = false);
+	static bool OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
 
 	template<class T>
 	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())

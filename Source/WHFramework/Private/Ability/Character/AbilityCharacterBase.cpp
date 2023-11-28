@@ -89,9 +89,9 @@ void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-void AAbilityCharacterBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	InitializeAbilitySystem();
 

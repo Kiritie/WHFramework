@@ -28,24 +28,24 @@ UUserWidgetBase* UWidgetModuleStatics::GetUserWidgetByName(FName InName, TSubcla
 	return UWidgetModule::Get().GetUserWidgetByName(InName, InClass);
 }
 
-UUserWidgetBase* UWidgetModuleStatics::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams)
+UUserWidgetBase* UWidgetModuleStatics::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	return UWidgetModule::Get().CreateUserWidget(InClass, InOwner, InParams);
+	return UWidgetModule::Get().CreateUserWidget(InClass, InOwner, InParams, bForce);
 }
 
-UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams)
+UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	return UWidgetModule::Get().CreateUserWidgetByName(InName, InOwner, InParams);
+	return UWidgetModule::Get().CreateUserWidgetByName(InName, InOwner, InParams, bForce);
 }
 
-bool UWidgetModuleStatics::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant)
+bool UWidgetModuleStatics::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	return UWidgetModule::Get().OpenUserWidget(InClass, InParams, bInstant);
+	return UWidgetModule::Get().OpenUserWidget(InClass, InParams, bInstant, bForce);
 }
 
-bool UWidgetModuleStatics::OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant)
+bool UWidgetModuleStatics::OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	return UWidgetModule::Get().OpenUserWidgetByName(InName, InParams, bInstant);
+	return UWidgetModule::Get().OpenUserWidgetByName(InName, InParams, bInstant, bForce);
 }
 
 bool UWidgetModuleStatics::CloseUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant)

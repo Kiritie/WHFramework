@@ -10,9 +10,9 @@ UWidgetEnumSettingItemBase::UWidgetEnumSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetEnumSettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetEnumSettingItemBase::OnDespawn_Implementation(bool bRecovery)

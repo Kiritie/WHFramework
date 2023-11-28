@@ -9,9 +9,9 @@ UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectI
 {
 }
 
-void UWidgetSettingItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);;
+	Super::OnSpawn_Implementation(InOwner, InParams);;
 }
 
 void UWidgetSettingItemBase::OnDespawn_Implementation(bool bRecovery)

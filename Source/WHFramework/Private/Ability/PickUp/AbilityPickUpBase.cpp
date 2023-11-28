@@ -36,9 +36,9 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 	FallingComponent->TraceChannel = UAbilityModuleStatics::GetPickUpTraceChannel();
 }
 
-void AAbilityPickUpBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)

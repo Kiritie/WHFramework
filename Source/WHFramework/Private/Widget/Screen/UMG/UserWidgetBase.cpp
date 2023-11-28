@@ -59,7 +59,7 @@ void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	
 }
 
-void UUserWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UUserWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }
@@ -73,6 +73,10 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 {
 	WidgetParams = InParams;
 
+	if(ParentWidget)
+	{
+		ParentWidget->RemoveChild(this);
+	}
 	if(ParentName != NAME_None)
 	{
 		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
@@ -80,6 +84,11 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 		{
 			ParentWidget->AddChild(this);
 		}
+	}
+	else if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
+	{
+		ParentWidget = InParent;
+		ParentWidget->AddChild(this);
 	}
 	
 	for(const auto& Iter : ChildNames)
@@ -114,6 +123,11 @@ void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& I
 	K2_OnInitialize(InOwner, InParams);
 }
 
+void UUserWidgetBase::OnReset()
+{
+	K2_OnReset();
+}
+
 void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
@@ -122,10 +136,11 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
-	if(ParentName != NAME_None)
+	if(ParentWidget && ParentWidget->GetRootPanelWidget())
 	{
-		if(!GetParent() && ParentWidget && ParentWidget->GetRootPanelWidget())
+		if(GetParent() != ParentWidget->GetRootPanelWidget())
 		{
+			RemoveFromParent();
 			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(ParentWidget->GetRootPanelWidget()->AddChild(this)))
 			{
 				CanvasPanelSlot->SetZOrder(WidgetZOrder);
@@ -136,10 +151,11 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	}
 	else
 	{
-		if(!IsInViewport())
+		if(GetParent())
 		{
-			AddToViewport(WidgetZOrder);
+			RemoveFromParent();
 		}
+		AddToViewport(WidgetZOrder);
 	}
 	switch(WidgetOpenType)
 	{
@@ -222,11 +238,6 @@ void UUserWidgetBase::OnClose(bool bInstant)
 	K2_OnClose(bInstant);
 }
 
-void UUserWidgetBase::OnReset()
-{
-	K2_OnReset();
-}
-
 void UUserWidgetBase::OnRefresh()
 {
 	K2_OnRefresh();
@@ -261,14 +272,14 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 	K2_OnStateChanged(InWidgetState);
 }
 
-void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams)
+void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)
 {
-	Init(InOwner, InParams ? *InParams : TArray<FParameter>());
+	Init(InOwner, InParams ? *InParams : TArray<FParameter>(), bForce);
 }
 
-void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams)
+void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	if(OwnerObject != InOwner || !InOwner)
+	if(bForce || !InOwner || OwnerObject != InOwner)
 	{
 		OwnerObject = InOwner;
 
@@ -276,14 +287,14 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams)
 	}
 }
 
-void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
+void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, GetClass());
+	UWidgetModuleStatics::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, bForce, GetClass());
 }
 
-void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
+void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidget(GetClass(), InParams, bInstant);
+	UWidgetModuleStatics::OpenUserWidget(GetClass(), InParams, bInstant, bForce);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
@@ -402,7 +413,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 
 USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, InClass))
+	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;

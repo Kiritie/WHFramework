@@ -10,7 +10,7 @@ USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Su
 	Owner = nullptr;
 }
 
-void USubWidgetBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void USubWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 
 }

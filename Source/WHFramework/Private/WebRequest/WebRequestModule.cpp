@@ -117,7 +117,7 @@ UWebInterfaceBase* UWebRequestModule::CreateWebInterface(TSubclassOf<UWebInterfa
 
 	if(!HasWebInterface(InClass))
 	{
-		UWebInterfaceBase* WebInterface = UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, InClass);
+		UWebInterfaceBase* WebInterface = UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, nullptr, InClass);
 		WebInterfaceMap.Add(InClass, WebInterface);
 		
 		WHLog(FString::Printf(TEXT("Succeeded to creating the interface: %s"), *WebInterface->GetName().ToString()), EDC_WebRequest);

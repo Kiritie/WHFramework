@@ -17,9 +17,9 @@ AAbilityItemBase::AAbilityItemBase()
 	OwnerActor = nullptr;
 }
 
-void AAbilityItemBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)

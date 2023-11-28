@@ -101,14 +101,14 @@ void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
-void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams)
+void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)
 {
-	Init(InOwner, InParams ? *InParams : TArray<FParameter>());
+	Init(InOwner, InParams ? *InParams : TArray<FParameter>(), bForce);
 }
 
-void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams)
+void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	if(OwnerObject != InOwner || !InOwner)
+	if(bForce || !InOwner || OwnerObject != InOwner)
 	{
 		OwnerObject = InOwner;
 
@@ -116,11 +116,11 @@ void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams
 	}
 }
 
-void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
+void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
 }
 
-void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
+void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
 	//UWidgetModuleStatics::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant);
 }

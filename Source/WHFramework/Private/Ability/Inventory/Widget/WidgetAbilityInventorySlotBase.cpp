@@ -15,9 +15,9 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 	CooldownTimerHandle = FTimerHandle();
 }
 
-void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)

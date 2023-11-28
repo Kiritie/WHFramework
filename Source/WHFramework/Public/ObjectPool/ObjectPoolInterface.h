@@ -4,7 +4,7 @@
 
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
-#include "ObjectPoolInterface.generated.h"
+#include "ObjectPoolInterface.generated.h"	
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -26,7 +26,7 @@ public:
 	int32 GetLimit() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
-	void OnSpawn(const TArray<FParameter>& InParams);
+	void OnSpawn(UObject* InOwner, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void OnDespawn(bool bRecovery);

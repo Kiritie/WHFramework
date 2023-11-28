@@ -29,14 +29,11 @@ void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool b
 	}
 	LoadProgress = 0.f;
 	CurrentProgress = 0.f;
-	FinishOpen(bInstant);
 }
 
 void UWidgetLoadingLevelPanel::OnClose(bool bInstant)
 {
 	Super::OnClose(bInstant);
-	
-	FinishClose(bInstant);
 }
 
 void UWidgetLoadingLevelPanel::OnRefresh()

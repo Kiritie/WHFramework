@@ -102,12 +102,12 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 				{
 					case EWidgetCreateType::AutoCreate:
 					{
-						CreateUserWidget<UUserWidgetBase>(nullptr, nullptr, Iter);
+						CreateUserWidget<UUserWidgetBase>(nullptr, nullptr, false, Iter);
 						break;
 					}
 					case EWidgetCreateType::AutoCreateAndOpen:
 					{
-						OpenUserWidget<UUserWidgetBase>(nullptr, false, Iter);
+						OpenUserWidget<UUserWidgetBase>(nullptr, false, false, Iter);
 						break;
 					}
 					default: break;
@@ -227,24 +227,24 @@ UUserWidgetBase* UWidgetModule::GetUserWidgetByName(FName InName, TSubclassOf<UU
 	return nullptr;
 }
 
-UUserWidgetBase* UWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams)
+UUserWidgetBase* UWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	return CreateUserWidget<UUserWidgetBase>(InOwner, &InParams, InClass);
+	return CreateUserWidget<UUserWidgetBase>(InOwner, &InParams, bForce, InClass);
 }
 
-UUserWidgetBase* UWidgetModule::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams)
+UUserWidgetBase* UWidgetModule::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner, &InParams);
+	return CreateUserWidgetByName<UUserWidgetBase>(InName, InOwner, &InParams, bForce);
 }
 
-bool UWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams,  bool bInstant)
+bool UWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams,  bool bInstant, bool bForce)
 {
-	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, InClass);
+	return OpenUserWidget<UUserWidgetBase>(&InParams, bInstant, bForce, InClass);
 }
 
-bool UWidgetModule::OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant)
+bool UWidgetModule::OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	return OpenUserWidgetByName(InName, &InParams, bInstant);
+	return OpenUserWidgetByName(InName, &InParams, bInstant, bForce);
 }
 
 bool UWidgetModule::CloseUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant)

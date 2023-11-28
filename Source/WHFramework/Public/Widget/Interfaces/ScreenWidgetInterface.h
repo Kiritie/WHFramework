@@ -37,13 +37,13 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
-	virtual void Init(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr) = 0;
+	virtual void Init(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false) = 0;
 	
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) = 0;
 
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) = 0;
 	
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) = 0;
 
 	virtual void Close(bool bInstant = false) = 0;
 

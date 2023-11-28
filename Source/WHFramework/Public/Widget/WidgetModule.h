@@ -143,20 +143,20 @@ public:
 	UUserWidgetBase* GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass = nullptr) const;
 
 	template<class T>
-	T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass) return nullptr;
 		
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 		
-		return CreateUserWidgetByName<T>(WidgetName, InOwner, InParams);
+		return CreateUserWidgetByName<T>(WidgetName, InOwner, InParams, bForce);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams);
+	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
 
 	template<class T>
-	T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
+	T* CreateUserWidgetByName(FName InName, UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false)
 	{
 		if(InName.IsNone()) return nullptr;
 		
@@ -170,7 +170,7 @@ public:
 		
 		if(!HasUserWidgetByName(InName))
 		{
-			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, UserWidgetClassMap[InName]);
+			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
 				AllUserWidgets.Add(InName, UserWidget);
@@ -180,34 +180,39 @@ public:
 		else
 		{
 			UserWidget = GetUserWidgetByName(InName);
+			if(UserWidget && bForce)
+			{
+				UserWidget->OnCreate(InOwner, InParams ? * InParams : TArray<FParameter>());
+			}
 		}
 		
 		if(UserWidget)
 		{
-			UserWidget->Init(InOwner, InParams);
+			UserWidget->Init(InOwner, InParams, bForce);
 		}
 		return Cast<T>(UserWidget);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams);
+	UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
 
 	template<class T>
-	bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 
-		return OpenUserWidgetByName(WidgetName, InParams, bInstant);
+		return OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false);
+	bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
 
-	bool OpenUserWidgetByName(FName InName, const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
+	bool OpenUserWidgetByName(FName InName, const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false)
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InName) ? GetUserWidgetByName<UUserWidgetBase>(InName) : CreateUserWidgetByName<UUserWidgetBase>(InName))
 		{
 			if(!UserWidget->CanOpen()) return false;
+			if(bForce) CloseUserWidgetByName(InName, true);
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening && UserWidget->GetWidgetState() != EScreenWidgetState::Opened)
 			{
 				if(!UserWidget->GetParentWidgetN())
@@ -247,7 +252,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	bool OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant = false);
+	bool OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
 
 	template<class T>
 	bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -265,7 +270,7 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = GetUserWidgetByName<UUserWidgetBase>(InName))
 		{
-			if(UserWidget->GetWidgetState() != EScreenWidgetState::Closing && UserWidget->GetWidgetState() != EScreenWidgetState::Closed)
+			if(UserWidget->GetWidgetState() != EScreenWidgetState::None && UserWidget->GetWidgetState() != EScreenWidgetState::Closing && UserWidget->GetWidgetState() != EScreenWidgetState::Closed)
 			{
 				if(!UserWidget->GetParentWidgetN())
 				{
@@ -584,7 +589,7 @@ public:
 			return nullptr;
 		}
 		
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, WorldWidgetClassMap[InName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, WorldWidgetClassMap[InName]))
 		{
 			if(!AllWorldWidgets.Contains(InName))
 			{

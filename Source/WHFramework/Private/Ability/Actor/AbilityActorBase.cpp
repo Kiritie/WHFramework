@@ -40,7 +40,7 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	Level = 0;
 }
 
-void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
@@ -51,7 +51,7 @@ void AAbilityActorBase::OnSpawn_Implementation(const TArray<FParameter>& InParam
 		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
 	}
 
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	InitializeAbilitySystem();
 }

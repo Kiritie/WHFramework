@@ -46,9 +46,9 @@ void AAbilitySkillRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComp
 	}
 }
 
-void AAbilitySkillRemoteBase::OnSpawn_Implementation(const TArray<FParameter>& InParams)
+void AAbilitySkillRemoteBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void AAbilitySkillRemoteBase::OnDespawn_Implementation(bool bRecovery)

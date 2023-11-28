@@ -78,7 +78,7 @@ struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
 // Functions
 extern const UObject* GetWorldContext(bool bInEditor = false);
 
-template<class T>
+template<class T = UObject>
 extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 {
 	if(!Value) return nullptr;
