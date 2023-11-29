@@ -17,12 +17,12 @@ UEnhancedInputLocalPlayerSubsystem* UInputModuleStatics::GetInputSubsystem(int32
 
 UInputUserSettingsBase* UInputModuleStatics::GetInputUserSettings(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
-	return GetInputSubsystem(InPlayerIndex)->GetUserSettings<UInputUserSettingsBase>();
+	return GetDeterminesOutputObject(GetInputSubsystem(InPlayerIndex)->GetUserSettings<UInputUserSettingsBase>(), InClass);
 }
 
 UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex, TSubclassOf<UInputComponentBase> InClass)
 {
-	return Cast<UInputComponentBase>(UCommonStatics::GetLocalPlayerController(InPlayerIndex)->InputComponent);
+	return GetDeterminesOutputObject(Cast<UInputComponentBase>(UCommonStatics::GetLocalPlayerController(InPlayerIndex)->InputComponent), InClass);
 }
 
 int32 UInputModuleStatics::GetTouchPressedCount()

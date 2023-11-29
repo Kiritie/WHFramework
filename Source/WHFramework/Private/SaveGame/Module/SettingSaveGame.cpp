@@ -2,7 +2,6 @@
 
 #include "SaveGame/Module/SettingSaveGame.h"
 
-#include "Common/CommonStatics.h"
 #include "Setting/SettingModule.h"
 
 USettingSaveGame::USettingSaveGame()

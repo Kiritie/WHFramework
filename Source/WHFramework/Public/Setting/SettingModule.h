@@ -57,22 +57,22 @@ protected:
 	virtual FSaveData* ToData() override;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetSettingItemCategoryBase> SettingItemCategoryClass;
 
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetFloatSettingItemBase> FloatSettingItemClass;
 
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetBoolSettingItemBase> BoolSettingItemClass;
 
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetEnumSettingItemBase> EnumSettingItemClass;
 
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetTextSettingItemBase> TextSettingItemClass;
 
-	UPROPERTY(EditAnywhere, Category = "Wdiget")
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetKeySettingItemBase> KeySettingItemClass;
 
 public:

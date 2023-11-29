@@ -223,10 +223,6 @@ void UCameraModule::OnPreparatory(EPhase InPhase)
 		{
 			Load();
 		}
-	}
-
-	if(PHASEC(InPhase, EPhase::Final))
-	{
 		if(DefaultCamera)
 		{
 			SwitchCamera(DefaultCamera, DefaultInstantSwitch);

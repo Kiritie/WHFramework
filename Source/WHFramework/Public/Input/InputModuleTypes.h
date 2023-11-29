@@ -51,20 +51,23 @@ public:
 		Auxs = TArray<FKey>();
 	}
 
-	FInputKeyShortcut(const FText& InDisplayName)
-		: DisplayName(InDisplayName)
+	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory)
+		: DisplayName(InDisplayName),
+		  Category(InCategory)
 	{
 	}
 
-	FInputKeyShortcut(const FText& InDisplayName, const FKey& InKey)
+	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const FKey& InKey)
 		: DisplayName(InDisplayName),
+		  Category(InCategory),
 		  Key(InKey),
 		  Auxs({})
 	{
 	}
 
-	FInputKeyShortcut(const FText& InDisplayName, const FKey& InKey, const TArray<FKey>& InAuxs)
+	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const FKey& InKey, const TArray<FKey>& InAuxs)
 		: DisplayName(InDisplayName),
+		  Category(InCategory),
 		  Key(InKey),
 		  Auxs(InAuxs)
 	{

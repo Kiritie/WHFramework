@@ -43,9 +43,6 @@ protected:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Content")
-	FText ButtonText;
-
-	UPROPERTY(EditAnywhere, Category = "Content")
 	FText Title;
 
 	UPROPERTY(BlueprintReadOnly)

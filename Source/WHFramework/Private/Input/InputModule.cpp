@@ -34,11 +34,11 @@ UInputModule::UInputModule()
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
-	AddKeyShortcut(FName("InteractSelect"), FText::FromString("Interact Select"));
+	AddKeyShortcut(FName("InteractSelect"), FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
 	
-	AddKeyShortcut(FName("CameraPanMove"), FText::FromString("Camera Pan Move"));
-	AddKeyShortcut(FName("CameraRotate"), FText::FromString("Camera Rotate"));
-	AddKeyShortcut(FName("CameraZoom"), FText::FromString("Camera Zoom"));
+	AddKeyShortcut(FName("CameraPanMove"), FInputKeyShortcut(FText::FromString("Camera Pan Move"), FText::FromString("Camera Control")));
+	AddKeyShortcut(FName("CameraRotate"), FInputKeyShortcut(FText::FromString("Camera Rotate"), FText::FromString("Camera Control")));
+	AddKeyShortcut(FName("CameraZoom"), FInputKeyShortcut(FText::FromString("Camera Zoom"), FText::FromString("Camera Control")));
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
 	if(CameraMovementMapping.Succeeded())
