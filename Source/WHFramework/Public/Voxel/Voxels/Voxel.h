@@ -5,6 +5,7 @@
 #include "Input/InputModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Common/Base/WHObject.h"
+#include "ReferencePool/ReferencePoolInterface.h"
 
 #include "Voxel.generated.h"
 

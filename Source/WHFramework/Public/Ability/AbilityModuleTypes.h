@@ -1,13 +1,10 @@
 #pragma once
 
-#include "Abilities/GameplayAbilityTypes.h"
-#include "Asset/AssetManagerBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Abilities/GameplayAbility.h"
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
-#include "NativeGameplayTags.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -886,7 +883,7 @@ struct WHFRAMEWORK_API FActorSaveData : public FSaveData
 public:
 	FORCEINLINE FActorSaveData()
 	{
-		ActorID = FGuid::NewGuid();
+		ActorID = FGuid();
 		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;

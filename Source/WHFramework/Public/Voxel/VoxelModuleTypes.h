@@ -4,6 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "AsyncTasks/AsyncTask_ChunkQueue.h"
+#include "Common/CommonTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 

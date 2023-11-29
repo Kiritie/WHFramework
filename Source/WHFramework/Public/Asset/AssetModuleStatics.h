@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "AssetManagerBase.h"
 #include "AssetModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Asset/Primary/PrimaryAssetBase.h"

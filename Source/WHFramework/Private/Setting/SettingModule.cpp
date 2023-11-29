@@ -8,7 +8,12 @@
 #include "SaveGame/Module/SettingSaveGame.h"
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
+#include "Setting/Widget/Item/WidgetBoolSettingItemBase.h"
+#include "Setting/Widget/Item/WidgetEnumSettingItemBase.h"
 #include "Setting/Widget/Item/WidgetFloatSettingItemBase.h"
+#include "Setting/Widget/Item/WidgetKeySettingItemBase.h"
+#include "Setting/Widget/Item/WidgetSettingItemCategoryBase.h"
+#include "Setting/Widget/Item/WidgetTextSettingItemBase.h"
 #include "Video/VideoModule.h"
 
 IMPLEMENTATION_MODULE(USettingModule)
@@ -22,7 +27,7 @@ USettingModule::USettingModule()
 	ModuleSaveGame = USettingSaveGame::StaticClass();
 	
 	ModuleNetworkComponent = USettingModuleNetworkComponent::StaticClass();
-		
+	
 	static ConstructorHelpers::FClassFinder<UWidgetSettingItemCategoryBase> SettingItemCategoryClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Setting/Blueprints/Widget/Item/WBP_SettingItemCategory.WBP_SettingItemCategory_C'"));
 	if(SettingItemCategoryClassHelper.Succeeded())
 	{

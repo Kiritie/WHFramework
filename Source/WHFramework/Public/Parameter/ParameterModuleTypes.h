@@ -143,12 +143,18 @@ public:
 		IntegerValue = 0;
 		FloatValue = 0.f;
 		StringValue = TEXT("");
+		NameValue = NAME_None;
 		TextValue = FText::GetEmpty();
 		BooleanValue = false;
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
+		ColorValue = FColor();
+		TagValue = FGameplayTag();
+		TagsValue = FGameplayTagContainer();
 		ClassValue = nullptr;
+		ClassPtrValue = nullptr;
 		ObjectValue = nullptr;
+		ObjectPtrValue = nullptr;
 		PointerValue = nullptr;
 	}
 	
