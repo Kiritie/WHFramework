@@ -30,7 +30,7 @@ public:
 	
 	virtual void OnClose(bool bInstant = false) override;
 
-	virtual void OnReset() override;
+	virtual void OnReset(bool bForce = false) override;
 	
 	virtual void OnRefresh() override;
 
@@ -51,7 +51,7 @@ public:
 
 	virtual void Toggle(bool bInstant) override;
 
-	virtual void Reset(bool bResetOwner) override;
+	virtual void Reset(bool bForce) override;
 
 	virtual void Refresh() override;
 

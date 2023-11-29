@@ -127,7 +127,7 @@ public:
 	void ApplyTouchMappings();
 	
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InInputTag"))
-	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound = true) const;
+	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex = 0);

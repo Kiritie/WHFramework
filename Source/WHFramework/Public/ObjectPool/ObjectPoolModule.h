@@ -53,7 +53,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, Transient)
 	TMap<TSubclassOf<UObject>, UObjectPool*> ObjectPools;
 
-public:
+protected:
 	template<class T>
 	bool HasPool(TSubclassOf<UObject> InType = T::StaticClass())
 	{
@@ -86,6 +86,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DestroyPool(TSubclassOf<UObject> InType);
 
+public:
 	template<class T>
 	bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{

@@ -99,9 +99,9 @@ void UWidgetInputSettingPageBase::OnApply()
 	}
 }
 
-void UWidgetInputSettingPageBase::OnReset()
+void UWidgetInputSettingPageBase::OnReset(bool bForce)
 {
-	Super::OnReset();
+	Super::OnReset(bForce);
 
 	for(auto& Iter : ShortcutSettingItems)
 	{

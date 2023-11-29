@@ -17,6 +17,15 @@ class WHFRAMEWORK_API UObjectPoolModuleStatics : public UBlueprintFunctionLibrar
 
 public:
 	template<class T>
+	static bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
+	{
+		return HasObject(InType);
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
+	static bool HasObject(TSubclassOf<UObject> InType);
+	
+	template<class T>
 	static T* SpawnObject(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		return UObjectPoolModule::Get().SpawnObject<T>(InOwner, InParams, InType);
@@ -26,13 +35,11 @@ public:
 	{
 		return UObjectPoolModule::Get().SpawnObject<T>(InOwner, InParams, InType);
 	}
-
-	UFUNCTION(BlueprintCallable, meta = (WorldContext = "InWorldContext", DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleStatics")
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleStatics")
 	static UObject* SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
 	static void DespawnObject(UObject* InObject, bool bRecovery = true);
-
 	template<class T>
 	static void DespawnObjects(TArray<T*> InObjects, bool bRecovery = true)
 	{
@@ -51,7 +58,6 @@ public:
 	}
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
 	static void ClearObject(TSubclassOf<UObject> InType);
-
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
 	static void ClearAllObject();
 };

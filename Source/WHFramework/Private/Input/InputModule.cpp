@@ -314,7 +314,7 @@ void UInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
 	TouchMappings.Add(InKeyMapping);
 }
 
-const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, bool bLogNotFound) const
+const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured) const
 {
 	for (const auto& Iter1 : ContextMappings)
 	{
@@ -333,7 +333,7 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 		}
 	}
 	
-	if (bLogNotFound)
+	if (bEnsured)
 	{
 		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InInputTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
 	}

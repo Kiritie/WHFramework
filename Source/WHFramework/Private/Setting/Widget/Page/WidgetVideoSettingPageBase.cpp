@@ -96,9 +96,9 @@ void UWidgetVideoSettingPageBase::OnApply()
 	UVideoModule::Get().ApplyVideoQualitySettings();
 }
 
-void UWidgetVideoSettingPageBase::OnReset()
+void UWidgetVideoSettingPageBase::OnReset(bool bForce)
 {
-	Super::OnReset();
+	Super::OnReset(bForce);
 
 	SettingItem_GlobalVideoQuality->SetValue((int32)GetDefaultSaveData()->CastRef<FVideoModuleSaveData>().GlobalVideoQuality);
 	SettingItem_ViewDistanceQuality->SetValue((int32)GetDefaultSaveData()->CastRef<FVideoModuleSaveData>().ViewDistanceQuality);

@@ -4,9 +4,9 @@
 
 FAbilityItem FAbilityItem::Empty = FAbilityItem();
 
-UAbilityItemDataBase& FAbilityItem::GetData(bool bLogWarning) const
+UAbilityItemDataBase& FAbilityItem::GetData(bool bEnsured) const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID, bLogWarning);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID, bEnsured);
 }
 
 void FDataTableRowBase::OnInitializeRow(const FName& InRowName)

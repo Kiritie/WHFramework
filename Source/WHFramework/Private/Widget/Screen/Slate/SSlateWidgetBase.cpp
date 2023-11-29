@@ -85,7 +85,7 @@ void SSlateWidgetBase::OnClose(bool bInstant)
 	}
 }
 
-void SSlateWidgetBase::OnReset()
+void SSlateWidgetBase::OnReset(bool bForce)
 {
 }
 
@@ -144,9 +144,9 @@ void SSlateWidgetBase::Toggle(bool bInstant)
 	}
 }
 
-void SSlateWidgetBase::Reset(bool bResetOwner)
+void SSlateWidgetBase::Reset(bool bForce)
 {
-	OnReset();
+	OnReset(bForce);
 }
 
 void SSlateWidgetBase::Refresh()

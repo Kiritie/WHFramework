@@ -51,10 +51,12 @@ enum class EWidgetOpenType : uint8
 UENUM(BlueprintType)
 enum class EWidgetOpenFinishType : uint8
 {
-	/// 延时
-	Delay,
 	/// 瞬间
 	Instant,
+	/// 延时
+	Delay,
+	/// 动画
+	Animator,
 	/// 程序调用
 	Procedure
 };
@@ -79,10 +81,12 @@ enum class EWidgetCloseType : uint8
 UENUM(BlueprintType)
 enum class EWidgetCloseFinishType : uint8
 {
-	/// 延时
-	Delay,
 	/// 瞬间
 	Instant,
+	/// 延时
+	Delay,
+	/// 动画
+	Animator,
 	/// 程序调用
 	Procedure
 };

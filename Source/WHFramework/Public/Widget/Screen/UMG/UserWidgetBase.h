@@ -10,6 +10,7 @@
 
 #include "UserWidgetBase.generated.h"
 
+class UWidgetAnimatorBase;
 /**
  * 
  */
@@ -54,9 +55,9 @@ public:
 	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
-	void K2_OnReset();
+	void K2_OnReset(bool bForce = false);
 	UFUNCTION()
-	virtual void OnReset() override;
+	virtual void OnReset(bool bForce = false) override;
 
 	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnOpen")
 	void K2_OnOpen(const TArray<FParameter>& InParams, bool bInstant = false);
@@ -101,7 +102,7 @@ public:
 	virtual void Toggle(bool bInstant = false) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Reset(bool bResetOwner = false) override;
+	virtual void Reset(bool bForce = false) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Refresh() override;
@@ -213,6 +214,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
 	float WidgetOpenFinishTime;
 
+	UPROPERTY(EditDefaultsOnly, Instanced, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Animator"))
+	UWidgetAnimatorBase* WidgetOpenAnimator;
+
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetCloseType WidgetCloseType;
 	
@@ -221,6 +225,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
 	float WidgetCloseFinishTime;
+
+	UPROPERTY(EditDefaultsOnly, Instanced, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Animator"))
+	UWidgetAnimatorBase* WidgetCloseAnimator;
 
 	UPROPERTY(EditDefaultsOnly)
 	EWidgetRefreshType WidgetRefreshType;

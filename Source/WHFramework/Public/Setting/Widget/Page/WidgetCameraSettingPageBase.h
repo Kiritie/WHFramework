@@ -29,7 +29,7 @@ public:
 
 	virtual void OnApply() override;
 
-	virtual void OnReset() override;
+	virtual void OnReset(bool bForce) override;
 
 	virtual void OnClose(bool bInstant) override;
 

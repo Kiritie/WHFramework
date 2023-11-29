@@ -10,6 +10,7 @@
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Input/InputModuleStatics.h"
+#include "Widget/Animator/WidgetAnimatorBase.h"
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -29,9 +30,11 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetOpenFinishType = EWidgetOpenFinishType::Instant;
 	WidgetOpenFinishTime = 0.f;
+	WidgetOpenAnimator = nullptr;
 	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetCloseFinishType = EWidgetCloseFinishType::Instant;
 	WidgetCloseFinishTime = 0.f;
+	WidgetCloseAnimator = nullptr;
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
@@ -103,7 +106,17 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 		}
 	}
 
-	for(auto Iter : GetAllSubWidgets())
+	if(WidgetOpenAnimator)
+	{
+		WidgetOpenAnimator->Execute_OnSpawn(WidgetOpenAnimator, this, {});
+	}
+
+	if(WidgetCloseAnimator)
+	{
+		WidgetCloseAnimator->Execute_OnSpawn(WidgetCloseAnimator, this, {});
+	}
+
+	for(const auto Iter : GetAllSubWidgets())
 	{
 		Iter->OnCreate(this, Iter->GetParams());
 	}
@@ -123,9 +136,9 @@ void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& I
 	K2_OnInitialize(InOwner, InParams);
 }
 
-void UUserWidgetBase::OnReset()
+void UUserWidgetBase::OnReset(bool bForce)
 {
-	K2_OnReset();
+	K2_OnReset(bForce);
 }
 
 void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
@@ -183,20 +196,45 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 
-	if(bInstant || WidgetOpenFinishType == EWidgetOpenFinishType::Instant)
+	switch(WidgetOpenFinishType)
 	{
-		FinishOpen(bInstant);
-	}
-	else if(WidgetOpenFinishType == EWidgetOpenFinishType::Delay)
-	{
-		FTimerDelegate TimerDelegate;
-		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, bInstant);
-		GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
+		case EWidgetOpenFinishType::Instant:
+		{
+			FinishOpen(true);
+			break;
+		}
+		case EWidgetOpenFinishType::Delay:
+		{
+			if(!bInstant)
+			{
+				FTimerDelegate TimerDelegate;
+				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, false);
+				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
+			}
+			else
+			{
+				FinishOpen(true);
+			}
+		}
+		case EWidgetOpenFinishType::Animator:
+		{
+			if(WidgetOpenAnimator)
+			{
+				FOnWidgetAnimatorCompleted OnWidgetAnimatorCompleted;
+				OnWidgetAnimatorCompleted.BindDynamic(this, &UUserWidgetBase::FinishOpen);
+				WidgetOpenAnimator->Play(OnWidgetAnimatorCompleted, bInstant);
+			}
+			else
+			{
+				FinishOpen(true);
+			}
+		}
+		default: break;
 	}
 
 	UInputModuleStatics::UpdateGlobalInputMode();
 
-	for(auto Iter : ChildNames)
+	for(const auto Iter : ChildNames)
 	{
 		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
 		{
@@ -221,15 +259,40 @@ void UUserWidgetBase::OnClose(bool bInstant)
 	WidgetState = EScreenWidgetState::Closing;
 	OnStateChanged(WidgetState);
 
-	if(bInstant || WidgetCloseFinishType == EWidgetCloseFinishType::Instant)
+	switch(WidgetCloseFinishType)
 	{
-		FinishClose(bInstant);
-	}
-	else if(WidgetCloseFinishType == EWidgetCloseFinishType::Delay)
-	{
-		FTimerDelegate TimerDelegate;
-		TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, bInstant);
-		GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
+		case EWidgetCloseFinishType::Instant:
+		{
+			FinishClose(true);
+			break;
+		}
+		case EWidgetCloseFinishType::Delay:
+		{
+			if(!bInstant)
+			{
+				FTimerDelegate TimerDelegate;
+				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, false);
+				GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
+			}
+			else
+			{
+				FinishClose(true);
+			}
+		}
+		case EWidgetCloseFinishType::Animator:
+		{
+			if(WidgetCloseAnimator)
+			{
+				FOnWidgetAnimatorCompleted OnWidgetAnimatorCompleted;
+				OnWidgetAnimatorCompleted.BindDynamic(this, &UUserWidgetBase::FinishClose);
+				WidgetCloseAnimator->Play(OnWidgetAnimatorCompleted, bInstant);
+			}
+			else
+			{
+				FinishClose(true);
+			}
+		}
+		default: break;
 	}
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
@@ -316,13 +379,13 @@ void UUserWidgetBase::Toggle(bool bInstant)
 	}
 }
 
-void UUserWidgetBase::Reset(bool bResetOwner)
+void UUserWidgetBase::Reset(bool bForce)
 {
-	if(bResetOwner)
+	if(bForce)
 	{
 		OwnerObject = nullptr;
 	}
-	OnReset();
+	OnReset(bForce);
 }
 
 void UUserWidgetBase::Refresh()

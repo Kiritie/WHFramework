@@ -181,9 +181,9 @@ AVoxelChunk* FVoxelItem::GetOwner() const
 	return UVoxelModuleStatics::FindChunkByIndex(Index);
 }
 
-UVoxelData& FVoxelItem::GetVoxelData(bool bLogWarning) const
+UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(ID, bLogWarning);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(ID, bEnsured);
 }
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)

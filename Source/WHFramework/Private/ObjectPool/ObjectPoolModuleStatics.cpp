@@ -3,6 +3,11 @@
 
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
+bool UObjectPoolModuleStatics::HasObject(TSubclassOf<UObject> InType)
+{
+	return UObjectPoolModule::Get().HasObject(InType);
+}
+
 UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	return UObjectPoolModule::Get().SpawnObject(InType, InOwner, InParams);

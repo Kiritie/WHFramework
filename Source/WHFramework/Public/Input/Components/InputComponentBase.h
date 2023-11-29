@@ -24,18 +24,18 @@ public:
 
 public:
 	template<class UserClass, typename FuncType>
-	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bLogIfNotFound = true)
+	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bEnsured = true)
 	{
-		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bLogIfNotFound))
+		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bEnsured))
 		{
 			BindAction(InputAction, TriggerEvent, Object, Func);
 		}
 	}
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InputTag"))
-	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, const FEnhancedInputActionHandlerDynamicSignature& Delegate, bool bLogIfNotFound = true)
+	void BindInputAction(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, const FEnhancedInputActionHandlerDynamicSignature& Delegate, bool bEnsured = true)
 	{
-		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bLogIfNotFound))
+		if (const UInputActionBase* InputAction = UInputModule::Get().FindInputActionForTag(InputTag, bEnsured))
 		{
 			TUniquePtr<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>> AB = MakeUnique<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>>(InputAction, TriggerEvent);
 			AB->Delegate.BindDelegate(const_cast<UObject*>(Delegate.GetUObject()), Delegate.GetFunctionName());

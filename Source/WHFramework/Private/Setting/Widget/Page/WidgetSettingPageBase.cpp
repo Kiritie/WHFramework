@@ -33,9 +33,9 @@ void UWidgetSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bIn
 	Super::OnOpen(InParams, bInstant);
 }
 
-void UWidgetSettingPageBase::OnReset()
+void UWidgetSettingPageBase::OnReset(bool bForce)
 {
-	Super::OnReset();
+	Super::OnReset(bForce);
 }
 
 void UWidgetSettingPageBase::OnClose(bool bInstant)

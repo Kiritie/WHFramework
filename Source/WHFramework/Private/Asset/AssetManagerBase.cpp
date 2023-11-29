@@ -37,7 +37,7 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimary
 	return Super::LoadPrimaryAsset(AssetToLoad, LoadBundles, DelegateToCall, Priority);
 }
 
-UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning)
+UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bEnsured)
 {
 	UPrimaryAssetBase* LoadedAsset = nullptr;
 
@@ -58,7 +58,7 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 		}
 	}
 
-	if(bLogWarning && !LoadedAsset)
+	if(bEnsured && !LoadedAsset)
 	{
 		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDC_Asset, EDV_Warning);
 	}
@@ -70,7 +70,7 @@ TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAssets(const TArray<
 	return Super::LoadPrimaryAssets(AssetsToLoad, LoadBundles, DelegateToCall, Priority);
 }
 
-TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning)
+TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bEnsured)
 {
 	TArray<UPrimaryAssetBase*> LoadedAssets;
 
@@ -81,14 +81,14 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 	
 		for(auto& Iter : AssetIds)
 		{
-			if(UPrimaryAssetBase* Asset = LoadPrimaryAsset(Iter, bLogWarning))
+			if(UPrimaryAssetBase* Asset = LoadPrimaryAsset(Iter, bEnsured))
 			{
 				LoadedAssets.Add(Asset);
 			}
 		}
 	}
 	
-	if(bLogWarning && LoadedAssets.IsEmpty())
+	if(bEnsured && LoadedAssets.IsEmpty())
 	{
 		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Warning);
 	}

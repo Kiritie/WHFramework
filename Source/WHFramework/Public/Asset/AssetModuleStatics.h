@@ -201,50 +201,50 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InParams", DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleStatics")
-	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
+	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bEnsured = true)
 	{
-		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bLogWarning), InPrimaryAssetClass);
+		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryAssetId, bEnsured), InPrimaryAssetClass);
 	}
 	
 	template<class T>
-	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
+	static T* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryAssetId, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryAssetId, bEnsured);
 	}
 				
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadEntityAsset"), Category = "AssetModuleStatics")
-	static UPrimaryAssetBase* K2_LoadEntityAsset(const TScriptInterface<IPrimaryEntityInterface>& InPrimaryEntity, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bLogWarning = true)
+	static UPrimaryAssetBase* K2_LoadEntityAsset(const TScriptInterface<IPrimaryEntityInterface>& InPrimaryEntity, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bEnsured = true)
 	{
-		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bLogWarning), InPrimaryAssetClass);
+		return GetDeterminesOutputObject(UAssetManagerBase::Get().LoadPrimaryAsset(InPrimaryEntity->Execute_GetAssetID(InPrimaryEntity.GetObject()), bEnsured), InPrimaryAssetClass);
 	}
 
 	template<class T>
-	static T* LoadEntityAsset(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
+	static T* LoadEntityAsset(IPrimaryEntityInterface* InPrimaryEntity, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryEntity->Execute_GetAssetID(Cast<UObject>(InPrimaryEntity)), bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAsset<T>(InPrimaryEntity->Execute_GetAssetID(Cast<UObject>(InPrimaryEntity)), bEnsured);
 	}
 
 	template<class T>
-	static T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bLogWarning = true)
+	static T& LoadPrimaryAssetRef(const FPrimaryAssetId& InPrimaryAssetId, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryAssetId, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryAssetId, bEnsured);
 	}
 
 	template<class T>
-	static T& LoadEntityAssetRef(IPrimaryEntityInterface* InPrimaryEntity, bool bLogWarning = true)
+	static T& LoadEntityAssetRef(IPrimaryEntityInterface* InPrimaryEntity, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryEntity->Execute_GetAssetID(Cast<UObject>(InPrimaryEntity)), bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssetRef<T>(InPrimaryEntity->Execute_GetAssetID(Cast<UObject>(InPrimaryEntity)), bEnsured);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static TArray<UPrimaryAssetBase*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)
+	static TArray<UPrimaryAssetBase*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAssets(InPrimaryAssetType, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssets(InPrimaryAssetType, bEnsured);
 	}
 
 	template<class T>
-	static TArray<T*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bLogWarning = true)
+	static TArray<T*> LoadPrimaryAssets(FPrimaryAssetType InPrimaryAssetType, bool bEnsured = true)
 	{
-		return UAssetManagerBase::Get().LoadPrimaryAssets<T>(InPrimaryAssetType, bLogWarning);
+		return UAssetManagerBase::Get().LoadPrimaryAssets<T>(InPrimaryAssetType, bEnsured);
 	}
 };

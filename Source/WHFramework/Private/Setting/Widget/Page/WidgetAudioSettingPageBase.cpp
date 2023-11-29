@@ -58,9 +58,9 @@ void UWidgetAudioSettingPageBase::OnApply()
 	UAudioModuleStatics::SetEffectSoundVolume(SettingItem_EffectSoundVolume->GetValue().GetFloatValue());
 }
 
-void UWidgetAudioSettingPageBase::OnReset()
+void UWidgetAudioSettingPageBase::OnReset(bool bForce)
 {
-	Super::OnReset();
+	Super::OnReset(bForce);
 
 	SettingItem_GlobalSoundVolume->SetValue(GetDefaultSaveData()->CastRef<FAudioModuleSaveData>().GlobalSoundParams.Volume);
 	SettingItem_BackgroundSoundVolume->SetValue(GetDefaultSaveData()->CastRef<FAudioModuleSaveData>().BackgroundSoundParams.Volume);

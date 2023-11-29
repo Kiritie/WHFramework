@@ -25,7 +25,7 @@ public:
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
-	virtual void OnReset() override;
+	virtual void OnReset(bool bForce) override;
 
 	virtual void OnClose(bool bInstant) override;
 

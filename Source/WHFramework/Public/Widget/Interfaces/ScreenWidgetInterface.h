@@ -32,7 +32,7 @@ public:
 	
 	virtual void OnClose(bool bInstant = false) = 0;
 
-	virtual void OnReset() = 0;
+	virtual void OnReset(bool bForce = false) = 0;
 
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
@@ -49,7 +49,7 @@ public:
 
 	virtual void Toggle(bool bInstant = false) = 0;
 
-	virtual void Reset(bool bResetOwner = false) = 0;
+	virtual void Reset(bool bForce = false) = 0;
 
 public:
 	virtual bool CanOpen() const = 0;

@@ -493,12 +493,12 @@ public:
 	virtual ~FAbilityItem() override = default;
 
 	template<class T>
-	T& GetData(bool bLogWarning = true) const
+	T& GetData(bool bEnsured = true) const
 	{
-		return static_cast<T&>(GetData(bLogWarning));
+		return static_cast<T&>(GetData(bEnsured));
 	}
 
-	UAbilityItemDataBase& GetData(bool bLogWarning = true) const;
+	UAbilityItemDataBase& GetData(bool bEnsured = true) const;
 	
 	EAbilityItemType GetType() const;
 

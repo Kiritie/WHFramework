@@ -28,7 +28,7 @@ public:
 
 	virtual void OnApply() override;
 
-	virtual void OnReset() override;
+	virtual void OnReset(bool bForce) override;
 
 	virtual void OnValueChange(UWidgetSettingItemBase* InSettingItem, const FParameter& InValue) override;
 

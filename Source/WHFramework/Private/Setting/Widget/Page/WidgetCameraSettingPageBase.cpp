@@ -94,9 +94,9 @@ void UWidgetCameraSettingPageBase::OnApply()
 	UCameraModule::Get().SetCameraZoomSpeed(SettingItem_CameraZoomSpeed->GetValue().GetFloatValue());
 }
 
-void UWidgetCameraSettingPageBase::OnReset()
+void UWidgetCameraSettingPageBase::OnReset(bool bForce)
 {
-	Super::OnReset();
+	Super::OnReset(bForce);
 
 	SettingItem_CameraMoveRate->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().CameraMoveRate);
 	SettingItem_SmoothCameraMove->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bSmoothCameraMove);

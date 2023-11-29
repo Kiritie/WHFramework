@@ -364,12 +364,12 @@ public:
 	AVoxelChunk* GetOwner() const;
 
 	template<class T>
-	T& GetVoxelData(bool bLogWarning = true) const
+	T& GetVoxelData(bool bEnsured = true) const
 	{
-		return static_cast<T&>(GetVoxelData(bLogWarning));
+		return static_cast<T&>(GetVoxelData(bEnsured));
 	}
 
-	UVoxelData& GetVoxelData(bool bLogWarning = true) const;
+	UVoxelData& GetVoxelData(bool bEnsured = true) const;
 
 public:
 	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
