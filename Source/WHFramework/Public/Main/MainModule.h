@@ -12,7 +12,7 @@ UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cookin
 class WHFRAMEWORK_API AMainModule : public AWHActor
 {
 #if WITH_EDITOR
-	friend class FMainModuleDetailsPanel;
+	friend class FMainModuleDetailCustomization;
 #endif
 	
 	GENERATED_BODY()

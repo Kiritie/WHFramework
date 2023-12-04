@@ -9,6 +9,7 @@
 #include "TaskModuleStatics.generated.h"
 
 class UTaskBase;
+class UTaskAsset;
 /**
  * 
  */
@@ -18,6 +19,12 @@ class WHFRAMEWORK_API UTaskModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskAsset* GetCurrentTaskAsset();
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void SetCurrentTaskAsset(UTaskAsset* InTaskAsset, bool bAutoEnterFirst = false);
+
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetCurrentTask();
 

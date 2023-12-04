@@ -3,30 +3,58 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ClassViewerFilter.h"
+#include "StepEditor.h"
+#include "WHFrameworkEditorStyle.h"
+#include "Styling/SlateStyle.h"
+#include "StepEditorTypes.generated.h"
 
 FString GStepEditorIni;
 
-class FStepClassFilter : public IClassViewerFilter
+//////////////////////////////////////////////////////////////////////////
+// ClassFilter
+class FStepClassFilter : public FAssetClassFilterBase
 {
 public:
-	const UClass* IncludeParentClass;
-	const UClass* UnIncludeParentClass;
+	FStepClassFilter();
 
-	virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs ) override
-	{
-		return IsClassAllowedHelper(InClass);
-	}
-	
-	virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef< const IUnloadedBlueprintData > InBlueprint, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
-	{
-		return IsClassAllowedHelper(InBlueprint);
-	}
+	TWeakPtr<FStepEditor> StepEditor;
 
 private:
-	template <typename TClass>
-	bool IsClassAllowedHelper(TClass InClass)
-	{
-		return InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass);
-	}
+	virtual bool IsClassAllowed(const UClass* InClass) override;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Commands
+class FStepEditorCommands : public TCommands<FStepEditorCommands>
+{	  
+public:
+	FStepEditorCommands()
+		: TCommands<FStepEditorCommands>(TEXT("StepEditor"),
+			NSLOCTEXT("StepEditor", "Step Editor", "Step Editor Commands"),
+			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
+	{}
+	
+public:
+	virtual void RegisterCommands() override;
+
+public:
+	TSharedPtr< FUICommandInfo > OpenStepEditorWindow;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// EditorSettings
+UCLASS(config = StepEditor, configdonotcheckdefaults)
+class WHFRAMEWORKEDITOR_API UStepEditorSettings : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UStepEditorSettings();
+
+public:
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsMultiMode;
+
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsEditMode;
 };

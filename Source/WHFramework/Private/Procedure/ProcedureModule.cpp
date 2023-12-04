@@ -7,6 +7,8 @@
 #include "Procedure/Base/ProcedureBase.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Procedure/EventHandle_SwitchProcedure.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(UProcedureModule)
@@ -19,12 +21,10 @@ UProcedureModule::UProcedureModule()
 
 	ModuleNetworkComponent = UProcedureModuleNetworkComponent::StaticClass();
 
-	Procedures = TArray<UProcedureBase*>();
-	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();
-
 	bAutoSwitchFirst = false;
 
-	FirstProcedure = nullptr;
+	DefaultAsset = nullptr;
+	CurrentAsset = nullptr;
 	CurrentProcedure = nullptr;
 }
 
@@ -44,14 +44,14 @@ void UProcedureModule::OnDestroy()
 	Super::OnDestroy();
 
 	TERMINATION_MODULE(UProcedureModule)
-
-	ClearAllProcedure();
 }
 #endif
 
 void UProcedureModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, FName("OnSwitchProcedure"));
 }
 
 void UProcedureModule::OnPreparatory(EPhase InPhase)
@@ -60,23 +60,16 @@ void UProcedureModule::OnPreparatory(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(!FirstProcedure && Procedures.Num() > 0)
+		if(DefaultAsset)
 		{
-			FirstProcedure = Procedures[0];
-		}
-		for(auto Iter : Procedures)
-		{
-			if(Iter)
-			{
-				Iter->OnInitialize();
-			}
+			SetCurrentAsset(DefaultAsset);
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(bAutoSwitchFirst && FirstProcedure)
+		if(bAutoSwitchFirst)
 		{
-			SwitchProcedure(FirstProcedure);
+			SwitchFirstProcedure();
 		}
 	}
 }
@@ -107,6 +100,11 @@ void UProcedureModule::OnUnPause()
 void UProcedureModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+}
+
+void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle)
+{
+	SwitchProcedureByClass(InEventHandle->ProcedureClass);
 }
 
 void UProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
@@ -151,15 +149,15 @@ void UProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClas
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), InClass ? *InClass->GetName() : TEXT("None")), EDM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		SwitchProcedure(nullptr);
 	}
 }
 
 void UProcedureModule::SwitchFirstProcedure()
 {
-	if(FirstProcedure)
+	if(GetFirstProcedure())
 	{
-		SwitchProcedure(FirstProcedure);
+		SwitchProcedure(GetFirstProcedure());
 	}
 }
 
@@ -173,7 +171,7 @@ void UProcedureModule::SwitchLastProcedure()
 
 void UProcedureModule::SwitchNextProcedure()
 {
-	if(CurrentProcedure && CurrentProcedure->ProcedureIndex < Procedures.Num() - 1)
+	if(CurrentProcedure && CurrentProcedure->ProcedureIndex < GetProcedures().Num() - 1)
 	{
 		SwitchProcedureByIndex(CurrentProcedure->ProcedureIndex + 1);
 	}
@@ -187,30 +185,32 @@ void UProcedureModule::GuideCurrentProcedure()
 	}
 }
 
-void UProcedureModule::ClearAllProcedure()
+void UProcedureModule::SetCurrentAsset(UProcedureAsset* InProcedureAsset, bool bInAutoSwitchFirst)
 {
-	for(auto Iter : Procedures)
+	if(!InProcedureAsset || (CurrentAsset && InProcedureAsset == CurrentAsset->SourceObject)) return;
+
+	CurrentAsset = DuplicateObject<UProcedureAsset>(InProcedureAsset, this);
+	CurrentAsset->Initialize(InProcedureAsset);
+
+	WHDebug(FString::Printf(TEXT("切换流程源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+
+	for(auto Iter : GetProcedures())
 	{
 		if(Iter)
 		{
-#if(WITH_EDITOR)
-			Iter->OnUnGenerate();
-#else
-			Iter->ConditionalBeginDestroy();
-#endif
+			Iter->OnInitialize();
 		}
 	}
-	
-	Procedures.Empty();
 
-	ProcedureMap.Empty();
-
-	Modify();
+	if(bInAutoSwitchFirst)
+	{
+		SwitchFirstProcedure();
+	}
 }
 
 bool UProcedureModule::HasProcedureByIndex(int32 InIndex) const
 {
-	return Procedures.IsValidIndex(InIndex);
+	return GetProcedures().IsValidIndex(InIndex);
 }
 
 UProcedureBase* UProcedureModule::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass) const
@@ -237,25 +237,3 @@ bool UProcedureModule::IsCurrentProcedureIndex(int32 InIndex) const
 {
 	return CurrentProcedure && CurrentProcedure->ProcedureIndex == InIndex;
 }
-
-#if WITH_EDITOR
-void UProcedureModule::GenerateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
-{
-	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
-	for (int32 i = 0; i < Procedures.Num(); i++)
-	{
-		auto Item = MakeShared<FProcedureListItem>();
-		Procedures[i]->GenerateListItem(Item);
-		OutProcedureListItems.Add(Item);
-	}
-}
-
-void UProcedureModule::UpdateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
-{
-	for (int32 i = 0; i < Procedures.Num(); i++)
-	{
-		Procedures[i]->ProcedureIndex = i;
-		Procedures[i]->UpdateListItem(OutProcedureListItems[i]);
-	}
-}
-#endif

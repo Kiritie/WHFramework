@@ -10,6 +10,7 @@
 
 #include "ProcedureBase.generated.h"
 
+class UProcedureAsset;
 class ACameraActorBase;
 /**
  * 流程基类
@@ -148,6 +149,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	EProcedureState GetProcedureState() const { return ProcedureState; }
+	/**
+	* 获取流程资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UProcedureAsset* GetProcedureAsset() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Operation Target

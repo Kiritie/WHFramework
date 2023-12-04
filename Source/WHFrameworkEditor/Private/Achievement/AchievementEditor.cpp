@@ -1,18 +1,68 @@
-// Copyright 2021 Sam Carey. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Achievement/AchievementEditor.h"
 
-IMPLEMENTATION_EDITOR_MODULE(FAchievementEditor)
+#if WITH_EDITOR
+#include "Editor.h"
+#endif
 
-void FAchievementEditor::OnInitialize()
+#define LOCTEXT_NAMESPACE "FAchievementEditor"
+
+IMPLEMENTATION_EDITOR_MODULE(FAchievementEditorModule)
+
+FAchievementEditorModule::FAchievementEditorModule()
 {
-	//Register achievement combo Box pin Factory
-	BlueprintGraphPanelPinFactory = MakeShareable(new FAchievementPinFactory());
-	FEdGraphUtilities::RegisterVisualPinFactory(BlueprintGraphPanelPinFactory);
+	AppIdentifier = FName("AchievementEditorApp");
 }
 
-void FAchievementEditor::OnTermination()
+void FAchievementEditorModule::StartupModule()
 {
-	//Unregister achievement combo Box pin Factory
-	FEdGraphUtilities::UnregisterVisualPinFactory(BlueprintGraphPanelPinFactory);
+	
 }
+
+void FAchievementEditorModule::ShutdownModule()
+{
+	
+}
+
+void FAchievementEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
+{
+	
+}
+
+void FAchievementEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
+{
+	
+}
+
+bool FAchievementEditorModule::HandleSettingsSaved()
+{
+	return true;
+}
+
+void FAchievementEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
+{
+	
+}
+
+void FAchievementEditorModule::RegisterMenus(const TSharedPtr<FUICommandList>& Commands)
+{
+	
+}
+
+void FAchievementEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions)
+{
+	
+}
+
+void FAchievementEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+{
+	
+}
+
+void FAchievementEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+{
+	PropertyEditor.UnregisterCustomClassLayout(FName("AchievementBase"));
+}
+
+#undef LOCTEXT_NAMESPACE

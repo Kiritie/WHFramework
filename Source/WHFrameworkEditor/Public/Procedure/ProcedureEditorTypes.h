@@ -3,34 +3,58 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ClassViewerFilter.h"
-#include "Procedure/ProcedureModule.h"
+#include "ProcedureEditor.h"
+#include "WHFrameworkEditorStyle.h"
 #include "Styling/SlateStyle.h"
-#include "Procedure/Base/ProcedureBase.h"
+#include "ProcedureEditorTypes.generated.h"
 
 FString GProcedureEditorIni;
 
-class FProcedureClassFilter : public IClassViewerFilter
+//////////////////////////////////////////////////////////////////////////
+// ClassFilter
+class FProcedureClassFilter : public FAssetClassFilterBase
 {
 public:
-	const UClass* IncludeParentClass;
-	const UClass* UnIncludeParentClass;
-	
-	UProcedureModule* ProcedureModule;
+	FProcedureClassFilter();
 
-	virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs ) override
-	{
-		return IsClassAllowedHelper(InClass);
-	}
-	
-	virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef< const IUnloadedBlueprintData > InBlueprint, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
-	{
-		return IsClassAllowedHelper(InBlueprint->GetClassWithin());
-	}
+	TWeakPtr<FProcedureEditor> ProcedureEditor;
 
 private:
-	bool IsClassAllowedHelper(const UClass* InClass)
-	{
-		return InClass != IncludeParentClass && InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass) && !ProcedureModule->GetProcedureMap().Contains(const_cast<UClass*>(InClass));
-	}
+	virtual bool IsClassAllowed(const UClass* InClass) override;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Commands
+class FProcedureEditorCommands : public TCommands<FProcedureEditorCommands>
+{	  
+public:
+	FProcedureEditorCommands()
+		: TCommands<FProcedureEditorCommands>(TEXT("ProcedureEditor"),
+			NSLOCTEXT("ProcedureEditor", "Procedure Editor", "Procedure Editor Commands"),
+			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
+	{}
+	
+public:
+	virtual void RegisterCommands() override;
+
+public:
+	TSharedPtr< FUICommandInfo > OpenProcedureEditorWindow;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// EditorSettings
+UCLASS(config = ProcedureEditor, configdonotcheckdefaults)
+class WHFRAMEWORKEDITOR_API UProcedureEditorSettings : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UProcedureEditorSettings();
+
+public:
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsMultiMode;
+
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsEditMode;
 };

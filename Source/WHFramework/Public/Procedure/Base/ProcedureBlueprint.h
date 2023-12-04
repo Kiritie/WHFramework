@@ -25,8 +25,5 @@ class WHFRAMEWORK_API UProcedureBlueprint : public UBlueprint
 	}
 	// End of UBlueprint interface
 
-	/** Returns the most base procedure blueprint for a given blueprint (if it is inherited from another procedure blueprint, returning null if only native / non-procedure BP classes are it's parent) */
-	static UProcedureBlueprint* FindProcedureBlueprint(UProcedureBlueprint* DerivedBlueprint);
-
 #endif
 };

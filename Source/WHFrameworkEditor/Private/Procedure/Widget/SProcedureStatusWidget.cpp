@@ -3,6 +3,7 @@
 
 #include "Procedure/Widget/SProcedureStatusWidget.h"
 #include "SlateOptMacros.h"
+#include "Procedure/ProcedureEditor.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -16,10 +17,8 @@ SProcedureStatusWidget::SProcedureStatusWidget()
 void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-
-	ListWidget = InArgs._ListWidget;
-
-	if(!ListWidget) return;
+	
+	ProcedureEditor = InArgs._ProcedureEditor;
 
 	ChildSlot
 	[
@@ -52,7 +51,7 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalProcedureNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ProcedureEditor.Pin()->ListWidget->GetTotalProcedureNum())); })
 				]
 
 				+ SHorizontalBox::Slot()
@@ -61,7 +60,7 @@ void SProcedureStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedProcedureNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ProcedureEditor.Pin()->ListWidget->GetSelectedProcedureNum())); })
 				]
 			]
 		]

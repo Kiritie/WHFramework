@@ -4,9 +4,8 @@
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Procedure/ProcedureModule.h"
+#include "Procedure/ProcedureEditor.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Procedure/Widget/SProcedureEditorWidget.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -15,19 +14,15 @@ SProcedureDetailsWidget::SProcedureDetailsWidget()
 {
 	WidgetName = FName("ProcedureDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
-	ProcedureModule = nullptr;
 }
 
 void SProcedureDetailsWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+	
+	ProcedureEditor = InArgs._ProcedureEditor;
 
-	ProcedureModule = InArgs._ProcedureModule;
-	ListWidget = InArgs._ListWidget;
-
-	if(!ProcedureModule || !ListWidget) return;
-
-	ListWidget->OnSelectProcedureListItemsDelegate.BindRaw(this, &SProcedureDetailsWidget::OnSelectProcedureListItem);
+	ProcedureEditor.Pin()->ListWidget->OnSelectProcedureListItemsDelegate.BindRaw(this, &SProcedureDetailsWidget::OnSelectProcedureListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -108,7 +103,7 @@ void SProcedureDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(ProcedureModule);
+		DetailsView->SetObject(ProcedureEditor.Pin()->GetEditingAsset());
 	}
 }
 

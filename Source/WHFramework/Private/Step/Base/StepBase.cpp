@@ -65,13 +65,7 @@ void UStepBase::OnGenerate()
 
 void UStepBase::OnUnGenerate()
 {
-	if(bFirstStep)
-	{
-		if(UStepModule::Get(true).GetFirstStep() == this)
-		{
-			UStepModule::Get(true).SetFirstStep(nullptr);
-		}
-	}
+	
 }
 #endif
 
@@ -379,6 +373,11 @@ void UStepBase::OnLeave()
 			}
 		}
 	}
+}
+
+UStepAsset* UStepBase::GetStepAsset() const
+{
+	return Cast<UStepAsset>(GetOuter());
 }
 
 bool UStepBase::IsEntered() const
@@ -702,15 +701,15 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstStep)
 			{
-				if(UStepModule::Get(true).GetFirstStep())
+				if(GetStepAsset()->GetFirstStep())
 				{
-					UStepModule::Get(true).GetFirstStep()->bFirstStep = false;
+					GetStepAsset()->GetFirstStep()->bFirstStep = false;
 				}
-				UStepModule::Get(true).SetFirstStep(this);
+				GetStepAsset()->SetFirstStep(this);
 			}
-			else if(UStepModule::Get(true).GetFirstStep() == this)
+			else if(GetStepAsset()->GetFirstStep() == this)
 			{
-				UStepModule::Get(true).SetFirstStep(nullptr);
+				GetStepAsset()->SetFirstStep(nullptr);
 			}
 		}
 	}

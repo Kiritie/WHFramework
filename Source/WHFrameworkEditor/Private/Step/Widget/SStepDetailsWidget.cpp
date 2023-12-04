@@ -4,7 +4,6 @@
 #include "Step/Widget/SStepDetailsWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Step/StepModule.h"
 #include "Step/Base/StepBase.h"
 #include "Step/Widget/SStepListWidget.h"
 
@@ -14,19 +13,15 @@ SStepDetailsWidget::SStepDetailsWidget()
 {
 	WidgetName = FName("StepDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
-	StepModule = nullptr;
 }
 
 void SStepDetailsWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+	
+	StepEditor = InArgs._StepEditor;
 
-	ListWidget = InArgs._ListWidget;
-	StepModule = InArgs._StepModule;
-
-	if(!StepModule || !StepModule->IsValidLowLevel() || !ListWidget) return;
-
-	ListWidget->OnSelectStepListItemsDelegate.BindRaw(this, &SStepDetailsWidget::OnSelectStepListItem);
+	StepEditor.Pin()->ListWidget->OnSelectStepListItemsDelegate.BindRaw(this, &SStepDetailsWidget::OnSelectStepListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -107,7 +102,7 @@ void SStepDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(StepModule);
+		DetailsView->SetObject(StepEditor.Pin()->GetEditingAsset());
 	}
 }
 

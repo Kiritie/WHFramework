@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
+
+class FProcedureEditor;
 
 /**
  * 
@@ -14,8 +16,8 @@ public:
 	SProcedureStatusWidget();
 	
 	SLATE_BEGIN_ARGS(SProcedureStatusWidget) {}
-	
-		SLATE_ARGUMENT(TSharedPtr<class SProcedureListWidget>, ListWidget)
+
+		SLATE_ARGUMENT(TWeakPtr<FProcedureEditor>, ProcedureEditor)
 
 	SLATE_END_ARGS()
 
@@ -31,7 +33,7 @@ public:
 	virtual void OnDestroy() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Refs
+	/// Stats
 public:
-	TSharedPtr<class SProcedureListWidget> ListWidget;
+	TWeakPtr<FProcedureEditor> ProcedureEditor;
 };

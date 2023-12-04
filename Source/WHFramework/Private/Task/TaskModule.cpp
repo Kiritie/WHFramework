@@ -24,11 +24,9 @@ UTaskModule::UTaskModule()
 
 	bAutoEnterFirst = false;
 
-	RootTasks = TArray<UTaskBase*>();
-
-	FirstTask = nullptr;
+	DefaultAsset = nullptr;
+	CurrentAsset = nullptr;
 	CurrentTask = nullptr;
-	TaskMap = TMap<FString, UTaskBase*>();
 }
 
 UTaskModule::~UTaskModule()
@@ -47,8 +45,6 @@ void UTaskModule::OnDestroy()
 	Super::OnDestroy();
 
 	TERMINATION_MODULE(UTaskModule)
-
-	ClearAllTask();
 }
 #endif
 
@@ -63,16 +59,9 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(!FirstTask && RootTasks.Num() > 0)
+		if(DefaultAsset)
 		{
-			FirstTask = RootTasks[0];
-		}
-		for(auto Iter : RootTasks)
-		{
-			if(Iter)
-			{
-				Iter->OnInitialize();
-			}
+			SetCurrentAsset(DefaultAsset);
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
@@ -86,7 +75,7 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 	{
 		if(bAutoEnterFirst && !CurrentTask)
 		{
-			EnterTask(FirstTask);
+			EnterTask(GetFirstTask());
 		}
 	}
 }
@@ -109,9 +98,9 @@ void UTaskModule::OnRefresh(float DeltaSeconds)
 				{
 					CurrentTask->ParentTask->Refresh();
 				}
-				else if(CurrentTask->ParentTask->IsRootTask() && RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
+				else if(CurrentTask->ParentTask->IsRootTask() && GetRootTasks().IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
 				{
-					EnterTask(RootTasks[CurrentTask->ParentTask->TaskIndex + 1]);
+					EnterTask(GetRootTasks()[CurrentTask->ParentTask->TaskIndex + 1]);
 				}
 			}
 		}
@@ -121,9 +110,9 @@ void UTaskModule::OnRefresh(float DeltaSeconds)
 			{
 				CurrentTask->Refresh();
 			}
-			else if(RootTasks.IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
+			else if(GetRootTasks().IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
 			{
-				EnterTask(RootTasks[CurrentTask->ParentTask->TaskIndex + 1]);
+				EnterTask(GetRootTasks()[CurrentTask->ParentTask->TaskIndex + 1]);
 			}
 		}
 	}
@@ -175,14 +164,14 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	for(auto Iter : SaveData.TaskItemMap)
 	{
-		if(TaskMap.Contains(Iter.Key))
+		if(GetTaskMap().Contains(Iter.Key))
 		{
-			TaskMap[Iter.Key]->LoadSaveData(&Iter.Value);
+			GetTaskMap()[Iter.Key]->LoadSaveData(&Iter.Value);
 		}
 	}
 	if(!CurrentTask)
 	{
-		EnterTask(FirstTask);
+		EnterTask(GetFirstTask());
 	}
 }
 
@@ -194,7 +183,7 @@ void UTaskModule::UnloadData(EPhase InPhase)
 		{
 			CurrentTask->Leave();
 		}
-		for(auto Iter : RootTasks)
+		for(auto Iter : GetRootTasks())
 		{
 			Iter->Restore();
 		}
@@ -207,7 +196,7 @@ FSaveData* UTaskModule::ToData()
 	static FTaskModuleSaveData SaveData;
 	SaveData = FTaskModuleSaveData();
 
-	for(auto Iter : TaskMap)
+	for(auto Iter : GetTaskMap())
 	{
 		SaveData.TaskItemMap.Add(Iter.Key, Iter.Value->GetSaveDataRef<FSaveData>(true));
 	}
@@ -310,30 +299,9 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 	}
 }
 
-void UTaskModule::ClearAllTask()
-{
-	for(auto Iter : RootTasks)
-	{
-		if(Iter)
-		{
-#if WITH_EDITOR
-			Iter->OnUnGenerate();
-#else
-			Iter->ConditionalBeginDestroy();
-#endif
-		}
-	}
-	
-	RootTasks.Empty();
-
-	TaskMap.Empty();
-
-	Modify();
-}
-
 bool UTaskModule::IsAllTaskCompleted()
 {
-	for(auto Iter : RootTasks)
+	for(auto Iter : GetRootTasks())
 	{
 		if(!Iter->IsCompleted(true))
 		{
@@ -341,6 +309,29 @@ bool UTaskModule::IsAllTaskCompleted()
 		}
 	}
 	return true;
+}
+
+void UTaskModule::SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirst)
+{
+	if(!InTaskAsset || (CurrentAsset && InTaskAsset == CurrentAsset->SourceObject)) return;
+
+	CurrentAsset = DuplicateObject<UTaskAsset>(InTaskAsset, this);
+	CurrentAsset->Initialize(InTaskAsset);
+
+	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+
+	for(auto Iter : GetRootTasks())
+	{
+		if(Iter)
+		{
+			Iter->OnInitialize();
+		}
+	}
+
+	if(bInAutoEnterFirst)
+	{
+		EnterTask(GetFirstTask());
+	}
 }
 
 UTaskBase* UTaskModule::GetCurrentRootTask() const
@@ -351,26 +342,3 @@ UTaskBase* UTaskModule::GetCurrentRootTask() const
 	}
 	return nullptr;
 }
-
-#if WITH_EDITOR
-void UTaskModule::GenerateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
-{
-	OutTaskListItems = TArray<TSharedPtr<FTaskListItem>>();
-	for (int32 i = 0; i < RootTasks.Num(); i++)
-	{
-		auto Item = MakeShared<FTaskListItem>();
-		RootTasks[i]->GenerateListItem(Item);
-		OutTaskListItems.Add(Item);
-	}
-}
-
-void UTaskModule::UpdateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
-{
-	for (int32 i = 0; i < RootTasks.Num(); i++)
-	{
-		RootTasks[i]->TaskIndex = i;
-		RootTasks[i]->TaskHierarchy = 0;
-		RootTasks[i]->UpdateListItem(OutTaskListItems[i]);
-	}
-}
-#endif

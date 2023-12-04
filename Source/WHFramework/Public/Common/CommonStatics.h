@@ -254,8 +254,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Class
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static TArray<UClass*> GetClassChildren(const UClass* InClass, bool bIncludeSelf = false);
+	static bool IsClassHasChildren(const UClass* InClass, EClassFlags InDisabledFlags = CLASS_None);
+
+	static TArray<UClass*> GetClassChildren(const UClass* InClass, bool bIncludeSelf = false, EClassFlags InDisabledFlags = CLASS_None);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Texture

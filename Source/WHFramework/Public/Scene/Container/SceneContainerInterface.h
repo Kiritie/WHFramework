@@ -2,8 +2,7 @@
 
 #pragma once
 
-
-#include "Scene/Actor/SceneActorInterface.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 #include "UObject/Interface.h"
 #include "SceneContainerInterface.generated.h"
 

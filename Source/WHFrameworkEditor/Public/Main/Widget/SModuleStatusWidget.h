@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 /**
  * 

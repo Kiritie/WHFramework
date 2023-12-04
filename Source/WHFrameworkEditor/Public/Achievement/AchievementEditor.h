@@ -1,20 +1,39 @@
-// Copyright 2021 Sam Carey. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
+
 #pragma once
 
-#include "AchievementPinFactory.h"
-#include "Main/Base/ModuleEditorBase.h"
+#include "CoreMinimal.h"
+#include "Common/CommonEditorTypes.h"
+#include "Common/Module/EditorModuleBase.h"
 
-class FAchievementEditor : public FModuleEditorBase
+//////////////////////////////////////////////////////////////////////////
+// AchievementEditorModule
+class FAchievementEditorModule : public FEditorModuleBase
 {
-	GENERATED_EDITOR_MODULE(FAchievementEditor)
+	GENERATED_EDITOR_MODULE(FAchievementEditorModule)
+
+public:
+	FAchievementEditorModule();
 	
 public:
-	/* Called when the module is loaded */
-	virtual void OnInitialize() override;
+	virtual void StartupModule() override;
 
-	/* Called when the module is unloaded */
-	virtual void OnTermination() override;
+	virtual void ShutdownModule() override;
 
-protected:
-	TSharedPtr<FAchievementPinFactory> BlueprintGraphPanelPinFactory;
+public:
+	virtual void RegisterSettings(ISettingsModule* SettingsModule) override;
+
+	virtual void UnRegisterSettings(ISettingsModule* SettingsModule) override;
+
+	virtual bool HandleSettingsSaved() override;
+	
+	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& Commands) override;
+
+	virtual void RegisterMenus(const TSharedPtr<FUICommandList>& Commands) override;
+
+	virtual void RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions) override;
+
+	virtual void RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+
+	virtual void UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
 };

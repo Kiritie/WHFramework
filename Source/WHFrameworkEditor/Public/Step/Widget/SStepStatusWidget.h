@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Step/StepEditor.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 /**
  * 
@@ -15,7 +16,7 @@ public:
 
 	SLATE_BEGIN_ARGS(SStepStatusWidget) {}
 
-		SLATE_ARGUMENT(TSharedPtr<class SStepListWidget>, ListWidget)
+		SLATE_ARGUMENT(TWeakPtr<FStepEditor>, StepEditor)
 
 	SLATE_END_ARGS()
 
@@ -31,7 +32,7 @@ public:
 	virtual void OnDestroy() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Refs
+	/// Stats
 public:
-	TSharedPtr<class SStepListWidget> ListWidget;
+	TWeakPtr<FStepEditor> StepEditor;
 };

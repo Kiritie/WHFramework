@@ -18,6 +18,12 @@ class WHFRAMEWORK_API UProcedureModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
+	static UProcedureAsset* GetCurrentProcedureAsset();
+
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
+	static void SetCurrentProcedureAsset(UProcedureAsset* InProcedureAsset, bool bAutoSwitchFirst = false);
+
 	template<class T>
 	static T* GetCurrentProcedure()
 	{

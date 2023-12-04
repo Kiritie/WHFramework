@@ -59,13 +59,7 @@ void UTaskBase::OnGenerate()
 
 void UTaskBase::OnUnGenerate()
 {
-	if(bFirstTask)
-	{
-		if(UTaskModule::Get(true).GetFirstTask() == this)
-		{
-			UTaskModule::Get(true).SetFirstTask(nullptr);
-		}
-	}
+	
 }
 #endif
 
@@ -295,6 +289,11 @@ void UTaskBase::OnLeave()
 			}
 		}
 	}
+}
+
+UTaskAsset* UTaskBase::GetTaskAsset() const
+{
+	return Cast<UTaskAsset>(GetOuter());
 }
 
 bool UTaskBase::IsEntered() const
@@ -582,15 +581,15 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstTask)
 			{
-				if(UTaskModule::Get(true).GetFirstTask())
+				if(GetTaskAsset()->GetFirstTask())
 				{
-					UTaskModule::Get(true).GetFirstTask()->bFirstTask = false;
+					GetTaskAsset()->GetFirstTask()->bFirstTask = false;
 				}
-				UTaskModule::Get(true).SetFirstTask(this);
+				GetTaskAsset()->SetFirstTask(this);
 			}
-			else if(UTaskModule::Get(true).GetFirstTask() == this)
+			else if(GetTaskAsset()->GetFirstTask() == this)
 			{
-				UTaskModule::Get(true).SetFirstTask(nullptr);
+				GetTaskAsset()->SetFirstTask(nullptr);
 			}
 		}
 	}

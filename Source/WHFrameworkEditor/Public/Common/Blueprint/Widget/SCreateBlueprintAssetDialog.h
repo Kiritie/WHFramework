@@ -6,7 +6,7 @@
 #include "ClassViewerFilter.h"
 #include "ClassViewerModule.h"
 #include "Step/StepEditorTypes.h"
-#include "Widget/Window/SEditorWindowBase.h"
+#include "Widget/Base/Window/SEditorWindowBase.h"
 
 class UBlueprintFactoryBase;
 

@@ -8,7 +8,6 @@
 #include "Animation/AnimInstance.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Audio/AudioModuleStatics.h"
-#include "Camera/CameraComponent.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterAnimBase.h"
 #include "Character/Base/CharacterDataBase.h"

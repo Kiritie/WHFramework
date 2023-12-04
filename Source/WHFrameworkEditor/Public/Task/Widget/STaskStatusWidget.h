@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Task/TaskEditor.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 /**
  * 
@@ -15,7 +16,7 @@ public:
 
 	SLATE_BEGIN_ARGS(STaskStatusWidget) {}
 
-		SLATE_ARGUMENT(TSharedPtr<class STaskListWidget>, ListWidget)
+		SLATE_ARGUMENT(TWeakPtr<FTaskEditor>, TaskEditor)
 
 	SLATE_END_ARGS()
 
@@ -33,5 +34,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	TSharedPtr<class STaskListWidget> ListWidget;
+	TWeakPtr<FTaskEditor> TaskEditor;
 };

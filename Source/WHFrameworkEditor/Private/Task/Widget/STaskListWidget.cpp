@@ -8,11 +8,11 @@
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
 #include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Task/TaskBlueprintFactory.h"
 #include "Task/TaskEditorTypes.h"
-#include "Task/TaskModule.h"
+#include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBlueprint.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/Blueprint/TaskBlueprintFactory.h"
 #include "Task/Widget/STaskListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -22,20 +22,17 @@ STaskListWidget::STaskListWidget()
 	WidgetName = FName("TaskListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
-	bMultiMode = true;
+	bMultiMode = false;
 	bEditMode = false;
 
-	TaskModule = nullptr;
 	CopiedTask = nullptr;
 }
 
 void STaskListWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-
-	TaskModule = InArgs._TaskModule;
-
-	if(!TaskModule) return;
+	
+	TaskEditor = InArgs._TaskEditor;
 
 	if(!TreeView.IsValid())
 	{
@@ -72,12 +69,9 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 	ClassViewerOptions.bAllowViewOptions = true;
 
 	TaskClassFilter = MakeShareable(new FTaskClassFilter);
-	TaskClassFilter->IncludeParentClass = UTaskBase::StaticClass();
-	#if ENGINE_MAJOR_VERSION == 4
-	ClassViewerOptions.ClassFilter = TaskClassFilter;
-	#else if ENGINE_MAJOR_VERSION == 5
+	TaskClassFilter->TaskEditor = TaskEditor;
+	
 	ClassViewerOptions.ClassFilters.Add(TaskClassFilter.ToSharedRef());
-	#endif
 
 	SAssignNew(ClassPickButton, SComboButton)
 		.OnGetMenuContent(this, &STaskListWidget::GenerateClassPicker)
@@ -281,7 +275,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Expand")))
-						.IsEnabled_Lambda([this](){ return TaskModule->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnExpandAllTaskItemButtonClicked)
 					]
@@ -294,7 +288,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Collapse")))
-						.IsEnabled_Lambda([this](){ return TaskModule->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnCollapseAllTaskItemButtonClicked)
 					]
@@ -307,7 +301,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
-						.IsEnabled_Lambda([this](){ return TaskModule->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnClearAllTaskItemButtonClicked)
 					]
@@ -348,7 +342,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
 							return SelectedTaskListItems.Num() == 1 &&
-								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskModule->GetRootTasks().Num()) - 1;
+								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num()) - 1;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnMoveDownTaskItemButtonClicked)
@@ -393,7 +387,7 @@ void STaskListWidget::OnDestroy()
 
 UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InClass)
 {
-	UTaskBase* NewTask = NewObject<UTaskBase>(TaskModule, InClass, NAME_None);
+	UTaskBase* NewTask = NewObject<UTaskBase>(TaskEditor.Pin()->GetEditingAsset<UTaskAsset>(), InClass, NAME_None);
 
 	// NewTask->TaskName = *CurrentTaskClass->GetName().Replace(TEXT("Task_"), TEXT(""));
 	// NewTask->TaskDisplayName = FText::FromName(NewTask->TaskName);
@@ -405,7 +399,7 @@ UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InClass)
 
 UTaskBase* STaskListWidget::DuplicateTask(UTaskBase* InTask)
 {
-	UTaskBase* NewTask = DuplicateObject<UTaskBase>(InTask, TaskModule, NAME_None);
+	UTaskBase* NewTask = DuplicateObject<UTaskBase>(InTask, TaskEditor.Pin()->GetEditingAsset<UTaskAsset>(), NAME_None);
 
 	NewTask->TaskGUID = FGuid::NewGuid().ToString();
 	NewTask->SubTasks.Empty();
@@ -461,15 +455,15 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 					}
 					else
 					{
-						TaskModule->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
+						TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
 					}
-					TaskModule->GetTaskMap().Emplace(OldTask->TaskGUID, NewTask);
+					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Emplace(OldTask->TaskGUID, NewTask);
 					OldTask->OnUnGenerate();
 					Refresh();
 				}
 			}
 
-			TaskModule->Modify();
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 
 			OnSelectTaskListItemsDelegate.Execute(SelectedTaskListItems);
 			SelectedTaskClass = InClass;
@@ -534,11 +528,11 @@ int32 STaskListWidget::GetSelectedTaskNum() const
 
 void STaskListWidget::UpdateTreeView(bool bRegenerate)
 {
-	if(!TaskModule) return;
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return;
 
 	if(bRegenerate)
 	{
-		TaskModule->GenerateTaskListItem(TaskListItems);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GenerateTaskListItem(TaskListItems);
 		for(auto Iter : TaskListItems)
 		{
 			SetTreeItemExpansionRecursive(Iter);
@@ -546,7 +540,7 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 	}
 	else
 	{
-		TaskModule->UpdateTaskListItem(TaskListItems);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->UpdateTaskListItem(TaskListItems);
 	}
 	TreeView->ClearSelection();
 	TreeView->RequestTreeRefresh();
@@ -621,7 +615,7 @@ void STaskListWidget::TreeSelectionChanged(TSharedPtr<FTaskListItem> TreeItem, E
 
 FReply STaskListWidget::OnEditTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(SelectedTaskClass->ClassGeneratedBy)
 	{
@@ -674,14 +668,14 @@ FReply STaskListWidget::OnNewTaskClassButtonClicked()
 
 FReply STaskListWidget::OnAddTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	UTaskBase* NewTask = GenerateTask(SelectedTaskClass);
 
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = NewTask;
 
-	TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+	TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -696,12 +690,12 @@ FReply STaskListWidget::OnAddTaskItemButtonClicked()
 	}
 	else
 	{
-		NewTask->TaskIndex = TaskModule->GetRootTasks().Num();
+		NewTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num();
 		NewTask->TaskHierarchy = 0;
-		TaskModule->GetRootTasks().Add(NewTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Add(NewTask);
 		TaskListItems.Add(Item);
 
-		TaskModule->Modify();
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 	}
 
 	if(Item->ParentListItem)
@@ -716,7 +710,7 @@ FReply STaskListWidget::OnAddTaskItemButtonClicked()
 
 FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -726,7 +720,7 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
 
-		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -737,10 +731,10 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex);
 
-			TaskModule->Modify();
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 		}
 
 		TreeView->SetSelection(Item);
@@ -752,7 +746,7 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 
 FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -762,7 +756,7 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
 
-		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -773,10 +767,10 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
-			TaskModule->Modify();
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 		}
 
 		TreeView->SetSelection(Item);
@@ -788,7 +782,7 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 
 FReply STaskListWidget::OnCopyTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	CopiedTask = DuplicateTask(SelectedTaskListItems[0]->Task);
 
@@ -797,12 +791,12 @@ FReply STaskListWidget::OnCopyTaskItemButtonClicked()
 
 FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 {
-	if(!TaskModule || !CopiedTask) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>() || !CopiedTask) return FReply::Handled();
 
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = CopiedTask;
 
-	TaskModule->GetTaskMap().Add(CopiedTask->TaskGUID, CopiedTask);
+	TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(CopiedTask->TaskGUID, CopiedTask);
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -817,12 +811,12 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 	}
 	else
 	{
-		CopiedTask->TaskIndex = TaskModule->GetRootTasks().Num();
+		CopiedTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num();
 		CopiedTask->TaskHierarchy = 0;
-		TaskModule->GetRootTasks().Add(CopiedTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Add(CopiedTask);
 		TaskListItems.Add(Item);
 
-		TaskModule->Modify();
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 	}
 
 	if(Item->ParentListItem)
@@ -839,7 +833,7 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 
 FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -849,7 +843,7 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
 
-		TaskModule->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -860,10 +854,10 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskModule->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
-			TaskModule->Modify();
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 		}
 
 		TreeView->SetSelection(Item);
@@ -895,7 +889,7 @@ FReply STaskListWidget::OnCollapseAllTaskItemButtonClicked()
 
 FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to remove selected Tasks?"))) != EAppReturnType::Yes) return FReply::Handled();
 
@@ -903,7 +897,7 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 	{
 		for(auto Iter : SelectedTaskListItems)
 		{
-			TaskModule->GetTaskMap().Remove(Iter->Task->TaskGUID);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Remove(Iter->Task->TaskGUID);
 
 			if(Iter->GetParentTask())
 			{
@@ -917,12 +911,12 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 			}
 			else
 			{
-				TaskModule->GetRootTasks()[Iter->GetTaskIndex()]->OnUnGenerate();
-				TaskModule->GetRootTasks().RemoveAt(Iter->GetTaskIndex());
+				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[Iter->GetTaskIndex()]->OnUnGenerate();
+				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(Iter->GetTaskIndex());
 				TaskListItems.RemoveAt(Iter->GetTaskIndex());
 				//TreeView->SetSelection(TaskListItems[FMath::Min(SelectedTaskListItem->GetTaskIndex(),TaskListItems.Num() - 1)]);
 
-				TaskModule->Modify();
+				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 			}
 		}
 		UpdateTreeView();
@@ -933,11 +927,11 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 
 FReply STaskListWidget::OnClearAllTaskItemButtonClicked()
 {
-	if(!TaskModule) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to clear all tasks?"))) != EAppReturnType::Yes) return FReply::Handled();
 
-	TaskModule->ClearAllTask();
+	TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->ClearAllTask();
 
 	UpdateTreeView(true);
 
@@ -946,7 +940,7 @@ FReply STaskListWidget::OnClearAllTaskItemButtonClicked()
 
 FReply STaskListWidget::OnMoveUpTaskItemButtonClicked()
 {
-	if(!TaskModule || SelectedTaskListItems.Num() == 0 || SelectedTaskListItems[0]->GetTaskIndex() == 0) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>() || SelectedTaskListItems.Num() == 0 || SelectedTaskListItems[0]->GetTaskIndex() == 0) return FReply::Handled();
 
 	if(SelectedTaskListItems[0]->GetParentTask())
 	{
@@ -963,14 +957,14 @@ FReply STaskListWidget::OnMoveUpTaskItemButtonClicked()
 	}
 	else
 	{
-		const auto TmpTask = TaskModule->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
-		TaskModule->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
-		TaskModule->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() - 1);
+		const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() - 1);
 
 		TaskListItems.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
 		TaskListItems.Insert(SelectedTaskListItems, SelectedTaskListItems[0]->GetTaskIndex() - 1);
 
-		TaskModule->Modify();
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 
 		UpdateTreeView();
 	}
@@ -980,7 +974,7 @@ FReply STaskListWidget::OnMoveUpTaskItemButtonClicked()
 
 FReply STaskListWidget::OnMoveDownTaskItemButtonClicked()
 {
-	if(!TaskModule || SelectedTaskListItems.Num() == 0) return FReply::Handled();
+	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>() || SelectedTaskListItems.Num() == 0) return FReply::Handled();
 
 	if(SelectedTaskListItems[0]->GetParentTask())
 	{
@@ -1000,16 +994,16 @@ FReply STaskListWidget::OnMoveDownTaskItemButtonClicked()
 	}
 	else
 	{
-		if(SelectedTaskListItems[0]->GetTaskIndex() < TaskModule->GetRootTasks().Num() - 1)
+		if(SelectedTaskListItems[0]->GetTaskIndex() < TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() - 1)
 		{
-			const auto TmpTask = TaskModule->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
-			TaskModule->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
-			TaskModule->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() + 1);
+			const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() + 1);
 
 			TaskListItems.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
 			TaskListItems.Insert(SelectedTaskListItems, SelectedTaskListItems[0]->GetTaskIndex() + 1);
 
-			TaskModule->Modify();
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 
 			UpdateTreeView();
 		}

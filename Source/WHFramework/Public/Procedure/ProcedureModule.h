@@ -2,12 +2,13 @@
 
 #pragma once
 
-
+#include "Base/ProcedureAsset.h"
 #include "Base/ProcedureBase.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "ProcedureModule.generated.h"
 
+class UEventHandle_SwitchProcedure;
 class UProcedureBase;
 
 /**
@@ -56,6 +57,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
 	bool bAutoSwitchFirst;
 
+protected:
+	UFUNCTION(BlueprintCallable)
+	void OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle);
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchProcedure(UProcedureBase* InProcedure);
@@ -81,26 +86,36 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void GuideCurrentProcedure();
 
-	UFUNCTION(BlueprintCallable)
-	void ClearAllProcedure();
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure Stats
 protected:
-	/// 初始流程 
+	/// 默认流程资产 
+	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Procedure Stats")
+	UProcedureAsset* DefaultAsset;
+	/// 当前流程资产 
 	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
-	UProcedureBase* FirstProcedure;
+	UProcedureAsset* CurrentAsset;
 	/// 当前流程 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "ProcedureModule|Procedure Stats")
 	UProcedureBase* CurrentProcedure;
-	/// 流程列表
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
-	TArray<UProcedureBase*> Procedures;
-	/// 流程Map
-	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
-	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> ProcedureMap;
 
 public:
+	/**
+	* 获取默认资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UProcedureAsset* GetDefaultAsset() const { return DefaultAsset; }
+	/**
+	* 获取当前资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UProcedureAsset* GetCurrentAsset() const { return CurrentAsset; }
+	/**
+	* 设置当前资产
+	*/
+	UFUNCTION(BlueprintCallable)
+	void SetCurrentAsset(UProcedureAsset* InProcedureAsset, bool bInAutoSwitchFirst = false);
+
 	UFUNCTION(BlueprintPure)
 	bool HasProcedureByIndex(int32 InIndex) const;
 
@@ -109,7 +124,7 @@ public:
 	{
 		if(HasProcedureByIndex(InIndex))
 		{
-			return Cast<T>(Procedures[InIndex]);
+			return Cast<T>(CurrentAsset->Procedures[InIndex]);
 		}
 		return nullptr;
 	}
@@ -122,7 +137,7 @@ public:
 	{
 		if(!InClass) return false;
 
-		return ProcedureMap.Contains(InClass);
+		return CurrentAsset->ProcedureMap.Contains(InClass);
 	}
 	
 	UFUNCTION(BlueprintPure)
@@ -135,7 +150,7 @@ public:
 
 		if(HasProcedureByClass<T>(InClass))
 		{
-			return Cast<T>(ProcedureMap[InClass]);
+			return Cast<T>(CurrentAsset->ProcedureMap[InClass]);
 		}
 		return nullptr;
 	}
@@ -168,12 +183,7 @@ public:
 	* 获取初始流程
 	*/
 	UFUNCTION(BlueprintPure)
-	UProcedureBase* GetFirstProcedure() const { return FirstProcedure; }
-	/**
-	* 设置初始流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstProcedure(UProcedureBase* InFirstProcedure) { this->FirstProcedure = InFirstProcedure; }
+	UProcedureBase* GetFirstProcedure() const { return CurrentAsset ? CurrentAsset->FirstProcedure : nullptr; }
 	/**
 	* 获取当前流程
 	*/
@@ -188,19 +198,10 @@ public:
 	* 获取流程列表
 	*/
 	UFUNCTION(BlueprintPure)
-	TArray<UProcedureBase*>& GetProcedures() { return Procedures; }
+	TArray<UProcedureBase*> GetProcedures() const { return CurrentAsset ? CurrentAsset->Procedures : TArray<UProcedureBase*>(); }
 	/**
 	* 获取流程Map
 	*/
 	UFUNCTION(BlueprintPure)
-	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>& GetProcedureMap() { return ProcedureMap; }
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
-#if WITH_EDITOR
-	virtual void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
-
-	virtual void UpdateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
-#endif
+	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> GetProcedureMap() const { return CurrentAsset ? CurrentAsset->ProcedureMap : TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>(); }
 };

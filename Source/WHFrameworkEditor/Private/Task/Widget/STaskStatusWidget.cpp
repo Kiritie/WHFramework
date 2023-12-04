@@ -16,10 +16,8 @@ STaskStatusWidget::STaskStatusWidget()
 void STaskStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-
-	ListWidget = InArgs._ListWidget;
-
-	if(!ListWidget) return;
+	
+	TaskEditor = InArgs._TaskEditor;
 
 	ChildSlot
 	[
@@ -52,7 +50,7 @@ void STaskStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalTaskNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), TaskEditor.Pin()->ListWidget->GetTotalTaskNum())); })
 				]
 
 				+ SHorizontalBox::Slot()
@@ -61,7 +59,7 @@ void STaskStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedTaskNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), TaskEditor.Pin()->ListWidget->GetSelectedTaskNum())); })
 				]
 			]
 		]

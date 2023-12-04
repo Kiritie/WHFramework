@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Window/SEditorWindowBase.h"
+#include "Widget/Base/Window/SEditorWindowBase.h"
 
 class UFactory;
 

@@ -9,11 +9,11 @@
 #include "SourceCodeNavigation.h"
 #include "Common/CommonStatics.h"
 #include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Procedure/ProcedureBlueprintFactory.h"
 #include "Procedure/ProcedureEditorTypes.h"
-#include "Procedure/ProcedureModule.h"
+#include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
 #include "Procedure/Base/ProcedureBase.h"
+#include "Procedure/Blueprint/ProcedureBlueprintFactory.h"
 #include "Procedure/Widget/SProcedureListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -23,19 +23,15 @@ SProcedureListWidget::SProcedureListWidget()
 	WidgetName = FName("ProcedureListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
-	bMultiMode = true;
+	bMultiMode = false;
 	bEditMode = false;
-
-	ProcedureModule = nullptr;
 }
 
 void SProcedureListWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-
-	ProcedureModule = InArgs._ProcedureModule;
-
-	if(!ProcedureModule) return;
+	
+	ProcedureEditor = InArgs._ProcedureEditor;
 
 	if(!ListView.IsValid())
 	{
@@ -68,13 +64,9 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	ClassViewerOptions.bAllowViewOptions = true;
 
 	ProcedureClassFilter = MakeShareable(new FProcedureClassFilter);
-	ProcedureClassFilter->IncludeParentClass = UProcedureBase::StaticClass();
-	ProcedureClassFilter->ProcedureModule = ProcedureModule;
-	#if ENGINE_MAJOR_VERSION == 4
-	ClassViewerOptions.ClassFilter = ProcedureClassFilter;
-	#else if ENGINE_MAJOR_VERSION == 5
+	ProcedureClassFilter->ProcedureEditor = ProcedureEditor;
+	
 	ClassViewerOptions.ClassFilters.Add(ProcedureClassFilter.ToSharedRef());
-	#endif
 
 	SAssignNew(ClassPickButton, SComboButton)
 		.OnGetMenuContent(this, &SProcedureListWidget::GenerateClassPicker)
@@ -239,7 +231,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
-						.IsEnabled_Lambda([this](){ return ProcedureModule->GetProcedures().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnClearAllProcedureItemButtonClicked)
 					]
@@ -280,7 +272,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
 							return SelectedProcedureListItems.Num() == 1 &&
-								SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureModule->GetProcedures().Num() - 1;
+								SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num() - 1;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnMoveDownProcedureItemButtonClicked)
@@ -313,8 +305,6 @@ void SProcedureListWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
 
-	ProcedureClassFilter->ProcedureModule = ProcedureModule;
-
 	UpdateListView(true);
 	UpdateSelection();
 	SetIsEditMode(bEditMode);
@@ -327,7 +317,7 @@ void SProcedureListWidget::OnDestroy()
 
 UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBase> InClass)
 {
-	UProcedureBase* NewProcedure = NewObject<UProcedureBase>(ProcedureModule, InClass, NAME_None);
+	UProcedureBase* NewProcedure = NewObject<UProcedureBase>(ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>(), InClass, NAME_None);
 
 	// NewProcedure->ProcedureName = *CurrentProcedureClass->GetName().Replace(TEXT("Procedure_"), TEXT(""));
 	// NewProcedure->ProcedureDisplayName = FText::FromName(NewProcedure->ProcedureName);
@@ -339,7 +329,7 @@ UProcedureBase* SProcedureListWidget::GenerateProcedure(TSubclassOf<UProcedureBa
 
 UProcedureBase* SProcedureListWidget::DuplicateProcedure(UProcedureBase* InProcedure)
 {
-	UProcedureBase* NewProcedure = DuplicateObject<UProcedureBase>(InProcedure, ProcedureModule, NAME_None);
+	UProcedureBase* NewProcedure = DuplicateObject<UProcedureBase>(InProcedure, ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>(), NAME_None);
 
 	// NewProcedure->ProcedureName = *FString::Printf(TEXT("%s_Copy"), *NewProcedure->ProcedureName.ToString());
 	// NewProcedure->ProcedureDisplayName = FText::FromString(FString::Printf(TEXT("%s_Copy"), *NewProcedure->ProcedureDisplayName.ToString()));
@@ -386,15 +376,15 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 				if(NewProcedure && OldProcedure)
 				{
 					UCommonStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
-					ProcedureModule->GetProcedures().EmplaceAt(OldProcedure->ProcedureIndex, NewProcedure);
-					ProcedureModule->GetProcedureMap().Remove(OldProcedure->GetClass());
-					ProcedureModule->GetProcedureMap().Add(OldProcedure->GetClass(), OldProcedure);
+					ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().EmplaceAt(OldProcedure->ProcedureIndex, NewProcedure);
+					ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Remove(OldProcedure->GetClass());
+					ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Add(OldProcedure->GetClass(), OldProcedure);
 					OldProcedure->OnUnGenerate();
 					Refresh();
 				}
 			}
 
-			ProcedureModule->Modify();
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 
 			OnSelectProcedureListItemsDelegate.Execute(SelectedProcedureListItems);
 			SelectedProcedureClass = InClass;
@@ -453,15 +443,15 @@ int32 SProcedureListWidget::GetSelectedProcedureNum() const
 
 void SProcedureListWidget::UpdateListView(bool bRegenerate)
 {
-	if(!ProcedureModule) return;
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return;
 
 	if(bRegenerate)
 	{
-		ProcedureModule->GenerateProcedureListItem(ProcedureListItems);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GenerateProcedureListItem(ProcedureListItems);
 	}
 	else
 	{
-		ProcedureModule->UpdateProcedureListItem(ProcedureListItems);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->UpdateProcedureListItem(ProcedureListItems);
 	}
 
 	ListView->ClearSelection();
@@ -502,7 +492,7 @@ void SProcedureListWidget::ListSelectionChanged(TSharedPtr<FProcedureListItem> L
 
 FReply SProcedureListWidget::OnEditProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	if(SelectedProcedureClass->ClassGeneratedBy)
 	{
@@ -555,19 +545,19 @@ FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
 
 FReply SProcedureListWidget::OnAddProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	UProcedureBase* NewProcedure = GenerateProcedure(SelectedProcedureClass);
 
 	const auto Item = MakeShared<FProcedureListItem>();
 	Item->Procedure = NewProcedure;
 
-	NewProcedure->ProcedureIndex = ProcedureModule->GetProcedures().Num();
-	ProcedureModule->GetProcedures().Add(NewProcedure);
-	ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
+	NewProcedure->ProcedureIndex = ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num();
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Add(NewProcedure);
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
 	ProcedureListItems.Add(Item);
 
-	ProcedureModule->Modify();
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 	
 	SelectedProcedureClass = nullptr;
 	
@@ -579,7 +569,7 @@ FReply SProcedureListWidget::OnAddProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	if(SelectedProcedureListItems.Num() > 0)
 	{
@@ -588,11 +578,11 @@ FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 		const auto Item = MakeShared<FProcedureListItem>();
 		Item->Procedure = NewProcedure;
 
-		ProcedureModule->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex);
-		ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
 		ProcedureListItems.Insert(Item, SelectedProcedureListItems[0]->Procedure->ProcedureIndex);
 
-		ProcedureModule->Modify();
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 
 		SelectedProcedureClass = nullptr;
 
@@ -605,7 +595,7 @@ FReply SProcedureListWidget::OnInsertProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	if(SelectedProcedureListItems.Num() > 0)
 	{
@@ -614,11 +604,11 @@ FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 		const auto Item = MakeShared<FProcedureListItem>();
 		Item->Procedure = NewProcedure;
 
-		ProcedureModule->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex + 1);
-		ProcedureModule->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Insert(NewProcedure, SelectedProcedureListItems[0]->Procedure->ProcedureIndex + 1);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Add(NewProcedure->GetClass(), NewProcedure);
 		ProcedureListItems.Insert(Item, SelectedProcedureListItems[0]->Procedure->ProcedureIndex + 1);
 
-		ProcedureModule->Modify();
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 
 		SelectedProcedureClass = nullptr;
 
@@ -631,7 +621,7 @@ FReply SProcedureListWidget::OnAppendProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to remove selected procedures?"))) != EAppReturnType::Yes) return FReply::Handled();
 
@@ -639,13 +629,13 @@ FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 	{
 		for(auto Iter : SelectedProcedureListItems)
 		{
-			ProcedureModule->GetProcedures()[Iter->GetProcedureIndex()]->OnUnGenerate();
-			ProcedureModule->GetProcedures().RemoveAt(Iter->GetProcedureIndex());
-			ProcedureModule->GetProcedureMap().Remove(Iter->Procedure->GetClass());
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[Iter->GetProcedureIndex()]->OnUnGenerate();
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().RemoveAt(Iter->GetProcedureIndex());
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Remove(Iter->Procedure->GetClass());
 			ProcedureListItems.RemoveAt(Iter->GetProcedureIndex());
 			//ListView->SetSelection(ProcedureListItems[FMath::Min(SelectedProcedureListItem->GetProcedureIndex(),ProcedureListItems.Num() - 1)]);
 
-			ProcedureModule->Modify();
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 		}
 		UpdateListView();
 	}
@@ -655,11 +645,11 @@ FReply SProcedureListWidget::OnRemoveProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnClearAllProcedureItemButtonClicked()
 {
-	if(!ProcedureModule) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to clear all procedures?"))) != EAppReturnType::Yes) return FReply::Handled();
 
-	ProcedureModule->ClearAllProcedure();
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->ClearAllProcedure();
 
 	UpdateListView(true);
 
@@ -668,16 +658,16 @@ FReply SProcedureListWidget::OnClearAllProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnMoveUpProcedureItemButtonClicked()
 {
-	if(!ProcedureModule || SelectedProcedureListItems.Num() == 0 || SelectedProcedureListItems[0]->GetProcedureIndex() == 0) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>() || SelectedProcedureListItems.Num() == 0 || SelectedProcedureListItems[0]->GetProcedureIndex() == 0) return FReply::Handled();
 
-	const auto TmpProcedure = ProcedureModule->GetProcedures()[SelectedProcedureListItems[0]->GetProcedureIndex()];
-	ProcedureModule->GetProcedures().RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
-	ProcedureModule->GetProcedures().Insert(TmpProcedure, SelectedProcedureListItems[0]->GetProcedureIndex() - 1);
+	const auto TmpProcedure = ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[SelectedProcedureListItems[0]->GetProcedureIndex()];
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Insert(TmpProcedure, SelectedProcedureListItems[0]->GetProcedureIndex() - 1);
 
 	ProcedureListItems.RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
 	ProcedureListItems.Insert(SelectedProcedureListItems, SelectedProcedureListItems[0]->GetProcedureIndex() - 1);
 
-	ProcedureModule->Modify();
+	ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 
 	UpdateListView();
 
@@ -686,18 +676,18 @@ FReply SProcedureListWidget::OnMoveUpProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnMoveDownProcedureItemButtonClicked()
 {
-	if(!ProcedureModule || SelectedProcedureListItems.Num() == 0) return FReply::Handled();
+	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>() || SelectedProcedureListItems.Num() == 0) return FReply::Handled();
 
-	if(SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureModule->GetProcedures().Num() - 1)
+	if(SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num() - 1)
 	{
-		const auto TmpProcedure = ProcedureModule->GetProcedures()[SelectedProcedureListItems[0]->GetProcedureIndex()];
-		ProcedureModule->GetProcedures().RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
-		ProcedureModule->GetProcedures().Insert(TmpProcedure, SelectedProcedureListItems[0]->GetProcedureIndex() + 1);
+		const auto TmpProcedure = ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[SelectedProcedureListItems[0]->GetProcedureIndex()];
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Insert(TmpProcedure, SelectedProcedureListItems[0]->GetProcedureIndex() + 1);
 
 		ProcedureListItems.RemoveAt(SelectedProcedureListItems[0]->GetProcedureIndex());
 		ProcedureListItems.Insert(SelectedProcedureListItems, SelectedProcedureListItems[0]->GetProcedureIndex() + 1);
 
-		ProcedureModule->Modify();
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
 
 		UpdateListView();
 	}

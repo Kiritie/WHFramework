@@ -4,6 +4,7 @@
 
 
 #include "StepModuleTypes.h"
+#include "Base/StepAsset.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "StepModule.generated.h"
@@ -103,9 +104,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void LeaveStep(UStepBase* InStep);
 
-	UFUNCTION(BlueprintCallable)
-	void ClearAllStep();
-
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsAllStepCompleted();
@@ -113,33 +111,40 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats
 protected:
-	/// 初始步骤 
+	/// 默认流程资产 
+	UPROPERTY(EditAnywhere, Category = "StepModule|Step Stats")
+	UStepAsset* DefaultAsset;
+	/// 当前流程资产 
 	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
-	UStepBase* FirstStep;
+	UStepAsset* CurrentAsset;
 	/// 当前步骤 
 	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	UStepBase* CurrentStep;
 	/// 当前根步骤索引
 	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	int32 CurrentRootStepIndex;
-	/// 根步骤
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
-	TArray<UStepBase*> RootSteps;
-	/// 步骤Map
-	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
-	TMap<FString, UStepBase*> StepMap;
 
 public:
+	/**
+	* 获取默认资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UStepAsset* GetDefaultAsset() const { return DefaultAsset; }
+	/**
+	* 获取当前资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UStepAsset* GetCurrentAsset() const { return CurrentAsset; }
+	/**
+	* 设置当前资产
+	*/
+	UFUNCTION(BlueprintCallable)
+	void SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirst = false);
 	/**
 	* 获取初始步骤
 	*/
 	UFUNCTION(BlueprintPure)
-	UStepBase* GetFirstStep() const { return FirstStep; }
-	/**
-	* 设置初始步骤
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstStep(UStepBase* InFirstStep) { this->FirstStep = InFirstStep; }
+	UStepBase* GetFirstStep() const { return CurrentAsset ? CurrentAsset->FirstStep : nullptr; }
 	/**
 	* 获取当前步骤
 	*/
@@ -151,9 +156,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	UStepBase* GetCurrentRootStep() const
 	{
-		if(RootSteps.IsValidIndex(CurrentRootStepIndex))
+		if(GetRootSteps().IsValidIndex(CurrentRootStepIndex))
 		{
-			return RootSteps[CurrentRootStepIndex];
+			return GetRootSteps()[CurrentRootStepIndex];
 		}
 		return nullptr;
 	}
@@ -161,17 +166,17 @@ public:
 	* 获取根步骤列表
 	*/
 	UFUNCTION(BlueprintPure)
-	TArray<UStepBase*>& GetRootSteps() { return RootSteps; }
+	TArray<UStepBase*> GetRootSteps() const { return CurrentAsset ? CurrentAsset->RootSteps : TArray<UStepBase*>(); }
 	/**
 	* 获取步骤Map
 	*/
 	UFUNCTION(BlueprintPure)
-	TMap<FString, UStepBase*>& GetStepMap() { return StepMap; }
+	TMap<FString, UStepBase*> GetStepMap() const { return CurrentAsset ? CurrentAsset->StepMap : TMap<FString, UStepBase*>(); }
 	/**
 	* 通过GUID获取步骤
 	*/
 	UFUNCTION(BlueprintPure)
-	UStepBase* GetStepByGUID(const FString& InStepGUID) const { return *StepMap.Find(InStepGUID); }
+	UStepBase* GetStepByGUID(const FString& InStepGUID) const { return *GetStepMap().Find(InStepGUID); }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Global Options
@@ -204,13 +209,4 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
-#if WITH_EDITOR
-	virtual void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-
-	virtual void UpdateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-#endif
 };

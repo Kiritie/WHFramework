@@ -6,144 +6,324 @@
 #include "Editor.h"
 #endif
 
-#include "WHFrameworkEditorCommands.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-#include "Procedure/ProcedureGraphSchema.h"
+#include "ISettingsSection.h"
+#include "Procedure/ProcedureModule.h"
+#include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
-#include "Procedure/Widget/SProcedureEditorWidget.h"
+#include "Procedure/Blueprint/ProcedureBlueprintActions.h"
+#include "Procedure/Blueprint/ProcedureGraphSchema.h"
+#include "Procedure/Customization/ProcedureDetailCustomization.h"
+#include "Procedure/Widget/SProcedureDetailsWidget.h"
+#include "Procedure/Widget/SProcedureListWidget.h"
+#include "Procedure/Widget/SProcedureStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FProcedureEditor"
 
-static const FName ProcedureEditorTabName("ProcedureEditor");
+//////////////////////////////////////////////////////////////////////////
+/// ProcedureEditorModule
+IMPLEMENTATION_EDITOR_MODULE(FProcedureEditorModule)
 
-IMPLEMENTATION_EDITOR_MODULE(FProcedureEditor)
+FProcedureEditorModule::FProcedureEditorModule()
+{
+	AppIdentifier = FName("ProcedureEditorApp");
+}
 
-void FProcedureEditor::OnInitialize()
+void FProcedureEditorModule::StartupModule()
 {
 	FProcedureEditorCommands::Register();
-	// Register tabs
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ProcedureEditorTabName, FOnSpawnTab::CreateRaw(this, &FProcedureEditor::OnSpawnProcedureEditorTab))
-		.SetDisplayName(LOCTEXT("FProcedureEditorTabTitle", "Procedure Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FProcedureEditor::OnTermination()
+void FProcedureEditorModule::ShutdownModule()
 {
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ProcedureEditorTabName);
+	FProcedureEditorCommands::Unregister();
 }
 
-void FProcedureEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+void FProcedureEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
 {
-	InCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenProcedureEditorWindow,
-		FExecuteAction::CreateRaw(this, &FProcedureEditor::OnClickedProcedureEditorButton),
+	GProcedureEditorIni = GConfig->GetDestIniFilename(TEXT("ProcedureEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
+	const ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Procedure Editor"), FText::FromString(TEXT("Procedure Editor")), FText::FromString(TEXT("Configure the procedure editor plugin")), GetMutableDefault<UProcedureEditorSettings>());
+	if(SettingsSection.IsValid())
+	{
+		SettingsSection->OnModified().BindRaw(this, &FProcedureEditorModule::HandleSettingsSaved);
+	}
+}
+
+void FProcedureEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
+{
+	SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Procedure Editor"));
+}
+
+bool FProcedureEditorModule::HandleSettingsSaved()
+{
+	UProcedureEditorSettings* ProcedureEditorSetting = GetMutableDefault<UProcedureEditorSettings>();
+	ProcedureEditorSetting->SaveConfig();
+	return true;
+}
+
+void FProcedureEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
+{
+	Commands->MapAction(
+		FProcedureEditorCommands::Get().OpenProcedureEditorWindow,
+		FExecuteAction::CreateRaw(this, &FProcedureEditorModule::OnClickedProcedureEditorButton),
 		FCanExecuteAction());
 }
 
-void FProcedureEditor::OnClickedProcedureEditorButton()
+void FProcedureEditorModule::RegisterMenus(const TSharedPtr<FUICommandList>& Commands)
 {
-	FGlobalTabmanager::Get()->TryInvokeTab(ProcedureEditorTabName);
+	AddWindowMenu(FProcedureEditorCommands::Get().OpenProcedureEditorWindow, Commands);
+	
+	AddToolbarMenu(FProcedureEditorCommands::Get().OpenProcedureEditorWindow, Commands);
 }
 
-TSharedRef<SDockTab> FProcedureEditor::OnSpawnProcedureEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+void FProcedureEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions)
 {
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(ProcedureEditorWidget, SProcedureEditorWidget)
-	];
+	const TSharedRef<IAssetTypeActions> AssetAction = MakeShareable(new FProcedureBlueprintActions(AssetCategory));
+	AssetTools.RegisterAssetTypeActions(AssetAction);
+	AssetTypeActions.Add(AssetAction);
 }
 
-void FProcedureEditorCommands::RegisterCommands()
+void FProcedureEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	
+	PropertyEditor.RegisterCustomClassLayout(FName("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailCustomization::MakeInstance));
 }
 
-/////////////////////////////////////////////////////
-// FProcedureEditor
-
-FProcedureBlueprintEditor::FProcedureBlueprintEditor()
+void FProcedureEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	// todo: Do we need to register a callback for when properties are changed?
+	PropertyEditor.UnregisterCustomClassLayout(FName("ProcedureBase"));
 }
 
-FProcedureBlueprintEditor::~FProcedureBlueprintEditor()
+TSharedRef<FProcedureEditor> FProcedureEditorModule::CreateProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr< IToolkitHost >& InitToolkitHost, UProcedureAsset* Procedure)
 {
-	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
+	TSharedRef< FProcedureEditor > NewProcedureEditor( new FProcedureEditor() );
+	NewProcedureEditor->InitAssetEditorBase( Mode, InitToolkitHost, Procedure );
+	return NewProcedureEditor;
 }
 
-void FProcedureBlueprintEditor::InitProcedureEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FProcedureEditorModule::OnClickedProcedureEditorButton()
 {
-	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
-
-	for(auto Blueprint : InBlueprints) { EnsureProcedureBlueprintIsUpToDate(Blueprint); }
-}
-
-void FProcedureBlueprintEditor::EnsureProcedureBlueprintIsUpToDate(UBlueprint* Blueprint)
-{
-	#if WITH_EDITORONLY_DATA
-	for(UEdGraph* Graph : Blueprint->UbergraphPages)
+	if(const UProcedureModule* ProcedureModule = UProcedureModule::GetPtr(true))
 	{
-		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
-		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
+		if(ProcedureModule->GetDefaultAsset())
 		{
-			check(!Graph->Schema->GetClass()->IsChildOf<UProcedureGraphSchema>());
-			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
-			break;
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ProcedureModule->GetDefaultAsset());
 		}
 	}
-	#endif
 }
 
-// FRED_TODO: don't merge this back
-// FName FProcedureEditor::GetToolkitContextFName() const
-// {
-// 	return GetToolkitFName();
-// }
-
-FName FProcedureBlueprintEditor::GetToolkitFName() const { return FName("ProcedureEditor"); }
-
-FText FProcedureBlueprintEditor::GetBaseToolkitName() const { return LOCTEXT("ProcedureEditorAppLabel", "Procedure Editor"); }
-
-FText FProcedureBlueprintEditor::GetToolkitName() const
+//////////////////////////////////////////////////////////////////////////
+/// ProcedureEditor
+FProcedureEditor::FProcedureEditor()
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-
-	check(EditingObjs.Num() > 0);
-
-	FFormatNamedArguments Args;
-
-	const UObject* EditingObject = EditingObjs[0];
-
-	const bool bDirtyState = EditingObject->GetOutermost()->IsDirty();
-
-	Args.Add(TEXT("ObjectName"), FText::FromString(EditingObject->GetName()));
-	Args.Add(TEXT("DirtyState"), bDirtyState ? FText::FromString(TEXT("*")) : FText::GetEmpty());
-	return FText::Format(LOCTEXT("ProcedureToolkitName", "{ObjectName}{DirtyState}"), Args);
+	ToolkitFName = FName("ProcedureEditor");
+	BaseToolkitName =  LOCTEXT("AppLabel", "Procedure Editor");
+	MenuCategory = LOCTEXT("ProcedureEditor", "Procedure Editor");
+	DefaultLayoutName = FName("ProcedureEditor_Layout");
+	WorldCentricTabPrefix =  LOCTEXT("WorldCentricTabPrefix", "Procedure ").ToString();
+	WorldCentricTabColorScale =  FLinearColor( 0.0f, 0.0f, 0.2f, 0.5f );
 }
 
-FText FProcedureBlueprintEditor::GetToolkitToolTipText() const
+FProcedureEditor::~FProcedureEditor()
 {
-	const UObject* EditingObject = GetEditingObject();
-
-	check(EditingObject != NULL);
-
-	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
+	
 }
 
-FString FProcedureBlueprintEditor::GetWorldCentricTabPrefix() const { return TEXT("ProcedureEditor"); }
-
-FLinearColor FProcedureBlueprintEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
-
-UBlueprint* FProcedureBlueprintEditor::GetBlueprintObj() const
+void FProcedureEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UProcedureBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
-	return nullptr;
+	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }
 
-FString FProcedureBlueprintEditor::GetDocumentationLink() const
+void FProcedureEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
 {
-	return FBlueprintEditor::GetDocumentationLink(); // todo: point this at the correct documentation
+	FAssetEditorBase::RegisterTabSpawners(InTabManager);
+
+	SAssignNew(ListWidget, SProcedureListWidget)
+		.ProcedureEditor(SharedThis(this));
+
+	SAssignNew(DetailsWidget, SProcedureDetailsWidget)
+		.ProcedureEditor(SharedThis(this));
+
+	SAssignNew(StatusWidget, SProcedureStatusWidget)
+		.ProcedureEditor(SharedThis(this));
+
+	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnListWidgetTab))
+		.SetDisplayName(LOCTEXT("ListTab", "List"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Details", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnDetailsWidgetTab))
+		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Status", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnStatusWidgetTab))
+		.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+}
+
+void FProcedureEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
+{
+	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
+
+	InTabManager->UnregisterTabSpawner("List");
+	InTabManager->UnregisterTabSpawner("Details");
+	InTabManager->UnregisterTabSpawner("Status");
+}
+
+TSharedRef<FTabManager::FLayout> FProcedureEditor::CreateDefaultLayout()
+{
+	const TSharedRef<FTabManager::FLayout> DefaultLayout = FAssetEditorBase::CreateDefaultLayout();
+
+	DefaultLayout->AddArea
+	(
+		FTabManager::NewPrimaryArea()
+		->SetOrientation(Orient_Vertical)
+		->Split
+		(
+			// Main application area
+			FTabManager::NewSplitter()
+			->SetOrientation(Orient_Horizontal)
+			->SetSizeCoefficient(0.9f)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("List", ETabState::OpenedTab)
+			)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("Details", ETabState::OpenedTab)
+			)
+		)
+		->Split
+		(
+			FTabManager::NewStack()
+			->SetHideTabWell(true)
+			->SetSizeCoefficient(0.1f)
+			->AddTab("Status", ETabState::OpenedTab)
+		)
+	);
+
+	return DefaultLayout;
+}
+
+void FProcedureEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
+{
+	FSlateIcon Icon(FName("WidgetReflectorStyleStyle"), "Icon.Empty");
+
+	ToolbarBuilder.BeginSection("List");
+	{
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnMultiModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Multi Mode")),
+			FText::FromString(TEXT("Toggle Multi Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnEditModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Edit Mode")),
+			FText::FromString(TEXT("Toggle Edit Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+	}
+	ToolbarBuilder.EndSection();
+}
+
+TSharedRef<SDockTab> FProcedureEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ListTab", "List"))
+		.ShouldAutosize(false)
+		[
+			ListWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FProcedureEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("DetailsTab", "Details"))
+		.ShouldAutosize(false)
+		[
+			DetailsWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FProcedureEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("StatusTab", "Status"))
+		.ShouldAutosize(true)
+		[
+			StatusWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+void FProcedureEditor::PostUndo(bool bSuccess)
+{
+	FAssetEditorBase::PostUndo(bSuccess);
+}
+
+void FProcedureEditor::PostRedo(bool bSuccess)
+{
+	FAssetEditorBase::PostRedo(bSuccess);
+}
+
+FEditorModuleBase* FProcedureEditor::GetEditorModule() const
+{
+	return &FProcedureEditorModule::Get();
+}
+
+void FProcedureEditor::OnBlueprintCompiled()
+{
+	FAssetEditorBase::OnBlueprintCompiled();
+}
+
+void FProcedureEditor::OnMultiModeToggled()
+{
+	ListWidget->ToggleMultiMode();
+}
+
+void FProcedureEditor::OnEditModeToggled()
+{
+	ListWidget->ToggleEditMode();
+}
+
+//////////////////////////////////////////////////////////////////////////
+/// ProcedureBlueprintEditor
+FProcedureBlueprintEditor::FProcedureBlueprintEditor()
+{
+	BlueprintClass = UProcedureBlueprint::StaticClass();
+	GraphSchemaClass = UProcedureGraphSchema::StaticClass();
+	
+	ToolkitFName = FName("ProcedureBlueprintEditor");
+	BaseToolkitName = LOCTEXT("ProcedureBlueprintEditorAppLabel", "Procedure Blueprint Editor");
+	ToolkitNameFormat = LOCTEXT("ProcedureBlueprintEditorToolkitName", "{ObjectName}{DirtyState}");
+
+	WorldCentricTabPrefix = TEXT("ProcedureBlueprintEditor");
+	WorldCentricTabColorScale = FLinearColor::White;
 }
 
 #undef LOCTEXT_NAMESPACE

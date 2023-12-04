@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Asset/Primary/PrimaryAssetBase.h"
+#include "Pawn/Base/PawnDataBase.h"
 
 #include "CharacterDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UCharacterDataBase : public UPrimaryAssetBase
+class WHFRAMEWORK_API UCharacterDataBase : public UPawnDataBase
 {
 	GENERATED_BODY()
 

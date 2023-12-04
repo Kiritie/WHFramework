@@ -10,8 +10,8 @@
 // Sets default values
 UModuleBase::UModuleBase()
 {
-	ModuleName = NAME_None;
-	ModuleDisplayName = FText::GetEmpty();
+	ModuleName = FName("ModuleBase");
+	ModuleDisplayName = FText::FromString("Module Base");
 	ModuleDescription = FText::GetEmpty();
 	ModuleState = EModuleState::None;
 	ModuleIndex = 0;

@@ -22,12 +22,6 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
-	BoxComponent->SetCollisionProfileName(FName("Vitality"));
-	BoxComponent->SetBoxExtent(FVector(20, 20, 20));
-	BoxComponent->CanCharacterStepUpOn = ECB_No;
-	SetRootComponent(BoxComponent);
-
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
@@ -46,41 +40,9 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	FSM->States.Add(UAbilityPawnState_Default::StaticClass());
 	FSM->States.Add(UAbilityPawnState_Death::StaticClass());
 
-	ActorID = FGuid::NewGuid();
-	bVisible = true;
-	Container = nullptr;
-
 	// stats
-	AssetID = FPrimaryAssetId();
-	Name = NAME_None;
 	RaceID = NAME_None;
 	Level = 0;
-	GenerateVoxelID = FPrimaryAssetId();
-}
-
-void AAbilityPawnBase::SetActorVisible_Implementation(bool bInVisible)
-{
-	bVisible = bInVisible;
-	GetRootComponent()->SetVisibility(bInVisible, true);
-	TArray<AActor*> AttachedActors;
-	GetAttachedActors(AttachedActors);
-	for(auto Iter : AttachedActors)
-	{
-		if(Iter && Iter->Implements<USceneActorInterface>())
-		{
-			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
-		}
-	}
-}
-
-bool AAbilityPawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool AAbilityPawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
 void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -328,11 +290,6 @@ float AAbilityPawnBase::GetRadius() const
 float AAbilityPawnBase::GetHalfHeight() const
 {
 	return BoxComponent->GetScaledBoxExtent().Z;
-}
-
-UAbilityPawnDataBase& AAbilityPawnBase::GetPawnData() const
-{
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityPawnDataBase>(AssetID);
 }
 
 UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const

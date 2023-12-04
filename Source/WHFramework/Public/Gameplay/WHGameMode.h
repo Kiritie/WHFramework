@@ -10,7 +10,7 @@
 /**
  * 游戏模式基类
  */
-UCLASS()
+UCLASS(meta = (ShortTooltip = "Game Mode Base defines the game being played, its rules, scoring, and other facets of the game type."))
 class WHFRAMEWORK_API AWHGameMode : public AGameModeBase, public IWHActorInterface
 {
 	GENERATED_BODY()

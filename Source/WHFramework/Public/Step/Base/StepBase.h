@@ -10,6 +10,7 @@
 
 #include "StepBase.generated.h"
 
+class UStepAsset;
 class ACameraActorBase;
 /**
  * 步骤基类
@@ -177,6 +178,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	EStepState GetStepState() const { return StepState; }
+	/**
+	* 获取步骤资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UStepAsset* GetStepAsset() const;
 	/**
 	* 是否是根步骤
 	*/

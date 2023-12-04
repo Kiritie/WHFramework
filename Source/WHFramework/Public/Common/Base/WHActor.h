@@ -57,7 +57,7 @@ protected:
 /**
  * 
  */
-UCLASS(hidecategories = (Tick, Replication, Collision, Input, Cooking, Hidden, Hlod, Physics, LevelInstance))
+UCLASS(meta=(ShortTooltip="An Actor is an object that can be placed or spawned in the world."), hidecategories = (Tick, Replication, Collision, Input, Cooking, Hidden, Hlod, Physics, LevelInstance))
 class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()

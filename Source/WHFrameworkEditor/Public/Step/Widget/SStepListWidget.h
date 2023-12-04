@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class UStepBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectStepListItemsDelegate, TArray<TSharedPtr<FStepListItem>>)
@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SStepListWidget) {}
 
-		SLATE_ARGUMENT(class UStepModule*, StepModule)
+		SLATE_ARGUMENT(TWeakPtr<FStepEditor>, StepEditor)
 
 	SLATE_END_ARGS()
 
@@ -39,6 +39,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	bool bMultiMode = false;
+
+	bool bEditMode = false;
+
 	TSubclassOf<UStepBase> SelectedStepClass;
 
 	TArray<TSharedPtr<FStepListItem>> StepListItems;
@@ -47,14 +51,7 @@ public:
 
 	FOnSelectStepListItemsDelegate OnSelectStepListItemsDelegate;
 
-	bool bMultiMode = true;
-
-	bool bEditMode = false;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UStepModule* StepModule;
+	TWeakPtr<FStepEditor> StepEditor;
 
 	UStepBase* CopiedStep;
 

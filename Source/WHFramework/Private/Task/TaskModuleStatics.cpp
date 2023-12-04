@@ -6,6 +6,16 @@
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskBase.h"
 
+UTaskAsset* UTaskModuleStatics::GetCurrentTaskAsset()
+{
+	return UTaskModule::Get().GetCurrentAsset();
+}
+
+void UTaskModuleStatics::SetCurrentTaskAsset(UTaskAsset* InTaskAsset, bool bAutoEnterFirst)
+{
+	return UTaskModule::Get().SetCurrentAsset(InTaskAsset, bAutoEnterFirst);
+}
+
 UTaskBase* UTaskModuleStatics::GetCurrentTask()
 {
 	return UTaskModule::Get().GetCurrentTask();

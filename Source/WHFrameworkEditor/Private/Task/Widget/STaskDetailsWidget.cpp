@@ -4,7 +4,6 @@
 #include "Task/Widget/STaskDetailsWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Task/TaskModule.h"
 #include "Task/Base/TaskBase.h"
 #include "Task/Widget/STaskListWidget.h"
 
@@ -14,19 +13,15 @@ STaskDetailsWidget::STaskDetailsWidget()
 {
 	WidgetName = FName("TaskDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
-	TaskModule = nullptr;
 }
 
 void STaskDetailsWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+	
+	TaskEditor = InArgs._TaskEditor;
 
-	ListWidget = InArgs._ListWidget;
-	TaskModule = InArgs._TaskModule;
-
-	if(!TaskModule || !TaskModule->IsValidLowLevel() || !ListWidget) return;
-
-	ListWidget->OnSelectTaskListItemsDelegate.BindRaw(this, &STaskDetailsWidget::OnSelectTaskListItem);
+	TaskEditor.Pin()->ListWidget->OnSelectTaskListItemsDelegate.BindRaw(this, &STaskDetailsWidget::OnSelectTaskListItem);
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -107,7 +102,7 @@ void STaskDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(TaskModule);
+		DetailsView->SetObject(TaskEditor.Pin()->GetEditingAsset());
 	}
 }
 

@@ -13,7 +13,8 @@ public class WHFrameworkEditor : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core"
+				"Core",
+				"WHFramework"
 			});
 			
 		PrivateDependencyModuleNames.AddRange(
@@ -27,13 +28,13 @@ public class WHFrameworkEditor : ModuleRules
 				"ToolMenus",
 				"CoreUObject",
 				"AssetRegistry",
+				"AssetDefinition",
 				"AssetTools",
 				"Engine",
 				"Kismet",
 				"Slate",
 				"SlateCore",
 				"EditorStyle",
-				"WHFramework",
 				"ApplicationCore",
 				"PropertyEditor",
 				"ClassViewer",

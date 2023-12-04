@@ -8,7 +8,7 @@
 
 #include "StepModuleStatics.generated.h"
 
-class UStepBase;
+class UStepAsset;
 class UStepBase;
 /**
  * 
@@ -19,6 +19,12 @@ class WHFRAMEWORK_API UStepModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintPure, Category = "StepModuleStatics")
+	static UStepAsset* GetCurrentStepAsset();
+
+	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
+	static void SetCurrentStepAsset(UStepAsset* InStepAsset, bool bAutoStartFirst = false);
+
 	UFUNCTION(BlueprintPure, Category = "StepModuleStatics")
 	static UStepBase* GetCurrentStep();
 

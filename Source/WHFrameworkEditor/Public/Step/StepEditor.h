@@ -3,97 +3,107 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Editor/Kismet/Public/BlueprintEditor.h"
-#include "Main/Base/ModuleEditorBase.h"
+#include "Common/CommonEditorTypes.h"
+#include "Common/Asset/AssetEditorBase.h"
+#include "Common/Module/EditorModuleBase.h"
+#include "Common/Blueprint/BlueprintEditorBase.h"
 
-class SStepEditorWidget;
+class FStepEditor;
+class UStepAsset;
 
-class FStepEditor : public FModuleEditorBase
+//////////////////////////////////////////////////////////////////////////
+/// StepEditorModule
+class FStepEditorModule : public FEditorModuleBase
 {
-	GENERATED_EDITOR_MODULE(FStepEditor)
+	GENERATED_EDITOR_MODULE(FStepEditorModule)
+
+public:
+	FStepEditorModule();
 	
 public:
-	virtual void OnInitialize() override;
+	virtual void StartupModule() override;
 
-	virtual void OnTermination() override;
+	virtual void ShutdownModule() override;
 
-	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& InCommands) override;
+public:
+	virtual void RegisterSettings(ISettingsModule* SettingsModule) override;
+
+	virtual void UnRegisterSettings(ISettingsModule* SettingsModule) override;
+
+	virtual bool HandleSettingsSaved() override;
 	
+	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& Commands) override;
+
+	virtual void RegisterMenus(const TSharedPtr<FUICommandList>& Commands) override;
+
+	virtual void RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions) override;
+
+	virtual void RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+
+	virtual void UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+	
+public:
+	TSharedRef<FStepEditor> CreateStepEditor( const EToolkitMode::Type Mode, const TSharedPtr< class IToolkitHost >& InitToolkitHost, UStepAsset* Step );
+
 private:
 	void OnClickedStepEditorButton();
-	
-	TSharedRef<class SDockTab> OnSpawnStepEditorTab(const class FSpawnTabArgs& SpawnTabArgs);
-
-private:
-	TSharedPtr<SStepEditorWidget> StepEditorWidget;
 };
 
-class FStepEditorCommands : public TCommands<FStepEditorCommands>
-{	  
+//////////////////////////////////////////////////////////////////////////
+/// StepEditor
+class FStepEditor : public FAssetEditorBase
+{
 public:
-	FStepEditorCommands()
-		: TCommands<FStepEditorCommands>(TEXT("StepEditorCommands"),    // Context name for fast lookup
-			NSLOCTEXT(
-			"Step", "StepEditor", "StepEditor Commands"),    // Localized context name for displaying
-			NAME_None,
-			FName("EditorStyle")    // Icon Style Set
-			)
-	{}
+	FStepEditor();
 
-	TSharedPtr<FUICommandInfo> Save;
+	~FStepEditor();
+
 public:
+	virtual void InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset) override;
+	
+	virtual void RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager) override;
+	
+	virtual void UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager) override;
 
-	virtual void RegisterCommands() override;
+	virtual TSharedRef<FTabManager::FLayout> CreateDefaultLayout() override;
+
+	virtual void ExtendToolbar(FToolBarBuilder& ToolbarBuilder) override;
+
+	virtual void PostUndo(bool bSuccess) override;
+	
+	virtual void PostRedo(bool bSuccess) override;
+
+public:
+	virtual FEditorModuleBase* GetEditorModule() const override;
+
+protected:
+	TSharedRef<SDockTab> SpawnListWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
+
+	TSharedRef<SDockTab> SpawnStatusWidgetTab(const FSpawnTabArgs& Args);
+
+protected:
+	virtual void OnBlueprintCompiled() override;
+
+	virtual void OnMultiModeToggled();
+
+	virtual void OnEditModeToggled();
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// Widgets
+public:
+	TSharedPtr<class SStepListWidget> ListWidget;
+
+	TSharedPtr<class SStepDetailsWidget> DetailsWidget;
+
+	TSharedPtr<class SStepStatusWidget> StatusWidget;
 };
 
 //////////////////////////////////////////////////////////////////////////
 // FStepBlueprintEditor
-
-/**
- * Gameplay abilities asset editor (extends Blueprint editor)
- */
-class FStepBlueprintEditor : public FBlueprintEditor
+class FStepBlueprintEditor : public FBlueprintEditorBase
 {
 public:
-	/**
-	 * Edits the specified gameplay ability asset(s)
-	 *
-	 * @param	Mode					Asset editing mode for this editor (standalone or world-centric)
-	 * @param	InitToolkitHost			When Mode is WorldCentric, this is the level editor instance to spawn this editor within
-	 * @param	InBlueprints			The blueprints to edit
-	 * @param	bShouldOpenInDefaultsMode	If true, the editor will open in defaults editing mode
-	 */ 
-
-	void InitStepEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode);
-
-private:
-	/**
-	 * Updates existing gameplay ability blueprints to make sure that they are up to date
-	 * 
-	 * @param	Blueprint	The blueprint to be updated
-	 */
-	void EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint);
-
-public:
 	FStepBlueprintEditor();
-
-	virtual ~FStepBlueprintEditor();
-
-public:
-	// IToolkit interface
-	// FRED_TODO: don't merge this back
-//	virtual FName GetToolkitContextFName() const override;
-	virtual FName GetToolkitFName() const override;
-	virtual FText GetBaseToolkitName() const override;
-	virtual FText GetToolkitName() const override;
-	virtual FText GetToolkitToolTipText() const override;
-	virtual FString GetWorldCentricTabPrefix() const override;
-	virtual FLinearColor GetWorldCentricTabColorScale() const override;
-	// End of IToolkit interface
-
-	/** @return the documentation location for this editor */
-	virtual FString GetDocumentationLink() const override;
-	
-	/** Returns a pointer to the Blueprint object we are currently editing, as long as we are editing exactly one */
-	virtual UBlueprint* GetBlueprintObj() const override;
 };

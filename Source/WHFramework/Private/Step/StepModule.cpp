@@ -24,9 +24,9 @@ UStepModule::UStepModule()
 	bAutoStartFirst = false;
 
 	CurrentRootStepIndex = -1;
-	RootSteps = TArray<UStepBase*>();
 
-	FirstStep = nullptr;
+	DefaultAsset = nullptr;
+	CurrentAsset = nullptr;
 	CurrentStep = nullptr;
 	StepModuleState = EStepModuleState::None;
 
@@ -51,8 +51,6 @@ void UStepModule::OnDestroy()
 	Super::OnDestroy();
 
 	TERMINATION_MODULE(UStepModule)
-
-	ClearAllStep();
 }
 #endif
 
@@ -67,16 +65,9 @@ void UStepModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(!FirstStep && RootSteps.Num() > 0)
+		if(DefaultAsset)
 		{
-			FirstStep = RootSteps[0];
-		}
-		for(auto Iter : RootSteps)
-		{
-			if(Iter)
-			{
-				Iter->OnInitialize();
-			}
+			SetCurrentAsset(DefaultAsset);
 		}
 	}
 	if(PHASEC(InPhase, EPhase::Final))
@@ -151,10 +142,10 @@ void UStepModule::OnTermination(EPhase InPhase)
 
 void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
-	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : FirstStep && FirstStep->IsA<UStepBase>() ? FirstStep->StepIndex : -1;
+	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : GetFirstStep() ? GetFirstStep()->StepIndex : -1;
 	if(InRootStepIndex != -1)
 	{
-		if(RootSteps.IsValidIndex(InRootStepIndex))
+		if(GetRootSteps().IsValidIndex(InRootStepIndex))
 		{
 			if(StepModuleState != EStepModuleState::Running)
 			{
@@ -164,26 +155,26 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
             {
-            	if(RootSteps.IsValidIndex(i) && RootSteps[i])
+            	if(GetRootSteps().IsValidIndex(i) && GetRootSteps()[i])
             	{
             		if(i == InRootStepIndex)
             		{
-            			RootSteps[i]->Enter();
+            			GetRootSteps()[i]->Enter();
             		}
             		else if(bSkipSteps)
             		{
-            			RootSteps[i]->Complete(EStepExecuteResult::Skipped);
+            			GetRootSteps()[i]->Complete(EStepExecuteResult::Skipped);
             		}
             	}
             }
             CurrentRootStepIndex = InRootStepIndex;
 		}
 	}
-	else if(FirstStep)
+	else if(GetFirstStep())
 	{
-		InRootStepIndex = FirstStep->RootStep->StepIndex;
+		InRootStepIndex = GetFirstStep()->RootStep->StepIndex;
 		
-		if(RootSteps.IsValidIndex(InRootStepIndex))
+		if(GetRootSteps().IsValidIndex(InRootStepIndex))
 		{
 			if(StepModuleState != EStepModuleState::Running)
 			{
@@ -195,25 +186,25 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			{
 				for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
 				{
-					if(RootSteps.IsValidIndex(i) && RootSteps[i])
+					if(GetRootSteps().IsValidIndex(i) && GetRootSteps()[i])
 					{
 						if(i == InRootStepIndex)
 						{
-							RootSteps[i]->Enter();
-							RootSteps[i]->Execute();
-							for(int32 j = 0; j < FirstStep->StepIndex; j++)
+							GetRootSteps()[i]->Enter();
+							GetRootSteps()[i]->Execute();
+							for(int32 j = 0; j < GetFirstStep()->StepIndex; j++)
 							{
-								FirstStep->ParentStep->SubSteps[j]->Complete(EStepExecuteResult::Skipped);
+								GetFirstStep()->ParentStep->SubSteps[j]->Complete(EStepExecuteResult::Skipped);
 							}
 						}
 						else
 						{
-							RootSteps[i]->Complete(EStepExecuteResult::Skipped);
+							GetRootSteps()[i]->Complete(EStepExecuteResult::Skipped);
 						}
 					}
 				}
 			}
-			FirstStep->Enter();
+			GetFirstStep()->Enter();
 		
 			CurrentRootStepIndex = InRootStepIndex;
 		}
@@ -230,15 +221,15 @@ void UStepModule::EndStep(bool bRestoreSteps)
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)
 	{
-		if(RootSteps.IsValidIndex(i) && RootSteps[i])
+		if(GetRootSteps().IsValidIndex(i) && GetRootSteps()[i])
 		{
 			if(i == CurrentRootStepIndex)
 			{
-				RootSteps[i]->Complete(EStepExecuteResult::Skipped);
+				GetRootSteps()[i]->Complete(EStepExecuteResult::Skipped);
 			}
 			if(bRestoreSteps)
 			{
-				RootSteps[i]->Restore();
+				GetRootSteps()[i]->Restore();
 			}
 		}
 	}
@@ -334,7 +325,7 @@ void UStepModule::LeaveStep(UStepBase* InStep)
 		InStep->OnLeave();
 		if(InStep->IsA<UStepBase>())
 		{
-			if(InStep->StepIndex == RootSteps.Num() - 1)
+			if(InStep->StepIndex == GetRootSteps().Num() - 1)
 			{
 				EndStep();
 			}
@@ -342,30 +333,9 @@ void UStepModule::LeaveStep(UStepBase* InStep)
 	}
 }
 
-void UStepModule::ClearAllStep()
-{
-	for(auto Iter : RootSteps)
-	{
-		if(Iter)
-		{
-#if(WITH_EDITOR)
-			Iter->OnUnGenerate();
-#else
-			Iter->ConditionalBeginDestroy();
-#endif
-		}
-	}
-	
-	RootSteps.Empty();
-
-	StepMap.Empty();
-
-	Modify();
-}
-
 bool UStepModule::IsAllStepCompleted()
 {
-	for(auto Iter : RootSteps)
+	for(auto Iter : GetRootSteps())
 	{
 		if(!Iter->IsCompleted(true))
 		{
@@ -373,6 +343,29 @@ bool UStepModule::IsAllStepCompleted()
 		}
 	}
 	return true;
+}
+
+void UStepModule::SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirst)
+{
+	if(!InStepAsset || (CurrentAsset && InStepAsset == CurrentAsset->SourceObject)) return;
+
+	CurrentAsset = DuplicateObject<UStepAsset>(InStepAsset, this);
+	CurrentAsset->Initialize(InStepAsset);
+
+	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+
+	for(auto Iter : GetRootSteps())
+	{
+		if(Iter)
+		{
+			Iter->OnInitialize();
+		}
+	}
+
+	if(bInAutoStartFirst)
+	{
+		StartStep(-1, true);
+	}
 }
 
 void UStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteType)
@@ -410,26 +403,3 @@ void UStepModule::SetGlobalStepLeaveType(EStepLeaveType InGlobalStepLeaveType)
 		}
 	}
 }
-
-#if WITH_EDITOR
-void UStepModule::GenerateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
-{
-	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
-	for (int32 i = 0; i < RootSteps.Num(); i++)
-	{
-		auto Item = MakeShared<FStepListItem>();
-		RootSteps[i]->GenerateListItem(Item);
-		OutStepListItems.Add(Item);
-	}
-}
-
-void UStepModule::UpdateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
-{
-	for (int32 i = 0; i < RootSteps.Num(); i++)
-	{
-		RootSteps[i]->StepIndex = i;
-		RootSteps[i]->StepHierarchy = 0;
-		RootSteps[i]->UpdateListItem(OutStepListItems[i]);
-	}
-}
-#endif

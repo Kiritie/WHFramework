@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class UTaskBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectTaskListItemsDelegate, TArray<TSharedPtr<FTaskListItem>>)
@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(STaskListWidget) {}
 
-		SLATE_ARGUMENT(class UTaskModule*, TaskModule)
+		SLATE_ARGUMENT(TWeakPtr<FTaskEditor>, TaskEditor)
 
 	SLATE_END_ARGS()
 
@@ -39,6 +39,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	bool bMultiMode = false;
+
+	bool bEditMode = false;
+	
+	TWeakPtr<FTaskEditor> TaskEditor;
+
 	TSubclassOf<UTaskBase> SelectedTaskClass;
 
 	TArray<TSharedPtr<FTaskListItem>> TaskListItems;
@@ -46,15 +52,6 @@ public:
 	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
 
 	FOnSelectTaskListItemsDelegate OnSelectTaskListItemsDelegate;
-
-	bool bMultiMode = true;
-
-	bool bEditMode = false;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UTaskModule* TaskModule;
 
 	UTaskBase* CopiedTask;
 

@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
@@ -21,7 +21,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SProcedureListWidget) {}
 
-		SLATE_ARGUMENT(class UProcedureModule*, ProcedureModule)
+		SLATE_ARGUMENT(TWeakPtr<FProcedureEditor>, ProcedureEditor)
 
 	SLATE_END_ARGS()
 
@@ -39,6 +39,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	bool bMultiMode;
+
+	bool bEditMode;
+
+	TWeakPtr<FProcedureEditor> ProcedureEditor;
+
 	TSubclassOf<UProcedureBase> SelectedProcedureClass;
 
 	TArray<TSharedPtr<FProcedureListItem>> ProcedureListItems;
@@ -46,15 +52,6 @@ public:
 	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
 
 	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
-
-	bool bMultiMode;
-
-	bool bEditMode;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UProcedureModule* ProcedureModule;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

@@ -3,9 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Step/StepEditor.h"
 
 #include "Step/Base/StepBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class SStepListWidget;
 class UStepModule;
@@ -19,9 +20,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SStepDetailsWidget) {}
 
-		SLATE_ARGUMENT(UStepModule*, StepModule)
-
-		SLATE_ARGUMENT(TSharedPtr<SStepListWidget>, ListWidget)
+		SLATE_ARGUMENT(TWeakPtr<FStepEditor>, StepEditor)
 
 	SLATE_END_ARGS()
 
@@ -41,12 +40,7 @@ public:
 public:
 	TArray<TSharedPtr<FStepListItem>> SelectedStepListItems;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UStepModule* StepModule;
-
-	TSharedPtr<SStepListWidget> ListWidget;
+	TWeakPtr<FStepEditor> StepEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

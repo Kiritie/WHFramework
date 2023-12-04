@@ -1,6 +1,7 @@
 #include "Ability/Abilities/AbilityBase.h"
 
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Common/CommonTypes.h"
 
 UAbilityBase::UAbilityBase()
 {

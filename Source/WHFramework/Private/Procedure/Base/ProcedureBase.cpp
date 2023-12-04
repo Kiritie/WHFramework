@@ -41,9 +41,9 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(UProcedureModule::Get(true).GetFirstProcedure() == this)
+		if(GetProcedureAsset()->GetFirstProcedure() == this)
 		{
-			UProcedureModule::Get(true).SetFirstProcedure(nullptr);
+			GetProcedureAsset()->SetFirstProcedure(nullptr);
 		}
 	}
 }
@@ -153,6 +153,11 @@ bool UProcedureBase::IsCurrent()
 	return UProcedureModuleStatics::IsCurrentProcedure(this);
 }
 
+UProcedureAsset* UProcedureBase::GetProcedureAsset() const
+{
+	return Cast<UProcedureAsset>(GetOuter());
+}
+
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
@@ -245,15 +250,15 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 		{
 			if(bFirstProcedure)
 			{
-				if(UProcedureModule::Get(true).GetFirstProcedure())
+				if(GetProcedureAsset()->GetFirstProcedure())
 				{
-					UProcedureModule::Get(true).GetFirstProcedure()->bFirstProcedure = false;
+					GetProcedureAsset()->GetFirstProcedure()->bFirstProcedure = false;
 				}
-				UProcedureModule::Get(true).SetFirstProcedure(this);
+				GetProcedureAsset()->SetFirstProcedure(this);
 			}
-			else if(UProcedureModule::Get(true).GetFirstProcedure() == this)
+			else if(GetProcedureAsset()->GetFirstProcedure() == this)
 			{
-				UProcedureModule::Get(true).SetFirstProcedure(nullptr);
+				GetProcedureAsset()->SetFirstProcedure(nullptr);
 			}
 		}
 	}

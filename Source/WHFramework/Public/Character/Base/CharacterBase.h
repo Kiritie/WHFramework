@@ -15,11 +15,12 @@
 
 #include "CharacterBase.generated.h"
 
+class UCharacterDataBase;
 class UAIPerceptionStimuliSourceComponent;
 /**
  * 
  */
-UCLASS(Blueprintable)
+UCLASS(meta=(ShortTooltip="A character is a type of Pawn that includes the ability to walk around."))
 class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
@@ -63,6 +64,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName Name;
 public:
+	virtual FName GetNameP() const override { return Name; }
+
+	virtual void SetNameP(FName InName) override { Name = InName; }
+
 	virtual FName GetNameC() const override { return Name; }
 
 	virtual void SetNameC(FName InName) override { Name = InName; }

@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Main/Base/ModuleBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class SModuleListWidget;
 class AMainModule;

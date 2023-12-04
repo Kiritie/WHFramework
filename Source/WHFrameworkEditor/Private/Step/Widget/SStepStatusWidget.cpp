@@ -16,10 +16,8 @@ SStepStatusWidget::SStepStatusWidget()
 void SStepStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-
-	ListWidget = InArgs._ListWidget;
-
-	if(!ListWidget) return;
+	
+	StepEditor = InArgs._StepEditor;
 
 	ChildSlot
 	[
@@ -52,7 +50,7 @@ void SStepStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalStepNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), StepEditor.Pin()->ListWidget->GetTotalStepNum())); })
 				]
 
 				+ SHorizontalBox::Slot()
@@ -61,7 +59,7 @@ void SStepStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedStepNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), StepEditor.Pin()->ListWidget->GetSelectedStepNum())); })
 				]
 			]
 		]

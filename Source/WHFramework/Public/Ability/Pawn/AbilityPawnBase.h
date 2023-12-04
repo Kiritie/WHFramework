@@ -9,10 +9,9 @@
 #include "FSM/Base/FSMAgentInterface.h"
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
-#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Targeting/TargetingAgentInterface.h"
+#include "Pawn/Base/PawnBase.h"
 
 #include "AbilityPawnBase.generated.h"
 
@@ -30,7 +29,7 @@ class UAbilityPawnDataBase;
  * Ability Vitality基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterface, public ISceneActorInterface, public IAbilityPawnInterface, public IFSMAgentInterface, public IVoxelAgentInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface, public ITargetingAgentInterface
+class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -39,47 +38,6 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawn, public IObjectPoolInterfa
 
 public:
 	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Actor
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
-	FGuid ActorID;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
-	bool bVisible;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
-	TScriptInterface<ISceneContainerInterface> Container;
-	
-public:
-	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
-
-	virtual void SetActorID_Implementation(const FString& InID) override { ActorID = FGuid(InID); }
-
-	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
-
-	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
-
-	virtual bool IsVisible_Implementation() const override { return bVisible; }
-
-	virtual void SetActorVisible_Implementation(bool bInVisible) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Voxel
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FPrimaryAssetId GenerateVoxelID;
-
-public:
-	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
-
-	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
-
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
-
-public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
-
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
@@ -131,9 +89,6 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UBoxComponent* BoxComponent;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -149,13 +104,6 @@ protected:
 	UFSMComponent* FSM;
 
 protected:
-	// stats
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VitalityStats")
-	FPrimaryAssetId AssetID;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FName Name;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FName RaceID;
 	
@@ -163,14 +111,6 @@ protected:
 	int32 Level;
 
 public:
-	template<class T>
-	T& GetPawnData() const
-	{
-		return static_cast<T&>(GetPawnData());
-	}
-	
-	UAbilityPawnDataBase& GetPawnData() const;
-
 	template<class T>
 	T* GetAttributeSet() const
 	{
@@ -219,10 +159,6 @@ public:
 	virtual bool IsDying() const override;
 
 public:
-	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
-	
-	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
-
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameV() const override { return Name; }
 

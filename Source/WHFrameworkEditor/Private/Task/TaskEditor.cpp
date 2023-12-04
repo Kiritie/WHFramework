@@ -6,144 +6,324 @@
 #include "Editor.h"
 #endif
 
-#include "WHFrameworkEditorCommands.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-#include "Task/TaskGraphSchema.h"
+#include "ISettingsSection.h"
+#include "Task/TaskModule.h"
+#include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBlueprint.h"
-#include "Task/Widget/STaskEditorWidget.h"
+#include "Task/Blueprint/TaskBlueprintActions.h"
+#include "Task/Blueprint/TaskGraphSchema.h"
+#include "Task/Customization/TaskDetailCustomization.h"
+#include "Task/Widget/STaskDetailsWidget.h"
+#include "Task/Widget/STaskListWidget.h"
+#include "Task/Widget/STaskStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FTaskEditor"
 
-static const FName TaskEditorTabName("TaskEditor");
+//////////////////////////////////////////////////////////////////////////
+/// TaskEditorModule
+IMPLEMENTATION_EDITOR_MODULE(FTaskEditorModule)
 
-IMPLEMENTATION_EDITOR_MODULE(FTaskEditor)
+FTaskEditorModule::FTaskEditorModule()
+{
+	AppIdentifier = FName("TaskEditorApp");
+}
 
-void FTaskEditor::OnInitialize()
+void FTaskEditorModule::StartupModule()
 {
 	FTaskEditorCommands::Register();
-	// Register tabs
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TaskEditorTabName, FOnSpawnTab::CreateRaw(this, &FTaskEditor::OnSpawnTaskEditorTab))
-		.SetDisplayName(LOCTEXT("FTaskEditorTabTitle", "Task Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FTaskEditor::OnTermination()
+void FTaskEditorModule::ShutdownModule()
 {
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TaskEditorTabName);
+	FTaskEditorCommands::Unregister();
 }
 
-void FTaskEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+void FTaskEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
 {
-	InCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenTaskEditorWindow,
-		FExecuteAction::CreateRaw(this, &FTaskEditor::OnClickedTaskEditorButton),
+	GTaskEditorIni = GConfig->GetDestIniFilename(TEXT("TaskEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
+	const ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Task Editor"), FText::FromString(TEXT("Task Editor")), FText::FromString(TEXT("Configure the Task editor plugin")), GetMutableDefault<UTaskEditorSettings>());
+	if(SettingsSection.IsValid())
+	{
+		SettingsSection->OnModified().BindRaw(this, &FTaskEditorModule::HandleSettingsSaved);
+	}
+}
+
+void FTaskEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
+{
+	SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Task Editor"));
+}
+
+bool FTaskEditorModule::HandleSettingsSaved()
+{
+	UTaskEditorSettings* TaskEditorSetting = GetMutableDefault<UTaskEditorSettings>();
+	TaskEditorSetting->SaveConfig();
+	return true;
+}
+
+void FTaskEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
+{
+	Commands->MapAction(
+		FTaskEditorCommands::Get().OpenTaskEditorWindow,
+		FExecuteAction::CreateRaw(this, &FTaskEditorModule::OnClickedTaskEditorButton),
 		FCanExecuteAction());
 }
 
-void FTaskEditor::OnClickedTaskEditorButton()
+void FTaskEditorModule::RegisterMenus(const TSharedPtr<FUICommandList>& Commands)
 {
-	FGlobalTabmanager::Get()->TryInvokeTab(TaskEditorTabName);
+	AddWindowMenu(FTaskEditorCommands::Get().OpenTaskEditorWindow, Commands);
+	
+	AddToolbarMenu(FTaskEditorCommands::Get().OpenTaskEditorWindow, Commands);
 }
 
-TSharedRef<SDockTab> FTaskEditor::OnSpawnTaskEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+void FTaskEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions)
 {
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(TaskEditorWidget, STaskEditorWidget)
-	];
+	const TSharedRef<IAssetTypeActions> AssetAction = MakeShareable(new FTaskBlueprintActions(AssetCategory));
+	AssetTools.RegisterAssetTypeActions(AssetAction);
+	AssetTypeActions.Add(AssetAction);
 }
 
-void FTaskEditorCommands::RegisterCommands()
+void FTaskEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	
+	PropertyEditor.RegisterCustomClassLayout(FName("TaskBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FTaskDetailCustomization::MakeInstance));
 }
 
-/////////////////////////////////////////////////////
-// FTaskBlueprintEditor
-
-FTaskBlueprintEditor::FTaskBlueprintEditor()
+void FTaskEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	// todo: Do we need to register a callback for when properties are changed?
+	PropertyEditor.UnregisterCustomClassLayout(FName("TaskBase"));
 }
 
-FTaskBlueprintEditor::~FTaskBlueprintEditor()
+TSharedRef<FTaskEditor> FTaskEditorModule::CreateTaskEditor(const EToolkitMode::Type Mode, const TSharedPtr< IToolkitHost >& InitToolkitHost, UTaskAsset* Task)
 {
-	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
+	TSharedRef< FTaskEditor > NewTaskEditor( new FTaskEditor() );
+	NewTaskEditor->InitAssetEditorBase( Mode, InitToolkitHost, Task );
+	return NewTaskEditor;
 }
 
-void FTaskBlueprintEditor::InitTaskEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FTaskEditorModule::OnClickedTaskEditorButton()
 {
-	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
-
-	for(auto Blueprint : InBlueprints) { EnsureTaskBlueprintIsUpToDate(Blueprint); }
-}
-
-void FTaskBlueprintEditor::EnsureTaskBlueprintIsUpToDate(UBlueprint* Blueprint)
-{
-	#if WITH_EDITORONLY_DATA
-	for(UEdGraph* Graph : Blueprint->UbergraphPages)
+	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(true))
 	{
-		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
-		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
+		if(TaskModule->GetDefaultAsset())
 		{
-			check(!Graph->Schema->GetClass()->IsChildOf<UTaskGraphSchema>());
-			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
-			break;
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(TaskModule->GetDefaultAsset());
 		}
 	}
-	#endif
 }
 
-// FRED_TODO: don't merge this back
-// FName FTaskEditor::GetToolkitContextFName() const
-// {
-// 	return GetToolkitFName();
-// }
-
-FName FTaskBlueprintEditor::GetToolkitFName() const { return FName("TaskEditor"); }
-
-FText FTaskBlueprintEditor::GetBaseToolkitName() const { return LOCTEXT("TaskEditorAppLabel", "Task Editor"); }
-
-FText FTaskBlueprintEditor::GetToolkitName() const
+//////////////////////////////////////////////////////////////////////////
+/// TaskEditor
+FTaskEditor::FTaskEditor()
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-
-	check(EditingObjs.Num() > 0);
-
-	FFormatNamedArguments Args;
-
-	const UObject* EditingObject = EditingObjs[0];
-
-	const bool bDirtyState = EditingObject->GetOutermost()->IsDirty();
-
-	Args.Add(TEXT("ObjectName"), FText::FromString(EditingObject->GetName()));
-	Args.Add(TEXT("DirtyState"), bDirtyState ? FText::FromString(TEXT("*")) : FText::GetEmpty());
-	return FText::Format(LOCTEXT("TaskToolkitName", "{ObjectName}{DirtyState}"), Args);
+	ToolkitFName = FName("TaskEditor");
+	BaseToolkitName =  LOCTEXT("AppLabel", "Task Editor");
+	MenuCategory = LOCTEXT("TaskEditor", "Task Editor");
+	DefaultLayoutName = FName("TaskEditor_Layout");
+	WorldCentricTabPrefix =  LOCTEXT("WorldCentricTabPrefix", "Task ").ToString();
+	WorldCentricTabColorScale =  FLinearColor( 0.0f, 0.0f, 0.2f, 0.5f );
 }
 
-FText FTaskBlueprintEditor::GetToolkitToolTipText() const
+FTaskEditor::~FTaskEditor()
 {
-	const UObject* EditingObject = GetEditingObject();
-
-	check(EditingObject != NULL);
-
-	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
+	
 }
 
-FString FTaskBlueprintEditor::GetWorldCentricTabPrefix() const { return TEXT("TaskEditor"); }
-
-FLinearColor FTaskBlueprintEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
-
-UBlueprint* FTaskBlueprintEditor::GetBlueprintObj() const
+void FTaskEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UTaskBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
-	return nullptr;
+	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }
 
-FString FTaskBlueprintEditor::GetDocumentationLink() const
+void FTaskEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
 {
-	return FBlueprintEditor::GetDocumentationLink(); // todo: point this at the correct documentation
+	FAssetEditorBase::RegisterTabSpawners(InTabManager);
+
+	SAssignNew(ListWidget, STaskListWidget)
+		.TaskEditor(SharedThis(this));
+
+	SAssignNew(DetailsWidget, STaskDetailsWidget)
+		.TaskEditor(SharedThis(this));
+
+	SAssignNew(StatusWidget, STaskStatusWidget)
+		.TaskEditor(SharedThis(this));
+
+	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnListWidgetTab))
+		.SetDisplayName(LOCTEXT("ListTab", "List"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Details", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnDetailsWidgetTab))
+		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Status", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnStatusWidgetTab))
+		.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+}
+
+void FTaskEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
+{
+	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
+
+	InTabManager->UnregisterTabSpawner("List");
+	InTabManager->UnregisterTabSpawner("Details");
+	InTabManager->UnregisterTabSpawner("Status");
+}
+
+TSharedRef<FTabManager::FLayout> FTaskEditor::CreateDefaultLayout()
+{
+	const TSharedRef<FTabManager::FLayout> DefaultLayout = FAssetEditorBase::CreateDefaultLayout();
+
+	DefaultLayout->AddArea
+	(
+		FTabManager::NewPrimaryArea()
+		->SetOrientation(Orient_Vertical)
+		->Split
+		(
+			// Main application area
+			FTabManager::NewSplitter()
+			->SetOrientation(Orient_Horizontal)
+			->SetSizeCoefficient(0.9f)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("List", ETabState::OpenedTab)
+			)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("Details", ETabState::OpenedTab)
+			)
+		)
+		->Split
+		(
+			FTabManager::NewStack()
+			->SetHideTabWell(true)
+			->SetSizeCoefficient(0.1f)
+			->AddTab("Status", ETabState::OpenedTab)
+		)
+	);
+
+	return DefaultLayout;
+}
+
+void FTaskEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
+{
+	FSlateIcon Icon(FName("WidgetReflectorStyleStyle"), "Icon.Empty");
+
+	ToolbarBuilder.BeginSection("List");
+	{
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FTaskEditor::OnMultiModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Multi Mode")),
+			FText::FromString(TEXT("Toggle Multi Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FTaskEditor::OnEditModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Edit Mode")),
+			FText::FromString(TEXT("Toggle Edit Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+	}
+	ToolbarBuilder.EndSection();
+}
+
+TSharedRef<SDockTab> FTaskEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ListTab", "List"))
+		.ShouldAutosize(false)
+		[
+			ListWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FTaskEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("DetailsTab", "Details"))
+		.ShouldAutosize(false)
+		[
+			DetailsWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FTaskEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("StatusTab", "Status"))
+		.ShouldAutosize(true)
+		[
+			StatusWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+void FTaskEditor::PostUndo(bool bSuccess)
+{
+	FAssetEditorBase::PostUndo(bSuccess);
+}
+
+void FTaskEditor::PostRedo(bool bSuccess)
+{
+	FAssetEditorBase::PostRedo(bSuccess);
+}
+
+FEditorModuleBase* FTaskEditor::GetEditorModule() const
+{
+	return &FTaskEditorModule::Get();
+}
+
+void FTaskEditor::OnBlueprintCompiled()
+{
+	FAssetEditorBase::OnBlueprintCompiled();
+}
+
+void FTaskEditor::OnMultiModeToggled()
+{
+	ListWidget->ToggleMultiMode();
+}
+
+void FTaskEditor::OnEditModeToggled()
+{
+	ListWidget->ToggleEditMode();
+}
+
+//////////////////////////////////////////////////////////////////////////
+/// TaskBlueprintEditor
+FTaskBlueprintEditor::FTaskBlueprintEditor()
+{
+	BlueprintClass = UTaskBlueprint::StaticClass();
+	GraphSchemaClass = UTaskGraphSchema::StaticClass();
+	
+	ToolkitFName = FName("TaskBlueprintEditor");
+	BaseToolkitName = LOCTEXT("TaskBlueprintEditorAppLabel", "Task Blueprint Editor");
+	ToolkitNameFormat = LOCTEXT("TaskBlueprintEditorToolkitName", "{ObjectName}{DirtyState}");
+
+	WorldCentricTabPrefix = TEXT("TaskBlueprintEditor");
+	WorldCentricTabColorScale = FLinearColor::White;
 }
 
 #undef LOCTEXT_NAMESPACE

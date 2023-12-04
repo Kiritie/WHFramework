@@ -3,9 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Task/TaskEditor.h"
 
 #include "Task/Base/TaskBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 class STaskListWidget;
 class UTaskModule;
@@ -19,9 +20,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(STaskDetailsWidget) {}
 
-		SLATE_ARGUMENT(UTaskModule*, TaskModule)
-
-		SLATE_ARGUMENT(TSharedPtr<STaskListWidget>, ListWidget)
+		SLATE_ARGUMENT(TWeakPtr<FTaskEditor>, TaskEditor)
 
 	SLATE_END_ARGS()
 
@@ -41,12 +40,7 @@ public:
 public:
 	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UTaskModule* TaskModule;
-
-	TSharedPtr<STaskListWidget> ListWidget;
+	TWeakPtr<FTaskEditor> TaskEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

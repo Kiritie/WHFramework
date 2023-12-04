@@ -6,144 +6,324 @@
 #include "Editor.h"
 #endif
 
-#include "WHFrameworkEditorCommands.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-#include "Step/StepGraphSchema.h"
+#include "ISettingsSection.h"
+#include "Step/StepModule.h"
+#include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBlueprint.h"
-#include "Step/Widget/SStepEditorWidget.h"
+#include "Step/Blueprint/StepBlueprintActions.h"
+#include "Step/Blueprint/StepGraphSchema.h"
+#include "Step/Customization/StepDetailCustomization.h"
+#include "Step/Widget/SStepDetailsWidget.h"
+#include "Step/Widget/SStepListWidget.h"
+#include "Step/Widget/SStepStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FStepEditor"
 
-IMPLEMENTATION_EDITOR_MODULE(FStepEditor)
+//////////////////////////////////////////////////////////////////////////
+/// StepEditorModule
+IMPLEMENTATION_EDITOR_MODULE(FStepEditorModule)
 
-static const FName StepEditorTabName("StepEditor");
+FStepEditorModule::FStepEditorModule()
+{
+	AppIdentifier = FName("StepEditorApp");
+}
 
-void FStepEditor::OnInitialize()
+void FStepEditorModule::StartupModule()
 {
 	FStepEditorCommands::Register();
-	// Register tabs
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StepEditorTabName, FOnSpawnTab::CreateRaw(this, &FStepEditor::OnSpawnStepEditorTab))
-		.SetDisplayName(LOCTEXT("FStepEditorTabTitle", "Step Editor"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
-void FStepEditor::OnTermination()
+void FStepEditorModule::ShutdownModule()
 {
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(StepEditorTabName);
+	FStepEditorCommands::Unregister();
 }
 
-void FStepEditor::RegisterCommands(const TSharedPtr<FUICommandList>& InCommands)
+void FStepEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
 {
-	InCommands->MapAction(
-		FWHFrameworkEditorCommands::Get().OpenStepEditorWindow,
-		FExecuteAction::CreateRaw(this, &FStepEditor::OnClickedStepEditorButton),
+	GStepEditorIni = GConfig->GetDestIniFilename(TEXT("StepEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
+	const ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Step Editor"), FText::FromString(TEXT("Step Editor")), FText::FromString(TEXT("Configure the Step editor plugin")), GetMutableDefault<UStepEditorSettings>());
+	if(SettingsSection.IsValid())
+	{
+		SettingsSection->OnModified().BindRaw(this, &FStepEditorModule::HandleSettingsSaved);
+	}
+}
+
+void FStepEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
+{
+	SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Step Editor"));
+}
+
+bool FStepEditorModule::HandleSettingsSaved()
+{
+	UStepEditorSettings* StepEditorSetting = GetMutableDefault<UStepEditorSettings>();
+	StepEditorSetting->SaveConfig();
+	return true;
+}
+
+void FStepEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
+{
+	Commands->MapAction(
+		FStepEditorCommands::Get().OpenStepEditorWindow,
+		FExecuteAction::CreateRaw(this, &FStepEditorModule::OnClickedStepEditorButton),
 		FCanExecuteAction());
 }
 
-void FStepEditor::OnClickedStepEditorButton()
+void FStepEditorModule::RegisterMenus(const TSharedPtr<FUICommandList>& Commands)
 {
-	FGlobalTabmanager::Get()->TryInvokeTab(StepEditorTabName);
+	AddWindowMenu(FStepEditorCommands::Get().OpenStepEditorWindow, Commands);
+	
+	AddToolbarMenu(FStepEditorCommands::Get().OpenStepEditorWindow, Commands);
 }
 
-TSharedRef<SDockTab> FStepEditor::OnSpawnStepEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+void FStepEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions)
 {
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNew(StepEditorWidget, SStepEditorWidget)
-	];
+	const TSharedRef<IAssetTypeActions> AssetAction = MakeShareable(new FStepBlueprintActions(AssetCategory));
+	AssetTools.RegisterAssetTypeActions(AssetAction);
+	AssetTypeActions.Add(AssetAction);
 }
 
-void FStepEditorCommands::RegisterCommands()
+void FStepEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	
+	PropertyEditor.RegisterCustomClassLayout(FName("StepBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FStepDetailCustomization::MakeInstance));
 }
 
-/////////////////////////////////////////////////////
-// FStepEditor
-
-FStepBlueprintEditor::FStepBlueprintEditor()
+void FStepEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
 {
-	// todo: Do we need to register a callback for when properties are changed?
+	PropertyEditor.UnregisterCustomClassLayout(FName("StepBase"));
 }
 
-FStepBlueprintEditor::~FStepBlueprintEditor()
+TSharedRef<FStepEditor> FStepEditorModule::CreateStepEditor(const EToolkitMode::Type Mode, const TSharedPtr< IToolkitHost >& InitToolkitHost, UStepAsset* Step)
 {
-	// NOTE: Any tabs that we still have hanging out when destroyed will be cleaned up by FBaseToolkit's destructor
+	TSharedRef< FStepEditor > NewStepEditor( new FStepEditor() );
+	NewStepEditor->InitAssetEditorBase( Mode, InitToolkitHost, Step );
+	return NewStepEditor;
 }
 
-void FStepBlueprintEditor::InitStepEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, const TArray<UBlueprint*>& InBlueprints, bool bShouldOpenInDefaultsMode)
+void FStepEditorModule::OnClickedStepEditorButton()
 {
-	InitBlueprintEditor(Mode, InitToolkitHost, InBlueprints, bShouldOpenInDefaultsMode);
-
-	for(auto Blueprint : InBlueprints) { EnsureStepBlueprintIsUpToDate(Blueprint); }
-}
-
-void FStepBlueprintEditor::EnsureStepBlueprintIsUpToDate(UBlueprint* Blueprint)
-{
-	#if WITH_EDITORONLY_DATA
-	for(UEdGraph* Graph : Blueprint->UbergraphPages)
+	if(const UStepModule* StepModule = UStepModule::GetPtr(true))
 	{
-		// remove the default event graph, if it exists, from existing Gameplay Ability Blueprints
-		if(Graph->GetName() == "EventGraph" && Graph->Nodes.Num() == 0)
+		if(StepModule->GetDefaultAsset())
 		{
-			check(!Graph->Schema->GetClass()->IsChildOf<UStepGraphSchema>());
-			FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
-			break;
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(StepModule->GetDefaultAsset());
 		}
 	}
-	#endif
 }
 
-// FRED_TODO: don't merge this back
-// FName FStepEditor::GetToolkitContextFName() const
-// {
-// 	return GetToolkitFName();
-// }
-
-FName FStepBlueprintEditor::GetToolkitFName() const { return FName("StepEditor"); }
-
-FText FStepBlueprintEditor::GetBaseToolkitName() const { return LOCTEXT("StepEditorAppLabel", "Step Editor"); }
-
-FText FStepBlueprintEditor::GetToolkitName() const
+//////////////////////////////////////////////////////////////////////////
+/// StepEditor
+FStepEditor::FStepEditor()
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-
-	check(EditingObjs.Num() > 0);
-
-	FFormatNamedArguments Args;
-
-	const UObject* EditingObject = EditingObjs[0];
-
-	const bool bDirtyState = EditingObject->GetOutermost()->IsDirty();
-
-	Args.Add(TEXT("ObjectName"), FText::FromString(EditingObject->GetName()));
-	Args.Add(TEXT("DirtyState"), bDirtyState ? FText::FromString(TEXT("*")) : FText::GetEmpty());
-	return FText::Format(LOCTEXT("StepToolkitName", "{ObjectName}{DirtyState}"), Args);
+	ToolkitFName = FName("StepEditor");
+	BaseToolkitName =  LOCTEXT("AppLabel", "Step Editor");
+	MenuCategory = LOCTEXT("StepEditor", "Step Editor");
+	DefaultLayoutName = FName("StepEditor_Layout");
+	WorldCentricTabPrefix =  LOCTEXT("WorldCentricTabPrefix", "Step ").ToString();
+	WorldCentricTabColorScale =  FLinearColor( 0.0f, 0.0f, 0.2f, 0.5f );
 }
 
-FText FStepBlueprintEditor::GetToolkitToolTipText() const
+FStepEditor::~FStepEditor()
 {
-	const UObject* EditingObject = GetEditingObject();
-
-	check(EditingObject != NULL);
-
-	return FAssetEditorToolkit::GetToolTipTextForObject(EditingObject);
+	
 }
 
-FString FStepBlueprintEditor::GetWorldCentricTabPrefix() const { return TEXT("StepEditor"); }
-
-FLinearColor FStepBlueprintEditor::GetWorldCentricTabColorScale() const { return FLinearColor::White; }
-
-UBlueprint* FStepBlueprintEditor::GetBlueprintObj() const
+void FStepEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
-	const TArray<UObject*>& EditingObjs = GetEditingObjects();
-	for(int32 i = 0; i < EditingObjs.Num(); ++i) { if(EditingObjs[i]->IsA<UStepBlueprint>()) { return (UBlueprint*)EditingObjs[i]; } }
-	return nullptr;
+	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }
 
-FString FStepBlueprintEditor::GetDocumentationLink() const
+void FStepEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
 {
-	return FBlueprintEditor::GetDocumentationLink(); // todo: point this at the correct documentation
+	FAssetEditorBase::RegisterTabSpawners(InTabManager);
+
+	SAssignNew(ListWidget, SStepListWidget)
+		.StepEditor(SharedThis(this));
+
+	SAssignNew(DetailsWidget, SStepDetailsWidget)
+		.StepEditor(SharedThis(this));
+
+	SAssignNew(StatusWidget, SStepStatusWidget)
+		.StepEditor(SharedThis(this));
+
+	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnListWidgetTab))
+		.SetDisplayName(LOCTEXT("ListTab", "List"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Details", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnDetailsWidgetTab))
+		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+	RegisterTrackedTabSpawner(InTabManager, "Status", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnStatusWidgetTab))
+		.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+}
+
+void FStepEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
+{
+	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
+
+	InTabManager->UnregisterTabSpawner("List");
+	InTabManager->UnregisterTabSpawner("Details");
+	InTabManager->UnregisterTabSpawner("Status");
+}
+
+TSharedRef<FTabManager::FLayout> FStepEditor::CreateDefaultLayout()
+{
+	const TSharedRef<FTabManager::FLayout> DefaultLayout = FAssetEditorBase::CreateDefaultLayout();
+
+	DefaultLayout->AddArea
+	(
+		FTabManager::NewPrimaryArea()
+		->SetOrientation(Orient_Vertical)
+		->Split
+		(
+			// Main application area
+			FTabManager::NewSplitter()
+			->SetOrientation(Orient_Horizontal)
+			->SetSizeCoefficient(0.9f)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("List", ETabState::OpenedTab)
+			)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetHideTabWell(false)
+				->SetSizeCoefficient(0.5f)
+				->AddTab("Details", ETabState::OpenedTab)
+			)
+		)
+		->Split
+		(
+			FTabManager::NewStack()
+			->SetHideTabWell(true)
+			->SetSizeCoefficient(0.1f)
+			->AddTab("Status", ETabState::OpenedTab)
+		)
+	);
+
+	return DefaultLayout;
+}
+
+void FStepEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
+{
+	FSlateIcon Icon(FName("WidgetReflectorStyleStyle"), "Icon.Empty");
+
+	ToolbarBuilder.BeginSection("List");
+	{
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FStepEditor::OnMultiModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Multi Mode")),
+			FText::FromString(TEXT("Toggle Multi Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FStepEditor::OnEditModeToggled),
+				FCanExecuteAction(),
+				FGetActionCheckState::CreateLambda([this](){
+					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Edit Mode")),
+			FText::FromString(TEXT("Toggle Edit Mode")),
+			Icon,
+			EUserInterfaceActionType::ToggleButton
+		);
+	}
+	ToolbarBuilder.EndSection();
+}
+
+TSharedRef<SDockTab> FStepEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("ListTab", "List"))
+		.ShouldAutosize(false)
+		[
+			ListWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FStepEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("DetailsTab", "Details"))
+		.ShouldAutosize(false)
+		[
+			DetailsWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+TSharedRef<SDockTab> FStepEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args)
+{
+	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
+		.Label(LOCTEXT("StatusTab", "Status"))
+		.ShouldAutosize(true)
+		[
+			StatusWidget.ToSharedRef()
+		];
+	return SpawnedTab;
+}
+
+void FStepEditor::PostUndo(bool bSuccess)
+{
+	FAssetEditorBase::PostUndo(bSuccess);
+}
+
+void FStepEditor::PostRedo(bool bSuccess)
+{
+	FAssetEditorBase::PostRedo(bSuccess);
+}
+
+FEditorModuleBase* FStepEditor::GetEditorModule() const
+{
+	return &FStepEditorModule::Get();
+}
+
+void FStepEditor::OnBlueprintCompiled()
+{
+	FAssetEditorBase::OnBlueprintCompiled();
+}
+
+void FStepEditor::OnMultiModeToggled()
+{
+	ListWidget->ToggleMultiMode();
+}
+
+void FStepEditor::OnEditModeToggled()
+{
+	ListWidget->ToggleEditMode();
+}
+
+//////////////////////////////////////////////////////////////////////////
+/// StepBlueprintEditor
+FStepBlueprintEditor::FStepBlueprintEditor()
+{
+	BlueprintClass = UStepBlueprint::StaticClass();
+	GraphSchemaClass = UStepGraphSchema::StaticClass();
+	
+	ToolkitFName = FName("StepBlueprintEditor");
+	BaseToolkitName = LOCTEXT("StepBlueprintEditorAppLabel", "Step Blueprint Editor");
+	ToolkitNameFormat = LOCTEXT("StepBlueprintEditorToolkitName", "{ObjectName}{DirtyState}");
+
+	WorldCentricTabPrefix = TEXT("StepBlueprintEditor");
+	WorldCentricTabColorScale = FLinearColor::White;
 }
 
 #undef LOCTEXT_NAMESPACE

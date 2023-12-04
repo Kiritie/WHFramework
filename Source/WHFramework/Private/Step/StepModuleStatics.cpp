@@ -6,6 +6,16 @@
 #include "Step/StepModule.h"
 #include "Step/Base/StepBase.h"
 
+UStepAsset* UStepModuleStatics::GetCurrentStepAsset()
+{
+	return UStepModule::Get().GetCurrentAsset();
+}
+
+void UStepModuleStatics::SetCurrentStepAsset(UStepAsset* InStepAsset, bool bAutoStartFirst)
+{
+	return UStepModule::Get().SetCurrentAsset(InStepAsset, bAutoStartFirst);
+}
+
 UStepBase* UStepModuleStatics::GetCurrentStep()
 {
 	return UStepModule::Get().GetCurrentStep();

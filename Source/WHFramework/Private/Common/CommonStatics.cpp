@@ -401,15 +401,21 @@ bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncNam
 	return false;
 }
 
-TArray<UClass*> UCommonStatics::GetClassChildren(const UClass* InClass, bool bIncludeSelf)
+bool UCommonStatics::IsClassHasChildren(const UClass* InClass, EClassFlags InDisabledFlags)
 {
+	return !GetClassChildren(InClass, false, InDisabledFlags).IsEmpty();
+}
+
+TArray<UClass*> UCommonStatics::GetClassChildren(const UClass* InClass, bool bIncludeSelf, EClassFlags InDisabledFlags)
+{
+	TArray<UClass*> Children;
+	GetDerivedClasses(InClass, Children);
 	TArray<UClass*> ReturnValues;
-	for (TObjectIterator<UClass> Iter; Iter; ++Iter)
+	for (const auto Iter : Children)
 	{
-		UClass* Class = *Iter;
-		if (Class->IsChildOf(InClass) && (bIncludeSelf || Class != InClass))
+		if (!Iter->HasAnyClassFlags(InDisabledFlags) && !Iter->HasAnyFlags(RF_Transient) && (bIncludeSelf || Iter != InClass))
 		{
-			ReturnValues.Add(Class);
+			ReturnValues.Add(Iter);
 		}
 	}
 	return ReturnValues;

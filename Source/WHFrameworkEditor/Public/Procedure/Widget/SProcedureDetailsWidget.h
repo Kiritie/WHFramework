@@ -5,8 +5,9 @@
 #include "CoreMinimal.h"
 
 #include "Procedure/Base/ProcedureBase.h"
-#include "Widget/SEditorWidgetBase.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
+class FProcedureEditor;
 class SProcedureListWidget;
 class UProcedureModule;
 /**
@@ -19,9 +20,7 @@ public:
 	
 	SLATE_BEGIN_ARGS(SProcedureDetailsWidget) {}
 
-		SLATE_ARGUMENT(UProcedureModule*, ProcedureModule)
-
-		SLATE_ARGUMENT(TSharedPtr<SProcedureListWidget>, ListWidget)
+		SLATE_ARGUMENT(TWeakPtr<FProcedureEditor>, ProcedureEditor)
 
 	SLATE_END_ARGS()
 
@@ -41,12 +40,7 @@ public:
 public:
 	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	UProcedureModule* ProcedureModule;
-
-	TSharedPtr<SProcedureListWidget> ListWidget;
+	TWeakPtr<FProcedureEditor> ProcedureEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

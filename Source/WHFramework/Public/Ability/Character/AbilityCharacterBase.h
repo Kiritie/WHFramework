@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "AbilitySystemInterface.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"

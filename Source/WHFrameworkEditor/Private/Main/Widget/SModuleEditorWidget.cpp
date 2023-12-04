@@ -7,7 +7,6 @@
 #include "SlateOptMacros.h"
 #include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
-#include "Main/ModuleEditor.h"
 #include "Main/Widget/SModuleDetailsWidget.h"
 #include "Main/Widget/SModuleListWidget.h"
 #include "Main/Widget/SModuleStatusWidget.h"

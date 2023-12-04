@@ -9,11 +9,11 @@
 #include "SourceCodeNavigation.h"
 #include "Common/CommonStatics.h"
 #include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
-#include "Main/ModuleBlueprintFactory.h"
 #include "Main/MainModule.h"
 #include "Main/Base/ModuleBlueprint.h"
 #include "Main/Base/ModuleBase.h"
 #include "Main/Widget/SModuleListItemWidget.h"
+#include "Main/Blueprint/ModuleBlueprintFactory.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -22,7 +22,7 @@ SModuleListWidget::SModuleListWidget()
 	WidgetName = FName("ModuleListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
-	bMultiMode = true;
+	bMultiMode = false;
 	bEditMode = false;
 
 	MainModule = nullptr;
@@ -67,13 +67,9 @@ void SModuleListWidget::Construct(const FArguments& InArgs)
 	ClassViewerOptions.bAllowViewOptions = true;
 
 	ModuleClassFilter = MakeShareable(new FModuleClassFilter);
-	ModuleClassFilter->IncludeParentClass = UModuleBase::StaticClass();
 	ModuleClassFilter->MainModule = MainModule;
-	#if ENGINE_MAJOR_VERSION == 4
-	ClassViewerOptions.ClassFilter = ModuleClassFilter;
-	#else if ENGINE_MAJOR_VERSION == 5
+	
 	ClassViewerOptions.ClassFilters.Add(ModuleClassFilter.ToSharedRef());
-	#endif
 
 	SAssignNew(ClassPickButton, SComboButton)
 		.OnGetMenuContent(this, &SModuleListWidget::GenerateClassPicker)
@@ -515,9 +511,9 @@ void SModuleListWidget::ListSelectionChanged(TSharedPtr<FModuleListItem> ListIte
 TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const
 {
 	TArray<UClass*> ReturnValues;
-	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass()))
+	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass(), false, CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown))
 	{
-		if (!MainModule->GetModuleMap().Contains(Iter->GetDefaultObject<UModuleBase>()->GetModuleName()) && UCommonStatics::GetClassChildren(Iter).IsEmpty())
+		if (!MainModule->GetModuleMap().Contains(Iter->GetDefaultObject<UModuleBase>()->GetModuleName()) && !UCommonStatics::IsClassHasChildren(Iter))
 		{
 			ReturnValues.Add(Iter);
 		}

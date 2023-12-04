@@ -10,6 +10,7 @@
 
 #include "TaskBase.generated.h"
 
+class UTaskAsset;
 class ACameraActorBase;
 /**
  * 任务基类
@@ -186,6 +187,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	ETaskState GetTaskState() const { return TaskState; }
+	/**
+	* 获取任务资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UTaskAsset* GetTaskAsset() const;
 	/**
 	* 是否是根任务
 	*/

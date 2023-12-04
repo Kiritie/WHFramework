@@ -5,9 +5,19 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
+UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset()
+{
+	return UProcedureModule::Get().GetCurrentAsset();
+}
+
+void UProcedureModuleStatics::SetCurrentProcedureAsset(UProcedureAsset* InProcedureAsset, bool bAutoSwitchFirst)
+{
+	return UProcedureModule::Get().SetCurrentAsset(InProcedureAsset, bAutoSwitchFirst);
+}
+
 UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
 {
-	return UProcedureModule::Get().GetCurrentProcedure();
+	return GetDeterminesOutputObject(UProcedureModule::Get().GetCurrentProcedure(), InClass);
 }
 
 bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)

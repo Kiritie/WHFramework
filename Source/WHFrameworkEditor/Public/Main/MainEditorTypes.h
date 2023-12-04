@@ -1,50 +1,62 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-#include "ClassViewerFilter.h"
-#include "Common/CommonStatics.h"
-#include "Main/MainModule.h"
+#include "MainEditor.h"
+#include "WHFrameworkEditorStyle.h"
+#include "Common/CommonEditorTypes.h"
+#include "MainEditorTypes.generated.h"
 
-#define GENERATED_EDITOR_MODULE(ModuleClass) \
-protected: \
-	static ModuleClass* Instance; \
-public: \
-	static ModuleClass& Get();
-
-#define IMPLEMENTATION_EDITOR_MODULE(ModuleClass) \
-ModuleClass* ModuleClass::Instance = nullptr; \
-ModuleClass& ModuleClass::Get() \
-{ \
-	if(!Instance) \
-	{ \
-		Instance = new ModuleClass(); \
-	} \
-	return *Instance; \
-}
+class AMainModule;
 
 FString GModuleEditorIni;
 
-class FModuleClassFilter : public IClassViewerFilter
+//////////////////////////////////////////////////////////////////////////
+// ClassFilter
+class FModuleClassFilter : public FAssetClassFilterBase
 {
 public:
-	const UClass* IncludeParentClass;
-	const UClass* UnIncludeParentClass;
-	
+	FModuleClassFilter();
+
 	AMainModule* MainModule;
 
-	virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs ) override
-	{
-		return IsClassAllowedHelper(InClass);
-	}
-	
-	virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef< const IUnloadedBlueprintData > InBlueprint, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
-	{
-		return IsClassAllowedHelper(InBlueprint->GetClassWithin());
-	}
-
 private:
-	bool IsClassAllowedHelper(const UClass* InClass)
-	{
-		return InClass != IncludeParentClass && InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass) && !MainModule->GetModuleMap().Contains(InClass->GetDefaultObject<UModuleBase>()->GetModuleName()) && UCommonStatics::GetClassChildren(InClass).IsEmpty();
-	}
+	virtual bool IsClassAllowed(const UClass* InClass) override;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Commands
+class FModuleEditorCommands : public TCommands<FModuleEditorCommands>
+{	  
+public:
+	FModuleEditorCommands()
+		: TCommands<FModuleEditorCommands>(TEXT("ModuleEditor"),
+			NSLOCTEXT("ModuleEditor", "Module Editor", "Module Editor Commands"),
+			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
+	{}
+	
+public:
+	virtual void RegisterCommands() override;
+
+public:
+	TSharedPtr< FUICommandInfo > OpenModuleEditorWindow;
+	
+	TSharedPtr< FUICommandInfo > Save;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// EditorSettings
+UCLASS(config = ModuleEditor, configdonotcheckdefaults)
+class WHFRAMEWORKEDITOR_API UModuleEditorSettings : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UModuleEditorSettings();
+
+public:
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsMultiMode;
+
+	UPROPERTY(Config, EditAnywhere, Category = "List")
+	bool bDefaultIsEditMode;
 };

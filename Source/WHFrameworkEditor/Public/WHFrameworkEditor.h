@@ -18,24 +18,28 @@ public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
-	void OnPostEngineInit();
+public:
+	void StartupEditorModules();
 
-	const TArray<FClassPickerDefaults>& GetiVisualClassPickers();
+	void ShutdownEditorModules();
 
-	TArray<FClassPickerDefaults> ClassPickers;
-
-private:
 	void RegisterMenus();
 
-	void RegisterSettings();
+	void UnRegisterMenus();
 
-	void UnRegisterSettings();
+protected:
+	void OnPostEngineInit();
 
-	bool HandleSettingsSaved();
+	void OnBeginPIE(bool bIsSimulating);
 
-	void RegisterAssetTypeAction(class IAssetTools& AssetTools, TSharedRef<IAssetTypeActions> Action);
-	
+	void OnEndPIE(bool bIsSimulating);
+
+protected:
+	const TArray<FClassPickerDefaults>& GetNewAssetDefaultClasses();
+
 private:
+	TArray<FClassPickerDefaults> DefaultClassPickers;
+
 	TSharedPtr<class FUICommandList> PluginCommands;
 
 	TArray< TSharedPtr<IAssetTypeActions> > CreatedAssetTypeActions;
@@ -43,9 +47,4 @@ private:
 	FDelegateHandle BeginPIEDelegateHandle;
 
 	FDelegateHandle EndPIEDelegateHandle;
-
-private:
-	void OnBeginPIE(bool bIsSimulating);
-
-	void OnEndPIE(bool bIsSimulating);
 };

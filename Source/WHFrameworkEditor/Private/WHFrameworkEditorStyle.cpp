@@ -46,13 +46,13 @@ TSharedRef<FSlateStyleSet> FWHFrameworkEditorStyle::Create()
 	TSharedRef<FSlateStyleSet> Style = MakeShareable(new FSlateStyleSet("WHFrameworkEditorStyle"));
 	Style->SetContentRoot(IPluginManager::Get().FindPlugin("WHFramework")->GetBaseDir() / TEXT("Resources"));
 
-	Style->Set("WHFrameworkEditor.OpenModuleEditorWindow", new IMAGE_BRUSH(TEXT("Icon_ModuleEditor_40"), Icon40x40));
+	Style->Set("ModuleEditor.OpenModuleEditorWindow", new IMAGE_BRUSH(TEXT("Icon_ModuleEditor_40"), Icon40x40));
 
-	Style->Set("WHFrameworkEditor.OpenProcedureEditorWindow", new IMAGE_BRUSH(TEXT("Icon_ProcedureEditor_40"), Icon40x40));
+	Style->Set("ProcedureEditor.OpenProcedureEditorWindow", new IMAGE_BRUSH(TEXT("Icon_ProcedureEditor_40"), Icon40x40));
 
-	Style->Set("WHFrameworkEditor.OpenStepEditorWindow", new IMAGE_BRUSH(TEXT("Icon_StepEditor_40"), Icon40x40));
+	Style->Set("StepEditor.OpenStepEditorWindow", new IMAGE_BRUSH(TEXT("Icon_StepEditor_40"), Icon40x40));
 
-	Style->Set("WHFrameworkEditor.OpenTaskEditorWindow", new IMAGE_BRUSH(TEXT("Icon_TaskEditor_40"), Icon40x40));
+	Style->Set("TaskEditor.OpenTaskEditorWindow", new IMAGE_BRUSH(TEXT("Icon_TaskEditor_40"), Icon40x40));
 
 	return Style;
 }

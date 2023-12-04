@@ -4,6 +4,7 @@
 
 
 #include "TaskModuleTypes.h"
+#include "Base/TaskAsset.h"
 #include "Base/TaskBase.h"
 #include "Main/Base/ModuleBase.h"
 
@@ -89,9 +90,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void LeaveTask(UTaskBase* InTask);
 
-	UFUNCTION(BlueprintCallable)
-	void ClearAllTask();
-
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsAllTaskCompleted();
@@ -99,30 +97,37 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 protected:
-	/// 初始任务 
+	/// 默认流程资产 
+	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
+	UTaskAsset* DefaultAsset;
+	/// 当前流程资产 
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
-	UTaskBase* FirstTask;
+	UTaskAsset* CurrentAsset;
 	/// 当前任务 
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	UTaskBase* CurrentTask;
-	/// 根任务
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
-	TArray<UTaskBase*> RootTasks;
-	/// 任务Map
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
-	TMap<FString, UTaskBase*> TaskMap;
 
 public:
+	/**
+	* 获取默认资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UTaskAsset* GetDefaultAsset() const { return DefaultAsset; }
+	/**
+	* 获取当前资产
+	*/
+	UFUNCTION(BlueprintPure)
+	UTaskAsset* GetCurrentAsset() const { return CurrentAsset; }
+	/**
+	* 设置当前资产
+	*/
+	UFUNCTION(BlueprintCallable)
+	void SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirst = false);
 	/**
 	* 获取初始任务
 	*/
 	UFUNCTION(BlueprintPure)
-	UTaskBase* GetFirstTask() const { return FirstTask; }
-	/**
-	* 设置初始任务
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstTask(UTaskBase* InFirstTask) { this->FirstTask = InFirstTask; }
+	UTaskBase* GetFirstTask() const { return CurrentAsset ? CurrentAsset->FirstTask : nullptr; }
 	/**
 	* 获取当前任务
 	*/
@@ -137,24 +142,15 @@ public:
 	* 获取根任务列表
 	*/
 	UFUNCTION(BlueprintPure)
-	TArray<UTaskBase*>& GetRootTasks() { return RootTasks; }
+	TArray<UTaskBase*> GetRootTasks() const { return CurrentAsset ? CurrentAsset->RootTasks : TArray<UTaskBase*>(); }
 	/**
 	* 获取任务Map
 	*/
 	UFUNCTION(BlueprintPure)
-	TMap<FString, UTaskBase*>& GetTaskMap() { return TaskMap; }
+	TMap<FString, UTaskBase*> GetTaskMap() const { return CurrentAsset ? CurrentAsset->TaskMap : TMap<FString, UTaskBase*>(); }
 	/**
 	* 通过GUID获取任务
 	*/
 	UFUNCTION(BlueprintPure)
-	UTaskBase* GetTaskByGUID(const FString& InTaskGUID) const { return *TaskMap.Find(InTaskGUID); }
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
-#if WITH_EDITOR
-	virtual void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
-
-	virtual void UpdateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
-#endif
+	UTaskBase* GetTaskByGUID(const FString& InTaskGUID) const { return *GetTaskMap().Find(InTaskGUID); }
 };

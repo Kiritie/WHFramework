@@ -7,7 +7,7 @@
 #include "ContentBrowserModule.h"
 #include "IAssetTools.h"
 #include "IContentBrowserSingleton.h"
-#include "Common/Blueprint/Factory/BlueprintFactoryBase.h"
+#include "Common/Blueprint/BlueprintFactoryBase.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 
 #define LOCTEXT_NAMESPACE "CreateBlueprintAssetDialog"
