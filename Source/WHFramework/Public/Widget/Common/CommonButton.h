@@ -28,7 +28,7 @@ public:
 
 public:
 	virtual void NativePreConstruct() override;
-	
+
 	virtual void NativeOnCurrentTextStyleChanged() override;
 
 	virtual void NativeOnClicked() override;

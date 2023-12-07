@@ -18,6 +18,8 @@ class WHFRAMEWORK_API UStepAsset : public UAssetBase
 public:
 	virtual void Initialize(UAssetBase* InSource) override;
 
+	void AAA(UStepBase* InStep, TMap<FString, UStepBase*>& InMap);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats
 public:
@@ -28,7 +30,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<UStepBase*> RootSteps;
 	/// 步骤Map
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(Transient)
 	TMap<FString, UStepBase*> StepMap;
 
 public:
@@ -60,6 +62,8 @@ public:
 	void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
 
 	void UpdateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+
+	bool CanAddStep(TSubclassOf<UStepBase> InStepClass);
 
 	void ClearAllStep();
 #endif

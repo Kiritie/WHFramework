@@ -37,16 +37,13 @@ bool UAssetFactoryBase::ConfigureProperties()
 	// nullptr the AssetClass so we can check for selection
 	PickedClass = nullptr;
 
-	// Load the classviewer module to display a class picker
-	FClassViewerModule& ClassViewerModule = FModuleManager::LoadModuleChecked<FClassViewerModule>("ClassViewer");
-
 	// Fill in options
 	FClassViewerInitializationOptions Options;
 	Options.Mode = EClassViewerMode::ClassPicker;
 	Options.DisplayMode = EClassViewerDisplayMode::TreeView;
 	Options.NameTypeToDisplay = EClassViewerNameTypeToDisplay::DisplayName;
 	
-	const TSharedPtr<FAssetClassFilterBase> Filter = MakeShareable(new FAssetClassFilterBase);
+	const TSharedPtr<FClassViewerFilterBase> Filter = MakeShareable(new FClassViewerFilterBase);
 	Filter->DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
 	Filter->AllowedChildrenOfClasses.Add(ParentClass);
 	

@@ -49,6 +49,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
 	static void UnPauseAllModule();
 				
+	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
+	static void TerminationModuleByClass(TSubclassOf<UModuleBase> InClass);
+
+	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
+	static void TerminationModuleByName(const FName InName);
+
 public:
 	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
 	static AMainModule* GetMainModule(bool bInEditor = false);

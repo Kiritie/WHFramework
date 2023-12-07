@@ -4,29 +4,24 @@
 #include "Procedure/Widget/SProcedureListItemWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Procedure/Base/ProcedureBase.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-void SProcedureListItemWidget::Construct(const FArguments&, const TSharedPtr<const FProcedureListItem>& InItem)
+void SProcedureListItemWidget::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView)
 {
-	ChildSlot
-	[
-		SNew(SBorder)
-		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-		.Padding(2.f)
+	Item = InArgs._Item;
+	STableRow::Construct
+	(
+		STableRow::FArguments()
+		.Style(FAppStyle::Get(), "SceneOutliner.TableViewRow")
+		.ShowWires(false)
+		.Content()
 		[
-			SNew(SHorizontalBox)
-
-			+ SHorizontalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Text_Lambda([InItem](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), InItem->Procedure->ProcedureIndex + 1, *InItem->Procedure->ProcedureDisplayName.ToString())); })
-			]
-		]
-	];
+			SNew(STextBlock)
+			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), Item->Procedure->ProcedureIndex + 1, *Item->Procedure->ProcedureDisplayName.ToString())); })
+		], 
+		InOwnerTableView
+	);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

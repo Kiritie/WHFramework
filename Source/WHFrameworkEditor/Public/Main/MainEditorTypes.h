@@ -6,21 +6,24 @@
 #include "Common/CommonEditorTypes.h"
 #include "MainEditorTypes.generated.h"
 
+class UModuleBase;
 class AMainModule;
 
 FString GModuleEditorIni;
 
 //////////////////////////////////////////////////////////////////////////
 // ClassFilter
-class FModuleClassFilter : public FAssetClassFilterBase
+class FModuleClassFilter : public FClassViewerFilterBase
 {
 public:
 	FModuleClassFilter();
 
 	AMainModule* MainModule;
 
-private:
-	virtual bool IsClassAllowed(const UClass* InClass) override;
+	TSubclassOf<UModuleBase> EditingModuleClass;
+
+public:
+	virtual bool IsClassAllowed(UClass* InClass) override;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -40,7 +43,7 @@ public:
 public:
 	TSharedPtr< FUICommandInfo > OpenModuleEditorWindow;
 	
-	TSharedPtr< FUICommandInfo > Save;
+	TSharedPtr< FUICommandInfo > SaveModuleEditor;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -55,8 +58,8 @@ public:
 
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsMultiMode;
+	bool bDefaultIsDefaults;
 
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsEditMode;
+	bool bDefaultIsEditing;
 };

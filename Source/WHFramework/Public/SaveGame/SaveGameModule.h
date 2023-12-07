@@ -4,6 +4,7 @@
 
 
 #include "SaveGameModuleTypes.h"
+#include "Event/Handle/Common/EventHandle_ExitGame.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "SaveGameModule.generated.h"
@@ -46,6 +47,8 @@ public:
 	virtual void OnUnPause() override;
 
 	virtual void OnTermination(EPhase InPhase) override;
+
+	virtual void OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;

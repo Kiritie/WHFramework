@@ -2,10 +2,7 @@
 
 #include "Procedure/ProcedureEditor.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "ISettingsSection.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureAsset.h"
@@ -138,13 +135,13 @@ void FProcedureEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNew(ListWidget, SProcedureListWidget)
+	SAssignNewEd(ListWidget, SProcedureListWidget, nullptr)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNew(DetailsWidget, SProcedureDetailsWidget)
+	SAssignNewEd(DetailsWidget, SProcedureDetailsWidget, nullptr)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNew(StatusWidget, SProcedureStatusWidget)
+	SAssignNewEd(StatusWidget, SProcedureStatusWidget, nullptr)
 		.ProcedureEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnListWidgetTab))
@@ -212,36 +209,34 @@ TSharedRef<FTabManager::FLayout> FProcedureEditor::CreateDefaultLayout()
 
 void FProcedureEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
 {
-	FSlateIcon Icon(FName("WidgetReflectorStyleStyle"), "Icon.Empty");
-
 	ToolbarBuilder.BeginSection("List");
 	{
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnMultiModeToggled),
+				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnDefaultsToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return ListWidget->bDefaults ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Multi Mode")),
-			FText::FromString(TEXT("Toggle Multi Mode")),
-			Icon,
+			FText::FromString(TEXT("Defaults")),
+			FText::FromString(TEXT("Toggle Defaults")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "FullBlueprintEditor.EditGlobalOptions"),
 			EUserInterfaceActionType::ToggleButton
 		);
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnEditModeToggled),
+				FExecuteAction::CreateRaw(this, &FProcedureEditor::OnEditingToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return ListWidget->bEditing ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Edit Mode")),
-			FText::FromString(TEXT("Toggle Edit Mode")),
-			Icon,
+			FText::FromString(TEXT("Editing")),
+			FText::FromString(TEXT("Toggle Editing")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
 			EUserInterfaceActionType::ToggleButton
 		);
 	}
@@ -254,7 +249,7 @@ TSharedRef<SDockTab> FProcedureEditor::SpawnListWidgetTab(const FSpawnTabArgs& A
 		.Label(LOCTEXT("ListTab", "List"))
 		.ShouldAutosize(false)
 		[
-			ListWidget.ToSharedRef()
+			ListWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -265,7 +260,7 @@ TSharedRef<SDockTab> FProcedureEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs
 		.Label(LOCTEXT("DetailsTab", "Details"))
 		.ShouldAutosize(false)
 		[
-			DetailsWidget.ToSharedRef()
+			DetailsWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -276,7 +271,7 @@ TSharedRef<SDockTab> FProcedureEditor::SpawnStatusWidgetTab(const FSpawnTabArgs&
 		.Label(LOCTEXT("StatusTab", "Status"))
 		.ShouldAutosize(true)
 		[
-			StatusWidget.ToSharedRef()
+			StatusWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -301,14 +296,14 @@ void FProcedureEditor::OnBlueprintCompiled()
 	FAssetEditorBase::OnBlueprintCompiled();
 }
 
-void FProcedureEditor::OnMultiModeToggled()
+void FProcedureEditor::OnDefaultsToggled()
 {
-	ListWidget->ToggleMultiMode();
+	ListWidget->ToggleDefaults();
 }
 
-void FProcedureEditor::OnEditModeToggled()
+void FProcedureEditor::OnEditingToggled()
 {
-	ListWidget->ToggleEditMode();
+	ListWidget->ToggleEditing();
 }
 
 //////////////////////////////////////////////////////////////////////////

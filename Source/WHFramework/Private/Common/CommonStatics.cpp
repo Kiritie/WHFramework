@@ -413,7 +413,7 @@ TArray<UClass*> UCommonStatics::GetClassChildren(const UClass* InClass, bool bIn
 	TArray<UClass*> ReturnValues;
 	for (const auto Iter : Children)
 	{
-		if (!Iter->HasAnyClassFlags(InDisabledFlags) && !Iter->HasAnyFlags(RF_Transient) && (bIncludeSelf || Iter != InClass))
+		if (!Iter->HasAnyClassFlags(InDisabledFlags) && (bIncludeSelf || Iter != InClass))
 		{
 			ReturnValues.Add(Iter);
 		}

@@ -25,6 +25,8 @@ USceneModule::USceneModule()
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 
+	bModuleAutoRun = false;
+
 	static ConstructorHelpers::FClassFinder<UWorldTimer> WorldTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BP_WorldTimer.BP_WorldTimer_C'"));
 	if(WorldTimerClass.Succeeded())
 	{

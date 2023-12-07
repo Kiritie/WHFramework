@@ -26,25 +26,10 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-protected:
-	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
-
-protected:
-	virtual void OnWindowActivated();
-	
-	virtual void OnWindowDeactivated();
-	
-	virtual void OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow);
-
-	virtual void OnBindCommands();
-
-private:
-	FDelegateHandle OnWindowActivatedHandle;
-	FDelegateHandle OnWindowDeactivatedHandle;
-	FDelegateHandle OnWindowClosedHandle;
-
 public:
 	virtual void OnCreate();
+
+	virtual void OnInitialize();
 
 	virtual void OnSave();
 	
@@ -54,10 +39,24 @@ public:
 
 	virtual void OnDestroy();
 
+protected:
+	virtual void OnBindCommands(const TSharedRef<FUICommandList>& InCommands);
+
+	virtual void OnWindowActivated();
+	
+	virtual void OnWindowDeactivated();
+	
+	virtual void OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow);
+
+protected:
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
 public:
 	virtual void Save();
 
 	virtual void Reset();
+
+	virtual void Rebuild();
 
 	virtual void Refresh();
 
@@ -86,7 +85,14 @@ protected:
 	
 	TSharedRef<FUICommandList> WidgetCommands;
 
+private:
+	FDelegateHandle OnWindowActivatedHandle;
+	FDelegateHandle OnWindowDeactivatedHandle;
+	FDelegateHandle OnWindowClosedHandle;
+
 public:
+	TSharedRef<SEditorWidgetBase> TakeWidget(bool bInit = true);
+
 	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;
 
 	TSharedPtr<SWindow> GetOwnerWindow();
@@ -96,6 +102,12 @@ public:
 	int32 GetChildNum() const { return ChildWidgets.Num(); }
 
 	TSharedPtr<SEditorWidgetBase> GetParentWidgetN() const { return ParentWidget; }
+
+	template<class T>
+	TSharedPtr<T> GetParentWidgetN() const
+	{
+		return StaticCastSharedPtr<T>(ParentWidget);
+	}
 
 	TArray<TSharedPtr<SEditorWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
 };

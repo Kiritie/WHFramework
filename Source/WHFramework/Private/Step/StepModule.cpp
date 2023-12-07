@@ -354,14 +354,6 @@ void UStepModule::SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirs
 
 	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
 
-	for(auto Iter : GetRootSteps())
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
-
 	if(bInAutoStartFirst)
 	{
 		StartStep(-1, true);

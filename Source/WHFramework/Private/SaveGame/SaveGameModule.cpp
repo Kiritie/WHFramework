@@ -3,6 +3,8 @@
 
 #include "SaveGame/SaveGameModule.h"
 
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Common/EventHandle_ExitGame.h"
 #include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Base/SaveGameBase.h"
@@ -16,6 +18,7 @@ USaveGameModule::USaveGameModule()
 	ModuleName = FName("SaveGameModule");
 	ModuleDisplayName = FText::FromString(TEXT("Save Game Module"));
 	bModuleAutoSave = true;
+	ModuleSavePhase = EPhase::Primary;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 
 	UserIndex = 0;
@@ -43,19 +46,13 @@ void USaveGameModule::OnDestroy()
 void USaveGameModule::OnInitialize()
 {
 	Super::OnInitialize();
+	
+	UEventModuleStatics::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnExitGame"));
 }
 
 void USaveGameModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 }
 
 void USaveGameModule::OnRefresh(float DeltaSeconds)
@@ -76,34 +73,27 @@ void USaveGameModule::OnUnPause()
 void USaveGameModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+}
 
-	if(PHASEC(InPhase, EPhase::Primary))
+void USaveGameModule::OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle)
+{
+	if(bModuleAutoSave)
 	{
-		if(bModuleAutoSave)
+		for(auto& Iter1 : SaveGameInfos)
 		{
-			Save();
-		}
-	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(bModuleAutoSave)
-		{
-			for(auto& Iter1 : SaveGameInfos)
+			for(const auto Iter2 : Iter1.Value.SaveGames)
 			{
-				for(const auto Iter2 : Iter1.Value.SaveGames)
+				if(Iter2->IsSaved())
 				{
-					if(Iter2->IsSaved())
-					{
-						UGameplayStatics::SaveGameToSlot(Iter2, GetSlotName(Iter2->SaveName, Iter2->GetSaveIndex()), UserIndex);
-					}
+					UGameplayStatics::SaveGameToSlot(Iter2, GetSlotName(Iter2->SaveName, Iter2->GetSaveIndex()), UserIndex);
 				}
 			}
-			for(auto Iter : DestroyedSlotNames)
+		}
+		for(auto Iter : DestroyedSlotNames)
+		{
+			if(UGameplayStatics::DoesSaveGameExist(Iter, UserIndex))
 			{
-				if(UGameplayStatics::DoesSaveGameExist(Iter, UserIndex))
-				{
-					UGameplayStatics::DeleteGameInSlot(Iter, UserIndex);
-				}
+				UGameplayStatics::DeleteGameInSlot(Iter, UserIndex);
 			}
 		}
 	}

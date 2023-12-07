@@ -5,8 +5,10 @@
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
+#include "EditorDirectories.h"
 #include "IAssetTools.h"
 #include "IContentBrowserSingleton.h"
+#include "SPrimaryButton.h"
 #include "Common/Blueprint/BlueprintFactoryBase.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 
@@ -14,62 +16,41 @@
 
 SCreateBlueprintAssetDialog::SCreateBlueprintAssetDialog()
 {
-	BlueprintFactory = nullptr;
-	UserResponse = EAppReturnType::Cancel;
-
 	WindowTitle = LOCTEXT("CreateBlueprintAssetDialog_Title", "Create New Blueprint Asset");
 	WindowSize = FVector2D(450, 450);
+
+	AssetPath = TEXT("");
+	AssetName = TEXT("");
+	PackageName = TEXT("");
+
+	BlueprintFactory = nullptr;
+	UserResponse = EAppReturnType::No;
+	
+	BlueprintAsset = nullptr;
+
+	bAutoOpenAsset = false;
 }
 
 void SCreateBlueprintAssetDialog::Construct(const FArguments& InArgs)
 {
-	AssetPath = InArgs._DefaultAssetPath/*FText::FromString(FPackageName::GetLongPackagePath(InArgs._DefaultAssetPath.ToString()))*/;
+	BlueprintFactory = NewObject<UBlueprintFactoryBase>(GetTransientPackage(), InArgs._BlueprintFactoryClass);
 
-	BlueprintFactory = InArgs._BlueprintFactory;
+	bAutoOpenAsset = InArgs._IsAutoOpenAsset;
 
 	WindowTitle = FText::FromString(FString::Printf(TEXT("Create %s"), *BlueprintFactory->GetSupportedClass()->GetName()));
 
-	if(AssetPath.IsEmpty())
+	const FString DefaultFilesystemDirectory = FEditorDirectories::Get().GetLastDirectory(ELastDirectory::NEW_ASSET);
+	if (DefaultFilesystemDirectory.IsEmpty() || !FPackageName::TryConvertFilenameToLongPackageName(DefaultFilesystemDirectory, AssetPath) || AssetPath.EndsWith(TEXT("/")))
 	{
-		AssetPath = FText::FromString(TEXT("/Game"));
+		AssetPath = TEXT("/Game");
 	}
 
 	FPathPickerConfig PathPickerConfig;
-	PathPickerConfig.DefaultPath = AssetPath.ToString();
+	PathPickerConfig.DefaultPath = AssetPath;
 	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCreateBlueprintAssetDialog::OnPathChange);
 	PathPickerConfig.bAddDefaultPath = true;
 
-	SelectedClass = BlueprintFactory->ParentClass;
-
-	ClassViewerOptions.bShowBackgroundBorder = false;
-	ClassViewerOptions.bShowUnloadedBlueprints = true;
-	ClassViewerOptions.bShowNoneOption = false;
-
-	ClassViewerOptions.bIsBlueprintBaseOnly = false;
-	ClassViewerOptions.bIsPlaceableOnly = false;
-	ClassViewerOptions.NameTypeToDisplay = EClassViewerNameTypeToDisplay::ClassName;
-	ClassViewerOptions.DisplayMode = EClassViewerDisplayMode::ListView;
-	ClassViewerOptions.bAllowViewOptions = true;
-
-	ClassFilter = MakeShareable(new FBlueprintParentClassFilter);
-	ClassFilter->IncludeParentClass = BlueprintFactory->ParentClass;
-	#if ENGINE_MAJOR_VERSION == 4
-	ClassViewerOptions.ClassFilter = ClassFilter;
-	#else if ENGINE_MAJOR_VERSION == 5
-	ClassViewerOptions.ClassFilters.Add(ClassFilter.ToSharedRef());
-	#endif
-
-	SAssignNew(ClassPickButton, SComboButton)
-		.OnGetMenuContent(this, &SCreateBlueprintAssetDialog::GenerateClassPicker)
-		.ContentPadding(FMargin(2.0f, 2.0f))
-		.ToolTipText(this, &SCreateBlueprintAssetDialog::GetPickedClassName)
-		.ButtonContent()
-		[
-			SNew(STextBlock)
-			.Text(this, &SCreateBlueprintAssetDialog::GetPickedClassName)
-		];
-
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+	const FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
 	SEditorWindowBase::Construct(SEditorWindowBase::FArguments()
 		.WindowArgs(SWindow::FArguments()
@@ -112,29 +93,6 @@ void SCreateBlueprintAssetDialog::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Center)
 				.AutoWidth()
 				[
-					SNew(STextBlock).Text(LOCTEXT("ParentClass", "Parent Class:"))
-				]
-
-				+ SHorizontalBox::Slot()
-				.Padding(2)
-				.HAlign(HAlign_Fill)
-				.FillWidth(1.f)
-				[
-					ClassPickButton.ToSharedRef()
-				]
-			]
-
-			+ SVerticalBox::Slot()
-			.Padding(2)
-			.AutoHeight()
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.Padding(2)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				.AutoWidth()
-				[
 					SNew(STextBlock).Text(LOCTEXT("AssetName", "Asset Name:"))
 				]
 
@@ -151,44 +109,42 @@ void SCreateBlueprintAssetDialog::Construct(const FArguments& InArgs)
 				]
 			]
 
-			+ SVerticalBox::Slot()
+			+SVerticalBox::Slot()
 			.AutoHeight()
 			.HAlign(HAlign_Right)
-			.Padding(5)
+			.VAlign(VAlign_Bottom)
+			.Padding(8.f, 16.f)
 			[
 				SNew(SUniformGridPanel)
-				.SlotPadding(FAppStyle::GetMargin("StandardDialog.SlotPadding"))
 				.MinDesiredSlotWidth(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotWidth"))
 				.MinDesiredSlotHeight(FAppStyle::GetFloat("StandardDialog.MinDesiredSlotHeight"))
-				+ SUniformGridPanel::Slot(0, 0)
+				.SlotPadding(FAppStyle::GetMargin("StandardDialog.SlotPadding"))
+
+				+SUniformGridPanel::Slot(0,0)
 				[
-					SNew(SButton)
-					.HAlign(HAlign_Center)
-					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
+					SNew(SPrimaryButton)
 					.Text(LOCTEXT("OK", "OK"))
-					.IsEnabled_Lambda([this](){ return SelectedClass != nullptr; })
 					.OnClicked(this, &SCreateBlueprintAssetDialog::OnButtonClick, EAppReturnType::Ok)
 				]
-				+ SUniformGridPanel::Slot(1, 0)
+				+SUniformGridPanel::Slot(1,0)
 				[
 					SNew(SButton)
-					.HAlign(HAlign_Center)
-					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
+					.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
 					.OnClicked(this, &SCreateBlueprintAssetDialog::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
 		])
 	);
 
-	OnPathChange(AssetPath.ToString());
+	OnPathChange(AssetPath);
 }
 
 void SCreateBlueprintAssetDialog::OnPathChange(const FString& NewPath)
 {
 	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
 
-	AssetPath = FText::FromString(NewPath);
+	AssetPath = NewPath;
 
 	AssetTools->CreateUniqueAssetName(NewPath / BlueprintFactory->GetDefaultNewAssetName(), FString(), PackageName, AssetName);
 }
@@ -196,6 +152,27 @@ void SCreateBlueprintAssetDialog::OnPathChange(const FString& NewPath)
 FReply SCreateBlueprintAssetDialog::OnButtonClick(EAppReturnType::Type ButtonID)
 {
 	UserResponse = ButtonID;
+
+	if(ButtonID != EAppReturnType::Cancel)
+	{
+		IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
+
+		BlueprintAsset = Cast<UBlueprint>(AssetTools->CreateAsset(AssetName, AssetPath, BlueprintFactory->SupportedClass, BlueprintFactory, FName("ContentBrowserNewAsset")));
+		if(BlueprintAsset)
+		{
+			// TArray<UObject*> ObjectsToSyncTo;
+			// ObjectsToSyncTo.Add(BlueprintAsset);
+			//
+			// GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
+
+			FEditorDirectories::Get().SetLastDirectory(ELastDirectory::NEW_ASSET, AssetPath);
+
+			if(bAutoOpenAsset)
+			{
+				GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(BlueprintAsset, EToolkitMode::Standalone);
+			}
+		}
+	}
 
 	RequestDestroyWindow();
 
@@ -207,57 +184,17 @@ void SCreateBlueprintAssetDialog::SetAssetName(const FText& InText)
 	AssetName = InText.ToString();
 }
 
-
 EAppReturnType::Type SCreateBlueprintAssetDialog::ShowModal()
 {
-	GEditor->EditorAddModalWindow(SharedThis(this));
+	if(BlueprintFactory->ConfigureProperties())
+	{
+		GEditor->EditorAddModalWindow(SharedThis(this));
+	}
+	else
+	{
+		OnButtonClick(EAppReturnType::Cancel);
+	}
 	return UserResponse;
-}
-
-TSharedRef<SWidget> SCreateBlueprintAssetDialog::GenerateClassPicker()
-{
-	FOnClassPicked OnPicked(FOnClassPicked::CreateRaw(this, &SCreateBlueprintAssetDialog::OnClassPicked));
-
-	return SNew(SBox)
-		.WidthOverride(280)
-		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.MaxHeight(500)
-			[
-				FModuleManager::LoadModuleChecked<FClassViewerModule>("ClassViewer").CreateClassViewer(ClassViewerOptions, OnPicked)
-			]
-		];
-}
-
-void SCreateBlueprintAssetDialog::OnClassPicked(UClass* InClass)
-{
-	ClassPickButton->SetIsOpen(false);
-
-	SelectedClass = InClass;
-
-	BlueprintFactory->ParentClass = SelectedClass;
-}
-
-FText SCreateBlueprintAssetDialog::GetPickedClassName() const
-{
-	return FText::FromString(SelectedClass ? SelectedClass->GetName() : TEXT("None"));
-}
-
-FString SCreateBlueprintAssetDialog::GetAssetPath()
-{
-	return AssetPath.ToString();
-}
-
-FString SCreateBlueprintAssetDialog::GetAssetName()
-{
-	return AssetName;
-}
-
-FString SCreateBlueprintAssetDialog::GetPackageName()
-{
-	return PackageName;
 }
 
 #undef LOCTEXT_NAMESPACE

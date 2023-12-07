@@ -194,14 +194,6 @@ void UProcedureModule::SetCurrentAsset(UProcedureAsset* InProcedureAsset, bool b
 
 	WHDebug(FString::Printf(TEXT("切换流程源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
 
-	for(auto Iter : GetProcedures())
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
-
 	if(bInAutoSwitchFirst)
 	{
 		SwitchFirstProcedure();

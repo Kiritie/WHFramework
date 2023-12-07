@@ -10,18 +10,20 @@
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API STaskListItemWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API STaskListItemWidget : public STableRow<TSharedPtr<FTaskListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(STaskListItemWidget) {}
 
+		SLATE_ARGUMENT(TSharedPtr<FTaskListItem>, Item)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
-	void Construct(const FArguments&, const TSharedPtr<const FTaskListItem>& InItem);
+	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	TSharedPtr<const FTaskListItem> Item;
+	TSharedPtr<FTaskListItem> Item;
 };

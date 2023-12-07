@@ -63,14 +63,6 @@ void UAchievementModule::OnInitialize()
 void UAchievementModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-	
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 }
 
 void UAchievementModule::OnRefresh(float DeltaSeconds)
@@ -91,14 +83,6 @@ void UAchievementModule::OnUnPause()
 void UAchievementModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

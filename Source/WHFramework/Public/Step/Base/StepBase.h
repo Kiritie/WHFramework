@@ -5,7 +5,6 @@
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Common/Base/WHObject.h"
-#include "Math/MathTypes.h"
 #include "Camera/CameraModuleTypes.h"
 
 #include "StepBase.generated.h"
@@ -208,7 +207,7 @@ public:
 	/// Operation Target
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
-	AActor* OperationTarget;
+	TSoftObjectPtr<AActor> OperationTarget;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
 	bool bTrackTarget;
@@ -384,9 +383,11 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// StepListItem
 public:
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FStepListItemStates StepListItemStates;
-public:
+#endif
+#if WITH_EDITOR
 	/**
 	* 构建步骤列表项
 	*/
@@ -396,12 +397,73 @@ public:
 	*/
 	virtual void UpdateListItem(TSharedPtr<struct FStepListItem> OutStepListItem);
 
-#if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 };
+
+/**
+ * 步骤列表项
+ */ 
+#if WITH_EDITOR
+struct FStepListItem : public TSharedFromThis<FStepListItem>
+{
+public:
+	FStepListItem()
+	{
+		Step = nullptr;
+		ParentListItem = nullptr; 
+		SubListItems = TArray<TSharedPtr<FStepListItem>>();
+	}
+
+	UStepBase* Step;
+
+	TSharedPtr<FStepListItem> ParentListItem;
+
+	TArray<TSharedPtr<FStepListItem>> SubListItems;
+
+public:
+	FStepListItemStates& GetStates() const
+	{
+		return Step->StepListItemStates;
+	}
+
+	int32& GetStepIndex() const
+	{
+		return Step->StepIndex;
+	}
+
+	UStepBase* GetParentStep() const
+	{
+		return Step->ParentStep;
+	}
 	
+	TArray<UStepBase*>& GetSubSteps()const
+	{
+		return Step->SubSteps;
+	}
+	
+	void GetSubStepNum(int32& OutNum) const
+	{
+		OutNum += SubListItems.Num();
+		for(auto Iter : SubListItems)
+		{
+			Iter->GetSubStepNum(OutNum);
+		}
+	}
+
+	TArray<UStepBase*>& GetParentSubSteps() const
+	{
+		return ParentListItem->GetSubSteps();
+	}
+	
+	TArray<TSharedPtr<FStepListItem>>& GetParentSubListItems() const
+	{
+		return ParentListItem->SubListItems;
+	}
+};
+#endif
+
 /**
 * 步骤任务项
 */
@@ -505,65 +567,5 @@ private:
 	{
 		RemainTime -= DeltaSeconds;
 		return RemainTime <= 0;
-	}
-};
-
-/**
- * 步骤列表项
- */ 
-struct FStepListItem : public TSharedFromThis<FStepListItem>
-{
-public:
-	FStepListItem()
-	{
-		Step = nullptr;
-		ParentListItem = nullptr; 
-		SubListItems = TArray<TSharedPtr<FStepListItem>>();
-	}
-
-	UStepBase* Step;
-
-	TSharedPtr<FStepListItem> ParentListItem;
-
-	TArray<TSharedPtr<FStepListItem>> SubListItems;
-
-public:
-	FStepListItemStates& GetStates() const
-	{
-		return Step->StepListItemStates;
-	}
-
-	int32& GetStepIndex() const
-	{
-		return Step->StepIndex;
-	}
-
-	UStepBase* GetParentStep() const
-	{
-		return Step->ParentStep;
-	}
-	
-	TArray<UStepBase*>& GetSubSteps()const
-	{
-		return Step->SubSteps;
-	}
-	
-	void GetSubStepNum(int32& OutNum) const
-	{
-		OutNum += SubListItems.Num();
-		for(auto Iter : SubListItems)
-		{
-			Iter->GetSubStepNum(OutNum);
-		}
-	}
-
-	TArray<UStepBase*>& GetParentSubSteps() const
-	{
-		return ParentListItem->GetSubSteps();
-	}
-	
-	TArray<TSharedPtr<FStepListItem>>& GetParentSubListItems() const
-	{
-		return ParentListItem->SubListItems;
 	}
 };

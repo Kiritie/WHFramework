@@ -17,10 +17,6 @@ SEditorWidgetBase::SEditorWidgetBase()
 
 void SEditorWidgetBase::Construct(const FArguments& InArgs)
 {
-	OnBindCommands();
-
-	GWorld->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateRaw(this, &SEditorWidgetBase::OnCreate));
-
 	/*
 	ChildSlot
 	[
@@ -29,47 +25,10 @@ void SEditorWidgetBase::Construct(const FArguments& InArgs)
 	*/
 }
 
-FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
-{
-	if(WidgetCommands->ProcessCommandBindings(InKeyEvent))
-	{
-		return FReply::Handled();
-	}
-	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
-}
-
-void SEditorWidgetBase::OnWindowActivated()
-{
-}
-
-void SEditorWidgetBase::OnWindowDeactivated()
-{
-}
-
-void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
-{
-	OnDestroy();
-	if(OnWindowActivatedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
-	}
-	if(OnWindowDeactivatedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
-	}
-	if(OnWindowClosedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
-	}
-}
-
-void SEditorWidgetBase::OnBindCommands()
-{
-	
-}
-
 void SEditorWidgetBase::OnCreate()
 {
+	OnBindCommands(WidgetCommands);
+	
 	if(WidgetType == EEditorWidgetType::Main)
 	{
 		if(GetOwnerWindow().IsValid())
@@ -79,6 +38,10 @@ void SEditorWidgetBase::OnCreate()
 			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
 		}
 	}
+}
+
+void SEditorWidgetBase::OnInitialize()
+{
 }
 
 void SEditorWidgetBase::OnSave()
@@ -106,6 +69,45 @@ void SEditorWidgetBase::OnDestroy()
 	ChildWidgets.Empty();
 }
 
+void SEditorWidgetBase::OnBindCommands(const TSharedRef<FUICommandList>& InCommands)
+{
+	
+}
+
+void SEditorWidgetBase::OnWindowActivated()
+{
+}
+
+void SEditorWidgetBase::OnWindowDeactivated()
+{
+}
+
+void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
+{
+	OnDestroy();
+	if(OnWindowActivatedHandle.IsValid())
+	{
+		InOwnerWindow->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
+	}
+	if(OnWindowDeactivatedHandle.IsValid())
+	{
+		InOwnerWindow->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
+	}
+	if(OnWindowClosedHandle.IsValid())
+	{
+		InOwnerWindow->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
+	}
+}
+
+FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(WidgetCommands->ProcessCommandBindings(InKeyEvent))
+	{
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
+}
+
 void SEditorWidgetBase::Save()
 {
 	OnSave();
@@ -114,6 +116,12 @@ void SEditorWidgetBase::Save()
 void SEditorWidgetBase::Reset()
 {
 	OnReset();
+}
+
+void SEditorWidgetBase::Rebuild()
+{
+	OnDestroy();
+	OnCreate();
 }
 
 void SEditorWidgetBase::Refresh()
@@ -173,6 +181,15 @@ void SEditorWidgetBase::RemoveAllChild()
 	}
 	ChildWidgets.Empty();
 	ChildWidgetMap.Empty();
+}
+
+TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget(bool bInit)
+{
+	if(bInit)
+	{
+		OnInitialize();
+	}
+	return SharedThis(this);
 }
 
 TSharedPtr<SEditorWidgetBase> SEditorWidgetBase::GetChild(int32 InIndex) const

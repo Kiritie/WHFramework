@@ -12,15 +12,15 @@ FString GStepEditorIni;
 
 //////////////////////////////////////////////////////////////////////////
 // ClassFilter
-class FStepClassFilter : public FAssetClassFilterBase
+class FStepClassFilter : public FClassViewerFilterBase
 {
 public:
 	FStepClassFilter();
 
 	TWeakPtr<FStepEditor> StepEditor;
 
-private:
-	virtual bool IsClassAllowed(const UClass* InClass) override;
+public:
+	virtual bool IsClassAllowed(UClass* InClass) override;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -53,8 +53,8 @@ public:
 
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsMultiMode;
+	bool bDefaultIsDefaults;
 
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsEditMode;
+	bool bDefaultIsEditing;
 };

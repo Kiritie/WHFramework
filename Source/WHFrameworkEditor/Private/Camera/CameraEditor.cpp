@@ -2,10 +2,7 @@
 
 #include "Camera/CameraEditor.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "Camera/Customization/CameraModuleDetailCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FCameraEditor"

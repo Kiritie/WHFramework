@@ -7,6 +7,8 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 {
 	Txt_Title = nullptr;
 	bClicked = false;
+
+	Style = UCommonButtonStyle::StaticClass();
 }
 
 void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

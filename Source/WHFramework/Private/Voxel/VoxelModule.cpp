@@ -198,20 +198,6 @@ void UVoxelModule::OnPreparatory(EPhase InPhase)
 			UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(bAutoGenerate)
-		{
-			if(bModuleAutoSave)
-			{
-				Load();
-			}
-			else
-			{
-				LoadSaveData(NewWorldData());
-			}
-		}
-	}
 }
 
 void UVoxelModule::OnRefresh(float DeltaSeconds)
@@ -243,12 +229,17 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 	{
 		DestroyChunkQueues();
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
+}
+
+void UVoxelModule::Load_Implementation()
+{
+	if(!bAutoGenerate) return;
+		
+	Super::Load_Implementation();
+
+	if(!bModuleAutoSave)
 	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
+		LoadSaveData(NewWorldData());
 	}
 }
 

@@ -33,6 +33,13 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
+public:
+#if WITH_EDITOR
+	virtual bool IsUserManaged() const override { return false; }
+
+	virtual bool CanChangeIsSpatiallyLoadedFlag() const override { return false; }
+#endif
+
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class UCameraComponent* Camera;

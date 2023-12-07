@@ -104,14 +104,6 @@ void UAudioModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
-
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, 0.f);
@@ -139,14 +131,6 @@ void UAudioModule::OnUnPause()
 void UAudioModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

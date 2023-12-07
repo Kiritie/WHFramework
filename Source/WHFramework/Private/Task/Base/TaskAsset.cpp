@@ -21,9 +21,16 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 {
 	Super::Initialize(InSource);
 
-	if(!FirstTask && RootTasks.Num() > 0)
+	for(const auto Iter : RootTasks)
 	{
-		FirstTask = RootTasks[0];
+		if(!Iter) continue;
+
+		Iter->OnInitialize();
+
+		if(!FirstTask)
+		{
+			FirstTask = Iter;
+		}
 	}
 }
 
@@ -47,6 +54,11 @@ void UTaskAsset::UpdateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskLi
 		RootTasks[i]->TaskHierarchy = 0;
 		RootTasks[i]->UpdateListItem(OutTaskListItems[i]);
 	}
+}
+
+bool UTaskAsset::CanAddTask(TSubclassOf<UTaskBase> InTaskClass)
+{
+	return true;
 }
 
 void UTaskAsset::ClearAllTask()

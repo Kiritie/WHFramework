@@ -17,11 +17,12 @@ FModuleClassFilter::FModuleClassFilter()
 	bIncludeParentClasses = false;
 		
 	MainModule = nullptr;
+	EditingModuleClass = nullptr;
 }
 
-bool FModuleClassFilter::IsClassAllowed(const UClass* InClass)
+bool FModuleClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return !MainModule->GetModuleMap().Contains(InClass->GetDefaultObject<UModuleBase>()->GetModuleName());
+	return EditingModuleClass ? InClass != EditingModuleClass && InClass->GetDefaultObject<UModuleBase>()->GetModuleName() == EditingModuleClass.GetDefaultObject()->GetModuleName() : MainModule->CanAddModule(InClass);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -30,15 +31,20 @@ void FModuleEditorCommands::RegisterCommands()
 {
 	UI_COMMAND(OpenModuleEditorWindow, "Module Editor", "Bring up ModuleEditor window", EUserInterfaceActionType::Button, FInputGesture());
 
-	FUICommandInfo::MakeCommandInfo(AsShared(), this->Save, "Save", FText::FromString("Save"), FText(), FSlateIcon(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+	FUICommandInfo::MakeCommandInfo(AsShared(), SaveModuleEditor, FName("SaveModuleEditor"),
+		LOCTEXT("SaveModuleEditor", "Save"),
+		LOCTEXT("SaveModuleEditorTooltip", "Save ModuleEditor"),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Level.SaveIcon16x"),
+		EUserInterfaceActionType::Button,
+		FInputChord(EModifierKey::Control, EKeys::S));
 }
 
 //////////////////////////////////////////////////////////////////////////
 // EditorSettings
 UModuleEditorSettings::UModuleEditorSettings()
 {
-	bDefaultIsMultiMode = false;
-	bDefaultIsEditMode = false;
+	bDefaultIsDefaults = false;
+	bDefaultIsEditing = false;
 }
 
 #undef LOCTEXT_NAMESPACE

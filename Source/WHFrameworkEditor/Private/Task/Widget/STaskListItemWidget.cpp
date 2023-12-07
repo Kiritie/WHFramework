@@ -4,29 +4,24 @@
 #include "Task/Widget/STaskListItemWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Task/Base/TaskBase.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-void STaskListItemWidget::Construct(const FArguments&, const TSharedPtr<const FTaskListItem>& InItem)
+void STaskListItemWidget::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView)
 {
-	ChildSlot
-	[
-		SNew(SBorder)
-		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-		.Padding(2.f)
+	Item = InArgs._Item;
+	STableRow::Construct
+	(
+		STableRow::FArguments()
+		.Style(FAppStyle::Get(), "SceneOutliner.TableViewRow")
+		.ShowWires(false)
+		.Content()
 		[
-			SNew(SHorizontalBox)
-
-			+ SHorizontalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Text_Lambda([InItem](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), InItem->Task->TaskIndex + 1, *InItem->Task->TaskDisplayName.ToString())); })
-			]
-		]
-	];
+			SNew(STextBlock)
+			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), Item->Task->TaskIndex + 1, *Item->Task->TaskDisplayName.ToString())); })
+		], 
+		InOwnerTableView
+	);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

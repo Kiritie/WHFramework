@@ -327,9 +327,11 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskListItem
 public:
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FTaskListItemStates TaskListItemStates;
-public:
+#endif
+#if WITH_EDITOR
 	/**
 	* 构建任务列表项
 	*/
@@ -339,7 +341,6 @@ public:
 	*/
 	virtual void UpdateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem);
 
-#if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -348,6 +349,7 @@ public:
 /**
  * 任务列表项
  */ 
+#if WITH_EDITOR
 struct FTaskListItem : public TSharedFromThis<FTaskListItem>
 {
 public:
@@ -404,3 +406,4 @@ public:
 		return ParentListItem->SubListItems;
 	}
 };
+#endif

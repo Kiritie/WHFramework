@@ -4,6 +4,7 @@
 #include "ClassViewerFilter.h"
 #include "Common/CommonStatics.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Widget/Base/SEditorWidgetBase.h"
 
 #define GENERATED_EDITOR_MODULE(ModuleClass) \
 protected: \
@@ -22,10 +23,10 @@ ModuleClass& ModuleClass::Get() \
 	return *Instance; \
 }
 
-class FAssetClassFilterBase : public IClassViewerFilter
+class FClassViewerFilterBase : public IClassViewerFilter
 {
 public:
-	FAssetClassFilterBase()
+	FClassViewerFilterBase()
 		: bIncludeBaseClasses(true), bIncludeParentClasses(true), bDisallowBlueprintBase(false), DisallowedClassFlags(CLASS_None)
 	{
 	}
@@ -52,7 +53,7 @@ public:
 			&& InFilterFuncs->IfInChildOfClassesSet(AllowedChildrenOfClasses, InClass) != EFilterReturn::Failed
 			&& (bIncludeBaseClasses || InFilterFuncs->IfInClassesSet(AllowedChildrenOfClasses, InClass) == EFilterReturn::Failed)
 			&& (bIncludeParentClasses || !UCommonStatics::IsClassHasChildren(InClass))
-			&& IsClassAllowed(InClass);
+			&& IsClassAllowed(const_cast<UClass*>(InClass));
 
 		if (bAllowed && bDisallowBlueprintBase)
 		{
@@ -77,7 +78,7 @@ public:
 			&& IsClassAllowed(InUnloadedClassData);
 	}
 		
-	virtual bool IsClassAllowed(const UClass* InClass)
+	virtual bool IsClassAllowed(UClass* InClass)
 	{
 		return true;
 	}
@@ -87,3 +88,23 @@ public:
 		return IsClassAllowed(StaticLoadClass(UObject::StaticClass(), nullptr, *InUnloadedClassData->GetClassPathName().ToString()));
 	}
 };
+
+
+#define SNewEd( WidgetType, ParentWidget, ... ) \
+MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+
+#define SAssignNewEd( ExposeAs, WidgetType, ParentWidget, ... ) \
+MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+
+template<typename WidgetType, typename RequiredArgsPayloadType>
+TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InType, const TSharedPtr<SEditorWidgetBase>& InParentWidget, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
+{
+	LLM_SCOPE_BYTAG(UI_Slate);
+	TSlateDecl<WidgetType, RequiredArgsPayloadType> SlateDecl(InType, InFile, OnLine, Forward<RequiredArgsPayloadType>(InRequiredArgs));
+	if(InParentWidget)
+	{
+		InParentWidget->AddChild(SlateDecl._Widget);
+	}
+	SlateDecl._Widget->OnCreate();
+	return SlateDecl;
+}

@@ -3,6 +3,7 @@
 
 #include "Main/Widget/SModuleStatusWidget.h"
 #include "SlateOptMacros.h"
+#include "Main/Widget/SModuleEditorWidget.h"
 #include "Main/Widget/SModuleListWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -16,10 +17,11 @@ SModuleStatusWidget::SModuleStatusWidget()
 void SModuleStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+}
 
-	ListWidget = InArgs._ListWidget;
-
-	if(!ListWidget) return;
+void SModuleStatusWidget::OnCreate()
+{
+	SEditorWidgetBase::OnCreate();
 
 	ChildSlot
 	[
@@ -52,7 +54,7 @@ void SModuleStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), ListWidget->GetTotalModuleNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), GetParentWidgetN<SModuleEditorWidget>()->ListWidget->GetTotalModuleNum())); })
 				]
 
 				+ SHorizontalBox::Slot()
@@ -61,16 +63,11 @@ void SModuleStatusWidget::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), ListWidget->GetSelectedModuleNum())); })
+					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), GetParentWidgetN<SModuleEditorWidget>()->ListWidget->GetSelectedModuleNum())); })
 				]
 			]
 		]
 	];
-}
-
-void SModuleStatusWidget::OnCreate()
-{
-	SEditorWidgetBase::OnCreate();
 }
 
 void SModuleStatusWidget::OnReset()

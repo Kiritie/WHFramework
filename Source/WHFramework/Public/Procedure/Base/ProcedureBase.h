@@ -6,7 +6,6 @@
 
 #include "Procedure/ProcedureModuleTypes.h"
 #include "Common/Base/WHObject.h"
-#include "Math/MathTypes.h"
 
 #include "ProcedureBase.generated.h"
 
@@ -159,7 +158,7 @@ public:
 	/// Operation Target
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
-	AActor* OperationTarget;
+	TSoftObjectPtr<AActor> OperationTarget;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
 	bool bTrackTarget;
@@ -198,9 +197,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureListItem
 public:
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FProcedureListItemStates ProcedureListItemStates;
-public:
+#endif
+#if WITH_EDITOR
 	/**
 	* 构建流程列表项
 	*/
@@ -210,7 +211,6 @@ public:
 	*/
 	virtual void UpdateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
 
-#if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -219,6 +219,7 @@ public:
 /**
  * 流程列表项
  */ 
+#if WITH_EDITOR
 struct FProcedureListItem : public TSharedFromThis<FProcedureListItem>
 {
 public:
@@ -240,3 +241,4 @@ public:
 		return Procedure->ProcedureIndex;
 	}
 };
+#endif

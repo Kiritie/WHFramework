@@ -19,9 +19,9 @@ FStepClassFilter::FStepClassFilter()
 	StepEditor = nullptr;
 }
 
-bool FStepClassFilter::IsClassAllowed(const UClass* InClass)
+bool FStepClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return true;
+	return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->CanAddStep(InClass);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,8 +35,8 @@ void FStepEditorCommands::RegisterCommands()
 // EditorSettings
 UStepEditorSettings::UStepEditorSettings()
 {
-	bDefaultIsMultiMode = false;
-	bDefaultIsEditMode = false;
+	bDefaultIsDefaults = false;
+	bDefaultIsEditing = false;
 }
 
 #undef LOCTEXT_NAMESPACE

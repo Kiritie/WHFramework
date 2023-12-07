@@ -10,7 +10,6 @@
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Common/CommonStatics.h"
-#include "Event/Handle/Common/EventHandle_InitGame.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Net/UnrealNetwork.h"
 
@@ -59,8 +58,6 @@ void UEventModule::OnInitialize()
 			EventManagerRefs.Add(Iter, EventManager);
 		}
 	}
-	
-	BroadcastEvent<UEventHandle_InitGame>(this);
 }
 
 void UEventModule::OnPreparatory(EPhase InPhase)
@@ -70,11 +67,6 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 	for(auto Iter : EventManagerRefs)
 	{
 		Iter.Value->OnPreparatory(InPhase);
-	}
-
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		BroadcastEvent<UEventHandle_StartGame>(this);
 	}
 }
 
@@ -105,11 +97,6 @@ void UEventModule::OnTermination(EPhase InPhase)
 	for(auto Iter : EventManagerRefs)
 	{
 		Iter.Value->OnTermination(InPhase);
-	}
-
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		BroadcastEvent<UEventHandle_ExitGame>(this);
 	}
 }
 

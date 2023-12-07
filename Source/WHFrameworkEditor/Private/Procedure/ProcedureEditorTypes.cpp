@@ -19,9 +19,9 @@ FProcedureClassFilter::FProcedureClassFilter()
 	ProcedureEditor = nullptr;
 }
 
-bool FProcedureClassFilter::IsClassAllowed(const UClass* InClass)
+bool FProcedureClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return !ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedureMap().Contains(const_cast<UClass*>(InClass));
+	return ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->CanAddProcedure(InClass);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,8 +35,8 @@ void FProcedureEditorCommands::RegisterCommands()
 // EditorSettings
 UProcedureEditorSettings::UProcedureEditorSettings()
 {
-	bDefaultIsMultiMode = false;
-	bDefaultIsEditMode = false;
+	bDefaultIsDefaults = false;
+	bDefaultIsEditing = false;
 }
 
 #undef LOCTEXT_NAMESPACE

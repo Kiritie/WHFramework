@@ -21,8 +21,6 @@ void SStepDetailsWidget::Construct(const FArguments& InArgs)
 	
 	StepEditor = InArgs._StepEditor;
 
-	StepEditor.Pin()->ListWidget->OnSelectStepListItemsDelegate.BindRaw(this, &SStepDetailsWidget::OnSelectStepListItem);
-
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
 	FDetailsViewArgs DetailsViewArgs;
@@ -62,8 +60,6 @@ void SStepDetailsWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	UpdateDetailsView();
 }
 
 void SStepDetailsWidget::OnCreate()
@@ -79,19 +75,15 @@ void SStepDetailsWidget::OnReset()
 void SStepDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-}
 
-void SStepDetailsWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-}
-
-void SStepDetailsWidget::UpdateDetailsView()
-{
-	if(SelectedStepListItems.Num() > 0)
+	if(StepEditor.Pin()->ListWidget->bDefaults)
+	{
+		DetailsView->SetObject(StepEditor.Pin()->GetEditingAsset());
+	}
+	else if(StepEditor.Pin()->ListWidget->SelectedStepListItems.Num() > 0)
 	{
 		TArray<UObject*> Steps = TArray<UObject*>();
-		for(auto Iter : SelectedStepListItems)
+		for(auto Iter : StepEditor.Pin()->ListWidget->SelectedStepListItems)
 		{
 			if(Iter->Step)
 			{
@@ -102,15 +94,13 @@ void SStepDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(StepEditor.Pin()->GetEditingAsset());
+		DetailsView->SetObject(nullptr);
 	}
 }
 
-void SStepDetailsWidget::OnSelectStepListItem(TArray<TSharedPtr<FStepListItem>> StepListItem)
+void SStepDetailsWidget::OnDestroy()
 {
-	SelectedStepListItems = StepListItem;
-
-	UpdateDetailsView();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

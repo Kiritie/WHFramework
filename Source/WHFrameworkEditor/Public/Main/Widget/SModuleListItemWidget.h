@@ -10,18 +10,20 @@
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SModuleListItemWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SModuleListItemWidget : public STableRow<TSharedPtr<FModuleListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(SModuleListItemWidget) {}
 
+		SLATE_ARGUMENT(TSharedPtr<FModuleListItem>, Item)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
-	void Construct(const FArguments&, const TSharedPtr<const FModuleListItem>& InItem);
+	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	TSharedPtr<const FModuleListItem> Item;
+	TSharedPtr<FModuleListItem> Item;
 };

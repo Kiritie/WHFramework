@@ -10,18 +10,20 @@
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SProcedureListItemWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SProcedureListItemWidget : public STableRow<TSharedPtr<FProcedureListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(SProcedureListItemWidget) {}
 
+		SLATE_ARGUMENT(TSharedPtr<FProcedureListItem>, Item)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
-	void Construct(const FArguments&, const TSharedPtr<const FProcedureListItem>& InItem);
+	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	TSharedPtr<const FProcedureListItem> Item;
+	TSharedPtr<FProcedureListItem> Item;
 };

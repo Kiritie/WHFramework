@@ -58,6 +58,9 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+public:
+	virtual void Load_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Capture
 protected:

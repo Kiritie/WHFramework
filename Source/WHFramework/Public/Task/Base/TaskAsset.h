@@ -28,7 +28,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<UTaskBase*> RootTasks;
 	/// 任务Map
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(Transient)
 	TMap<FString, UTaskBase*> TaskMap;
 
 public:
@@ -60,6 +60,8 @@ public:
 	void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
 
 	void UpdateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+
+	bool CanAddTask(TSubclassOf<UTaskBase> InTaskClass);
 
 	void ClearAllTask();
 #endif

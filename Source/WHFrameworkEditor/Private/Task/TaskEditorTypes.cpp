@@ -19,9 +19,9 @@ FTaskClassFilter::FTaskClassFilter()
 	TaskEditor = nullptr;
 }
 
-bool FTaskClassFilter::IsClassAllowed(const UClass* InClass)
+bool FTaskClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return true;
+	return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->CanAddTask(InClass);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,8 +35,8 @@ void FTaskEditorCommands::RegisterCommands()
 // EditorSettings
 UTaskEditorSettings::UTaskEditorSettings()
 {
-	bDefaultIsMultiMode = false;
-	bDefaultIsEditMode = false;
+	bDefaultIsDefaults = false;
+	bDefaultIsEditing = false;
 }
 
 #undef LOCTEXT_NAMESPACE

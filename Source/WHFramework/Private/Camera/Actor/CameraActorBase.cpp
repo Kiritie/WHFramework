@@ -9,9 +9,9 @@
 // Sets default values
 ACameraActorBase::ACameraActorBase()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
+#if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
+#endif
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);

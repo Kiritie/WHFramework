@@ -142,31 +142,34 @@ public:
 
 protected:
 	/// 模块名称
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName ModuleName;
 	/// 模块显示名称
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText ModuleDisplayName;
 	/// 模块描述
-	UPROPERTY(EditAnywhere, meta = (MultiLine = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FText ModuleDescription;
 	/// 模块状态
-	UPROPERTY(VisibleAnywhere, Replicated)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated)
 	EModuleState ModuleState;
 	/// 模块索引
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 ModuleIndex;
 	/// 自动运行
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoRun;
 	/// 自动保存
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoSave;
+	/// 保存时机
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
+	EPhase ModuleSavePhase;
 	/// 模块存档
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	TSubclassOf<USaveGameBase> ModuleSaveGame;
 	/// 模块网络组件
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UModuleNetworkComponentBase> ModuleNetworkComponent;
 
 public:
@@ -177,33 +180,27 @@ public:
 	/**
 	* 是否自动运行
 	*/
-	UFUNCTION(BlueprintPure)
-	bool IsAutoRunModule() const;
+	bool IsAutoRunModule() const { return bModuleAutoRun; }
 	/**
 	* 获取模块名称
 	*/
-	UFUNCTION(BlueprintPure)
-	FName GetModuleName() const;
+	FName GetModuleName() const { return ModuleName; }
 	/**
 	* 获取模块显示名称
 	*/
-	UFUNCTION(BlueprintPure)
-	FText GetModuleDisplayName() const;
+	FText GetModuleDisplayName() const { return ModuleDisplayName; }
 	/**
 	* 获取模块描述
 	*/
-	UFUNCTION(BlueprintPure)
-	FText GetModuleDescription() const;
+	FText GetModuleDescription() const { return ModuleDescription; }
 	/**
 	* 获取模块状态
 	*/
-	UFUNCTION(BlueprintPure)
-	EModuleState GetModuleState() const;
+	EModuleState GetModuleState() const { return ModuleState; }
 	/**
 	* 获取模块索引
 	*/
-	UFUNCTION(BlueprintPure)
-	int32 GetModuleIndex() const;
+	int32 GetModuleIndex() const { return ModuleIndex; }
 	/**
 	* 获取模块拥有者
 	*/
@@ -236,9 +233,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ModuleListItem
 public:
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FModuleListItemStates ModuleListItemStates;
-public:
+#endif
+#if WITH_EDITOR
 	/**
 	* 构建流程列表项
 	*/
@@ -248,7 +247,6 @@ public:
 	*/
 	virtual void UpdateListItem(TSharedPtr<struct FModuleListItem> OutModuleListItem);
 
-#if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -257,6 +255,7 @@ public:
 /**
  * 流程列表项
  */ 
+#if WITH_EDITOR
 struct FModuleListItem : public TSharedFromThis<FModuleListItem>
 {
 public:
@@ -278,3 +277,4 @@ public:
 		return Module->GetModuleIndex();
 	}
 };
+#endif

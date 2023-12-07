@@ -2,10 +2,7 @@
 
 #include "Task/TaskEditor.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "ISettingsSection.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskAsset.h"
@@ -138,13 +135,13 @@ void FTaskEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNew(ListWidget, STaskListWidget)
+	SAssignNewEd(ListWidget, STaskListWidget, nullptr)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNew(DetailsWidget, STaskDetailsWidget)
+	SAssignNewEd(DetailsWidget, STaskDetailsWidget, nullptr)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNew(StatusWidget, STaskStatusWidget)
+	SAssignNewEd(StatusWidget, STaskStatusWidget, nullptr)
 		.TaskEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnListWidgetTab))
@@ -212,36 +209,34 @@ TSharedRef<FTabManager::FLayout> FTaskEditor::CreateDefaultLayout()
 
 void FTaskEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
 {
-	FSlateIcon Icon(FName("WidgetReflectorStyleStyle"), "Icon.Empty");
-
 	ToolbarBuilder.BeginSection("List");
 	{
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FTaskEditor::OnMultiModeToggled),
+				FExecuteAction::CreateRaw(this, &FTaskEditor::OnDefaultsToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return ListWidget->bDefaults ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Multi Mode")),
-			FText::FromString(TEXT("Toggle Multi Mode")),
-			Icon,
+			FText::FromString(TEXT("Defaults")),
+			FText::FromString(TEXT("Toggle Defaults")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "FullBlueprintEditor.EditGlobalOptions"),
 			EUserInterfaceActionType::ToggleButton
 		);
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FTaskEditor::OnEditModeToggled),
+				FExecuteAction::CreateRaw(this, &FTaskEditor::OnEditingToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return ListWidget->bEditing ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Edit Mode")),
-			FText::FromString(TEXT("Toggle Edit Mode")),
-			Icon,
+			FText::FromString(TEXT("Editing")),
+			FText::FromString(TEXT("Toggle Editing")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
 			EUserInterfaceActionType::ToggleButton
 		);
 	}
@@ -254,7 +249,7 @@ TSharedRef<SDockTab> FTaskEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
 		.Label(LOCTEXT("ListTab", "List"))
 		.ShouldAutosize(false)
 		[
-			ListWidget.ToSharedRef()
+			ListWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -265,7 +260,7 @@ TSharedRef<SDockTab> FTaskEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Arg
 		.Label(LOCTEXT("DetailsTab", "Details"))
 		.ShouldAutosize(false)
 		[
-			DetailsWidget.ToSharedRef()
+			DetailsWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -276,7 +271,7 @@ TSharedRef<SDockTab> FTaskEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args
 		.Label(LOCTEXT("StatusTab", "Status"))
 		.ShouldAutosize(true)
 		[
-			StatusWidget.ToSharedRef()
+			StatusWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -301,14 +296,14 @@ void FTaskEditor::OnBlueprintCompiled()
 	FAssetEditorBase::OnBlueprintCompiled();
 }
 
-void FTaskEditor::OnMultiModeToggled()
+void FTaskEditor::OnDefaultsToggled()
 {
-	ListWidget->ToggleMultiMode();
+	ListWidget->ToggleDefaults();
 }
 
-void FTaskEditor::OnEditModeToggled()
+void FTaskEditor::OnEditingToggled()
 {
-	ListWidget->ToggleEditMode();
+	ListWidget->ToggleEditing();
 }
 
 //////////////////////////////////////////////////////////////////////////

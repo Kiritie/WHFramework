@@ -51,6 +51,9 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+public:
+	virtual void Load_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// MediaPlayer
 protected:

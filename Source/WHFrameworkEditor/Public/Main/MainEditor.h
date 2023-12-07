@@ -42,10 +42,11 @@ public:
 
 	virtual void UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
 
+public:
+	virtual void OpenModuleEditor();
+
 private:
 	TSharedRef<SDockTab> OnSpawnModuleEditorTab(const FSpawnTabArgs& SpawnTabArgs);
-
-	void OnClickedModuleEditorButton();
 
 public:
 	TSharedPtr<SModuleEditorWidget> ModuleEditorWidget;

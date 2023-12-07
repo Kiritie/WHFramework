@@ -22,13 +22,12 @@ UProcedureBase::UProcedureBase()
 	ProcedureIndex = 0;
 	ProcedureState = EProcedureState::None;
 	ProcedureGuideType = EProcedureGuideType::None;
+	ProcedureGuideIntervalTime = 0.f;
 
 	OperationTarget = nullptr;
 	bTrackTarget = false;
 	TrackTargetMode = ECameraTrackMode::LocationOnly;
 	CameraViewParams = FCameraViewParams();
-
-	ProcedureListItemStates = FProcedureListItemStates();
 }
 
 #if WITH_EDITOR
@@ -73,7 +72,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
 			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 	}
@@ -120,7 +119,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::EndTrackTarget(OperationTarget);
+		UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
 	}
 
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
@@ -191,7 +190,7 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+				UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
 					CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 					CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 			}
@@ -200,13 +199,14 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 		{
 			if(bTrackTarget)
 			{
-				UCameraModuleStatics::EndTrackTarget(OperationTarget);
+				UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
 			}
 		}
 	}
 	OperationTarget = InOperationTarget;
 }
 
+#if WITH_EDITOR
 void UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
 {
 	OutProcedureListItem->Procedure = this;
@@ -217,7 +217,6 @@ void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureL
 	OutProcedureListItem->Procedure = this;
 }
 
-#if WITH_EDITOR
 bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
@@ -243,7 +242,7 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 		
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, OperationTarget))
 		{
-			CameraViewParams.CameraViewTarget = OperationTarget;
+			CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))

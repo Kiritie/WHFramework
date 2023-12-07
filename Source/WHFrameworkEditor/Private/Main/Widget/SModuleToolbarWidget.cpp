@@ -19,74 +19,83 @@ SModuleToolbarWidget::SModuleToolbarWidget()
 void SModuleToolbarWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+}
 
-	MainWidget = InArgs._MainWidget;
-	ListWidget = InArgs._ListWidget;
+void SModuleToolbarWidget::OnPreviewToggled()
+{
+	GetParentWidgetN<SModuleEditorWidget>()->TogglePreview();
+}
 
-	if(!MainWidget || !ListWidget) return;
+void SModuleToolbarWidget::OnDefaultsToggled()
+{
+	GetParentWidgetN<SModuleEditorWidget>()->ListWidget->ToggleDefaults();
+}
 
-	FSlateIcon Icon(FName("WidgetModuleEditorStyle"), "Icon.Empty");
+void SModuleToolbarWidget::OnEditingToggled()
+{
+	GetParentWidgetN<SModuleEditorWidget>()->ListWidget->ToggleEditing();
+}
 
-	FToolBarBuilder ToolBarBuilder_Editor(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
+void SModuleToolbarWidget::OnCreate()
+{
+	SEditorWidgetBase::OnCreate();
 
-	ToolBarBuilder_Editor.BeginSection("Editor");
+	FSlimHorizontalToolBarBuilder ToolBarBuilder_List = FSlimHorizontalToolBarBuilder(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
+
+	ToolBarBuilder_List.SetStyle(&FAppStyle::Get(), "StatusBarToolBar");
+	
+	ToolBarBuilder_List.BeginSection("Editor");
 	{
-		#if WITH_SLATE_DEBUGGING
-		ToolBarBuilder_Editor.AddToolBarButton(
+		ToolBarBuilder_List.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnPreviewModeToggled),
+				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnPreviewToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
 					return UCommonStatics::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
-					return MainWidget->bPreviewMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return GetParentWidgetN<SModuleEditorWidget>()->bPreview ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Preview Mode")),
-			FText::FromString(TEXT("Toggle Preview Mode")),
-			Icon,
+			FText::FromString(TEXT("Preview")),
+			FText::FromString(TEXT("Toggle Preview")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Visibility"),
 			EUserInterfaceActionType::ToggleButton
 		);
-		#endif
 	}
-	ToolBarBuilder_Editor.EndSection();
-
-	FToolBarBuilder ToolBarBuilder_List(TSharedPtr<const FUICommandList>(), FMultiBoxCustomization::None);
+	ToolBarBuilder_List.EndSection();
 
 	ToolBarBuilder_List.BeginSection("List");
 	{
-		#if WITH_SLATE_DEBUGGING
 		ToolBarBuilder_List.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnMultiModeToggled),
+				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnDefaultsToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bMultiMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return GetParentWidgetN<SModuleEditorWidget>()->ListWidget->bDefaults ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Multi Mode")),
-			FText::FromString(TEXT("Toggle Multi Mode")),
-			Icon,
+			FText::FromString(TEXT("Defaults")),
+			FText::FromString(TEXT("Toggle Defaults")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "FullBlueprintEditor.EditGlobalOptions"),
 			EUserInterfaceActionType::ToggleButton
 		);
 		ToolBarBuilder_List.AddToolBarButton(
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnEditModeToggled),
+				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnEditingToggled),
 				FCanExecuteAction(),
 				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bEditMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return GetParentWidgetN<SModuleEditorWidget>()->ListWidget->bEditing ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				})
 			),
 			NAME_None,
-			FText::FromString(TEXT("Edit Mode")),
-			FText::FromString(TEXT("Toggle Edit Mode")),
-			Icon,
+			FText::FromString(TEXT("Editing")),
+			FText::FromString(TEXT("Toggle Editing")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
 			EUserInterfaceActionType::ToggleButton
 		);
-		#endif
 	}
 	ToolBarBuilder_List.EndSection();
 
@@ -101,6 +110,7 @@ void SModuleToolbarWidget::Construct(const FArguments& InArgs)
 			+ SVerticalBox::Slot()
 			.VAlign(VAlign_Fill)
 			.HAlign(HAlign_Fill)
+			.AutoHeight()
 			[
 				SNew(SHorizontalBox)
 
@@ -108,64 +118,12 @@ void SModuleToolbarWidget::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Center)
 				.HAlign(HAlign_Left)
 				.AutoWidth()
-				.Padding(5.f, 0.f, 0.f, 0.f)
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("Editor:")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(FMargin(5.f, 0.f))
-				[
-					ToolBarBuilder_Editor.MakeWidget()
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(5.f, 0.f, 0.f, 0.f)
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("List:")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				.Padding(FMargin(5.f, 0.f))
 				[
 					ToolBarBuilder_List.MakeWidget()
 				]
 			]
 		]
 	];
-}
-
-void SModuleToolbarWidget::OnPreviewModeToggled()
-{
-	MainWidget->TogglePreviewMode();
-}
-
-void SModuleToolbarWidget::OnMultiModeToggled()
-{
-	ListWidget->ToggleMultiMode();
-}
-
-void SModuleToolbarWidget::OnEditModeToggled()
-{
-	ListWidget->ToggleEditMode();
-}
-
-void SModuleToolbarWidget::OnCreate()
-{
-	SEditorWidgetBase::OnCreate();
 }
 
 void SModuleToolbarWidget::OnReset()

@@ -28,7 +28,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<UProcedureBase*> Procedures;
 	/// 流程Map
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(Transient)
 	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> ProcedureMap;
 
 public:
@@ -60,6 +60,8 @@ public:
 	void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 
 	void UpdateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
+
+	bool CanAddProcedure(TSubclassOf<UProcedureBase> InProcedureClass);
 
 	void ClearAllProcedure();
 #endif

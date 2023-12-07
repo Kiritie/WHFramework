@@ -40,6 +40,7 @@ UStepBase::UStepBase()
 	StepCompleteType = EStepCompleteType::Procedure;
 	AutoCompleteStepTime = 0.f;
 	StepGuideType = EStepGuideType::None;
+	StepGuideIntervalTime = 0.f;
 
 	CurrentSubStepIndex = -1;
 
@@ -53,8 +54,6 @@ UStepBase::UStepBase()
 	ParentStep = nullptr;
 
 	StepState = EStepState::None;
-
-	StepListItemStates = FStepListItemStates();
 }
 
 #if WITH_EDITOR
@@ -136,7 +135,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
 			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 	}
@@ -279,7 +278,7 @@ void UStepBase::OnExecute()
 
 	if(bTrackTarget && OperationTarget)
 	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget);
+		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous());
 	}
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), this, {this});
@@ -352,7 +351,7 @@ void UStepBase::OnLeave()
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::EndTrackTarget(OperationTarget);
+		UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
 	}
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
@@ -428,7 +427,7 @@ void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraV
 			}
 			if(bTrackTarget)
 			{
-				UCameraModuleStatics::StartTrackTarget(OperationTarget, TrackTargetMode, CameraViewParams.CameraViewSpace,
+				UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
 					CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 					CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
 			}
@@ -437,7 +436,7 @@ void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraV
 		{
 			if(bTrackTarget)
 			{
-				UCameraModuleStatics::EndTrackTarget(OperationTarget);
+				UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
 			}
 		}
 	}
@@ -601,6 +600,7 @@ FStepTaskItem& UStepBase::AddStepTask(const FName InTaskName, float InDurationTi
 	return StepTaskItems[StepTaskItems.Num() - 1];
 }
 
+#if WITH_EDITOR
 void UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem)
 {
 	OutStepListItem->Step = this;
@@ -631,7 +631,7 @@ void UStepBase::UpdateListItem(TSharedPtr<FStepListItem> OutStepListItem)
 		}
 	}
 }
-#if WITH_EDITOR
+
 bool UStepBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
@@ -680,7 +680,7 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, OperationTarget))
 		{
-			CameraViewParams.CameraViewTarget = OperationTarget;
+			CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, SubSteps) ||

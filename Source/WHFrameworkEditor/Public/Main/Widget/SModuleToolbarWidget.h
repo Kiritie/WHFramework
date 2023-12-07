@@ -15,9 +15,6 @@ public:
 	
 	SLATE_BEGIN_ARGS(SModuleToolbarWidget) {}
 
-		SLATE_ARGUMENT(TSharedPtr<class SModuleEditorWidget>, MainWidget)
-		SLATE_ARGUMENT(TSharedPtr<class SModuleListWidget>, ListWidget)
-
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -31,17 +28,10 @@ public:
 
 	virtual void OnDestroy() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	TSharedPtr<class SModuleEditorWidget> MainWidget;
-
-	TSharedPtr<class SModuleListWidget> ListWidget;
-
 private:
-	void OnPreviewModeToggled();
+	void OnPreviewToggled();
 
-	void OnMultiModeToggled();
+	void OnDefaultsToggled();
 
-	void OnEditModeToggled();
+	void OnEditingToggled();
 };

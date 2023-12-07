@@ -15,8 +15,6 @@ public:
 	
 	SLATE_BEGIN_ARGS(SModuleStatusWidget) {}
 	
-		SLATE_ARGUMENT(TSharedPtr<class SModuleListWidget>, ListWidget)
-
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -29,9 +27,4 @@ public:
 	virtual void OnRefresh() override;
 
 	virtual void OnDestroy() override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	TSharedPtr<class SModuleListWidget> ListWidget;
 };

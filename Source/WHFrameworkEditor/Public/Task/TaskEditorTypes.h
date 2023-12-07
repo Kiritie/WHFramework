@@ -12,15 +12,15 @@ FString GTaskEditorIni;
 
 //////////////////////////////////////////////////////////////////////////
 // ClassFilter
-class FTaskClassFilter : public FAssetClassFilterBase
+class FTaskClassFilter : public FClassViewerFilterBase
 {
 public:
 	FTaskClassFilter();
 
 	TWeakPtr<FTaskEditor> TaskEditor;
 
-private:
-	virtual bool IsClassAllowed(const UClass* InClass) override;
+public:
+	virtual bool IsClassAllowed(UClass* InClass) override;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -53,8 +53,8 @@ public:
 
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsMultiMode;
+	bool bDefaultIsDefaults;
 
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsEditMode;
+	bool bDefaultIsEditing;
 };

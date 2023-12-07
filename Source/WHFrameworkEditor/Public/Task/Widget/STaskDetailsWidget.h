@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Task/TaskEditor.h"
 
-#include "Task/Base/TaskBase.h"
 #include "Widget/Base/SEditorWidgetBase.h"
 
 class STaskListWidget;
@@ -38,17 +37,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
-
 	TWeakPtr<FTaskEditor> TaskEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
 	TSharedPtr<IDetailsView> DetailsView;
-
-private:
-	void UpdateDetailsView();
-
-	void OnSelectTaskListItem(TArray<TSharedPtr<FTaskListItem>> TaskListItem);
 };

@@ -3,36 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ClassViewerFilter.h"
-#include "ClassViewerModule.h"
-#include "Step/StepEditorTypes.h"
 #include "Widget/Base/Window/SEditorWindowBase.h"
 
 class UBlueprintFactoryBase;
-
-class FBlueprintParentClassFilter : public IClassViewerFilter
-{
-public:
-	const UClass* IncludeParentClass;
-	const UClass* UnIncludeParentClass;
-
-	virtual bool IsClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const UClass* InClass, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs ) override
-	{
-		return IsClassAllowedHelper(InClass);
-	}
-	
-	virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions, const TSharedRef< const IUnloadedBlueprintData > InBlueprint, TSharedRef< FClassViewerFilterFuncs > InFilterFuncs) override
-	{
-		return IsClassAllowedHelper(InBlueprint);
-	}
-
-private:
-	template <typename TClass>
-	bool IsClassAllowedHelper(TClass InClass)
-	{
-		return InClass->IsChildOf(IncludeParentClass) && !InClass->IsChildOf(UnIncludeParentClass);
-	}
-};
 
 class SCreateBlueprintAssetDialog : public SEditorWindowBase
 {
@@ -41,8 +14,8 @@ public:
 
 	SLATE_BEGIN_ARGS(SCreateBlueprintAssetDialog) { }
 
-		SLATE_ARGUMENT(FText, DefaultAssetPath)
-		SLATE_ARGUMENT(UBlueprintFactoryBase*, BlueprintFactory)
+		SLATE_ARGUMENT(TSubclassOf<UBlueprintFactoryBase>, BlueprintFactoryClass)
+		SLATE_ARGUMENT(bool, IsAutoOpenAsset)
 
 	SLATE_END_ARGS()
 
@@ -52,15 +25,6 @@ public:
 	/** Displays the dialog in a blocking fashion */
 	EAppReturnType::Type ShowModal();
 
-	/** Gets the resulting asset path */
-	FString GetAssetPath();
-
-	/** Gets the resulting asset name */
-	FString GetAssetName();
-
-	/** Gets the resulting package name */
-	FString GetPackageName();
-
 protected:
 	void OnPathChange(const FString& NewPath);
 	
@@ -68,25 +32,30 @@ protected:
 	
 	void SetAssetName(const FText &InText);
 
-	TSharedRef<SWidget> GenerateClassPicker();
-
-	void OnClassPicked(UClass* InClass);
-
-	FText GetPickedClassName() const;
-
-	FText AssetPath;
+protected:
+	FString AssetPath;
 	FString AssetName;
 	FString PackageName;
 
+
+	UBlueprint* BlueprintAsset;
+	
 	UBlueprintFactoryBase* BlueprintFactory;
 
 	EAppReturnType::Type UserResponse;
 
-	TSubclassOf<UObject> SelectedClass;
+	bool bAutoOpenAsset;
 
-	TSharedPtr<SComboButton> ClassPickButton;
+public:
+	/** Gets the resulting asset path */
+	FString GetAssetPath() const { return AssetPath; }
 
-	FClassViewerInitializationOptions ClassViewerOptions;
+	/** Gets the resulting asset name */
+	FString GetAssetName() const { return AssetName; }
 
-	TSharedPtr<FBlueprintParentClassFilter> ClassFilter;
+	/** Gets the resulting package name */
+	FString GetPackageName() const { return PackageName; }
+
+	/** Gets the BlueprintAsset */
+	UBlueprint* GetBlueprintAsset() const { return BlueprintAsset; }
 };

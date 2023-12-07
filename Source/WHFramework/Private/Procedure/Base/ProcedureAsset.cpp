@@ -21,9 +21,18 @@ void UProcedureAsset::Initialize(UAssetBase* InSource)
 {
 	Super::Initialize(InSource);
 
-	if(!FirstProcedure && Procedures.Num() > 0)
+	for(const auto Iter : Procedures)
 	{
-		FirstProcedure = Procedures[0];
+		if(!Iter) continue;
+
+		Iter->OnInitialize();
+
+		ProcedureMap.Add(Iter->GetClass(), Iter);
+		
+		if(!FirstProcedure)
+		{
+			FirstProcedure = Iter;
+		}
 	}
 }
 
@@ -46,6 +55,18 @@ void UProcedureAsset::UpdateProcedureListItem(TArray<TSharedPtr<FProcedureListIt
 		Procedures[i]->ProcedureIndex = i;
 		Procedures[i]->UpdateListItem(OutProcedureListItems[i]);
 	}
+}
+
+bool UProcedureAsset::CanAddProcedure(TSubclassOf<UProcedureBase> InProcedureClass)
+{
+	for(auto Iter : Procedures)
+	{
+		if(Iter->GetClass() == InProcedureClass)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void UProcedureAsset::ClearAllProcedure()

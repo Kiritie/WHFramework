@@ -16,6 +16,13 @@ class WHFRAMEWORK_API AVoxelCapture : public AWHActor
 public:
 	AVoxelCapture();
 
+public:
+#if WITH_EDITOR
+	virtual bool IsUserManaged() const override { return false; }
+
+	virtual bool CanChangeIsSpatiallyLoadedFlag() const override { return false; }
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:

@@ -19,7 +19,7 @@ class WHFRAMEWORK_API AMainModule : public AWHActor
 	
 	GENERATED_MAIN_MODULE(AMainModule)
 
-public:	
+public:
 	// ParamSets default values for this actor's properties
 	AMainModule();
 
@@ -49,6 +49,15 @@ protected:
 	virtual void BeginPlay() override;
 	
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+#if WITH_EDITOR
+	virtual bool IsUserManaged() const override { return false; }
+
+	virtual bool IsLockLocation() const override { return true; }
+
+	virtual bool CanChangeIsSpatiallyLoadedFlag() const override { return false; }
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Modules
@@ -165,6 +174,27 @@ public:
 			Module->UnPause();
 		}
 	}
+	/**
+	 * 通过类型结束模块
+	 */
+	template<class T>
+	static void TerminationModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
+	{
+		if(T* Module = GetModuleByClass<T>(false, InClass))
+		{
+			Module->Termination();
+		}
+	}
+	/**
+	* 通过名称结束模块
+	*/
+	static void TerminationModuleByName(const FName InName)
+	{
+		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
+		{
+			Module->Termination();
+		}
+	}
 
 public:
 	/**
@@ -234,9 +264,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	void GenerateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
 
 	void UpdateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
-	#endif
+
+	bool CanAddModule(TSubclassOf<UModuleBase> InModuleClass);
+#endif
 };

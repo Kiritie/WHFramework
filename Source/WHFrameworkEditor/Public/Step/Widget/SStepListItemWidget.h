@@ -10,18 +10,20 @@
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SStepListItemWidget : public SCompoundWidget
+class WHFRAMEWORKEDITOR_API SStepListItemWidget : public STableRow<TSharedPtr<FStepListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(SStepListItemWidget) {}
 
+		SLATE_ARGUMENT(TSharedPtr<FStepListItem>, Item)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
-	void Construct(const FArguments&, const TSharedPtr<const FStepListItem>& InItem);
+	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Refs
 public:
-	TSharedPtr<const FStepListItem> Item;
+	TSharedPtr<FStepListItem> Item;
 };

@@ -22,8 +22,8 @@ protected: \
 	static ModuleClass* Instance; \
 	static ModuleClass* InstanceEditor; \
 public: \
-	static ModuleClass& Get(bool bInEditor = false); \
-	static ModuleClass* GetPtr(bool bInEditor = false);
+	static ModuleClass& Get(bool bInEditor = false, bool bForce = false); \
+	static ModuleClass* GetPtr(bool bInEditor = false, bool bForce = false);
 
 #define GENERATED_MODULE(ModuleClass) \
 protected: \
@@ -56,15 +56,15 @@ public: \
 #define IMPLEMENTATION_MAIN_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
-ModuleClass& ModuleClass::Get(bool bInEditor) \
+ModuleClass& ModuleClass::Get(bool bInEditor, bool bForce) \
 { \
-	return ModuleClass::GetPtr(bInEditor) ? *ModuleClass::GetPtr(bInEditor) : *NewObject<ModuleClass>(); \
+	return ModuleClass::GetPtr(bInEditor, bForce) ? *ModuleClass::GetPtr(bInEditor, bForce) : *NewObject<ModuleClass>(); \
 } \
-ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
+ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 { \
 	if(!bInEditor) \
 	{ \
-		if(!Instance) \
+		if(!Instance || bForce) \
 		{ \
 			Instance = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
@@ -74,7 +74,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 	} \
 	else \
 	{ \
-		if(!InstanceEditor) \
+		if(!InstanceEditor || bForce) \
 		{ \
 			InstanceEditor = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
@@ -119,5 +119,6 @@ struct WHFRAMEWORK_API FModuleListItemStates
 public:
 	FORCEINLINE FModuleListItemStates()
 	{
+		
 	}
 };

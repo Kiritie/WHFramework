@@ -4,11 +4,8 @@
 
 #include "CoreMinimal.h"
 
-#include "Main/Base/ModuleBase.h"
 #include "Widget/Base/SEditorWidgetBase.h"
 
-class SModuleListWidget;
-class AMainModule;
 /**
  * 
  */
@@ -18,10 +15,6 @@ public:
 	SModuleDetailsWidget();
 	
 	SLATE_BEGIN_ARGS(SModuleDetailsWidget) {}
-
-		SLATE_ARGUMENT(AMainModule*, MainModule)
-
-		SLATE_ARGUMENT(TSharedPtr<SModuleListWidget>, ListWidget)
 
 	SLATE_END_ARGS()
 
@@ -37,24 +30,7 @@ public:
 	virtual void OnDestroy() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Stats
-public:
-	TArray<TSharedPtr<FModuleListItem>> SelectedModuleListItems;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	AMainModule* MainModule;
-
-	TSharedPtr<SModuleListWidget> ListWidget;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
 	TSharedPtr<IDetailsView> DetailsView;
-
-private:
-	void UpdateDetailsView();
-
-	void OnSelectModuleListItem(TArray<TSharedPtr<FModuleListItem>> ModuleListItem);
 };

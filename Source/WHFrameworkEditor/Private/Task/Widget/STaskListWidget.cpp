@@ -3,16 +3,14 @@
 
 #include "Task/Widget/STaskListWidget.h"
 
-#include "AssetToolsModule.h"
-#include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
-#include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
+#include "Common/CommonEditorStatics.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskAsset.h"
-#include "Task/Base/TaskBlueprint.h"
 #include "Task/Base/TaskBase.h"
 #include "Task/Blueprint/TaskBlueprintFactory.h"
+#include "Task/Widget/STaskDetailsWidget.h"
 #include "Task/Widget/STaskListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -22,8 +20,8 @@ STaskListWidget::STaskListWidget()
 	WidgetName = FName("TaskListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
-	bMultiMode = false;
-	bEditMode = false;
+	bDefaults = false;
+	bEditing = false;
 
 	CopiedTask = nullptr;
 }
@@ -41,12 +39,12 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 			.OnGenerateRow(this, &STaskListWidget::GenerateTreeRow)
 			.OnItemScrolledIntoView(this, &STaskListWidget::TreeItemScrolledIntoView)
 			.ItemHeight(18)
-			.SelectionMode_Lambda([this](){ return bMultiMode ? ESelectionMode::Multi : ESelectionMode::SingleToggle; })
+			.SelectionMode(ESelectionMode::Multi)
 			.OnSelectionChanged(this, &STaskListWidget::TreeSelectionChanged)
 			.OnGetChildren(this, &STaskListWidget::GetChildrenForTree)
 			.OnExpansionChanged(this, &STaskListWidget::OnTreeItemExpansionChanged)
 			.OnSetExpansionRecursive(this, &STaskListWidget::SetTreeItemExpansionRecursive)
-			.ClearSelectionOnClick(false)
+			.ClearSelectionOnClick(true)
 			.HighlightParentNodesForSelection(true);
 	}
 
@@ -166,7 +164,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedTaskListItems.Num() <= 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() <= 1 && SelectedTaskClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnAddTaskItemButtonClicked)
 					]
@@ -179,7 +177,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnInsertTaskItemButtonClicked)
 					]
@@ -192,7 +190,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnAppendTaskItemButtonClicked)
 					]
@@ -352,18 +350,26 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 		]
 	];
 
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bMultiMode"), bMultiMode, GTaskEditorIni);
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditMode"), bEditMode, GTaskEditorIni);
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bDefaults"), bDefaults, GTaskEditorIni);
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditing"), bEditing, GTaskEditorIni);
 
 	UpdateTreeView(true);
 
-	SetIsMultiMode(bMultiMode);
-	SetIsEditMode(bEditMode);
+	SetIsDefaults(bDefaults);
+	SetIsEditing(bEditing);
 }
 
 void STaskListWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
+}
+
+void STaskListWidget::OnInitialize()
+{
+	SEditorWidgetBase::OnInitialize();
+
+	SetIsDefaults(bDefaults);
+	SetIsEditing(bEditing);
 }
 
 void STaskListWidget::OnReset()
@@ -377,12 +383,22 @@ void STaskListWidget::OnRefresh()
 
 	UpdateTreeView(true);
 	UpdateSelection();
-	SetIsEditMode(bEditMode);
+	SetIsEditing(bEditing);
 }
 
 void STaskListWidget::OnDestroy()
 {
 	SEditorWidgetBase::OnDestroy();
+}
+
+FReply STaskListWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		TreeView->ClearSelection();
+		return FReply::Handled();
+	}
+	return SEditorWidgetBase::OnKeyDown(MyGeometry, InKeyEvent);
 }
 
 UTaskBase* STaskListWidget::GenerateTask(TSubclassOf<UTaskBase> InClass)
@@ -433,7 +449,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 {
 	ClassPickButton->SetIsOpen(false);
 
-	if(!bEditMode)
+	if(!bEditing)
 	{
 		SelectedTaskClass = InClass;
 	}
@@ -457,15 +473,16 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 					{
 						TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
 					}
-					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Emplace(OldTask->TaskGUID, NewTask);
 					OldTask->OnUnGenerate();
-					Refresh();
 				}
 			}
 
 			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
 
-			OnSelectTaskListItemsDelegate.Execute(SelectedTaskListItems);
+			UpdateTreeView();
+
+			UpdateSelection();
+
 			SelectedTaskClass = InClass;
 		}
 	}
@@ -476,15 +493,15 @@ FText STaskListWidget::GetPickedClassName() const
 	return FText::FromString(SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None"));
 }
 
-void STaskListWidget::ToggleEditMode()
+void STaskListWidget::ToggleEditing()
 {
-	SetIsEditMode(!bEditMode);
+	SetIsEditing(!bEditing);
 }
 
-void STaskListWidget::SetIsEditMode(bool bIsEditMode)
+void STaskListWidget::SetIsEditing(bool bIsEditing)
 {
-	bEditMode = bIsEditMode;
-	if(bEditMode)
+	bEditing = bIsEditing;
+	if(bEditing)
 	{
 		SelectedTaskClass = SelectedTaskListItems.Num() > 0 ? SelectedTaskListItems[0]->Task->GetClass() : nullptr;
 	}
@@ -492,22 +509,20 @@ void STaskListWidget::SetIsEditMode(bool bIsEditMode)
 	{
 		SelectedTaskClass = UTaskBase::StaticClass();
 	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditMode"), bEditMode, GTaskEditorIni);
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditing"), bEditing, GTaskEditorIni);
 }
 
-void STaskListWidget::ToggleMultiMode()
+void STaskListWidget::ToggleDefaults()
 {
-	SetIsMultiMode(!bMultiMode);
+	SetIsDefaults(!bDefaults);
 }
 
-void STaskListWidget::SetIsMultiMode(bool bIsMultiMode)
+void STaskListWidget::SetIsDefaults(bool bIsDefaults)
 {
-	bMultiMode = bIsMultiMode;
-	if(!bMultiMode)
-	{
-		TreeView->ClearSelection();
-	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bMultiMode"), bMultiMode, GTaskEditorIni);
+	bDefaults = bIsDefaults;
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bDefaults"), bDefaults, GTaskEditorIni);
+
+	TaskEditor.Pin()->DetailsWidget->Refresh();
 }
 
 int32 STaskListWidget::GetTotalTaskNum() const
@@ -537,12 +552,12 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 		{
 			SetTreeItemExpansionRecursive(Iter);
 		}
+		TreeView->ClearSelection();
 	}
 	else
 	{
 		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->UpdateTaskListItem(TaskListItems);
 	}
-	TreeView->ClearSelection();
 	TreeView->RequestTreeRefresh();
 }
 
@@ -550,7 +565,7 @@ void STaskListWidget::UpdateSelection()
 {
 	SelectedTaskListItems = TreeView->GetSelectedItems();
 	
-	if(bEditMode)
+	if(bEditing)
 	{
 		SelectedTaskClass = SelectedTaskListItems.Num() > 0 ? SelectedTaskListItems[0]->Task->GetClass() : nullptr;
 	}
@@ -559,16 +574,16 @@ void STaskListWidget::UpdateSelection()
 	{
 		OnSelectTaskListItemsDelegate.Execute(SelectedTaskListItems);
 	}
+
+	TaskEditor.Pin()->DetailsWidget->Refresh();
 }
 
 TSharedRef<ITableRow> STaskListWidget::GenerateTreeRow(TSharedPtr<FTaskListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	check(TreeItem.IsValid());
 
-	return SNew(STableRow<TSharedPtr<FTaskListItem>>, OwnerTable)
-	[
-		SNew(STaskListItemWidget, TreeItem)
-	];
+	return SNew(STaskListItemWidget, OwnerTable)
+		.Item(TreeItem);
 }
 
 void STaskListWidget::TreeItemScrolledIntoView(TSharedPtr<FTaskListItem> TreeItem, const TSharedPtr<ITableRow>& Widget) { }
@@ -630,36 +645,11 @@ FReply STaskListWidget::OnEditTaskItemButtonClicked()
 
 FReply STaskListWidget::OnNewTaskClassButtonClicked()
 {
-	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
-
-	FString DefaultAssetPath = TEXT("/Game");
-	
-	GConfig->GetString(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("DefaultAssetPath"), DefaultAssetPath, GTaskEditorIni);
-
-	UTaskBlueprintFactory* TaskBlueprintFactory = NewObject<UTaskBlueprintFactory>(GetTransientPackage(), UTaskBlueprintFactory::StaticClass());
-
-	const TSharedRef<SCreateBlueprintAssetDialog> CreateBlueprintAssetDialog = SNew(SCreateBlueprintAssetDialog)
-	.DefaultAssetPath(FText::FromString(DefaultAssetPath))
-	.BlueprintFactory(TaskBlueprintFactory);
-
-	if(CreateBlueprintAssetDialog->ShowModal() != EAppReturnType::Cancel)
+	if(const UBlueprint* Blueprint = UCommonEditorStatics::CreateBlueprintAssetWithDialog(UTaskBlueprintFactory::StaticClass()))
 	{
-		DefaultAssetPath = CreateBlueprintAssetDialog->GetAssetPath();
-
-		const FString AssetName = CreateBlueprintAssetDialog->GetAssetName();
-	
-		const FString PackageName = CreateBlueprintAssetDialog->GetPackageName();
-
-		GConfig->SetString(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("DefaultAssetPath"), *DefaultAssetPath, GTaskEditorIni);
-	
-		if(UTaskBlueprint* TaskBlueprintAsset = Cast<UTaskBlueprint>(AssetTools->CreateAsset(AssetName, DefaultAssetPath, UTaskBlueprint::StaticClass(), TaskBlueprintFactory, FName("ContentBrowserNewAsset"))))
+		if(!bEditing)
 		{
-			TArray<UObject*> ObjectsToSyncTo;
-			ObjectsToSyncTo.Add(TaskBlueprintAsset);
-
-			GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
-
-			//SelectedTaskClass = TaskBlueprintAsset->GetClass();
+			SelectedTaskClass = Blueprint->GeneratedClass;
 		}
 	}
 
@@ -674,8 +664,6 @@ FReply STaskListWidget::OnAddTaskItemButtonClicked()
 
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = NewTask;
-
-	TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -720,8 +708,6 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
 
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
-
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
 			SelectedTaskListItems[0]->GetParentSubTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
@@ -755,8 +741,6 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 		const auto Item = MakeShared<FTaskListItem>();
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
-
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -795,8 +779,6 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 
 	const auto Item = MakeShared<FTaskListItem>();
 	Item->Task = CopiedTask;
-
-	TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(CopiedTask->TaskGUID, CopiedTask);
 
 	if(SelectedTaskListItems.Num() > 0)
 	{
@@ -842,8 +824,6 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 		const auto Item = MakeShared<FTaskListItem>();
 		Item->Task = NewTask;
 		Item->ParentListItem = SelectedTaskListItems[0]->ParentListItem;
-
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Add(NewTask->TaskGUID, NewTask);
 
 		if(SelectedTaskListItems[0]->GetParentTask())
 		{
@@ -897,8 +877,6 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 	{
 		for(auto Iter : SelectedTaskListItems)
 		{
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetTaskMap().Remove(Iter->Task->TaskGUID);
-
 			if(Iter->GetParentTask())
 			{
 				Iter->GetParentSubTasks()[Iter->GetTaskIndex()]->OnUnGenerate();

@@ -21,8 +21,6 @@ void STaskDetailsWidget::Construct(const FArguments& InArgs)
 	
 	TaskEditor = InArgs._TaskEditor;
 
-	TaskEditor.Pin()->ListWidget->OnSelectTaskListItemsDelegate.BindRaw(this, &STaskDetailsWidget::OnSelectTaskListItem);
-
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
 	FDetailsViewArgs DetailsViewArgs;
@@ -62,8 +60,6 @@ void STaskDetailsWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	UpdateDetailsView();
 }
 
 void STaskDetailsWidget::OnCreate()
@@ -79,19 +75,15 @@ void STaskDetailsWidget::OnReset()
 void STaskDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-}
 
-void STaskDetailsWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-}
-
-void STaskDetailsWidget::UpdateDetailsView()
-{
-	if(SelectedTaskListItems.Num() > 0)
+	if(TaskEditor.Pin()->ListWidget->bDefaults)
+	{
+		DetailsView->SetObject(TaskEditor.Pin()->GetEditingAsset());
+	}
+	else if(TaskEditor.Pin()->ListWidget->SelectedTaskListItems.Num() > 0)
 	{
 		TArray<UObject*> Tasks = TArray<UObject*>();
-		for(auto Iter : SelectedTaskListItems)
+		for(auto Iter : TaskEditor.Pin()->ListWidget->SelectedTaskListItems)
 		{
 			if(Iter->Task)
 			{
@@ -102,15 +94,13 @@ void STaskDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(TaskEditor.Pin()->GetEditingAsset());
+		DetailsView->SetObject(nullptr);
 	}
 }
 
-void STaskDetailsWidget::OnSelectTaskListItem(TArray<TSharedPtr<FTaskListItem>> TaskListItem)
+void STaskDetailsWidget::OnDestroy()
 {
-	SelectedTaskListItems = TaskListItem;
-
-	UpdateDetailsView();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

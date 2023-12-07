@@ -65,7 +65,7 @@ void FMainEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Comma
 {
 	Commands->MapAction(
 		FModuleEditorCommands::Get().OpenModuleEditorWindow,
-		FExecuteAction::CreateRaw(this, &FMainEditorModule::OnClickedModuleEditorButton),
+		FExecuteAction::CreateRaw(this, &FMainEditorModule::OpenModuleEditor),
 		FCanExecuteAction());
 }
 
@@ -95,17 +95,17 @@ void FMainEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& Prope
 	PropertyEditor.UnregisterCustomClassLayout(FName("MainModule"));
 }
 
+void FMainEditorModule::OpenModuleEditor()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(FName("ModuleEditor"));
+}
+
 TSharedRef<SDockTab> FMainEditorModule::OnSpawnModuleEditorTab(const FSpawnTabArgs& SpawnTabArgs)
 {
 	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
 	[
-		SAssignNew(ModuleEditorWidget, SModuleEditorWidget)
+		SAssignNewEd(ModuleEditorWidget, SModuleEditorWidget, nullptr)
 	];
-}
-
-void FMainEditorModule::OnClickedModuleEditorButton()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(FName("ModuleEditor"));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -4,29 +4,24 @@
 #include "Step/Widget/SStepListItemWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Step/Base/StepBase.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-void SStepListItemWidget::Construct(const FArguments&, const TSharedPtr<const FStepListItem>& InItem)
+void SStepListItemWidget::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView)
 {
-	ChildSlot
-	[
-		SNew(SBorder)
-		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-		.Padding(2.f)
+	Item = InArgs._Item;
+	STableRow::Construct
+	(
+		STableRow::FArguments()
+		.Style(FAppStyle::Get(), "SceneOutliner.TableViewRow")
+		.ShowWires(false)
+		.Content()
 		[
-			SNew(SHorizontalBox)
-
-			+ SHorizontalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Text_Lambda([InItem](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), InItem->Step->StepIndex + 1, *InItem->Step->StepDisplayName.ToString())); })
-			]
-		]
-	];
+			SNew(STextBlock)
+			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), Item->Step->StepIndex + 1, *Item->Step->StepDisplayName.ToString())); })
+		], 
+		InOwnerTableView
+	);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

@@ -2,10 +2,7 @@
 
 #include "Achievement/AchievementEditor.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #define LOCTEXT_NAMESPACE "FAchievementEditor"
 
 IMPLEMENTATION_EDITOR_MODULE(FAchievementEditorModule)

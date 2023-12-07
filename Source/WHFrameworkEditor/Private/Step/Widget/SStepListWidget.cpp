@@ -3,15 +3,13 @@
 
 #include "Step/Widget/SStepListWidget.h"
 
-#include "AssetToolsModule.h"
-#include "IAssetTools.h"
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
-#include "Common/Blueprint/Widget/SCreateBlueprintAssetDialog.h"
+#include "Common/CommonEditorStatics.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepAsset.h"
-#include "Step/Base/StepBlueprint.h"
 #include "Step/Blueprint/StepBlueprintFactory.h"
+#include "Step/Widget/SStepDetailsWidget.h"
 #include "Step/Widget/SStepListItemWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -21,8 +19,8 @@ SStepListWidget::SStepListWidget()
 	WidgetName = FName("StepListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
-	bMultiMode = false;
-	bEditMode = false;
+	bDefaults = false;
+	bEditing = false;
 
 	CopiedStep = nullptr;
 }
@@ -40,12 +38,12 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 			.OnGenerateRow(this, &SStepListWidget::GenerateTreeRow)
 			.OnItemScrolledIntoView(this, &SStepListWidget::TreeItemScrolledIntoView)
 			.ItemHeight(18)
-			.SelectionMode_Lambda([this](){ return bMultiMode ? ESelectionMode::Multi : ESelectionMode::SingleToggle; })
+			.SelectionMode(ESelectionMode::Multi)
 			.OnSelectionChanged(this, &SStepListWidget::TreeSelectionChanged)
 			.OnGetChildren(this, &SStepListWidget::GetChildrenForTree)
 			.OnExpansionChanged(this, &SStepListWidget::OnTreeItemExpansionChanged)
 			.OnSetExpansionRecursive(this, &SStepListWidget::SetTreeItemExpansionRecursive)
-			.ClearSelectionOnClick(false)
+			.ClearSelectionOnClick(true)
 			.HighlightParentNodesForSelection(true);
 	}
 
@@ -165,7 +163,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() <= 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() <= 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnAddStepItemButtonClicked)
 					]
@@ -178,7 +176,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnInsertStepItemButtonClicked)
 					]
@@ -191,7 +189,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditMode && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnAppendStepItemButtonClicked)
 					]
@@ -351,18 +349,23 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 		]
 	];
 
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bMultiMode"), bMultiMode, GStepEditorIni);
-	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditMode"), bEditMode, GStepEditorIni);
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bDefaults"), bDefaults, GStepEditorIni);
+	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditing"), bEditing, GStepEditorIni);
 
 	UpdateTreeView(true);
-
-	SetIsMultiMode(bMultiMode);
-	SetIsEditMode(bEditMode);
 }
 
 void SStepListWidget::OnCreate()
 {
 	SEditorWidgetBase::OnCreate();
+}
+
+void SStepListWidget::OnInitialize()
+{
+	SEditorWidgetBase::OnInitialize();
+
+	SetIsDefaults(bDefaults);
+	SetIsEditing(bEditing);
 }
 
 void SStepListWidget::OnReset()
@@ -376,12 +379,22 @@ void SStepListWidget::OnRefresh()
 
 	UpdateTreeView(true);
 	UpdateSelection();
-	SetIsEditMode(bEditMode);
+	SetIsEditing(bEditing);
 }
 
 void SStepListWidget::OnDestroy()
 {
 	SEditorWidgetBase::OnDestroy();
+}
+
+FReply SStepListWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if(InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		TreeView->ClearSelection();
+		return FReply::Handled();
+	}
+	return SEditorWidgetBase::OnKeyDown(MyGeometry, InKeyEvent);
 }
 
 UStepBase* SStepListWidget::GenerateStep(TSubclassOf<UStepBase> InClass)
@@ -432,7 +445,7 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 {
 	ClassPickButton->SetIsOpen(false);
 
-	if(!bEditMode)
+	if(!bEditing)
 	{
 		SelectedStepClass = InClass;
 	}
@@ -454,17 +467,18 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 					}
 					else
 					{
-						StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().EmplaceAt(OldStep->StepIndex, NewStep);
+						StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[OldStep->StepIndex] = NewStep;
 					}
-					StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Emplace(OldStep->StepGUID, NewStep);
 					OldStep->OnUnGenerate();
-					Refresh();
 				}
 			}
 
 			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
 
-			OnSelectStepListItemsDelegate.Execute(SelectedStepListItems);
+			UpdateTreeView();
+
+			UpdateSelection();
+
 			SelectedStepClass = InClass;
 		}
 	}
@@ -472,18 +486,18 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 FText SStepListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedStepListItems.Num() <= 1 ? (SelectedStepClass ? SelectedStepClass->GetName() : TEXT("None")) : TEXT("Multiple Values"));
+	return FText::FromString(SelectedStepClass ? SelectedStepClass->GetName() : TEXT("None"));
 }
 
-void SStepListWidget::ToggleEditMode()
+void SStepListWidget::ToggleEditing()
 {
-	SetIsEditMode(!bEditMode);
+	SetIsEditing(!bEditing);
 }
 
-void SStepListWidget::SetIsEditMode(bool bIsEditMode)
+void SStepListWidget::SetIsEditing(bool bIsEditing)
 {
-	bEditMode = bIsEditMode;
-	if(bEditMode)
+	bEditing = bIsEditing;
+	if(bEditing)
 	{
 		SelectedStepClass = SelectedStepListItems.Num() > 0 ? SelectedStepListItems[0]->Step->GetClass() : nullptr;
 	}
@@ -491,22 +505,20 @@ void SStepListWidget::SetIsEditMode(bool bIsEditMode)
 	{
 		SelectedStepClass = UStepBase::StaticClass();
 	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditMode"), bEditMode, GStepEditorIni);
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditing"), bEditing, GStepEditorIni);
 }
 
-void SStepListWidget::ToggleMultiMode()
+void SStepListWidget::ToggleDefaults()
 {
-	SetIsMultiMode(!bMultiMode);
+	SetIsDefaults(!bDefaults);
 }
 
-void SStepListWidget::SetIsMultiMode(bool bIsMultiMode)
+void SStepListWidget::SetIsDefaults(bool bIsDefaults)
 {
-	bMultiMode = bIsMultiMode;
-	if(!bMultiMode)
-	{
-		TreeView->ClearSelection();
-	}
-	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bMultiMode"), bMultiMode, GStepEditorIni);
+	bDefaults = bIsDefaults;
+	GConfig->SetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bDefaults"), bDefaults, GStepEditorIni);
+
+	StepEditor.Pin()->DetailsWidget->Refresh();
 }
 
 int32 SStepListWidget::GetTotalStepNum() const
@@ -536,12 +548,12 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 		{
 			SetTreeItemExpansionRecursive(Iter);
 		}
+		TreeView->ClearSelection();
 	}
 	else
 	{
 		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->UpdateStepListItem(StepListItems);
 	}
-	TreeView->ClearSelection();
 	TreeView->RequestTreeRefresh();
 }
 
@@ -549,7 +561,7 @@ void SStepListWidget::UpdateSelection()
 {
 	SelectedStepListItems = TreeView->GetSelectedItems();
 	
-	if(bEditMode)
+	if(bEditing)
 	{
 		SelectedStepClass = SelectedStepListItems.Num() > 0 ? SelectedStepListItems[0]->Step->GetClass() : nullptr;
 	}
@@ -558,16 +570,16 @@ void SStepListWidget::UpdateSelection()
 	{
 		OnSelectStepListItemsDelegate.Execute(SelectedStepListItems);
 	}
+
+	StepEditor.Pin()->DetailsWidget->Refresh();
 }
 
 TSharedRef<ITableRow> SStepListWidget::GenerateTreeRow(TSharedPtr<FStepListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	check(TreeItem.IsValid());
 
-	return SNew(STableRow<TSharedPtr<FStepListItem>>, OwnerTable)
-	[
-		SNew(SStepListItemWidget, TreeItem)
-	];
+	return SNew(SStepListItemWidget, OwnerTable)
+		.Item(TreeItem);
 }
 
 void SStepListWidget::TreeItemScrolledIntoView(TSharedPtr<FStepListItem> TreeItem, const TSharedPtr<ITableRow>& Widget) { }
@@ -629,36 +641,11 @@ FReply SStepListWidget::OnEditStepItemButtonClicked()
 
 FReply SStepListWidget::OnNewStepClassButtonClicked()
 {
-	IAssetTools* AssetTools = &FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
-
-	FString DefaultAssetPath = TEXT("/Game");
-	
-	GConfig->GetString(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("DefaultAssetPath"), DefaultAssetPath, GStepEditorIni);
-
-	UStepBlueprintFactory* StepBlueprintFactory = NewObject<UStepBlueprintFactory>(GetTransientPackage(), UStepBlueprintFactory::StaticClass());
-
-	const TSharedRef<SCreateBlueprintAssetDialog> CreateBlueprintAssetDialog = SNew(SCreateBlueprintAssetDialog)
-	.DefaultAssetPath(FText::FromString(DefaultAssetPath))
-	.BlueprintFactory(StepBlueprintFactory);
-
-	if(CreateBlueprintAssetDialog->ShowModal() != EAppReturnType::Cancel)
+	if(const UBlueprint* Blueprint = UCommonEditorStatics::CreateBlueprintAssetWithDialog(UStepBlueprintFactory::StaticClass()))
 	{
-		DefaultAssetPath = CreateBlueprintAssetDialog->GetAssetPath();
-
-		const FString AssetName = CreateBlueprintAssetDialog->GetAssetName();
-	
-		const FString PackageName = CreateBlueprintAssetDialog->GetPackageName();
-
-		GConfig->SetString(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("DefaultAssetPath"), *DefaultAssetPath, GStepEditorIni);
-	
-		if(UStepBlueprint* StepBlueprintAsset = Cast<UStepBlueprint>(AssetTools->CreateAsset(AssetName, DefaultAssetPath, UStepBlueprint::StaticClass(), StepBlueprintFactory, FName("ContentBrowserNewAsset"))))
+		if(!bEditing)
 		{
-			TArray<UObject*> ObjectsToSyncTo;
-			ObjectsToSyncTo.Add(StepBlueprintAsset);
-
-			GEditor->SyncBrowserToObjects(ObjectsToSyncTo);
-
-			//SelectedStepClass = StepBlueprintAsset->GetClass();
+			SelectedStepClass = Blueprint->GeneratedClass;
 		}
 	}
 
@@ -673,8 +660,6 @@ FReply SStepListWidget::OnAddStepItemButtonClicked()
 
 	const auto Item = MakeShared<FStepListItem>();
 	Item->Step = NewStep;
-
-	StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Add(NewStep->StepGUID, NewStep);
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -719,8 +704,6 @@ FReply SStepListWidget::OnInsertStepItemButtonClicked()
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
 
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Add(NewStep->StepGUID, NewStep);
-
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
 			SelectedStepListItems[0]->GetParentSubSteps().Insert(NewStep, SelectedStepListItems[0]->Step->StepIndex);
@@ -754,8 +737,6 @@ FReply SStepListWidget::OnAppendStepItemButtonClicked()
 		const auto Item = MakeShared<FStepListItem>();
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
-
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Add(NewStep->StepGUID, NewStep);
 
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
@@ -794,8 +775,6 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 
 	const auto Item = MakeShared<FStepListItem>();
 	Item->Step = CopiedStep;
-
-	StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Add(CopiedStep->StepGUID, CopiedStep);
 
 	if(SelectedStepListItems.Num() > 0)
 	{
@@ -841,8 +820,6 @@ FReply SStepListWidget::OnDuplicateStepItemButtonClicked()
 		const auto Item = MakeShared<FStepListItem>();
 		Item->Step = NewStep;
 		Item->ParentListItem = SelectedStepListItems[0]->ParentListItem;
-
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Add(NewStep->StepGUID, NewStep);
 
 		if(SelectedStepListItems[0]->GetParentStep())
 		{
@@ -896,8 +873,6 @@ FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 	{
 		for(auto Iter : SelectedStepListItems)
 		{
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetStepMap().Remove(Iter->Step->StepGUID);
-
 			if(Iter->GetParentStep())
 			{
 				Iter->GetParentSubSteps()[Iter->GetStepIndex()]->OnUnGenerate();

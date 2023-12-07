@@ -64,13 +64,6 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 			SetCurrentAsset(DefaultAsset);
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(bAutoEnterFirst && !CurrentTask)
@@ -131,14 +124,6 @@ void UTaskModule::OnUnPause()
 void UTaskModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UTaskModule::Serialize(FArchive& Ar)
@@ -319,14 +304,6 @@ void UTaskModule::SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirs
 	CurrentAsset->Initialize(InTaskAsset);
 
 	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
-
-	for(auto Iter : GetRootTasks())
-	{
-		if(Iter)
-		{
-			Iter->OnInitialize();
-		}
-	}
 
 	if(bInAutoEnterFirst)
 	{

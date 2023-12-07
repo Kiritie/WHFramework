@@ -57,18 +57,6 @@ void UVideoModule::OnInitialize()
 void UVideoModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-		else
-		{
-			SetGlobalVideoQuality(GlobalVideoQuality, true);
-		}
-	}
 }
 
 void UVideoModule::OnRefresh(float DeltaSeconds)
@@ -89,14 +77,6 @@ void UVideoModule::OnUnPause()
 void UVideoModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -141,6 +121,16 @@ FSaveData* UVideoModule::ToData()
 	SaveData.ShadingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetShadingQuality() : GetGlobalVideoQuality();
 
 	return &SaveData;
+}
+
+void UVideoModule::Load_Implementation()
+{
+	Super::Load_Implementation();
+
+	if(!bModuleAutoSave)
+	{
+		SetGlobalVideoQuality(GlobalVideoQuality, true);
+	}
 }
 
 void UVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)

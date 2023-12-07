@@ -8,7 +8,9 @@
 // Sets default values
 AVoxelCapture::AVoxelCapture()
 {
+#if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
+#endif
 
 	Capture2D = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
 	Capture2D->SetupAttachment(RootComponent);

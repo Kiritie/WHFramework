@@ -21,8 +21,6 @@ public:
 	
 	SLATE_BEGIN_ARGS(SModuleListWidget) {}
 
-		SLATE_ARGUMENT(class AMainModule*, MainModule)
-
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -30,15 +28,24 @@ public:
 public:
 	virtual void OnCreate() override;
 
+	virtual void OnInitialize() override;
+
 	virtual void OnReset() override;
 
 	virtual void OnRefresh() override;
 
 	virtual void OnDestroy() override;
 
+protected:
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	bool bDefaults;
+
+	bool bEditing;
+
 	TSubclassOf<UModuleBase> SelectedModuleClass;
 
 	TArray<TSharedPtr<FModuleListItem>> ModuleListItems;
@@ -46,15 +53,6 @@ public:
 	TArray<TSharedPtr<FModuleListItem>> SelectedModuleListItems;
 
 	FOnSelectModuleListItemsDelegate OnSelectModuleListItemsDelegate;
-
-	bool bMultiMode;
-
-	bool bEditMode;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
-	AMainModule* MainModule;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
@@ -88,13 +86,13 @@ private:
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
 public:
-	void ToggleEditMode();
+	void ToggleEditing();
 
-	void SetIsEditMode(bool bIsEditMode);
+	void SetIsEditing(bool bIsEditing);
 
-	void ToggleMultiMode();
+	void ToggleDefaults();
 
-	void SetIsMultiMode(bool bIsMultiMode);
+	void SetIsDefaults(bool bIsDefaults);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Num
@@ -132,6 +130,8 @@ private:
 	FReply OnInsertModuleItemButtonClicked();
 
 	FReply OnAppendModuleItemButtonClicked();
+
+	FReply OnRefreshModuleItemButtonClicked();
 
 	FReply OnRemoveModuleItemButtonClicked();
 

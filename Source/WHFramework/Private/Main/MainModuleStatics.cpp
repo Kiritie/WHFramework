@@ -85,6 +85,22 @@ void UMainModuleStatics::UnPauseAllModule()
 	}
 }
 
+void UMainModuleStatics::TerminationModuleByClass(TSubclassOf<UModuleBase> InClass)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->TerminationModuleByClass(InClass);
+	}
+}
+
+void UMainModuleStatics::TerminationModuleByName(const FName InName)
+{
+	if(AMainModule* MainModule = GetMainModule())
+	{
+		MainModule->TerminationModuleByName(InName);
+	}
+}
+
 AMainModule* UMainModuleStatics::GetMainModule(bool bInEditor)
 {
 	return AMainModule::GetPtr(bInEditor);

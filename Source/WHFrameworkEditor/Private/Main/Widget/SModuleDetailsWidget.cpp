@@ -15,19 +15,16 @@ SModuleDetailsWidget::SModuleDetailsWidget()
 {
 	WidgetName = FName("ModuleDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
-	MainModule = nullptr;
 }
 
 void SModuleDetailsWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+}
 
-	MainModule = InArgs._MainModule;
-	ListWidget = InArgs._ListWidget;
-
-	if(!MainModule || !ListWidget) return;
-
-	ListWidget->OnSelectModuleListItemsDelegate.BindRaw(this, &SModuleDetailsWidget::OnSelectModuleListItem);
+void SModuleDetailsWidget::OnCreate()
+{
+	SEditorWidgetBase::OnCreate();
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -68,13 +65,6 @@ void SModuleDetailsWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	UpdateDetailsView();
-}
-
-void SModuleDetailsWidget::OnCreate()
-{
-	SEditorWidgetBase::OnCreate();
 }
 
 void SModuleDetailsWidget::OnReset()
@@ -85,19 +75,15 @@ void SModuleDetailsWidget::OnReset()
 void SModuleDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-}
 
-void SModuleDetailsWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-}
-
-void SModuleDetailsWidget::UpdateDetailsView()
-{
-	if(SelectedModuleListItems.Num() > 0)
+	if(GetParentWidgetN<SModuleEditorWidget>()->ListWidget->bDefaults)
+	{
+		DetailsView->SetObject(GetParentWidgetN<SModuleEditorWidget>()->MainModule);
+	}
+	else if(GetParentWidgetN<SModuleEditorWidget>()->ListWidget->SelectedModuleListItems.Num() > 0)
 	{
 		TArray<UObject*> Modules = TArray<UObject*>();
-		for(auto Iter : SelectedModuleListItems)
+		for(auto Iter : GetParentWidgetN<SModuleEditorWidget>()->ListWidget->SelectedModuleListItems)
 		{
 			if(Iter->Module)
 			{
@@ -108,15 +94,13 @@ void SModuleDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(MainModule);
+		DetailsView->SetObject(nullptr);
 	}
 }
 
-void SModuleDetailsWidget::OnSelectModuleListItem(TArray<TSharedPtr<FModuleListItem>> ModuleListItem)
+void SModuleDetailsWidget::OnDestroy()
 {
-	SelectedModuleListItems = ModuleListItem;
-
-	UpdateDetailsView();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

@@ -2,10 +2,7 @@
 
 #include "Common/Asset/AssetEditorBase.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "Procedure/Widget/SProcedureListWidget.h"
 
 #define LOCTEXT_NAMESPACE "FAssetEditorBase"
@@ -25,6 +22,11 @@ FAssetEditorBase::FAssetEditorBase()
 FAssetEditorBase::~FAssetEditorBase()
 {
 	GEditor->UnregisterForUndo(this);
+
+	if(OnBlueprintCompiledHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
+	}
 }
 
 void FAssetEditorBase::PostInitAssetEditor()

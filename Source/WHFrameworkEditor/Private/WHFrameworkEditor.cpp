@@ -112,8 +112,6 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 {
 	ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(FName("Settings"));
 
-	IAssetTools& AssetTools = FModuleManager::GetModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
-
 	FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
 
 	#define SHUTDOWN_MODULE(ModuleName) \
@@ -132,11 +130,16 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FTaskEditorModule);
 	SHUTDOWN_MODULE(FWidgetEditorModule);
 
-	for(auto& AssetTypeAction : CreatedAssetTypeActions)
+	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{
-		if(AssetTypeAction.IsValid())
+		IAssetTools& AssetTools = FModuleManager::GetModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
+
+		for(auto& AssetTypeAction : CreatedAssetTypeActions)
 		{
-			AssetTools.UnregisterAssetTypeActions(AssetTypeAction.ToSharedRef());
+			if(AssetTypeAction.IsValid())
+			{
+				AssetTools.UnregisterAssetTypeActions(AssetTypeAction.ToSharedRef());
+			}
 		}
 	}
 	CreatedAssetTypeActions.Empty();

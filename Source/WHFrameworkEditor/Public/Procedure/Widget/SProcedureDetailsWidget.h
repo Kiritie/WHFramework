@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 
-#include "Procedure/Base/ProcedureBase.h"
 #include "Widget/Base/SEditorWidgetBase.h"
 
 class FProcedureEditor;
@@ -38,17 +37,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
-
 	TWeakPtr<FProcedureEditor> ProcedureEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
 	TSharedPtr<IDetailsView> DetailsView;
-
-private:
-	void UpdateDetailsView();
-
-	void OnSelectProcedureListItem(TArray<TSharedPtr<FProcedureListItem>> ProcedureListItem);
 };

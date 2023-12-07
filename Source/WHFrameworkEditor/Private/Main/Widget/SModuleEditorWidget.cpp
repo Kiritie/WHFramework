@@ -5,12 +5,15 @@
 
 #include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
+#include "SPrimaryButton.h"
 #include "Common/CommonStatics.h"
+#include "Kismet2/SClassPickerDialog.h"
 #include "Main/MainModule.h"
 #include "Main/Widget/SModuleDetailsWidget.h"
 #include "Main/Widget/SModuleListWidget.h"
 #include "Main/Widget/SModuleStatusWidget.h"
 #include "Main/Widget/SModuleToolbarWidget.h"
+#include "Subsystems/EditorActorSubsystem.h"
 
 #define LOCTEXT_NAMESPACE "ModuleEditorWidget"
 
@@ -21,44 +24,43 @@ SModuleEditorWidget::SModuleEditorWidget()
 	WidgetName = FName("ModuleEditorWidget");
 	WidgetType = EEditorWidgetType::Main;
 
-	bPreviewMode = false;
-	bShowListPanel = true;
-	bShowDetailsPanel = true;
-	bShowStatusPanel = true;
+	MainModule = nullptr;
+
+	bPreview = false;
+
+	bNeedRebuild = false;
 }
 
 void SModuleEditorWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+}
 
-	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying());
+void SModuleEditorWidget::OnCreate()
+{
+	SEditorWidgetBase::OnCreate();
+
+	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SModuleEditorWidget::OnBeginPIE);
+
+	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SModuleEditorWidget::OnEndPIE);
+
+	OnMapChangeHandle = FEditorDelegates::MapChange.AddRaw(this, &SModuleEditorWidget::OnMapChanged);
+	
+	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SModuleEditorWidget::OnMapOpened);
+
+	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SModuleEditorWidget::OnBlueprintCompiled);
+	
+	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying() || !bPreview, true);
 
 	if(MainModule)
 	{
-		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ModuleEditorSettings"), TEXT("bShowListPanel"), bShowListPanel, GModuleEditorIni);
-		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ModuleEditorSettings"), TEXT("bShowDetailsPanel"), bShowDetailsPanel, GModuleEditorIni);
-		GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ModuleEditorSettings"), TEXT("bShowStatusPanel"), bShowStatusPanel, GModuleEditorIni);
+		SAssignNewEd(ListWidget, SModuleListWidget, SharedThis(this));
 
-		SAssignNew(ListWidget, SModuleListWidget)
-			.MainModule(MainModule)
-			.Visibility_Lambda([this](){ return bShowListPanel ? EVisibility::Visible : EVisibility::Collapsed; });
-		AddChild(ListWidget);
+		SAssignNewEd(DetailsWidget, SModuleDetailsWidget, SharedThis(this));
 
-		SAssignNew(DetailsWidget, SModuleDetailsWidget)
-			.MainModule(MainModule)
-			.ListWidget(ListWidget)
-			.Visibility_Lambda([this](){ return bShowDetailsPanel ? EVisibility::Visible : EVisibility::Collapsed; });
-		AddChild(DetailsWidget);
+		SAssignNewEd(StatusWidget, SModuleStatusWidget, SharedThis(this));
 
-		SAssignNew(StatusWidget, SModuleStatusWidget)
-			.ListWidget(ListWidget)
-			.Visibility_Lambda([this](){ return bShowStatusPanel ? EVisibility::Visible : EVisibility::Collapsed; });
-		AddChild(StatusWidget);
-
-		SAssignNew(ToolbarWidget, SModuleToolbarWidget)
-			.MainWidget(SharedThis(this))
-			.ListWidget(ListWidget);
-		AddChild(ToolbarWidget);
+		SAssignNewEd(ToolbarWidget, SModuleToolbarWidget, SharedThis(this));
 
 		const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ModuleEditor_Layout")
 		->AddArea
@@ -178,55 +180,66 @@ void SModuleEditorWidget::Construct(const FArguments& InArgs)
 			]
 		];
 		
-		SetIsPreviewMode(UCommonStatics::IsPlaying());
+		SetIsPreview(UCommonStatics::IsPlaying());
+
+		bNeedRebuild = false;
 	}
 	else
 	{
 		ChildSlot
 		[
-			SNew(SVerticalBox)
+			SNew(SOverlay)
 
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
+			+ SOverlay::Slot()
+			.VAlign(VAlign_Center)
 			.HAlign(HAlign_Fill)
 			[
-				SNew(SHorizontalBox)
+				SNew(SVerticalBox)
 
-				+ SHorizontalBox::Slot()
+				+ SVerticalBox::Slot()
 				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Center)
+				.HAlign(HAlign_Fill)
+				.Padding(5.f)
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("No main module found, please close this window!")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Red))
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.HAlign(HAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("No main module found, please close this window or create one!")))
+						.ColorAndOpacity(FSlateColor(FLinearColor::White))
+					]
+				]
+
+				+ SVerticalBox::Slot()
+				.VAlign(VAlign_Center)
+				.HAlign(HAlign_Fill)
+				.Padding(5.f)
+				[
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.HAlign(HAlign_Center)
+					[
+						SNew(SVerticalBox)
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(SPrimaryButton)
+							.Text(FText::FromString(TEXT("Create")))
+							.OnClicked(this, &SModuleEditorWidget::OnCreateMainModuleButtonClicked)
+						]
+					]
 				]
 			]
 		];
+
+		bNeedRebuild = true;
 	}
-}
-
-void SModuleEditorWidget::OnBindCommands()
-{
-	SEditorWidgetBase::OnBindCommands();
-
-	WidgetCommands->MapAction(
-		FModuleEditorCommands::Get().Save,
-		FExecuteAction::CreateSP(this, &SModuleEditorWidget::Save),
-		FCanExecuteAction::CreateSP(this, &SModuleEditorWidget::CanSave)
-	);
-}
-
-void SModuleEditorWidget::OnCreate()
-{
-	SEditorWidgetBase::OnCreate();
-
-	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SModuleEditorWidget::OnBeginPIE);
-
-	OnEndPIEHandle = FEditorDelegates::EndPIE.AddRaw(this, &SModuleEditorWidget::OnEndPIE);
-
-	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SModuleEditorWidget::OnMapOpened);
-
-	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SModuleEditorWidget::OnBlueprintCompiled);
 }
 
 void SModuleEditorWidget::OnSave()
@@ -243,22 +256,21 @@ void SModuleEditorWidget::OnReset()
 
 void SModuleEditorWidget::OnRefresh()
 {
-	MainModule = AMainModule::GetPtr(!bPreviewMode);
+	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying() || !bPreview, true);
 	if(MainModule)
 	{
-		if(ListWidget)
+		if(bNeedRebuild)
 		{
-			ListWidget->MainModule = MainModule;
+			Rebuild();
 		}
-		if(DetailsWidget)
+		else
 		{
-			DetailsWidget->MainModule = MainModule;
+			SEditorWidgetBase::OnRefresh();
 		}
-		SEditorWidgetBase::OnRefresh();
 	}
 	else
 	{
-		Destroy();
+		Rebuild();
 	}
 }
 
@@ -276,6 +288,11 @@ void SModuleEditorWidget::OnDestroy()
 		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
 	}
 
+	if(OnMapChangeHandle.IsValid())
+	{
+		FEditorDelegates::MapChange.Remove(OnMapChangeHandle);
+	}
+
 	if(OnMapOpenedHandle.IsValid())
 	{
 		FEditorDelegates::OnMapOpened.Remove(OnMapOpenedHandle);
@@ -287,11 +304,22 @@ void SModuleEditorWidget::OnDestroy()
 	}
 }
 
+void SModuleEditorWidget::OnBindCommands(const TSharedRef<FUICommandList>& InCommands)
+{
+	SEditorWidgetBase::OnBindCommands(InCommands);
+
+	InCommands->MapAction(
+		FModuleEditorCommands::Get().SaveModuleEditor,
+		FExecuteAction::CreateSP(this, &SModuleEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &SModuleEditorWidget::CanSave)
+	);
+}
+
 void SModuleEditorWidget::OnBeginPIE(bool bIsSimulating)
 {
 	if(!bIsSimulating)
 	{
-		SetIsPreviewMode(true);
+		SetIsPreview(true);
 	}
 }
 
@@ -299,11 +327,16 @@ void SModuleEditorWidget::OnEndPIE(bool bIsSimulating)
 {
 	if(!bIsSimulating)
 	{
-		SetIsPreviewMode(false);
+		SetIsPreview(false);
 	}
 }
 
 void SModuleEditorWidget::OnMapOpened(const FString& Filename, bool bAsTemplate)
+{
+	Refresh();
+}
+
+void SModuleEditorWidget::OnMapChanged(uint32 MapChangeFlags)
 {
 	Refresh();
 }
@@ -341,7 +374,7 @@ TSharedRef<SDockTab> SModuleEditorWidget::SpawnToolbarWidgetTab(const FSpawnTabA
 		.Label(LOCTEXT("ToolbarTab", "Toolbar"))
 		.ShouldAutosize(true)
 		[
-			ToolbarWidget.ToSharedRef()
+			ToolbarWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -352,7 +385,7 @@ TSharedRef<SDockTab> SModuleEditorWidget::SpawnListWidgetTab(const FSpawnTabArgs
 		.Label(LOCTEXT("ListTab", "List"))
 		.ShouldAutosize(false)
 		[
-			ListWidget.ToSharedRef()
+			ListWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -363,7 +396,7 @@ TSharedRef<SDockTab> SModuleEditorWidget::SpawnDetailsWidgetTab(const FSpawnTabA
 		.Label(LOCTEXT("DetailsTab", "Details"))
 		.ShouldAutosize(false)
 		[
-			DetailsWidget.ToSharedRef()
+			DetailsWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
@@ -374,14 +407,14 @@ TSharedRef<SDockTab> SModuleEditorWidget::SpawnStatusWidgetTab(const FSpawnTabAr
 		.Label(LOCTEXT("StatusTab", "Status"))
 		.ShouldAutosize(true)
 		[
-			StatusWidget.ToSharedRef()
+			StatusWidget->TakeWidget()
 		];
 	return SpawnedTab;
 }
 
 void SModuleEditorWidget::HandlePullDownFileMenu(FMenuBuilder& MenuBuilder)
 {
-	MenuBuilder.AddMenuEntry(FModuleEditorCommands::Get().Save);
+	MenuBuilder.AddMenuEntry(FModuleEditorCommands::Get().SaveModuleEditor);
 }
 
 void SModuleEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)
@@ -394,18 +427,52 @@ void SModuleEditorWidget::HandlePullDownWindowMenu(FMenuBuilder& MenuBuilder)
 	TabManager->PopulateLocalTabSpawnerMenu(MenuBuilder);
 }
 
-void SModuleEditorWidget::TogglePreviewMode()
+FReply SModuleEditorWidget::OnCreateMainModuleButtonClicked()
 {
-	SetIsPreviewMode(!bPreviewMode);
+	// Fill in options
+	FClassViewerInitializationOptions Options;
+	Options.Mode = EClassViewerMode::ClassPicker;
+	Options.DisplayMode = EClassViewerDisplayMode::ListView;
+	Options.NameTypeToDisplay = EClassViewerNameTypeToDisplay::DisplayName;
+	
+	const TSharedPtr<FClassViewerFilterBase> Filter = MakeShareable(new FClassViewerFilterBase);
+	Filter->DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
+	Filter->AllowedChildrenOfClasses.Add(AMainModule::StaticClass());
+	
+	Options.ClassFilters.Add(Filter.ToSharedRef());
+
+	Options.bExpandAllNodes = true;
+	Options.bShowDefaultClasses = false;
+
+	UClass* PickedClass = nullptr;
+
+	const bool bPressedOk = SClassPickerDialog::PickClass(LOCTEXT("CreateMainModuleOptions", "Pick Class For MainModule"), Options, PickedClass, UObject::StaticClass());
+	
+	if(bPressedOk && PickedClass)
+	{
+		if(UEditorActorSubsystem* EditorActorSubsystem = GEditor->GetEditorSubsystem<UEditorActorSubsystem>())
+		{
+			EditorActorSubsystem->SpawnActorFromClass(PickedClass, FVector::ZeroVector, FRotator::ZeroRotator);
+
+			Rebuild();
+		}
+	}
+	
+	return FReply::Handled();
 }
 
-void SModuleEditorWidget::SetIsPreviewMode(bool bIsPreviewMode)
+void SModuleEditorWidget::TogglePreview()
 {
-	if(bPreviewMode != bIsPreviewMode)
+	SetIsPreview(!bPreview);
+}
+
+void SModuleEditorWidget::SetIsPreview(bool bIsPreview)
+{
+	if(bPreview != bIsPreview)
 	{
-		bPreviewMode = bIsPreviewMode;
+		bPreview = bIsPreview;
 		Refresh();
-		SetRenderOpacity(bPreviewMode ? 0.8f : 1.f);
+		SetRenderOpacity(bPreview ? 0.8f : 1.f);
 	}
 }
 

@@ -5,6 +5,10 @@
 
 #include "Ability/AbilityModule.h"
 #include "Common/CommonStatics.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Common/EventHandle_ExitGame.h"
+#include "Event/Handle/Common/EventHandle_InitGame.h"
+#include "Event/Handle/Common/EventHandle_StartGame.h"
 #include "Net/UnrealNetwork.h"
 
 IMPLEMENTATION_MAIN_MODULE(AMainModule)
@@ -12,7 +16,9 @@ IMPLEMENTATION_MAIN_MODULE(AMainModule)
 // ParamSets default values
 AMainModule::AMainModule()
 {
+#if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
+#endif
 
 	Modules = TArray<UModuleBase*>();
 	ModuleMap = TMap<FName, UModuleBase*>();
@@ -39,11 +45,13 @@ void AMainModule::OnInitialize_Implementation()
 
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			Modules[i]->OnInitialize();
 		}
 	}
+
+	UEventModuleStatics::BroadcastEvent<UEventHandle_InitGame>(this);
 }
 
 void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -52,7 +60,7 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			if(InPhase != EPhase::Final)
 			{
@@ -64,6 +72,11 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 			}
 		}
 	}
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		UEventModuleStatics::BroadcastEvent<UEventHandle_StartGame>(this);
+	}
 }
 
 void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
@@ -72,7 +85,7 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel() && Modules[i]->GetModuleState() == EModuleState::Running)
+		if(Modules[i] && Modules[i]->GetModuleState() == EModuleState::Running)
 		{
 			Modules[i]->OnRefresh(DeltaSeconds);
 		}
@@ -85,7 +98,7 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			if(InPhase != EPhase::Final)
 			{
@@ -100,6 +113,8 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Final))
 	{
+		UEventModuleStatics::BroadcastEvent<UEventHandle_ExitGame>(this);
+
 		ModuleMap.Empty();
 	}
 }
@@ -138,7 +153,7 @@ void AMainModule::DestroyModules()
 {
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			Modules[i]->OnDestroy();
 		}
@@ -153,7 +168,7 @@ void AMainModule::PauseModules_Implementation()
 {
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			Modules[i]->Pause();
 		}
@@ -164,7 +179,7 @@ void AMainModule::UnPauseModules_Implementation()
 {
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->IsValidLowLevel())
+		if(Modules[i])
 		{
 			Modules[i]->UnPause();
 		}
@@ -206,5 +221,10 @@ void AMainModule::UpdateListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleL
 		Modules[i]->ModuleIndex = i;
 		Modules[i]->UpdateListItem(OutModuleListItems[i]);
 	}
+}
+
+bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass)
+{
+	return !ModuleMap.Contains(InModuleClass->GetDefaultObject<UModuleBase>()->ModuleName);
 }
 #endif

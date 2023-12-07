@@ -88,14 +88,6 @@ void USettingModule::OnInitialize()
 void USettingModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 }
 
 void USettingModule::OnRefresh(float DeltaSeconds)
@@ -116,14 +108,6 @@ void USettingModule::OnUnPause()
 void USettingModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void USettingModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

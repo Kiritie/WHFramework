@@ -36,6 +36,7 @@ UTaskBase::UTaskBase()
 	TaskCompleteType = ETaskCompleteType::Procedure;
 	AutoCompleteTaskTime = 0.f;
 	TaskGuideType = ETaskGuideType::None;
+	TaskGuideIntervalTime = 0.f;
 	
 	bTaskSkipAble = false;
 
@@ -47,8 +48,6 @@ UTaskBase::UTaskBase()
 
 	RootTask = nullptr;
 	ParentTask = nullptr;
-
-	TaskListItemStates = FTaskListItemStates();
 }
 
 #if WITH_EDITOR
@@ -486,6 +485,7 @@ bool UTaskBase::IsAllSubExecuteSucceed() const
 	return true;
 }
 
+#if WITH_EDITOR
 void UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
 {
 	OutTaskListItem->Task = this;
@@ -516,7 +516,7 @@ void UTaskBase::UpdateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
 		}
 	}
 }
-#if WITH_EDITOR
+
 bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)

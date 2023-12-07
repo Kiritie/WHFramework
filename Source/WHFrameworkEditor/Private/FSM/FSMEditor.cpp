@@ -2,10 +2,7 @@
 
 #include "FSM/FSMEditor.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "FSM/Base/FiniteStateBlueprint.h"
 #include "FSM/Blueprint/FiniteStateBlueprintActions.h"
 #include "FSM/Blueprint/FiniteStateGraphSchema.h"

@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Step/StepEditor.h"
 
-#include "Step/Base/StepBase.h"
 #include "Widget/Base/SEditorWidgetBase.h"
 
 class SStepListWidget;
@@ -38,17 +37,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	TArray<TSharedPtr<FStepListItem>> SelectedStepListItems;
-
 	TWeakPtr<FStepEditor> StepEditor;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
 	TSharedPtr<IDetailsView> DetailsView;
-
-private:
-	void UpdateDetailsView();
-
-	void OnSelectStepListItem(TArray<TSharedPtr<FStepListItem>> StepListItem);
 };

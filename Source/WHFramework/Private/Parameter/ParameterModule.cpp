@@ -45,14 +45,6 @@ void UParameterModule::OnInitialize()
 void UParameterModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 }
 
 void UParameterModule::OnRefresh(float DeltaSeconds)
@@ -73,14 +65,6 @@ void UParameterModule::OnUnPause()
 void UParameterModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

@@ -34,7 +34,7 @@ public:
 	 * 当前是否为播放状态
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static bool IsPlaying() { return GIsPlayInEditorWorld; }
+	static bool IsPlaying() { return GIsPlaying; }
 	/*
 	 * 当前是否为模拟状态
 	 */

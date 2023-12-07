@@ -2,10 +2,7 @@
 
 #include "Common/Blueprint/BlueprintEditorBase.h"
 
-#if WITH_EDITOR
 #include "Editor.h"
-#endif
-
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Procedure/Widget/SProcedureListWidget.h"
 

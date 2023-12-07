@@ -86,9 +86,9 @@ protected:
 protected:
 	virtual void OnBlueprintCompiled() override;
 
-	virtual void OnMultiModeToggled();
+	virtual void OnDefaultsToggled();
 
-	virtual void OnEditModeToggled();
+	virtual void OnEditingToggled();
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets

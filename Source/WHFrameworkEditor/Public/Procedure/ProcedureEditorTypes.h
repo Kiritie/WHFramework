@@ -12,15 +12,15 @@ FString GProcedureEditorIni;
 
 //////////////////////////////////////////////////////////////////////////
 // ClassFilter
-class FProcedureClassFilter : public FAssetClassFilterBase
+class FProcedureClassFilter : public FClassViewerFilterBase
 {
 public:
 	FProcedureClassFilter();
 
 	TWeakPtr<FProcedureEditor> ProcedureEditor;
 
-private:
-	virtual bool IsClassAllowed(const UClass* InClass) override;
+public:
+	virtual bool IsClassAllowed(UClass* InClass) override;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -53,8 +53,8 @@ public:
 
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsMultiMode;
+	bool bDefaultIsDefaults;
 
 	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsEditMode;
+	bool bDefaultIsEditing;
 };

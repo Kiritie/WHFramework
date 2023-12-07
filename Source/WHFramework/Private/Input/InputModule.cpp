@@ -117,13 +117,6 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 		}
 		OnBindAction(Component);
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		UpdateInputMode();
@@ -155,14 +148,6 @@ void UInputModule::OnUnPause()
 void UInputModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
@@ -292,7 +277,7 @@ void UInputModule::ApplyKeyMappings()
 	GetPlayerController()->InputComponent->KeyBindings.Empty();
 	for(auto& Iter : KeyMappings)
 	{
-		FInputKeyBinding KB(FInputChord(Iter.Key, false, false, false, false), Iter.Value.Event);
+		FInputKeyBinding KB(FInputChord(Iter.Value.Key, false, false, false, false), Iter.Value.Event);
 		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.DynamicDelegate.GetUObject(), Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.TryGetBoundFunctionName() : Iter.Value.DynamicDelegate.GetFunctionName());
 		GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
 	}

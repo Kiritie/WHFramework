@@ -26,6 +26,7 @@ public class WHFrameworkEditor : ModuleRules
 				"Settings",
 				"KismetCompiler",
 				"ToolMenus",
+				"ToolWidgets",
 				"CoreUObject",
 				"AssetRegistry",
 				"AssetDefinition",

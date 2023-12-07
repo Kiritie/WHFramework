@@ -30,18 +30,23 @@ public:
 public:
 	virtual void OnCreate() override;
 
+	virtual void OnInitialize() override;
+
 	virtual void OnReset() override;
 
 	virtual void OnRefresh() override;
 
 	virtual void OnDestroy() override;
 
+protected:
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
-	bool bMultiMode;
+	bool bDefaults;
 
-	bool bEditMode;
+	bool bEditing;
 
 	TWeakPtr<FProcedureEditor> ProcedureEditor;
 
@@ -85,13 +90,13 @@ private:
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
 public:
-	void ToggleEditMode();
+	void ToggleEditing();
 
-	void SetIsEditMode(bool bIsEditMode);
+	void SetIsEditing(bool bIsEditing);
 
-	void ToggleMultiMode();
+	void ToggleDefaults();
 
-	void SetIsMultiMode(bool bIsMultiMode);
+	void SetIsDefaults(bool bIsDefaults);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Num

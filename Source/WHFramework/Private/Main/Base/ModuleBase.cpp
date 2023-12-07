@@ -17,6 +17,7 @@ UModuleBase::UModuleBase()
 	ModuleIndex = 0;
 	bModuleAutoRun = true;
 	bModuleAutoSave = false;
+	ModuleSavePhase = EPhase::Final;
 	ModuleSaveGame = nullptr;
 	ModuleNetworkComponent = nullptr;
 }
@@ -41,6 +42,11 @@ void UModuleBase::OnInitialize()
 void UModuleBase::OnPreparatory(EPhase InPhase)
 {
 	K2_OnPreparatory(InPhase);
+
+	if(InPhase == ModuleSavePhase)
+	{
+		Load();
+	}
 }
 
 void UModuleBase::OnReset()
@@ -66,6 +72,11 @@ void UModuleBase::OnRefresh(float DeltaSeconds)
 void UModuleBase::OnTermination(EPhase InPhase)
 {
 	K2_OnTermination(InPhase);
+
+	if(InPhase == ModuleSavePhase)
+	{
+		Save();
+	}
 }
 
 void UModuleBase::OnStateChanged(EModuleState InModuleState)
@@ -90,12 +101,18 @@ FSaveData* UModuleBase::ToData()
 
 void UModuleBase::Load_Implementation()
 {
-	USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+	if(bModuleAutoSave)
+	{
+		USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0);
+	}
 }
 
 void UModuleBase::Save_Implementation()
 {
-	USaveGameModuleStatics::SaveSaveGame(ModuleSaveGame, 0, true);
+	if(bModuleAutoSave)
+	{
+		USaveGameModuleStatics::SaveSaveGame(ModuleSaveGame, 0, true);
+	}
 }
 
 void UModuleBase::Run_Implementation()
@@ -143,31 +160,6 @@ void UModuleBase::Termination_Implementation()
 	}
 }
 
-bool UModuleBase::IsAutoRunModule() const
-{
-	return bModuleAutoRun;
-}
-
-FName UModuleBase::GetModuleName() const
-{
-	return ModuleName;
-}
-
-FText UModuleBase::GetModuleDisplayName() const
-{
-	return ModuleDisplayName;
-}
-
-FText UModuleBase::GetModuleDescription() const
-{
-	return ModuleDescription;
-}
-
-EModuleState UModuleBase::GetModuleState() const
-{
-	return ModuleState;
-}
-
 AMainModule* UModuleBase::GetModuleOwner() const
 {
 	return Cast<AMainModule>(GetOuter());
@@ -190,11 +182,7 @@ void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(UModuleBase, ModuleState);
 }
 
-int32 UModuleBase::GetModuleIndex() const
-{
-	return ModuleIndex;
-}
-
+#if WITH_EDITOR
 void UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)
 {
 	OutModuleListItem->Module = this;
@@ -205,7 +193,6 @@ void UModuleBase::UpdateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)
 	OutModuleListItem->Module = this;
 }
 
-#if WITH_EDITOR
 bool UModuleBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)

@@ -8,25 +8,21 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-void SModuleListItemWidget::Construct(const FArguments&, const TSharedPtr<const FModuleListItem>& InItem)
+void SModuleListItemWidget::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView)
 {
-	ChildSlot
-	[
-		SNew(SBorder)
-		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-		.Padding(2.f)
+	Item = InArgs._Item;
+	STableRow::Construct
+	(
+		STableRow::FArguments()
+		.Style(FAppStyle::Get(), "SceneOutliner.TableViewRow")
+		.ShowWires(false)
+		.Content()
 		[
-			SNew(SHorizontalBox)
-
-			+ SHorizontalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Text_Lambda([InItem](){ return FText::FromString(FString::Printf(TEXT("%s"), *InItem->Module->GetModuleDisplayName().ToString())); })
-			]
-		]
-	];
+			SNew(STextBlock)
+			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%s"), *Item->Module->GetModuleDisplayName().ToString())); })
+		], 
+		InOwnerTableView
+	);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

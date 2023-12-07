@@ -211,6 +211,10 @@ void UCameraModule::OnInitialize()
 			CameraMap.Add(Iter->GetCameraName(), Iter);
 		}
 	}
+	
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, FName("OnSetCameraView"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_ResetCameraView>(this, FName("OnResetCameraView"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchCameraPoint>(this, FName("OnSwitchCameraPoint"));
 }
 
 void UCameraModule::OnPreparatory(EPhase InPhase)
@@ -219,10 +223,6 @@ void UCameraModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bModuleAutoSave)
-		{
-			Load();
-		}
 		if(DefaultCamera)
 		{
 			SwitchCamera(DefaultCamera, DefaultInstantSwitch);
@@ -232,10 +232,6 @@ void UCameraModule::OnPreparatory(EPhase InPhase)
 			SwitchCameraPoint(DefaultCameraPoint);
 		}
 	}
-	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, FName("OnSetCameraView"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_ResetCameraView>(this, FName("OnResetCameraView"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchCameraPoint>(this, FName("OnSwitchCameraPoint"));
 }
 
 void UCameraModule::OnRefresh(float DeltaSeconds)
@@ -327,14 +323,6 @@ void UCameraModule::OnUnPause()
 void UCameraModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		if(bModuleAutoSave)
-		{
-			Save();
-		}
-	}
 }
 
 void UCameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

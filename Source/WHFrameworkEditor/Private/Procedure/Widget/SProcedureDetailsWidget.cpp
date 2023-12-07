@@ -22,8 +22,6 @@ void SProcedureDetailsWidget::Construct(const FArguments& InArgs)
 	
 	ProcedureEditor = InArgs._ProcedureEditor;
 
-	ProcedureEditor.Pin()->ListWidget->OnSelectProcedureListItemsDelegate.BindRaw(this, &SProcedureDetailsWidget::OnSelectProcedureListItem);
-
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
 	FDetailsViewArgs DetailsViewArgs;
@@ -63,8 +61,6 @@ void SProcedureDetailsWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	UpdateDetailsView();
 }
 
 void SProcedureDetailsWidget::OnCreate()
@@ -80,19 +76,15 @@ void SProcedureDetailsWidget::OnReset()
 void SProcedureDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-}
 
-void SProcedureDetailsWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-}
-
-void SProcedureDetailsWidget::UpdateDetailsView()
-{
-	if(SelectedProcedureListItems.Num() > 0)
+	if(ProcedureEditor.Pin()->ListWidget->bDefaults)
+	{
+		DetailsView->SetObject(ProcedureEditor.Pin()->GetEditingAsset());
+	}
+	else if(ProcedureEditor.Pin()->ListWidget->SelectedProcedureListItems.Num() > 0)
 	{
 		TArray<UObject*> Procedures = TArray<UObject*>();
-		for(auto Iter : SelectedProcedureListItems)
+		for(auto Iter : ProcedureEditor.Pin()->ListWidget->SelectedProcedureListItems)
 		{
 			if(Iter->Procedure)
 			{
@@ -103,15 +95,13 @@ void SProcedureDetailsWidget::UpdateDetailsView()
 	}
 	else
 	{
-		DetailsView->SetObject(ProcedureEditor.Pin()->GetEditingAsset());
+		DetailsView->SetObject(nullptr);
 	}
 }
 
-void SProcedureDetailsWidget::OnSelectProcedureListItem(TArray<TSharedPtr<FProcedureListItem>> ProcedureListItem)
+void SProcedureDetailsWidget::OnDestroy()
 {
-	SelectedProcedureListItems = ProcedureListItem;
-
-	UpdateDetailsView();
+	SEditorWidgetBase::OnDestroy();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION
