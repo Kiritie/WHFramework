@@ -100,11 +100,11 @@ TSharedRef<FProcedureEditor> FProcedureEditorModule::CreateProcedureEditor(const
 
 void FProcedureEditorModule::OnClickedProcedureEditorButton()
 {
-	if(const UProcedureModule* ProcedureModule = UProcedureModule::GetPtr(true))
+	if(const UProcedureModule* ProcedureModule = UProcedureModule::GetPtr(!UCommonStatics::IsPlaying()))
 	{
-		if(ProcedureModule->GetDefaultAsset())
+		if(UProcedureAsset* ProcedureAsset = !UCommonStatics::IsPlaying() ? ProcedureModule->GetDefaultAsset() : ProcedureModule->GetCurrentAsset())
 		{
-			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ProcedureModule->GetDefaultAsset());
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ProcedureAsset);
 		}
 	}
 }
@@ -135,13 +135,13 @@ void FProcedureEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, SProcedureListWidget, nullptr)
+	SAssignNewEd(ListWidget, SProcedureListWidget)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, SProcedureDetailsWidget, nullptr)
+	SAssignNewEd(DetailsWidget, SProcedureDetailsWidget)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, SProcedureStatusWidget, nullptr)
+	SAssignNewEd(StatusWidget, SProcedureStatusWidget)
 		.ProcedureEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnListWidgetTab))

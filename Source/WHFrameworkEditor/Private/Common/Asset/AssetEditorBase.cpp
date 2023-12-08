@@ -63,9 +63,6 @@ void FAssetEditorBase::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 	WorkspaceMenuCategory = InTabManager->AddLocalWorkspaceMenuCategory(MenuCategory);
 
 	FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
-
-	// const TSharedRef<SDockTab> NomadTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
-	// this->InTabManager = FGlobalTabmanager::Get()->NewTabManager(NomadTab);
 }
 
 void FAssetEditorBase::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)

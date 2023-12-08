@@ -42,6 +42,13 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 public:
+	UFUNCTION(BlueprintCallable)
+	virtual void LogMessage(const FString& InMessage, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DebugMessage(const FString& InMessage, EDebugMode InMode = EDM_Screen, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log, const FLinearColor InDisplayColor = FLinearColor(0,255,255), float InDuration = 1.5f, int InKey = -1, bool bNewerOnTop = true);
+
+public:
 	UFUNCTION(BlueprintPure)
 	FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory) const;
 

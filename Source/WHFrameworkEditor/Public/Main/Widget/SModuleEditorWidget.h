@@ -3,23 +3,23 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Widget/Base/SMainEditorWidgetBase.h"
 
 class AMainModule;
 
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SModuleEditorWidget : public SEditorWidgetBase
+class WHFRAMEWORKEDITOR_API SModuleEditorWidget : public SMainEditorWidgetBase
 {
 public:
 	SModuleEditorWidget();
 	
 	SLATE_BEGIN_ARGS(SModuleEditorWidget) {}
-	
+
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments& InArgs);
+	void Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab);
 
 public:
 	virtual void OnCreate() override;
@@ -36,6 +36,17 @@ protected:
 	virtual void OnBindCommands(const TSharedRef<FUICommandList>& InCommands) override;
 
 protected:
+	virtual void RegisterMenuBar(FMenuBarBuilder& InMenuBarBuilder) override;
+
+	virtual void RegisterTabSpawners() override;
+
+	virtual void UnRegisterTabSpawners() override;
+
+	virtual TSharedRef<FTabManager::FLayout> CreateDefaultLayout() override;
+
+	virtual TSharedRef<SWidget> CreateMainWidget() override;
+
+protected:
 	void OnBeginPIE(bool bIsSimulating);
 
 	void OnEndPIE(bool bIsSimulating);
@@ -45,10 +56,6 @@ protected:
 	void OnMapChanged(uint32 MapChangeFlags);
 
 	void OnBlueprintCompiled();
-	
-	void OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab);
-
-	void HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave);
 
 	TSharedRef<SDockTab> SpawnToolbarWidgetTab(const FSpawnTabArgs& Args);
 	
@@ -69,14 +76,9 @@ protected:
 public:
 	bool bPreview;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Refs
-public:
+	bool bNeedRebuild;
+
 	AMainModule* MainModule;
-	
-	TSharedPtr<FTabManager> TabManager;
-	
-	TMap<FName, TWeakPtr<SDockTab>> SpawnedTabs;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
@@ -95,8 +97,6 @@ private:
 	FDelegateHandle OnMapChangeHandle;
 	FDelegateHandle OnMapOpenedHandle;
 	FDelegateHandle OnBlueprintCompiledHandle;
-
-	bool bNeedRebuild;
 
 public:
 	void TogglePreview();

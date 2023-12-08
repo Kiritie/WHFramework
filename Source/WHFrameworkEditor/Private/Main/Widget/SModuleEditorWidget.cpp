@@ -3,7 +3,6 @@
 
 #include "Main/Widget/SModuleEditorWidget.h"
 
-#include "LevelEditorActions.h"
 #include "SlateOptMacros.h"
 #include "SPrimaryButton.h"
 #include "Common/CommonStatics.h"
@@ -22,7 +21,8 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 SModuleEditorWidget::SModuleEditorWidget()
 {
 	WidgetName = FName("ModuleEditorWidget");
-	WidgetType = EEditorWidgetType::Main;
+
+	DefaultLayoutName = FName("ModuleEditor_Layout");
 
 	MainModule = nullptr;
 
@@ -31,14 +31,14 @@ SModuleEditorWidget::SModuleEditorWidget()
 	bNeedRebuild = false;
 }
 
-void SModuleEditorWidget::Construct(const FArguments& InArgs)
+void SModuleEditorWidget::Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab)
 {
-	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
+	SMainEditorWidgetBase::Construct(SMainEditorWidgetBase::FArguments(), InNomadTab);
 }
 
 void SModuleEditorWidget::OnCreate()
 {
-	SEditorWidgetBase::OnCreate();
+	SMainEditorWidgetBase::OnCreate();
 
 	OnBeginPIEHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &SModuleEditorWidget::OnBeginPIE);
 
@@ -49,147 +49,186 @@ void SModuleEditorWidget::OnCreate()
 	OnMapOpenedHandle = FEditorDelegates::OnMapOpened.AddRaw(this, &SModuleEditorWidget::OnMapOpened);
 
 	OnBlueprintCompiledHandle = GEditor->OnBlueprintCompiled().AddRaw(this, &SModuleEditorWidget::OnBlueprintCompiled);
-	
-	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying() || !bPreview, true);
+}
 
+void SModuleEditorWidget::OnSave()
+{
+	SMainEditorWidgetBase::OnSave();
+}
+
+void SModuleEditorWidget::OnReset()
+{
+	SMainEditorWidgetBase::OnReset();
+}
+
+void SModuleEditorWidget::OnRefresh()
+{
+	MainModule = AMainModule::GetPtr(!bPreview, true);
 	if(MainModule)
 	{
-		SAssignNewEd(ListWidget, SModuleListWidget, SharedThis(this));
-
-		SAssignNewEd(DetailsWidget, SModuleDetailsWidget, SharedThis(this));
-
-		SAssignNewEd(StatusWidget, SModuleStatusWidget, SharedThis(this));
-
-		SAssignNewEd(ToolbarWidget, SModuleToolbarWidget, SharedThis(this));
-
-		const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ModuleEditor_Layout")
-		->AddArea
-		(
-			FTabManager::NewPrimaryArea()
-			->SetOrientation(Orient_Vertical)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(true)
-				->SetSizeCoefficient(0.2f)
-				->AddTab("Toolbar", ETabState::OpenedTab)
-			)
-			->Split
-			(
-				// Main application area
-				FTabManager::NewSplitter()
-				->SetOrientation(Orient_Horizontal)
-				->SetSizeCoefficient(1.f)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetHideTabWell(false)
-					->SetSizeCoefficient(0.5f)
-					->AddTab("List", ETabState::OpenedTab)
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetHideTabWell(false)
-					->SetSizeCoefficient(0.5f)
-					->AddTab("Details", ETabState::OpenedTab)
-				)
-			)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(true)
-				->SetSizeCoefficient(0.1f)
-				->AddTab("Status", ETabState::OpenedTab)
-			)
-		);
-
-		auto RegisterTrackedTabSpawner = [this](const FName& TabId, const FOnSpawnTab& OnSpawnTab) -> FTabSpawnerEntry&
+		if(bNeedRebuild)
 		{
-			return TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateLambda([this, OnSpawnTab](const FSpawnTabArgs& Args) -> TSharedRef<SDockTab>
-			{
-				TSharedRef<SDockTab> SpawnedTab = OnSpawnTab.Execute(Args);
-				OnTabSpawned(Args.GetTabId().TabType, SpawnedTab);
-				return SpawnedTab;
-			}));
-		};
-
-        const TSharedRef<SDockTab> NomadTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
-		TabManager = FGlobalTabmanager::Get()->NewTabManager(NomadTab);
-		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &SModuleEditorWidget::HandleTabManagerPersistLayout));
-
-		RegisterTrackedTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnToolbarWidgetTab))
-			.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))
-			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Toolbar"));
-
-		RegisterTrackedTabSpawner("List", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnListWidgetTab))
-			.SetDisplayName(LOCTEXT("ListTab", "List"))
-			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
-
-		RegisterTrackedTabSpawner("Details", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnDetailsWidgetTab))
-			.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
-			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
-
-		RegisterTrackedTabSpawner("Status", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnStatusWidgetTab))
-			.SetDisplayName(LOCTEXT("StatusTab", "Status"))
-			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
-
-		if (GIsEditor)
-		{
-			//Layout = FLayoutSaveRestore::LoadFromConfig(GEditorLayoutIni, Layout);
+			Rebuild();
 		}
-
-		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
-		MenuBarBuilder.AddPullDownMenu(
-			LOCTEXT("FileMenuLabel", "File"),
-			FText::GetEmpty(),
-			FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownFileMenu),
-			"File"
-		);
-		
-		MenuBarBuilder.AddPullDownMenu(
-			LOCTEXT("WindowMenuLabel", "Window"),
-			FText::GetEmpty(),
-			FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownWindowMenu),
-			"Window"
-		);
-		
-		const TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
-		TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuWidget);
-
-		ChildSlot
-		[
-			SNew(SBorder)
-			.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-			.BorderBackgroundColor(FLinearColor::Gray) // Darken the outer border
-			[
-				SNew(SVerticalBox)
-		
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
-				[
-					MenuWidget
-				]
-				
-				+ SVerticalBox::Slot()
-				.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
-				[
-					TabManager->RestoreFrom(Layout, nullptr).ToSharedRef()
-				]
-			]
-		];
-		
-		SetIsPreview(UCommonStatics::IsPlaying());
-
-		bNeedRebuild = false;
+		else
+		{
+			SMainEditorWidgetBase::OnRefresh();
+		}
 	}
 	else
 	{
-		ChildSlot
-		[
-			SNew(SOverlay)
+		Rebuild();
+	}
+}
 
+void SModuleEditorWidget::OnDestroy()
+{
+	SMainEditorWidgetBase::OnDestroy();
+
+	if(OnBeginPIEHandle.IsValid())
+	{
+		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
+	}
+
+	if(OnEndPIEHandle.IsValid())
+	{
+		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
+	}
+
+	if(OnMapChangeHandle.IsValid())
+	{
+		FEditorDelegates::MapChange.Remove(OnMapChangeHandle);
+	}
+
+	if(OnMapOpenedHandle.IsValid())
+	{
+		FEditorDelegates::OnMapOpened.Remove(OnMapOpenedHandle);
+	}
+
+	if(OnBlueprintCompiledHandle.IsValid())
+	{
+		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
+	}
+}
+
+void SModuleEditorWidget::OnBindCommands(const TSharedRef<FUICommandList>& InCommands)
+{
+	SMainEditorWidgetBase::OnBindCommands(InCommands);
+
+	InCommands->MapAction(
+		FModuleEditorCommands::Get().SaveModuleEditor,
+		FExecuteAction::CreateSP(this, &SModuleEditorWidget::Save),
+		FCanExecuteAction::CreateSP(this, &SModuleEditorWidget::CanSave)
+	);
+}
+
+void SModuleEditorWidget::RegisterMenuBar(FMenuBarBuilder& InMenuBarBuilder)
+{
+	InMenuBarBuilder.AddPullDownMenu(
+		LOCTEXT("FileMenuLabel", "File"),
+		FText::GetEmpty(),
+		FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownFileMenu),
+		"File"
+	);
+		
+	InMenuBarBuilder.AddPullDownMenu(
+		LOCTEXT("WindowMenuLabel", "Window"),
+		FText::GetEmpty(),
+		FNewMenuDelegate::CreateSP(this, &SModuleEditorWidget::HandlePullDownWindowMenu),
+		"Window"
+	);
+}
+
+void SModuleEditorWidget::RegisterTabSpawners()
+{
+	SAssignNewEdN(ListWidget, SModuleListWidget, SharedThis(this));
+
+	SAssignNewEdN(DetailsWidget, SModuleDetailsWidget, SharedThis(this));
+
+	SAssignNewEdN(StatusWidget, SModuleStatusWidget, SharedThis(this));
+
+	SAssignNewEdN(ToolbarWidget, SModuleToolbarWidget, SharedThis(this));
+
+	RegisterTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnToolbarWidgetTab))
+		.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Toolbar"));
+
+	RegisterTabSpawner("List", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnListWidgetTab))
+		.SetDisplayName(LOCTEXT("ListTab", "List"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+
+	RegisterTabSpawner("Details", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnDetailsWidgetTab))
+		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+
+	RegisterTabSpawner("Status", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnStatusWidgetTab))
+		.SetDisplayName(LOCTEXT("StatusTab", "Status"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.StatsViewer"));
+}
+
+void SModuleEditorWidget::UnRegisterTabSpawners()
+{
+	UnRegisterTabSpawner("Toolbar");
+	UnRegisterTabSpawner("List");
+	UnRegisterTabSpawner("Details");
+	UnRegisterTabSpawner("Status");
+}
+
+TSharedRef<FTabManager::FLayout> SModuleEditorWidget::CreateDefaultLayout()
+{
+	return FLayoutSaveRestore::LoadFromConfig(GEditorLayoutIni,
+		SMainEditorWidgetBase::CreateDefaultLayout()
+		   ->AddArea
+		   (
+			   FTabManager::NewPrimaryArea()
+			   ->SetOrientation(Orient_Vertical)
+			   ->Split
+			   (
+				   FTabManager::NewStack()
+				   ->SetHideTabWell(true)
+				   ->SetSizeCoefficient(0.2f)
+				   ->AddTab("Toolbar", ETabState::OpenedTab)
+			   )
+			   ->Split
+			   (
+				   // Main application area
+				   FTabManager::NewSplitter()
+				   ->SetOrientation(Orient_Horizontal)
+				   ->SetSizeCoefficient(1.f)
+				   ->Split
+				   (
+					   FTabManager::NewStack()
+					   ->SetHideTabWell(false)
+					   ->SetSizeCoefficient(0.5f)
+					   ->AddTab("List", ETabState::OpenedTab)
+				   )
+				   ->Split
+				   (
+					   FTabManager::NewStack()
+					   ->SetHideTabWell(false)
+					   ->SetSizeCoefficient(0.5f)
+					   ->AddTab("Details", ETabState::OpenedTab)
+				   )
+			   )
+			   ->Split
+			   (
+				   FTabManager::NewStack()
+				   ->SetHideTabWell(true)
+				   ->SetSizeCoefficient(0.1f)
+				   ->AddTab("Status", ETabState::OpenedTab)
+			   )
+		   ));
+}
+
+TSharedRef<SWidget> SModuleEditorWidget::CreateMainWidget()
+{
+	MainModule = AMainModule::GetPtr(!bPreview, true);
+
+	if(!MainModule)
+	{
+		bNeedRebuild = true;
+		
+		return SNew(SOverlay)
 			+ SOverlay::Slot()
 			.VAlign(VAlign_Center)
 			.HAlign(HAlign_Fill)
@@ -235,84 +274,14 @@ void SModuleEditorWidget::OnCreate()
 						]
 					]
 				]
-			]
-		];
-
-		bNeedRebuild = true;
-	}
-}
-
-void SModuleEditorWidget::OnSave()
-{
-	SEditorWidgetBase::OnSave();
-
-	FLevelEditorActionCallbacks::Save();
-}
-
-void SModuleEditorWidget::OnReset()
-{
-	SEditorWidgetBase::OnReset();
-}
-
-void SModuleEditorWidget::OnRefresh()
-{
-	MainModule = AMainModule::GetPtr(!UCommonStatics::IsPlaying() || !bPreview, true);
-	if(MainModule)
-	{
-		if(bNeedRebuild)
-		{
-			Rebuild();
-		}
-		else
-		{
-			SEditorWidgetBase::OnRefresh();
-		}
-	}
-	else
-	{
-		Rebuild();
-	}
-}
-
-void SModuleEditorWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-
-	if(OnBeginPIEHandle.IsValid())
-	{
-		FEditorDelegates::PostPIEStarted.Remove(OnBeginPIEHandle);
+			];
 	}
 
-	if(OnEndPIEHandle.IsValid())
-	{
-		FEditorDelegates::EndPIE.Remove(OnEndPIEHandle);
-	}
+	bNeedRebuild = false;
+	
+	SetIsPreview(UCommonStatics::IsPlaying());
 
-	if(OnMapChangeHandle.IsValid())
-	{
-		FEditorDelegates::MapChange.Remove(OnMapChangeHandle);
-	}
-
-	if(OnMapOpenedHandle.IsValid())
-	{
-		FEditorDelegates::OnMapOpened.Remove(OnMapOpenedHandle);
-	}
-
-	if(OnBlueprintCompiledHandle.IsValid())
-	{
-		GEditor->OnBlueprintCompiled().Remove(OnBlueprintCompiledHandle);
-	}
-}
-
-void SModuleEditorWidget::OnBindCommands(const TSharedRef<FUICommandList>& InCommands)
-{
-	SEditorWidgetBase::OnBindCommands(InCommands);
-
-	InCommands->MapAction(
-		FModuleEditorCommands::Get().SaveModuleEditor,
-		FExecuteAction::CreateSP(this, &SModuleEditorWidget::Save),
-		FCanExecuteAction::CreateSP(this, &SModuleEditorWidget::CanSave)
-	);
+	return SMainEditorWidgetBase::CreateMainWidget();
 }
 
 void SModuleEditorWidget::OnBeginPIE(bool bIsSimulating)
@@ -344,28 +313,6 @@ void SModuleEditorWidget::OnMapChanged(uint32 MapChangeFlags)
 void SModuleEditorWidget::OnBlueprintCompiled()
 {
 	Refresh();
-}
-
-void SModuleEditorWidget::OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab)
-{
-	TWeakPtr<SDockTab>* const ExistingTab = SpawnedTabs.Find(TabIdentifier);
-	if (!ExistingTab)
-	{
-		SpawnedTabs.Add(TabIdentifier, SpawnedTab);
-	}
-	else
-	{
-		check(!ExistingTab->IsValid());
-		*ExistingTab = SpawnedTab;
-	}
-}
-
-void SModuleEditorWidget::HandleTabManagerPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave)
-{
-	if (FUnrealEdMisc::Get().IsSavingLayoutOnClosedAllowed())
-	{
-		FLayoutSaveRestore::SaveToConfig(GEditorLayoutIni, LayoutToSave);
-	}
 }
 
 TSharedRef<SDockTab> SModuleEditorWidget::SpawnToolbarWidgetTab(const FSpawnTabArgs& Args)

@@ -61,7 +61,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Event")
-	TArray<TSubclassOf<UEventHandleBase>> EventsToHandle;
+	TArray<TSubclassOf<UEventHandleBase>> EventHandleClasses;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Events

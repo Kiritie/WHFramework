@@ -490,7 +490,9 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 FText STaskListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None"));
+	FString ClassName = SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None");
+	ClassName.RemoveFromEnd(TEXT("_C"));
+	return FText::FromString(ClassName);
 }
 
 void STaskListWidget::ToggleEditing()

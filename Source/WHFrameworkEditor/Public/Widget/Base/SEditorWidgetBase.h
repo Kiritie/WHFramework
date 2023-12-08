@@ -91,11 +91,11 @@ private:
 	FDelegateHandle OnWindowClosedHandle;
 
 public:
+	TSharedPtr<SWindow> GetOwnerWindow();
+
 	TSharedRef<SEditorWidgetBase> TakeWidget(bool bInit = true);
 
 	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;
-
-	TSharedPtr<SWindow> GetOwnerWindow();
 
 	FName GetWidgetName() const { return WidgetName; }
 

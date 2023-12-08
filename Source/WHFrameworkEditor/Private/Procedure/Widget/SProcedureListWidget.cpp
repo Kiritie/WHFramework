@@ -407,7 +407,9 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 
 FText SProcedureListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedProcedureClass ? SelectedProcedureClass->GetName() : TEXT("None"));
+	FString ClassName = SelectedProcedureClass ? SelectedProcedureClass->GetName() : TEXT("None");
+	ClassName.RemoveFromEnd(TEXT("_C"));
+	return FText::FromString(ClassName);
 }
 
 void SProcedureListWidget::ToggleEditing()

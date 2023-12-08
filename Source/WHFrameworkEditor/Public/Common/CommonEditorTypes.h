@@ -89,11 +89,16 @@ public:
 	}
 };
 
+#define SNewEd( WidgetType, ... ) \
+MakeTDeclEd<WidgetType>( #WidgetType, nullptr, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
-#define SNewEd( WidgetType, ParentWidget, ... ) \
+#define SNewEdN( WidgetType, ParentWidget, ... ) \
 MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
-#define SAssignNewEd( ExposeAs, WidgetType, ParentWidget, ... ) \
+#define SAssignNewEd( ExposeAs, WidgetType, ... ) \
+MakeTDeclEd<WidgetType>( #WidgetType, nullptr, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+
+#define SAssignNewEdN( ExposeAs, WidgetType, ParentWidget, ... ) \
 MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
 template<typename WidgetType, typename RequiredArgsPayloadType>
@@ -105,6 +110,5 @@ TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InT
 	{
 		InParentWidget->AddChild(SlateDecl._Widget);
 	}
-	SlateDecl._Widget->OnCreate();
 	return SlateDecl;
 }

@@ -11,14 +11,14 @@
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()
 {
-	EventsToHandle = TArray<TSubclassOf<UEventHandleBase>>();
+	EventHandleClasses = TArray<TSubclassOf<UEventHandleBase>>();
 }
 
 void UEventManagerBase::OnInitialize()
 {
 	K2_OnInitialize();
 
-	for(const auto Iter : EventsToHandle)
+	for(const auto Iter : EventHandleClasses)
 	{
 		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, FName("OnHandleEvent"));
 	}

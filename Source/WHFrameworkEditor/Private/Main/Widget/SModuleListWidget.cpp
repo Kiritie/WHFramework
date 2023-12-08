@@ -429,7 +429,9 @@ void SModuleListWidget::OnClassPicked(UClass* InClass)
 
 FText SModuleListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedModuleClass ? SelectedModuleClass->GetName() : TEXT("None"));
+	FString ClassName = SelectedModuleClass ? SelectedModuleClass->GetName() : TEXT("None");
+	ClassName.RemoveFromEnd(TEXT("_C"));
+	return FText::FromString(ClassName);
 }
 
 void SModuleListWidget::ToggleEditing()

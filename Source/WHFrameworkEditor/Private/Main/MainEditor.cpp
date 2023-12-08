@@ -102,10 +102,15 @@ void FMainEditorModule::OpenModuleEditor()
 
 TSharedRef<SDockTab> FMainEditorModule::OnSpawnModuleEditorTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
-	[
-		SAssignNewEd(ModuleEditorWidget, SModuleEditorWidget, nullptr)
-	];
+	const TSharedRef<SDockTab> NomadTab = SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		.Label(NSLOCTEXT("ModuleEditor", "ModuleEditorTabTitle", "Module Editor"));
+
+	SAssignNewEd(ModuleEditorWidget, SModuleEditorWidget, NomadTab);
+
+	NomadTab->SetContent(ModuleEditorWidget->TakeWidget());
+	
+	return NomadTab;
 }
 
 //////////////////////////////////////////////////////////////////////////

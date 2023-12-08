@@ -100,11 +100,11 @@ TSharedRef<FStepEditor> FStepEditorModule::CreateStepEditor(const EToolkitMode::
 
 void FStepEditorModule::OnClickedStepEditorButton()
 {
-	if(const UStepModule* StepModule = UStepModule::GetPtr(true))
+	if(const UStepModule* StepModule = UStepModule::GetPtr(!UCommonStatics::IsPlaying()))
 	{
-		if(StepModule->GetDefaultAsset())
+		if(UStepAsset* StepAsset = !UCommonStatics::IsPlaying() ? StepModule->GetDefaultAsset() : StepModule->GetCurrentAsset())
 		{
-			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(StepModule->GetDefaultAsset());
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(StepAsset);
 		}
 	}
 }
@@ -135,13 +135,13 @@ void FStepEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, SStepListWidget, nullptr)
+	SAssignNewEd(ListWidget, SStepListWidget)
 		.StepEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, SStepDetailsWidget, nullptr)
+	SAssignNewEd(DetailsWidget, SStepDetailsWidget)
 		.StepEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, SStepStatusWidget, nullptr)
+	SAssignNewEd(StatusWidget, SStepStatusWidget)
 		.StepEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnListWidgetTab))

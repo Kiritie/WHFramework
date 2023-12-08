@@ -486,7 +486,9 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 FText SStepListWidget::GetPickedClassName() const
 {
-	return FText::FromString(SelectedStepClass ? SelectedStepClass->GetName() : TEXT("None"));
+	FString ClassName = SelectedStepClass ? SelectedStepClass->GetName() : TEXT("None");
+	ClassName.RemoveFromEnd(TEXT("_C"));
+	return FText::FromString(ClassName);
 }
 
 void SStepListWidget::ToggleEditing()

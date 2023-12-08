@@ -17,6 +17,8 @@ SEditorWidgetBase::SEditorWidgetBase()
 
 void SEditorWidgetBase::Construct(const FArguments& InArgs)
 {
+	OnCreate();
+	
 	/*
 	ChildSlot
 	[
@@ -26,6 +28,11 @@ void SEditorWidgetBase::Construct(const FArguments& InArgs)
 }
 
 void SEditorWidgetBase::OnCreate()
+{
+	
+}
+
+void SEditorWidgetBase::OnInitialize()
 {
 	OnBindCommands(WidgetCommands);
 	
@@ -40,16 +47,20 @@ void SEditorWidgetBase::OnCreate()
 	}
 }
 
-void SEditorWidgetBase::OnInitialize()
-{
-}
-
 void SEditorWidgetBase::OnSave()
 {
+	for(auto Iter : ChildWidgets)
+	{
+		Iter->OnSave();
+	}
 }
 
 void SEditorWidgetBase::OnReset()
 {
+	for(auto Iter : ChildWidgets)
+	{
+		Iter->OnReset();
+	}
 }
 
 void SEditorWidgetBase::OnRefresh()
@@ -183,6 +194,11 @@ void SEditorWidgetBase::RemoveAllChild()
 	ChildWidgetMap.Empty();
 }
 
+TSharedPtr<SWindow> SEditorWidgetBase::GetOwnerWindow()
+{
+	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
+}
+
 TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget(bool bInit)
 {
 	if(bInit)
@@ -199,11 +215,6 @@ TSharedPtr<SEditorWidgetBase> SEditorWidgetBase::GetChild(int32 InIndex) const
 		return ChildWidgets[InIndex];
 	}
 	return nullptr;
-}
-
-TSharedPtr<SWindow> SEditorWidgetBase::GetOwnerWindow()
-{
-	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

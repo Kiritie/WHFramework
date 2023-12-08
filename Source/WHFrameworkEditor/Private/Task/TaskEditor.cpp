@@ -100,11 +100,11 @@ TSharedRef<FTaskEditor> FTaskEditorModule::CreateTaskEditor(const EToolkitMode::
 
 void FTaskEditorModule::OnClickedTaskEditorButton()
 {
-	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(true))
+	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(!UCommonStatics::IsPlaying()))
 	{
-		if(TaskModule->GetDefaultAsset())
+		if(UTaskAsset* TaskAsset = !UCommonStatics::IsPlaying() ? TaskModule->GetDefaultAsset() : TaskModule->GetCurrentAsset())
 		{
-			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(TaskModule->GetDefaultAsset());
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(TaskAsset);
 		}
 	}
 }
@@ -135,13 +135,13 @@ void FTaskEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, STaskListWidget, nullptr)
+	SAssignNewEd(ListWidget, STaskListWidget)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, STaskDetailsWidget, nullptr)
+	SAssignNewEd(DetailsWidget, STaskDetailsWidget)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, STaskStatusWidget, nullptr)
+	SAssignNewEd(StatusWidget, STaskStatusWidget)
 		.TaskEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnListWidgetTab))

@@ -26,8 +26,8 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Event, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_FSM, Log, All);
 // 输入
 DEFINE_LOG_CATEGORY_STATIC(WH_Input, Log, All);
-// 潜行任务
-DEFINE_LOG_CATEGORY_STATIC(WH_LatentAction, Log, All);
+// 动画
+DEFINE_LOG_CATEGORY_STATIC(WH_Animation, Log, All);
 // 媒体
 DEFINE_LOG_CATEGORY_STATIC(WH_Media, Log, All);
 // 网络
@@ -36,6 +36,8 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Network, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_ObjectPool, Log, All);
 // 参数
 DEFINE_LOG_CATEGORY_STATIC(WH_Parameter, Log, All);
+// Pawn
+DEFINE_LOG_CATEGORY_STATIC(WH_Pawn, Log, All);
 // 流程
 DEFINE_LOG_CATEGORY_STATIC(WH_Procedure, Log, All);
 // 引用池
@@ -70,6 +72,18 @@ static bool bExecuted = false; \
 WHLog(Message, Category, Verbosity); \
 return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
 }) && [] () { PLATFORM_BREAK(); return false; } ()))
+
+#define LOG_CASE(Category, Verbosity) \
+case EDC_##Category: \
+{ \
+	switch (Verbosity) \
+	{ \
+		case EDV_Log: UE_LOG(WH_##Category, Log, TEXT("%s"), *InMessage); break; \
+		case EDV_Warning: UE_LOG(WH_##Category, Warning, TEXT("%s"), *InMessage); break; \
+		case EDV_Error: UE_LOG(WH_##Category, Error, TEXT("%s"), *InMessage); break; \
+	} \
+	break; \
+}
 
 #define ensureEditor(InExpression) WH_ENSUREEDITOR_IMPL ( , true, InExpression, TEXT(""))
 
