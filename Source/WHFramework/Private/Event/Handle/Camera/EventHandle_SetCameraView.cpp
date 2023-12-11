@@ -12,7 +12,7 @@ void UEventHandle_SetCameraView::OnDespawn_Implementation(bool bRecovery)
 	CameraViewData = FCameraViewData();
 }
 
-void UEventHandle_SetCameraView::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_SetCameraView::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	CameraViewData.FromParams(InParams);
 }

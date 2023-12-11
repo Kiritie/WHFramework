@@ -12,7 +12,7 @@ void UEventHandle_ChangeInputMode::OnDespawn_Implementation(bool bRecovery)
 {
 }
 
-void UEventHandle_ChangeInputMode::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ChangeInputMode::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

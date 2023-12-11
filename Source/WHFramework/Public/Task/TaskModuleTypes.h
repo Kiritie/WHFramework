@@ -77,21 +77,6 @@ enum class ETaskTaskState : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FTaskListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	bool bExpanded;
-
-	FORCEINLINE FTaskListItemStates()
-	{
-		bExpanded = true;
-	}
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()

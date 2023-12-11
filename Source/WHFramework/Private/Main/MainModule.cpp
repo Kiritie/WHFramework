@@ -203,18 +203,20 @@ void AMainModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 }
 
 #if WITH_EDITOR
-void AMainModule::GenerateListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleListItems)
+void AMainModule::GenerateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleListItems, const FString& InFilterText)
 {
 	OutModuleListItems = TArray<TSharedPtr<FModuleListItem>>();
 	for (int32 i = 0; i < Modules.Num(); i++)
 	{
 		auto Item = MakeShared<FModuleListItem>();
-		Modules[i]->GenerateListItem(Item);
-		OutModuleListItems.Add(Item);
+		if(Modules[i]->GenerateListItem(Item, InFilterText))
+		{
+			OutModuleListItems.Add(Item);
+		}
 	}
 }
 
-void AMainModule::UpdateListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleListItems)
+void AMainModule::UpdateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleListItems)
 {
 	for (int32 i = 0; i < Modules.Num(); i++)
 	{

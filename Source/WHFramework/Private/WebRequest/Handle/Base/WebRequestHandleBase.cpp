@@ -13,7 +13,7 @@ void UWebRequestHandleBase::OnDespawn_Implementation(bool bRecovery)
 	bSucceeded = false;
 }
 
-void UWebRequestHandleBase::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
+void UWebRequestHandleBase::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
 	bSucceeded = InResult.bSucceeded;
 }

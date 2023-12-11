@@ -57,7 +57,7 @@ public:
 	/// Editor
 public:
 #if WITH_EDITOR
-	void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
+	void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems, const FString& InFilterText = TEXT(""));
 
 	void UpdateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
 

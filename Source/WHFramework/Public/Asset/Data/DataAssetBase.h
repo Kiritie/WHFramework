@@ -19,11 +19,11 @@ public:
 	UDataAssetBase();
 
 public:
-	virtual void FillData(const FString& InJsonString);
-
-	virtual void FillData(TSharedPtr<FJsonObject> InJsonObject);
+	UFUNCTION(BlueprintNativeEvent)
+	void Parse(const FString& InParams);
 	
-	virtual FString PackData();
+	UFUNCTION(BlueprintNativeEvent)
+	FString Pack();
 
 protected:
 	UPROPERTY(EditDefaultsOnly)

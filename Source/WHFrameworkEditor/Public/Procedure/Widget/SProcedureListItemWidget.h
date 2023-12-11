@@ -17,6 +17,8 @@ public:
 
 		SLATE_ARGUMENT(TSharedPtr<FProcedureListItem>, Item)
 
+		SLATE_ARGUMENT(TSharedPtr<SProcedureListWidget>, ListWidget)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
@@ -26,4 +28,6 @@ public:
 	/// Refs
 public:
 	TSharedPtr<FProcedureListItem> Item;
+	
+	TSharedPtr<SProcedureListWidget> ListWidget;
 };

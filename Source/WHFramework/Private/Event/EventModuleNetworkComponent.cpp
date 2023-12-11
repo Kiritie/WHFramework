@@ -17,14 +17,14 @@ void UEventModuleNetworkComponent::ClientBroadcastEvent_Implementation(UObject* 
 	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single);
 }
 
-bool UEventModuleNetworkComponent::ServerBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams) { return true; }
-void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams)
+bool UEventModuleNetworkComponent::ServerBroadcastEvent_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery) { return true; }
+void UEventModuleNetworkComponent::ServerBroadcastEvent_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery)
 {
-	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single);
+	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single, bRecovery);
 }
 
-bool UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams) { return true; }
-void UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams)
+bool UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Validate(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery) { return true; }
+void UEventModuleNetworkComponent::ServerBroadcastEventMulticast_Implementation(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery)
 {
-	UEventModule::Get().MultiBroadcastEvent(InClass, InSender, InParams);
+	UEventModule::Get().MultiBroadcastEvent(InClass, InSender, InParams, bRecovery);
 }

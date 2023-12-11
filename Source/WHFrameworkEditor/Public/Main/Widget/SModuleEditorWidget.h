@@ -71,6 +71,11 @@ protected:
 
 	FReply OnCreateMainModuleButtonClicked();
 
+public:
+	void TogglePreview();
+
+	void SetIsPreview(bool bIsPreview);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
@@ -97,9 +102,4 @@ private:
 	FDelegateHandle OnMapChangeHandle;
 	FDelegateHandle OnMapOpenedHandle;
 	FDelegateHandle OnBlueprintCompiledHandle;
-
-public:
-	void TogglePreview();
-
-	void SetIsPreview(bool bIsPreview);
 };

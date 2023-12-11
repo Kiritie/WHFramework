@@ -8,7 +8,7 @@ UEventHandle_DestroyVoxel::UEventHandle_DestroyVoxel()
 	VoxelItem = FVoxelItem();
 }
 
-void UEventHandle_DestroyVoxel::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_DestroyVoxel::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

@@ -13,7 +13,7 @@ bool UEventHandleBase::Filter_Implementation(UObject* InOwner, const FName InFun
 	return true;
 }
 
-void UEventHandleBase::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandleBase::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	
 }

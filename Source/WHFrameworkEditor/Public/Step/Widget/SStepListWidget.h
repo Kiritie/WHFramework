@@ -42,38 +42,6 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Stats
-public:
-	bool bDefaults = false;
-
-	bool bEditing = false;
-
-	TSubclassOf<UStepBase> SelectedStepClass;
-
-	TArray<TSharedPtr<FStepListItem>> StepListItems;
-
-	TArray<TSharedPtr<FStepListItem>> SelectedStepListItems;
-
-	FOnSelectStepListItemsDelegate OnSelectStepListItemsDelegate;
-
-	TWeakPtr<FStepEditor> StepEditor;
-
-	UStepBase* CopiedStep;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Widgets
-public:
-	TSharedPtr<SScrollBar> ScrollBar;
-
-	TSharedPtr<SComboButton> ClassPickButton;
-
-	FClassViewerInitializationOptions ClassViewerOptions;
-
-	TSharedPtr<FStepClassFilter> StepClassFilter;
-
-	TSharedPtr<STreeView<TSharedPtr<FStepListItem>>> TreeView;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Step
 private:
 	UStepBase* GenerateStep(TSubclassOf<UStepBase> InClass);
@@ -88,6 +56,15 @@ private:
 	void OnClassPicked(UClass* InClass);
 
 	FText GetPickedClassName() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Search Box
+private:
+	FText GetFilterText() const;
+
+	void OnFilterTextChanged(const FText& InFilterText);
+
+	void OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
@@ -122,7 +99,9 @@ private:
 
 	void GetChildrenForTree(TSharedPtr<FStepListItem> TreeItem, TArray<TSharedPtr<FStepListItem>>& OutChildren);
 
-	void OnTreeItemExpansionChanged(TSharedPtr<FStepListItem> TreeItem, bool bInExpansionState);
+	void SetTreeItemSelectionRecursive(TSharedPtr<FStepListItem> TreeItem);
+
+	void TreeItemExpansionChanged(TSharedPtr<FStepListItem> TreeItem, bool bInExpansionState);
 
 	void SetTreeItemExpansionRecursive(TSharedPtr<FStepListItem> TreeItem);
 
@@ -158,4 +137,42 @@ private:
 	FReply OnMoveUpStepItemButtonClicked();
 
 	FReply OnMoveDownStepItemButtonClicked();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Stats
+public:
+	bool bDefaults;
+
+	bool bEditing;
+	
+	FText ActiveFilterText;
+
+	TSubclassOf<UStepBase> SelectedStepClass;
+
+	TArray<TSharedPtr<FStepListItem>> StepListItems;
+
+	TArray<TSharedPtr<FStepListItem>> VisibleStepListItems;
+
+	TArray<TSharedPtr<FStepListItem>> SelectedStepListItems;
+
+	FOnSelectStepListItemsDelegate OnSelectStepListItemsDelegate;
+
+	TWeakPtr<FStepEditor> StepEditor;
+
+	UStepBase* CopiedStep;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Widgets
+public:
+	TSharedPtr<SScrollBar> ScrollBar;
+
+	TSharedPtr<SComboButton> ClassPickButton;
+
+	FClassViewerInitializationOptions ClassViewerOptions;
+
+	TSharedPtr<FStepClassFilter> StepClassFilter;
+
+	TSharedPtr<STreeView<TSharedPtr<FStepListItem>>> TreeView;
+
+	TSharedPtr<SSearchBox> SearchBox;
 };

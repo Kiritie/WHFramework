@@ -601,7 +601,7 @@ FStepTaskItem& UStepBase::AddStepTask(const FName InTaskName, float InDurationTi
 }
 
 #if WITH_EDITOR
-void UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem)
+bool UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem, const FString& InFilterText)
 {
 	OutStepListItem->Step = this;
 	for (int32 i = 0; i < SubSteps.Num(); i++)
@@ -610,10 +610,19 @@ void UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem)
 		{
 			auto Item = MakeShared<FStepListItem>();
 			Item->ParentListItem = OutStepListItem;
-			OutStepListItem->SubListItems.Add(Item);
-			SubSteps[i]->GenerateListItem(Item);
+			if(SubSteps[i]->GenerateListItem(Item, InFilterText))
+			{
+				OutStepListItem->SubListItems.Add(Item);
+				return true;
+			}
 		}
 	}
+	if(!InFilterText.IsEmpty())
+	{
+		OutStepListItem->GetStates().bExpanded = true;
+		return StepDisplayName.ToString().Contains(InFilterText);
+	}
+	return true;
 }
 
 void UStepBase::UpdateListItem(TSharedPtr<FStepListItem> OutStepListItem)
@@ -627,7 +636,10 @@ void UStepBase::UpdateListItem(TSharedPtr<FStepListItem> OutStepListItem)
 			SubSteps[i]->StepHierarchy = StepHierarchy + 1;
 			SubSteps[i]->RootStep = IsRootStep() ? this : RootStep;
 			SubSteps[i]->ParentStep = this;
-			SubSteps[i]->UpdateListItem(OutStepListItem->SubListItems[i]);
+			if(OutStepListItem->SubListItems.IsValidIndex(i))
+			{
+				SubSteps[i]->UpdateListItem(OutStepListItem->SubListItems[i]);
+			}
 		}
 	}
 }

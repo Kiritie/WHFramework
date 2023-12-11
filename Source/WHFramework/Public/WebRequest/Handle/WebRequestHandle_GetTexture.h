@@ -21,7 +21,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams) override;
+	virtual void Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)

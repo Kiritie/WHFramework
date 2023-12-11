@@ -13,6 +13,7 @@
 #include "Main/Blueprint/ModuleBlueprintFactory.h"
 #include "Main/Widget/SModuleDetailsWidget.h"
 #include "Main/Widget/SModuleEditorWidget.h"
+#include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -37,7 +38,7 @@ void SModuleListWidget::OnCreate()
 	if(!ListView.IsValid())
 	{
 		SAssignNew(ListView, SListView< TSharedPtr<FModuleListItem> >)
-			.ListItemsSource(&ModuleListItems)
+			.ListItemsSource(&VisibleModuleListItems)
 			.OnGenerateRow(this, &SModuleListWidget::GenerateListRow)
 			.OnItemScrolledIntoView(this, &SModuleListWidget::ListItemScrolledIntoView)
 			.ItemHeight(18)
@@ -162,7 +163,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedModuleClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedModuleClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnAddModuleItemButtonClicked)
 					]
@@ -175,7 +176,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add All")))
-						.IsEnabled_Lambda([this](){ return !bEditing && GetUnAddedModuleClasses().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && GetUnAddedModuleClasses().Num() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnAddAllModuleItemButtonClicked)
 					]
@@ -188,7 +189,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedModuleListItems.Num() == 1 && SelectedModuleClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedModuleListItems.Num() == 1 && SelectedModuleClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnInsertModuleItemButtonClicked)
 					]
@@ -201,7 +202,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedModuleListItems.Num() == 1 && SelectedModuleClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedModuleListItems.Num() == 1 && SelectedModuleClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnAppendModuleItemButtonClicked)
 					]
@@ -217,6 +218,20 @@ void SModuleListWidget::OnCreate()
 						.IsEnabled_Lambda([this](){ return ModuleListItems.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnRefreshModuleItemButtonClicked)
+					]
+				]
+				
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.Padding(1.f, 4.f)
+					[
+						SAssignNew(SearchBox, SSearchBox)
+						.InitialText(this, &SModuleListWidget::GetFilterText)
+						.OnTextChanged(this, &SModuleListWidget::OnFilterTextChanged)
+						.OnTextCommitted(this, &SModuleListWidget::OnFilterTextCommitted)
 					]
 				]
 
@@ -271,7 +286,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Remove")))
-						.IsEnabled_Lambda([this](){ return SelectedModuleListItems.Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedModuleListItems.Num() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnRemoveModuleItemButtonClicked)
 					]
@@ -284,7 +299,7 @@ void SModuleListWidget::OnCreate()
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Up")))
-						.IsEnabled_Lambda([this](){ return SelectedModuleListItems.Num() == 1 && SelectedModuleListItems[0]->GetModuleIndex() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedModuleListItems.Num() == 1 && SelectedModuleListItems[0]->GetModuleIndex() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnMoveUpModuleItemButtonClicked)
 					]
@@ -298,8 +313,8 @@ void SModuleListWidget::OnCreate()
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
-							return SelectedModuleListItems.Num() == 1 &&
-								SelectedModuleListItems[0]->GetModuleIndex() < GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Num() - 1;
+							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedModuleListItems.Num() == 1 &&
+								SelectedModuleListItems[0]->GetModuleIndex() < GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Num() - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SModuleListWidget::OnMoveDownModuleItemButtonClicked)
@@ -311,8 +326,6 @@ void SModuleListWidget::OnCreate()
 
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ModuleEditorSettings"), TEXT("bDefaults"), bDefaults, GModuleEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ModuleEditorSettings"), TEXT("bEditing"), bEditing, GModuleEditorIni);
-
-	UpdateListView(true);
 }
 
 void SModuleListWidget::OnInitialize()
@@ -321,6 +334,8 @@ void SModuleListWidget::OnInitialize()
 
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
+
+	UpdateListView(true);
 }
 
 void SModuleListWidget::OnReset()
@@ -434,6 +449,27 @@ FText SModuleListWidget::GetPickedClassName() const
 	return FText::FromString(ClassName);
 }
 
+FText SModuleListWidget::GetFilterText() const
+{
+	return ActiveFilterText;
+}
+
+void SModuleListWidget::OnFilterTextChanged(const FText& InFilterText)
+{
+	ActiveFilterText = InFilterText;
+
+	UpdateListView(true);
+}
+
+void SModuleListWidget::OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo)
+{
+	if (CommitInfo == ETextCommit::OnCleared)
+	{
+		SearchBox->SetText(FText::GetEmpty());
+		OnFilterTextChanged(FText::GetEmpty());
+	}
+}
+
 void SModuleListWidget::ToggleEditing()
 {
 	SetIsEditing(!bEditing);
@@ -482,15 +518,25 @@ void SModuleListWidget::UpdateListView(bool bRegenerate)
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return;
 
-	if(bRegenerate)
+	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GenerateListItem(ModuleListItems);
-
-		ListView->ClearSelection();
+		if(bRegenerate)
+		{
+			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GenerateModuleListItem(ModuleListItems);
+		}
+		else
+		{
+			GetParentWidgetN<SModuleEditorWidget>()->MainModule->UpdateModuleListItem(ModuleListItems);
+		}
+		VisibleModuleListItems = ModuleListItems;
 	}
 	else
 	{
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->UpdateListItem(ModuleListItems);
+		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GenerateModuleListItem(VisibleModuleListItems, ActiveFilterText.ToString());
+	}
+	for(auto Iter : VisibleModuleListItems)
+	{
+		SetListItemSelectionRecursive(Iter);
 	}
 
 	ListView->RequestListRefresh();
@@ -523,17 +569,34 @@ TSharedRef<ITableRow> SModuleListWidget::GenerateListRow(TSharedPtr<FModuleListI
 	check(ListItem.IsValid());
 
 	return SNew(SModuleListItemWidget, OwnerTable)
-		.Item(ListItem);
+		.Item(ListItem)
+		.ListWidget(SharedThis(this));
 }
 
-void SModuleListWidget::ListItemScrolledIntoView(TSharedPtr<FModuleListItem> ListItem, const TSharedPtr<ITableRow>& Widget)
-{
-	
-}
+void SModuleListWidget::ListItemScrolledIntoView(TSharedPtr<FModuleListItem> ListItem, const TSharedPtr<ITableRow>& Widget) { }
 
 void SModuleListWidget::ListSelectionChanged(TSharedPtr<FModuleListItem> ListItem, ESelectInfo::Type SelectInfo)
 {
+	if(SelectInfo != ESelectInfo::Direct)
+	{
+		if(!ActiveFilterText.IsEmptyOrWhitespace())
+		{
+			for(auto Iter : ModuleListItems)
+			{
+				Iter->GetStates().bSelected = false;
+			}
+		}
+		for(auto Iter : VisibleModuleListItems)
+		{
+			Iter->GetStates().bSelected = ListView->IsItemSelected(Iter);
+		}
+	}
 	UpdateSelection();
+}
+
+void SModuleListWidget::SetListItemSelectionRecursive(TSharedPtr<FModuleListItem> ListItem)
+{
+	ListView->SetItemSelection(ListItem, ListItem->GetStates().bSelected);
 }
 
 TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const

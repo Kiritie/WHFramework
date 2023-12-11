@@ -110,15 +110,3 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 		return InstanceEditor; \
 	} \
 }
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FModuleListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FModuleListItemStates()
-	{
-		
-	}
-};

@@ -21,15 +21,4 @@ enum class EProcedureGuideType : uint8
 	TimerLoop
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FProcedureListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FProcedureListItemStates()
-	{
-	}
-};
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnProcedureStateChanged, EProcedureState, InProcedureState);

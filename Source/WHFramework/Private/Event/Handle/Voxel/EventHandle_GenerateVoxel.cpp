@@ -8,7 +8,7 @@ UEventHandle_GenerateVoxel::UEventHandle_GenerateVoxel()
 	VoxelItem = FVoxelItem();
 }
 
-void UEventHandle_GenerateVoxel::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_GenerateVoxel::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

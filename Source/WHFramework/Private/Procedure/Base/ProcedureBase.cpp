@@ -207,9 +207,14 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 }
 
 #if WITH_EDITOR
-void UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
+bool UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem, const FString& InFilterText)
 {
 	OutProcedureListItem->Procedure = this;
+	if(!InFilterText.IsEmpty())
+	{
+		return ProcedureDisplayName.ToString().Contains(InFilterText);
+	}
+	return true;
 }
 
 void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)

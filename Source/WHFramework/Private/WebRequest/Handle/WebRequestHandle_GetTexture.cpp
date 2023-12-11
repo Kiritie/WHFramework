@@ -19,7 +19,7 @@ void UWebRequestHandle_GetTexture::OnDespawn_Implementation(bool bRecovery)
 	Texture = nullptr;
 }
 
-void UWebRequestHandle_GetTexture::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
+void UWebRequestHandle_GetTexture::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
     if ( InResult.bSucceeded && InResult.HttpResponse->GetContentLength() > 0 )
     {

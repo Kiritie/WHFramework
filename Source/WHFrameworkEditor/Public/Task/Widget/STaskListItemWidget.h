@@ -17,6 +17,8 @@ public:
 
 		SLATE_ARGUMENT(TSharedPtr<FTaskListItem>, Item)
 
+		SLATE_ARGUMENT(TSharedPtr<STaskListWidget>, ListWidget)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
@@ -26,4 +28,6 @@ public:
 	/// Refs
 public:
 	TSharedPtr<FTaskListItem> Item;
+	
+	TSharedPtr<STaskListWidget> ListWidget;
 };

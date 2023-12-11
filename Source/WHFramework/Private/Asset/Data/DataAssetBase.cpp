@@ -10,19 +10,12 @@ UDataAssetBase::UDataAssetBase()
 	
 }
 
-void UDataAssetBase::FillData(const FString& InJsonString)
-{
-	TSharedPtr<FJsonObject> JsonObject;
-	UCommonStatics::ParseJsonObjectFromString(InJsonString, JsonObject);
-	FillData(InJsonString);
-}
-
-void UDataAssetBase::FillData(TSharedPtr<FJsonObject> InJsonObject)
+void UDataAssetBase::Parse_Implementation(const FString& InParams)
 {
 	
 }
 
-FString UDataAssetBase::PackData()
+FString UDataAssetBase::Pack_Implementation()
 {
 	return TEXT("");
 }

@@ -486,7 +486,7 @@ bool UTaskBase::IsAllSubExecuteSucceed() const
 }
 
 #if WITH_EDITOR
-void UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
+bool UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem, const FString& InFilterText)
 {
 	OutTaskListItem->Task = this;
 	for (int32 i = 0; i < SubTasks.Num(); i++)
@@ -495,10 +495,19 @@ void UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
 		{
 			auto Item = MakeShared<FTaskListItem>();
 			Item->ParentListItem = OutTaskListItem;
-			OutTaskListItem->SubListItems.Add(Item);
-			SubTasks[i]->GenerateListItem(Item);
+			if(SubTasks[i]->GenerateListItem(Item, InFilterText))
+			{
+				OutTaskListItem->SubListItems.Add(Item);
+				return true;
+			}
 		}
 	}
+	if(!InFilterText.IsEmpty())
+	{
+		OutTaskListItem->GetStates().bExpanded = true;
+		return TaskDisplayName.ToString().Contains(InFilterText);
+	}
+	return true;
 }
 
 void UTaskBase::UpdateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)

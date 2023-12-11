@@ -15,7 +15,7 @@ void UEventHandle_EnterProcedure::OnDespawn_Implementation(bool bRecovery)
 	Procedure = nullptr;
 }
 
-void UEventHandle_EnterProcedure::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_EnterProcedure::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

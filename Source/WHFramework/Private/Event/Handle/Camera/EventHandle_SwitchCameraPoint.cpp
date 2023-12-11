@@ -13,7 +13,7 @@ void UEventHandle_SwitchCameraPoint::OnDespawn_Implementation(bool bRecovery)
 	CameraPoint = nullptr;
 }
 
-void UEventHandle_SwitchCameraPoint::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_SwitchCameraPoint::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

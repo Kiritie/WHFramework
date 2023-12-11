@@ -43,7 +43,7 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray
 	}
 	if(WebRequestHandle)
 	{
-		WebRequestHandle->Fill(InResult, InParams);
+		WebRequestHandle->Parse(InResult, InParams);
 		OnRequestComplete(WebRequestHandle);
 		OnWebRequestComplete.Broadcast(WebRequestHandle);
 		HandleMap.Emplace(InResult.Content, WebRequestHandle);

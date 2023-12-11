@@ -32,7 +32,7 @@ public:
 	bool Filter(UObject* InOwner, const FName InFuncName) const;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void Fill(const TArray<FParameter>& InParams);
+	void Parse(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintNativeEvent)
 	TArray<FParameter> Pack() const;    

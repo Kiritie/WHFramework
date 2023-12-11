@@ -42,36 +42,6 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Stats
-public:
-	bool bDefaults;
-
-	bool bEditing;
-
-	TWeakPtr<FProcedureEditor> ProcedureEditor;
-
-	TSubclassOf<UProcedureBase> SelectedProcedureClass;
-
-	TArray<TSharedPtr<FProcedureListItem>> ProcedureListItems;
-
-	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
-
-	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Widgets
-public:
-	TSharedPtr<SScrollBar> ScrollBar;
-
-	TSharedPtr<SComboButton> ClassPickButton;
-
-	FClassViewerInitializationOptions ClassViewerOptions;
-
-	TSharedPtr<FProcedureClassFilter> ProcedureClassFilter;
-
-	TSharedPtr<SListView<TSharedPtr<FProcedureListItem>>> ListView;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Procedure
 private:
 	UProcedureBase* GenerateProcedure(TSubclassOf<UProcedureBase> InClass);
@@ -86,6 +56,15 @@ private:
 	void OnClassPicked(UClass* InClass);
 
 	FText GetPickedClassName() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Search Box
+private:
+	FText GetFilterText() const;
+
+	void OnFilterTextChanged(const FText& InFilterText);
+
+	void OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
@@ -118,6 +97,8 @@ private:
 
 	void ListSelectionChanged(TSharedPtr<FProcedureListItem> ListItem, ESelectInfo::Type SelectInfo);
 
+	void SetListItemSelectionRecursive(TSharedPtr<FProcedureListItem> ListItem);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Buttons
 private:
@@ -138,4 +119,40 @@ private:
 	FReply OnMoveUpProcedureItemButtonClicked();
 
 	FReply OnMoveDownProcedureItemButtonClicked();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Stats
+public:
+	bool bDefaults;
+
+	bool bEditing;
+	
+	FText ActiveFilterText;
+
+	TWeakPtr<FProcedureEditor> ProcedureEditor;
+
+	TSubclassOf<UProcedureBase> SelectedProcedureClass;
+
+	TArray<TSharedPtr<FProcedureListItem>> ProcedureListItems;
+
+	TArray<TSharedPtr<FProcedureListItem>> VisibleProcedureListItems;
+
+	TArray<TSharedPtr<FProcedureListItem>> SelectedProcedureListItems;
+
+	FOnSelectProcedureListItemsDelegate OnSelectProcedureListItemsDelegate;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Widgets
+public:
+	TSharedPtr<SScrollBar> ScrollBar;
+
+	TSharedPtr<SComboButton> ClassPickButton;
+
+	FClassViewerInitializationOptions ClassViewerOptions;
+
+	TSharedPtr<FProcedureClassFilter> ProcedureClassFilter;
+
+	TSharedPtr<SListView<TSharedPtr<FProcedureListItem>>> ListView;
+
+	TSharedPtr<SSearchBox> SearchBox;
 };

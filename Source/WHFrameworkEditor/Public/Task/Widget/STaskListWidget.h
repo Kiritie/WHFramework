@@ -42,38 +42,6 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Stats
-public:
-	bool bDefaults = false;
-
-	bool bEditing = false;
-	
-	TWeakPtr<FTaskEditor> TaskEditor;
-
-	TSubclassOf<UTaskBase> SelectedTaskClass;
-
-	TArray<TSharedPtr<FTaskListItem>> TaskListItems;
-
-	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
-
-	FOnSelectTaskListItemsDelegate OnSelectTaskListItemsDelegate;
-
-	UTaskBase* CopiedTask;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Widgets
-public:
-	TSharedPtr<SScrollBar> ScrollBar;
-
-	TSharedPtr<SComboButton> ClassPickButton;
-
-	FClassViewerInitializationOptions ClassViewerOptions;
-
-	TSharedPtr<FTaskClassFilter> TaskClassFilter;
-
-	TSharedPtr<STreeView<TSharedPtr<FTaskListItem>>> TreeView;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Task
 private:
 	UTaskBase* GenerateTask(TSubclassOf<UTaskBase> InClass);
@@ -88,6 +56,15 @@ private:
 	void OnClassPicked(UClass* InClass);
 
 	FText GetPickedClassName() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Search Box
+private:
+	FText GetFilterText() const;
+
+	void OnFilterTextChanged(const FText& InFilterText);
+
+	void OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
@@ -122,7 +99,9 @@ private:
 
 	void GetChildrenForTree(TSharedPtr<FTaskListItem> TreeItem, TArray<TSharedPtr<FTaskListItem>>& OutChildren);
 
-	void OnTreeItemExpansionChanged(TSharedPtr<FTaskListItem> TreeItem, bool bInExpansionState);
+	void SetTreeItemSelectionRecursive(TSharedPtr<FTaskListItem> TreeItem);
+
+	void TreeItemExpansionChanged(TSharedPtr<FTaskListItem> TreeItem, bool bInExpansionState);
 
 	void SetTreeItemExpansionRecursive(TSharedPtr<FTaskListItem> TreeItem);
 
@@ -158,4 +137,42 @@ private:
 	FReply OnMoveUpTaskItemButtonClicked();
 
 	FReply OnMoveDownTaskItemButtonClicked();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Stats
+public:
+	bool bDefaults;
+
+	bool bEditing;
+		
+	FText ActiveFilterText;
+
+	TWeakPtr<FTaskEditor> TaskEditor;
+
+	TSubclassOf<UTaskBase> SelectedTaskClass;
+
+	TArray<TSharedPtr<FTaskListItem>> TaskListItems;
+
+	TArray<TSharedPtr<FTaskListItem>> VisibleTaskListItems;
+
+	TArray<TSharedPtr<FTaskListItem>> SelectedTaskListItems;
+
+	FOnSelectTaskListItemsDelegate OnSelectTaskListItemsDelegate;
+
+	UTaskBase* CopiedTask;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Widgets
+public:
+	TSharedPtr<SScrollBar> ScrollBar;
+
+	TSharedPtr<SComboButton> ClassPickButton;
+
+	FClassViewerInitializationOptions ClassViewerOptions;
+
+	TSharedPtr<FTaskClassFilter> TaskClassFilter;
+
+	TSharedPtr<STreeView<TSharedPtr<FTaskListItem>>> TreeView;
+
+	TSharedPtr<SSearchBox> SearchBox;
 };

@@ -47,7 +47,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Event
 protected:
-	TMap<TSubclassOf<UEventHandleBase>, FEventHandleInfo> EventHandleInfos;
+	UPROPERTY(VisibleAnywhere)
+	TMap<TSubclassOf<UEventHandleBase>, FEventMapping> EventMappings;
 
 public:
 	template<class T>
@@ -94,34 +95,34 @@ public:
 	void UnsubscribeAllEvent();
 
 	template<class T>
-	void BroadcastEvent(UObject* InSender, const TArray<FParameter>* InParams = nullptr, EEventNetType InNetType = EEventNetType::Single)
+	void BroadcastEvent(UObject* InSender, const TArray<FParameter>* InParams = nullptr, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
 	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams ? *InParams : TArray<FParameter>(), InNetType);
+		BroadcastEvent(T::StaticClass(), InSender, InParams ? *InParams : TArray<FParameter>(), InNetType, bRecovery);
 	}
 
 	template<class T>
-	void BroadcastEvent(UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single)
+	void BroadcastEvent(UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
 	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams, InNetType);
+		BroadcastEvent(T::StaticClass(), InSender, InParams, InNetType, bRecovery);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single);
+	void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
 
 	UFUNCTION(BlueprintCallable)
-	void BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType = EEventNetType::Single);
+	void BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams);
+	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery = true);
 
 protected:
 	UFUNCTION()
-	void ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams);
+	void ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Event Manager
 protected:
-	UPROPERTY(EditAnywhere, Category = "EventManager")
+	UPROPERTY(EditAnywhere)
 	TArray<TSubclassOf<UEventManagerBase>> EventManagers;
 
 	UPROPERTY(Transient)

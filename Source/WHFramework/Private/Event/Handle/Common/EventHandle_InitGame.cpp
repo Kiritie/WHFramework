@@ -12,6 +12,6 @@ void UEventHandle_InitGame::OnDespawn_Implementation(bool bRecovery)
 {
 }
 
-void UEventHandle_InitGame::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_InitGame::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 }

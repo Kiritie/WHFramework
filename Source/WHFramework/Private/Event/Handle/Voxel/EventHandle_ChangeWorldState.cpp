@@ -8,7 +8,7 @@ UEventHandle_ChangeWorldState::UEventHandle_ChangeWorldState()
 	WorldState = EVoxelWorldState::None;
 }
 
-void UEventHandle_ChangeWorldState::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ChangeWorldState::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

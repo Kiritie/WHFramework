@@ -18,7 +18,7 @@ void UWebRequestHandle_DownloadFile::OnDespawn_Implementation(bool bRecovery)
 	FilePath = TEXT("");
 }
 
-void UWebRequestHandle_DownloadFile::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
+void UWebRequestHandle_DownloadFile::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
 	if (InParams.IsValidIndex(0))
 	{

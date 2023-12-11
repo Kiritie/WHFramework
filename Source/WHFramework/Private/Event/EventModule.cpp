@@ -104,29 +104,26 @@ void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 {
 	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
-	if(!EventHandleInfos.Contains(InClass))
-	{
-		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
-	}
+	FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
 
-	if(!EventHandleInfos[InClass].EventHandleDelegate.IsBoundToObject(this))
+	if(!Mapping.Delegate.IsBoundToObject(this))
 	{
-		EventHandleInfos[InClass].EventHandleDelegate.BindUFunction(this, FName("ExecuteEvent"));
+		Mapping.Delegate.BindUFunction(this, FName("ExecuteEvent"));
 	}
 
 	switch (InClass->GetDefaultObject<UEventHandleBase>()->EventType)
 	{
 		case EEventType::Single:
 		{
-			EventHandleInfos[InClass].EventHandleFuncMap.Empty();
+			Mapping.FuncMap.Empty();
 		}
 		case EEventType::Multicast:
 		{
-			if(!EventHandleInfos[InClass].EventHandleFuncMap.Contains(InOwner))
+			if(!Mapping.FuncMap.Contains(InOwner))
 			{
-				EventHandleInfos[InClass].EventHandleFuncMap.Add(InOwner, FEventHandleFuncs());
+				Mapping.FuncMap.Add(InOwner, FEventFuncs());
 			}
-			EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Add(InFuncName);
+			Mapping.FuncMap[InOwner].FuncNames.Add(InFuncName);
 			break;
 		}
 	}
@@ -146,26 +143,23 @@ void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObje
 {
 	if(!InClass || !InOwner || InFuncName.IsNone()) return;
 
-	if(!EventHandleInfos.Contains(InClass))
-	{
-		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
-	}
+	FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
 	
-	if(EventHandleInfos[InClass].EventHandleFuncMap.Contains(InOwner))
+	if(Mapping.FuncMap.Contains(InOwner))
 	{
-		if(EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Contains(InFuncName))
+		if(Mapping.FuncMap[InOwner].FuncNames.Contains(InFuncName))
 		{
-			EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Remove(InFuncName);
+			Mapping.FuncMap[InOwner].FuncNames.Remove(InFuncName);
 		}
-		if(EventHandleInfos[InClass].EventHandleFuncMap[InOwner].FuncNames.Num() == 0)
+		if(Mapping.FuncMap[InOwner].FuncNames.Num() == 0)
 		{
-			EventHandleInfos[InClass].EventHandleFuncMap.Remove(InOwner);
+			Mapping.FuncMap.Remove(InOwner);
 		}
 	}
 
-	if(EventHandleInfos[InClass].EventHandleFuncMap.Num() == 0)
+	if(Mapping.FuncMap.Num() == 0)
 	{
-		EventHandleInfos[InClass].EventHandleDelegate.Unbind();
+		Mapping.Delegate.Unbind();
 	}
 }
 
@@ -181,17 +175,14 @@ void UEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InCl
 
 void UEventModule::UnsubscribeAllEvent()
 {
-	EventHandleInfos.Empty();
+	EventMappings.Empty();
 }
 
-void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType)
+void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType, bool bRecovery)
 {
 	if(!InClass) return;
 
-	if(!EventHandleInfos.Contains(InClass))
-	{
-		EventHandleInfos.Add(InClass, FEventHandleInfo(FEventHandleDelegate()));
-	}
+	const FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
 
 	switch(InNetType)
 	{
@@ -215,33 +206,33 @@ void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 		{
 			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
 			{
-				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InClass, InParams);
+				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InClass, InParams, bRecovery);
 				return;
 			}
 		}
 		default: break;
 	}
 	
-	EventHandleInfos[InClass].EventHandleDelegate.ExecuteIfBound(InClass, InSender, InParams);
+	Mapping.Delegate.ExecuteIfBound(InClass, InSender, InParams, bRecovery);
 }
 
-void UEventModule::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType)
+void UEventModule::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType, bool bRecovery)
 {
-	BroadcastEvent(InHandle->GetClass(), InSender, InHandle->Pack(), InNetType);
+	BroadcastEvent(InHandle->GetClass(), InSender, InHandle->Pack(), InNetType, bRecovery);
 }
 
-void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery)
 {
-	BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single);
+	BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single, bRecovery);
 }
 
-void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams)
+void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery)
 {
-	if(!EventHandleInfos.Contains(InClass)) return;
+	if(!EventMappings.Contains(InClass)) return;
 	
 	if(UEventHandleBase* EventHandle = UObjectPoolModuleStatics::SpawnObject<UEventHandleBase>(nullptr, nullptr, InClass))
 	{
-		EventHandle->Fill(InParams);
+		EventHandle->Parse(InParams);
 		
 		struct
 		{
@@ -249,8 +240,8 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			UEventHandleBase* EventHandle;
 		} Params{InSender, EventHandle};
 
-		auto TmpEventHandleInfos = EventHandleInfos;
-		for (auto Iter1 : TmpEventHandleInfos[InClass].EventHandleFuncMap)
+		FEventMapping& Mapping = EventMappings[InClass];
+		for (auto& Iter1 : Mapping.FuncMap)
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)
 			{
@@ -261,7 +252,10 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			}
 		}
 
-		UObjectPoolModuleStatics::DespawnObject(EventHandle);
+		if(bRecovery)
+		{
+			UObjectPoolModuleStatics::DespawnObject(EventHandle);
+		}
 	}
 }
 

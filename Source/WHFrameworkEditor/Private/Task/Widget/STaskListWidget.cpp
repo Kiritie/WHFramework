@@ -12,6 +12,7 @@
 #include "Task/Blueprint/TaskBlueprintFactory.h"
 #include "Task/Widget/STaskDetailsWidget.h"
 #include "Task/Widget/STaskListItemWidget.h"
+#include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -35,14 +36,14 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 	if(!TreeView.IsValid())
 	{
 		SAssignNew(TreeView, STreeView< TSharedPtr<FTaskListItem> >)
-			.TreeItemsSource(&TaskListItems)
+			.TreeItemsSource(&VisibleTaskListItems)
 			.OnGenerateRow(this, &STaskListWidget::GenerateTreeRow)
 			.OnItemScrolledIntoView(this, &STaskListWidget::TreeItemScrolledIntoView)
 			.ItemHeight(18)
 			.SelectionMode(ESelectionMode::Multi)
 			.OnSelectionChanged(this, &STaskListWidget::TreeSelectionChanged)
 			.OnGetChildren(this, &STaskListWidget::GetChildrenForTree)
-			.OnExpansionChanged(this, &STaskListWidget::OnTreeItemExpansionChanged)
+			.OnExpansionChanged(this, &STaskListWidget::TreeItemExpansionChanged)
 			.OnSetExpansionRecursive(this, &STaskListWidget::SetTreeItemExpansionRecursive)
 			.ClearSelectionOnClick(true)
 			.HighlightParentNodesForSelection(true);
@@ -164,7 +165,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() <= 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedTaskListItems.Num() <= 1 && SelectedTaskClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnAddTaskItemButtonClicked)
 					]
@@ -177,7 +178,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnInsertTaskItemButtonClicked)
 					]
@@ -190,7 +191,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedTaskListItems.Num() == 1 && SelectedTaskClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnAppendTaskItemButtonClicked)
 					]
@@ -203,7 +204,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Copy")))
-						.IsEnabled_Lambda([this](){ return SelectedTaskListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() == 1) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnCopyTaskItemButtonClicked)
 					]
@@ -216,7 +217,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Paste")))
-						.IsEnabled_Lambda([this](){ return CopiedTask != nullptr; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (CopiedTask != nullptr) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnPasteTaskItemButtonClicked)
 					]
@@ -229,9 +230,23 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Duplicate")))
-						.IsEnabled_Lambda([this](){ return SelectedTaskListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() == 1) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnDuplicateTaskItemButtonClicked)
+					]
+				]
+				
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.Padding(1.f, 4.f)
+					[
+						SAssignNew(SearchBox, SSearchBox)
+						.InitialText(this, &STaskListWidget::GetFilterText)
+						.OnTextChanged(this, &STaskListWidget::OnFilterTextChanged)
+						.OnTextCommitted(this, &STaskListWidget::OnFilterTextCommitted)
 					]
 				]
 
@@ -312,7 +327,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Remove")))
-						.IsEnabled_Lambda([this](){ return SelectedTaskListItems.Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnRemoveTaskItemButtonClicked)
 					]
@@ -325,7 +340,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Up")))
-						.IsEnabled_Lambda([this](){ return SelectedTaskListItems.Num() == 1 && SelectedTaskListItems[0]->GetTaskIndex() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() == 1 && SelectedTaskListItems[0]->GetTaskIndex() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnMoveUpTaskItemButtonClicked)
 					]
@@ -339,8 +354,8 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
-							return SelectedTaskListItems.Num() == 1 &&
-								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num()) - 1;
+							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() == 1 &&
+								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num()) - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnMoveDownTaskItemButtonClicked)
@@ -352,11 +367,6 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bDefaults"), bDefaults, GTaskEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.TaskEditorSettings"), TEXT("bEditing"), bEditing, GTaskEditorIni);
-
-	UpdateTreeView(true);
-
-	SetIsDefaults(bDefaults);
-	SetIsEditing(bEditing);
 }
 
 void STaskListWidget::OnCreate()
@@ -370,6 +380,8 @@ void STaskListWidget::OnInitialize()
 
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
+
+	UpdateTreeView(true);
 }
 
 void STaskListWidget::OnReset()
@@ -453,28 +465,25 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 	{
 		SelectedTaskClass = InClass;
 	}
-	else if(SelectedTaskListItems.Num() > 0)
+	else if(SelectedTaskListItems.Num() == 1)
 	{
-		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected tasks class?"))) == EAppReturnType::Yes)
+		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected task class?"))) == EAppReturnType::Yes)
 		{
-			for(int32 i = 0; i < SelectedTaskListItems.Num(); i++)
-			{
-				UTaskBase* OldTask = SelectedTaskListItems[i]->Task;
-				UTaskBase* NewTask = GenerateTask(InClass);
+			UTaskBase* OldTask = SelectedTaskListItems[0]->Task;
+			UTaskBase* NewTask = GenerateTask(InClass);
 
-				if(NewTask && OldTask)
+			if(NewTask && OldTask)
+			{
+				UCommonStatics::ExportPropertiesToObject(OldTask, NewTask);
+				if(OldTask->ParentTask)
 				{
-					UCommonStatics::ExportPropertiesToObject(OldTask, NewTask);
-					if(OldTask->ParentTask)
-					{
-						OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;
-					}
-					else
-					{
-						TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
-					}
-					OldTask->OnUnGenerate();
+					OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;
 				}
+				else
+				{
+					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
+				}
+				OldTask->OnUnGenerate();
 			}
 
 			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -493,6 +502,27 @@ FText STaskListWidget::GetPickedClassName() const
 	FString ClassName = SelectedTaskClass ? SelectedTaskClass->GetName() : TEXT("None");
 	ClassName.RemoveFromEnd(TEXT("_C"));
 	return FText::FromString(ClassName);
+}
+
+FText STaskListWidget::GetFilterText() const
+{
+	return ActiveFilterText;
+}
+
+void STaskListWidget::OnFilterTextChanged(const FText& InFilterText)
+{
+	ActiveFilterText = InFilterText;
+
+	UpdateTreeView();
+}
+
+void STaskListWidget::OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo)
+{
+	if (CommitInfo == ETextCommit::OnCleared)
+	{
+		SearchBox->SetText(FText::GetEmpty());
+		OnFilterTextChanged(FText::GetEmpty());
+	}
 }
 
 void STaskListWidget::ToggleEditing()
@@ -547,19 +577,28 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 {
 	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return;
 
-	if(bRegenerate)
+	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GenerateTaskListItem(TaskListItems);
-		for(auto Iter : TaskListItems)
+		if(bRegenerate)
 		{
-			SetTreeItemExpansionRecursive(Iter);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GenerateTaskListItem(TaskListItems);
 		}
-		TreeView->ClearSelection();
+		else
+		{
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->UpdateTaskListItem(TaskListItems);
+		}
+		VisibleTaskListItems = TaskListItems;
 	}
 	else
 	{
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->UpdateTaskListItem(TaskListItems);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GenerateTaskListItem(VisibleTaskListItems, ActiveFilterText.ToString());
 	}
+	for(auto Iter : VisibleTaskListItems)
+	{
+		SetTreeItemExpansionRecursive(Iter);
+		SetTreeItemSelectionRecursive(Iter);
+	}
+
 	TreeView->RequestTreeRefresh();
 }
 
@@ -585,7 +624,8 @@ TSharedRef<ITableRow> STaskListWidget::GenerateTreeRow(TSharedPtr<FTaskListItem>
 	check(TreeItem.IsValid());
 
 	return SNew(STaskListItemWidget, OwnerTable)
-		.Item(TreeItem);
+		.Item(TreeItem)
+		.ListWidget(SharedThis(this));
 }
 
 void STaskListWidget::TreeItemScrolledIntoView(TSharedPtr<FTaskListItem> TreeItem, const TSharedPtr<ITableRow>& Widget) { }
@@ -595,14 +635,19 @@ void STaskListWidget::GetChildrenForTree(TSharedPtr<FTaskListItem> TreeItem, TAr
 	OutChildren = TreeItem->SubListItems;
 }
 
-void STaskListWidget::OnTreeItemExpansionChanged(TSharedPtr<FTaskListItem> TreeItem, bool bInExpansionState)
+void STaskListWidget::SetTreeItemSelectionRecursive(TSharedPtr<FTaskListItem> TreeItem)
 {
-	if(TreeItem->GetStates().bExpanded != bInExpansionState)
-	{
-		TreeItem->GetStates().bExpanded = bInExpansionState;
+	TreeView->SetItemSelection(TreeItem, TreeItem->GetStates().bSelected);
 
-		TreeItem->Task->Modify();
+	for(auto Iter : TreeItem->SubListItems)
+	{
+		SetTreeItemSelectionRecursive(Iter);
 	}
+}
+
+void STaskListWidget::TreeItemExpansionChanged(TSharedPtr<FTaskListItem> TreeItem, bool bInExpansionState)
+{
+	TreeItem->GetStates().bExpanded = bInExpansionState;
 }
 
 void STaskListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FTaskListItem> TreeItem)
@@ -627,6 +672,28 @@ void STaskListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FTaskListItem> Tr
 
 void STaskListWidget::TreeSelectionChanged(TSharedPtr<FTaskListItem> TreeItem, ESelectInfo::Type SelectInfo)
 {
+	if(SelectInfo != ESelectInfo::Direct)
+	{
+		if(!ActiveFilterText.IsEmptyOrWhitespace())
+		{
+			for(auto Iter : TaskListItems)
+			{
+				RecursiveItems<TSharedPtr<FTaskListItem>>(Iter, [this](TSharedPtr<FTaskListItem>& Item)
+				{
+					Item->GetStates().bSelected = false;
+					return Item->SubListItems;
+				});
+			}
+		}
+		for(auto Iter : VisibleTaskListItems)
+		{
+			RecursiveItems<TSharedPtr<FTaskListItem>>(Iter, [this](TSharedPtr<FTaskListItem>& Item)
+			{
+				Item->GetStates().bSelected = TreeView->IsItemSelected(Item);
+				return Item->SubListItems;
+			});
+		}
+	}
 	UpdateSelection();
 }
 

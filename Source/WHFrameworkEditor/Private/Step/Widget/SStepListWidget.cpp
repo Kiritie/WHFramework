@@ -11,6 +11,7 @@
 #include "Step/Blueprint/StepBlueprintFactory.h"
 #include "Step/Widget/SStepDetailsWidget.h"
 #include "Step/Widget/SStepListItemWidget.h"
+#include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -34,14 +35,14 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 	if(!TreeView.IsValid())
 	{
 		SAssignNew(TreeView, STreeView< TSharedPtr<FStepListItem> >)
-			.TreeItemsSource(&StepListItems)
+			.TreeItemsSource(&VisibleStepListItems)
 			.OnGenerateRow(this, &SStepListWidget::GenerateTreeRow)
 			.OnItemScrolledIntoView(this, &SStepListWidget::TreeItemScrolledIntoView)
 			.ItemHeight(18)
 			.SelectionMode(ESelectionMode::Multi)
 			.OnSelectionChanged(this, &SStepListWidget::TreeSelectionChanged)
 			.OnGetChildren(this, &SStepListWidget::GetChildrenForTree)
-			.OnExpansionChanged(this, &SStepListWidget::OnTreeItemExpansionChanged)
+			.OnExpansionChanged(this, &SStepListWidget::TreeItemExpansionChanged)
 			.OnSetExpansionRecursive(this, &SStepListWidget::SetTreeItemExpansionRecursive)
 			.ClearSelectionOnClick(true)
 			.HighlightParentNodesForSelection(true);
@@ -163,7 +164,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() <= 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedStepListItems.Num() <= 1 && SelectedStepClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnAddStepItemButtonClicked)
 					]
@@ -176,7 +177,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnInsertStepItemButtonClicked)
 					]
@@ -189,7 +190,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedStepListItems.Num() == 1 && SelectedStepClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnAppendStepItemButtonClicked)
 					]
@@ -202,7 +203,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Copy")))
-						.IsEnabled_Lambda([this](){ return SelectedStepListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() == 1) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnCopyStepItemButtonClicked)
 					]
@@ -215,7 +216,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Paste")))
-						.IsEnabled_Lambda([this](){ return CopiedStep != nullptr; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (CopiedStep != nullptr) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnPasteStepItemButtonClicked)
 					]
@@ -228,9 +229,23 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Duplicate")))
-						.IsEnabled_Lambda([this](){ return SelectedStepListItems.Num() == 1; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() == 1) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnDuplicateStepItemButtonClicked)
+					]
+				]
+				
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.Padding(1.f, 4.f)
+					[
+						SAssignNew(SearchBox, SSearchBox)
+						.InitialText(this, &SStepListWidget::GetFilterText)
+						.OnTextChanged(this, &SStepListWidget::OnFilterTextChanged)
+						.OnTextCommitted(this, &SStepListWidget::OnFilterTextCommitted)
 					]
 				]
 
@@ -311,7 +326,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Remove")))
-						.IsEnabled_Lambda([this](){ return SelectedStepListItems.Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnRemoveStepItemButtonClicked)
 					]
@@ -324,7 +339,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Up")))
-						.IsEnabled_Lambda([this](){ return SelectedStepListItems.Num() == 1 && SelectedStepListItems[0]->GetStepIndex() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() == 1 && SelectedStepListItems[0]->GetStepIndex() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnMoveUpStepItemButtonClicked)
 					]
@@ -338,8 +353,8 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
-							return SelectedStepListItems.Num() == 1 &&
-								SelectedStepListItems[0]->GetStepIndex() < (SelectedStepListItems[0]->GetParentStep() ? SelectedStepListItems[0]->GetParentSubSteps().Num() : StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num()) - 1;
+							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() == 1 &&
+								SelectedStepListItems[0]->GetStepIndex() < (SelectedStepListItems[0]->GetParentStep() ? SelectedStepListItems[0]->GetParentSubSteps().Num() : StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num()) - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnMoveDownStepItemButtonClicked)
@@ -351,8 +366,6 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bDefaults"), bDefaults, GStepEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.StepEditorSettings"), TEXT("bEditing"), bEditing, GStepEditorIni);
-
-	UpdateTreeView(true);
 }
 
 void SStepListWidget::OnCreate()
@@ -366,6 +379,8 @@ void SStepListWidget::OnInitialize()
 
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
+
+	UpdateTreeView(true);
 }
 
 void SStepListWidget::OnReset()
@@ -449,28 +464,25 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 	{
 		SelectedStepClass = InClass;
 	}
-	else if(SelectedStepListItems.Num() > 0)
+	else if(SelectedStepListItems.Num() == 1)
 	{
-		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected steps class?"))) == EAppReturnType::Yes)
+		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected step class?"))) == EAppReturnType::Yes)
 		{
-			for(int32 i = 0; i < SelectedStepListItems.Num(); i++)
-			{
-				UStepBase* OldStep = SelectedStepListItems[i]->Step;
-				UStepBase* NewStep = GenerateStep(InClass);
+			UStepBase* OldStep = SelectedStepListItems[0]->Step;
+			UStepBase* NewStep = GenerateStep(InClass);
 
-				if(NewStep && OldStep)
+			if(NewStep && OldStep)
+			{
+				UCommonStatics::ExportPropertiesToObject(OldStep, NewStep);
+				if(OldStep->ParentStep)
 				{
-					UCommonStatics::ExportPropertiesToObject(OldStep, NewStep);
-					if(OldStep->ParentStep)
-					{
-						OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;
-					}
-					else
-					{
-						StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[OldStep->StepIndex] = NewStep;
-					}
-					OldStep->OnUnGenerate();
+					OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;
 				}
+				else
+				{
+					StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[OldStep->StepIndex] = NewStep;
+				}
+				OldStep->OnUnGenerate();
 			}
 
 			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -489,6 +501,27 @@ FText SStepListWidget::GetPickedClassName() const
 	FString ClassName = SelectedStepClass ? SelectedStepClass->GetName() : TEXT("None");
 	ClassName.RemoveFromEnd(TEXT("_C"));
 	return FText::FromString(ClassName);
+}
+
+FText SStepListWidget::GetFilterText() const
+{
+	return ActiveFilterText;
+}
+
+void SStepListWidget::OnFilterTextChanged(const FText& InFilterText)
+{
+	ActiveFilterText = InFilterText;
+
+	UpdateTreeView();
+}
+
+void SStepListWidget::OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo)
+{
+	if (CommitInfo == ETextCommit::OnCleared)
+	{
+		SearchBox->SetText(FText::GetEmpty());
+		OnFilterTextChanged(FText::GetEmpty());
+	}
 }
 
 void SStepListWidget::ToggleEditing()
@@ -543,26 +576,35 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 {
 	if(!StepEditor.Pin()->GetEditingAsset<UStepAsset>()) return;
 
-	if(bRegenerate)
+	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GenerateStepListItem(StepListItems);
-		for(auto Iter : StepListItems)
+		if(bRegenerate)
 		{
-			SetTreeItemExpansionRecursive(Iter);
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GenerateStepListItem(StepListItems);
 		}
-		TreeView->ClearSelection();
+		else
+		{
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->UpdateStepListItem(StepListItems);
+		}
+		VisibleStepListItems = StepListItems;
 	}
 	else
 	{
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->UpdateStepListItem(StepListItems);
+		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GenerateStepListItem(VisibleStepListItems, ActiveFilterText.ToString());
 	}
+	for(auto Iter : VisibleStepListItems)
+	{
+		SetTreeItemExpansionRecursive(Iter);
+		SetTreeItemSelectionRecursive(Iter);
+	}
+
 	TreeView->RequestTreeRefresh();
 }
 
 void SStepListWidget::UpdateSelection()
 {
 	SelectedStepListItems = TreeView->GetSelectedItems();
-	
+
 	if(bEditing)
 	{
 		SelectedStepClass = SelectedStepListItems.Num() > 0 ? SelectedStepListItems[0]->Step->GetClass() : nullptr;
@@ -581,7 +623,8 @@ TSharedRef<ITableRow> SStepListWidget::GenerateTreeRow(TSharedPtr<FStepListItem>
 	check(TreeItem.IsValid());
 
 	return SNew(SStepListItemWidget, OwnerTable)
-		.Item(TreeItem);
+		.Item(TreeItem)
+		.ListWidget(SharedThis(this));
 }
 
 void SStepListWidget::TreeItemScrolledIntoView(TSharedPtr<FStepListItem> TreeItem, const TSharedPtr<ITableRow>& Widget) { }
@@ -591,14 +634,19 @@ void SStepListWidget::GetChildrenForTree(TSharedPtr<FStepListItem> TreeItem, TAr
 	OutChildren = TreeItem->SubListItems;
 }
 
-void SStepListWidget::OnTreeItemExpansionChanged(TSharedPtr<FStepListItem> TreeItem, bool bInExpansionState)
+void SStepListWidget::SetTreeItemSelectionRecursive(TSharedPtr<FStepListItem> TreeItem)
 {
-	if(TreeItem->GetStates().bExpanded != bInExpansionState)
-	{
-		TreeItem->GetStates().bExpanded = bInExpansionState;
+	TreeView->SetItemSelection(TreeItem, TreeItem->GetStates().bSelected);
 
-		TreeItem->Step->Modify();
+	for(auto Iter : TreeItem->SubListItems)
+	{
+		SetTreeItemSelectionRecursive(Iter);
 	}
+}
+
+void SStepListWidget::TreeItemExpansionChanged(TSharedPtr<FStepListItem> TreeItem, bool bInExpansionState)
+{
+	TreeItem->GetStates().bExpanded = bInExpansionState;
 }
 
 void SStepListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FStepListItem> TreeItem)
@@ -623,6 +671,28 @@ void SStepListWidget::SetTreeItemExpansionRecursive(TSharedPtr<FStepListItem> Tr
 
 void SStepListWidget::TreeSelectionChanged(TSharedPtr<FStepListItem> TreeItem, ESelectInfo::Type SelectInfo)
 {
+	if(SelectInfo != ESelectInfo::Direct)
+	{
+		if(!ActiveFilterText.IsEmptyOrWhitespace())
+		{
+			for(auto Iter : StepListItems)
+			{
+				RecursiveItems<TSharedPtr<FStepListItem>>(Iter, [this](TSharedPtr<FStepListItem>& Item)
+				{
+					Item->GetStates().bSelected = false;
+					return Item->SubListItems;
+				});
+			}
+		}
+		for(auto Iter : VisibleStepListItems)
+		{
+			RecursiveItems<TSharedPtr<FStepListItem>>(Iter, [this](TSharedPtr<FStepListItem>& Item)
+			{
+				Item->GetStates().bSelected = TreeView->IsItemSelected(Item);
+				return Item->SubListItems;
+			});
+		}
+	}
 	UpdateSelection();
 }
 

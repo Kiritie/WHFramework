@@ -13,7 +13,7 @@ void UEventHandle_LeaveTask::OnDespawn_Implementation(bool bRecovery)
 	Task = nullptr;
 }
 
-void UEventHandle_LeaveTask::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_LeaveTask::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

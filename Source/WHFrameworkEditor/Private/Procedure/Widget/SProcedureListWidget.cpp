@@ -13,6 +13,7 @@
 #include "Procedure/Blueprint/ProcedureBlueprintFactory.h"
 #include "Procedure/Widget/SProcedureDetailsWidget.h"
 #include "Procedure/Widget/SProcedureListItemWidget.h"
+#include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -34,7 +35,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 	if(!ListView.IsValid())
 	{
 		SAssignNew(ListView, SListView< TSharedPtr<FProcedureListItem> >)
-			.ListItemsSource(&ProcedureListItems)
+			.ListItemsSource(&VisibleProcedureListItems)
 			.OnGenerateRow(this, &SProcedureListWidget::GenerateListRow)
 			.OnItemScrolledIntoView(this, &SProcedureListWidget::ListItemScrolledIntoView)
 			.ItemHeight(18)
@@ -159,7 +160,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Add")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedProcedureClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedProcedureClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnAddProcedureItemButtonClicked)
 					]
@@ -172,7 +173,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Insert")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedProcedureListItems.Num() == 1 && SelectedProcedureClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedProcedureListItems.Num() == 1 && SelectedProcedureClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnInsertProcedureItemButtonClicked)
 					]
@@ -185,9 +186,23 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Append")))
-						.IsEnabled_Lambda([this](){ return !bEditing && SelectedProcedureListItems.Num() == 1 && SelectedProcedureClass; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (!bEditing && SelectedProcedureListItems.Num() == 1 && SelectedProcedureClass) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnAppendProcedureItemButtonClicked)
+					]
+				]
+				
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.Padding(1.f, 4.f)
+					[
+						SAssignNew(SearchBox, SSearchBox)
+						.InitialText(this, &SProcedureListWidget::GetFilterText)
+						.OnTextChanged(this, &SProcedureListWidget::OnFilterTextChanged)
+						.OnTextCommitted(this, &SProcedureListWidget::OnFilterTextCommitted)
 					]
 				]
 
@@ -242,7 +257,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Remove")))
-						.IsEnabled_Lambda([this](){ return SelectedProcedureListItems.Num() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedProcedureListItems.Num() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnRemoveProcedureItemButtonClicked)
 					]
@@ -255,7 +270,7 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Up")))
-						.IsEnabled_Lambda([this](){ return SelectedProcedureListItems.Num() == 1 && SelectedProcedureListItems[0]->GetProcedureIndex() > 0; })
+						.IsEnabled_Lambda([this](){ return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedProcedureListItems.Num() == 1 && SelectedProcedureListItems[0]->GetProcedureIndex() > 0) : false; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnMoveUpProcedureItemButtonClicked)
 					]
@@ -269,8 +284,8 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
-							return SelectedProcedureListItems.Num() == 1 &&
-								SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num() - 1;
+							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedProcedureListItems.Num() == 1 &&
+								SelectedProcedureListItems[0]->GetProcedureIndex() < ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures().Num() - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SProcedureListWidget::OnMoveDownProcedureItemButtonClicked)
@@ -282,8 +297,6 @@ void SProcedureListWidget::Construct(const FArguments& InArgs)
 
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bDefaults"), bDefaults, GProcedureEditorIni);
 	GConfig->GetBool(TEXT("/Script/WHFrameworkEditor.ProcedureEditorSettings"), TEXT("bEditing"), bEditing, GProcedureEditorIni);
-
-	UpdateListView(true);
 }
 
 void SProcedureListWidget::OnCreate()
@@ -297,6 +310,8 @@ void SProcedureListWidget::OnInitialize()
 
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
+
+	UpdateListView(true);
 }
 
 void SProcedureListWidget::OnReset()
@@ -377,21 +392,18 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 	{
 		SelectedProcedureClass = InClass;
 	}
-	else if(SelectedProcedureListItems.Num() > 0)
+	else if(SelectedProcedureListItems.Num() == 1)
 	{
-		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected procedures class?"))) == EAppReturnType::Yes)
+		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected procedure class?"))) == EAppReturnType::Yes)
 		{
-			for(int32 i = 0; i < SelectedProcedureListItems.Num(); i++)
-			{
-				UProcedureBase* OldProcedure = SelectedProcedureListItems[i]->Procedure;
-				UProcedureBase* NewProcedure = GenerateProcedure(InClass);
+			UProcedureBase* OldProcedure = SelectedProcedureListItems[0]->Procedure;
+			UProcedureBase* NewProcedure = GenerateProcedure(InClass);
 
-				if(NewProcedure && OldProcedure)
-				{
-					UCommonStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
-					ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[OldProcedure->ProcedureIndex] = NewProcedure;
-					OldProcedure->OnUnGenerate();
-				}
+			if(NewProcedure && OldProcedure)
+			{
+				UCommonStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
+				ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[OldProcedure->ProcedureIndex] = NewProcedure;
+				OldProcedure->OnUnGenerate();
 			}
 
 			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->Modify();
@@ -410,6 +422,27 @@ FText SProcedureListWidget::GetPickedClassName() const
 	FString ClassName = SelectedProcedureClass ? SelectedProcedureClass->GetName() : TEXT("None");
 	ClassName.RemoveFromEnd(TEXT("_C"));
 	return FText::FromString(ClassName);
+}
+
+FText SProcedureListWidget::GetFilterText() const
+{
+	return ActiveFilterText;
+}
+
+void SProcedureListWidget::OnFilterTextChanged(const FText& InFilterText)
+{
+	ActiveFilterText = InFilterText;
+
+	UpdateListView();
+}
+
+void SProcedureListWidget::OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo)
+{
+	if (CommitInfo == ETextCommit::OnCleared)
+	{
+		SearchBox->SetText(FText::GetEmpty());
+		OnFilterTextChanged(FText::GetEmpty());
+	}
 }
 
 void SProcedureListWidget::ToggleEditing()
@@ -458,15 +491,25 @@ void SProcedureListWidget::UpdateListView(bool bRegenerate)
 {
 	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return;
 
-	if(bRegenerate)
+	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
-		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GenerateProcedureListItem(ProcedureListItems);
-
-		ListView->ClearSelection();
+		if(bRegenerate)
+		{
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GenerateProcedureListItem(ProcedureListItems);
+		}
+		else
+		{
+			ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->UpdateProcedureListItem(ProcedureListItems);
+		}
+		VisibleProcedureListItems = ProcedureListItems;
 	}
 	else
 	{
-		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->UpdateProcedureListItem(ProcedureListItems);
+		ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GenerateProcedureListItem(VisibleProcedureListItems, ActiveFilterText.ToString());
+	}
+	for(auto Iter : VisibleProcedureListItems)
+	{
+		SetListItemSelectionRecursive(Iter);
 	}
 
 	ListView->RequestListRefresh();
@@ -494,14 +537,34 @@ TSharedRef<ITableRow> SProcedureListWidget::GenerateListRow(TSharedPtr<FProcedur
 	check(ListItem.IsValid());
 
 	return SNew(SProcedureListItemWidget, OwnerTable)
-		.Item(ListItem);
+		.Item(ListItem)
+		.ListWidget(SharedThis(this));
 }
 
 void SProcedureListWidget::ListItemScrolledIntoView(TSharedPtr<FProcedureListItem> ListItem, const TSharedPtr<ITableRow>& Widget) { }
 
 void SProcedureListWidget::ListSelectionChanged(TSharedPtr<FProcedureListItem> ListItem, ESelectInfo::Type SelectInfo)
 {
+	if(SelectInfo != ESelectInfo::Direct)
+	{
+		if(!ActiveFilterText.IsEmptyOrWhitespace())
+		{
+			for(auto Iter : ProcedureListItems)
+			{
+				Iter->GetStates().bSelected = false;
+			}
+		}
+		for(auto Iter : VisibleProcedureListItems)
+		{
+			Iter->GetStates().bSelected = ListView->IsItemSelected(Iter);
+		}
+	}
 	UpdateSelection();
+}
+
+void SProcedureListWidget::SetListItemSelectionRecursive(TSharedPtr<FProcedureListItem> ListItem)
+{
+	ListView->SetItemSelection(ListItem, ListItem->GetStates().bSelected);
 }
 
 FReply SProcedureListWidget::OnEditProcedureItemButtonClicked()

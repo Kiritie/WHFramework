@@ -13,7 +13,7 @@ void UEventHandle_StartStep::OnDespawn_Implementation(bool bRecovery)
 	RootStepIndex = -1;
 }
 
-void UEventHandle_StartStep::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_StartStep::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

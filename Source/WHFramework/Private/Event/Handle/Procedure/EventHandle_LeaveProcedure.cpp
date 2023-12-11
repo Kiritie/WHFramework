@@ -13,7 +13,7 @@ void UEventHandle_LeaveProcedure::OnDespawn_Implementation(bool bRecovery)
 	Procedure = nullptr;
 }
 
-void UEventHandle_LeaveProcedure::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_LeaveProcedure::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

@@ -13,7 +13,7 @@ void UEventHandle_UnPauseGame::OnDespawn_Implementation(bool bRecovery)
 	PauseMode = EPauseMode::Default;
 }
 
-void UEventHandle_UnPauseGame::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_UnPauseGame::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

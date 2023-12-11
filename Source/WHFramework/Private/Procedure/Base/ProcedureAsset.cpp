@@ -37,14 +37,16 @@ void UProcedureAsset::Initialize(UAssetBase* InSource)
 }
 
 #if WITH_EDITOR
-void UProcedureAsset::GenerateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems)
+void UProcedureAsset::GenerateProcedureListItem(TArray<TSharedPtr<FProcedureListItem>>& OutProcedureListItems, const FString& InFilterText)
 {
 	OutProcedureListItems = TArray<TSharedPtr<FProcedureListItem>>();
 	for (int32 i = 0; i < Procedures.Num(); i++)
 	{
 		auto Item = MakeShared<FProcedureListItem>();
-		Procedures[i]->GenerateListItem(Item);
-		OutProcedureListItems.Add(Item);
+		if(Procedures[i]->GenerateListItem(Item, InFilterText))
+		{
+			OutProcedureListItems.Add(Item);
+		}
 	}
 }
 

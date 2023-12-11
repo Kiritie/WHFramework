@@ -12,7 +12,7 @@ void UEventHandle_AsyncUnloadLevelFinished::OnDespawn_Implementation(bool bRecov
 {
 }
 
-void UEventHandle_AsyncUnloadLevelFinished::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_AsyncUnloadLevelFinished::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

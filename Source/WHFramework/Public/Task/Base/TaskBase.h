@@ -12,6 +12,28 @@
 
 class UTaskAsset;
 class ACameraActorBase;
+
+#if WITH_EDITORONLY_DATA
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTaskListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	bool bExpanded;
+
+	UPROPERTY(Transient)
+	bool bSelected;
+
+	FORCEINLINE FTaskListItemStates()
+	{
+		bExpanded = true;
+		bSelected = false;
+	}
+};
+#endif
+
 /**
  * 任务基类
  */
@@ -335,7 +357,7 @@ public:
 	/**
 	* 构建任务列表项
 	*/
-	virtual void GenerateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem);
+	virtual bool GenerateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem, const FString& InFilterText = TEXT(""));
 	/**
 	* 更新任务列表项
 	*/

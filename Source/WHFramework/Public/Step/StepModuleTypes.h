@@ -67,19 +67,4 @@ enum class EStepTaskState : uint8
 	Completed
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FStepListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	bool bExpanded;
-
-	FORCEINLINE FStepListItemStates()
-	{
-		bExpanded = true;
-	}
-};
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStepStateChanged, EStepState, InStepState);

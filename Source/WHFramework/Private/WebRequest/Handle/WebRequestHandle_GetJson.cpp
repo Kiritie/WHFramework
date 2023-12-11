@@ -18,7 +18,7 @@ void UWebRequestHandle_GetJson::OnDespawn_Implementation(bool bRecovery)
 	Json = nullptr;
 }
 
-void UWebRequestHandle_GetJson::Fill(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
+void UWebRequestHandle_GetJson::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
 	if(InResult.bSucceeded)
 	{

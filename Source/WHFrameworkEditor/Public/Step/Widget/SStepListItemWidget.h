@@ -17,6 +17,8 @@ public:
 
 		SLATE_ARGUMENT(TSharedPtr<FStepListItem>, Item)
 
+		SLATE_ARGUMENT(TSharedPtr<SStepListWidget>, ListWidget)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
@@ -26,4 +28,6 @@ public:
 	/// Refs
 public:
 	TSharedPtr<FStepListItem> Item;
+	
+	TSharedPtr<SStepListWidget> ListWidget;
 };

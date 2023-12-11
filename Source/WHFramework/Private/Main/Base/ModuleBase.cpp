@@ -183,9 +183,14 @@ void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 }
 
 #if WITH_EDITOR
-void UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)
+bool UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem, const FString& InFilterText)
 {
 	OutModuleListItem->Module = this;
+	if(!InFilterText.IsEmpty())
+	{
+		return ModuleDisplayName.ToString().Contains(InFilterText);
+	}
+	return true;
 }
 
 void UModuleBase::UpdateListItem(TSharedPtr<FModuleListItem> OutModuleListItem)

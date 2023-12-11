@@ -8,7 +8,7 @@
 
 class UEventHandleBase;
 
-DECLARE_DELEGATE_ThreeParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>);
+DECLARE_DELEGATE_FourParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>, bool);
 
 DECLARE_DELEGATE_TwoParams(FEventExecuteDelegate, UObject* InSender, UEventHandleBase* InEventHandle);
 
@@ -31,12 +31,12 @@ enum class EEventNetType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FEventHandleFuncs
+struct FEventFuncs
 {
 	GENERATED_BODY()
 
 public:
-	FEventHandleFuncs()
+	FEventFuncs()
 	{
 		FuncNames = TArray<FName>(); 
 	}
@@ -46,26 +46,26 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct FEventHandleInfo
+struct FEventMapping
 {
 	GENERATED_BODY()
 
 public:
-	FEventHandleInfo()
+	FEventMapping()
 	{
-		EventHandleFuncMap = TMap<UObject*, FEventHandleFuncs>();
+		FuncMap = TMap<UObject*, FEventFuncs>();
 	}
 
-	FEventHandleInfo(FEventHandleDelegate InSingleDelegate)
+	FEventMapping(const FEventHandleDelegate& InDelegate)
 	{
-		EventHandleDelegate = InSingleDelegate;
-		EventHandleFuncMap = TMap<UObject*, FEventHandleFuncs>();
+		Delegate = InDelegate;
+		FuncMap = TMap<UObject*, FEventFuncs>();
 	}
 	
-	FEventHandleDelegate EventHandleDelegate;
+	FEventHandleDelegate Delegate;
 
 	UPROPERTY()
-	TMap<UObject*, FEventHandleFuncs> EventHandleFuncMap;
+	TMap<UObject*, FEventFuncs> FuncMap;
 };
 
 USTRUCT(BlueprintType)

@@ -25,6 +25,12 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 	{
 		if(!Iter) continue;
 
+		RecursiveItems<UTaskBase>(Iter, [this](UTaskBase* Task)
+		{
+			TaskMap.Add(Task->TaskGUID, Task);
+			return Task->SubTasks;
+		});
+
 		Iter->OnInitialize();
 
 		if(!FirstTask)
@@ -35,14 +41,16 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 }
 
 #if WITH_EDITOR
-void UTaskAsset::GenerateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems)
+void UTaskAsset::GenerateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems, const FString& InFilterText)
 {
 	OutTaskListItems = TArray<TSharedPtr<FTaskListItem>>();
 	for (int32 i = 0; i < RootTasks.Num(); i++)
 	{
 		auto Item = MakeShared<FTaskListItem>();
-		RootTasks[i]->GenerateListItem(Item);
-		OutTaskListItems.Add(Item);
+		if(RootTasks[i]->GenerateListItem(Item))
+		{
+			OutTaskListItems.Add(Item);
+		}
 	}
 }
 

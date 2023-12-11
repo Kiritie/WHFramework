@@ -15,7 +15,7 @@ void UEventHandle_ExecuteStep::OnDespawn_Implementation(bool bRecovery)
 	Step = nullptr;
 }
 
-void UEventHandle_ExecuteStep::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ExecuteStep::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

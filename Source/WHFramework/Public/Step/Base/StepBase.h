@@ -11,6 +11,28 @@
 
 class UStepAsset;
 class ACameraActorBase;
+
+#if WITH_EDITORONLY_DATA
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FStepListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	bool bExpanded;
+
+	UPROPERTY(Transient)
+	bool bSelected;
+
+	FORCEINLINE FStepListItemStates()
+	{
+		bExpanded = true;
+		bSelected = false;
+	}
+};
+#endif
+
 /**
  * 步骤基类
  */
@@ -385,13 +407,13 @@ protected:
 public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
-	FStepListItemStates StepListItemStates;
+	struct FStepListItemStates StepListItemStates;
 #endif
 #if WITH_EDITOR
 	/**
 	* 构建步骤列表项
 	*/
-	virtual void GenerateListItem(TSharedPtr<struct FStepListItem> OutStepListItem);
+	virtual bool GenerateListItem(TSharedPtr<struct FStepListItem> OutStepListItem, const FString& InFilterText = TEXT(""));
 	/**
 	* 更新步骤列表项
 	*/

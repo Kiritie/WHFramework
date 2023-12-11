@@ -265,9 +265,9 @@ public:
 	/// Editor
 public:
 #if WITH_EDITOR
-	void GenerateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
+	void GenerateModuleListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems, const FString& InFilterText = TEXT(""));
 
-	void UpdateListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
+	void UpdateModuleListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
 
 	bool CanAddModule(TSubclassOf<UModuleBase> InModuleClass);
 #endif

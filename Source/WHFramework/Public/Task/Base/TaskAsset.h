@@ -55,9 +55,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
-	public:
+public:
 #if WITH_EDITOR
-	void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+	void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems, const FString& InFilterText = TEXT(""));
 
 	void UpdateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
 

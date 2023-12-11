@@ -41,14 +41,14 @@ void UEventModuleStatics::UnsubscribeAllEvent()
 	UEventModule::Get().UnsubscribeAllEvent();
 }
 
-void UEventModuleStatics::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType)
+void UEventModuleStatics::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType, bool bRecovery)
 {
-	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, InNetType);
+	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, InNetType, bRecovery);
 }
 
-void UEventModuleStatics::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType)
+void UEventModuleStatics::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType, bool bRecovery)
 {
-	UEventModule::Get().BroadcastEventByHandle(InHandle, InSender, InNetType);
+	UEventModule::Get().BroadcastEventByHandle(InHandle, InSender, InNetType, bRecovery);
 }
 
 UEventManagerBase* UEventModuleStatics::GetEventManager(TSubclassOf<UEventManagerBase> InClass)

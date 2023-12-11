@@ -17,6 +17,8 @@ public:
 
 		SLATE_ARGUMENT(TSharedPtr<FModuleListItem>, Item)
 
+		SLATE_ARGUMENT(TSharedPtr<SModuleListWidget>, ListWidget)
+
 	SLATE_END_ARGS()
 
 	/** Constructs this widget with InArgs */
@@ -26,4 +28,6 @@ public:
 	/// Refs
 public:
 	TSharedPtr<FModuleListItem> Item;
+	
+	TSharedPtr<SModuleListWidget> ListWidget;
 };

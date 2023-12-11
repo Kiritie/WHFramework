@@ -13,7 +13,7 @@ void UEventHandle_LeaveStep::OnDespawn_Implementation(bool bRecovery)
 	Step = nullptr;
 }
 
-void UEventHandle_LeaveStep::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_LeaveStep::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

@@ -40,34 +40,6 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Stats
-public:
-	bool bDefaults;
-
-	bool bEditing;
-
-	TSubclassOf<UModuleBase> SelectedModuleClass;
-
-	TArray<TSharedPtr<FModuleListItem>> ModuleListItems;
-
-	TArray<TSharedPtr<FModuleListItem>> SelectedModuleListItems;
-
-	FOnSelectModuleListItemsDelegate OnSelectModuleListItemsDelegate;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Widgets
-public:
-	TSharedPtr<SScrollBar> ScrollBar;
-
-	TSharedPtr<SComboButton> ClassPickButton;
-
-	FClassViewerInitializationOptions ClassViewerOptions;
-
-	TSharedPtr<FModuleClassFilter> ModuleClassFilter;
-
-	TSharedPtr<SListView<TSharedPtr<FModuleListItem>>> ListView;
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Module
 private:
 	UModuleBase* GenerateModule(TSubclassOf<UModuleBase> InClass);
@@ -82,6 +54,15 @@ private:
 	void OnClassPicked(UClass* InClass);
 
 	FText GetPickedClassName() const;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Search Box
+private:
+	FText GetFilterText() const;
+
+	void OnFilterTextChanged(const FText& InFilterText);
+
+	void OnFilterTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Mode
@@ -114,6 +95,8 @@ private:
 
 	void ListSelectionChanged(TSharedPtr<FModuleListItem> ListItem, ESelectInfo::Type SelectInfo);
 
+	void SetListItemSelectionRecursive(TSharedPtr<FModuleListItem> ListItem);
+
 	TArray<UClass*> GetUnAddedModuleClasses() const;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -140,4 +123,38 @@ private:
 	FReply OnMoveUpModuleItemButtonClicked();
 
 	FReply OnMoveDownModuleItemButtonClicked();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Stats
+public:
+	bool bDefaults;
+
+	bool bEditing;
+	
+	FText ActiveFilterText;
+
+	TSubclassOf<UModuleBase> SelectedModuleClass;
+
+	TArray<TSharedPtr<FModuleListItem>> ModuleListItems;
+
+	TArray<TSharedPtr<FModuleListItem>> VisibleModuleListItems;
+
+	TArray<TSharedPtr<FModuleListItem>> SelectedModuleListItems;
+
+	FOnSelectModuleListItemsDelegate OnSelectModuleListItemsDelegate;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Widgets
+public:
+	TSharedPtr<SScrollBar> ScrollBar;
+
+	TSharedPtr<SComboButton> ClassPickButton;
+
+	FClassViewerInitializationOptions ClassViewerOptions;
+
+	TSharedPtr<FModuleClassFilter> ModuleClassFilter;
+
+	TSharedPtr<SListView<TSharedPtr<FModuleListItem>>> ListView;
+
+	TSharedPtr<SSearchBox> SearchBox;
 };

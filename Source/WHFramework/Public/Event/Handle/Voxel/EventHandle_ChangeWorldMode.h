@@ -21,7 +21,7 @@ public:
 	UEventHandle_ChangeWorldMode();
 	
 public:
-	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
 	UPROPERTY(BlueprintReadOnly)

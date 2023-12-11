@@ -18,8 +18,6 @@ class WHFRAMEWORK_API UStepAsset : public UAssetBase
 public:
 	virtual void Initialize(UAssetBase* InSource) override;
 
-	void AAA(UStepBase* InStep, TMap<FString, UStepBase*>& InMap);
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats
 public:
@@ -59,7 +57,7 @@ public:
 	/// Editor
 public:
 #if WITH_EDITOR
-	void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
+	void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems, const FString& InFilterText = TEXT(""));
 
 	void UpdateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
 

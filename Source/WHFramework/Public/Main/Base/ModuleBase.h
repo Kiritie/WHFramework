@@ -14,6 +14,23 @@ class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
+#if WITH_EDITORONLY_DATA
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FModuleListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	bool bSelected;
+
+	FORCEINLINE FModuleListItemStates()
+	{
+		bSelected = false;
+	}
+};
+#endif
+
 UCLASS()
 class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataInterface
 {
@@ -241,7 +258,7 @@ public:
 	/**
 	* 构建流程列表项
 	*/
-	virtual void GenerateListItem(TSharedPtr<struct FModuleListItem> OutModuleListItem);
+	virtual bool GenerateListItem(TSharedPtr<struct FModuleListItem> OutModuleListItem, const FString& InFilterText = TEXT(""));
 	/**
 	* 更新流程列表项
 	*/

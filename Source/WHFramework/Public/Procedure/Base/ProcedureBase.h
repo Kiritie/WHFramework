@@ -11,6 +11,24 @@
 
 class UProcedureAsset;
 class ACameraActorBase;
+
+#if WITH_EDITORONLY_DATA
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FProcedureListItemStates
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	bool bSelected;
+
+	FORCEINLINE FProcedureListItemStates()
+	{
+		bSelected = false;
+	}
+};
+#endif
+
 /**
  * 流程基类
  */
@@ -205,7 +223,7 @@ public:
 	/**
 	* 构建流程列表项
 	*/
-	virtual void GenerateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
+	virtual bool GenerateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem, const FString& InFilterText = TEXT(""));
 	/**
 	* 更新流程列表项
 	*/

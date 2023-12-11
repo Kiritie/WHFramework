@@ -22,7 +22,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Fill_Implementation(const TArray<FParameter>& InParams) override;
+	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual TArray<FParameter> Pack_Implementation() const override;
 

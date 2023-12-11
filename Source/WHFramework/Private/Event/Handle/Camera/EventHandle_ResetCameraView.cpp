@@ -12,7 +12,7 @@ void UEventHandle_ResetCameraView::OnDespawn_Implementation(bool bRecovery)
 	
 }
 
-void UEventHandle_ResetCameraView::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ResetCameraView::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	
 }

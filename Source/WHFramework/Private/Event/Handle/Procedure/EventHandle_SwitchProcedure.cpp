@@ -15,7 +15,7 @@ void UEventHandle_SwitchProcedure::OnDespawn_Implementation(bool bRecovery)
 	ProcedureClass = nullptr;
 }
 
-void UEventHandle_SwitchProcedure::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_SwitchProcedure::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

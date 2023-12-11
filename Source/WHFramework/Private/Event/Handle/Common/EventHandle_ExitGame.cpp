@@ -13,7 +13,7 @@ void UEventHandle_ExitGame::OnDespawn_Implementation(bool bRecovery)
 	bIsSimulating = false;
 }
 
-void UEventHandle_ExitGame::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ExitGame::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

@@ -89,6 +89,24 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 	return nullptr;
 }
 
+template<typename T>
+extern void RecursiveItems(T* Value, TFunction<TArray<T*>(T*)> Func)
+{
+	for(auto Iter : Func(Value))
+	{
+		RecursiveItems(Iter, Func);
+	}
+}
+
+template<typename T>
+extern void RecursiveItems(T& Value, TFunction<TArray<T>(T&)> Func)
+{
+	for(auto Iter : Func(Value))
+	{
+		RecursiveItems(Iter, Func);
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // MACROS
 #define PHASEC(A, B) \

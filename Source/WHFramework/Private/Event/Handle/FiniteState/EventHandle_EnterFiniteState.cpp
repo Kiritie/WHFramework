@@ -14,7 +14,7 @@ void UEventHandle_EnterFiniteState::OnDespawn_Implementation(bool bRecovery)
 	FSM = nullptr;
 }
 
-void UEventHandle_EnterFiniteState::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_EnterFiniteState::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{

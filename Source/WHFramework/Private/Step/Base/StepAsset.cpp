@@ -2,6 +2,7 @@
 
 #include "Step/Base/StepAsset.h"
 #include "AssetRegistry/AssetData.h"
+#include "Common/CommonTypes.h"
 #include "Step/Base/StepBase.h"
 
 UStepAsset::UStepAsset(const FObjectInitializer& ObjectInitializer)
@@ -25,9 +26,13 @@ void UStepAsset::Initialize(UAssetBase* InSource)
 	{
 		if(!Iter) continue;
 
-		Iter->OnInitialize();
+		RecursiveItems<UStepBase>(Iter, [this](UStepBase* Step)
+		{
+			StepMap.Add(Step->StepGUID, Step);
+			return Step->SubSteps;
+		});
 
-		AAA(Iter, StepMap);
+		Iter->OnInitialize();
 		
 		if(!FirstStep)
 		{
@@ -36,24 +41,17 @@ void UStepAsset::Initialize(UAssetBase* InSource)
 	}
 }
 
-void UStepAsset::AAA(UStepBase* InStep, TMap<FString, UStepBase*>& InMap)
-{
-	InMap.Add(InStep->StepGUID, InStep);
-	for(auto Iter : InStep->SubSteps)
-	{
-		AAA(Iter, InMap);
-	}
-};
-
 #if WITH_EDITOR
-void UStepAsset::GenerateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems)
+void UStepAsset::GenerateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepListItems, const FString& InFilterText)
 {
 	OutStepListItems = TArray<TSharedPtr<FStepListItem>>();
 	for (int32 i = 0; i < RootSteps.Num(); i++)
 	{
 		auto Item = MakeShared<FStepListItem>();
-		RootSteps[i]->GenerateListItem(Item);
-		OutStepListItems.Add(Item);
+		if(RootSteps[i]->GenerateListItem(Item, InFilterText))
+		{
+			OutStepListItems.Add(Item);
+		}
 	}
 }
 
@@ -63,7 +61,10 @@ void UStepAsset::UpdateStepListItem(TArray<TSharedPtr<FStepListItem>>& OutStepLi
 	{
 		RootSteps[i]->StepIndex = i;
 		RootSteps[i]->StepHierarchy = 0;
-		RootSteps[i]->UpdateListItem(OutStepListItems[i]);
+		if(OutStepListItems.IsValidIndex(i))
+		{
+			RootSteps[i]->UpdateListItem(OutStepListItems[i]);
+		}
 	}
 }
 

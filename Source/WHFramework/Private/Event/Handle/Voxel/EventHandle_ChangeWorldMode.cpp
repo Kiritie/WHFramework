@@ -8,7 +8,7 @@ UEventHandle_ChangeWorldMode::UEventHandle_ChangeWorldMode()
 	WorldMode = EVoxelWorldMode::None;
 }
 
-void UEventHandle_ChangeWorldMode::Fill_Implementation(const TArray<FParameter>& InParams)
+void UEventHandle_ChangeWorldMode::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
