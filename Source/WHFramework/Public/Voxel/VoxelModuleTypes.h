@@ -7,6 +7,7 @@
 #include "Common/CommonTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "Scene/SceneModuleTypes.h"
 
 #include "VoxelModuleTypes.generated.h"
 
@@ -597,8 +598,7 @@ public:
 
 		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
 
-		TimeSeconds = -1.f;
-		SecondsOfDay = 1200.f;
+		SceneData = FSceneModuleSaveData();
 	}
 
 public:
@@ -646,12 +646,9 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float TimeSeconds;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float SecondsOfDay;
+	FSceneModuleSaveData SceneData;
 
 public:
 	FORCEINLINE FVector GetChunkRealSize() const

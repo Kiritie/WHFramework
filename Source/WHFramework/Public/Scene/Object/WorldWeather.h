@@ -12,7 +12,7 @@ class ADirectionalLight;
 /**
  * �����������
  */
-UCLASS(Blueprintable, DefaultToInstanced)
+UCLASS(Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWorldWeather : public UWHObject
 {
 	GENERATED_BODY()
@@ -28,5 +28,31 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	void UpdateWeather(float DeltaSeconds = 0.f);
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnInitialize();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPreparatory();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnRefresh(float DeltaSeconds);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPause();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnUnPause();
+
+public:
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	int32 GetWeatherSeed() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void SetWeatherSeed(int32 InSeed) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	TArray<FParameter> GetWeatherParams() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SetWeatherParams(const TArray<FParameter>& InParams) const;
 };

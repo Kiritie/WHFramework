@@ -11,7 +11,7 @@ class UModuleBase;
 /**
  * 常模块数据存取类
  */
-UCLASS()
+UCLASS(Abstract)
 class WHFRAMEWORK_API UModuleSaveGame : public USaveGameBase
 {
 	GENERATED_BODY()

@@ -10,7 +10,7 @@
 /**
 * 数据存取基类
 */
-UCLASS()
+UCLASS(Abstract)
 class WHFRAMEWORK_API USaveGameBase : public USaveGame
 {
 	GENERATED_BODY()

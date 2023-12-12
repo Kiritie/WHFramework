@@ -240,7 +240,7 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			UEventHandleBase* EventHandle;
 		} Params{InSender, EventHandle};
 
-		FEventMapping& Mapping = EventMappings[InClass];
+		FEventMapping Mapping = EventMappings[InClass];
 		for (auto& Iter1 : Mapping.FuncMap)
 		{
 			for (auto Iter2 : Iter1.Value.FuncNames)

@@ -8,8 +8,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Base/SaveGameBase.h"
-#include "SaveGame/General/GeneralSaveGame.h"
-		
+#include "SaveGame/Module/GeneralSaveGame.h"
+
 IMPLEMENTATION_MODULE(USaveGameModule)
 
 // ParamSets default values

@@ -11,38 +11,13 @@ class ADirectionalLight;
 /**
  * ʱ��������
  */
-UCLASS(Blueprintable, DefaultToInstanced)
+UCLASS(Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWorldTimer : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
 	UWorldTimer();
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	ASkyLight* SkyLight;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	ADirectionalLight* SunLight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	float TimeSeconds;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	float SecondsOfDay;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	int32 CurrentDay;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	int32 CurrentHour;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	int32 CurrentMinute;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "WorldTimer")
-	int32 CurrentSeconds;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Object
@@ -52,44 +27,55 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void InitializeTimer(float InSecondsOfDay, float InTimeSeconds = -1.f);
-
-	UFUNCTION(BlueprintCallable)
-	void UpdateTimer(float DeltaSeconds = 0.f);
-
-	UFUNCTION(BlueprintCallable)
-	void SetCurrentTime(float InTimeSeconds, bool bUpdateTimer = true);
-
-protected:
 	UFUNCTION(BlueprintImplementableEvent)
-	void UpdateLight(float InLightDirection);
-	
+	void OnInitialize();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPreparatory();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnRefresh(float DeltaSeconds);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPause();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnUnPause();
+
 public:
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void ResetDateTime(float InNewTime = -1.f) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	FDateTime GetDateTime() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void SetDateTime(FDateTime InDataTime) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	float GetTimeOfDay() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void SetTimeOfDay(float InTime) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	float GetDayLength() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void SetDayLength(float InLength) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	float GetNightLength() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void SetNightLength(float InLength) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunriseTime() const;
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetNoonTime() const;
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunsetTime() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetSecondsOfDay() const { return SecondsOfDay; }
-
-	UFUNCTION(BlueprintPure)
-	float GetTimeSeconds() const { return TimeSeconds; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentDay() const { return CurrentDay; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentHour() const { return CurrentHour; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentMinute() const { return CurrentMinute; }
-
-	UFUNCTION(BlueprintPure)
-	int32 GetCurrentSeconds() const { return CurrentSeconds; }
 };

@@ -1,16 +1,15 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
-#include "SaveGame/General/GeneralSaveGame.h"
+#include "SaveGame/Module/GeneralSaveGame.h"
 
-#include "Camera/CameraModuleStatics.h"
 #include "Common/CommonStatics.h"
-#include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModule.h"
-#include "SaveGame/SaveGameModuleStatics.h"
 
 UGeneralSaveGame::UGeneralSaveGame()
 {
 	SaveName = FName("General");
+
+	ModuleClass = USaveGameModule::StaticClass();
 }
 
 void UGeneralSaveGame::OnCreate_Implementation(int32 InIndex)
@@ -31,6 +30,4 @@ void UGeneralSaveGame::OnUnload_Implementation(EPhase InPhase)
 void UGeneralSaveGame::OnRefresh_Implementation()
 {
 	Super::OnRefresh_Implementation();
-
-	SetSaveData(USaveGameModule::Get().GetSaveData(true));
 }

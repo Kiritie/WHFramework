@@ -3,7 +3,6 @@
 
 #include "Voxel/VoxelModule.h"
 
-#include "Ability/AbilityModuleStatics.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -13,7 +12,6 @@
 #include "Main/MainModuleStatics.h"
 #include "Math/MathStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "Scene/Object/WorldTimer.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -32,6 +30,7 @@
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/VoxelSaveGame.h"
+#include "Scene/SceneModule.h"
 #include "Voxel/Capture/VoxelCapture.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Voxels/VoxelTree.h"
@@ -285,7 +284,7 @@ FVoxelWorldSaveData* UVoxelModule::NewWorldData(FSaveData* InBasicData) const
 
 void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
+	auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -329,10 +328,6 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			ItemIndex++;
 		)
 	}
-	if(PHASEC(InPhase, EPhase::PrimaryAndLesser))
-	{
-		USceneModuleStatics::GetWorldTimer()->InitializeTimer(SaveData.SecondsOfDay, SaveData.TimeSeconds);
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SetWorldMode(EVoxelWorldMode::Default);
@@ -342,12 +337,19 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			Iter.Value->Generate(EPhase::Final);
 		}
 	}
+
+	if(SaveData.SceneData.WeatherSeed == 0)
+	{
+		SaveData.SceneData.WeatherSeed = WorldData->WorldSeed;
+	}
+	USceneModule::Get().LoadSaveData(&SaveData.SceneData, InPhase);
 }
 
 FSaveData* UVoxelModule::ToData()
 {
 	static FVoxelWorldSaveData* SaveData;
 	SaveData = NewWorldData(WorldData);
+	
 	for(auto& Iter : ChunkMap)
 	{
 		if(Iter.Value->IsGenerated())
@@ -355,8 +357,9 @@ FSaveData* UVoxelModule::ToData()
 			SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
 		}
 	}
-	SaveData->TimeSeconds = USceneModuleStatics::GetWorldTimer()->GetTimeSeconds();
-	SaveData->SecondsOfDay = USceneModuleStatics::GetWorldTimer()->GetSecondsOfDay();
+
+	SaveData->SceneData = USceneModule::Get().GetSaveDataRef<FSceneModuleSaveData>(true);
+	
 	return SaveData;
 }
 

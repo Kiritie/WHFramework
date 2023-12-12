@@ -15,8 +15,3 @@ void UWorldWeather::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 }
-
-void UWorldWeather::UpdateWeather(float DeltaSeconds)
-{
-	
-}

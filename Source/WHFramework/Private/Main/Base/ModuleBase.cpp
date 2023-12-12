@@ -6,6 +6,7 @@
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
+#include "SaveGame/Module/ModuleSaveGame.h"
 
 // Sets default values
 UModuleBase::UModuleBase()

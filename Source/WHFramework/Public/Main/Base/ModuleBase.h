@@ -8,8 +8,8 @@
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "ModuleBase.generated.h"
 
+class UModuleSaveGame;
 class AMainModule;
-class USaveGameBase;
 class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
@@ -184,7 +184,7 @@ protected:
 	EPhase ModuleSavePhase;
 	/// 模块存档
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
-	TSubclassOf<USaveGameBase> ModuleSaveGame;
+	TSubclassOf<UModuleSaveGame> ModuleSaveGame;
 	/// 模块网络组件
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UModuleNetworkComponentBase> ModuleNetworkComponent;

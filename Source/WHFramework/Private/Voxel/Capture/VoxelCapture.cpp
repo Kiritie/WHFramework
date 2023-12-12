@@ -4,6 +4,7 @@
 #include "Voxel/Capture/VoxelCapture.h"
 
 #include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 // Sets default values
 AVoxelCapture::AVoxelCapture()
@@ -11,7 +12,7 @@ AVoxelCapture::AVoxelCapture()
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
-
+	
 	Capture2D = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
 	Capture2D->SetupAttachment(RootComponent);
 	Capture2D->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));

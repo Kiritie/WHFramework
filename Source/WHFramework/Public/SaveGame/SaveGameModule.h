@@ -48,6 +48,8 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+protected:
+	UFUNCTION()
 	virtual void OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
 
 protected:

@@ -10,6 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "SaveGame/Module/SceneSaveGame.h"
 #include "Scene/Object/WorldTimer.h"
 #include "Scene/Object/WorldWeather.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -25,18 +26,10 @@ USceneModule::USceneModule()
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 
-	bModuleAutoRun = false;
+	ModuleSaveGame = USceneSaveGame::StaticClass();
 
-	static ConstructorHelpers::FClassFinder<UWorldTimer> WorldTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BP_WorldTimer.BP_WorldTimer_C'"));
-	if(WorldTimerClass.Succeeded())
-	{
-		WorldTimer = Cast<UWorldTimer>(CreateDefaultSubobject(TEXT("WorldTimer"), WorldTimerClass.Class, WorldTimerClass.Class, true, true));
-	}
-	static ConstructorHelpers::FClassFinder<UWorldWeather> WeatherTimerClass(TEXT("Blueprint'/WHFramework/Scene/Blueprints/Components/BP_WorldWeather.BP_WorldWeather_C'"));
-	if(WeatherTimerClass.Succeeded())
-	{                                                                                          
-		WorldWeather = Cast<UWorldWeather>(CreateDefaultSubobject(TEXT("WorldWeather"), WeatherTimerClass.Class, WeatherTimerClass.Class, true, true));
-	}
+	WorldTimer = nullptr;
+	WorldWeather = nullptr;
 
 	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
 
@@ -90,6 +83,15 @@ void USceneModule::OnDestroy()
 void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	if(WorldTimer)
+	{
+		WorldTimer->OnInitialize();
+	}
+	if(WorldWeather)
+	{
+		WorldWeather->OnInitialize();
+	}
 
 	for(auto Iter : SceneActors)
 	{
@@ -168,6 +170,18 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 	
 		SetOutlineColor(OutlineColor);
 	}
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		if(WorldTimer)
+    	{
+    		WorldTimer->OnPreparatory();
+    	}
+    	if(WorldWeather)
+    	{
+    		WorldWeather->OnPreparatory();
+    	}
+	}
 }
 
 void USceneModule::OnRefresh(float DeltaSeconds)
@@ -176,22 +190,40 @@ void USceneModule::OnRefresh(float DeltaSeconds)
 
 	if(WorldTimer)
 	{
-		WorldTimer->UpdateTimer(DeltaSeconds);
+		WorldTimer->OnRefresh(DeltaSeconds);
 	}
-	if (WorldWeather)
+	if(WorldWeather)
 	{
-		WorldWeather->UpdateWeather(DeltaSeconds);
+		WorldWeather->OnRefresh(DeltaSeconds);
 	}
 }
 
 void USceneModule::OnPause()
 {
 	Super::OnPause();
+
+	if(WorldTimer)
+	{
+		WorldTimer->OnPause();
+	}
+	if(WorldWeather)
+	{
+		WorldWeather->OnPause();
+	}
 }
 
 void USceneModule::OnUnPause()
 {
 	Super::OnUnPause();
+
+	if(WorldTimer)
+	{
+		WorldTimer->OnUnPause();
+	}
+	if(WorldWeather)
+	{
+		WorldWeather->OnUnPause();
+	}
 }
 
 void USceneModule::OnTermination(EPhase InPhase)
@@ -199,120 +231,45 @@ void USceneModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	if(!LoadedLevels.Contains(InLevelPath))
+	const auto& SaveData = InSaveData->CastRef<FSceneModuleSaveData>();
+
+	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(bCreateLoadingWidget)
+		if(WorldTimer)
 		{
-			TArray<FParameter> Parameters { InLevelPath.ToString(), false };
-			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
+			WorldTimer->SetDayLength(SaveData.DayLength);
+			WorldTimer->SetNightLength(SaveData.NightLength);
+			if(SaveData.DateTime != -1) WorldTimer->SetDateTime(SaveData.DateTime);
+			else WorldTimer->SetTimeOfDay(SaveData.TimeOfDay);
 		}
-		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([&](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
-			if(Result == EAsyncLoadingResult::Failed)
-			{
-				WHLog(TEXT("Load level failed!"));
-			}
-			else if(Result == EAsyncLoadingResult::Succeeded)
-			{
-				FLatentActionInfo LatentActionInfo;
-				UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedPackage, true, false, LatentActionInfo);
-				if(InFinishDelayTime > 0.f)
-				{
-					FTimerHandle TimerHandle;
-					FTimerDelegate TimerDelegate;
-					TimerDelegate.BindUObject(this, &USceneModule::OnAsyncLoadLevelFinished, InLevelPath, InOnAsyncLoadLevelFinished);
-					GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
-				}
-				else
-				{
-					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
-				}
-				if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
-				{
-					UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
-				}
-				LoadedLevels.Add(InLevelPath, LoadedPackage);
-			}
-		}), 0, PKG_ContainsMap);
-	}
-	else
-	{
-		FLatentActionInfo LatentActionInfo;
-		UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
-		OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
+		if(WorldWeather)
+		{
+			WorldWeather->SetWeatherSeed(SaveData.WeatherSeed);
+			if(!SaveData.WeatherParams.IsEmpty()) WorldWeather->SetWeatherParams(SaveData.WeatherParams);
+		}
 	}
 }
 
-void USceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+FSaveData* USceneModule::ToData()
 {
-	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	if(LoadedLevels.Contains(InLevelPath))
+	static FSceneModuleSaveData* SaveData;
+	SaveData = new FSceneModuleSaveData();
+
+	if(WorldTimer)
 	{
-		FLatentActionInfo LatentActionInfo;
-		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
-		if(bCreateLoadingWidget)
-		{
-			TArray<FParameter> Parameters { InLevelPath.ToString(), true };
-			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
-		}
-		WHLog(TEXT("Start unload level: ") + LoadPackagePath);
-		if(InFinishDelayTime > 0.f)
-		{
-			FTimerHandle TimerHandle;
-			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &USceneModule::OnAsyncUnloadLevelFinished, InLevelPath, InOnAsyncUnloadLevelFinished);
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
-		}
-		else
-		{
-			OnAsyncUnloadLevelFinished(InLevelPath, InOnAsyncUnloadLevelFinished);
-		}
-		if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
-		{
-			UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
-		}
-		LoadedLevels.Remove(InLevelPath);
+		SaveData->DayLength = WorldTimer->GetDayLength();
+		SaveData->NightLength = WorldTimer->GetNightLength();
+		SaveData->TimeOfDay = WorldTimer->GetTimeOfDay();
+		SaveData->DateTime = WorldTimer->GetDateTime();
 	}
-}
-
-float USceneModule::GetAsyncLoadLevelProgress(FName InLevelPath) const
-{
-	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	return GetAsyncLoadPercentage(*LoadPackagePath) / 100.f;
-}
-
-float USceneModule::GetAsyncUnloadLevelProgress(FName InLevelPath) const
-{
-	return 1.f;
-}
-
-void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished)
-{
-	WHLog(TEXT("Load level Succeeded!"));
-
-	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
-
-	if(InOnAsyncLoadLevelFinished.IsBound())
+	if(WorldWeather)
 	{
-		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
+		SaveData->WeatherParams = WorldWeather->GetWeatherParams();
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
-}
 
-void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
-{
-	WHLog(TEXT("Unload level Succeeded!"));
-
-	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
-	
-	if(InOnAsyncUnloadLevelFinished.IsBound())
-	{
-		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
-	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
+	return SaveData;
 }
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const
@@ -514,4 +471,120 @@ void USceneModule::SetOutlineColor(const FLinearColor& InColor)
 	{
 		OutlineMatInst->SetVectorParameterValue("Color", OutlineColor);
 	}
+}
+
+void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	if(!LoadedLevels.Contains(InLevelPath))
+	{
+		if(bCreateLoadingWidget)
+		{
+			TArray<FParameter> Parameters { InLevelPath.ToString(), false };
+			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
+		}
+		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([&](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
+			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
+			if(Result == EAsyncLoadingResult::Failed)
+			{
+				WHLog(TEXT("Load level failed!"));
+			}
+			else if(Result == EAsyncLoadingResult::Succeeded)
+			{
+				FLatentActionInfo LatentActionInfo;
+				UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedPackage, true, false, LatentActionInfo);
+				if(InFinishDelayTime > 0.f)
+				{
+					FTimerHandle TimerHandle;
+					FTimerDelegate TimerDelegate;
+					TimerDelegate.BindUObject(this, &USceneModule::OnAsyncLoadLevelFinished, InLevelPath, InOnAsyncLoadLevelFinished);
+					GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
+				}
+				else
+				{
+					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
+				}
+				if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
+				{
+					UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
+				}
+				LoadedLevels.Add(InLevelPath, LoadedPackage);
+			}
+		}), 0, PKG_ContainsMap);
+	}
+	else
+	{
+		FLatentActionInfo LatentActionInfo;
+		UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
+		OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
+	}
+}
+
+void USceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	if(LoadedLevels.Contains(InLevelPath))
+	{
+		FLatentActionInfo LatentActionInfo;
+		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
+		if(bCreateLoadingWidget)
+		{
+			TArray<FParameter> Parameters { InLevelPath.ToString(), true };
+			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
+		}
+		WHLog(TEXT("Start unload level: ") + LoadPackagePath);
+		if(InFinishDelayTime > 0.f)
+		{
+			FTimerHandle TimerHandle;
+			FTimerDelegate TimerDelegate;
+			TimerDelegate.BindUObject(this, &USceneModule::OnAsyncUnloadLevelFinished, InLevelPath, InOnAsyncUnloadLevelFinished);
+			GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
+		}
+		else
+		{
+			OnAsyncUnloadLevelFinished(InLevelPath, InOnAsyncUnloadLevelFinished);
+		}
+		if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
+		{
+			UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
+		}
+		LoadedLevels.Remove(InLevelPath);
+	}
+}
+
+float USceneModule::GetAsyncLoadLevelProgress(FName InLevelPath) const
+{
+	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
+	return GetAsyncLoadPercentage(*LoadPackagePath) / 100.f;
+}
+
+float USceneModule::GetAsyncUnloadLevelProgress(FName InLevelPath) const
+{
+	return 1.f;
+}
+
+void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished)
+{
+	WHLog(TEXT("Load level Succeeded!"));
+
+	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+
+	if(InOnAsyncLoadLevelFinished.IsBound())
+	{
+		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
+	}
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
+}
+
+void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
+{
+	WHLog(TEXT("Unload level Succeeded!"));
+
+	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+	
+	if(InOnAsyncUnloadLevelFinished.IsBound())
+	{
+		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
+	}
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
 }

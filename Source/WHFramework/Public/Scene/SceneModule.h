@@ -48,46 +48,30 @@ public:
 	
 	virtual void OnTermination(EPhase InPhase) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	// Components
 protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	// WorldTimer
+protected:
+	UPROPERTY(EditAnywhere, Instanced, Category = "WorldWeather")
 	UWorldTimer* WorldTimer;
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UWorldWeather* WorldWeather;
 public:
 	UFUNCTION(BlueprintPure)
 	UWorldTimer* GetWorldTimer() const { return WorldTimer; }
 
-	UFUNCTION(BlueprintPure)
-	UWorldWeather* GetWorldWeather() const { return WorldWeather; }
-
 	//////////////////////////////////////////////////////////////////////////
-	/// Level
+	// WorldWeather
 protected:
-	UPROPERTY(VisibleAnywhere, Transient, Category = "TargetPoint")
-	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
+	UPROPERTY(EditAnywhere, Instanced, Category = "WorldWeather")
+	UWorldWeather* WorldWeather;
 	
 public:
-	UFUNCTION(BlueprintCallable)
-	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
-
-	UFUNCTION(BlueprintCallable)
-	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
-
 	UFUNCTION(BlueprintPure)
-	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
-
-	UFUNCTION(BlueprintPure)
-	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
-
-protected:
-	UFUNCTION()
-	void OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
-
-	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
+	UWorldWeather* GetWorldWeather() const { return WorldWeather; }
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor
@@ -213,4 +197,30 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetOutlineColor(const FLinearColor& InColor);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Level
+protected:
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Level")
+	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
+	
+public:
+	UFUNCTION(BlueprintCallable)
+	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable)
+	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintPure)
+	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
+
+protected:
+	UFUNCTION()
+	void OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
 };

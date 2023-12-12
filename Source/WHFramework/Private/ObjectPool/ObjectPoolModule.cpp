@@ -131,7 +131,7 @@ bool UObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
 
 UObject* UObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass()) || ModuleState == EModuleState::Terminated) return nullptr;
+	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
 
 	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
 	return ObjectPool->Spawn(InOwner, InParams);
