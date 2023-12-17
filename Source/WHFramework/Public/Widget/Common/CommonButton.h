@@ -9,9 +9,11 @@
 
 class UCommonTextBlock;
 
-UCLASS(Abstract, BlueprintType, Blueprintable)
+UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
 class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
 {
+	friend class UCommonButtonGroup;
+
 	GENERATED_BODY()
 
 public:
@@ -57,9 +59,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsClicked() const { return bClicked; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetClicked(bool bInClicked) { bClicked = bInClicked; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinWidth(int32 InValue);

@@ -5,6 +5,7 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Common/CommonStatics.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
 IMPLEMENTATION_MODULE(UWidgetModule)
@@ -16,7 +17,7 @@ UWidgetModule::UWidgetModule()
 	ModuleDisplayName = FText::FromString(TEXT("Widget Module"));
 
 	UserWidgetClasses = TArray<TSubclassOf<UUserWidgetBase>>();
-	AllUserWidgets = TMap<FName, UUserWidgetBase*>();
+	AllUserWidget = TMap<FName, UUserWidgetBase*>();
 	TemporaryUserWidget = nullptr;
 	UserWidgetClassMap = TMap<FName, TSubclassOf<UUserWidgetBase>>();
 
@@ -90,9 +91,9 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Primary))
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		for(auto& Iter : UserWidgetClasses)
+		for(const auto& Iter : UserWidgetClasses)
 		{
 			if(!Iter) continue;
 			const UUserWidgetBase* DefaultObject = Iter->GetDefaultObject<UUserWidgetBase>();
@@ -114,22 +115,6 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 				}
 			}
 		}
-
-		for(auto Iter : WorldWidgetClasses)
-		{
-			if(!Iter) return;
-			const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
-			if(!WorldWidgetClassMap.Contains(WidgetName))
-			{
-				WorldWidgetClassMap.Add(WidgetName, Iter);
-			}
-		}
-
-		WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
-		if(WorldWidgetContainer)
-		{
-			WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
-		}
 	}
 }
 
@@ -150,7 +135,7 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 		}
 	}
 
-	for (auto Iter : AllUserWidgets)
+	for (auto Iter : AllUserWidget)
 	{
 		if(!Iter.Value) continue;
 		UUserWidgetBase* UserWidget = Iter.Value;
@@ -203,6 +188,16 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	}
 }
 
+void UWidgetModule::SortUserWidgetClasses()
+{
+	UCommonStatics::SortStringElementArray<TSubclassOf<UUserWidgetBase>>(UserWidgetClasses,
+		[](const TSubclassOf<UUserWidgetBase>& InClass)
+		{
+			return InClass->GetName();
+		});
+	Modify();
+}
+
 bool UWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const
 {
 	return HasUserWidgetClass<UUserWidgetBase>(InClass);
@@ -220,9 +215,9 @@ UUserWidgetBase* UWidgetModule::GetUserWidget(TSubclassOf<UUserWidgetBase> InCla
 
 UUserWidgetBase* UWidgetModule::GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass) const
 {
-	if(AllUserWidgets.Contains(InName))
+	if(AllUserWidget.Contains(InName))
 	{
-		return AllUserWidgets[InName];
+		return AllUserWidget[InName];
 	}
 	return nullptr;
 }
@@ -264,7 +259,7 @@ bool UWidgetModule::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass,  boo
 
 void UWidgetModule::CloseAllUserWidget(bool bInstant)
 {
-	for (auto Iter : AllUserWidgets)
+	for (auto Iter : AllUserWidget)
 	{
 		if(Iter.Value)
 		{
@@ -276,14 +271,14 @@ void UWidgetModule::CloseAllUserWidget(bool bInstant)
 
 void UWidgetModule::ClearAllUserWidget()
 {
-	for (auto Iter : AllUserWidgets)
+	for (auto Iter : AllUserWidget)
 	{
 		if(Iter.Value)
 		{
 			Iter.Value->OnDestroy();
 		}
 	}
-	AllUserWidgets.Empty();
+	AllUserWidget.Empty();
 }
 
 void UWidgetModule::CloseAllSlateWidget(bool bInstant)
@@ -408,7 +403,7 @@ void UWidgetModule::ClearAllWorldWidget()
 EInputMode UWidgetModule::GetNativeInputMode() const
 {
 	EInputMode InputMode = EInputMode::None;
-    for (const auto& Iter : AllUserWidgets)
+    for (const auto& Iter : AllUserWidget)
     {
     	if (Iter.Value && (Iter.Value->GetWidgetState() == EScreenWidgetState::Opening || Iter.Value->GetWidgetState() == EScreenWidgetState::Opened) &&
     		(int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)

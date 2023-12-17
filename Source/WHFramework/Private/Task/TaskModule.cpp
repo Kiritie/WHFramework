@@ -51,19 +51,17 @@ void UTaskModule::OnDestroy()
 void UTaskModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	if(DefaultAsset)
+	{
+		SetCurrentAsset(DefaultAsset);
+	}
 }
 
 void UTaskModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		if(DefaultAsset)
-		{
-			SetCurrentAsset(DefaultAsset);
-		}
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(bAutoEnterFirst && !CurrentTask)

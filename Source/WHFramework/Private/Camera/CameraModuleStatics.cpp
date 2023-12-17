@@ -11,6 +11,16 @@ ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(TSubclassOf<ACameraActo
 	return UCameraModule::Get().GetCurrentCamera(InClass);
 }
 
+ACameraPointBase* UCameraModuleStatics::GetDefaultCameraPoint()
+{
+	return UCameraModule::Get().GetDefaultCameraPoint();
+}
+
+void UCameraModuleStatics::SetDefaultCameraPoint(ACameraPointBase* InCameraPoint)
+{
+	UCameraModule::Get().SetDefaultCameraPoint(InCameraPoint);
+}
+
 FVector UCameraModuleStatics::GetCameraLocation(bool bReal)
 {
 	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation();
@@ -156,12 +166,12 @@ void UCameraModuleStatics::SetCameraViewParams(const FCameraViewParams& InCamera
 	UCameraModule::Get().SetCameraViewParams(InCameraViewParams);
 }
 
-void UCameraModuleStatics::ResetCameraView()
+void UCameraModuleStatics::ResetCameraView(bool bUseCachedParams)
 {
-	UCameraModule::Get().ResetCameraView();
+	UCameraModule::Get().ResetCameraView(bUseCachedParams);
 }
 
-void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint)
+void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault)
 {
-	UCameraModule::Get().SwitchCameraPoint(InCameraPoint);
+	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bSetAsDefault);
 }

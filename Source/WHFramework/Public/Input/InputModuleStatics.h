@@ -7,6 +7,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "InputModuleStatics.generated.h"
 
+class UInputActionBase;
 class UEnhancedInputLocalPlayerSubsystem;
 class UInputUserSettingsBase;
 class UInputComponentBase;
@@ -49,6 +50,30 @@ public:
 public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static FInputKeyShortcut GetKeyShortcutByName(const FName InName);
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void RemoveKeyShortcut(const FName InName);
+
+	//////////////////////////////////////////////////////////////////////////
+	// InputMappings
+public:
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping);
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void RemoveKeyMapping(const FName InName);
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void AddTouchMapping(const FInputTouchMapping& InKeyMapping);
+	
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured = true);
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputStates

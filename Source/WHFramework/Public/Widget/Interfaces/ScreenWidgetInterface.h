@@ -69,6 +69,8 @@ public:
 public:
 	virtual FName GetParentName() const = 0;
 
+	virtual FName GetParentSlot() const = 0;
+
 	virtual TArray<FName> GetChildNames() const = 0;
 
 	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const = 0;

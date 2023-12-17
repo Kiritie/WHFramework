@@ -19,6 +19,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetType = EWidgetType::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
+	ParentSlot = NAME_None;
 	ChildNames = TArray<FName>();
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
@@ -80,29 +81,17 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	{
 		ParentWidget->RemoveChild(this);
 	}
-	if(ParentName != NAME_None)
+	if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
+	{
+		ParentWidget = InParent;
+		ParentWidget->AddChild(this);
+	}
+	else if(ParentName != NAME_None)
 	{
 		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
 		if(ParentWidget)
 		{
 			ParentWidget->AddChild(this);
-		}
-	}
-	else if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
-	{
-		ParentWidget = InParent;
-		ParentWidget->AddChild(this);
-	}
-	
-	for(const auto& Iter : ChildNames)
-	{
-		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
-		{
-			const UUserWidgetBase* DefaultObject = UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
-			if(DefaultObject->ParentName != NAME_None && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
-			{
-				UWidgetModuleStatics::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
-			}
 		}
 	}
 
@@ -116,24 +105,36 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 		WidgetCloseAnimator->Execute_OnSpawn(WidgetCloseAnimator, this, {});
 	}
 
+	K2_OnCreate(InOwner, InParams);
+
+	for(const auto& Iter : ChildNames)
+	{
+		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
+		{
+			const UUserWidgetBase* DefaultObject = UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
+			if(DefaultObject->ParentName == WidgetName && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
+			{
+				UWidgetModuleStatics::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
+			}
+		}
+	}
+
 	for(const auto Iter : GetAllSubWidgets())
 	{
 		Iter->OnCreate(this, Iter->GetParams());
 	}
-
-	K2_OnCreate(InOwner, InParams);
 }
 
 void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	WidgetParams = InParams;
 
+	K2_OnInitialize(InOwner, InParams);
+
 	for(auto& Iter : ChildWidgets)
 	{
 		Iter->OnInitialize(InOwner, InParams);
 	}
-
-	K2_OnInitialize(InOwner, InParams);
 }
 
 void UUserWidgetBase::OnReset(bool bForce)
@@ -149,16 +150,28 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
-	if(ParentWidget && ParentWidget->GetRootPanelWidget())
+	if(const auto ParentUserWidget = GetParentWidgetN<UUserWidgetBase>())
 	{
-		if(GetParent() != ParentWidget->GetRootPanelWidget())
+		UPanelWidget* ParentSlotWidget;
+		if(ParentSlot.IsNone())
 		{
-			RemoveFromParent();
-			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(ParentWidget->GetRootPanelWidget()->AddChild(this)))
+			ParentSlotWidget = ParentUserWidget->GetRootPanelWidget();
+		}
+		else
+		{
+			ParentSlotWidget = Cast<UPanelWidget>(ParentUserWidget->WidgetTree->FindWidget(ParentSlot));
+		}
+		if(ParentSlotWidget)
+		{
+			if(GetParent() != ParentSlotWidget)
 			{
-				CanvasPanelSlot->SetZOrder(WidgetZOrder);
-				CanvasPanelSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
-				CanvasPanelSlot->SetOffsets(FMargin(0.f));
+				UPanelSlot* PanelSlot = ParentSlotWidget->AddChild(this);
+				if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
+				{
+					CanvasPanelSlot->SetZOrder(WidgetZOrder);
+					CanvasPanelSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+					CanvasPanelSlot->SetOffsets(FMargin(0.f));
+				}
 			}
 		}
 	}
@@ -187,6 +200,7 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 			break;
 		}
+		default: break;
 	}
 		
 	Refresh();
@@ -234,22 +248,18 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	UInputModuleStatics::UpdateGlobalInputMode();
 
-	for(const auto Iter : ChildNames)
-	{
-		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
-		{
-			const UUserWidgetBase* DefaultObject = Cast<UUserWidgetBase>(UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject());
-			if(DefaultObject->ParentName != NAME_None && DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen)
-			{
-				UWidgetModuleStatics::OpenUserWidgetByName(Iter);
-			}
-		}
-	}
-
 	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
 	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
 
 	K2_OnOpen(InParams, bInstant);
+
+	for(const auto Iter : ChildWidgets)
+	{
+		if(Iter->GetParentName() == WidgetName && Iter->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
+		{
+			Iter->Open(nullptr, bInstant);
+		}
+	}
 }
 
 void UUserWidgetBase::OnClose(bool bInstant)
@@ -439,24 +449,16 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		}
 		case EWidgetCloseType::Remove:
 		{
-			if(ParentName != NAME_None)
+			if(ParentWidget)
 			{
-				if(GetParent())
-				{
-					GetParent()->RemoveChild(this);
-				}
+				ParentWidget->RemoveChild(this);
 			}
-			else
-			{
-				if(IsInViewport())
-				{
-					RemoveFromParent();
-				}
-			}
+			RemoveFromParent();
 			break;
 		}
+		default: break;
 	}
-		
+	
 	if(GetWidgetType(false) == EWidgetType::Temporary)
 	{
 		if(GetLastTemporary())

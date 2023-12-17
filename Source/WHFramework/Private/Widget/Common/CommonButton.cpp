@@ -6,6 +6,7 @@
 UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	Txt_Title = nullptr;
+	
 	bClicked = false;
 
 	Style = UCommonButtonStyle::StaticClass();
@@ -18,10 +19,11 @@ void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParam
 
 void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 {
-	bClicked = true;
-	SetIsSelected(false);
-	SetTitle(FText::GetEmpty());
 	bClicked = false;
+
+	SetTitle(FText::GetEmpty());
+
+	SetSelectedInternal(false, false, false);
 
 	RemoveFromParent();
 }
@@ -49,22 +51,20 @@ void UCommonButton::NativeOnCurrentTextStyleChanged()
 void UCommonButton::NativeOnClicked()
 {
 	Super::NativeOnClicked();
-
-	bClicked = true;
 }
 
 void UCommonButton::NativeOnSelected(bool bBroadcast)
 {
-	Super::NativeOnSelected(bBroadcast);
+	bClicked = bBroadcast;
 
-	bClicked = false;
+	Super::NativeOnSelected(bBroadcast);
 }
 
 void UCommonButton::NativeOnDeselected(bool bBroadcast)
 {
-	Super::NativeOnDeselected(bBroadcast);
+	bClicked = bBroadcast;
 
-	bClicked = false;
+	Super::NativeOnDeselected(bBroadcast);
 }
 
 void UCommonButton::SetTitle(const FText InTitle)

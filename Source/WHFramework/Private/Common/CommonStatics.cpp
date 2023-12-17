@@ -387,6 +387,11 @@ FText UCommonStatics::GetInputActionKeyCodeByName(const FString& InInputActionNa
 	return FText::GetEmpty();
 }
 
+FKey UCommonStatics::MakeKeyFromName(const FName InKeyName)
+{
+	return FKey(InKeyName);
+}
+
 bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params)
 {
 	if (ensureEditor(InObject))

@@ -57,6 +57,10 @@ void UAbilityModule::OnDestroy()
 void UAbilityModule::OnInitialize()
 {
 	Super::OnInitialize();
+	
+	DON_WITHINDEX(UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
+		if(i > 0) UAssetModuleStatics::RegisterPrimaryAssetType(*UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
+	);
 
 	UAssetModuleStatics::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
 }
@@ -64,13 +68,6 @@ void UAbilityModule::OnInitialize()
 void UAbilityModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		DON_WITHINDEX(UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
-			if(i > 0) UAssetModuleStatics::RegisterPrimaryAssetType(*UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
-		);
-	}
 }
 
 void UAbilityModule::OnRefresh(float DeltaSeconds)

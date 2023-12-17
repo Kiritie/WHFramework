@@ -170,7 +170,7 @@ protected:
 	/// 模块状态
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated)
 	EModuleState ModuleState;
-	/// 模块索引
+	/// 模块索引（决定模块执行顺序）
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 ModuleIndex;
 	/// 自动运行

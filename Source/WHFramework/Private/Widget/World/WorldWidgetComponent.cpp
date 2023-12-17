@@ -111,7 +111,7 @@ bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
-		FString PropertyName = InProperty->GetName();
+		const FString PropertyName = InProperty->GetName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Space) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WidgetClass) ||
@@ -138,7 +138,7 @@ bool UWorldWidgetComponent::CanEditChange(const FProperty* InProperty) const
 
 void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	FProperty* Property = PropertyChangedEvent.MemberProperty;
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
@@ -147,7 +147,7 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 		static FName AutoCreateName("bAutoCreate");
 		static FName WorldWidgetClassName("WorldWidgetClass");
 
-		auto PropertyName = Property->GetFName();
+		const FName PropertyName = Property->GetFName();
 
 		if(PropertyName == RefreshEditorOnly)
 		{

@@ -203,7 +203,7 @@ bool UModuleBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
-		FString PropertyName = InProperty->GetName();
+		const FString PropertyName = InProperty->GetName();
 
 		return true;
 	}
@@ -213,11 +213,11 @@ bool UModuleBase::CanEditChange(const FProperty* InProperty) const
 
 void UModuleBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	FProperty* Property = PropertyChangedEvent.MemberProperty;
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
-		auto PropertyName = Property->GetFName();
+		const FName PropertyName = Property->GetFName();
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);

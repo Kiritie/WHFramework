@@ -12,7 +12,7 @@ class ADirectionalLight;
 /**
  * �����������
  */
-UCLASS(Blueprintable, BlueprintType, EditInlineNew)
+UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWorldWeather : public UWHObject
 {
 	GENERATED_BODY()

@@ -110,66 +110,63 @@ void USceneModule::OnInitialize()
 	}
 
 	OutlineMatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, OutlineMat);
+
+	APostProcessVolume* UnboundPostProcessVolume = nullptr;
+	
+	for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
+	{
+		if (PostProcessVolumeInterface)
+		{
+			if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
+			{
+				if (PostProcessVolume->bUnbound)
+				{
+					UnboundPostProcessVolume = PostProcessVolume;
+					break;
+				}
+			}
+		}
+	}
+	
+	if (!UnboundPostProcessVolume)
+	{
+		APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
+		
+		if (PostProcessVolume)
+		{
+			PostProcessVolume->bUnbound = true;
+			UnboundPostProcessVolume = PostProcessVolume;
+		}
+	}
+	
+	if (UnboundPostProcessVolume)
+	{
+		bool bNeedAddMat = true;
+		// 查找是否描边材质已经添加
+		for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
+		{
+			if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
+			{
+				if (OutlineMatInst)
+				{
+					UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
+				}
+				bNeedAddMat = false;
+				break;
+			}
+		}
+		if (bNeedAddMat)
+		{
+			UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
+		}
+	}
+	
+	SetOutlineColor(OutlineColor);
 }
 
 void USceneModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		APostProcessVolume* UnboundPostProcessVolume = nullptr;
-	
-		for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
-		{
-			if (PostProcessVolumeInterface)
-			{
-				if (APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(PostProcessVolumeInterface))
-				{
-					if (PostProcessVolume->bUnbound)
-					{
-						UnboundPostProcessVolume = PostProcessVolume;
-						break;
-					}
-				}
-			}
-		}
-	
-		if (!UnboundPostProcessVolume)
-		{
-			APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
-		
-			if (PostProcessVolume)
-			{
-				PostProcessVolume->bUnbound = true;
-				UnboundPostProcessVolume = PostProcessVolume;
-			}
-		}
-	
-		if (UnboundPostProcessVolume)
-		{
-			bool bNeedAddMat = true;
-			// 查找是否描边材质已经添加
-			for (int32 i = 0; i < UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Num(); ++i)
-			{
-				if (UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object == OutlineMat)
-				{
-					if (OutlineMatInst)
-					{
-						UnboundPostProcessVolume->Settings.WeightedBlendables.Array[i].Object = OutlineMatInst;
-					}
-					bNeedAddMat = false;
-					break;
-				}
-			}
-			if (bNeedAddMat)
-			{
-				UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
-			}
-		}
-	
-		SetOutlineColor(OutlineColor);
-	}
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -266,10 +263,21 @@ FSaveData* USceneModule::ToData()
 	}
 	if(WorldWeather)
 	{
+		SaveData->WeatherSeed = WorldWeather->GetWeatherSeed();
 		SaveData->WeatherParams = WorldWeather->GetWeatherParams();
 	}
 
 	return SaveData;
+}
+
+UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
+{
+	return GetDeterminesOutputObject(WorldTimer, InClass);
+}
+
+UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass) const
+{
+	return GetDeterminesOutputObject(WorldWeather, InClass);
 }
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const

@@ -98,6 +98,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	ACameraManagerBase* GetCurrentCameraManager();
+	
+	UFUNCTION(BlueprintPure)
+	ACameraPointBase* GetDefaultCameraPoint() const { return DefaultCameraPoint; }
+	
+	UFUNCTION(BlueprintCallable)
+	void SetDefaultCameraPoint(ACameraPointBase* InCameraPoint) { DefaultCameraPoint = InCameraPoint; }
 
 	template<class T>
 	T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
@@ -257,6 +263,7 @@ private:
 	float CameraDoZoomDistance;
 	EEaseType CameraDoZoomEaseType;
 	FVector InitSocketOffset;
+	FCameraViewParams CachedCameraParams;
 	UPROPERTY()
 	AActor* TrackTargetActor;
 	FVector TrackLocationOffset;
@@ -346,10 +353,10 @@ public:
 	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView();
+	virtual void ResetCameraView(bool bUseCachedParams = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SwitchCameraPoint(ACameraPointBase* InCameraPoint);
+	virtual void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
 	
 protected:
 	UFUNCTION()

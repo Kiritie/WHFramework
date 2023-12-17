@@ -57,19 +57,17 @@ void UStepModule::OnDestroy()
 void UStepModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	if(DefaultAsset)
+	{
+		SetCurrentAsset(DefaultAsset);
+	}
 }
 
 void UStepModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		if(DefaultAsset)
-		{
-			SetCurrentAsset(DefaultAsset);
-		}
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(bAutoStartFirst)

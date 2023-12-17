@@ -530,7 +530,7 @@ bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
-		FString PropertyName = InProperty->GetName();
+		const FString PropertyName = InProperty->GetName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskExecuteType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskCompleteType) ||
@@ -566,11 +566,11 @@ bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 
 void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	FProperty* Property = PropertyChangedEvent.MemberProperty;
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
-		auto PropertyName = Property->GetFName();
+		const FName PropertyName = Property->GetFName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, SubTasks) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, bMergeSubTask))

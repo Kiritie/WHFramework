@@ -56,12 +56,12 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// WorldTimer
 protected:
-	UPROPERTY(EditAnywhere, Instanced, Category = "WorldWeather")
+	UPROPERTY(EditAnywhere, Instanced, Category = "WorldTimer")
 	UWorldTimer* WorldTimer;
 
 public:
-	UFUNCTION(BlueprintPure)
-	UWorldTimer* GetWorldTimer() const { return WorldTimer; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// WorldWeather
@@ -70,8 +70,8 @@ protected:
 	UWorldWeather* WorldWeather;
 	
 public:
-	UFUNCTION(BlueprintPure)
-	UWorldWeather* GetWorldWeather() const { return WorldWeather; }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor

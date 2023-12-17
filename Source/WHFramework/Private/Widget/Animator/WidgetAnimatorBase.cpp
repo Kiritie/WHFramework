@@ -22,9 +22,16 @@ void UWidgetAnimatorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<
 
 	ParentWidget = Cast<UUserWidget>(InOwner);
 	
-	if(ParentWidget && !WidgetName.IsNone())
+	if(ParentWidget)
 	{
-		TargetWidget = ParentWidget->WidgetTree->FindWidget(WidgetName);
+		if(!WidgetName.IsNone())
+		{
+			TargetWidget = ParentWidget->WidgetTree->FindWidget(WidgetName);
+		}
+		else
+		{
+			TargetWidget = ParentWidget;
+		}
 	}
 }
 

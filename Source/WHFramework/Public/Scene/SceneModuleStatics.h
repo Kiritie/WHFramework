@@ -23,11 +23,11 @@ class WHFRAMEWORK_API USceneModuleStatics : public UBlueprintFunctionLibrary
 public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
-	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static UWorldTimer* GetWorldTimer();
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
+	static UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr);
 
-	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static UWorldWeather* GetWorldWeather();
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
+	static UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level

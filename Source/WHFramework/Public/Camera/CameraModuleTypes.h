@@ -108,6 +108,8 @@ public:
 
 	void SetCameraParams(const FCameraParams& InCameraParams);
 
+	bool IsValid() const { return CameraViewMode != ECameraViewMode::None; }
+
 public:
 	UPROPERTY(BlueprintReadOnly)
 	AActor* CameraViewTarget;

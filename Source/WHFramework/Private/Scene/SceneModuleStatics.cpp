@@ -5,14 +5,14 @@
 
 #include "Scene/SceneModule.h"
 
-UWorldTimer* USceneModuleStatics::GetWorldTimer()
+UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)
 {
-	return USceneModule::Get().GetWorldTimer();
+	return USceneModule::Get().GetWorldTimer(InClass);
 }
 
-UWorldWeather* USceneModuleStatics::GetWorldWeather()
+UWorldWeather* USceneModuleStatics::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
 {
-	return USceneModule::Get().GetWorldWeather();
+	return USceneModule::Get().GetWorldWeather(InClass);
 }
 
 void USceneModuleStatics::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)

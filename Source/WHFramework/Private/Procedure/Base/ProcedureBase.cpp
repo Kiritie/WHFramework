@@ -129,7 +129,20 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), this, {this});
 }
 
-void UProcedureBase::Guide()
+void UProcedureBase::SwitchOut_Implementation()
+{
+	UProcedureModuleStatics::SwitchProcedure(this);
+}
+
+void UProcedureBase::SwitchIn_Implementation()
+{
+	if(IsCurrent())
+	{
+		UProcedureModuleStatics::SwitchProcedure(nullptr);
+	}
+}
+
+void UProcedureBase::Guide_Implementation()
 {
 	if(ProcedureState == EProcedureState::Entered)
 	{
@@ -137,17 +150,17 @@ void UProcedureBase::Guide()
 	}
 }
 
-void UProcedureBase::SwitchLast()
+void UProcedureBase::SwitchLast_Implementation()
 {
 	UProcedureModuleStatics::SwitchLastProcedure();
 }
 
-void UProcedureBase::SwitchNext()
+void UProcedureBase::SwitchNext_Implementation()
 {
 	UProcedureModuleStatics::SwitchNextProcedure();
 }
 
-bool UProcedureBase::IsCurrent()
+bool UProcedureBase::IsCurrent_Implementation()
 {
 	return UProcedureModuleStatics::IsCurrentProcedure(this);
 }
@@ -226,7 +239,7 @@ bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
-		FString PropertyName = InProperty->GetName();
+		const FString PropertyName = InProperty->GetName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideIntervalTime))
 		{
@@ -239,11 +252,11 @@ bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 
 void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	FProperty* Property = PropertyChangedEvent.MemberProperty;
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
-		auto PropertyName = Property->GetFName();
+		const FName PropertyName = Property->GetFName();
 		
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, OperationTarget))
 		{

@@ -8,6 +8,7 @@
 #include "Math/MathTypes.h"
 #include "CameraModuleStatics.generated.h"
 
+class ACameraPointBase;
 class USpringArmComponent;
 class UCameraComponent;
 class ACameraActorBase;
@@ -28,6 +29,12 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CameraModuleStatics")
 	static ACameraActorBase* GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass = nullptr);
+	
+	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
+	static ACameraPointBase* GetDefaultCameraPoint();
+	
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetDefaultCameraPoint(ACameraPointBase* InCameraPoint);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
 	static FVector GetCameraLocation(bool bReal = false);
@@ -137,8 +144,8 @@ public:
 	static void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
 	
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void ResetCameraView();
+	static void ResetCameraView(bool bUseCachedParams = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint);
+	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
 };

@@ -180,26 +180,29 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly)
 	FName ParentName;
-		
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	FName ParentSlot;
+
 	UPROPERTY(EditDefaultsOnly)
 	TArray<FName> ChildNames;
 		
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FAnchors WidgetAnchors;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	bool bWidgetAutoSize;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
 	FVector2D WidgetDrawSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None) && bWidgetAutoSize == false"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
 	FMargin WidgetOffsets;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "ParentName != NAME_None)"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FVector2D WidgetAlignment;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -289,6 +292,9 @@ public:
 	virtual FName GetParentName() const override { return ParentName; }
 
 	UFUNCTION(BlueprintPure)
+	virtual FName GetParentSlot() const override { return ParentSlot; }
+
+	UFUNCTION(BlueprintPure)
 	virtual TArray<FName> GetChildNames() const override { return ChildNames; }
 
 	UFUNCTION(BlueprintPure)
@@ -322,14 +328,7 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EScreenWidgetState GetWidgetState() const override
-	{
-		if(ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
-		{
-			return EScreenWidgetState::Closed;
-		}
-		return WidgetState;
-	}
+	virtual EScreenWidgetState GetWidgetState() const override { return WidgetState; }
 	
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
@@ -342,7 +341,6 @@ public:
 	{
 		return Cast<T>(GetOwnerObject());
 	}
-
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
@@ -352,10 +350,20 @@ public:
 
 	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) override { LastTemporary = InLastTemporary; }
 
+	template<class T>
+	T* GetParentWidgetN() const
+	{
+		return Cast<T>(GetParentWidgetN());
+	}
 	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 	
+	template<class T>
+	T* GetTemporaryChild() const
+	{
+		return Cast<T>(GetTemporaryChild());
+	}
 	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
 
 	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
@@ -363,10 +371,27 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 
+	template<class T>
+	TArray<T*> GetChildWidgets()
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetChildWidgets())
+		{
+			ReturnValues.Add(Cast<T>(Iter));
+		}
+		return ReturnValues;
+	}
 	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
 
 	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
 
 	UFUNCTION(BlueprintPure)
-	virtual class UPanelWidget* GetRootPanelWidget() const override;
+	virtual UPanelWidget* GetRootPanelWidget() const override;
+
+private:
+	UFUNCTION()
+	bool EDC_ParentName() const { return ParentName != NAME_None; };
+	
+	UFUNCTION()
+	bool EDC_WidgetAutoSize() const { return ParentName != NAME_None && !bWidgetAutoSize; };
 };

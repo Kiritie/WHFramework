@@ -54,12 +54,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserWidget")
 	TArray<TSubclassOf<UUserWidgetBase>> UserWidgetClasses;
 
+	UFUNCTION(CallInEditor, Category = "UserWidget")
+	void SortUserWidgetClasses();
+
 private:
 	UPROPERTY(Transient)
 	UUserWidgetBase* TemporaryUserWidget;
 
 	UPROPERTY()
-	TMap<FName, UUserWidgetBase*> AllUserWidgets;
+	TMap<FName, UUserWidgetBase*> AllUserWidget;
 
 	UPROPERTY(Transient)
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
@@ -70,6 +73,9 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	UUserWidgetBase* GetTemporaryUserWidget() const { return TemporaryUserWidget; }
+	
+	UFUNCTION(BlueprintPure)
+	TMap<FName, UUserWidgetBase*> GetAllUserWidget() const { return AllUserWidget; }
 
 	template<class T>
 	bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
@@ -114,7 +120,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool HasUserWidgetByName(FName InName) const
 	{
-		return AllUserWidgets.Contains(InName);
+		return AllUserWidget.Contains(InName);
 	}
 
 	template<class T>
@@ -132,9 +138,9 @@ public:
 	template<class T>
 	T* GetUserWidgetByName(FName InName) const
 	{
-		if(AllUserWidgets.Contains(InName))
+		if(AllUserWidget.Contains(InName))
 		{
-			return Cast<T>(AllUserWidgets[InName]);
+			return Cast<T>(AllUserWidget[InName]);
 		}
 		return nullptr;
 	}
@@ -173,7 +179,7 @@ public:
 			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
-				AllUserWidgets.Add(InName, UserWidget);
+				AllUserWidget.Add(InName, UserWidget);
 				UserWidget->OnCreate(InOwner, InParams ? * InParams : TArray<FParameter>());
 			}
 		}
@@ -329,11 +335,11 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool DestroyUserWidgetByName(FName InName,  bool bRecovery = false)
 	{
-		if(AllUserWidgets.Contains(InName))
+		if(AllUserWidget.Contains(InName))
 		{
-			if(UUserWidgetBase* UserWidget = AllUserWidgets[InName])
+			if(UUserWidgetBase* UserWidget = AllUserWidget[InName])
 			{
-				AllUserWidgets.Remove(InName);
+				AllUserWidget.Remove(InName);
 				if(TemporaryUserWidget == UserWidget)
 				{
 					TemporaryUserWidget = nullptr;

@@ -23,4 +23,7 @@ public:
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+protected:
+	virtual void OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected) override;
 };

@@ -52,19 +52,17 @@ void UProcedureModule::OnInitialize()
 	Super::OnInitialize();
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, FName("OnSwitchProcedure"));
+
+	if(DefaultAsset)
+	{
+		SetCurrentAsset(DefaultAsset);
+	}
 }
 
 void UProcedureModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 	
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		if(DefaultAsset)
-		{
-			SetCurrentAsset(DefaultAsset);
-		}
-	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(bAutoSwitchFirst)

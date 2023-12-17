@@ -96,7 +96,7 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Primary))
+	if(PHASEC(InPhase, EPhase::Final))
 	{
 		ApplyKeyMappings();
 		ApplyTouchMappings();
@@ -116,9 +116,7 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 			}
 		}
 		OnBindAction(Component);
-	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
+		
 		UpdateInputMode();
 	}
 }
@@ -242,9 +240,10 @@ FInputKeyShortcut UInputModule::GetKeyShortcutByName(const FName InName) const
 
 void UInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
 {
-	if(!KeyShortcuts.Contains(InName))
+	const FName Name = !InName.IsNone() ? InName : InKeyShortcut.Key.GetFName();
+	if(!KeyShortcuts.Contains(Name))
 	{
-		KeyShortcuts.Add(InName, InKeyShortcut);
+		KeyShortcuts.Add(Name, InKeyShortcut);
 	}
 }
 
@@ -258,9 +257,10 @@ void UInputModule::RemoveKeyShortcut(const FName InName)
 
 void UInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
 {
-	if(!KeyMappings.Contains(InName))
+	const FName Name = !InName.IsNone() ? InName : InKeyMapping.Key.GetFName();
+	if(!KeyMappings.Contains(Name))
 	{
-		KeyMappings.Add(InName, InKeyMapping);
+		KeyMappings.Add(Name, InKeyMapping);
 	}
 }
 

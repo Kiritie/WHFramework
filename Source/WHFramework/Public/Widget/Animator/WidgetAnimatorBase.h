@@ -15,7 +15,7 @@ class UUserWidget;
 /**
  * 
  */
-UCLASS(Blueprintable, BlueprintType, EditInlineNew)
+UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWidgetAnimatorBase : public UWHObject
 {
 	GENERATED_BODY()

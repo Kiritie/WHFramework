@@ -30,5 +30,5 @@ void USceneSaveGame::OnUnload_Implementation(EPhase InPhase)
 
 void USceneSaveGame::OnRefresh_Implementation()
 {
-	SetSaveData(AMainModule::GetModuleByClass(false, ModuleClass)->GetSaveData(false));
+	Super::OnRefresh_Implementation();
 }

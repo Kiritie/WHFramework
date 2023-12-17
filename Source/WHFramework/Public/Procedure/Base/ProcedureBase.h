@@ -104,22 +104,32 @@ public:
 	/**
 	* 指引流程
 	*/
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void Guide();
+	/**
+	* 切入当前流程
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void SwitchIn();
+	/**
+	* 切出当前流程
+	*/
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void SwitchOut();
 	/**
 	* 切换到上一个流程
 	*/
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void SwitchLast();
 	/**
 	* 切换到下一个流程
 	*/
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void SwitchNext();
 	/**
 	* 是否是当前流程
 	*/
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent();
 
 	//////////////////////////////////////////////////////////////////////////

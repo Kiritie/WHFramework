@@ -13,6 +13,8 @@ UVoxelSaveGame::UVoxelSaveGame()
 
 void UVoxelSaveGame::OnCreate_Implementation(int32 InIndex)
 {
+	SaveData = UVoxelModule::Get().NewWorldData()->CastRef<FVoxelModuleSaveData>();
+	
 	Super::OnCreate_Implementation(InIndex);
 }
 

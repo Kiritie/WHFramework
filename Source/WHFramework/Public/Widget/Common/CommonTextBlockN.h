@@ -8,7 +8,7 @@
 
 #include "CommonTextBlockN.generated.h"
 
-UCLASS(BlueprintType, Blueprintable)
+UCLASS(BlueprintType, Blueprintable, Config = CommonUI, DefaultConfig, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Text N", PrioritizeCategories = "Content"))
 class WHFRAMEWORK_API UCommonTextBlockN : public UCommonTextBlock, public IObjectPoolInterface
 {
 	GENERATED_BODY()

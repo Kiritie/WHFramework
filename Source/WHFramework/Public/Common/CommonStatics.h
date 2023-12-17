@@ -10,6 +10,7 @@
 #include "Dom/JsonObject.h"
 #include "Gameplay/WHGameInstance.h"
 #include "Gameplay/WHPlayerController.h"
+#include "Kismet/KismetStringLibrary.h"
 
 #include "CommonStatics.generated.h"
 
@@ -206,6 +207,36 @@ public:
 	static bool StringToBool(const FString& InString);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Array
+	template<class T>
+	static void SortStringElementArray(TArray<T>& InArray, const TFunction<FString(const T&)>& InElementFunc, bool bAscending = true)
+	{
+		for(int32 i = 0; i < InArray.Num(); i++)
+		{
+			for(int32 j = i; j < InArray.Num(); j++)
+			{
+				const FString Str1 = InElementFunc(InArray[i]);
+				const FString Str2 = InElementFunc(InArray[j]);
+				int32 Num1 = 0;
+				int32 Num2 = 0;
+				for(int32 k = 0; k < (Str1.Len() < Str2.Len() ? Str1.Len() : Str2.Len()); k++)
+				{
+					Num1 = UKismetStringLibrary::GetCharacterAsNumber(Str1, k);
+					Num2 = UKismetStringLibrary::GetCharacterAsNumber(Str2, k);
+					if(Num1 != Num2)
+					{
+						break;
+					}
+				}
+				if(bAscending ? Num1 > Num2 : Num1 < Num2)
+				{
+					InArray.Swap(i, j);
+				}
+			}
+		}
+	}
+	
+	//////////////////////////////////////////////////////////////////////////
 	// Text
 private:
 	static TArray<FString> NotNumberSymbols;
@@ -247,6 +278,9 @@ public:
 	// Input
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
+
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FKey MakeKeyFromName(const FName InKeyName);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Object

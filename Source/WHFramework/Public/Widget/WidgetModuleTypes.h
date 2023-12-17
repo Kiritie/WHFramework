@@ -37,6 +37,8 @@ enum class EWidgetCreateType : uint8
 UENUM(BlueprintType)
 enum class EWidgetOpenType : uint8
 {
+	/// 无
+	None,
 	/// 显示
 	Visible,
 	/// 显示并禁用点击
@@ -67,6 +69,8 @@ enum class EWidgetOpenFinishType : uint8
 UENUM(BlueprintType)
 enum class EWidgetCloseType : uint8
 {
+	/// 无
+	None,
 	/// 隐藏
 	Hidden,
 	/// 塌陷

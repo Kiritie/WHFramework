@@ -61,6 +61,8 @@ public:
 public:
 	virtual void Load_Implementation() override;
 
+	virtual void Save_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Capture
 protected:

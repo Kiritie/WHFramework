@@ -35,47 +35,44 @@ void UAssetModule::OnDestroy()
 void UAssetModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	for(auto& Iter : StaticClasses)
+	{
+		FStaticClass& StaticClass = Iter.Value;
+		StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
+	}
+		
+	for(auto& Iter : StaticObjects)
+	{
+		FStaticObject& StaticObject = Iter.Value;
+		StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
+	}
+		
+	for(auto Iter : DataAssets)
+	{
+		if(Iter)
+		{
+			DataAssetMap.Add(Iter->GetDataAssetTag(), Iter);
+		}
+	}
+		
+	for(auto Iter : DataTables)
+	{
+		if(Iter)
+		{
+			FString ContextStr;
+			Iter->ForeachRow<FDataTableRowBase>(ContextStr, [](const FName& Key, const FDataTableRowBase& Value)
+			{
+				const_cast<FDataTableRowBase&>(Value).OnInitializeRow(Key);
+			});
+			DataTableMap.Add(Iter->RowStruct, Iter);
+		}
+	}
 }
 
 void UAssetModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		for(auto& Iter : StaticClasses)
-		{
-			FStaticClass& StaticClass = Iter.Value;
-			StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
-		}
-		
-		for(auto& Iter : StaticObjects)
-		{
-			FStaticObject& StaticObject = Iter.Value;
-			StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
-		}
-		
-		for(auto Iter : DataAssets)
-		{
-			if(Iter)
-			{
-				DataAssetMap.Add(Iter->GetDataAssetTag(), Iter);
-			}
-		}
-		
-		for(auto Iter : DataTables)
-		{
-			if(Iter)
-			{
-				FString ContextStr;
-				Iter->ForeachRow<FDataTableRowBase>(ContextStr, [](const FName& Key, const FDataTableRowBase& Value)
-				{
-					const_cast<FDataTableRowBase&>(Value).OnInitializeRow(Key);
-				});
-				DataTableMap.Add(Iter->RowStruct, Iter);
-			}
-		}
-	}
 }
 
 void UAssetModule::OnRefresh(float DeltaSeconds)

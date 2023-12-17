@@ -11,7 +11,7 @@ class ADirectionalLight;
 /**
  * ʱ��������
  */
-UCLASS(Blueprintable, BlueprintType, EditInlineNew)
+UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWorldTimer : public UWHObject
 {
 	GENERATED_BODY()

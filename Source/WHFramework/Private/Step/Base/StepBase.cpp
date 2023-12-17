@@ -648,7 +648,7 @@ bool UStepBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
 	{
-		FString PropertyName = InProperty->GetName();
+		const FString PropertyName = InProperty->GetName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepExecuteType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepCompleteType) ||
@@ -684,11 +684,11 @@ bool UStepBase::CanEditChange(const FProperty* InProperty) const
 
 void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	FProperty* Property = PropertyChangedEvent.MemberProperty;
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
-		auto PropertyName = Property->GetFName();
+		const FName PropertyName = Property->GetFName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, OperationTarget))
 		{

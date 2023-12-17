@@ -150,53 +150,48 @@ void UVoxelModule::OnInitialize()
 	Super::OnInitialize();
 
 	UAssetModuleStatics::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
+
+	UAssetModuleStatics::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
+
+	for(const auto Iter1 : UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")))
+	{
+		for(auto& Iter2 : Iter1->MeshDatas)
+		{
+			for(auto& Iter3 : Iter2.MeshUVDatas)
+			{
+				if(Iter3.Texture && WorldBasicData.RenderDatas.Contains(Iter1->Transparency))
+				{
+					Iter3.UVOffset = FVector2D(0.f, WorldBasicData.RenderDatas[Iter1->Transparency].Textures.AddUnique(Iter3.Texture));
+				}
+			}
+		}
+	}
+	for(auto& Iter : WorldBasicData.RenderDatas)
+	{
+		Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
+
+		if(UTexture2D* Texture = UCommonStatics::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
+		{
+			Iter.Value.CombineTexture = Texture;
+				
+			UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
+			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
+			Iter.Value.MaterialInst = MatInst;
+			
+			MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
+			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
+			Iter.Value.UnlitMaterialInst = MatInst;
+		}
+	}
+	for(const auto& Iter : VoxelClasses)
+	{
+		UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
+	}
 }
 
 void UVoxelModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		UAssetModuleStatics::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
-	}
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		for(const auto Iter1 : UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")))
-		{
-			for(auto& Iter2 : Iter1->MeshDatas)
-			{
-				for(auto& Iter3 : Iter2.MeshUVDatas)
-				{
-					if(Iter3.Texture && WorldBasicData.RenderDatas.Contains(Iter1->Transparency))
-					{
-						Iter3.UVOffset = FVector2D(0.f, WorldBasicData.RenderDatas[Iter1->Transparency].Textures.AddUnique(Iter3.Texture));
-					}
-				}
-			}
-		}
-		for(auto& Iter : WorldBasicData.RenderDatas)
-		{
-			Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
-
-			if(UTexture2D* Texture = UCommonStatics::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
-			{
-				Iter.Value.CombineTexture = Texture;
-				
-				UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
-				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-				Iter.Value.MaterialInst = MatInst;
-			
-				MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
-				MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-				Iter.Value.UnlitMaterialInst = MatInst;
-			}
-		}
-		for(const auto& Iter : VoxelClasses)
-		{
-			UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
-		}
-	}
 }
 
 void UVoxelModule::OnRefresh(float DeltaSeconds)
@@ -232,13 +227,21 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 
 void UVoxelModule::Load_Implementation()
 {
-	if(!bAutoGenerate) return;
-		
-	Super::Load_Implementation();
-
-	if(!bModuleAutoSave)
+	if(bAutoGenerate)
 	{
-		LoadSaveData(NewWorldData());
+		Super::Load_Implementation();
+		if(!bModuleAutoSave)
+		{
+			LoadSaveData(NewWorldData());
+		}
+	}
+}
+
+void UVoxelModule::Save_Implementation()
+{
+	if(bAutoGenerate)
+	{
+		Super::Save_Implementation();
 	}
 }
 
@@ -406,26 +409,26 @@ void UVoxelModule::GenerateWorld()
 	{
 		SetWorldState(EVoxelWorldState::MapLoad);
 	}
-	// Build chunk map
-	else if(UpdateChunkQueue(EVoxelWorldState::MapBuild, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
-	{
-		SetWorldState(EVoxelWorldState::MapBuild);
-	}
-	// Build chunk mesh
-	else if(UpdateChunkQueue(EVoxelWorldState::MeshBuild, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::MeshBuild);
-	}
-	// Generate chunk
-	else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Generate);
-	}
-	// Destroy chunk
-	if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Destroy);
-	}
+	// // Build chunk map
+	// else if(UpdateChunkQueue(EVoxelWorldState::MapBuild, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
+	// {
+	// 	SetWorldState(EVoxelWorldState::MapBuild);
+	// }
+	// // Build chunk mesh
+	// else if(UpdateChunkQueue(EVoxelWorldState::MeshBuild, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
+	// {
+	// 	SetWorldState(EVoxelWorldState::MeshBuild);
+	// }
+	// // Generate chunk
+	// else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
+	// {
+	// 	SetWorldState(EVoxelWorldState::Generate);
+	// }
+	// // Destroy chunk
+	// if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
+	// {
+	// 	SetWorldState(EVoxelWorldState::Destroy);
+	// }
 }
 
 void UVoxelModule::LoadChunkMap(FIndex InIndex)

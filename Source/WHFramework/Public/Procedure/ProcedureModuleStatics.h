@@ -31,7 +31,7 @@ public:
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ProcedureModuleStatics")
-	UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
+	static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
