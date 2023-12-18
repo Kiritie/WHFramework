@@ -220,7 +220,7 @@ public:
 	* 设置操作目标
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = false);
+	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureListItem

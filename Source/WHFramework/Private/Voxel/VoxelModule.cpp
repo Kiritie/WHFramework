@@ -64,7 +64,7 @@ UVoxelModule::UVoxelModule()
 	};
 
 	ChunkSpawnBatch = 0;
-	ChunkGenerateIndex = Index_Empty;
+	ChunkGenerateIndex = EMPTY_Index;
 	ChunkMap = TMap<FIndex, AVoxelChunk*>();
 
 	VoxelClasses.Add(UVoxel::StaticClass());
@@ -382,7 +382,7 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		ChunkMap.Empty();
 
 		ChunkSpawnBatch = 0;
-		ChunkGenerateIndex = Index_Empty;
+		ChunkGenerateIndex = EMPTY_Index;
 
 		WorldData = NewWorldData();
 	}
@@ -409,26 +409,26 @@ void UVoxelModule::GenerateWorld()
 	{
 		SetWorldState(EVoxelWorldState::MapLoad);
 	}
-	// // Build chunk map
-	// else if(UpdateChunkQueue(EVoxelWorldState::MapBuild, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
-	// {
-	// 	SetWorldState(EVoxelWorldState::MapBuild);
-	// }
-	// // Build chunk mesh
-	// else if(UpdateChunkQueue(EVoxelWorldState::MeshBuild, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
-	// {
-	// 	SetWorldState(EVoxelWorldState::MeshBuild);
-	// }
-	// // Generate chunk
-	// else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
-	// {
-	// 	SetWorldState(EVoxelWorldState::Generate);
-	// }
-	// // Destroy chunk
-	// if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
-	// {
-	// 	SetWorldState(EVoxelWorldState::Destroy);
-	// }
+	// Build chunk map
+	else if(UpdateChunkQueue(EVoxelWorldState::MapBuild, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
+	{
+		SetWorldState(EVoxelWorldState::MapBuild);
+	}
+	// Build chunk mesh
+	else if(UpdateChunkQueue(EVoxelWorldState::MeshBuild, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
+	{
+		SetWorldState(EVoxelWorldState::MeshBuild);
+	}
+	// Generate chunk
+	else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
+	{
+		SetWorldState(EVoxelWorldState::Generate);
+	}
+	// Destroy chunk
+	if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
+	{
+		SetWorldState(EVoxelWorldState::Destroy);
+	}
 }
 
 void UVoxelModule::LoadChunkMap(FIndex InIndex)
@@ -844,7 +844,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 		GenerateIndex = LocationToChunkIndex(AgentLocation);
 		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector()).GetAbs();
 	}
-	if(bForce || ChunkGenerateIndex == Index_Empty || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f) || WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f)))
+	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f) || WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f)))
 	{
 		TArray<FIndex> DestroyQueue;
 		ChunkMap.GenerateKeyArray(DestroyQueue);

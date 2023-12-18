@@ -2,6 +2,8 @@
 
 
 #include "Asset/AssetModule.h"
+
+#include "Asset/AssetManagerBase.h"
 #include "Asset/AssetModuleTypes.h"
 		
 IMPLEMENTATION_MODULE(UAssetModule)
@@ -35,18 +37,6 @@ void UAssetModule::OnDestroy()
 void UAssetModule::OnInitialize()
 {
 	Super::OnInitialize();
-
-	for(auto& Iter : StaticClasses)
-	{
-		FStaticClass& StaticClass = Iter.Value;
-		StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
-	}
-		
-	for(auto& Iter : StaticObjects)
-	{
-		FStaticObject& StaticObject = Iter.Value;
-		StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
-	}
 		
 	for(auto Iter : DataAssets)
 	{
@@ -73,6 +63,21 @@ void UAssetModule::OnInitialize()
 void UAssetModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		for(auto& Iter : StaticClasses)
+		{
+			FStaticClass& StaticClass = Iter.Value;
+			StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
+		}
+		
+		for(auto& Iter : StaticObjects)
+		{
+			FStaticObject& StaticObject = Iter.Value;
+			StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
+		}
+	}
 }
 
 void UAssetModule::OnRefresh(float DeltaSeconds)

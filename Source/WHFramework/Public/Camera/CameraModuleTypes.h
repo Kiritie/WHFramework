@@ -114,31 +114,31 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AActor* CameraViewTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<ACameraActorBase> CameraViewActor;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ECameraViewMode CameraViewMode;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ECameraViewSpace CameraViewSpace;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == ECameraViewMode::Duration"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "CameraViewMode == ECameraViewMode::Duration"))
 	EEaseType CameraViewEaseType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "CameraViewMode == ECameraViewMode::Duration"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "CameraViewMode == ECameraViewMode::Duration"))
 	float CameraViewDuration;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector CameraViewOffset;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CameraViewYaw;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CameraViewPitch;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CameraViewDistance;
 };
 
@@ -171,16 +171,16 @@ public:
 	virtual TArray<FParameter> ToParams() const override;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<AActor> CameraViewTarget;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bTrackTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bTrackTarget == true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bTrackTarget == true"))
 	ECameraTrackMode TrackTargetMode;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FCameraViewParams CameraViewParams;
 };
 

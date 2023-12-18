@@ -54,7 +54,7 @@ void UAIBlackboardBase::OnValueChanged(FName InValueName)
 		}
 		else
 		{
-			SetTargetLocation(Vector_Empty);
+			SetTargetLocation(EMPTY_Vector);
 		}
 	}
 	else if(InValueName.IsEqual(FName("TargetCharacter")))

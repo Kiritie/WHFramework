@@ -3,7 +3,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
 {

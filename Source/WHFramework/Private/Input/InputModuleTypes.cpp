@@ -37,7 +37,7 @@ bool FInputKeyShortcut::IsReleased(APlayerController* InPlayerController, bool b
 
 bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
-	if(!IsValid() && bAllowInvalid) return true;
+	if(!IsValid()) return bAllowInvalid;
 	bool ReturnValue = InPlayerController->IsInputKeyDown(Key);
 	for(auto& Iter : Auxs)
 	{

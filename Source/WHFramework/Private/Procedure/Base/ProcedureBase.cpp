@@ -70,13 +70,6 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	ResetCameraView();
 
-	if(bTrackTarget)
-	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
-			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
-			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
-	}
-
 	switch(ProcedureGuideType)
 	{
 		case EProcedureGuideType::TimerOnce:
@@ -188,11 +181,28 @@ void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	UCameraModuleStatics::SetCameraViewParams(CameraViewParams);
+	if(bTrackTarget)
+	{
+		if(CameraViewParams.CameraViewActor.LoadSynchronous())
+		{
+			UCameraModuleStatics::SwitchCamera(CameraViewParams.CameraViewActor.LoadSynchronous());
+		}
+		UCameraModuleStatics::EndTrackTarget();
+		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewMode, CameraViewParams.CameraViewSpace,
+			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
+			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, false, true, CameraViewParams.CameraViewEaseType, CameraViewParams.CameraViewDuration);
+	}
+	else
+	{
+		UCameraModuleStatics::SetCameraViewParams(CameraViewParams);
+	}
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
+	OperationTarget = InOperationTarget;
+	CameraViewParams.CameraViewTarget = InOperationTarget;
+
 	if(ProcedureState == EProcedureState::Entered)
 	{
 		if(InOperationTarget)
@@ -201,22 +211,15 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 			{
 				ResetCameraView();
 			}
-			if(bTrackTarget)
-			{
-				UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewSpace,
-					CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
-					CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, true, CameraViewParams.CameraViewMode == ECameraViewMode::Instant);
-			}
 		}
 		else
 		{
-			if(bTrackTarget)
+			if(bResetCameraView && bTrackTarget)
 			{
 				UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
 			}
 		}
 	}
-	OperationTarget = InOperationTarget;
 }
 
 #if WITH_EDITOR

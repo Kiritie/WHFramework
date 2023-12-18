@@ -7,8 +7,11 @@
 
 #define DEG_2_RAD (0.01745329f)
 
-#define Vector_Empty FVector(MAX_flt)
-#define Index_Empty FIndex(MAX_int32)
+#define EMPTY_Vector FVector(MAX_flt)
+#define EMPTY_Rotator FRotator(MAX_flt)
+#define EMPTY_Index FIndex(MAX_int32)
+#define EMPTY_Int MAX_int32
+#define EMPTY_Flt MAX_flt
 
 UENUM(BlueprintType)
 enum class EEaseType : uint8

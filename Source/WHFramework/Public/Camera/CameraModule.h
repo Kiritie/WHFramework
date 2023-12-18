@@ -264,17 +264,12 @@ private:
 	EEaseType CameraDoZoomEaseType;
 	FVector InitSocketOffset;
 	FCameraViewParams CachedCameraParams;
-	UPROPERTY()
-	AActor* TrackTargetActor;
-	FVector TrackLocationOffset;
-	float TrackYawOffset;
-	float TrackPitchOffset;
-	float TrackDistance;
+	FCameraViewParams TrackCameraParams;
+	ECameraTrackMode TrackTargetMode;
 	bool bTrackAllowControl;
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
 	bool bIsControllingZoom;
-	ECameraTrackMode TrackTargetMode;
 	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 
@@ -288,8 +283,8 @@ protected:
 	virtual void DoTrackTargetDistance(bool bInstant);
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewSpace InTrackTargetSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"))
+	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bInstant = false, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);

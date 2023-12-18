@@ -79,8 +79,8 @@ public:
 	static void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewSpace InTrackTargetSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, bool bInstant = false);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"), Category = "CameraModuleStatics")
+	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bInstant = false, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void EndTrackTarget(AActor* InTargetActor = nullptr);

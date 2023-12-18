@@ -61,9 +61,9 @@ void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bInstant)
 	UCameraModule::Get().SwitchCameraByName(InName, bInstant);
 }
 
-void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackTargetMode, ECameraViewSpace InTrackTargetSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, bool bInstant)
+void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bInstant, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration)
 {
-	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackTargetMode, InTrackTargetSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, bInstant);
+	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bInstant, bAllowControl, InViewEaseType, InViewDuration);
 }
 
 void UCameraModuleStatics::EndTrackTarget(AActor* InTargetActor)
