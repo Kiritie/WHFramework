@@ -10,11 +10,6 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 {
 	WidgetName = FName("SettingPanel");
 
-	ChildNames.Add(FName("AudioSettingPage"));
-	ChildNames.Add(FName("VideoSettingPage"));
-	ChildNames.Add(FName("CameraSettingPage"));
-	ChildNames.Add(FName("InputSettingPage"));
-
 	WidgetType = EWidgetType::Temporary;
 	WidgetInputMode = EInputMode::UIOnly;
 

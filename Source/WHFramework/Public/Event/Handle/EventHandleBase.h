@@ -12,7 +12,7 @@
 /**
  * 
  */
-UCLASS(Blueprintable, BlueprintType, EditInlineNew)
+UCLASS(Abstract, Blueprintable, BlueprintType)
 class WHFRAMEWORK_API UEventHandleBase : public UWHObject
 {
 	GENERATED_BODY()
@@ -35,7 +35,7 @@ public:
 	void Parse(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintNativeEvent)
-	TArray<FParameter> Pack() const;    
+	TArray<FParameter> Pack();    
 
 public:
 	UPROPERTY(BlueprintReadOnly)

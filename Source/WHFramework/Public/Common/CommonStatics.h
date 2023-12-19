@@ -270,6 +270,9 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag,InTagContainer"), Category = "CommonStatics")
 	static int32 GetTagIndexForContainer(const FGameplayTag& InTag, const FGameplayTagContainer& InTagContainer);
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
+	static FGameplayTagContainer GetTagChildren(const FGameplayTag& InTag);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Json
 	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);

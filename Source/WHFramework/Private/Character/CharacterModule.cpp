@@ -9,7 +9,6 @@
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonStatics.h"
-#include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
 		
 IMPLEMENTATION_MODULE(UCharacterModule)
@@ -121,31 +120,30 @@ void UCharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 
 void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
-	if(!CurrentCharacter || CurrentCharacter != InCharacter)
+	if(CurrentCharacter == InCharacter) return;
+
+	AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
+	
+	if(InCharacter)
 	{
-		if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
+		if(CurrentCharacter && CurrentCharacter->GetDefaultController())
 		{
-			if(InCharacter)
-			{
-				if(CurrentCharacter && CurrentCharacter->GetDefaultController())
-				{
-					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
-				}
-				CurrentCharacter = InCharacter;
-				PlayerController->Possess(InCharacter);
-				UCameraModuleStatics::EndTrackTarget();
-				UCameraModuleStatics::StartTrackTarget(InCharacter, ECameraTrackMode::LocationAndRotationOnce, ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, InCharacter->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, bInstant);
-			}
-			else if(CurrentCharacter)
-			{
-				PlayerController->UnPossess();
-				if(CurrentCharacter->GetDefaultController())
-				{
-					CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
-				}
-				CurrentCharacter = nullptr;
-			}
+			CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
 		}
+		CurrentCharacter = InCharacter;
+		PlayerController->Possess(InCharacter);
+		UCameraModuleStatics::EndTrackTarget();
+		UCameraModuleStatics::StartTrackTarget(InCharacter, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, InCharacter->GetCameraOffset() * InCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, InCharacter->GetCameraDistance(), bInstant);
+	}
+	else if(CurrentCharacter)
+	{
+		PlayerController->UnPossess();
+		if(CurrentCharacter->GetDefaultController())
+		{
+			CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
+		}
+		CurrentCharacter = nullptr;
+		UCameraModuleStatics::EndTrackTarget();
 	}
 }
 

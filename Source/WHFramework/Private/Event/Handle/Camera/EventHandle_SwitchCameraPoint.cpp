@@ -21,7 +21,7 @@ void UEventHandle_SwitchCameraPoint::Parse_Implementation(const TArray<FParamete
 	}
 }
 
-TArray<FParameter> UEventHandle_SwitchCameraPoint::Pack_Implementation() const
+TArray<FParameter> UEventHandle_SwitchCameraPoint::Pack_Implementation()
 {
 	return { CameraPoint };
 }

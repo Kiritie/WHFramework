@@ -16,8 +16,8 @@
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHGameState.h"
 #include "Common/CommonTypes.h"
-#include "Event/Handle/Common/EventHandle_PauseGame.h"
-#include "Event/Handle/Common/EventHandle_UnPauseGame.h"
+#include "Event/Handle/Common/EventHandle_GamePaused.h"
+#include "Event/Handle/Common/EventHandle_GameUnPaused.h"
 #include "Gameplay/WHLocalPlayer.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
@@ -70,7 +70,7 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_PauseGame>(nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GamePaused>(nullptr, { (int32)PauseMode } );
 }
 
 void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
@@ -93,7 +93,7 @@ void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UnPauseGame>(nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GameUnPaused>(nullptr, { (int32)PauseMode } );
 }
 
 void UCommonStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
@@ -368,6 +368,17 @@ int32 UCommonStatics::GetTagHierarchy(const FGameplayTag& InTag)
 int32 UCommonStatics::GetTagIndexForContainer(const FGameplayTag& InTag, const FGameplayTagContainer& InTagContainer)
 {
 	return InTagContainer.GetGameplayTagArray().IndexOfByKey(InTag);
+}
+
+FGameplayTagContainer UCommonStatics::GetTagChildren(const FGameplayTag& InTag)
+{
+	FGameplayTagContainer ReturnValue;
+	const TSharedPtr<FGameplayTagNode> TagNode = UGameplayTagsManager::Get().FindTagNode(InTag.GetTagName());
+	for(const auto Iter : TagNode->GetChildTagNodes())
+	{
+		ReturnValue.AddTag(Iter->GetCompleteTag());
+	}
+	return ReturnValue;
 }
 
 bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)

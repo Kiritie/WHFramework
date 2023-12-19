@@ -71,8 +71,6 @@ public:
 
 	virtual FName GetParentSlot() const = 0;
 
-	virtual TArray<FName> GetChildNames() const = 0;
-
 	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const = 0;
 
 	virtual EWidgetCreateType GetWidgetCreateType() const = 0;
@@ -81,7 +79,7 @@ public:
 
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
-	virtual EScreenWidgetState GetWidgetState() const = 0;
+	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const = 0;
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const = 0;
 

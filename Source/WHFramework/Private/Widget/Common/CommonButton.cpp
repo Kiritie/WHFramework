@@ -9,12 +9,17 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	
 	bClicked = false;
 
+	bSingle = false;
+
 	Style = UCommonButtonStyle::StaticClass();
 }
 
 void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	
+	if(InParams.IsValidIndex(0))
+	{
+		bSingle = InParams[0].GetBooleanValue();
+	}
 }
 
 void UCommonButton::OnDespawn_Implementation(bool bRecovery)
@@ -23,7 +28,10 @@ void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 
 	SetTitle(FText::GetEmpty());
 
-	SetSelectedInternal(false, false, false);
+	if(GetSelected())
+	{
+		SetSelectedInternal(false, false, false);
+	}
 
 	RemoveFromParent();
 }

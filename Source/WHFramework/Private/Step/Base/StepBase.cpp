@@ -5,10 +5,10 @@
 
 #include "Camera/CameraModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Step/EventHandle_CompleteStep.h"
-#include "Event/Handle/Step/EventHandle_EnterStep.h"
-#include "Event/Handle/Step/EventHandle_ExecuteStep.h"
-#include "Event/Handle/Step/EventHandle_LeaveStep.h"
+#include "Event/Handle/Step/EventHandle_StepCompleted.h"
+#include "Event/Handle/Step/EventHandle_StepEntered.h"
+#include "Event/Handle/Step/EventHandle_StepExecuted.h"
+#include "Event/Handle/Step/EventHandle_StepLeaved.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleStatics.h"
 
@@ -143,7 +143,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterStep::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepEntered::StaticClass(), this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -269,12 +269,7 @@ void UStepBase::OnExecute()
 
 	K2_OnExecute();
 
-	if(bTrackTarget && OperationTarget)
-	{
-		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous());
-	}
-
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteStep::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepExecuted::StaticClass(), this, {this});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -322,7 +317,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteStep::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepCompleted::StaticClass(), this, {this});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -353,7 +348,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveStep::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepLeaved::StaticClass(), this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -407,11 +402,11 @@ void UStepBase::ResetCameraView()
 {
 	if(bTrackTarget)
 	{
+		UCameraModuleStatics::EndTrackTarget();
 		if(CameraViewParams.CameraViewActor.LoadSynchronous())
 		{
 			UCameraModuleStatics::SwitchCamera(CameraViewParams.CameraViewActor.LoadSynchronous());
 		}
-		UCameraModuleStatics::EndTrackTarget();
 		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewMode, CameraViewParams.CameraViewSpace,
 			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, false, true, CameraViewParams.CameraViewEaseType, CameraViewParams.CameraViewDuration);

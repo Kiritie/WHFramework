@@ -6,6 +6,9 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Widget/EventHandle_UserWidgetClosed.h"
+#include "Event/Handle/Widget/EventHandle_UserWidgetOpened.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -20,7 +23,6 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
 	ParentSlot = NAME_None;
-	ChildNames = TArray<FName>();
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetAutoSize = false;
@@ -107,7 +109,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	K2_OnCreate(InOwner, InParams);
 
-	for(const auto& Iter : ChildNames)
+	for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
 	{
 		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
 		{
@@ -251,6 +253,8 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
 	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
 
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetOpened>(this, { this });
+
 	K2_OnOpen(InParams, bInstant);
 
 	for(const auto Iter : ChildWidgets)
@@ -307,6 +311,8 @@ void UUserWidgetBase::OnClose(bool bInstant)
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
+
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetClosed>(this, { this });
 
 	K2_OnClose(bInstant);
 }

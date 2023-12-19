@@ -17,7 +17,7 @@ void UEventHandle_ResetCameraView::Parse_Implementation(const TArray<FParameter>
 	
 }
 
-TArray<FParameter> UEventHandle_ResetCameraView::Pack_Implementation() const
+TArray<FParameter> UEventHandle_ResetCameraView::Pack_Implementation()
 {
 	return Super::Pack_Implementation();
 }

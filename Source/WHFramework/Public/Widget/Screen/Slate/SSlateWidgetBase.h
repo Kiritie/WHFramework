@@ -135,8 +135,6 @@ public:
 
 	virtual FName GetParentName() const override { return ParentName; }
 
-	virtual TArray<FName> GetChildNames() const override { return ChildNames; }
-
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
@@ -149,9 +147,9 @@ public:
 
 	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
 
-	virtual EScreenWidgetState GetWidgetState() const override
+	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const override
 	{
-		if(ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
+		if(bInheritParent && ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
 		{
 			return EScreenWidgetState::Closed;
 		}

@@ -266,6 +266,7 @@ private:
 	FCameraViewParams CachedCameraParams;
 	FCameraViewParams TrackCameraParams;
 	ECameraTrackMode TrackTargetMode;
+	FVector TargetSocketOffset;
 	bool bTrackAllowControl;
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
@@ -293,7 +294,7 @@ public:
 	virtual void SetCameraLocation(FVector InLocation, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraLocation(FVector InLocation, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	virtual void DoCameraLocation(FVector InLocation, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraLocation();
@@ -302,7 +303,7 @@ public:
 	virtual void SetCameraRotation(float InYaw = -1.f, float InPitch = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraRotation(float InYaw = -1.f, float InPitch = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	virtual void DoCameraRotation(float InYaw = -1.f, float InPitch = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraRotation();
@@ -311,7 +312,7 @@ public:
 	virtual void SetCameraDistance(float InDistance = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraDistance(float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	virtual void DoCameraDistance(float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraDistance();
@@ -320,13 +321,13 @@ public:
 	virtual void SetCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	virtual void DoCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraTransform();
@@ -372,6 +373,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsControllingZoom();
+
+	UFUNCTION(BlueprintPure)
+	bool IsTrackingTarget();
 
 public:
 	UFUNCTION(BlueprintPure)

@@ -161,7 +161,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
 	EProcedureGuideType ProcedureGuideType;
 	/// 流程指引间隔时间 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "ProcedureGuideType != EProcedureGuideType::None"), Category = "Index/Type/Guide")
 	float ProcedureGuideIntervalTime;
 
 	UPROPERTY(BlueprintAssignable)

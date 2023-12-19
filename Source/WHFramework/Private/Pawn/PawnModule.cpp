@@ -120,31 +120,30 @@ void UPawnModule::RemovePawnFromList(APawnBase* InPawn)
 
 void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant)
 {
-	if(!CurrentPawn || CurrentPawn != InPawn)
+	if(CurrentPawn == InPawn) return;
+
+	AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
+	
+	if(InPawn)
 	{
-		if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
+		if(CurrentPawn && CurrentPawn->GetDefaultController())
 		{
-			if(InPawn)
-			{
-				if(CurrentPawn && CurrentPawn->GetDefaultController())
-				{
-					CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
-				}
-				CurrentPawn = InPawn;
-				PlayerController->Possess(InPawn);
-				UCameraModuleStatics::EndTrackTarget();
-				UCameraModuleStatics::StartTrackTarget(InPawn, ECameraTrackMode::LocationAndRotationOnce, ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, InPawn->GetCameraTraceOffset(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, -1.f, bInstant);
-			}
-			else if(CurrentPawn)
-			{
-				PlayerController->UnPossess();
-				if(CurrentPawn->GetDefaultController())
-				{
-					CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
-				}
-				CurrentPawn = nullptr;
-			}
+			CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
 		}
+		CurrentPawn = InPawn;
+		PlayerController->Possess(InPawn);
+		UCameraModuleStatics::EndTrackTarget();
+		UCameraModuleStatics::StartTrackTarget(InPawn, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, InPawn->GetCameraOffset() * InPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, InPawn->GetCameraDistance(), bInstant);
+	}
+	else if(CurrentPawn)
+	{
+		PlayerController->UnPossess();
+		if(CurrentPawn->GetDefaultController())
+		{
+			CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
+		}
+		CurrentPawn = nullptr;
+		UCameraModuleStatics::EndTrackTarget();
 	}
 }
 

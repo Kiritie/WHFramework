@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Event/Handle/EventHandleBase.h"
+#include "Event/Handle/InstancedEventHandleBase.h"
 
 #include "EventHandle_ResetCameraView.generated.h"
 
@@ -10,7 +10,7 @@
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_ResetCameraView : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_ResetCameraView : public UInstancedEventHandleBase
 {
 	GENERATED_BODY()
 
@@ -23,5 +23,5 @@ public:
 public:
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual TArray<FParameter> Pack_Implementation() const override;
+	virtual TArray<FParameter> Pack_Implementation() override;
 };

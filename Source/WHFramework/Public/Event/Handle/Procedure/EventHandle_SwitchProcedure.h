@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "Event/Handle/EventHandleBase.h"
-#include "Parameter/ParameterModuleTypes.h"
+#include "Event/Handle/InstancedEventHandleBase.h"
 
 #include "EventHandle_SwitchProcedure.generated.h"
 
@@ -11,7 +10,7 @@
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_SwitchProcedure : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_SwitchProcedure : public UInstancedEventHandleBase
 {
 	GENERATED_BODY()
 
@@ -23,7 +22,7 @@ public:
 
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
-	virtual TArray<FParameter> Pack_Implementation() const override;
+	virtual TArray<FParameter> Pack_Implementation() override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

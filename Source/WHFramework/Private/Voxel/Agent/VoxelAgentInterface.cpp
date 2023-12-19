@@ -1,8 +1,8 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_DestroyVoxel.h"
-#include "Event/Handle/Voxel/EventHandle_GenerateVoxel.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -33,7 +33,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResu
 	{
 		if(Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this))
 		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_GenerateVoxel>(Cast<UObject>(this), { &VoxelItem });
+			UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &VoxelItem });
 			return true;
 		}
 	}
@@ -49,7 +49,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResul
 	FVoxelItem VoxelItem = InVoxelHitResult.VoxelItem;
 	if(Chunk->SetVoxelComplex(VoxelItem.Index, FVoxelItem::Empty, true, this))
 	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_DestroyVoxel>(Cast<UObject>(this), { &VoxelItem });
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &VoxelItem });
 		return true;
 	}
 	return false;

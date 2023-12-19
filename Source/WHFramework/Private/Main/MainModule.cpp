@@ -6,9 +6,9 @@
 #include "Ability/AbilityModule.h"
 #include "Common/CommonStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/EventHandle_ExitGame.h"
-#include "Event/Handle/Common/EventHandle_InitGame.h"
-#include "Event/Handle/Common/EventHandle_StartGame.h"
+#include "Event/Handle/Common/EventHandle_GameExited.h"
+#include "Event/Handle/Common/EventHandle_GameInited.h"
+#include "Event/Handle/Common/EventHandle_GameStarted.h"
 #include "Net/UnrealNetwork.h"
 
 IMPLEMENTATION_MAIN_MODULE(AMainModule)
@@ -51,7 +51,7 @@ void AMainModule::OnInitialize_Implementation()
 		}
 	}
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_InitGame>(this);
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GameInited>(this);
 }
 
 void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
@@ -75,7 +75,7 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_StartGame>(this);
+		UEventModuleStatics::BroadcastEvent<UEventHandle_GameStarted>(this);
 	}
 }
 
@@ -113,7 +113,7 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_ExitGame>(this);
+		UEventModuleStatics::BroadcastEvent<UEventHandle_GameExited>(this);
 
 		ModuleMap.Empty();
 	}

@@ -42,10 +42,10 @@ public:
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class UCameraComponent* Camera;
+	UCameraComponent* Camera;
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	class USpringArmComponent* CameraBoom;
+	USpringArmComponent* CameraBoom;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")

@@ -15,6 +15,9 @@
 #include "Debug/DebugModuleTypes.h"
 #include "WidgetModule.generated.h"
 
+class UEventHandle_CloseUserWidget;
+class UEventHandle_OpenUserWidget;
+
 UCLASS()
 class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManager
 {
@@ -47,6 +50,13 @@ public:
 	virtual void OnUnPause() override;
 
 	virtual void OnTermination(EPhase InPhase) override;
+
+protected:
+	UFUNCTION()
+	void OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle);
+
+	UFUNCTION()
+	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
 
 	////////////////////////////////////////////////////
 	// UserWidget
@@ -103,6 +113,21 @@ public:
 			return UserWidgetClassMap[InName];
 		}
 		return nullptr;
+	}
+
+	UFUNCTION(BlueprintPure)
+	TArray<FName> GetUserWidgetChildrenByName(FName InName) const
+	{
+		TArray<FName> ReturnValues;
+		for(const auto Iter : UserWidgetClassMap)
+		{
+			const UUserWidgetBase* DefaultObject = Iter.Value->GetDefaultObject<UUserWidgetBase>();
+			if(DefaultObject->GetParentName() == InName)
+			{
+				ReturnValues.Add(DefaultObject->GetWidgetName());
+			}
+		}
+		return ReturnValues;
 	}
 
 	template<class T>

@@ -86,11 +86,16 @@ protected:
 
 	virtual void MoveUp_Implementation(float InValue) override;
 
+	virtual void JumpN_Implementation() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	FVector GetCameraTraceOffset() const override;
+	FVector GetCameraOffset() const override;
+
+	UFUNCTION(BlueprintNativeEvent)
+	float GetCameraDistance() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor

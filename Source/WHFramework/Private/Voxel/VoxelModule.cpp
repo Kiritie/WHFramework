@@ -7,8 +7,8 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_ChangeWorldMode.h"
-#include "Event/Handle/Voxel/EventHandle_ChangeWorldState.h"
+#include "Event/Handle/Voxel/EventHandle_WorldModeChanged.h"
+#include "Event/Handle/Voxel/EventHandle_WorldStateChanged.h"
 #include "Main/MainModuleStatics.h"
 #include "Math/MathStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -265,12 +265,12 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldMode::StaticClass(), this, {&WorldMode});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_WorldModeChanged::StaticClass(), this, {&WorldMode});
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeWorldState::StaticClass(), this, {&WorldState});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_WorldStateChanged::StaticClass(), this, {&WorldState});
 }
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
@@ -837,7 +837,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	if(bForce) DestroyChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
 	FVector GenerateOffset = FVector::ZeroVector;
-	const auto VoxelAgent  = UCommonStatics::GetPossessedPawn<IVoxelAgentInterface>();
+	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonStatics::GetPlayerController()->GetViewTarget());
 	if(bFromAgent && VoxelAgent)
 	{
 		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f, 0.f);

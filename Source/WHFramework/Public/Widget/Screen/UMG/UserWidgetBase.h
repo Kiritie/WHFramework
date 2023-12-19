@@ -183,9 +183,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FName ParentSlot;
-
-	UPROPERTY(EditDefaultsOnly)
-	TArray<FName> ChildNames;
 		
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
@@ -238,7 +235,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditDefaultsOnly)
 	TArray<FParameter> WidgetParams;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -295,9 +292,6 @@ public:
 	virtual FName GetParentSlot() const override { return ParentSlot; }
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<FName> GetChildNames() const override { return ChildNames; }
-
-	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	UFUNCTION(BlueprintPure)
@@ -328,7 +322,14 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EScreenWidgetState GetWidgetState() const override { return WidgetState; }
+	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const override
+	{
+		if(bInheritParent && ParentWidget && ParentWidget->GetWidgetState() == EScreenWidgetState::Closed)
+		{
+			return EScreenWidgetState::Closed;
+		}
+		return WidgetState;
+	}
 	
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }

@@ -7,7 +7,7 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Input/EventHandle_ChangeInputMode.h"
+#include "Event/Handle/Input/EventHandle_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Input/InputManager.h"
@@ -48,11 +48,19 @@ UInputModule::UInputModule()
 		ContextMappings.Add(ContextMapping);
 	}
 
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> PlayerMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterMovement.IMC_CharacterMovement'"));
-	if(PlayerMovementMapping.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CharacterMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterMovement.IMC_CharacterMovement'"));
+	if(CharacterMovementMapping.Succeeded())
 	{
 		FInputContextMapping ContextMapping;
-		ContextMapping.InputMapping = PlayerMovementMapping.Object;
+		ContextMapping.InputMapping = CharacterMovementMapping.Object;
+		ContextMappings.Add(ContextMapping);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CharacterActionMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterAction.IMC_CharacterAction'"));
+	if(CharacterActionMapping.Succeeded())
+	{
+		FInputContextMapping ContextMapping;
+		ContextMapping.InputMapping = CharacterActionMapping.Object;
 		ContextMappings.Add(ContextMapping);
 	}
 
@@ -163,6 +171,7 @@ void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UInputModule::JumpPlayer);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -569,6 +578,14 @@ void UInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 	}
 }
 
+void UInputModule::JumpPlayer()
+{
+	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
+	{
+		IWHPlayerInterface::Execute_JumpN(GetPlayerController()->GetPawn());
+	}
+}
+
 void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
@@ -798,6 +815,6 @@ void UInputModule::SetGlobalInputMode(EInputMode InInputMode)
 			}
 			default: break;
 		}
-		UEventModuleStatics::BroadcastEvent(UEventHandle_ChangeInputMode::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
+		UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
 	}
 }

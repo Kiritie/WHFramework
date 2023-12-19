@@ -18,7 +18,7 @@ void UEventHandleBase::Parse_Implementation(const TArray<FParameter>& InParams)
 	
 }
 
-TArray<FParameter> UEventHandleBase::Pack_Implementation() const
+TArray<FParameter> UEventHandleBase::Pack_Implementation()
 {
 	return TArray<FParameter>();
 }

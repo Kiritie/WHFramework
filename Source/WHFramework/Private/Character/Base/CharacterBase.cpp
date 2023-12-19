@@ -189,9 +189,19 @@ void ACharacterBase::MoveUp_Implementation(float InValue)
 	AddMovementInput(FVector(Direction.X * 0.2f, Direction.Y * 0.2f, 0.5f * InValue), 1.f);
 }
 
-FVector ACharacterBase::GetCameraTraceOffset_Implementation() const
+void ACharacterBase::JumpN_Implementation()
+{
+	Jump();
+}
+
+FVector ACharacterBase::GetCameraOffset_Implementation() const
 {
 	return FVector::ZeroVector;
+}
+
+float ACharacterBase::GetCameraDistance_Implementation() const
+{
+	return -1.f;
 }
 
 void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)

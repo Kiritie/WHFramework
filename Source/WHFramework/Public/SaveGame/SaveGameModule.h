@@ -4,7 +4,7 @@
 
 
 #include "SaveGameModuleTypes.h"
-#include "Event/Handle/Common/EventHandle_ExitGame.h"
+#include "Event/Handle/Common/EventHandle_GameExited.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "SaveGameModule.generated.h"
@@ -50,7 +50,7 @@ public:
 
 protected:
 	UFUNCTION()
-	virtual void OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
+	virtual void OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle);
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;

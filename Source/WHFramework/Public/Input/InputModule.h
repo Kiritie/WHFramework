@@ -195,6 +195,9 @@ protected:
 	UFUNCTION()
 	virtual void MoveUpPlayer(const FInputActionValue& InValue);
 
+	UFUNCTION()
+	virtual void JumpPlayer();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// TouchInputs
 protected:

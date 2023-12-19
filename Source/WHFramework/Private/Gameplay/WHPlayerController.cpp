@@ -2,6 +2,7 @@
 
 #include "Gameplay/WHPlayerController.h"
 
+#include "Camera/CameraModuleStatics.h"
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
@@ -77,6 +78,8 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	SetPlayerPawn(InPawn);
+
+	SetControlRotation(UCameraModuleStatics::GetCameraRotation());
 }
 
 void AWHPlayerController::OnUnPossess()

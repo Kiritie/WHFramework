@@ -7,8 +7,8 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Procedure/EventHandle_EnterProcedure.h"
-#include "Event/Handle/Procedure/EventHandle_LeaveProcedure.h"
+#include "Event/Handle/Procedure/EventHandle_ProcedureEntered.h"
+#include "Event/Handle/Procedure/EventHandle_ProcedureLeaved.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleStatics.h"
 
@@ -57,6 +57,8 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 void UProcedureBase::OnInitialize()
 {
 	K2_OnInitialize();
+
+	CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
 }
 
 void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
@@ -80,7 +82,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterProcedure::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureEntered::StaticClass(), this, {this});
 }
 
 void UProcedureBase::OnRefresh()
@@ -119,7 +121,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveProcedure::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureLeaved::StaticClass(), this, {this});
 }
 
 void UProcedureBase::SwitchOut_Implementation()
@@ -183,11 +185,11 @@ void UProcedureBase::ResetCameraView()
 {
 	if(bTrackTarget)
 	{
+		UCameraModuleStatics::EndTrackTarget();
 		if(CameraViewParams.CameraViewActor.LoadSynchronous())
 		{
 			UCameraModuleStatics::SwitchCamera(CameraViewParams.CameraViewActor.LoadSynchronous());
 		}
-		UCameraModuleStatics::EndTrackTarget();
 		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewMode, CameraViewParams.CameraViewSpace,
 			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
 			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, false, true, CameraViewParams.CameraViewEaseType, CameraViewParams.CameraViewDuration);
@@ -243,11 +245,6 @@ bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
 	if(InProperty)
 	{
 		const FString PropertyName = InProperty->GetName();
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, ProcedureGuideIntervalTime))
-		{
-			return ProcedureGuideType == EProcedureGuideType::TimerOnce || ProcedureGuideType == EProcedureGuideType::TimerLoop;
-		}
 	}
 
 	return Super::CanEditChange(InProperty);
@@ -261,11 +258,6 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 	{
 		const FName PropertyName = Property->GetFName();
 		
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, OperationTarget))
-		{
-			CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
-		}
-
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
 		{
 			if(bFirstProcedure)

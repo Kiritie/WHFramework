@@ -25,7 +25,7 @@ public:
 public:
 	virtual FVector GetVoxelAgentLocation() const = 0;
 
-	virtual FPrimaryAssetId GetGenerateVoxelID() const = 0;
+	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); };
 
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) = 0;
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { };
 };

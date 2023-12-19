@@ -7,9 +7,9 @@
 #include "EventManagerBase.generated.h"
 
 class UEventHandleBase;
-class UEventHandle_InitGame;
-class UEventHandle_ExitGame;
-class UEventHandle_StartGame;
+class UEventHandle_GameInited;
+class UEventHandle_GameExited;
+class UEventHandle_GameStarted;
 
 UCLASS()
 class WHFRAMEWORK_API UEventManagerBase : public UWHObject
@@ -69,22 +69,22 @@ protected:
 	/**
 	* 当初始化游戏
 	*/
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitGame")
-	void K2_OnInitGame(UObject* InSender, UEventHandle_InitGame* InEventHandle);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGameInited")
+	void K2_OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle);
 	UFUNCTION()
-	virtual void OnInitGame(UObject* InSender, UEventHandle_InitGame* InEventHandle);
+	virtual void OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle);
 	/**
 	* 当开始游戏
 	*/
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStartGame")
-	void K2_OnStartGame(UObject* InSender, UEventHandle_StartGame* InEventHandle);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGameStarted")
+	void K2_OnGameStarted(UObject* InSender, UEventHandle_GameStarted* InEventHandle);
 	UFUNCTION()
-	virtual void OnStartGame(UObject* InSender, UEventHandle_StartGame* InEventHandle);
+	virtual void OnGameStarted(UObject* InSender, UEventHandle_GameStarted* InEventHandle);
 	/**
 	* 当退出游戏
 	*/
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnExitGame")
-	void K2_OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGameExited")
+	void K2_OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle);
 	UFUNCTION()
-	virtual void OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle);
+	virtual void OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle);
 };

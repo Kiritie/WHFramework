@@ -38,4 +38,7 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void MoveUp(float InValue);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void JumpN();
 };

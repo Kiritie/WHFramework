@@ -4,7 +4,7 @@
 #include "SaveGame/SaveGameModule.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/EventHandle_ExitGame.h"
+#include "Event/Handle/Common/EventHandle_GameExited.h"
 #include "Kismet/GameplayStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Base/SaveGameBase.h"
@@ -48,7 +48,7 @@ void USaveGameModule::OnInitialize()
 {
 	Super::OnInitialize();
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnExitGame"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, FName("OnGameExited"));
 }
 
 void USaveGameModule::OnPreparatory(EPhase InPhase)
@@ -76,7 +76,7 @@ void USaveGameModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void USaveGameModule::OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle)
+void USaveGameModule::OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle)
 {
 	if(bModuleAutoSave)
 	{

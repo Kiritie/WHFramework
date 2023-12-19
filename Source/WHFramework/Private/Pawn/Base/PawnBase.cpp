@@ -9,7 +9,6 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Components/BoxComponent.h"
 #include "Pawn/PawnModuleNetworkComponent.h"
-#include "Pawn/Base/PawnDataBase.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
@@ -178,9 +177,19 @@ void APawnBase::MoveUp_Implementation(float InValue)
 	AddMovementInput(FVector(Direction.X * 0.2f, Direction.Y * 0.2f, 0.5f * InValue), 1.f);
 }
 
-FVector APawnBase::GetCameraTraceOffset_Implementation() const
+void APawnBase::JumpN_Implementation()
+{
+	
+}
+
+FVector APawnBase::GetCameraOffset_Implementation() const
 {
 	return FVector::ZeroVector;
+}
+
+float APawnBase::GetCameraDistance_Implementation() const
+{
+	return -1.f;
 }
 
 void APawnBase::SetActorVisible_Implementation(bool bInVisible)

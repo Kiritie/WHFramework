@@ -4,9 +4,9 @@
 #include "Event/Manager/EventManagerBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/EventHandle_StartGame.h"
-#include "Event/Handle/Common/EventHandle_ExitGame.h"
-#include "Event/Handle/Common/EventHandle_InitGame.h"
+#include "Event/Handle/Common/EventHandle_GameStarted.h"
+#include "Event/Handle/Common/EventHandle_GameExited.h"
+#include "Event/Handle/Common/EventHandle_GameInited.h"
 
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()
@@ -23,9 +23,9 @@ void UEventManagerBase::OnInitialize()
 		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, FName("OnHandleEvent"));
 	}
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_InitGame>(this, FName("OnInitGame"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_StartGame>(this, FName("OnStartGame"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_ExitGame>(this, FName("OnExitGame"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameInited>(this, FName("OnGameInited"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameStarted>(this, FName("OnGameStarted"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, FName("OnGameExited"));
 }
 
 void UEventManagerBase::OnPreparatory(EPhase InPhase)
@@ -48,17 +48,17 @@ void UEventManagerBase::OnHandleEvent(UObject* InSender, UEventHandleBase* InEve
 	K2_OnHandleEvent(InSender, InEventHandle);
 }
 
-void UEventManagerBase::OnInitGame(UObject* InSender, UEventHandle_InitGame* InEventHandle)
+void UEventManagerBase::OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle)
 {
-	K2_OnInitGame(InSender, InEventHandle);
+	K2_OnGameInited(InSender, InEventHandle);
 }
 
-void UEventManagerBase::OnStartGame(UObject* InSender, UEventHandle_StartGame* InEventHandle)
+void UEventManagerBase::OnGameStarted(UObject* InSender, UEventHandle_GameStarted* InEventHandle)
 {
-	K2_OnStartGame(InSender, InEventHandle);
+	K2_OnGameStarted(InSender, InEventHandle);
 }
 
-void UEventManagerBase::OnExitGame(UObject* InSender, UEventHandle_ExitGame* InEventHandle)
+void UEventManagerBase::OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle)
 {
-	K2_OnExitGame(InSender, InEventHandle);
+	K2_OnGameExited(InSender, InEventHandle);
 }

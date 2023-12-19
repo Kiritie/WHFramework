@@ -4,10 +4,10 @@
 #include "Task/Base/TaskBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Task/EventHandle_CompleteTask.h"
-#include "Event/Handle/Task/EventHandle_EnterTask.h"
-#include "Event/Handle/Task/EventHandle_ExecuteTask.h"
-#include "Event/Handle/Task/EventHandle_LeaveTask.h"
+#include "Event/Handle/Task/EventHandle_TaskCompleted.h"
+#include "Event/Handle/Task/EventHandle_TaskEntered.h"
+#include "Event/Handle/Task/EventHandle_TaskExecuted.h"
+#include "Event/Handle/Task/EventHandle_TaskLeaved.h"
 #include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Task/TaskModule.h"
@@ -129,7 +129,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterTask::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskEntered::StaticClass(), this, {this});
 
 	if(bMergeSubTask)
 	{
@@ -207,7 +207,7 @@ void UTaskBase::OnExecute()
 
 	K2_OnExecute();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ExecuteTask::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskExecuted::StaticClass(), this, {this});
 
 	if(TaskState != ETaskState::Completed)
 	{
@@ -250,7 +250,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	
 	K2_OnComplete(InTaskExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_CompleteTask::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskCompleted::StaticClass(), this, {this});
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
@@ -276,7 +276,7 @@ void UTaskBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveTask::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskLeaved::StaticClass(), this, {this});
 
 	if(bMergeSubTask)
 	{

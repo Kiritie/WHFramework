@@ -172,6 +172,7 @@ namespace GameplayTags
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveForwardPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveRightPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveUpPlayer);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_JumpPlayer);
 	
 	////////////////////////////////////////////////////
 	// State_Vitality

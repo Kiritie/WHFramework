@@ -17,7 +17,7 @@ void UEventHandle_SetCameraView::Parse_Implementation(const TArray<FParameter>& 
 	CameraViewData.FromParams(InParams);
 }
 
-TArray<FParameter> UEventHandle_SetCameraView::Pack_Implementation() const
+TArray<FParameter> UEventHandle_SetCameraView::Pack_Implementation()
 {
 	return CameraViewData.ToParams();
 }

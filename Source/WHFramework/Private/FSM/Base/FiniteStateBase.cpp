@@ -4,10 +4,10 @@
 
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/FiniteState/EventHandle_EnterFiniteState.h"
-#include "Event/Handle/FiniteState/EventHandle_LeaveFiniteState.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonStatics.h"
+#include "Event/Handle/FSM/EventHandle_FiniteStateEntered.h"
+#include "Event/Handle/FSM/EventHandle_FiniteStateLeaved.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
@@ -55,7 +55,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	K2_OnEnter(InLastFiniteState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_EnterFiniteState::StaticClass(), this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateEntered::StaticClass(), this, {this, FSM});
 }
 
 void UFiniteStateBase::OnRefresh()
@@ -78,7 +78,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	K2_OnLeave(InNextFiniteState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_LeaveFiniteState::StaticClass(), this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateLeaved::StaticClass(), this, {this, FSM});
 }
 
 void UFiniteStateBase::OnTermination()

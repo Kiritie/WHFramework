@@ -38,5 +38,7 @@ public:
 
 	virtual AController* GetDefaultController() const = 0;
 	
-	virtual FVector GetCameraTraceOffset() const = 0;
+	virtual FVector GetCameraOffset() const = 0;
+	
+	virtual float GetCameraDistance() const = 0;
 };

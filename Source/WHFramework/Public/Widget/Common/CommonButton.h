@@ -44,8 +44,11 @@ protected:
 	UCommonTextBlock* Txt_Title;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Content")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content")
 	FText Title;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
+	bool bSingle;
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bClicked;
@@ -59,6 +62,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsClicked() const { return bClicked; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsSingle() const { return bSingle; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinWidth(int32 InValue);

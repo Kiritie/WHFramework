@@ -61,6 +61,7 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveForwardPlayer, "Input.Player.MoveForward", "Move Forward Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveRightPlayer, "Input.Player.MoveRight", "Move Right Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveUpPlayer, "Input.Player.MoveUp", "Move Up Player");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_JumpPlayer, "Input.Player.Jump", "Jump Player");
 		
 	////////////////////////////////////////////////////
 	// State_Vitality

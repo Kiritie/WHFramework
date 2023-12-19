@@ -6,6 +6,9 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Common/CommonStatics.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
+#include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
 IMPLEMENTATION_MODULE(UWidgetModule)
@@ -60,6 +63,9 @@ void UWidgetModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, FName("OnOpenUserWidget"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, FName("OnCloseUserWidget"));
+
 	for(auto& Iter : UserWidgetClasses)
 	{
 		if(!Iter) continue;
@@ -70,9 +76,9 @@ void UWidgetModule::OnInitialize()
 		}
 	}
 
-	for(auto Iter : WorldWidgetClasses)
+	for(auto& Iter : WorldWidgetClasses)
 	{
-		if(!Iter) return;
+		if(!Iter) continue;
 		const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
 		if(!WorldWidgetClassMap.Contains(WidgetName))
 		{
@@ -185,6 +191,22 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 		ClearAllUserWidget();
 		ClearAllSlateWidget();
 		ClearAllWorldWidget();
+	}
+}
+
+void UWidgetModule::OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle)
+{
+	if(InEventHandle->WidgetClass)
+	{
+		OpenUserWidget(InEventHandle->WidgetClass, InEventHandle->WidgetParams, InEventHandle->bInstant);
+	}
+}
+
+void UWidgetModule::OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle)
+{
+	if(InEventHandle->WidgetClass)
+	{
+		CloseUserWidget(InEventHandle->WidgetClass, InEventHandle->bInstant);
 	}
 }
 
@@ -405,16 +427,14 @@ EInputMode UWidgetModule::GetNativeInputMode() const
 	EInputMode InputMode = EInputMode::None;
     for (const auto& Iter : AllUserWidget)
     {
-    	if (Iter.Value && (Iter.Value->GetWidgetState() == EScreenWidgetState::Opening || Iter.Value->GetWidgetState() == EScreenWidgetState::Opened) &&
-    		(int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
+    	if (Iter.Value && (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening || Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened) && (int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
     	{
     		InputMode = Iter.Value->GetWidgetInputMode();
     	}
     }
 	for (const auto& Iter : AllSlateWidgets)
 	{
-		if (Iter.Value && (Iter.Value->GetWidgetState() == EScreenWidgetState::Opening || Iter.Value->GetWidgetState() == EScreenWidgetState::Opened) &&
-			(int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
+		if (Iter.Value && (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening || Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened) && (int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
 		{
 			InputMode = Iter.Value->GetWidgetInputMode();
 		}

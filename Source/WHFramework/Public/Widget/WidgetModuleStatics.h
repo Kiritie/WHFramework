@@ -48,6 +48,12 @@ public:
 		return UWidgetModule::Get().GetUserWidgetClassByName(InName);
 	}
 
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static TArray<FName> GetUserWidgetChildrenByName(FName InName)
+	{
+		return UWidgetModule::Get().GetUserWidgetChildrenByName(InName);
+	}
+
 	template<class T>
 	static bool HasUserWidget(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{

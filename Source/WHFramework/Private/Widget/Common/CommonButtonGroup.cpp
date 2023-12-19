@@ -7,21 +7,37 @@
 
 UCommonButtonGroup::UCommonButtonGroup()
 {
-	
+	bBroadcastOnDeselected = true;
 }
 
 void UCommonButtonGroup::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	
+	if(InParams.IsValidIndex(0))
+	{
+		bBroadcastOnDeselected = InParams[0].GetBooleanValue();
+	}
 }
 
 void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 {
+	bBroadcastOnDeselected = true;
+
 	ForEach([](UCommonButtonBase& InButton, int32 InIndex)
 	{
 		UObjectPoolModuleStatics::DespawnObject(&InButton, true);
 	});
 	RemoveAll();
+}
+
+void UCommonButtonGroup::OnWidgetAdded(UWidget* NewWidget)
+{
+	if(const UCommonButton* CommonButton = Cast<UCommonButton>(NewWidget))
+	{
+		if(!CommonButton->IsSingle())
+		{
+			Super::OnWidgetAdded(NewWidget);
+		}
+	}
 }
 
 void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected)
@@ -41,7 +57,7 @@ void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButt
 				else if (Button->GetSelected())
 				{
 					// Make sure any other selected buttons are deselected
-					Button->SetSelectedInternal(false, false, false);
+					Button->SetSelectedInternal(false, false, bBroadcastOnDeselected);
 				}
 			}
 		}

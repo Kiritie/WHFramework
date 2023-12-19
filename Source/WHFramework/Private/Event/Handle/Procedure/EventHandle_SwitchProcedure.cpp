@@ -23,7 +23,7 @@ void UEventHandle_SwitchProcedure::Parse_Implementation(const TArray<FParameter>
 	}
 }
 
-TArray<FParameter> UEventHandle_SwitchProcedure::Pack_Implementation() const
+TArray<FParameter> UEventHandle_SwitchProcedure::Pack_Implementation()
 {
 	return { ProcedureClass.Get() };
 }
