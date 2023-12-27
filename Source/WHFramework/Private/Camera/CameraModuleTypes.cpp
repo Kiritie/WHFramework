@@ -42,6 +42,7 @@ void FCameraViewParams::SetCameraParams(const FCameraParams& InCameraParams)
 
 void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 {
+	if(InParams.Num() < 12) return;
 	int32 i = 0;
 	CameraViewTarget = InParams[i++].GetObjectPtrValue<AActor>();
 	bTrackTarget = InParams[i++].GetBooleanValue();
@@ -55,7 +56,7 @@ void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 	CameraViewParams.CameraViewOffset = InParams[i++].GetVectorValue();
 	CameraViewParams.CameraViewYaw = InParams[i++].GetFloatValue();
 	CameraViewParams.CameraViewPitch = InParams[i++].GetFloatValue();
-	CameraViewParams.CameraViewDistance = InParams[i++].GetFloatValue();
+	CameraViewParams.CameraViewDistance = InParams[i].GetFloatValue();
 }
 
 TArray<FParameter> FCameraViewData::ToParams() const

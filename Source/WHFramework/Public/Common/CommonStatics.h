@@ -273,6 +273,12 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
 	static FGameplayTagContainer GetTagChildren(const FGameplayTag& InTag);
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
+	static FName MakeLiteralNameTag(const FGameplayTag& InTag);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "CommonStatics")
+	static FString MakeLiteralStringTag(const FGameplayTag& InTag);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Json
 	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
@@ -284,6 +290,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static FKey MakeKeyFromName(const FName InKeyName);
+	
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static bool HasMouseCapture();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Object

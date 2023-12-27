@@ -40,6 +40,6 @@ public:
 	UFUNCTION(BlueprintPure)
 	FCameraViewData GetCameraViewData();
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
 	void SetCameraViewData(const FCameraViewData& InCameraViewData);
 };

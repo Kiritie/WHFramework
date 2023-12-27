@@ -4,9 +4,9 @@
 #include "Event/Manager/EventManagerBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/EventHandle_GameStarted.h"
-#include "Event/Handle/Common/EventHandle_GameExited.h"
-#include "Event/Handle/Common/EventHandle_GameInited.h"
+#include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
+#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
+#include "Event/Handle/Common/Game/EventHandle_GameInited.h"
 
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()

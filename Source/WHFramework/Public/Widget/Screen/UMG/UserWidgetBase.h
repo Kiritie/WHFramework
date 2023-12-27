@@ -17,15 +17,31 @@ class UWidgetAnimatorBase;
 UCLASS()
 class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
 {
+	friend class UWidgetModule;
+	
 	GENERATED_BODY()
 
 public:
 	UUserWidgetBase(const FObjectInitializer& ObjectInitializer);
 
-public:
-	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+protected:
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
-	virtual FReply NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -190,11 +206,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FAnchors WidgetAnchors;
 
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetPenetrable;
+
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	bool bWidgetAutoSize;
-
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
-	FVector2D WidgetDrawSize;
 	
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
 	FMargin WidgetOffsets;
@@ -298,10 +314,13 @@ public:
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
 
 	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
+
+	UFUNCTION(BlueprintPure)
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
+	virtual FVector2D GetWidgetDrawSize() const override { return FVector2D(WidgetOffsets.Right, WidgetOffsets.Bottom); }
 
 	UFUNCTION(BlueprintPure)
 	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Event/Handle/Common/EventHandle_GameExited.h"
+#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 
 UEventHandle_GameExited::UEventHandle_GameExited()
 {

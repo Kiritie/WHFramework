@@ -16,14 +16,15 @@
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHGameState.h"
 #include "Common/CommonTypes.h"
-#include "Event/Handle/Common/EventHandle_GamePaused.h"
-#include "Event/Handle/Common/EventHandle_GameUnPaused.h"
+#include "Event/Handle/Common/Game/EventHandle_GamePaused.h"
+#include "Event/Handle/Common/Game/EventHandle_GameUnPaused.h"
 #include "Gameplay/WHLocalPlayer.h"
 #include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
+#include "Widgets/SViewport.h"
 
 bool UCommonStatics::IsPaused()
 {
@@ -57,6 +58,7 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 		case EPauseMode::Default:
 		{
 			SetPaused(true);
+			UMainModuleStatics::PauseAllModule();
 			break;
 		}
 		case EPauseMode::OnlyTime:
@@ -80,6 +82,7 @@ void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
 		case EPauseMode::Default:
 		{
 			SetPaused(false);
+			UMainModuleStatics::UnPauseAllModule();
 			break;
 		}
 		case EPauseMode::OnlyTime:
@@ -381,6 +384,16 @@ FGameplayTagContainer UCommonStatics::GetTagChildren(const FGameplayTag& InTag)
 	return ReturnValue;
 }
 
+FName UCommonStatics::MakeLiteralNameTag(const FGameplayTag& InTag)
+{
+	return InTag.GetTagName();
+}
+
+FString UCommonStatics::MakeLiteralStringTag(const FGameplayTag& InTag)
+{
+	return InTag.GetTagName().ToString();
+}
+
 bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
 {
 	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
@@ -401,6 +414,11 @@ FText UCommonStatics::GetInputActionKeyCodeByName(const FString& InInputActionNa
 FKey UCommonStatics::MakeKeyFromName(const FName InKeyName)
 {
 	return FKey(InKeyName);
+}
+
+bool UCommonStatics::HasMouseCapture()
+{
+	return GetCurrentWorld()->GetGameViewport()->GetGameViewportWidget()->HasMouseCapture();
 }
 
 bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params)

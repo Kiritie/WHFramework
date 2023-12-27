@@ -104,14 +104,17 @@ public:
 	}
 
 public:
+	bool IsValid() const
+	{
+		return CameraViewMode != ECameraViewMode::None;
+	}
+
 	void GetCameraParams();
 
 	void SetCameraParams(const FCameraParams& InCameraParams);
 
-	bool IsValid() const { return CameraViewMode != ECameraViewMode::None; }
-
 public:
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Transient)
 	AActor* CameraViewTarget;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -171,6 +174,11 @@ public:
 	virtual TArray<FParameter> ToParams() const override;
 
 public:
+	bool IsValid() const
+	{
+		return CameraViewParams.IsValid();
+	}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<AActor> CameraViewTarget;
 

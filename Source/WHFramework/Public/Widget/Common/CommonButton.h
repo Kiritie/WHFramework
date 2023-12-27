@@ -48,7 +48,7 @@ protected:
 	FText Title;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
-	bool bSingle;
+	bool bStandalone;
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bClicked;
@@ -61,10 +61,10 @@ public:
 	void SetTitle(const FText InTitle);
 
 	UFUNCTION(BlueprintPure)
-	bool IsClicked() const { return bClicked; }
+	bool IsStandalone() const { return bStandalone; }
 
 	UFUNCTION(BlueprintPure)
-	bool IsSingle() const { return bSingle; }
+	bool IsClicked() const { return bClicked; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinWidth(int32 InValue);

@@ -24,8 +24,16 @@ public:
 	virtual TArray<FParameter> Pack_Implementation() override;
 
 public:
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UUserWidgetBase> WidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "WidgetClass == nullptr"))
+	FName WidgetName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bInstant;

@@ -8,6 +8,6 @@ UWidgetWorldText::UWidgetWorldText(const FObjectInitializer& ObjectInitializer) 
 	WidgetName = FName("WorldText");
 	WidgetInputMode = EInputMode::None;
 
-	bWidgetAutoVisibility = true;
+	WidgetVisibilityMode = EWorldWidgetVisibilityMode::DistanceOnly;
 	WidgetShowDistance = 1500.f;
 }

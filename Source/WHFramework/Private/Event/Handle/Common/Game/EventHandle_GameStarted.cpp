@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Event/Handle/Common/EventHandle_GameStarted.h"
+#include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
 
 UEventHandle_GameStarted::UEventHandle_GameStarted()
 {

@@ -29,6 +29,10 @@ protected:
 	
 	virtual void OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected) override;
 
+public:
+	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
+	void DeselectAllN();
+	
 protected:
 	UPROPERTY()
 	bool bBroadcastOnDeselected;
@@ -39,4 +43,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetBroadcastOnDeselected(bool bInBroadcastOnDeselected) { bBroadcastOnDeselected = bInBroadcastOnDeselected; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<UCommonButtonBase*> GetButtons()
+	{
+		TArray<UCommonButtonBase*> ReturnValues;
+		for(auto Iter : Buttons)
+		{
+			ReturnValues.Add(Iter.Get());
+		}
+		return  ReturnValues;
+	}
 };

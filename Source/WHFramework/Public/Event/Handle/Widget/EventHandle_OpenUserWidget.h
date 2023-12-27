@@ -34,9 +34,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UUserWidgetBase> WidgetClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "WidgetClass == nullptr"))
+	FName WidgetName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FParameter> WidgetParams;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bInstant;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bForce;
 };

@@ -183,21 +183,9 @@ void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	if(bTrackTarget)
-	{
-		UCameraModuleStatics::EndTrackTarget();
-		if(CameraViewParams.CameraViewActor.LoadSynchronous())
-		{
-			UCameraModuleStatics::SwitchCamera(CameraViewParams.CameraViewActor.LoadSynchronous());
-		}
-		UCameraModuleStatics::StartTrackTarget(OperationTarget.LoadSynchronous(), TrackTargetMode, CameraViewParams.CameraViewMode, CameraViewParams.CameraViewSpace,
-			CameraViewParams.CameraViewOffset, FVector(-1.f), CameraViewParams.CameraViewYaw,
-			CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, false, true, CameraViewParams.CameraViewEaseType, CameraViewParams.CameraViewDuration);
-	}
-	else
-	{
-		UCameraModuleStatics::SetCameraViewParams(CameraViewParams);
-	}
+	if(ProcedureState != EProcedureState::Entered) return;
+	
+	UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
@@ -205,22 +193,9 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 	OperationTarget = InOperationTarget;
 	CameraViewParams.CameraViewTarget = InOperationTarget;
 
-	if(ProcedureState == EProcedureState::Entered)
+	if(bResetCameraView)
 	{
-		if(InOperationTarget)
-		{
-			if(bResetCameraView)
-			{
-				ResetCameraView();
-			}
-		}
-		else
-		{
-			if(bResetCameraView && bTrackTarget)
-			{
-				UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
-			}
-		}
+		ResetCameraView();
 	}
 }
 

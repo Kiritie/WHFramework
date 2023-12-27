@@ -138,6 +138,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SwitchCameraByName(const FName InName, bool bInstant = false);
 
+	UFUNCTION(BlueprintCallable)
+	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control
 protected:
@@ -263,11 +266,11 @@ private:
 	float CameraDoZoomDistance;
 	EEaseType CameraDoZoomEaseType;
 	FVector InitSocketOffset;
-	FCameraViewParams CachedCameraParams;
-	FCameraViewParams TrackCameraParams;
-	ECameraTrackMode TrackTargetMode;
 	FVector TargetSocketOffset;
+	FCameraViewData CachedCameraViewData;
+	FCameraViewData TrackCameraViewData;
 	bool bTrackAllowControl;
+	bool bTrackAllowSmooth;
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
 	bool bIsControllingZoom;
@@ -275,13 +278,13 @@ private:
 	AWHPlayerController* PlayerController;
 
 protected:
-	virtual void DoTrackTarget(bool bInstant);
+	virtual void DoTrackTarget();
 	
-	virtual void DoTrackTargetLocation(bool bInstant);
+	virtual void DoTrackTargetLocation();
 	
-	virtual void DoTrackTargetRotation(bool bInstant);
+	virtual void DoTrackTargetRotation();
 	
-	virtual void DoTrackTargetDistance(bool bInstant);
+	virtual void DoTrackTargetDistance();
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"))
@@ -339,21 +342,19 @@ public:
 	virtual void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraDistanceInput(float InValue);
+	virtual void AddCameraDistanceInput(float InValue, bool bCanMove = false);
 
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraView(const FCameraViewData& InCameraViewData);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
+	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true);
 	
+	UFUNCTION(BlueprintCallable)
+	virtual void ResetCameraView(bool bUseCachedData = false);
+
+protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView(bool bUseCachedParams = false);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
-	
 protected:
 	UFUNCTION()
 	void OnSetCameraView(UObject* InSender, UEventHandle_SetCameraView* InEventHandle);

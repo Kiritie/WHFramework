@@ -144,11 +144,15 @@ void UInputModule::OnRefresh(float DeltaSeconds)
 void UInputModule::OnPause()
 {
 	Super::OnPause();
+
+	GetPlayerController()->DisableInput(nullptr);
 }
 
 void UInputModule::OnUnPause()
 {
 	Super::OnUnPause();
+
+	GetPlayerController()->EnableInput(nullptr);
 }
 
 void UInputModule::OnTermination(EPhase InPhase)

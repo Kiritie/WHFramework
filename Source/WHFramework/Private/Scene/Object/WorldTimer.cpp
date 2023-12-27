@@ -2,13 +2,12 @@
 
 #include "Scene/Object/WorldTimer.h"
 
-#include "Engine/DirectionalLight.h"
 #include "Engine/World.h"
-#include "Kismet/KismetMathLibrary.h"
+#include "Scene/SceneModuleTypes.h"
 
 UWorldTimer::UWorldTimer()
 {
-
+	bAutoSave = true;
 }
 
 void UWorldTimer::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -19,6 +18,29 @@ void UWorldTimer::OnSpawn_Implementation(UObject* InOwner, const TArray<FParamet
 void UWorldTimer::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+}
+
+void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	const auto& SaveData = InSaveData->CastRef<FWorldTimerSaveData>();
+
+	SetDayLength(SaveData.DayLength);
+	SetNightLength(SaveData.NightLength);
+	if(SaveData.DateTime != -1) SetDateTime(SaveData.DateTime);
+	else SetTimeOfDay(SaveData.TimeOfDay);
+}
+
+FSaveData* UWorldTimer::ToData()
+{
+	static FWorldTimerSaveData* SaveData;
+	SaveData = new FWorldTimerSaveData();
+
+	SaveData->DayLength = GetDayLength();
+	SaveData->NightLength = GetNightLength();
+	SaveData->TimeOfDay = GetTimeOfDay();
+	SaveData->DateTime = GetDateTime();
+
+	return SaveData;
 }
 
 void UWorldTimer::ResetDateTime_Implementation(float InNewTime) const

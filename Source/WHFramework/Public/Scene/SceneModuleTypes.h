@@ -21,20 +21,17 @@ enum class EWorldTextStyle : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
+struct WHFRAMEWORK_API FWorldTimerSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FSceneModuleSaveData()
+	FORCEINLINE FWorldTimerSaveData()
 	{
 		DayLength = 10.f;
 		NightLength = 5.f;
 		TimeOfDay = 960.f;
 		DateTime = -1.f;
-
-		WeatherSeed = 0;
-		WeatherParams = TArray<FParameter>();
 	}
 
 public:
@@ -49,21 +46,53 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FDateTime DateTime;
+};
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWorldWeatherSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FWorldWeatherSaveData()
+	{
+		WeatherSeed = 0;
+		WeatherParams = TArray<FParameter>();
+	}
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float WeatherSeed;
 		
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<FParameter> WeatherParams;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
 
 public:
-	virtual bool IsValid() const override
+	FORCEINLINE FSceneModuleSaveData()
 	{
-		return !Datas.IsEmpty();
+		TimerData = FWorldTimerSaveData();
+		WeatherData = FWorldWeatherSaveData();
 	}
-	
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWorldTimerSaveData TimerData;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWorldWeatherSaveData WeatherData;
+
+public:
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
+
+		TimerData.MakeSaved();
+		WeatherData.MakeSaved();
 	}
 };

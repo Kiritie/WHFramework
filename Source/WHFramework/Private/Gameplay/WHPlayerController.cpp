@@ -44,7 +44,7 @@ void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
 
 void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)
 {
-	OnRefreshInteraction();
+	RefreshInteraction();
 }
 
 void AWHPlayerController::OnTermination_Implementation(EPhase InPhase)
@@ -104,8 +104,10 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
-void AWHPlayerController::OnRefreshInteraction_Implementation()
+void AWHPlayerController::RefreshInteraction_Implementation()
 {
+	if(UCommonStatics::GetLocalPlayerNum() > 1) return;
+	
 	FHitResult HitResult;
 
 	switch (InteractionRaycastMode)
@@ -122,6 +124,7 @@ void AWHPlayerController::OnRefreshInteraction_Implementation()
 		}
 		default: break;
 	}
+	
 	if(HitResult.bBlockingHit)
 	{
 		AActor* HitActor = HitResult.GetActor();
@@ -153,34 +156,40 @@ void AWHPlayerController::OnRefreshInteraction_Implementation()
 			IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject());
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
+		
+		if(UInputModuleStatics::GetKeyShortcutByName(FName("InteractSelect")).IsPressed(this))
+		{
+			if(HoveringInteraction.GetObject())
+			{
+				if(!SelectedInteraction.GetObject())
+				{
+					SelectedInteraction = HoveringInteraction;
+					IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+				}
+				else if(SelectedInteraction != HoveringInteraction)
+				{
+					IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+					SelectedInteraction = HoveringInteraction;
+					IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+				}
+			}
+			else if(SelectedInteraction.GetObject())
+			{
+				IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+				SelectedInteraction = nullptr;
+			}
+		}
+
+		if(UCommonStatics::HasMouseCapture() && HoveringInteraction.GetObject())
+		{
+			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
+			HoveringInteraction = nullptr;
+		}
 	}
 	else if(HoveringInteraction.GetObject())
 	{
 		IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
 		HoveringInteraction = nullptr;
-	}
-
-	if(UInputModuleStatics::GetKeyShortcutByName(FName("InteractSelect")).IsPressed(this))
-	{
-		if(HoveringInteraction.GetObject())
-		{
-			if(!SelectedInteraction.GetObject())
-			{
-				SelectedInteraction = HoveringInteraction;
-				IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
-			}
-			else if(SelectedInteraction != HoveringInteraction)
-			{
-				IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
-				SelectedInteraction = HoveringInteraction;
-				IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
-			}
-		}
-		else if(SelectedInteraction.GetObject())
-		{
-			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
-			SelectedInteraction = nullptr;
-		}
 	}
 }
 

@@ -13,6 +13,11 @@ bool UWidgetModuleStatics::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InCla
 	return UWidgetModule::Get().HasUserWidgetClass(InClass);
 }
 
+void UWidgetModuleStatics::AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass)
+{
+	return UWidgetModule::Get().AddUserWidgetClassMapping(InName, InClass);
+}
+
 bool UWidgetModuleStatics::HasUserWidget(TSubclassOf<UUserWidgetBase> InClass)
 {
 	return UWidgetModule::Get().HasUserWidget(InClass);

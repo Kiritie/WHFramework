@@ -134,14 +134,11 @@ public:
 	static void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void AddCameraDistanceInput(float InValue);
+	static void AddCameraDistanceInput(float InValue, bool bCanMove = false);
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SetCameraView(const FCameraViewData& InCameraViewData);
-	
-	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"), Category = "CameraModuleStatics")
+	static void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void ResetCameraView(bool bUseCachedParams = false);

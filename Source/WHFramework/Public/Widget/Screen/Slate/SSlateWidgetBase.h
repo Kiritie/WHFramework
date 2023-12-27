@@ -20,6 +20,25 @@ public:
 
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
+	
+protected:
+	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	
+	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	
+	virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	
+	virtual FReply OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
+	virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	
+	virtual FReply OnTouchGesture(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent) override;
+	
+	virtual FReply OnTouchStarted(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent) override;
+	
+	virtual FReply OnTouchMoved(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent) override;
+	
+	virtual FReply OnTouchEnded(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent) override;
 
 public:
 	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
@@ -94,6 +113,8 @@ protected:
 
 	FAnchors WidgetAnchors;
 
+	bool bWidgetPenetrable;
+
 	bool bWidgetAutoSize;
 
 	FVector2D WidgetDrawSize;
@@ -138,6 +159,8 @@ public:
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+
+	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
 
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 

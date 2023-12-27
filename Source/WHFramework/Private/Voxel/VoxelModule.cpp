@@ -341,9 +341,9 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 	}
 
-	if(SaveData.SceneData.WeatherSeed == 0)
+	if(SaveData.SceneData.WeatherData.WeatherSeed == 0)
 	{
-		SaveData.SceneData.WeatherSeed = WorldData->WorldSeed;
+		SaveData.SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
 	}
 	USceneModule::Get().LoadSaveData(&SaveData.SceneData, InPhase);
 }

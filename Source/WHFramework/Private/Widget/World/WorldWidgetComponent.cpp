@@ -13,7 +13,10 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 
 	UPrimitiveComponent::SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+#if WITH_EDITORONLY_DATA
 	bRefreshEditorOnly = false;
+#endif
+
 	bAutoCreate = true;
 	bOrientCamera = true;
 	bBindToSelf = true;
@@ -142,14 +145,14 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
-		static FName RefreshEditorOnly("bRefreshEditorOnly");
-		static FName SpaceName("Space");
-		static FName AutoCreateName("bAutoCreate");
-		static FName WorldWidgetClassName("WorldWidgetClass");
+		static FName RefreshEditorOnlyName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bRefreshEditorOnly);
+		static FName SpaceName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Space);
+		static FName AutoCreateName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bAutoCreate);
+		static FName WorldWidgetClassName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WorldWidgetClass);
 
 		const FName PropertyName = Property->GetFName();
 
-		if(PropertyName == RefreshEditorOnly)
+		if(PropertyName == RefreshEditorOnlyName)
 		{
 			if(bRefreshEditorOnly)
 			{
@@ -183,7 +186,7 @@ void UWorldWidgetComponent::RefreshParams()
 {
 	if(WorldWidgetClass)
 	{
-		if(UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
+		if(const UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
 		{
 			Space = DefaultObject->GetWidgetSpace();
 			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);

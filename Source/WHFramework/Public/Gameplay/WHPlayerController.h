@@ -88,7 +88,7 @@ protected:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnRefreshInteraction();
+	void RefreshInteraction();
 
 public:
 	UFUNCTION(BlueprintPure)

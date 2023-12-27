@@ -129,6 +129,22 @@ enum class EScreenWidgetState : uint8
 	Closed
 };
 
+/**
+* 世界Widget可见类型
+*/
+UENUM(BlueprintType)
+enum class EWorldWidgetVisibilityMode : uint8
+{
+	/// 无
+	None,
+	/// 仅渲染
+	RenderOnly,
+	/// 仅距离
+	DistanceOnly,
+	/// 渲染和距离
+	RenderAndDistance,
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FWorldWidgets
 {

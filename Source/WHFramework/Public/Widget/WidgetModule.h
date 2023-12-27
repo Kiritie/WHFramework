@@ -64,8 +64,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserWidget")
 	TArray<TSubclassOf<UUserWidgetBase>> UserWidgetClasses;
 
-	UFUNCTION(CallInEditor, Category = "UserWidget")
-	void SortUserWidgetClasses();
+	UPROPERTY(EditAnywhere, Category = "UserWidget")
+	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 private:
 	UPROPERTY(Transient)
@@ -74,8 +74,9 @@ private:
 	UPROPERTY()
 	TMap<FName, UUserWidgetBase*> AllUserWidget;
 
-	UPROPERTY(Transient)
-	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
+private:
+	UFUNCTION(CallInEditor, Category = "UserWidget")
+	void SortUserWidgetClasses();
 
 public:
 	template<class T>
@@ -129,6 +130,20 @@ public:
 		}
 		return ReturnValues;
 	}
+
+	template<class T>
+	void AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{
+		if(!InClass) return;
+
+		if(!UserWidgetClassMap.Contains(InName))
+		{
+			UserWidgetClassMap.Add(InName, InClass);
+		}
+	}
+
+	UFUNCTION(Blueprintable)
+	void AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass);
 
 	template<class T>
 	bool HasUserWidget(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
@@ -205,6 +220,7 @@ public:
 			if(UserWidget)
 			{
 				AllUserWidget.Add(InName, UserWidget);
+				UserWidget->WidgetName = InName;
 				UserWidget->OnCreate(InOwner, InParams ? * InParams : TArray<FParameter>());
 			}
 		}
@@ -508,7 +524,7 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "WorldWidget")
 	int32 WorldWidgetContainerZOrder;
-	
+
 private:
 	UPROPERTY(Transient)
 	TMap<FName, FWorldWidgets> AllWorldWidgets;
@@ -518,6 +534,10 @@ private:
 
 	UPROPERTY(Transient)
 	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
+	
+private:
+	UFUNCTION(CallInEditor, Category = "WorldWidget")
+	void SortWorldWidgetClasses();
 
 public:
 	UFUNCTION(BlueprintPure)

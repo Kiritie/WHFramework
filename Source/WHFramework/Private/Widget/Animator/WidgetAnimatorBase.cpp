@@ -58,7 +58,7 @@ void UWidgetAnimatorBase::Reset_Implementation()
 {
 }
 
-void UWidgetAnimatorBase::Stop_Implementation()
+void UWidgetAnimatorBase::Stop_Implementation(bool bComplete)
 {
 }
 

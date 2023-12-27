@@ -230,21 +230,17 @@ void USceneModule::OnTermination(EPhase InPhase)
 
 void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FSceneModuleSaveData>();
+	auto& SaveData = InSaveData->CastRef<FSceneModuleSaveData>();
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(WorldTimer)
+		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
-			WorldTimer->SetDayLength(SaveData.DayLength);
-			WorldTimer->SetNightLength(SaveData.NightLength);
-			if(SaveData.DateTime != -1) WorldTimer->SetDateTime(SaveData.DateTime);
-			else WorldTimer->SetTimeOfDay(SaveData.TimeOfDay);
+			WorldTimer->LoadSaveData(&SaveData.TimerData);
 		}
-		if(WorldWeather)
+		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
-			WorldWeather->SetWeatherSeed(SaveData.WeatherSeed);
-			if(!SaveData.WeatherParams.IsEmpty()) WorldWeather->SetWeatherParams(SaveData.WeatherParams);
+			WorldWeather->LoadSaveData(&SaveData.WeatherData);
 		}
 	}
 }
@@ -254,17 +250,13 @@ FSaveData* USceneModule::ToData()
 	static FSceneModuleSaveData* SaveData;
 	SaveData = new FSceneModuleSaveData();
 
-	if(WorldTimer)
+	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
-		SaveData->DayLength = WorldTimer->GetDayLength();
-		SaveData->NightLength = WorldTimer->GetNightLength();
-		SaveData->TimeOfDay = WorldTimer->GetTimeOfDay();
-		SaveData->DateTime = WorldTimer->GetDateTime();
+		SaveData->TimerData = WorldTimer->GetSaveDataRef<FWorldTimerSaveData>(true);
 	}
-	if(WorldWeather)
+	if(WorldWeather && WorldWeather->IsAutoSave())
 	{
-		SaveData->WeatherSeed = WorldWeather->GetWeatherSeed();
-		SaveData->WeatherParams = WorldWeather->GetWeatherParams();
+		SaveData->WeatherData = WorldWeather->GetSaveDataRef<FWorldWeatherSaveData>(true);
 	}
 
 	return SaveData;

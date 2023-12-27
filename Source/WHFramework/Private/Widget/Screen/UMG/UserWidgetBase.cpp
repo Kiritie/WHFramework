@@ -24,9 +24,9 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ParentName = NAME_None;
 	ParentSlot = NAME_None;
 	WidgetZOrder = 0;
-	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
+	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
-	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetCreateType = EWidgetCreateType::None;
@@ -50,14 +50,49 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
-FReply UUserWidgetBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+FReply UUserWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
-FReply UUserWidgetBase::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+FReply UUserWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return Super::NativeOnKeyUp(InGeometry, InKeyEvent);
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+FReply UUserWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+}
+
+FReply UUserWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+}
+
+FReply UUserWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UUserWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
+}
+
+FReply UUserWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
+}
+
+FReply UUserWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
+}
+
+FReply UUserWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
 }
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -83,18 +118,17 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	{
 		ParentWidget->RemoveChild(this);
 	}
-	if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
-	{
-		ParentWidget = InParent;
-		ParentWidget->AddChild(this);
-	}
-	else if(ParentName != NAME_None)
+	if(ParentName != NAME_None)
 	{
 		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
-		if(ParentWidget)
-		{
-			ParentWidget->AddChild(this);
-		}
+	}
+	else if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
+	{
+		ParentWidget = InParent;
+	}
+	if(ParentWidget)
+	{
+		ParentWidget->AddChild(this);
 	}
 
 	if(WidgetOpenAnimator)
@@ -146,11 +180,47 @@ void UUserWidgetBase::OnReset(bool bForce)
 
 void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
+	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return K2_OnOpen(InParams, bInstant);
 	
 	WidgetParams = InParams;
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
+
+	switch(WidgetOpenFinishType)
+	{
+		case EWidgetOpenFinishType::Instant:
+		{
+			FinishOpen(true);
+			break;
+		}
+		case EWidgetOpenFinishType::Delay:
+		{
+			if(!bInstant)
+			{
+				FTimerDelegate TimerDelegate;
+				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, false);
+				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
+			}
+			else
+			{
+				FinishOpen(true);
+			}
+		}
+		case EWidgetOpenFinishType::Animator:
+		{
+			if(WidgetOpenAnimator)
+			{
+				FOnWidgetAnimatorCompleted OnWidgetAnimatorCompleted;
+				OnWidgetAnimatorCompleted.BindDynamic(this, &UUserWidgetBase::FinishOpen);
+				WidgetOpenAnimator->Play(OnWidgetAnimatorCompleted, bInstant);
+			}
+			else
+			{
+				FinishOpen(true);
+			}
+		}
+		default: break;
+	}
 
 	if(const auto ParentUserWidget = GetParentWidgetN<UUserWidgetBase>())
 	{
@@ -171,8 +241,9 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 				if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
 				{
 					CanvasPanelSlot->SetZOrder(WidgetZOrder);
-					CanvasPanelSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
-					CanvasPanelSlot->SetOffsets(FMargin(0.f));
+					CanvasPanelSlot->SetAnchors(WidgetAnchors);
+					CanvasPanelSlot->SetOffsets(WidgetOffsets);
+					CanvasPanelSlot->SetAlignment(WidgetAlignment);
 				}
 			}
 		}
@@ -210,42 +281,6 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
-	}
-
-	switch(WidgetOpenFinishType)
-	{
-		case EWidgetOpenFinishType::Instant:
-		{
-			FinishOpen(true);
-			break;
-		}
-		case EWidgetOpenFinishType::Delay:
-		{
-			if(!bInstant)
-			{
-				FTimerDelegate TimerDelegate;
-				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, false);
-				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
-			}
-			else
-			{
-				FinishOpen(true);
-			}
-		}
-		case EWidgetOpenFinishType::Animator:
-		{
-			if(WidgetOpenAnimator)
-			{
-				FOnWidgetAnimatorCompleted OnWidgetAnimatorCompleted;
-				OnWidgetAnimatorCompleted.BindDynamic(this, &UUserWidgetBase::FinishOpen);
-				WidgetOpenAnimator->Play(OnWidgetAnimatorCompleted, bInstant);
-			}
-			else
-			{
-				FinishOpen(true);
-			}
-		}
-		default: break;
 	}
 
 	UInputModuleStatics::UpdateGlobalInputMode();
@@ -368,17 +403,17 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams,
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidget<UUserWidgetBase>(InParams, bInstant, bForce, GetClass());
+	UWidgetModuleStatics::OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidget(GetClass(), InParams, bInstant, bForce);
+	UWidgetModuleStatics::OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
 {
-	UWidgetModuleStatics::CloseUserWidget<UUserWidgetBase>(bInstant, GetClass());
+	UWidgetModuleStatics::CloseUserWidgetByName(WidgetName, bInstant);
 }
 
 void UUserWidgetBase::Toggle(bool bInstant)
@@ -413,7 +448,7 @@ void UUserWidgetBase::Refresh()
 
 void UUserWidgetBase::Destroy(bool bRecovery)
 {
-	UWidgetModuleStatics::DestroyUserWidget<UUserWidgetBase>(bRecovery, GetClass());
+	UWidgetModuleStatics::DestroyUserWidgetByName(WidgetName, bRecovery);
 }
 
 bool UUserWidgetBase::CanOpen_Implementation() const

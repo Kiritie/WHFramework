@@ -19,13 +19,14 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
-	bWidgetAutoVisibility = false;
+	WidgetVisibilityMode = EWorldWidgetVisibilityMode::None;
 	WidgetShowDistance = -1;
 	WidgetParams = TArray<FParameter>();
 	WidgetInputMode = EInputMode::None;
@@ -34,6 +35,51 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 
 	WidgetComponent = nullptr;
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetBindInfo>();
+}
+
+FReply UWorldWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
+}
+
+FReply UWorldWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
 }
 
 void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -53,10 +99,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 			}
 		}
 	}
-	if(bWidgetAutoVisibility)
-	{
-		RefreshVisibility();
-	}
+	RefreshVisibility();
 }
 
 void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -119,10 +162,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInf
 		}
 	}
 
-	if(bWidgetAutoVisibility)
-	{
-		RefreshVisibility();
-	}
+	RefreshVisibility();
 
 	K2_OnCreate(InOwner, InParams);
 }
@@ -169,9 +209,30 @@ void UWorldWidgetBase::RefreshVisibility_Implementation()
 	FWorldWidgetBindInfo BindInfo;
 	if(GetWidgetBindInfo(this, BindInfo))
 	{
+		bShow = UCommonStatics::GetLocalPlayerNum() == 1;
+		
 		const auto OwnerActor = Cast<AActor>(OwnerObject);
 		const FVector Location = BindInfo.SceneComp ? (BindInfo.SocketName.IsNone() ? BindInfo.SceneComp->GetComponentLocation() : BindInfo.SceneComp->GetSocketLocation(BindInfo.SocketName)) + BindInfo.Location : BindInfo.Location;
-		bShow = (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location)) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+
+		switch(WidgetVisibilityMode)
+		{
+			case EWorldWidgetVisibilityMode::RenderOnly:
+			{
+				bShow = bShow && (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location));
+				break;
+			}
+			case EWorldWidgetVisibilityMode::DistanceOnly:
+			{
+				bShow = bShow && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+				break;
+			}
+			case EWorldWidgetVisibilityMode::RenderAndDistance:
+			{
+				bShow = bShow && (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location)) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+				break;
+			}
+			default: break;
+		}
 	}
 	SetVisibility(bShow ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }

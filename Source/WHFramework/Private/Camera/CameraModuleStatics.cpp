@@ -151,19 +151,14 @@ void UCameraModuleStatics::AddCameraRotationInput(float InYaw, float InPitch)
 	UCameraModule::Get().AddCameraRotationInput(InYaw, InPitch);
 }
 
-void UCameraModuleStatics::AddCameraDistanceInput(float InValue)
+void UCameraModuleStatics::AddCameraDistanceInput(float InValue, bool bCanMove)
 {
-	UCameraModule::Get().AddCameraDistanceInput(InValue);
+	UCameraModule::Get().AddCameraDistanceInput(InValue, bCanMove);
 }
 
-void UCameraModuleStatics::SetCameraView(const FCameraViewData& InCameraViewData)
+void UCameraModuleStatics::SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData)
 {
-	UCameraModule::Get().SetCameraView(InCameraViewData);
-}
-
-void UCameraModuleStatics::SetCameraViewParams(const FCameraViewParams& InCameraViewParams)
-{
-	UCameraModule::Get().SetCameraViewParams(InCameraViewParams);
+	UCameraModule::Get().SetCameraView(InCameraViewData, bCacheData);
 }
 
 void UCameraModuleStatics::ResetCameraView(bool bUseCachedParams)

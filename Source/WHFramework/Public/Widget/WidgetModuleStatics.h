@@ -55,6 +55,15 @@ public:
 	}
 
 	template<class T>
+	static void AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{
+		UWidgetModule::Get().AddUserWidgetClassMapping<T>(InName, InClass);
+	}
+
+	UFUNCTION(Blueprintable, Category = "WidgetModuleStatics")
+	static void AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass);
+
+	template<class T>
 	static bool HasUserWidget(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		return UWidgetModule::Get().HasUserWidget<T>(InClass);
@@ -108,6 +117,12 @@ public:
 		return UWidgetModule::Get().CreateUserWidgetByName<T>(InName, InOwner, InParams, bForce);
 	}
 	
+	template<class T>
+	static T* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false)
+	{
+		return CreateUserWidgetByName<T>(InName, InOwner, &InParams, bForce);
+	}
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
 	static UUserWidgetBase* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
 

@@ -15,6 +15,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	ChildNames = TArray<FName>();
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
+	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
@@ -40,6 +41,50 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 		// Populate the widget
 	];
 	*/
+}
+FReply SSlateWidgetBase::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
+}
+
+FReply SSlateWidgetBase::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseButtonUp(MyGeometry, MouseEvent);
+}
+
+FReply SSlateWidgetBase::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseWheel(MyGeometry, MouseEvent);
+}
+
+FReply SSlateWidgetBase::OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseButtonDoubleClick(MyGeometry, MouseEvent);
+}
+
+FReply SSlateWidgetBase::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseMove(MyGeometry, MouseEvent);
+}
+
+FReply SSlateWidgetBase::OnTouchGesture(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnTouchGesture(MyGeometry, GestureEvent);
+}
+
+FReply SSlateWidgetBase::OnTouchStarted(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnTouchStarted(MyGeometry, GestureEvent);
+}
+
+FReply SSlateWidgetBase::OnTouchMoved(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnTouchMoved(MyGeometry, GestureEvent);
+}
+
+FReply SSlateWidgetBase::OnTouchEnded(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent)
+{
+	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnTouchEnded(MyGeometry, GestureEvent);
 }
 
 void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)

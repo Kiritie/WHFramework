@@ -177,7 +177,12 @@ public:
 	{
 		*this = MakeString(InValue);
 	}
-		
+			
+	FParameter(const FName& InValue)
+	{
+		*this = MakeName(InValue);
+	}
+
 	FParameter(const FText& InValue)
 	{
 		*this = MakeText(InValue);

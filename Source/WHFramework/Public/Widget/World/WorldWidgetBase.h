@@ -25,6 +25,25 @@ class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetI
 
 public:
 	UWorldWidgetBase(const FObjectInitializer& ObjectInitializer);
+	
+protected:
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	
+	virtual FReply NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
 
 public:
 	virtual bool IsTickAble_Implementation() const override { return true; }
@@ -92,6 +111,9 @@ protected:
 	FAnchors WidgetAnchors;
 
 	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetPenetrable;
+
+	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetAutoSize;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::World && bWidgetAutoSize == false"))
@@ -110,9 +132,9 @@ protected:
 	float WidgetRefreshTime;
 	
 	UPROPERTY(EditDefaultsOnly)
-	bool bWidgetAutoVisibility;
+	EWorldWidgetVisibilityMode WidgetVisibilityMode;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "bWidgetAutoVisibility == true"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetVisibilityMode == EWidgetVisibilityMode::DistanceOnly || WidgetVisibilityMode == EWidgetVisibilityMode::RenderAndDistance"))
 	float WidgetShowDistance;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -145,6 +167,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
@@ -191,5 +216,5 @@ public:
 	EWidgetSpace GetWidgetSpace() const;
 	
 	UFUNCTION(BlueprintPure)
-	virtual class UPanelWidget* GetRootPanelWidget() const override;
+	virtual UPanelWidget* GetRootPanelWidget() const override;
 };

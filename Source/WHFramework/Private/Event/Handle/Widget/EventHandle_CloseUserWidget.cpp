@@ -3,17 +3,20 @@
 
 #include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
 
+#include "Widget/WidgetModule.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
 UEventHandle_CloseUserWidget::UEventHandle_CloseUserWidget()
 {
 	WidgetClass = nullptr;
+	WidgetName = NAME_None;
 	bInstant = false;
 }
 
 void UEventHandle_CloseUserWidget::OnDespawn_Implementation(bool bRecovery)
 {
 	WidgetClass = nullptr;
+	WidgetName = NAME_None;
 	bInstant = false;
 }
 
@@ -21,7 +24,15 @@ void UEventHandle_CloseUserWidget::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WidgetClass = InParams[0].GetClassValue();
+		if(InParams[0].GetParameterType() == EParameterType::Class)
+		{
+			WidgetClass = InParams[0].GetClassValue();
+			WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+		}
+		else
+		{
+			WidgetName = InParams[0].GetNameValue();
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
@@ -31,5 +42,31 @@ void UEventHandle_CloseUserWidget::Parse_Implementation(const TArray<FParameter>
 
 TArray<FParameter> UEventHandle_CloseUserWidget::Pack_Implementation()
 {
-	return { WidgetClass.Get(), bInstant };
+	return { WidgetClass ? FParameter(WidgetClass) : FParameter(WidgetName), bInstant };
 }
+
+#if WITH_EDITOR
+void UEventHandle_CloseUserWidget::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
+
+	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
+	{
+		const FName PropertyName = Property->GetFName();
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UEventHandle_CloseUserWidget, WidgetClass))
+		{
+			if(WidgetClass)
+			{
+				WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+			}
+			else
+			{
+				WidgetName = NAME_None;
+			}
+		}
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif

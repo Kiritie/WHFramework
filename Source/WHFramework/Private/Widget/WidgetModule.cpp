@@ -196,17 +196,17 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 
 void UWidgetModule::OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle)
 {
-	if(InEventHandle->WidgetClass)
+	if(!InEventHandle->WidgetName.IsNone())
 	{
-		OpenUserWidget(InEventHandle->WidgetClass, InEventHandle->WidgetParams, InEventHandle->bInstant);
+		OpenUserWidgetByName(InEventHandle->WidgetName, InEventHandle->WidgetParams, InEventHandle->bInstant, InEventHandle->bForce);
 	}
 }
 
 void UWidgetModule::OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle)
 {
-	if(InEventHandle->WidgetClass)
+	if(!InEventHandle->WidgetName.IsNone())
 	{
-		CloseUserWidget(InEventHandle->WidgetClass, InEventHandle->bInstant);
+		CloseUserWidgetByName(InEventHandle->WidgetName, InEventHandle->bInstant);
 	}
 }
 
@@ -223,6 +223,11 @@ void UWidgetModule::SortUserWidgetClasses()
 bool UWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const
 {
 	return HasUserWidgetClass<UUserWidgetBase>(InClass);
+}
+
+void UWidgetModule::AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass)
+{
+	AddUserWidgetClassMapping<UUserWidgetBase>(InName, InClass);
 }
 
 bool UWidgetModule::HasUserWidget(TSubclassOf<UUserWidgetBase> InClass) const
@@ -318,6 +323,16 @@ void UWidgetModule::CloseAllSlateWidget(bool bInstant)
 void UWidgetModule::ClearAllSlateWidget()
 {
 	AllSlateWidgets.Empty();
+}
+
+void UWidgetModule::SortWorldWidgetClasses()
+{
+	UCommonStatics::SortStringElementArray<TSubclassOf<UWorldWidgetBase>>(WorldWidgetClasses,
+		[](const TSubclassOf<UWorldWidgetBase>& InClass)
+		{
+			return InClass->GetName();
+		});
+	Modify();
 }
 
 bool UWidgetModule::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex) const

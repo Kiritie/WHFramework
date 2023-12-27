@@ -3,27 +3,40 @@
 
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
 
+#include "Widget/WidgetModuleStatics.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
 UEventHandle_OpenUserWidget::UEventHandle_OpenUserWidget()
 {
 	WidgetClass = nullptr;
+	WidgetName = NAME_None;
 	WidgetParams = TArray<FParameter>();
 	bInstant = false;
+	bForce = false;
 }
 
 void UEventHandle_OpenUserWidget::OnDespawn_Implementation(bool bRecovery)
 {
 	WidgetClass = nullptr;
+	WidgetName = NAME_None;
 	WidgetParams = TArray<FParameter>();
 	bInstant = false;
+	bForce = false;
 }
 
 void UEventHandle_OpenUserWidget::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WidgetClass = InParams[0].GetClassValue();
+		if(InParams[0].GetParameterType() == EParameterType::Class)
+		{
+			WidgetClass = InParams[0].GetClassValue();
+			WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
+		}
+		else
+		{
+			WidgetName = InParams[0].GetNameValue();
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
@@ -33,11 +46,15 @@ void UEventHandle_OpenUserWidget::Parse_Implementation(const TArray<FParameter>&
 	{
 		bInstant = InParams[2].GetBooleanValue();
 	}
+	if(InParams.IsValidIndex(3))
+	{
+		bForce = InParams[3].GetBooleanValue();
+	}
 }
 
 TArray<FParameter> UEventHandle_OpenUserWidget::Pack_Implementation()
 {
-	return { WidgetClass.Get(), &WidgetParams, bInstant };
+	return { WidgetClass ? FParameter(WidgetClass) : FParameter(WidgetName), &WidgetParams, bInstant, bForce };
 }
 
 #if WITH_EDITOR
@@ -53,7 +70,21 @@ void UEventHandle_OpenUserWidget::PostEditChangeProperty(FPropertyChangedEvent& 
 		{
 			if(WidgetClass)
 			{
-				WidgetParams = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetParams();
+				const auto DefaultObject = WidgetClass->GetDefaultObject<UUserWidgetBase>();
+				WidgetName = DefaultObject->GetWidgetName();
+				WidgetParams = DefaultObject->GetWidgetParams();
+			}
+			else
+			{
+				WidgetName = NAME_None;
+				WidgetParams.Empty();
+			}
+		}
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UEventHandle_OpenUserWidget, WidgetName))
+		{
+			if(const auto _WidgetClass = UWidgetModule::Get(true).GetUserWidgetClassByName(WidgetName))
+			{
+				WidgetParams = _WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetParams();
 			}
 			else
 			{

@@ -44,7 +44,7 @@ public:
 	void Reset();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Stop();
+	void Stop(bool bComplete = false);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void Complete(bool bInstant = false);

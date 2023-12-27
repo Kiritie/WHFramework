@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
+#include "SaveGame/Base/SaveDataInterface.h"
 #include "WorldTimer.generated.h"
 
 class ASkyLight;
@@ -12,7 +13,7 @@ class ADirectionalLight;
  * ʱ��������
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
-class WHFRAMEWORK_API UWorldTimer : public UWHObject
+class WHFRAMEWORK_API UWorldTimer : public UWHObject, public ISaveDataInterface
 {
 	GENERATED_BODY()
 
@@ -41,6 +42,11 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnUnPause();
+
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
@@ -78,4 +84,12 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunsetTime() const;
+
+protected:
+	UPROPERTY(EditAnywhere)
+	bool bAutoSave;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool IsAutoSave() const { return bAutoSave; }
 };

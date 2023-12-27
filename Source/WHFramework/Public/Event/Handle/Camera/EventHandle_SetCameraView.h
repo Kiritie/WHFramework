@@ -27,6 +27,23 @@ public:
 	virtual TArray<FParameter> Pack_Implementation() override;
 
 public:
+#if WITH_EDITOR
+	virtual void GetCameraView();
+	
+	virtual void SetCameraView(const FCameraParams& InCameraParams);
+
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+public:
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere)
+	bool bRefreshData;
+#endif
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FCameraViewData CameraViewData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bCacheData;
 };

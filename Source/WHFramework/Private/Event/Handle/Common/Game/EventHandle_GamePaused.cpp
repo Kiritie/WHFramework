@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Event/Handle/Common/EventHandle_GamePaused.h"
+#include "Event/Handle/Common/Game/EventHandle_GamePaused.h"
 
 UEventHandle_GamePaused::UEventHandle_GamePaused()
 {

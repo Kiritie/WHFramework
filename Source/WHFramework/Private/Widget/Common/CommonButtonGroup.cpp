@@ -12,43 +12,39 @@ UCommonButtonGroup::UCommonButtonGroup()
 
 void UCommonButtonGroup::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(InParams.IsValidIndex(0))
-	{
-		bBroadcastOnDeselected = InParams[0].GetBooleanValue();
-	}
+	
 }
 
 void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 {
 	bBroadcastOnDeselected = true;
 
-	ForEach([](UCommonButtonBase& InButton, int32 InIndex)
+	DeselectAllN();
+	for(auto Iter : Buttons)
 	{
-		UObjectPoolModuleStatics::DespawnObject(&InButton, true);
-	});
+		UObjectPoolModuleStatics::DespawnObject(Iter.Get(), true);
+	}
 	RemoveAll();
 }
 
 void UCommonButtonGroup::OnWidgetAdded(UWidget* NewWidget)
 {
-	if(const UCommonButton* CommonButton = Cast<UCommonButton>(NewWidget))
-	{
-		if(!CommonButton->IsSingle())
-		{
-			Super::OnWidgetAdded(NewWidget);
-		}
-	}
+	Super::OnWidgetAdded(NewWidget);
 }
 
 void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected)
 {
+	const UCommonButton* _BaseButton = Cast<UCommonButton>(BaseButton);
+
+	if (!_BaseButton || _BaseButton->IsStandalone()) return;
+
 	if (bIsSelected)
 	{
 		SelectedButtonIndex = INDEX_NONE;
 		for (int32 ButtonIndex = 0; ButtonIndex < Buttons.Num(); ButtonIndex++)
 		{
 			UCommonButton* Button = Cast<UCommonButton>(GetButtonBaseAtIndex(ButtonIndex));
-			if (Button)
+			if (Button && !Button->IsStandalone())
 			{
 				if (Button == BaseButton)
 				{
@@ -78,6 +74,26 @@ void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButt
 		SelectedButtonIndex = INDEX_NONE;
 
 		NativeOnSelectionCleared.Broadcast();
+		OnSelectionCleared.Broadcast();
+	}
+}
+
+void UCommonButtonGroup::DeselectAllN()
+{
+	if(bSelectionRequired) return;
+
+	for (auto& Iter : Buttons)
+	{
+		UCommonButton* Button = Cast<UCommonButton>(Iter.Get());
+		if (Button && Button->GetSelected() && !Button->IsStandalone())
+		{
+			Button->SetSelectedInternal(false);
+		}
+	}
+
+	if (SelectedButtonIndex != INDEX_NONE)
+	{
+		SelectedButtonIndex = INDEX_NONE;
 		OnSelectionCleared.Broadcast();
 	}
 }

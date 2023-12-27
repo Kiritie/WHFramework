@@ -4,7 +4,11 @@
 
 UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	SetStyle(UCommonTextStyle::StaticClass());
+	static ConstructorHelpers::FClassFinder<UCommonTextStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/Style/CTS_Default.CTS_Default_C'"));
+	if(StyleClassFinder.Succeeded())
+	{
+		SetStyle(StyleClassFinder.Class);
+	}
 }
 
 void UCommonTextBlockN::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

@@ -10,6 +10,8 @@
 #include "Widgets/Layout/Anchors.h"
 #include "BaseWidgetInterface.generated.h"
 
+class UPanelWidget;
+
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UBaseWidgetInterface : public UTickAbleWidgetInterface
@@ -43,6 +45,8 @@ public:
 
 	virtual FAnchors GetWidgetAnchors() const = 0;
 
+	virtual bool IsWidgetPenetrable() const = 0;
+
 	virtual bool IsWidgetAutoSize() const = 0;
 
 	virtual FVector2D GetWidgetDrawSize() const = 0;
@@ -57,5 +61,5 @@ public:
 
 	virtual UObject* GetOwnerObject() const = 0;
 
-	virtual class UPanelWidget* GetRootPanelWidget() const = 0;
+	virtual UPanelWidget* GetRootPanelWidget() const = 0;
 };

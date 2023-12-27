@@ -16,9 +16,14 @@ public class WHFramework : ModuleRules
 				"Core",
 				"CoreUObject",
 				"Engine",
+				"HTTP",
+				"Json",
+				"AIModule",
 				"CommonUI",
 				"CommonInput",
 				"EnhancedInput",
+				"GameplayTags",
+				"GameplayTasks",
 				"GameplayAbilities",
 			});
 			
@@ -26,24 +31,19 @@ public class WHFramework : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"RHI",
 				"UMG",
 				"Slate",
-				"HTTP",
-				"Json",
-				"Sockets",
 				"Paper2D",
+				"Sockets",
+				"MediaAssets",
 				"SlateCore",
 				"InputCore",
-				"ApplicationCore",
-				"MediaAssets",
-				"AIModule",
 				"AppFramework",
-				"RHI",
+				"ApplicationCore",
 				"ImageWrapper",
 				"ImageWriteQueue",
-				"GameplayTags",
-				"GameplayTasks",
-				"ProceduralMeshComponent"
+				"ProceduralMeshComponent",
 			});
 	}
 }
