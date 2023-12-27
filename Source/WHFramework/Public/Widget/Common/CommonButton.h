@@ -7,7 +7,7 @@
 
 #include "CommonButton.generated.h"
 
-class UCommonTextBlock;
+class UCommonTextBlockN;
 
 UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
 class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
@@ -41,7 +41,7 @@ public:
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UCommonTextBlock* Txt_Title;
+	UCommonTextBlockN* Txt_Title;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content")
