@@ -385,14 +385,14 @@ bool UStepBase::IsSkipAble_Implementation() const
 #if WITH_EDITOR
 void UStepBase::GetCameraView()
 {
-	CameraViewParams.GetCameraParams();
+	CameraViewParams.GetCameraParams(OperationTarget.LoadSynchronous());
 
 	Modify();
 }
 
 void UStepBase::SetCameraView(FCameraParams InCameraParams)
 {
-	CameraViewParams.SetCameraParams(InCameraParams);
+	CameraViewParams.SetCameraParams(InCameraParams, OperationTarget.LoadSynchronous());
 
 	Modify();
 }
@@ -402,7 +402,10 @@ void UStepBase::ResetCameraView()
 {
 	if(StepState != EStepState::Entered) return;
 	
-	UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+	if(CameraViewParams.IsValid())
+	{
+		UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+	}
 }
 
 void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)

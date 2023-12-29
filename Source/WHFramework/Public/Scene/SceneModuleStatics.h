@@ -22,10 +22,20 @@ class WHFRAMEWORK_API USceneModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	/// Components
+	/// World
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static float GetSeaLevel();
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static float GetAltitude(bool bUnsigned = false);
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// WorldTimer
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
 	static UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WorldWeather
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
 	static UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr);
 

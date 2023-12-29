@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Setting/Widget/Page/WidgetInputSettingPageBase.h"
+#include "Setting/Widget/Page/Module/WidgetInputSettingPageBase.h"
 
 #include "Input/InputModule.h"
 #include "Input/Base/PlayerMappableKeyProfileBase.h"

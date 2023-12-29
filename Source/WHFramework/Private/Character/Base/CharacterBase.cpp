@@ -204,6 +204,16 @@ float ACharacterBase::GetCameraDistance_Implementation() const
 	return -1.f;
 }
 
+ECameraSmoothMode ACharacterBase::GetCameraSmoothMode_Implementation() const
+{
+	return ECameraSmoothMode::All;
+}
+
+ECameraControlMode ACharacterBase::GetCameraControlMode_Implementation() const
+{
+	return ECameraControlMode::All;
+}
+
 void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
 {
 	bVisible = bInVisible;

@@ -14,7 +14,6 @@ class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
-#if WITH_EDITORONLY_DATA
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FModuleListItemStates
 {
@@ -29,7 +28,6 @@ public:
 		bSelected = false;
 	}
 };
-#endif
 
 UCLASS()
 class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataInterface

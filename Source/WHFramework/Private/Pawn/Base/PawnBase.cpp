@@ -192,6 +192,16 @@ float APawnBase::GetCameraDistance_Implementation() const
 	return -1.f;
 }
 
+ECameraSmoothMode APawnBase::GetCameraSmoothMode_Implementation() const
+{
+	return ECameraSmoothMode::All;
+}
+
+ECameraControlMode APawnBase::GetCameraControlMode_Implementation() const
+{
+	return ECameraControlMode::All;
+}
+
 void APawnBase::SetActorVisible_Implementation(bool bInVisible)
 {
 	bVisible = bInVisible;

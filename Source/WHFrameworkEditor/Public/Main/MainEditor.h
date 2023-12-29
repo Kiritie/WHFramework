@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Common/CommonEditorTypes.h"
-#include "Common/Asset/AssetEditorBase.h"
 #include "Common/Module/EditorModuleBase.h"
 #include "Common/Blueprint/BlueprintEditorBase.h"
 

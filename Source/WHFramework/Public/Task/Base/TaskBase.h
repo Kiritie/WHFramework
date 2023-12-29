@@ -13,7 +13,6 @@
 class UTaskAsset;
 class ACameraActorBase;
 
-#if WITH_EDITORONLY_DATA
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FTaskListItemStates
 {
@@ -32,7 +31,6 @@ public:
 		bSelected = false;
 	}
 };
-#endif
 
 /**
  * 任务基类

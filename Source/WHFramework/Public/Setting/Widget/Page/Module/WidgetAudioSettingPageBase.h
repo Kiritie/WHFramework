@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-#include "WidgetSettingPageBase.h"
-#include "Common/CommonTypes.h"
+#include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
 #include "WidgetAudioSettingPageBase.generated.h"
 

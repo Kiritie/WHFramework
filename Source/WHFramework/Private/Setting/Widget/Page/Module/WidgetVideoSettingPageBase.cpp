@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Setting/Widget/Page/WidgetVideoSettingPageBase.h"
+#include "Setting/Widget/Page/Module/WidgetVideoSettingPageBase.h"
 
 
 #include "SaveGame/SaveGameModuleStatics.h"

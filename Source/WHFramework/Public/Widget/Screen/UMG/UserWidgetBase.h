@@ -10,6 +10,7 @@
 
 #include "UserWidgetBase.generated.h"
 
+class USubWidgetBase;
 class UWidgetAnimatorBase;
 /**
  * 
@@ -178,6 +179,12 @@ public:
 		return GetDeterminesOutputObject(Cast<UUserWidgetBase>(GetChild(InIndex)), InClass);
 	}
 
+	UFUNCTION(BlueprintPure)
+	int32 FindChild(UUserWidgetBase* InChildWidget) const
+	{
+		return FindChild(Cast<IScreenWidgetInterface>(InChildWidget));
+	}
+
 	IScreenWidgetInterface* GetChild(int32 InIndex) const override
 	{
 		if(ChildWidgets.IsValidIndex(InIndex))
@@ -185,6 +192,11 @@ public:
 			return ChildWidgets[InIndex];
 		}
 		return nullptr;
+	}
+
+	int32 FindChild(IScreenWidgetInterface* InChildWidget) const override
+	{
+		return ChildWidgets.Find(InChildWidget);
 	}
 
 protected:

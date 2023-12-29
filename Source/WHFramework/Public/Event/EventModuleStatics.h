@@ -88,4 +88,7 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModuleStatics")
 	static UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModuleStatics")
+	static UEventManagerBase* GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr);
 };

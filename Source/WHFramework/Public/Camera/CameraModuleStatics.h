@@ -80,7 +80,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"), Category = "CameraModuleStatics")
-	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bInstant = false, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
+	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -134,15 +134,15 @@ public:
 	static void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void AddCameraDistanceInput(float InValue, bool bCanMove = false);
+	static void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"), Category = "CameraModuleStatics")
 	static void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void ResetCameraView(bool bUseCachedParams = false);
+	static void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
+	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false);
 };

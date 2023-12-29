@@ -61,7 +61,17 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Event")
+	FName EventManagerName;
+
+	UPROPERTY(EditAnywhere, Category = "Event")
 	TArray<TSubclassOf<UEventHandleBase>> EventHandleClasses;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FName GetEventManagerName() const { return EventManagerName; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<TSubclassOf<UEventHandleBase>> GetEventHandleClasses() const { return EventHandleClasses; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Events

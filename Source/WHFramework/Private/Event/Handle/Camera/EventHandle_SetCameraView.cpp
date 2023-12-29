@@ -37,14 +37,14 @@ TArray<FParameter> UEventHandle_SetCameraView::Pack_Implementation()
 #if WITH_EDITOR
 void UEventHandle_SetCameraView::GetCameraView()
 {
-	CameraViewData.CameraViewParams.GetCameraParams();
+	CameraViewData.CameraViewParams.GetCameraParams(CameraViewData.CameraViewTarget.LoadSynchronous());
 
 	Modify();
 }
 
 void UEventHandle_SetCameraView::SetCameraView(const FCameraParams& InCameraParams)
 {
-	CameraViewData.CameraViewParams.SetCameraParams(InCameraParams);
+	CameraViewData.CameraViewParams.SetCameraParams(InCameraParams, CameraViewData.CameraViewTarget.LoadSynchronous());
 
 	Modify();
 }

@@ -6,13 +6,14 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Actor/CameraActorBase.h"
 
-void FCameraViewParams::GetCameraParams()
+void FCameraViewParams::GetCameraParams(AActor* InCameraViewTarget)
 {
-	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	const AActor* ViewTarget = InCameraViewTarget ? InCameraViewTarget : CameraViewTarget;
+	if(CameraViewSpace == ECameraViewSpace::Local && ViewTarget)
 	{
-		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - CameraViewTarget->GetActorLocation();
-		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - CameraViewTarget->GetActorRotation().Yaw;
-		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - CameraViewTarget->GetActorRotation().Pitch;
+		CameraViewOffset = UCameraModuleStatics::GetCameraLocation() - ViewTarget->GetActorLocation();
+		CameraViewYaw = UCameraModuleStatics::GetCameraRotation().Yaw - ViewTarget->GetActorRotation().Yaw;
+		CameraViewPitch = UCameraModuleStatics::GetCameraRotation().Pitch - ViewTarget->GetActorRotation().Pitch;
 	}
 	else
 	{
@@ -23,13 +24,14 @@ void FCameraViewParams::GetCameraParams()
 	CameraViewDistance = UCameraModuleStatics::GetCameraDistance();
 }
 
-void FCameraViewParams::SetCameraParams(const FCameraParams& InCameraParams)
+void FCameraViewParams::SetCameraParams(const FCameraParams& InCameraParams, AActor* InCameraViewTarget)
 {
-	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	const AActor* ViewTarget = InCameraViewTarget ? InCameraViewTarget : CameraViewTarget;
+	if(CameraViewSpace == ECameraViewSpace::Local && ViewTarget)
 	{
-		CameraViewOffset = InCameraParams.CameraLocation - CameraViewTarget->GetActorLocation();
-		CameraViewYaw = InCameraParams.CameraRotation.Yaw - CameraViewTarget->GetActorRotation().Yaw;
-		CameraViewPitch = InCameraParams.CameraRotation.Pitch - CameraViewTarget->GetActorRotation().Pitch;
+		CameraViewOffset = InCameraParams.CameraLocation - ViewTarget->GetActorLocation();
+		CameraViewYaw = InCameraParams.CameraRotation.Yaw - ViewTarget->GetActorRotation().Yaw;
+		CameraViewPitch = InCameraParams.CameraRotation.Pitch - ViewTarget->GetActorRotation().Pitch;
 	}
 	else
 	{

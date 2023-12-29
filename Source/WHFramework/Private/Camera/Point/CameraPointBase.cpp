@@ -7,6 +7,10 @@ ACameraPointBase::ACameraPointBase()
 	bCameraTrack = false;
 	CameraTrackMode = ECameraTrackMode::LocationOnly;
 	CameraViewParams = FCameraViewParams();
+
+#if WITH_EDITORONLY_DATA
+	bIsSpatiallyLoaded = false;
+#endif
 }
 
 void ACameraPointBase::OnInitialize_Implementation()
@@ -28,6 +32,22 @@ void ACameraPointBase::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
 }
+
+#if WITH_EDITOR
+void ACameraPointBase::GetCameraView()
+{
+	CameraViewParams.GetCameraParams(this);
+
+	Modify();
+}
+
+void ACameraPointBase::SetCameraView(const FCameraParams& InCameraParams)
+{
+	CameraViewParams.SetCameraParams(InCameraParams, this);
+
+	Modify();
+}
+#endif
 
 FCameraViewData ACameraPointBase::GetCameraViewData()
 {

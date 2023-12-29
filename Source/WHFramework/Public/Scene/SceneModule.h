@@ -10,6 +10,7 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
 /**
@@ -47,11 +48,28 @@ public:
 	virtual void OnUnPause() override;
 	
 	virtual void OnTermination(EPhase InPhase) override;
-
+	
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
+
+protected:
+	UFUNCTION()
+	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
+
+	//////////////////////////////////////////////////////////////////////////
+	// World
+protected:
+	UPROPERTY(EditAnywhere, Category = "World")
+	float SeaLevel;
+
+public:
+	UFUNCTION(BlueprintPure)
+	float GetSeaLevel() const { return SeaLevel; }
+
+	UFUNCTION(BlueprintPure)
+	float GetAltitude(bool bUnsigned = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// WorldTimer

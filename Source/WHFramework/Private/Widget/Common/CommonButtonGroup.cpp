@@ -7,6 +7,7 @@
 
 UCommonButtonGroup::UCommonButtonGroup()
 {
+	bSelectionRequired = false;
 	bBroadcastOnDeselected = true;
 }
 
@@ -17,6 +18,7 @@ void UCommonButtonGroup::OnSpawn_Implementation(UObject* InOwner, const TArray<F
 
 void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 {
+	bSelectionRequired = false;
 	bBroadcastOnDeselected = true;
 
 	DeselectAllN();

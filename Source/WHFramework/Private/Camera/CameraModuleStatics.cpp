@@ -61,9 +61,9 @@ void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bInstant)
 	UCameraModule::Get().SwitchCameraByName(InName, bInstant);
 }
 
-void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bInstant, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration)
+void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration)
 {
-	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bInstant, bAllowControl, InViewEaseType, InViewDuration);
+	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, InViewEaseType, InViewDuration);
 }
 
 void UCameraModuleStatics::EndTrackTarget(AActor* InTargetActor)
@@ -151,9 +151,9 @@ void UCameraModuleStatics::AddCameraRotationInput(float InYaw, float InPitch)
 	UCameraModule::Get().AddCameraRotationInput(InYaw, InPitch);
 }
 
-void UCameraModuleStatics::AddCameraDistanceInput(float InValue, bool bCanMove)
+void UCameraModuleStatics::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
-	UCameraModule::Get().AddCameraDistanceInput(InValue, bCanMove);
+	UCameraModule::Get().AddCameraDistanceInput(InValue, bMoveIfZero);
 }
 
 void UCameraModuleStatics::SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData)
@@ -161,12 +161,12 @@ void UCameraModuleStatics::SetCameraView(const FCameraViewData& InCameraViewData
 	UCameraModule::Get().SetCameraView(InCameraViewData, bCacheData);
 }
 
-void UCameraModuleStatics::ResetCameraView(bool bUseCachedParams)
+void UCameraModuleStatics::ResetCameraView(ECameraResetMode InCameraResetMode)
 {
-	UCameraModule::Get().ResetCameraView(bUseCachedParams);
+	UCameraModule::Get().ResetCameraView(InCameraResetMode);
 }
 
-void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault)
+void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint, bool bSetAsDefault)
 {
-	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bSetAsDefault);
+	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bCachePoint, bSetAsDefault);
 }

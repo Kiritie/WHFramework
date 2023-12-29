@@ -55,3 +55,8 @@ UEventManagerBase* UEventModuleStatics::GetEventManager(TSubclassOf<UEventManage
 {
 	return UEventModule::Get().GetEventManager(InClass);
 }
+
+UEventManagerBase* UEventModuleStatics::GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass)
+{
+	return UEventModule::Get().GetEventManagerByName(InName, InClass);
+}

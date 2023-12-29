@@ -133,7 +133,7 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 		CurrentPawn = InPawn;
 		PlayerController->Possess(InPawn);
 		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(InPawn, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, InPawn->GetCameraOffset() * InPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, InPawn->GetCameraDistance(), bInstant);
+		UCameraModuleStatics::StartTrackTarget(InPawn, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(InPawn) * InPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(InPawn));
 	}
 	else if(CurrentPawn)
 	{

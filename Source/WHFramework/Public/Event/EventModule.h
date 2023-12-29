@@ -126,7 +126,7 @@ protected:
 	TArray<TSubclassOf<UEventManagerBase>> EventManagers;
 
 	UPROPERTY(Transient)
-	TMap<TSubclassOf<UEventManagerBase>, UEventManagerBase*> EventManagerRefs;
+	TMap<FName, UEventManagerBase*> EventManagerRefs;
 
 public:
 	template<class T>
@@ -137,6 +137,9 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass) const;
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UEventManagerBase* GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr) const;
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

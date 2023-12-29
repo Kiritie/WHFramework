@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-#include "WidgetSettingPageBase.h"
-#include "Common/CommonTypes.h"
+#include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
 #include "WidgetCameraSettingPageBase.generated.h"
 
@@ -74,4 +73,40 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UWidgetFloatSettingItemBase* SettingItem_CameraZoomSpeed;
+
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraMoveRate;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraMoveRate;
+	
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraMoveSpeed;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraMoveSpeed;
+
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraTurnRate;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraTurnRate;
+
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraLookUpRate;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraLookUpRate;
+
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraRotateSpeed;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraRotateSpeed;
+
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraZoomRate;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraZoomRate;
+
+	UPROPERTY(EditDefaultsOnly)
+	float MinCameraZoomSpeed;
+	UPROPERTY(EditDefaultsOnly)
+	float MaxCameraZoomSpeed;
 };

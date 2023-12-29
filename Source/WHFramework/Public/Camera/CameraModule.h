@@ -72,12 +72,12 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	ACameraActorBase* DefaultCamera;
-	
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera == nullptr"), Category = "Camera")
-	ACameraPointBase* DefaultCameraPoint;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
 	bool DefaultInstantSwitch;
+	
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	ACameraPointBase* DefaultCameraPoint;
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	ACameraActorBase* CurrentCamera;
@@ -139,7 +139,7 @@ public:
 	void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false);
+	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control
@@ -267,10 +267,13 @@ private:
 	EEaseType CameraDoZoomEaseType;
 	FVector InitSocketOffset;
 	FVector TargetSocketOffset;
+	UPROPERTY(Transient)
+	ACameraPointBase* CachedCameraPoint;
 	FCameraViewData CachedCameraViewData;
 	FCameraViewData TrackCameraViewData;
 	bool bTrackAllowControl;
-	bool bTrackAllowSmooth;
+	ECameraSmoothMode TrackSmoothMode;
+	ECameraControlMode TrackControlMode;
 	bool bIsControllingMove;
 	bool bIsControllingRotate;
 	bool bIsControllingZoom;
@@ -288,7 +291,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"))
-	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bInstant = false, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
+	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -342,14 +345,14 @@ public:
 	virtual void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraDistanceInput(float InValue, bool bCanMove = false);
+	virtual void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
 	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView(bool bUseCachedData = false);
+	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint);
 
 protected:
 	UFUNCTION(BlueprintCallable)

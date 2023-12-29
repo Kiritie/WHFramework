@@ -12,7 +12,6 @@
 class UStepAsset;
 class ACameraActorBase;
 
-#if WITH_EDITORONLY_DATA
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FStepListItemStates
 {
@@ -31,7 +30,6 @@ public:
 		bSelected = false;
 	}
 };
-#endif
 
 /**
  * 步骤基类

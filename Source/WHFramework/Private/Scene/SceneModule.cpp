@@ -1,12 +1,14 @@
 
 #include "Scene/SceneModule.h"
 
+#include "Camera/CameraModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/TargetPoint.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
+#include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -18,7 +20,9 @@
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleStatics.h"
-		
+#include "WorldPartition/DataLayer/DataLayerAsset.h"
+#include "WorldPartition/DataLayer/DataLayerSubsystem.h"
+
 IMPLEMENTATION_MODULE(USceneModule)
 
 USceneModule::USceneModule()
@@ -27,6 +31,8 @@ USceneModule::USceneModule()
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 
 	ModuleSaveGame = USceneSaveGame::StaticClass();
+
+	SeaLevel = 0.f;
 
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
@@ -83,6 +89,8 @@ void USceneModule::OnDestroy()
 void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, FName("OnSetDataLayerRuntimeState"));
 
 	if(WorldTimer)
 	{
@@ -260,6 +268,17 @@ FSaveData* USceneModule::ToData()
 	}
 
 	return SaveData;
+}
+
+void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle)
+{
+	UDataLayerManager::GetDataLayerManager(this)->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
+}
+
+float USceneModule::GetAltitude(bool bUnsigned) const
+{
+	const float Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
+	return bUnsigned ? FMathf::Max(Altitude, 0.f) : Altitude;
 }
 
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const

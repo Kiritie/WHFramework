@@ -12,7 +12,6 @@
 class UProcedureAsset;
 class ACameraActorBase;
 
-#if WITH_EDITORONLY_DATA
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FProcedureListItemStates
 {
@@ -27,7 +26,6 @@ public:
 		bSelected = false;
 	}
 };
-#endif
 
 /**
  * 流程基类

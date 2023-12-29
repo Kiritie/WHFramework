@@ -148,7 +148,7 @@ public:
 		BooleanValue = false;
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
-		ColorValue = FColor();
+		ColorValue = FColor::Transparent;
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
 		ClassValue = nullptr;

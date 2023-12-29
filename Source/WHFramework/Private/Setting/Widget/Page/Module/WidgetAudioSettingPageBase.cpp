@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Setting/Widget/Page/WidgetAudioSettingPageBase.h"
+#include "Setting/Widget/Page/Module/WidgetAudioSettingPageBase.h"
 
 #include "Audio/AudioModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"

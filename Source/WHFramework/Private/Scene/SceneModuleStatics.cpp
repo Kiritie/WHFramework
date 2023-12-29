@@ -5,6 +5,16 @@
 
 #include "Scene/SceneModule.h"
 
+float USceneModuleStatics::GetSeaLevel()
+{
+	return USceneModule::Get().GetSeaLevel();
+}
+
+float USceneModuleStatics::GetAltitude(bool bUnsigned)
+{
+	return USceneModule::Get().GetAltitude(bUnsigned);
+}
+
 UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)
 {
 	return USceneModule::Get().GetWorldTimer(InClass);

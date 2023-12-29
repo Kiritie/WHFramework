@@ -25,6 +25,13 @@ public:
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	
+public:
+#if WITH_EDITOR
+	void GetCameraView();
+	
+	void SetCameraView(const FCameraParams& InCameraParams);
+#endif
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

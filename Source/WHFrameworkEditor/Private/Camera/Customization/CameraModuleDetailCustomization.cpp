@@ -11,7 +11,6 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
-#include "DetailCategoryBuilder.h"
 #include "IDetailsView.h"
 
 #include "ScopedTransaction.h"
@@ -35,23 +34,17 @@ void FCameraModuleDetailCustomization::CustomizeDetails(IDetailLayoutBuilder& De
 
 	IDetailCategoryBuilder& CameraModuleCategory = DetailLayoutBuilder.EditCategory(FName("CameraStats"));
 
-	TSharedRef<SWrapBox> CameraModuleActionBox = SNew(SWrapBox).UseAllottedWidth(true);
-	CameraModuleActionBox->AddSlot()
-	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		[
-			SNew(SButton)
-			.Text(FText::FromString(TEXT("Copy Camera Params")))
-			.OnClicked(FOnClicked::CreateSP(this, &FCameraModuleDetailCustomization::OnClickCopyCameraParamsButton))
-		]
-	];
-
 	CameraModuleCategory.AddCustomRow(FText::GetEmpty())
-		.ValueContent()
+		.WholeRowContent()
 		[
-			CameraModuleActionBox
+			SNew(SWrapBox)
+			.UseAllottedWidth(true)
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Copy Camera Params")))
+				.OnClicked(FOnClicked::CreateSP(this, &FCameraModuleDetailCustomization::OnClickCopyCameraParamsButton))
+			]
 		];
 }
 

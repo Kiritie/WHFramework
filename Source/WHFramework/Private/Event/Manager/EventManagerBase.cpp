@@ -11,6 +11,8 @@
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()
 {
+	EventManagerName = NAME_None;
+	
 	EventHandleClasses = TArray<TSubclassOf<UEventHandleBase>>();
 }
 

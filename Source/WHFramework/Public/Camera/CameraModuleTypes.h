@@ -30,6 +30,32 @@ enum class ECameraTrackMode : uint8
 };
 
 UENUM(BlueprintType)
+enum class ECameraSmoothMode : uint8
+{
+	None = 0,
+	Location = 1 << 0,
+	Rotation = 1 << 1,
+	Distance = 1 << 2,
+	LocationAndRotation = Location | Rotation,
+	RotationAndDistance = Rotation | Distance,
+	LocationAndDistance = Location | Distance,
+	All = Location | Rotation | Distance
+};
+
+UENUM(BlueprintType)
+enum class ECameraControlMode : uint8
+{
+	None = 0,
+	Location = 1 << 0,
+	Rotation = 1 << 1,
+	Distance = 1 << 2,
+	LocationAndRotation = Location | Rotation,
+	RotationAndDistance = Rotation | Distance,
+	LocationAndDistance = Location | Distance,
+	All = Location | Rotation | Distance
+};
+
+UENUM(BlueprintType)
 enum class ECameraViewMode : uint8
 {
 	None,
@@ -43,6 +69,14 @@ enum class ECameraViewSpace : uint8
 {
 	Local,
 	World
+};
+
+UENUM(BlueprintType)
+enum class ECameraResetMode : uint8
+{
+	UseDefaultPoint,
+	UseCachedPoint,
+	UseCachedData
 };
 
 USTRUCT(BlueprintType)
@@ -109,9 +143,9 @@ public:
 		return CameraViewMode != ECameraViewMode::None;
 	}
 
-	void GetCameraParams();
+	void GetCameraParams(AActor* InCameraViewTarget = nullptr);
 
-	void SetCameraParams(const FCameraParams& InCameraParams);
+	void SetCameraParams(const FCameraParams& InCameraParams, AActor* InCameraViewTarget = nullptr);
 
 public:
 	UPROPERTY(BlueprintReadOnly, Transient)

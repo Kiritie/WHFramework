@@ -91,11 +91,13 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	FVector GetCameraOffset() const override;
+	virtual FVector GetCameraOffset_Implementation() const override;
 
-	UFUNCTION(BlueprintNativeEvent)
-	float GetCameraDistance() const override;
+	virtual float GetCameraDistance_Implementation() const override;
+
+	virtual ECameraSmoothMode GetCameraSmoothMode_Implementation() const override;
+
+	virtual ECameraControlMode GetCameraControlMode_Implementation() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor

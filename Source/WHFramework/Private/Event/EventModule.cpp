@@ -11,7 +11,6 @@
 #include "Event/Handle/EventHandleBase.h"
 #include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "Net/UnrealNetwork.h"
 
 IMPLEMENTATION_MODULE(UEventModule)
 
@@ -24,7 +23,7 @@ UEventModule::UEventModule()
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
 
 	EventManagers = TArray<TSubclassOf<UEventManagerBase>>();
-	EventManagerRefs = TMap<TSubclassOf<UEventManagerBase>, UEventManagerBase*>();
+	EventManagerRefs = TMap<FName, UEventManagerBase*>();
 }
 
 UEventModule::~UEventModule()
@@ -55,7 +54,7 @@ void UEventModule::OnInitialize()
 		if(UEventManagerBase* EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, nullptr, Iter))
 		{
 			EventManager->OnInitialize();
-			EventManagerRefs.Add(Iter, EventManager);
+			EventManagerRefs.Add(EventManager->GetEventManagerName(), EventManager);
 		}
 	}
 }
@@ -261,9 +260,15 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 
 UEventManagerBase* UEventModule::GetEventManager(TSubclassOf<UEventManagerBase> InClass) const
 {
-	if(EventManagerRefs.Contains(InClass))
+	const FName EventManagerName = InClass->GetDefaultObject<UEventManagerBase>()->GetEventManagerName();
+	return GetEventManagerByName(EventManagerName, InClass);
+}
+
+UEventManagerBase* UEventModule::GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass) const
+{
+	if(EventManagerRefs.Contains(InName))
 	{
-		return EventManagerRefs[InClass];
+		return GetDeterminesOutputObject(EventManagerRefs[InName], InClass);
 	}
 	return nullptr;
 }
@@ -271,6 +276,4 @@ UEventManagerBase* UEventModule::GetEventManager(TSubclassOf<UEventManagerBase> 
 void UEventModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
-	DOREPLIFETIME(UEventModule, EventManagerRefs);
 }

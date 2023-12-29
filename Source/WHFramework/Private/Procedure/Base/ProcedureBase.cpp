@@ -168,14 +168,14 @@ UProcedureAsset* UProcedureBase::GetProcedureAsset() const
 #if WITH_EDITOR
 void UProcedureBase::GetCameraView()
 {
-	CameraViewParams.GetCameraParams();
+	CameraViewParams.GetCameraParams(OperationTarget.LoadSynchronous());
 
 	Modify();
 }
 
 void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 {
-	CameraViewParams.SetCameraParams(InCameraParams);
+	CameraViewParams.SetCameraParams(InCameraParams, OperationTarget.LoadSynchronous());
 
 	Modify();
 }
@@ -184,8 +184,11 @@ void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 void UProcedureBase::ResetCameraView()
 {
 	if(ProcedureState != EProcedureState::Entered) return;
-	
-	UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+
+	if(CameraViewParams.IsValid())
+	{
+		UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+	}
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)

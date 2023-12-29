@@ -2,14 +2,13 @@
 
 #pragma once
 
-
+#include "Camera/Interface/CameraTrackableInterface.h"
 #include "Pawn/PawnModuleTypes.h"
-#include "UObject/Interface.h"
 #include "PawnInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UPawnInterface : public UInterface
+class UPawnInterface : public UCameraTrackableInterface
 {
 	GENERATED_BODY()
 };
@@ -17,7 +16,7 @@ class UPawnInterface : public UInterface
 /**
 * 
 */
-class WHFRAMEWORK_API IPawnInterface
+class WHFRAMEWORK_API IPawnInterface : public ICameraTrackableInterface
 {
 	GENERATED_BODY()
 
@@ -37,8 +36,4 @@ public:
 	virtual void SetNameP(FName InName) = 0;
 
 	virtual AController* GetDefaultController() const = 0;
-	
-	virtual FVector GetCameraOffset() const = 0;
-	
-	virtual float GetCameraDistance() const = 0;
 };

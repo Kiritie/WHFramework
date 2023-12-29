@@ -112,6 +112,9 @@ extern void RecursiveItems(T& Value, TFunction<TArray<T>(T&)> Func)
 #define PHASEC(A, B) \
 ((uint8)A & (uint8)B) != 0
 
+#define ENUMWITH(A, B) \
+((uint8)A & (uint8)B) != 0
+
 #define DON(Count, Expression) \
 for(int32 _Index = 0; _Index < Count; _Index++) \
 { \

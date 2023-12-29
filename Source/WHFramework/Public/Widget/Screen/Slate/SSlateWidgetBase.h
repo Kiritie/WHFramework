@@ -100,6 +100,11 @@ public:
 		return nullptr;
 	}
 
+	virtual int32 FindChild(IScreenWidgetInterface* InChildWidget) const override
+	{
+		return ChildWidgets.Find(InChildWidget);
+	}
+
 protected:
 	EWidgetType WidgetType;
 

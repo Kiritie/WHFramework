@@ -4,23 +4,23 @@
 
 UEventHandle_ResetCameraView::UEventHandle_ResetCameraView()
 {
-	bUseCachedData = false;
+	CameraResetMode = ECameraResetMode::UseDefaultPoint;
 }
 
 void UEventHandle_ResetCameraView::OnDespawn_Implementation(bool bRecovery)
 {
-	bUseCachedData = false;
+	CameraResetMode = ECameraResetMode::UseDefaultPoint;
 }
 
 void UEventHandle_ResetCameraView::Parse_Implementation(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		bUseCachedData = InParams[0].GetBooleanValue();
+		CameraResetMode = InParams[0].GetPointerValueRef<ECameraResetMode>();
 	}
 }
 
 TArray<FParameter> UEventHandle_ResetCameraView::Pack_Implementation()
 {
-	return { bUseCachedData };
+	return { &CameraResetMode };
 }

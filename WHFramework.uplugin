@@ -14,6 +14,7 @@
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
+	"EditorCustomVirtualPath": "WHFramework",
 	"Modules": [
 		{
 			"Name": "WHFramework",
