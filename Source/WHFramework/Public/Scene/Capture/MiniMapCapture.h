@@ -3,18 +3,18 @@
 #pragma once
 
 #include "Common/Base/WHActor.h"
-#include "VoxelCapture.generated.h"
+#include "MiniMapCapture.generated.h"
 
 /**
  * 体素模块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelCapture : public AWHActor
+class WHFRAMEWORK_API AMiniMapCapture : public AWHActor
 {
 	GENERATED_BODY()
 
 public:
-	AVoxelCapture();
+	AMiniMapCapture();
 
 public:
 #if WITH_EDITOR

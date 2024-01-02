@@ -619,20 +619,20 @@ public:
 	TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName) const;
 
 	template<class T>
-	T* CreateWorldWidget(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass) return nullptr;
 		
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 		
-		return CreateWorldWidgetByName<T>(WidgetName, InOwner, InBindInfo, InParams, InClass);
+		return CreateWorldWidgetByName<T>(WidgetName, InOwner, InMapping, InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
+	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
 	template<class T>
-	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
@@ -647,14 +647,14 @@ public:
 				AllWorldWidgets.Add(InName);
 			}
 			WorldWidget->SetWidgetIndex(AllWorldWidgets[InName].WorldWidgets.Add(WorldWidget));
-			WorldWidget->OnCreate(InOwner, InBindInfo, *InParams);
+			WorldWidget->OnCreate(InOwner, InMapping, *InParams);
 			return Cast<T>(WorldWidget);
 		}
 		return nullptr;
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
+	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
 	bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{

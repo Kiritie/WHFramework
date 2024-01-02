@@ -10,6 +10,7 @@
 #include "Components/BoxComponent.h"
 #include "Pawn/PawnModuleNetworkComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Pawn/PawnModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Damage.h"
@@ -75,6 +76,34 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 void APawnBase::OnTermination_Implementation(EPhase InPhase)
 {
 	IWHActorInterface::OnTermination_Implementation(InPhase);
+}
+
+void APawnBase::OnSwitch_Implementation()
+{
+	
+}
+
+void APawnBase::OnUnSwitch_Implementation()
+{
+	
+}
+
+void APawnBase::Switch_Implementation()
+{
+	UPawnModuleStatics::SwitchPawn(this);
+}
+
+void APawnBase::UnSwitch_Implementation()
+{
+	if(IsCurrent())
+	{
+		UPawnModuleStatics::SwitchPawn(nullptr);
+	}
+}
+
+bool APawnBase::IsCurrent_Implementation() const
+{
+	return UPawnModuleStatics::GetCurrentPawn() == this;
 }
 
 void APawnBase::BeginPlay()

@@ -26,8 +26,38 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static float GetSeaLevel();
 
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetSeaLevel(float InSeaLevel);
+
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static float GetAltitude(bool bUnsigned = false);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static AMiniMapCapture* GetMiniMapCapture();
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static EWorldMiniMapMode GetMiniMapMode();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetMiniMapMode(EWorldMiniMapMode InMiniMapMode);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static FTransform GetMiniMapPoint();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetMiniMapPoint(const FTransform& InMiniMapPoint);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static float GetMiniMapRange();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetMiniMapRange(float InMiniMapRange);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static UTextureRenderTarget2D* GetMiniMapTexture();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// WorldTimer
@@ -133,5 +163,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange = FVector::ZeroVector);
+	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 };

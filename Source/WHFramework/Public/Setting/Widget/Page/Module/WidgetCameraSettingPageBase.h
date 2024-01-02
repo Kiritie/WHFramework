@@ -42,6 +42,9 @@ protected:
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UWidgetBoolSettingItemBase* SettingItem_ReverseCameraPanMove;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UWidgetFloatSettingItemBase* SettingItem_CameraMoveRate;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Components")

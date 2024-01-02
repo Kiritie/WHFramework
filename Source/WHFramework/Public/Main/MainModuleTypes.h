@@ -13,6 +13,7 @@ enum class EModuleState : uint8
 {
 	None,
 	Running,
+	RunningPaused,
 	Paused,
 	Terminated
 };

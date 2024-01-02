@@ -9,6 +9,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Character/CharacterModuleNetworkComponent.h"
+#include "Character/CharacterModuleStatics.h"
 #include "Character/Base/CharacterAnimBase.h"
 #include "Character/Base/CharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
@@ -87,6 +88,34 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
 {
 	IWHActorInterface::OnTermination_Implementation(InPhase);
+}
+
+void ACharacterBase::OnSwitch_Implementation()
+{
+	
+}
+
+void ACharacterBase::OnUnSwitch_Implementation()
+{
+	
+}
+
+void ACharacterBase::Switch_Implementation()
+{
+	UCharacterModuleStatics::SwitchCharacter(this);
+}
+
+void ACharacterBase::UnSwitch_Implementation()
+{
+	if(IsCurrent())
+	{
+		UCharacterModuleStatics::SwitchCharacter(nullptr);
+	}
+}
+
+bool ACharacterBase::IsCurrent_Implementation() const
+{
+	return UCharacterModuleStatics::GetCurrentCharacter() == this;
 }
 
 void ACharacterBase::BeginPlay()

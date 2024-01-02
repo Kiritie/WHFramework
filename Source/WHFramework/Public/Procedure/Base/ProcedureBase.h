@@ -108,12 +108,12 @@ public:
 	* 切入当前流程
 	*/
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void SwitchIn();
+	void Switch();
 	/**
 	* 切出当前流程
 	*/
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void SwitchOut();
+	void UnSwitch();
 	/**
 	* 切换到上一个流程
 	*/

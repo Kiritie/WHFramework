@@ -17,7 +17,7 @@ public:
 	AAbilityPickUpSkill();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UPaperSpriteComponent* MeshComponent;
 
 protected:

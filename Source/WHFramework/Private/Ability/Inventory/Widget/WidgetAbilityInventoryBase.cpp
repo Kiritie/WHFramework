@@ -1,5 +1,6 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventoryBase.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 
 UWidgetAbilityInventoryBase::UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)

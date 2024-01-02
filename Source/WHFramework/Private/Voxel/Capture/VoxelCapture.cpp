@@ -13,15 +13,16 @@ AVoxelCapture::AVoxelCapture()
 	bIsSpatiallyLoaded = false;
 #endif
 	
-	Capture2D = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VoxelsCapture"));
-	Capture2D->SetupAttachment(RootComponent);
-	Capture2D->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));
+	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Capture"));
+	Capture->SetupAttachment(RootComponent);
+	Capture->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> VoxelsPreviewTexFinder(TEXT("TextureRenderTarget2D'/WHFramework/Voxel/Textures/RT_VoxelPreview.RT_VoxelPreview'"));
 	if(VoxelsPreviewTexFinder.Succeeded())
 	{
-		Capture2D->TextureTarget = VoxelsPreviewTexFinder.Object;
+		Capture->TextureTarget = VoxelsPreviewTexFinder.Object;
 	}
-	Capture2D->ProjectionType = ECameraProjectionMode::Orthographic;
-	Capture2D->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
-	Capture2D->bCaptureEveryFrame = true;
+	Capture->ProjectionType = ECameraProjectionMode::Orthographic;
+	Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
+	Capture->bCaptureEveryFrame = true;
+	Capture->bAutoActivate = false;
 }

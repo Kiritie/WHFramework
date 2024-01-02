@@ -4,6 +4,7 @@
 #include "Camera/Actor/CameraActorBase.h"
 
 #include "Camera/CameraComponent.h"
+#include "Camera/CameraModuleStatics.h"
 #include "GameFramework/SpringArmComponent.h"
 
 // Sets default values
@@ -44,6 +45,34 @@ void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 {
 	
+}
+
+void ACameraActorBase::OnSwitch_Implementation()
+{
+	
+}
+
+void ACameraActorBase::OnUnSwitch_Implementation()
+{
+	
+}
+
+void ACameraActorBase::Switch_Implementation()
+{
+	UCameraModuleStatics::SwitchCamera(this);
+}
+
+void ACameraActorBase::UnSwitch_Implementation()
+{
+	if(IsCurrent())
+	{
+		UCameraModuleStatics::SwitchCamera(nullptr);
+	}
+}
+
+bool ACameraActorBase::IsCurrent_Implementation() const
+{
+	return UCameraModuleStatics::GetCurrentCamera() == this;
 }
 
 void ACameraActorBase::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)

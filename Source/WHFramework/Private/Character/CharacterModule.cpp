@@ -126,17 +126,23 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 	
 	if(InCharacter)
 	{
-		if(CurrentCharacter && CurrentCharacter->GetDefaultController())
+		if(CurrentCharacter)
 		{
-			CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
+			CurrentCharacter->OnUnSwitch();
+			if(CurrentCharacter->GetDefaultController())
+			{
+				CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
+			}
 		}
 		CurrentCharacter = InCharacter;
-		PlayerController->Possess(InCharacter);
+		PlayerController->Possess(CurrentCharacter);
+		CurrentCharacter->OnSwitch();
 		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(InCharacter, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(InCharacter) * InCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(InCharacter));
+		UCameraModuleStatics::StartTrackTarget(CurrentCharacter, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentCharacter) * CurrentCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentCharacter));
 	}
 	else if(CurrentCharacter)
 	{
+		CurrentCharacter->OnSwitch();
 		PlayerController->UnPossess();
 		if(CurrentCharacter->GetDefaultController())
 		{

@@ -133,21 +133,46 @@ void UModuleBase::Reset_Implementation()
 
 void UModuleBase::Pause_Implementation()
 {
-	if(ModuleState != EModuleState::Paused)
+	switch(ModuleState)
 	{
-		ModuleState = EModuleState::Paused;
-		OnStateChanged(ModuleState);
-		OnPause();
+		case EModuleState::None:
+		{
+			ModuleState = EModuleState::RunningPaused;
+			OnStateChanged(ModuleState);
+			OnPause();
+			break;
+		}
+		case EModuleState::Running:
+		{
+			ModuleState = EModuleState::Paused;
+			OnStateChanged(ModuleState);
+			OnPause();
+			break;
+		}
+		default: break;
 	}
 }
 
 void UModuleBase::UnPause_Implementation()
 {
-	if(ModuleState == EModuleState::Paused)
+	switch(ModuleState)
 	{
-		ModuleState = EModuleState::Running;
-		OnStateChanged(ModuleState);
-		OnUnPause();
+		case EModuleState::RunningPaused:
+		{
+			ModuleState = EModuleState::Running;
+			OnStateChanged(ModuleState);
+			OnPreparatory(EPhase::Final);
+			OnUnPause();
+			break;
+		}
+		case EModuleState::Paused:
+		{
+			ModuleState = EModuleState::Running;
+			OnStateChanged(ModuleState);
+			OnUnPause();
+			break;
+		}
+		default: break;
 	}
 }
 

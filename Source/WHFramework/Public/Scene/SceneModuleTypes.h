@@ -9,6 +9,22 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath)
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
 
 /**
+* 世界小地图模式
+*/
+UENUM(BlueprintType)
+enum class EWorldMiniMapMode : uint8
+{
+	// 无
+	None,
+	// 固定位置
+	FixedPoint,
+	// 相机位置
+	CameraPoint,
+	// 玩家位置
+	PlayerPoint
+};
+
+/**
 * 世界文本风格
 */
 UENUM(BlueprintType)
@@ -76,11 +92,15 @@ struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FSceneModuleSaveData()
 	{
+		MiniMapRange = 512.f;
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
 	}
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MiniMapRange;
+		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FWorldTimerSaveData TimerData;
 		

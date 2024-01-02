@@ -2,25 +2,30 @@
 #include "Scene/SceneModule.h"
 
 #include "Camera/CameraModuleStatics.h"
+#include "Camera/Actor/CameraActorBase.h"
+#include "Common/CommonStatics.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/TargetPoint.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
+#include "Main/MainModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "SaveGame/Module/SceneSaveGame.h"
 #include "Scene/Object/WorldTimer.h"
 #include "Scene/Object/WorldWeather.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
+#include "Scene/Capture/MiniMapCapture.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Scene/Widget/WidgetWorldText.h"
 #include "Widget/WidgetModuleStatics.h"
-#include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerSubsystem.h"
 
 IMPLEMENTATION_MODULE(USceneModule)
@@ -34,6 +39,20 @@ USceneModule::USceneModule()
 
 	SeaLevel = 0.f;
 
+	MiniMapCapture = nullptr;
+
+	bMiniMapRotatable = false;
+
+	MiniMapMode = EWorldMiniMapMode::None;
+	MiniMapPoint = FTransform::Identity;
+	MiniMapRange = 512.f;
+	
+	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
+	if(MiniMapTexFinder.Succeeded())
+	{
+		MiniMapTexture = MiniMapTexFinder.Object;
+	}
+	
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
 
@@ -75,7 +94,33 @@ USceneModule::~USceneModule()
 #if WITH_EDITOR
 void USceneModule::OnGenerate()
 {
-	Super::OnGenerate();
+	if(!MiniMapCapture)
+	{
+		TArray<AActor*> ChildActors;
+		GetModuleOwner()->GetAttachedActors(ChildActors);
+		if(ChildActors.Num() > 0)
+		{
+			MiniMapCapture = Cast<AMiniMapCapture>(ChildActors[0]);
+		}
+	}
+	if(!MiniMapCapture)
+	{
+		FActorSpawnParameters ActorSpawnParameters;
+		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		MiniMapCapture = GetWorld()->SpawnActor<AMiniMapCapture>(ActorSpawnParameters);
+		if(MiniMapCapture)
+		{
+			MiniMapCapture->SetActorLabel(TEXT("MiniMapCapture"));
+			MiniMapCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
+		}
+	}
+	if(MiniMapCapture)
+	{
+		MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+		MiniMapCapture->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	}
+
+	Modify();
 }
 
 void USceneModule::OnDestroy()
@@ -83,6 +128,11 @@ void USceneModule::OnDestroy()
 	Super::OnDestroy();
 
 	TERMINATION_MODULE(USceneModule)
+
+	if(MiniMapCapture)
+	{
+		MiniMapCapture->Destroy();
+	}
 }
 #endif
 
@@ -178,6 +228,10 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
+		if(MiniMapCapture)
+		{
+			MiniMapCapture->GetCapture()->SetActive(MiniMapMode != EWorldMiniMapMode::None, true);
+		}
 		if(WorldTimer)
     	{
     		WorldTimer->OnPreparatory();
@@ -193,6 +247,35 @@ void USceneModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
 
+	if(MiniMapCapture)
+	{
+		switch(MiniMapMode)
+		{
+			case EWorldMiniMapMode::FixedPoint:
+			{
+				MiniMapCapture->SetActorLocationAndRotation(MiniMapPoint.GetLocation(), bMiniMapRotatable ? FRotator(0.f, MiniMapPoint.GetRotation().Z, 0.f) : FRotator::ZeroRotator);
+				break;
+			}
+			case EWorldMiniMapMode::CameraPoint:
+			{
+				if(const ACameraActorBase* CameraActor = UCameraModuleStatics::GetCurrentCamera())
+				{
+					MiniMapCapture->SetActorLocationAndRotation(CameraActor->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, CameraActor->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
+				}
+				break;
+			}
+			case EWorldMiniMapMode::PlayerPoint:
+			{
+				if(const APawn* PlayerPawn = UCommonStatics::GetPlayerPawn())
+				{
+					MiniMapCapture->SetActorLocationAndRotation(PlayerPawn->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, PlayerPawn->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
+				}
+				break;
+			}
+			default: break;
+		}
+		MiniMapCapture->GetCapture()->OrthoWidth = MiniMapRange;
+	}
 	if(WorldTimer)
 	{
 		WorldTimer->OnRefresh(DeltaSeconds);
@@ -242,13 +325,19 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(WorldTimer && WorldTimer->IsAutoSave())
+		if(SaveData.IsSaved())
 		{
-			WorldTimer->LoadSaveData(&SaveData.TimerData);
-		}
-		if(WorldWeather && WorldWeather->IsAutoSave())
-		{
-			WorldWeather->LoadSaveData(&SaveData.WeatherData);
+			MiniMapRange = SaveData.MiniMapRange;
+		
+			if(WorldTimer && WorldTimer->IsAutoSave())
+			{
+				WorldTimer->LoadSaveData(&SaveData.TimerData);
+			}
+		
+			if(WorldWeather && WorldWeather->IsAutoSave())
+			{
+				WorldWeather->LoadSaveData(&SaveData.WeatherData);
+			}
 		}
 	}
 }
@@ -258,10 +347,13 @@ FSaveData* USceneModule::ToData()
 	static FSceneModuleSaveData* SaveData;
 	SaveData = new FSceneModuleSaveData();
 
+	SaveData->MiniMapRange = MiniMapRange;
+	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
 		SaveData->TimerData = WorldTimer->GetSaveDataRef<FWorldTimerSaveData>(true);
 	}
+	
 	if(WorldWeather && WorldWeather->IsAutoSave())
 	{
 		SaveData->WeatherData = WorldWeather->GetSaveDataRef<FWorldWeatherSaveData>(true);
@@ -275,10 +367,57 @@ void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_Se
 	UDataLayerManager::GetDataLayerManager(this)->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
 }
 
+#if WITH_EDITOR
+bool USceneModule::CanEditChange(const FProperty* InProperty) const
+{
+	if(InProperty)
+	{
+		const FString PropertyName = InProperty->GetName();
+
+		return true;
+	}
+
+	return Super::CanEditChange(InProperty);
+}
+
+void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
+
+	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
+	{
+		const FName PropertyName = Property->GetFName();
+
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture))
+		{
+			MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+		}
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif
+
 float USceneModule::GetAltitude(bool bUnsigned) const
 {
 	const float Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
 	return bUnsigned ? FMathf::Max(Altitude, 0.f) : Altitude;
+}
+
+void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
+{
+	MiniMapMode = InMiniMapMode;
+	if(MiniMapCapture)
+	{
+		MiniMapCapture->GetCapture()->SetActive(MiniMapMode != EWorldMiniMapMode::None, true);
+	}
+}
+
+void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
+{
+	MiniMapTexture = InMiniMapTexture;
+
+	MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
 }
 
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
@@ -469,13 +608,13 @@ void USceneModule::RemovePhysicsVolumeByName(FName InName)
 	}
 }
 
-void USceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange)
+void USceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
 	if(InOffsetRange != FVector::ZeroVector)
 	{
-		InBindInfo.Location = InBindInfo.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
+		InMapping.Location = InMapping.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleStatics::CreateWorldWidget<UWidgetWorldText>(nullptr, InBindInfo, { InText, InTextColor, (int32)InTextStyle });
+	UWidgetModuleStatics::CreateWorldWidget<UWidgetWorldText>(nullptr, InMapping, { InText, InTextColor, (int32)InTextStyle });
 }
 
 FLinearColor USceneModule::GetOutlineColor() const

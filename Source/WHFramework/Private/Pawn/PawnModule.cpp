@@ -126,17 +126,23 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 	
 	if(InPawn)
 	{
-		if(CurrentPawn && CurrentPawn->GetDefaultController())
+		if(CurrentPawn)
 		{
-			CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
+			CurrentPawn->OnUnSwitch();
+			if(CurrentPawn->GetDefaultController())
+			{
+				CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
+			}
 		}
 		CurrentPawn = InPawn;
-		PlayerController->Possess(InPawn);
+		PlayerController->Possess(CurrentPawn);
+		CurrentPawn->OnSwitch();
 		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(InPawn, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(InPawn) * InPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(InPawn));
+		UCameraModuleStatics::StartTrackTarget(CurrentPawn, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentPawn) * CurrentPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentPawn));
 	}
 	else if(CurrentPawn)
 	{
+		CurrentPawn->OnUnSwitch();
 		PlayerController->UnPossess();
 		if(CurrentPawn->GetDefaultController())
 		{

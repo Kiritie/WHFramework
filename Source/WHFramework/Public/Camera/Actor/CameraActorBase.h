@@ -33,6 +33,25 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSwitch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnUnSwitch();
+
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Switch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void UnSwitch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsCurrent() const;
+
 public:
 #if WITH_EDITOR
 	virtual bool IsUserManaged() const override { return false; }

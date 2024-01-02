@@ -108,14 +108,14 @@ TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgetsByName(FName InNa
 	return UWidgetModule::Get().GetWorldWidgetsByName(InName);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
-	return UWidgetModule::Get().CreateWorldWidget(InClass, InOwner, InBindInfo, InParams);
+	return UWidgetModule::Get().CreateWorldWidget(InClass, InOwner, InMapping, InParams);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
-	return UWidgetModule::Get().CreateWorldWidgetByName(InName, InClass, InOwner, InBindInfo, InParams);
+	return UWidgetModule::Get().CreateWorldWidgetByName(InName, InClass, InOwner, InMapping, InParams);
 }
 
 bool UWidgetModuleStatics::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery)

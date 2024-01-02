@@ -41,6 +41,25 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Pawn
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSwitch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnUnSwitch();
+
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void Switch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void UnSwitch();
+
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsCurrent() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -60,7 +79,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
 public:
 	virtual UBoxComponent* GetBoxComponent() const { return BoxComponent; }
@@ -195,7 +214,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// AI
 protected: 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAIPerceptionStimuliSourceComponent* StimuliSource;
 
 public:

@@ -303,7 +303,8 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		}
 		WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
 
-		VoxelCapture->GetCapture2D()->OrthoWidth = WorldData->BlockSize * 4.f;
+		VoxelCapture->GetCapture()->SetActive(true);
+		VoxelCapture->GetCapture()->OrthoWidth = WorldData->BlockSize * 4.f;
 		
 		int32 ItemIndex = 0;
 		ITER_ARRAY(UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
@@ -316,7 +317,7 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			else
 			{
 				VoxelEntity = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityPreview>();
-				VoxelCapture->GetCapture2D()->ShowOnlyActors.Add(VoxelEntity);
+				VoxelCapture->GetCapture()->ShowOnlyActors.Add(VoxelEntity);
 				PreviewVoxels.EmplaceAt(ItemIndex, VoxelEntity);
 			}
 			if(VoxelEntity)
@@ -326,7 +327,7 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeScale3D(FVector(0.3f));
-				Item->SetIconByTexture(VoxelCapture->GetCapture2D()->TextureTarget, FVector2D(8.f), ItemIndex);
+				Item->SetIconByTexture(VoxelCapture->GetCapture()->TextureTarget, FVector2D(8.f), ItemIndex);
 			}
 			ItemIndex++;
 		)
@@ -385,6 +386,8 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		ChunkGenerateIndex = EMPTY_Index;
 
 		WorldData = NewWorldData();
+
+		VoxelCapture->GetCapture()->SetActive(false);
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{

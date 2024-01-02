@@ -61,7 +61,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
 	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnCreate(UObject* InOwner, FWorldWidgetBindInfo InBindInfo, const TArray<FParameter>& InParams);
+	virtual void OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
@@ -85,17 +85,20 @@ protected:
 	void RefreshVisibility();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RefreshLocation(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo);
+	void RefreshLocation(UWidget* InWidget, FWorldWidgetMapping InMapping);
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void BindWidgetPoint(UWidget* InWidget, FWorldWidgetBindInfo InBindInfo);
+	void BindWidgetPoint(UWidget* InWidget, FWorldWidgetMapping InMapping);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void UnBindWidgetPoint(UWidget* InWidget);
 	
 	UFUNCTION(BlueprintPure, BlueprintNativeEvent)
-	bool GetWidgetBindInfo(UWidget* InWidget, FWorldWidgetBindInfo& OutBindInfo);
+	bool GetWidgetMapping(UWidget* InWidget, FWorldWidgetMapping& OutMapping);
+	
+	UFUNCTION(BlueprintPure, BlueprintNativeEvent)
+	bool IsWidgetVisible(bool bRefresh = false);
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -153,7 +156,7 @@ protected:
 	class UWorldWidgetComponent* WidgetComponent;
 
 	UPROPERTY(Transient)
-	TMap<UWidget*, FWorldWidgetBindInfo> BindWidgetMap;
+	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
 
 private:
 	FTimerHandle RefreshTimerHandle;

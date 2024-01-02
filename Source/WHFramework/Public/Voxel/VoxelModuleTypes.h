@@ -651,6 +651,13 @@ public:
 	FSceneModuleSaveData SceneData;
 
 public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		SceneData.MakeSaved();
+	}
+	
 	FORCEINLINE FVector GetChunkRealSize() const
 	{
 		return ChunkSize * BlockSize;

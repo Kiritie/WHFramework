@@ -274,9 +274,6 @@ private:
 	bool bTrackAllowControl;
 	ECameraSmoothMode TrackSmoothMode;
 	ECameraControlMode TrackControlMode;
-	bool bIsControllingMove;
-	bool bIsControllingRotate;
-	bool bIsControllingZoom;
 	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 

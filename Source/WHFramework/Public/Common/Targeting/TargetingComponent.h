@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "TargetingComponent.generated.h"
 
+class UWorldWidgetBase;
 class UUserWidget;
 class UWidgetComponent;
 class APlayerController;
@@ -67,11 +68,7 @@ public:
 	// The Widget Class to use when locked on Target. If not defined, will fallback to a Text-rendered
 	// widget with a single O character.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
-	TSubclassOf<UUserWidget> LockedOnWidgetClass;
-
-	// The Widget Draw Size for the Widget class to use when locked on Target.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
-	float LockedOnWidgetDrawSize = 32.0f;
+	TSubclassOf<UWorldWidgetBase> LockedOnWidgetClass;
 
 	// The Socket name to attach the LockedOn Widget.
 	//
@@ -186,7 +183,7 @@ private:
 	APlayerController* OwnerPlayerController;
 
 	UPROPERTY()
-	UWidgetComponent* TargetLockedOnWidgetComponent;
+	UWorldWidgetBase* TargetLockedOnWidget;
 
 	UPROPERTY()
 	AActor* LockedOnTargetActor;

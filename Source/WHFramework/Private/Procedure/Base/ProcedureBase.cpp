@@ -124,12 +124,12 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureLeaved::StaticClass(), this, {this});
 }
 
-void UProcedureBase::SwitchOut_Implementation()
+void UProcedureBase::Switch_Implementation()
 {
 	UProcedureModuleStatics::SwitchProcedure(this);
 }
 
-void UProcedureBase::SwitchIn_Implementation()
+void UProcedureBase::UnSwitch_Implementation()
 {
 	if(IsCurrent())
 	{

@@ -3,13 +3,13 @@
 #include "Common/Targeting/TargetingComponent.h"
 
 #include "Common/Targeting/TargetingAgentInterface.h"
-#include "Components/WidgetComponent.h"
 #include "EngineUtils.h"
 #include "Camera/CameraComponent.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Widget/WidgetModuleStatics.h"
 
 // Sets default values for this component's properties
 UTargetingComponent::UTargetingComponent()
@@ -349,9 +349,10 @@ void UTargetingComponent::TargetLockOff()
 	SetupLocalPlayerController();
 
 	bTargetLocked = false;
-	if (TargetLockedOnWidgetComponent)
+	if (TargetLockedOnWidget)
 	{
-		TargetLockedOnWidgetComponent->DestroyComponent();
+		TargetLockedOnWidget->Destroy(true);
+		TargetLockedOnWidget = nullptr;
 	}
 
 	if (LockedOnTargetActor)
@@ -388,24 +389,10 @@ void UTargetingComponent::CreateAndAttachTargetLockedOnWidgetComponent(AActor* T
 		return;
 	}
 
-	TargetLockedOnWidgetComponent = NewObject<UWidgetComponent>(TargetActor, MakeUniqueObjectName(TargetActor, UWidgetComponent::StaticClass(), FName("TargetLockOn")));
-	TargetLockedOnWidgetComponent->SetWidgetClass(LockedOnWidgetClass);
-
 	UMeshComponent* MeshComponent = TargetActor->FindComponentByClass<UMeshComponent>();
 	USceneComponent* ParentComponent = MeshComponent && LockedOnWidgetParentSocket != NAME_None ? MeshComponent : TargetActor->GetRootComponent();
 
-	if (IsValid(OwnerPlayerController))
-	{
-		TargetLockedOnWidgetComponent->SetOwnerPlayer(OwnerPlayerController->GetLocalPlayer());
-	}
-
-	TargetLockedOnWidgetComponent->ComponentTags.Add(FName("Targeting.LockOnWidget"));
-	TargetLockedOnWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
-	TargetLockedOnWidgetComponent->SetupAttachment(ParentComponent, LockedOnWidgetParentSocket);
-	TargetLockedOnWidgetComponent->SetRelativeLocation(LockedOnWidgetRelativeLocation);
-	TargetLockedOnWidgetComponent->SetDrawSize(FVector2D(LockedOnWidgetDrawSize, LockedOnWidgetDrawSize));
-	TargetLockedOnWidgetComponent->SetVisibility(true);
-	TargetLockedOnWidgetComponent->RegisterComponent();
+	TargetLockedOnWidget = UWidgetModuleStatics::CreateWorldWidget(LockedOnWidgetClass, TargetActor, FWorldWidgetMapping(ParentComponent, LockedOnWidgetParentSocket, LockedOnWidgetRelativeLocation), {});
 }
 
 TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActor> ActorClass) const

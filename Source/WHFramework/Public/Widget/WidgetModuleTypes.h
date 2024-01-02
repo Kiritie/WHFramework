@@ -137,6 +137,8 @@ enum class EWorldWidgetVisibilityMode : uint8
 {
 	/// 无
 	None,
+	/// 始终显示
+	AlwaysShow,
 	/// 仅渲染
 	RenderOnly,
 	/// 仅距离
@@ -162,38 +164,39 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWorldWidgetBindInfo
+struct WHFRAMEWORK_API FWorldWidgetMapping
 {
 	GENERATED_USTRUCT_BODY()
 
 public:
-	FWorldWidgetBindInfo()
+	FWorldWidgetMapping()
 	{
-		Location = FVector();
 		SceneComp = nullptr;
 		SocketName = NAME_None;
+		Location = FVector();
 	}
 	
-	FWorldWidgetBindInfo(FVector InLocation) : FWorldWidgetBindInfo()
+	FWorldWidgetMapping(const FVector& InLocation) : FWorldWidgetMapping()
 	{
 		Location = InLocation;
 	}
 		
-	FWorldWidgetBindInfo(USceneComponent* InSceneComp, const FName InSocketName = NAME_None) : FWorldWidgetBindInfo()
+	FWorldWidgetMapping(USceneComponent* InSceneComp, const FName InSocketName = NAME_None, const FVector& InLocation = FVector::ZeroVector) : FWorldWidgetMapping()
 	{
 		SceneComp = InSceneComp;
 		SocketName = InSocketName;
+		Location = InLocation;
 	}
 
 public:
 	UPROPERTY(BlueprintReadWrite)
-	FVector Location;
-
-	UPROPERTY(BlueprintReadWrite)
 	USceneComponent* SceneComp;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "SceneComp != nullptr"))
 	FName SocketName;
+
+	UPROPERTY(BlueprintReadWrite)
+	FVector Location;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);

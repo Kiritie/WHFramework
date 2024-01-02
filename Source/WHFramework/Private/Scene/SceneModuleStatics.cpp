@@ -10,9 +10,59 @@ float USceneModuleStatics::GetSeaLevel()
 	return USceneModule::Get().GetSeaLevel();
 }
 
+void USceneModuleStatics::SetSeaLevel(float InSeaLevel)
+{
+	USceneModule::Get().SetSeaLevel(InSeaLevel);
+}
+
 float USceneModuleStatics::GetAltitude(bool bUnsigned)
 {
 	return USceneModule::Get().GetAltitude(bUnsigned);
+}
+
+AMiniMapCapture* USceneModuleStatics::GetMiniMapCapture()
+{
+	return USceneModule::Get().GetMiniMapCapture();
+}
+
+EWorldMiniMapMode USceneModuleStatics::GetMiniMapMode()
+{
+	return USceneModule::Get().GetMiniMapMode();
+}
+
+void USceneModuleStatics::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
+{
+	USceneModule::Get().SetMiniMapMode(InMiniMapMode);
+}
+
+FTransform USceneModuleStatics::GetMiniMapPoint()
+{
+	return USceneModule::Get().GetMiniMapPoint();
+}
+
+void USceneModuleStatics::SetMiniMapPoint(const FTransform& InMiniMapPoint)
+{
+	USceneModule::Get().SetMiniMapPoint(InMiniMapPoint);
+}
+
+float USceneModuleStatics::GetMiniMapRange()
+{
+	return USceneModule::Get().GetMiniMapRange();
+}
+
+void USceneModuleStatics::SetMiniMapRange(float InMiniMapRange)
+{
+	USceneModule::Get().SetMiniMapRange(InMiniMapRange);
+}
+
+UTextureRenderTarget2D* USceneModuleStatics::GetMiniMapTexture()
+{
+	return USceneModule::Get().GetMiniMapTexture();
+}
+
+void USceneModuleStatics::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
+{
+	USceneModule::Get().SetMiniMapTexture(InMiniMapTexture);
 }
 
 UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)
@@ -150,7 +200,7 @@ void USceneModuleStatics::RemovePhysicsVolumeByName(FName InName)
 	USceneModule::Get().RemovePhysicsVolumeByName(InName);
 }
 
-void USceneModuleStatics::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange)
+void USceneModuleStatics::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
-	USceneModule::Get().SpawnWorldText(InText, InTextColor, InTextStyle, InBindInfo, InOffsetRange);
+	USceneModule::Get().SpawnWorldText(InText, InTextColor, InTextStyle, InMapping, InOffsetRange);
 }

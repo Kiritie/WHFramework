@@ -18,7 +18,7 @@ public:
 	AAbilityPickUpVoxel();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UVoxelMeshComponent* MeshComponent;
 
 public:

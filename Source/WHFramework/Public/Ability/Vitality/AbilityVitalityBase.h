@@ -85,7 +85,7 @@ public:
 	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
 protected:

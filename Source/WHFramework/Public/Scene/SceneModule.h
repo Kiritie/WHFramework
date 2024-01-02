@@ -10,6 +10,7 @@
 
 #include "SceneModule.generated.h"
 
+class AMiniMapCapture;
 class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
@@ -20,7 +21,7 @@ UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface
 {
 	GENERATED_BODY()
-		
+
 	GENERATED_MODULE(USceneModule)
 
 public:
@@ -57,19 +58,72 @@ protected:
 protected:
 	UFUNCTION()
 	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
+	
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* InProperty) const override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
-	UPROPERTY(EditAnywhere, Category = "World")
+	UPROPERTY(EditAnywhere, Category = "World|Coordinate")
 	float SeaLevel;
+	
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "World|MiniMap")
+	AMiniMapCapture* MiniMapCapture;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	bool bMiniMapRotatable;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	EWorldMiniMapMode MiniMapMode;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "MiniMapMode == EWorldMiniMapMode::FixedPoint"), Category = "World|MiniMap")
+	FTransform MiniMapPoint;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	float MiniMapRange;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	UTextureRenderTarget2D* MiniMapTexture;
 
 public:
 	UFUNCTION(BlueprintPure)
 	float GetSeaLevel() const { return SeaLevel; }
+	
+	UFUNCTION(BlueprintCallable)
+	void SetSeaLevel(float InSeaLevel) { SeaLevel = InSeaLevel; }
 
 	UFUNCTION(BlueprintPure)
 	float GetAltitude(bool bUnsigned = false) const;
+
+	UFUNCTION(BlueprintPure)
+	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
+
+	UFUNCTION(BlueprintPure)
+	EWorldMiniMapMode GetMiniMapMode() const { return MiniMapMode; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMiniMapMode(EWorldMiniMapMode InMiniMapMode);
+
+	UFUNCTION(BlueprintPure)
+	FTransform GetMiniMapPoint() const { return MiniMapPoint; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMiniMapPoint(const FTransform& InMiniMapPoint) { MiniMapPoint = InMiniMapPoint; }
+
+	UFUNCTION(BlueprintPure)
+	float GetMiniMapRange() const { return FMath::Max(MiniMapRange, 0.f); }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = InMiniMapRange; }
+
+	UFUNCTION(BlueprintPure)
+	UTextureRenderTarget2D* GetMiniMapTexture() const { return MiniMapTexture; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 
 	//////////////////////////////////////////////////////////////////////////
 	// WorldTimer
@@ -195,7 +249,7 @@ public:
     /// World Text
 public:
 	UFUNCTION(BlueprintCallable)
-	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetBindInfo InBindInfo, FVector InOffsetRange = FVector::ZeroVector);
+	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline
