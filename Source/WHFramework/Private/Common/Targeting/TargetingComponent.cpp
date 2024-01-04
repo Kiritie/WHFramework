@@ -57,7 +57,7 @@ void UTargetingComponent::TickComponent(const float DeltaTime, const ELevelTick 
 
 	SetControlRotationOnTarget(LockedOnTargetActor);
 
-	// Target Locked Off based on Distance
+	// 根据距离锁定目标
 	if (GetDistanceFromCharacter(LockedOnTargetActor) > MinimumDistanceToEnable)
 	{
 		TargetLockOff();
@@ -100,7 +100,7 @@ void UTargetingComponent::TargetActor()
 
 void UTargetingComponent::TargetActorWithAxisInput(const float AxisValue)
 {
-	// If we're not locked on, do nothing
+	// 如果我们没有被锁定，什么都不要做
 	if (!bTargetLocked)
 	{
 		return;
@@ -111,32 +111,32 @@ void UTargetingComponent::TargetActorWithAxisInput(const float AxisValue)
 		return;
 	}
 
-	// If we're not allowed to switch target, do nothing
+	// 如果不允许我们切换目标，什么都不要做
 	if (!ShouldSwitchTargetActor(AxisValue))
 	{
 		return;
 	}
 
-	// If we're switching target, do nothing for a set amount of time
+	// 如果我们要转换目标，在一段时间内什么都不做
 	if (bIsSwitchingTarget)
 	{
 		return;
 	}
 
-	// Lock off target
+	// 锁定目标
 	AActor* CurrentTarget = LockedOnTargetActor;
 
-	// Depending on Axis Value negative / positive, set Direction to Look for (negative: left, positive: right)
+	// 根据轴值的负/正，设置寻找方向(负:左，正:右)
 	const float RangeMin = AxisValue < 0 ? 0 : 180;
 	const float RangeMax = AxisValue < 0 ? 180 : 360;
 
-	// Reset Closest Target Distance to Minimum Distance to Enable
+	// 将最近目标距离重置为最小距离为Enable
 	ClosestTargetDistance = MinimumDistanceToEnable;
 
-	// Get All Actors of Class
+	// 找到所有的Actor
 	TArray<AActor*> Actors = GetAllActorsOfClass(TargetableActors);
 
-	// For each of these actors, check line trace and ignore Current Target and build the list of actors to look from
+	// 遍历所有的Actor，选中行跟踪并忽略Current Target，并构建要查看的参与者列表
 	TArray<AActor*> ActorsToLook;
 
 	TArray<AActor*> ActorsToIgnore;
@@ -150,14 +150,14 @@ void UTargetingComponent::TargetActorWithAxisInput(const float AxisValue)
 		}
 	}
 
-	// Find Targets in Range (left or right, based on Character and CurrentTarget)
+	// 在范围内查找目标(根据角色和当前目标向左或向右)
 	TArray<AActor*> TargetsInRange = FindTargetsInRange(ActorsToLook, RangeMin, RangeMax);
 
-	// For each of these targets in range, get the closest one to current target
+	// 对于这些范围内的每一个目标，取离当前目标最近的一个
 	AActor* ActorToTarget = nullptr;
 	for (AActor* Actor : TargetsInRange)
 	{
-		// and filter out any character too distant from minimum distance to enable
+		// 过滤掉任何离最小距离太远而无法启用的字符
 		const float Distance = GetDistanceFromCharacter(Actor);
 		if (Distance < MinimumDistanceToEnable)
 		{
@@ -185,7 +185,7 @@ void UTargetingComponent::TargetActorWithAxisInput(const float AxisValue)
 			SwitchingTargetTimerHandle,
 			this,
 			&UTargetingComponent::ResetIsSwitchingTarget,
-			// Less sticky if still switching
+			// 如果仍在切换，粘性会降低
 			bIsSwitchingTarget ? 0.25f : 0.5f
 		);
 
@@ -229,7 +229,7 @@ float UTargetingComponent::GetAngleUsingCameraRotation(const AActor* ActorToLook
 	UCameraComponent* CameraComponent = OwnerActor->FindComponentByClass<UCameraComponent>();
 	if (!CameraComponent)
 	{
-		// Fallback to CharacterRotation if no CameraComponent can be found
+		// 如果找不到cameracomcomponent，则退回到CharacterRotation
 		return GetAngleUsingCharacterRotation(ActorToLook);
 	}
 
@@ -272,7 +272,7 @@ void UTargetingComponent::ResetIsSwitchingTarget()
 
 bool UTargetingComponent::ShouldSwitchTargetActor(const float AxisValue)
 {
-	// Sticky feeling computation
+	// 粘性计算
 	if (bEnableStickyTarget)
 	{
 		StartRotatingStack += (AxisValue != 0) ? AxisValue * AxisMultiplier : (StartRotatingStack > 0 ? -AxisMultiplier : AxisMultiplier);
@@ -282,14 +282,14 @@ bool UTargetingComponent::ShouldSwitchTargetActor(const float AxisValue)
 			StartRotatingStack = 0.0f;
 		}
 
-		// If Axis value does not exceeds configured threshold, do nothing
+		// 如果Axis值不超过配置的阈值，则不执行任何操作
 		if (FMath::Abs(StartRotatingStack) < StickyRotationThreshold)
 		{
 			bDesireToSwitch = false;
 			return false;
 		}
 
-		//Sticky when switching target.
+		// 切换目标时粘滞
 		if (StartRotatingStack * AxisValue > 0)
 		{
 			StartRotatingStack = StartRotatingStack > 0 ? StickyRotationThreshold : -StickyRotationThreshold;
@@ -304,7 +304,7 @@ bool UTargetingComponent::ShouldSwitchTargetActor(const float AxisValue)
 		return true;
 	}
 
-	// Non Sticky feeling, check Axis value exceeds threshold
+	// 无粘滞感，检查轴值超过阈值
 	return FMath::Abs(AxisValue) > StartRotatingThreshold;
 }
 
@@ -315,7 +315,7 @@ void UTargetingComponent::TargetLockOn(AActor* TargetToLockOn)
 		return;
 	}
 
-	// Recast PlayerController in case it wasn't already setup on Begin Play (local split screen)
+	// 重铸PlayerController，以防它还没有设置在开始播放(本地分屏)
 	SetupLocalPlayerController();
 
 	bTargetLocked = true;
@@ -345,7 +345,7 @@ void UTargetingComponent::TargetLockOn(AActor* TargetToLockOn)
 
 void UTargetingComponent::TargetLockOff()
 {
-	// Recast PlayerController in case it wasn't already setup on Begin Play (local split screen)
+	// 重铸PlayerController，以防它还没有设置在开始播放(本地分屏)
 	SetupLocalPlayerController();
 
 	bTargetLocked = false;
@@ -437,7 +437,7 @@ AActor* UTargetingComponent::FindNearestTarget(TArray<AActor*> Actors) const
 {
 	TArray<AActor*> ActorsHit;
 
-	// Find all actors we can line trace to
+	// 找到所有能追踪到的演员
 	for (AActor* Actor : Actors)
 	{
 		const bool bHit = LineTraceForActor(Actor);
@@ -447,7 +447,7 @@ AActor* UTargetingComponent::FindNearestTarget(TArray<AActor*> Actors) const
 		}
 	}
 
-	// From the hit actors, check distance and return the nearest
+	// 从命中的演员，检查距离并返回最近的
 	if (ActorsHit.Num() == 0)
 	{
 		return nullptr;

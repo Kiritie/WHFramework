@@ -10,6 +10,7 @@
 
 #include "SceneModule.generated.h"
 
+class ATargetPoint;
 class AMiniMapCapture;
 class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;

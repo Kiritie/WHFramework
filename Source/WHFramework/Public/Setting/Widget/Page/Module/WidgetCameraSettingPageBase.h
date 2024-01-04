@@ -32,6 +32,9 @@ public:
 
 	virtual void OnClose(bool bInstant) override;
 
+protected:
+	virtual void OnValueChange(UWidgetSettingItemBase* InSettingItem, const FParameter& InValue) override;
+
 public:
 	virtual bool CanApply_Implementation() const override;
 

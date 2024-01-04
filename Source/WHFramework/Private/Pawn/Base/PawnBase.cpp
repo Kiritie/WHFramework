@@ -221,6 +221,16 @@ float APawnBase::GetCameraDistance_Implementation() const
 	return -1.f;
 }
 
+float APawnBase::GetCameraMinPitch_Implementation() const
+{
+	return -1.f;
+}
+
+float APawnBase::GetCameraMaxPitch_Implementation() const
+{
+	return -1.f;
+}
+
 ECameraSmoothMode APawnBase::GetCameraSmoothMode_Implementation() const
 {
 	return ECameraSmoothMode::All;

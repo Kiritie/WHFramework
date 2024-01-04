@@ -18,10 +18,10 @@ struct WHFRAMEWORK_API FStepListItemStates
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bExpanded;
 
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bSelected;
 
 	FORCEINLINE FStepListItemStates()

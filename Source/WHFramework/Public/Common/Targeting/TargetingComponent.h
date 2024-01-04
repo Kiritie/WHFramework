@@ -28,71 +28,71 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	float MinimumDistanceToEnable = 1200.0f;
 
-	// The AActor Subclass to search for targetable Actors.
+	// AActor子类，用于搜索目标actor
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	TSubclassOf<AActor> TargetableActors;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	TEnumAsByte<ECollisionChannel> TargetableCollisionChannel;
 
-	// Whether or not the character rotation should be controlled when Target is locked on.
+	// 当目标被锁定时，角色旋转是否应该被控制
 	//
-	// If true, it'll set the value of bUseControllerRotationYaw and bOrientationToMovement variables on Target locked on / off.
+	// 如果为true，它将设置目标锁定上的busecontrolllerrotationyaw和borientationtommovement变量的值
 	//
-	// Set it to true if you want the character to rotate around the locked on target to enable you to setup strafe animations.
+	// 如果你想让角色围绕锁定的目标旋转，将其设置为true，以便设置策略动画
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	bool bShouldControlRotation = false;
 
-	// Whether to accept pitch input when bAdjustPitchBasedOnDistanceToTarget is disabled
+	// 当bAdjustPitchBasedOnDistanceToTarget被禁用时，是否接受pitch输入
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	bool bIgnoreLookInput = true;
 
-	// The amount of time to break line of sight when actor gets behind an Object.
+	// 当演员走到一个物体后面时，脱离视线的时间
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	float BreakLineOfSightDelay = 2.0f;
 
-	// Lower this value is, easier it will be to switch new target on right or left. Must be < 1.0f if controlling with gamepad stick
+	// 该值越小，在右侧或左侧切换新目标就越容易。如果用摇杆控制必须< 1.0f
 	//
-	// When using Sticky Feeling feature, it has no effect (see StickyRotationThreshold)
+	// 当使用粘性感觉功能时，它没有效果(参见StickyRotationThreshold)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	float StartRotatingThreshold = 0.85f;
 
-	// Whether or not the Target LockOn Widget indicator should be drawn and attached automatically.
+	// Target LockOn Widget指示器是否应该自动绘制和附加
 	//
-	// When set to false, this allow you to manually draw the widget for further control on where you'd like it to appear.
+	// 当设置为false时，这允许您手动绘制小部件，以进一步控制您希望它出现的位置
 	//
-	// OnTargetLockedOn and OnTargetLockedOff events can be used for this.
+	// OnTargetLockedOn和OnTargetLockedOff事件可以用于此
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
 	bool bShouldDrawLockedOnWidget = true;
 
-	// The Widget Class to use when locked on Target. If not defined, will fallback to a Text-rendered
-	// widget with a single O character.
+	// 锁定目标时要使用的小部件类。如果没有定义，将退回到文本呈现
+	// 带有单个0字符的小部件
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
 	TSubclassOf<UWorldWidgetBase> LockedOnWidgetClass;
 
-	// The Socket name to attach the LockedOn Widget.
+	// 附加LockedOn小部件的套接字名称
 	//
-	// You should use this to configure the Bone or Socket name the widget should be attached to, and allow
-	// the widget to move with target character's animation (Ex: spine_03)
+	// 您应该使用它来配置小部件应该附加到的Bone或Socket名称，并允许
+	// 随着目标角色的动画移动的小部件(例如:spine_03)
 	//
-	// Set it to None to attach the Widget Component to the Root Component instead of the Mesh.
+	// 将其设置为None以将Widget组件附加到根组件而不是网格
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
 	FName LockedOnWidgetParentSocket = FName("spine_03");
 
-	// The Relative Location to apply on Target LockedOn Widget when attached to a target.
+	// 当附加到目标时，应用于Target LockedOn小部件的相对位置
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
 	FVector LockedOnWidgetRelativeLocation = FVector(0.0f, 0.0f, 0.0f);
 
-	// Setting this to true will tell the Targeting to adjust the Pitch Offset (the Y axis) when locked on,
-	// depending on the distance to the target actor.
+	// 将此设置为true将告诉Targeting在锁定时调整Pitch Offset (Y轴)
+	// 取决于与目标演员的距离
 	//
-	// It will ensure that the Camera will be moved up vertically the closer this Actor gets to its target.
+	// 它将确保当Actor接近其目标时，摄像机将垂直向上移动
 	//
-	// Formula:
+	// 公式:
 	//
 	//   (DistanceToTarget * PitchDistanceCoefficient + PitchDistanceOffset) * -1.0f
 	//
-	// Then Clamped by PitchMin / PitchMax
+	// 由 PitchMin / PitchMax 限制
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Pitch Offset")
 	bool bAdjustPitchBasedOnDistanceToTarget = true;
 
@@ -108,29 +108,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Pitch Offset")
 	float PitchMax = -20.0f;
 
-	// Set it to true / false whether you want a sticky feeling when switching target
+	// 在切换目标时是否需要粘性感，请将其设置为true / false
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Sticky Feeling on Target Switch")
 	bool bEnableStickyTarget = false;
 
-	// This value gets multiplied to the AxisValue to check against StickyRotationThreshold.
+	// 该值将乘以AxisValue，以对照StickyRotationThreshold进行检查
 	//
-	// Only used when Sticky Target is enabled.
+	// 仅在启用粘接目标时使用
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Sticky Feeling on Target Switch")
 	float AxisMultiplier = 1.0f;
 
-	// Lower this value is, easier it will be to switch new target on right or left.
+	// 该值越小，在右侧或左侧切换新目标就越容易
 	//
-	// This is similar to StartRotatingThreshold, but you should set this to a much higher value.
+	// 这与StartRotatingThreshold类似，但您应该将其设置为更高的值
 	//
-	// Only used when Sticky Target is enabled.
+	// 仅在启用粘接目标时使用
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Sticky Feeling on Target Switch")
 	float StickyRotationThreshold = 30.0f;
 
-	// Function to call to target a new actor.
+	// 函数调用以定位新参与者
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	void TargetActor();
 	
-	// Function to call to manually untarget.
+	// 函数调用以手动解除目标
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	void TargetLockOff();
 
@@ -138,37 +138,37 @@ public:
 	void SetShouldControlRotation(bool bValue);
 
 	/**
-	* Function to call to switch with X-Axis mouse / controller stick movement.
+	* 函数调用来切换x轴鼠标/控制器摇杆的移动
 	*
-	* @param AxisValue Pass in the float value of your Input Axis
+	* @param AxisValue 传入输入轴的浮点值
 	*/
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	void TargetActorWithAxisInput(float AxisValue);
 
-	// Function to get TargetLocked private variable status
+	// 获取TargetLocked私有变量状态的函数
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	bool GetTargetLockedStatus();
 
-	// Called when a target is locked off, either if it is out of reach (based on MinimumDistanceToEnable) or behind an Object.
+	// 当目标被锁定时调用，如果它在到达之外(基于MinimumDistanceToEnable)或在对象后面
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
 	FComponentOnTargetLockedOnOff OnTargetLockedOff;
 
-	// Called when a target is locked on
+	// 锁定目标时调用
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
 	FComponentOnTargetLockedOnOff OnTargetLockedOn;
 
-	// Setup the control rotation on Tick when a target is locked on.
+	// when a target is locked on
 	//
-	// If not implemented, will fallback to default implementation.
-	// If this event is implemented, it lets you control the rotation of the character.
+	// 如果没有实现，将回退到默认实现
+	// 如果实现了这个事件，你就可以控制角色的旋转
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
 	FComponentSetRotation OnTargetSetRotation;
 
-	// Returns the reference to currently targeted Actor if any
+	// 如果有的话，返回对当前目标Actor的引用
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	AActor* GetLockedOnTargetActor() const;
 
-	// Returns true / false whether the system is targeting an actor
+	// 返回true / false系统是否针对参与者
 	UFUNCTION(BlueprintCallable, Category = "Targeting")
 	bool IsLocked() const;
 
@@ -241,9 +241,9 @@ private:
 	static bool TargetIsTargetable(const AActor* Actor);
 
 	/**
-	 *  Sets up cached Owner PlayerController from Owner Pawn.
+	 *  从Owner Pawn设置缓存的Owner PlayerController
 	 *
-	 *  For local split screen, Pawn's Controller may not have been setup already when this component begins play.
+	 *  对于本地分屏，当这个组件开始播放时，Pawn的控制器可能还没有设置好
 	 */
 	 void SetupLocalPlayerController();
 

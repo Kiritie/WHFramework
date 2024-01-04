@@ -20,7 +20,7 @@ struct WHFRAMEWORK_API FModuleListItemStates
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bSelected;
 
 	FORCEINLINE FModuleListItemStates()

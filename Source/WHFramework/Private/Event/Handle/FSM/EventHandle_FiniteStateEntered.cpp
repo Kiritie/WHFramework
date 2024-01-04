@@ -21,8 +21,8 @@ void UEventHandle_FiniteStateEntered::Parse_Implementation(const TArray<FParamet
 	{
 		State = InParams[0].GetObjectValue<UFiniteStateBase>();
 	}
-	if(InParams.IsValidIndex(0))
+	if(InParams.IsValidIndex(1))
 	{
-		FSM = InParams[0].GetObjectValue<UFSMComponent>();
+		FSM = InParams[1].GetObjectValue<UFSMComponent>();
 	}
 }

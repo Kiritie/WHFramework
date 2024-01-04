@@ -233,6 +233,16 @@ float ACharacterBase::GetCameraDistance_Implementation() const
 	return -1.f;
 }
 
+float ACharacterBase::GetCameraMinPitch_Implementation() const
+{
+	return -1.f;
+}
+
+float ACharacterBase::GetCameraMaxPitch_Implementation() const
+{
+	return -1.f;
+}
+
 ECameraSmoothMode ACharacterBase::GetCameraSmoothMode_Implementation() const
 {
 	return ECameraSmoothMode::All;

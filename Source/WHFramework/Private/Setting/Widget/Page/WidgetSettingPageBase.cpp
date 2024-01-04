@@ -82,9 +82,7 @@ FSaveData* UWidgetSettingPageBase::GetDefaultSaveData() const
 
 void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
 {
-	InSettingItem->OnValueChanged.RemoveAll(this);
 	InSettingItem->OnValueChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValueChange);
-	InSettingItem->OnValuesChanged.RemoveAll(this);
 	InSettingItem->OnValuesChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValuesChange);
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
 	{

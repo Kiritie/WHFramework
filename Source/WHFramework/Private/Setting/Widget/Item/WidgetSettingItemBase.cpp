@@ -19,6 +19,8 @@ void UWidgetSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 	SetLabel(FText::GetEmpty());
 	SetValue(FParameter());
+	OnValueChanged.Clear();
+	OnValuesChanged.Clear();
 }
 
 void UWidgetSettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)

@@ -51,11 +51,15 @@ UCameraModule::UCameraModule()
 	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
 	bReverseCameraPanMove = false;
-	bClampCameraMove = false;
 	CameraMoveRange = FBox(EForceInit::ForceInitToZero);
+
+#if WITH_EDITORONLY_DATA
+	bDrawCameraRange = false;
+#endif
+
 	CameraMoveRate = 600.f;
 	bSmoothCameraMove = true;
-	CameraMoveSpeed = 5.f;
+	CameraMoveSpeed = 6.f;
 
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
@@ -63,9 +67,9 @@ UCameraModule::UCameraModule()
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
 	bSmoothCameraRotate = true;
-	CameraRotateSpeed = 5.f;
-	MinCameraPitch = -89.f;
-	MaxCameraPitch = 89.f;
+	CameraRotateSpeed = 6.f;
+	MinCameraPitch = -90.f;
+	MaxCameraPitch = 90.f;
 	InitCameraPitch = -1.f;
 
 	bCameraZoomAble = true;
@@ -73,7 +77,7 @@ UCameraModule::UCameraModule()
 	bNormalizeCameraZoom = false;
 	CameraZoomRate = 300.f;
 	bSmoothCameraZoom = true;
-	CameraZoomSpeed = 5.f;
+	CameraZoomSpeed = 6.f;
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
 	InitCameraDistance = 0.f;
@@ -260,6 +264,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 			{
 				CurrentCamera->SetCameraLocation(!bSmoothCameraMove ? TargetCameraLocation : FMath::VInterpTo(CurrentCameraLocation, TargetCameraLocation, DeltaSeconds, CameraMoveSpeed));
 			}
+			CurrentCameraLocation = CurrentCamera->GetActorLocation();
 		}
 		else if(CameraDoMoveDuration != 0.f)
 		{
@@ -286,6 +291,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 			{
 				GetPlayerController()->SetControlRotation(!bSmoothCameraRotate ? TargetCameraRotation : FMath::RInterpTo(CurrentCameraRotation, TargetCameraRotation, DeltaSeconds, CameraRotateSpeed));
 			}
+			CurrentCameraRotation = GetPlayerController()->GetControlRotation();
 		}
 		else if(CameraDoRotateDuration != 0.f)
 		{
@@ -300,23 +306,39 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 	if(bCameraZoomAble && CurrentCamera)
 	{
 		CurrentCameraDistance = CurrentCamera->GetCameraBoom()->TargetArmLength;
-		if(CurrentCameraDistance != TargetCameraDistance)
+
+		float TargetDistance = TargetCameraDistance;
+
+		while(CameraMoveRange.IsValid && !CameraMoveRange.IsInsideOrOn(CurrentCameraLocation - CurrentCameraRotation.Vector() * TargetDistance) && TargetDistance > 0.f)
+		{
+			TargetDistance = FMath::Max(0.f, TargetDistance - 100.f);
+		}
+		
+		if(CurrentCameraDistance != TargetDistance)
 		{
 			if(CameraDoZoomDuration != 0.f)
 			{
 				CameraDoZoomTime = FMath::Clamp(CameraDoZoomTime + DeltaSeconds, 0.f, CameraDoZoomDuration);
-				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetCameraDistance, UMathStatics::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
+				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetDistance, UMathStatics::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
 			}
 			else
 			{
-				CurrentCamera->GetCameraBoom()->TargetArmLength = !bSmoothCameraZoom ? TargetCameraDistance : FMath::FInterpTo(CurrentCameraDistance, TargetCameraDistance, DeltaSeconds, bNormalizeCameraZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(CurrentCamera->GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
+				CurrentCamera->GetCameraBoom()->TargetArmLength = !bSmoothCameraZoom ? TargetDistance : FMath::FInterpTo(CurrentCameraDistance, TargetDistance, DeltaSeconds, bNormalizeCameraZoom && MaxCameraDistance != -1.f ? UKismetMathLibrary::NormalizeToRange(CurrentCamera->GetCameraBoom()->TargetArmLength, MinCameraDistance, MaxCameraDistance) * CameraZoomSpeed : CameraZoomSpeed);
 			}
+			CurrentCameraDistance = CurrentCamera->GetCameraBoom()->TargetArmLength;
 		}
 		else if(CameraDoZoomDuration != 0.f)
 		{
 			StopDoCameraDistance();
 		}
 	}
+
+#if WITH_EDITOR
+	if(bDrawCameraRange)
+	{
+		UKismetSystemLibrary::DrawDebugBox(this, CameraMoveRange.GetCenter(), CameraMoveRange.GetExtent(), FLinearColor::Red);
+	}
+#endif
 }
 
 void UCameraModule::OnPause()
@@ -636,7 +658,7 @@ void UCameraModule::SetCameraLocation(FVector InLocation, bool bInstant)
 {
 	if(!CurrentCamera) return;
 
-	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
+	TargetCameraLocation = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
 	if(bInstant)
 	{
 		CurrentCameraLocation = TargetCameraLocation;
@@ -649,7 +671,7 @@ void UCameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEase
 {
 	if(!CurrentCamera || ((CameraDoMoveLocation != EMPTY_Vector || CurrentCameraLocation == InLocation) && !bForce)) return;
 
-	TargetCameraLocation = bClampCameraMove ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
+	TargetCameraLocation = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
 	if(InDuration > 0.f)
 	{
 		CameraDoMoveTime = 0.f;
@@ -675,7 +697,7 @@ void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 {
 	if(!GetPlayerController()) return;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(bInstant)
 	{
 		CurrentCameraRotation = TargetCameraRotation;
@@ -692,7 +714,7 @@ void UCameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuratio
 {
 	if(!GetPlayerController() || (CameraDoRotateRotation != EMPTY_Rotator || (CurrentCameraRotation.Yaw == InYaw && CurrentCameraRotation.Pitch == InPitch))  && !bForce) return;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, MinCameraPitch, MaxCameraPitch), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(InDuration > 0.f)
 	{
 		CameraDoRotateTime = 0.f;
@@ -974,6 +996,16 @@ bool UCameraModule::IsControllingZoom()
 bool UCameraModule::IsTrackingTarget()
 {
 	return TrackCameraViewData.CameraViewParams.CameraViewTarget != nullptr;
+}
+
+float UCameraModule::GetMinCameraPitch() const
+{
+	return GetTrackingTarget() && GetTrackingTarget()->Implements<UCameraTrackableInterface>() && ICameraTrackableInterface::Execute_GetCameraMinPitch(GetTrackingTarget()) != -1.f ? ICameraTrackableInterface::Execute_GetCameraMinPitch(GetTrackingTarget()) : MinCameraPitch;
+}
+
+float UCameraModule::GetMaxCameraPitch() const
+{
+	return GetTrackingTarget() && GetTrackingTarget()->Implements<UCameraTrackableInterface>() && ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) != -1.f ? ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) : MaxCameraPitch;
 }
 
 AWHPlayerController* UCameraModule::GetPlayerController()

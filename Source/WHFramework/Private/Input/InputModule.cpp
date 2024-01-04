@@ -39,6 +39,7 @@ UInputModule::UInputModule()
 	AddKeyShortcut(FName("CameraPanMove"), FInputKeyShortcut(FText::FromString("Camera Pan Move"), FText::FromString("Camera Control")));
 	AddKeyShortcut(FName("CameraRotate"), FInputKeyShortcut(FText::FromString("Camera Rotate"), FText::FromString("Camera Control")));
 	AddKeyShortcut(FName("CameraZoom"), FInputKeyShortcut(FText::FromString("Camera Zoom"), FText::FromString("Camera Control")));
+	AddKeyShortcut(FName("CameraSprint"), FInputKeyShortcut(FText::FromString("Camera Sprint"), FText::FromString("Camera Control")));
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
 	if(CameraMovementMapping.Succeeded())
@@ -492,7 +493,7 @@ void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
@@ -500,14 +501,14 @@ void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>());
+	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::TurnPlayer(const FInputActionValue& InValue)

@@ -19,10 +19,10 @@ struct WHFRAMEWORK_API FTaskListItemStates
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bExpanded;
 
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bSelected;
 
 	FORCEINLINE FTaskListItemStates()

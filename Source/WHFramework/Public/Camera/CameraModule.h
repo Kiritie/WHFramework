@@ -158,11 +158,13 @@ protected:
 	bool bReverseCameraPanMove;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
-	bool bClampCameraMove;
-
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bClampCameraMove == true"), Category = "CameraControl|Move")
 	FBox CameraMoveRange;
-	
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = EDC_DrawCameraRange), Category = "CameraControl|Move")
+	bool bDrawCameraRange;
+#endif
+
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
 
@@ -470,13 +472,13 @@ public:
 	void SetCameraRotateSpeed(float InCameraRotateSpeed) { CameraRotateSpeed = InCameraRotateSpeed; }
 
 	UFUNCTION(BlueprintPure)
-	float GetMinCameraPitch() const { return MinCameraPitch; }
+	float GetMinCameraPitch() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinCameraPitch(float InMinCameraPitch) { MinCameraPitch = InMinCameraPitch; }
 
 	UFUNCTION(BlueprintPure)
-	float GetMaxCameraPitch() const { return MaxCameraPitch; }
+	float GetMaxCameraPitch() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMaxCameraPitch(float InMaxCameraPitch) { MaxCameraPitch = InMaxCameraPitch; }
@@ -553,6 +555,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	float GetTargetCameraDistance() const { return TargetCameraDistance; }
 
+	UFUNCTION(BlueprintPure)
+	AActor* GetTrackingTarget() const { return TrackCameraViewData.CameraViewParams.CameraViewTarget; }
+
 protected:
 	AWHPlayerController* GetPlayerController();
 
@@ -560,4 +565,8 @@ protected:
 	/// Network
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	UFUNCTION()
+	bool EDC_DrawCameraRange() const { return CameraMoveRange.IsValid == 1; };
 };

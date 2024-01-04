@@ -55,7 +55,7 @@ void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButt
 				else if (Button->GetSelected())
 				{
 					// Make sure any other selected buttons are deselected
-					Button->SetSelectedInternal(false, false, bBroadcastOnDeselected);
+					Button->SetSelectedInternal(false);
 				}
 			}
 		}

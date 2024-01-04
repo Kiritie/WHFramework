@@ -18,7 +18,7 @@ struct WHFRAMEWORK_API FProcedureListItemStates
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Transient)
+	UPROPERTY()
 	bool bSelected;
 
 	FORCEINLINE FProcedureListItemStates()

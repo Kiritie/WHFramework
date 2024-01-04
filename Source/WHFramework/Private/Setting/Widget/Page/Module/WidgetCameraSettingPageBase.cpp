@@ -143,6 +143,24 @@ void UWidgetCameraSettingPageBase::OnClose(bool bInstant)
 	Super::OnClose(bInstant);
 }
 
+void UWidgetCameraSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSettingItem, const FParameter& InValue)
+{
+	Super::OnValueChange(InSettingItem, InValue);
+
+	if(InSettingItem == SettingItem_SmoothCameraMove)
+	{
+		SettingItem_CameraMoveSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	else if(InSettingItem == SettingItem_SmoothCameraRotate)
+	{
+		SettingItem_CameraRotateSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	else if(InSettingItem == SettingItem_SmoothCameraZoom)
+	{
+		SettingItem_CameraZoomSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
 bool UWidgetCameraSettingPageBase::CanApply_Implementation() const
 {
 	return UCameraModule::Get().IsReverseCameraPanMove() != SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue() ||
