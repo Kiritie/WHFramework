@@ -158,6 +158,15 @@ for(auto& Item : Map) \
 namespace GameplayTags
 {
 	WHFRAMEWORK_API	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString = false);
+	
+	////////////////////////////////////////////////////
+	// Input_Shortcut
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_InteractSelect);
+
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_CameraPanMove);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_CameraRotate);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_CameraZoom);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_CameraSprint);
 
 	////////////////////////////////////////////////////
 	// Input_Camera
@@ -176,7 +185,11 @@ namespace GameplayTags
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveRightPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveUpPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_JumpPlayer);
-	
+
+	////////////////////////////////////////////////////
+	// Input_System
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_SystemOperation);
+
 	////////////////////////////////////////////////////
 	// State_Vitality
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Vitality_Dead);

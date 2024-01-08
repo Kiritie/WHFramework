@@ -8,10 +8,18 @@
 bool FInputKeyShortcut::IsPressed(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
 	if(!IsValid() && bAllowInvalid) return true;
-	bool ReturnValue = InPlayerController->WasInputKeyJustPressed(Key);
+	bool ReturnValue = false;
 	for(auto& Iter : Auxs)
 	{
-		if(!InPlayerController->WasInputKeyJustPressed(Iter))
+		if(InPlayerController->WasInputKeyJustPressed(Iter))
+		{
+			ReturnValue = true;
+			break;
+		}
+	}
+	for(auto& Iter : Auxs)
+	{
+		if(!InPlayerController->IsInputKeyDown(Iter))
 		{
 			ReturnValue = false;
 			break;
@@ -23,10 +31,18 @@ bool FInputKeyShortcut::IsPressed(APlayerController* InPlayerController, bool bA
 bool FInputKeyShortcut::IsReleased(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
 	if(!IsValid() && bAllowInvalid) return true;
-	bool ReturnValue = InPlayerController->WasInputKeyJustReleased(Key);
+	bool ReturnValue = false;
 	for(auto& Iter : Auxs)
 	{
-		if(!InPlayerController->WasInputKeyJustReleased(Iter))
+		if(InPlayerController->WasInputKeyJustReleased(Iter))
+		{
+			ReturnValue = true;
+			break;
+		}
+	}
+	for(auto& Iter : Auxs)
+	{
+		if(!InPlayerController->IsInputKeyDown(Iter))
 		{
 			ReturnValue = false;
 			break;
@@ -37,8 +53,16 @@ bool FInputKeyShortcut::IsReleased(APlayerController* InPlayerController, bool b
 
 bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool bAllowInvalid) const
 {
-	if(!IsValid()) return bAllowInvalid;
-	bool ReturnValue = InPlayerController->IsInputKeyDown(Key);
+	if(!IsValid() && bAllowInvalid) return true;
+	bool ReturnValue = false;
+	for(auto& Iter : Auxs)
+	{
+		if(InPlayerController->IsInputKeyDown(Iter))
+		{
+			ReturnValue = true;
+			break;
+		}
+	}
 	for(auto& Iter : Auxs)
 	{
 		if(!InPlayerController->IsInputKeyDown(Iter))

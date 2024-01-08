@@ -1,10 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Widget/Common/CommonButton.h"
+
+#include "Components/Image.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
 UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	Img_Icon = nullptr;
 	Txt_Title = nullptr;
 	
 	bClicked = false;
@@ -28,6 +31,7 @@ void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 	bClicked = false;
 
 	SetTitle(FText::GetEmpty());
+	SetIconBrush(FSlateBrush());
 
 	if(GetSelected())
 	{
@@ -80,6 +84,15 @@ void UCommonButton::SetTitle(const FText InTitle)
 	{
 		Txt_Title->SetText(Title);
 		Txt_Title->SetVisibility(Title.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
+void UCommonButton::SetIconBrush(const FSlateBrush& InBrush)
+{
+	if(Img_Icon)
+	{
+		Img_Icon->SetBrush(InBrush);
+		Img_Icon->SetVisibility(!InBrush.HasUObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 }
 

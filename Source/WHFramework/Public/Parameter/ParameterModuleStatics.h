@@ -74,6 +74,9 @@ public:
 	static FParameter MakeColorParameter(FColor InValue);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	static FParameter MakeKeyParameter(const FKey& InValue);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
 	static FParameter MakeTagParameter(const FGameplayTag& InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -161,6 +164,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetColorValue(UPARAM(ref) FParameter& InParameter, const FColor& InValue) { InParameter.SetColorValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FKey GetKeyValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetKeyValue(); }
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	static void SetKeyValue(UPARAM(ref) FParameter& InParameter, const FKey& InValue) { InParameter.SetKeyValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

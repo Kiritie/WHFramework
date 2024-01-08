@@ -7,6 +7,7 @@
 
 #include "CommonButton.generated.h"
 
+class UImage;
 class UCommonTextBlockN;
 
 UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
@@ -41,6 +42,9 @@ public:
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UImage* Img_Icon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UCommonTextBlockN* Txt_Title;
 
 protected:
@@ -65,6 +69,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsClicked() const { return bClicked; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetIconBrush(const FSlateBrush& InBrush);
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinWidth(int32 InValue);

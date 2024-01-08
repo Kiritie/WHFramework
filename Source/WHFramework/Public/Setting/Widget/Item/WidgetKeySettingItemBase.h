@@ -48,4 +48,7 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	TArray<UCommonButton*> Btn_Values;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FKey> Keys;
 };

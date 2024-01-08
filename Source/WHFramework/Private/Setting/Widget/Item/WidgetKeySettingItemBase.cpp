@@ -18,6 +18,8 @@ void UWidgetKeySettingItemBase::OnSpawn_Implementation(UObject* InOwner, const T
 void UWidgetKeySettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+
+	Keys.Empty();
 }
 
 void UWidgetKeySettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -38,6 +40,23 @@ void UWidgetKeySettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
 void UWidgetKeySettingItemBase::OnRefresh()
 {
 	Super::OnRefresh();
+
+	for(int32 i = 0; i < Keys.Num(); i++)
+	{
+		Btn_Values[i]->SetIconBrush(FSlateBrush());
+		Btn_Values[i]->SetTitle(FText::GetEmpty());
+		const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>();
+		FSlateBrush ImageBrush;
+		if(Settings->TryGetInputBrush(ImageBrush, Keys[i], ECommonInputType::MouseAndKeyboard, FName("XSX")))
+		{
+			ImageBrush.ImageSize = FVector2D(28.f);
+			Btn_Values[i]->SetIconBrush(ImageBrush);
+		}
+		else
+		{
+			Btn_Values[i]->SetTitle(Keys[i].GetDisplayName(false));
+		}
+	}
 }
 
 void UWidgetKeySettingItemBase::OnDestroy()
@@ -56,7 +75,7 @@ void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)
 void UWidgetKeySettingItemBase::OnKeySelected(FKey InKey, UWidgetPressAnyKeyPanelBase* InPressAnyKeyPanel)
 {
 	InPressAnyKeyPanel->OnKeySelected.RemoveAll(this);
-	Btn_Values[InPressAnyKeyPanel->GetWidgetParams()[0].GetIntegerValue()]->SetTitle(FText::FromString(InKey.ToString()));
+	Keys[InPressAnyKeyPanel->GetWidgetParams()[0].GetIntegerValue()] = InKey;
 	if(OnValuesChanged.IsBound())
 	{
 		OnValuesChanged.Broadcast(this, GetValues());
@@ -72,18 +91,19 @@ void UWidgetKeySettingItemBase::OnKeySelectionCanceled(UWidgetPressAnyKeyPanelBa
 TArray<FParameter> UWidgetKeySettingItemBase::GetValues() const
 {
 	TArray<FParameter> Values;
-	for(int32 i = 0; i < Btn_Values.Num(); i++)
+	for(int32 i = 0; i < Keys.Num(); i++)
 	{
-		Values.Add(Btn_Values[i]->GetTitle().ToString());
+		Values.Add(Keys[i]);
 	}
 	return Values;
 }
 
 void UWidgetKeySettingItemBase::SetValues(const TArray<FParameter>& InValues)
 {
+	Keys.Empty();
 	for(int32 i = 0; i < InValues.Num(); i++)
 	{
-		Btn_Values[i]->SetTitle(FText::FromString(InValues[i].GetStringValue()));
+		Keys.Add(InValues[i].GetKeyValue());
 	}
 	Super::SetValues(InValues);
 }

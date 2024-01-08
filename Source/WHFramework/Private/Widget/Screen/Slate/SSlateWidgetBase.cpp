@@ -256,4 +256,14 @@ void SSlateWidgetBase::RemoveAllChild()
 {
 }
 
+UPanelWidget* SSlateWidgetBase::GetRootPanelWidget() const
+{
+	return nullptr;
+}
+
+UPanelWidget* SSlateWidgetBase::GetParentPanelWidget() const
+{
+	return nullptr;
+}
+
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

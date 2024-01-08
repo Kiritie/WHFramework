@@ -24,7 +24,7 @@ public class WHFramework : ModuleRules
 				"EnhancedInput",
 				"GameplayTags",
 				"GameplayTasks",
-				"GameplayAbilities",
+				"GameplayAbilities"
 			});
 			
 		
@@ -44,6 +44,7 @@ public class WHFramework : ModuleRules
 				"ImageWrapper",
 				"ImageWriteQueue",
 				"ProceduralMeshComponent",
+				"DeveloperSettings"
 			});
 	}
 }

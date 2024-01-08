@@ -122,6 +122,7 @@ enum class EParameterType : uint8
 	Vector,
 	Rotator,
 	Color,
+	Key,
 	Tag,
 	Tags,
 	Class,
@@ -149,6 +150,7 @@ public:
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
 		ColorValue = FColor::Transparent;
+		KeyValue = FKey();
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
 		ClassValue = nullptr;
@@ -217,15 +219,20 @@ public:
 	{
 		*this = MakeColor(InValue);
 	}
-		
-	FParameter(const FGameplayTag& InTagValue)
+				
+	FParameter(const FKey& InValue)
 	{
-		*this = MakeTag(InTagValue);
+		*this = MakeKey(InValue);
+	}
+
+	FParameter(const FGameplayTag& InValue)
+	{
+		*this = MakeTag(InValue);
 	}
 		
-	FParameter(const FGameplayTagContainer& InTagsValue)
+	FParameter(const FGameplayTagContainer& InValue)
 	{
-		*this = MakeTags(InTagsValue);
+		*this = MakeTags(InValue);
 	}
 
 	FParameter(UClass* InValue)
@@ -341,6 +348,9 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Color"))
 	FColor ColorValue;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Key"))
+	FKey KeyValue;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Tag"))
 	FGameplayTag TagValue;
 
@@ -415,6 +425,11 @@ public:
 	void SetColorValue(const FColor& InValue) { ColorValue = InValue; }
 
 	void SetColorValue(const FLinearColor& InValue) { ColorValue = InValue.ToFColorSRGB(); }
+
+	//////////////////////////////////////////////////////////////////////////
+	FKey GetKeyValue() const { return KeyValue; }
+
+	void SetKeyValue(const FKey& InKeyValue) { KeyValue = InKeyValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FGameplayTag GetTagValue() const { return TagValue; }
@@ -550,6 +565,14 @@ public:
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Color;
 		Parameter.SetColorValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeKey(const FKey& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Key;
+		Parameter.SetKeyValue(InValue);
 		return Parameter;
 	}
 

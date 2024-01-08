@@ -211,4 +211,8 @@ public:
 	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 
 	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
+
+	virtual UPanelWidget* GetRootPanelWidget() const override;
+
+	virtual UPanelWidget* GetParentPanelWidget() const override;
 };

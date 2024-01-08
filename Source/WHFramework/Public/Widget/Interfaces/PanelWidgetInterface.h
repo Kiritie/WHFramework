@@ -8,13 +8,13 @@
 #include "UObject/Interface.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Widgets/Layout/Anchors.h"
-#include "BaseWidgetInterface.generated.h"
+#include "PanelWidgetInterface.generated.h"
 
 class UPanelWidget;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UBaseWidgetInterface : public UTickAbleWidgetInterface
+class UPanelWidgetInterface : public UTickAbleWidgetInterface
 {
 	GENERATED_BODY()
 };
@@ -22,7 +22,7 @@ class UBaseWidgetInterface : public UTickAbleWidgetInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IBaseWidgetInterface : public ITickAbleWidgetInterface
+class WHFRAMEWORK_API IPanelWidgetInterface : public ITickAbleWidgetInterface
 {
 	GENERATED_BODY()
 

@@ -7,7 +7,7 @@
 
 USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Owner = nullptr;
+	OwnerWidget = nullptr;
 }
 
 void USubWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -17,13 +17,13 @@ void USubWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 
 void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Owner = nullptr;
+	OwnerWidget = nullptr;
 	RemoveFromParent();
 }
 
 void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
 {
-	Owner = InOwner;
+	OwnerWidget = InOwner;
 	K2_OnCreate(InOwner, InParams);
 
 	OnInitialize(InParams);
@@ -31,7 +31,7 @@ void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>
 
 void USubWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
 {
-	Params = InParams;
+	WidgetParams = InParams;
 	K2_OnInitialize(InParams);
 
 	OnRefresh();
@@ -54,8 +54,8 @@ void USubWidgetBase::Refresh()
 
 void USubWidgetBase::Destroy(bool bRecovery)
 {
-	if(Owner)
+	if(OwnerWidget)
 	{
-		Owner->DestroySubWidget(this, bRecovery);
+		OwnerWidget->DestroySubWidget(this, bRecovery);
 	}
 }

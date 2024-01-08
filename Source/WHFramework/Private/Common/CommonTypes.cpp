@@ -46,13 +46,22 @@ namespace GameplayTags
 	}
 
 	////////////////////////////////////////////////////
+	// Input_Shortcut
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_InteractSelect, "Input.Shortcut.InteractSelect", "Camera Pan Move");
+	
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_CameraPanMove, "Input.Shortcut.CameraPanMove", "Camera Pan Move");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_CameraRotate, "Input.Shortcut.CameraRotate", "Camera Rotate");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_CameraZoom, "Input.Shortcut.CameraZoom", "Camera Zoom");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_CameraSprint, "Input.Shortcut.CameraSprint", "Camera Sprint");
+
+	////////////////////////////////////////////////////
 	// Input_Camera
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_TurnCamera, "Input.Camera.Turn", "Turn Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_LookUpCamera, "Input.Camera.LookUp", "Look Up Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_PanHCamera, "Input.Camera.PanH", "Pan H Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_PanVCamera, "Input.Camera.PanV", "Pan V Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_ZoomCamera, "Input.Camera.Zoom", "Zoom Camera");
-	
+
 	////////////////////////////////////////////////////
 	// Input_Player
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_TurnPlayer, "Input.Player.Turn", "Turn Player");
@@ -62,7 +71,11 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveRightPlayer, "Input.Player.MoveRight", "Move Right Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveUpPlayer, "Input.Player.MoveUp", "Move Up Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_JumpPlayer, "Input.Player.Jump", "Jump Player");
-		
+
+	////////////////////////////////////////////////////
+	// Input_System
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_SystemOperation, "Input.System.Operation", "System Operation");
+
 	////////////////////////////////////////////////////
 	// State_Vitality
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Vitality_Dead, "State.Vitality.Dead", "Vitality Dead");

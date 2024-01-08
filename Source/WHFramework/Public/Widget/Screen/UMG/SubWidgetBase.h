@@ -12,7 +12,7 @@
 /**
  * 
  */
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API USubWidgetBase : public UUserWidget, public IObjectPoolInterface
 {
 	GENERATED_BODY()
@@ -57,21 +57,21 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UUserWidgetBase* Owner;
+	UUserWidgetBase* OwnerWidget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn))
-	TArray<FParameter> Params;
+	TArray<FParameter> WidgetParams;
 
 public:
 	template<class T>
-	T* GetOwner() const
+	T* GetOwnerWidget() const
 	{
-		return Cast<T>(GetOwner());
+		return Cast<T>(GetOwnerWidget());
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetOwner(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputObject(Owner, InClass); }
+	UUserWidgetBase* GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputObject(OwnerWidget, InClass); }
 
 	UFUNCTION(BlueprintPure)
-	TArray<FParameter>& GetParams() { return Params; }
+	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }
 };

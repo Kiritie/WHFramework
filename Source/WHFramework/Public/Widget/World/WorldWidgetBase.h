@@ -10,7 +10,7 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
-#include "Widget/Interfaces/BaseWidgetInterface.h"
+#include "Widget/Interfaces/PanelWidgetInterface.h"
 
 #include "WorldWidgetBase.generated.h"
 
@@ -18,9 +18,11 @@ class UCanvasPanelSlot;
 /**
  * 
  */
-UCLASS()
-class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IBaseWidgetInterface, public IObjectPoolInterface
+UCLASS(BlueprintType, meta = (DisableNativeTick))
+class WHFRAMEWORK_API UWorldWidgetBase : public UUserWidget, public IPanelWidgetInterface, public IObjectPoolInterface
 {
+	friend class UWidgetModule;
+	
 	GENERATED_BODY()
 
 public:
@@ -45,8 +47,12 @@ protected:
 	
 	virtual FReply NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
 
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
+
 public:
-	virtual bool IsTickAble_Implementation() const override { return true; }
+	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
 
@@ -82,10 +88,13 @@ public:
 
 protected:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void RefreshLocation(UWidget* InWidget, FWorldWidgetMapping InMapping);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void RefreshVisibility();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RefreshLocation(UWidget* InWidget, FWorldWidgetMapping InMapping);
+	void RefreshLocationAndVisibility();
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)

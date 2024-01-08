@@ -48,32 +48,41 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
 public:
-	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
-	static FInputKeyShortcut GetKeyShortcutByName(const FName InName);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static void AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
 
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static void RemoveKeyShortcut(const FGameplayTag& InTag);
 
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void RemoveKeyShortcut(const FName InName);
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static FInputKeyShortcut GetKeyShortcut(const FGameplayTag& InTag);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMappings
 public:
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static void AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static void RemoveKeyMapping(const FGameplayTag& InTag);
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void RemoveKeyMapping(const FName InName);
+	static void AddTouchMapping(const FInputTouchMapping& InTouchMapping);
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void AddTouchMapping(const FInputTouchMapping& InKeyMapping);
+	static void AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 	
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured = true);
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static const UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputStates

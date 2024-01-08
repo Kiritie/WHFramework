@@ -47,8 +47,13 @@ struct WHFRAMEWORK_API FInputKeyShortcut
 public:
 	FInputKeyShortcut()
 	{
-		Key = FKey();
+		Keys = TArray<FKey>();
 		Auxs = TArray<FKey>();
+	}
+
+	FInputKeyShortcut(const TArray<FKey>& InKey)
+		: Keys(InKey)
+	{
 	}
 
 	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory)
@@ -57,18 +62,18 @@ public:
 	{
 	}
 
-	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const FKey& InKey)
+	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const TArray<FKey>& InKey)
 		: DisplayName(InDisplayName),
 		  Category(InCategory),
-		  Key(InKey),
+		  Keys(InKey),
 		  Auxs({})
 	{
 	}
 
-	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const FKey& InKey, const TArray<FKey>& InAuxs)
+	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const TArray<FKey>& InKey, const TArray<FKey>& InAuxs)
 		: DisplayName(InDisplayName),
 		  Category(InCategory),
-		  Key(InKey),
+		  Keys(InKey),
 		  Auxs(InAuxs)
 	{
 	}
@@ -76,7 +81,14 @@ public:
 public:
 	bool IsValid() const
 	{
-		return Key.IsValid();
+		for(auto& Iter : Keys)
+		{
+			if(Iter.IsValid())
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 		
 	bool IsPressed(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
@@ -93,7 +105,7 @@ public:
 	FText Category;
 
 	UPROPERTY(EditAnywhere)
-	FKey Key;
+	TArray<FKey> Keys;
 
 	UPROPERTY(EditAnywhere)
 	TArray<FKey> Auxs;
@@ -217,16 +229,16 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData()
 	{
-		KeyShortcuts = TMap<FName, FInputKeyShortcut>();
-		KeyMappings = TMap<FName, FKey>();
+		KeyShortcuts = TMap<FGameplayTag, FInputKeyShortcut>();
+		KeyMappings = TMap<FGameplayTag, FKey>();
 	}
 
 public:
 	UPROPERTY()
-	TMap<FName, FInputKeyShortcut> KeyShortcuts;
+	TMap<FGameplayTag, FInputKeyShortcut> KeyShortcuts;
 
 	UPROPERTY()
-	TMap<FName, FKey> KeyMappings;
+	TMap<FGameplayTag, FKey> KeyMappings;
 
 public:
 	virtual bool IsValid() const override

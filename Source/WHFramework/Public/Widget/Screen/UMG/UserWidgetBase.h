@@ -15,7 +15,7 @@ class UWidgetAnimatorBase;
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
 {
 	friend class UWidgetModule;
@@ -215,11 +215,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
-	FAnchors WidgetAnchors;
-
 	UPROPERTY(EditDefaultsOnly)
 	bool bWidgetPenetrable;
+
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	FAnchors WidgetAnchors;
 
 	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	bool bWidgetAutoSize;
@@ -419,6 +419,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual UPanelWidget* GetRootPanelWidget() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual UPanelWidget* GetParentPanelWidget() const override;
 
 private:
 	UFUNCTION()

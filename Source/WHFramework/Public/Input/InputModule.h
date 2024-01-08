@@ -70,64 +70,64 @@ protected:
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
+public:
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	void AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	void RemoveKeyShortcut(const FGameplayTag& InTag);
+
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputSteups|Key")
-	TMap<FName, FInputKeyShortcut> KeyShortcuts;
+	TMap<FGameplayTag, FInputKeyShortcut> KeyShortcuts;
 
 public:
 	UFUNCTION(BlueprintPure)
-	TMap<FName, FInputKeyShortcut>& GetKeyShortcuts() { return KeyShortcuts; }
+	TMap<FGameplayTag, FInputKeyShortcut>& GetKeyShortcuts() { return KeyShortcuts; }
 
-	UFUNCTION(BlueprintPure)
-	FInputKeyShortcut GetKeyShortcutByName(const FName InName) const;
-
-	UFUNCTION(BlueprintCallable)
-	void AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
-
-	UFUNCTION(BlueprintCallable)
-	void RemoveKeyShortcut(const FName InName);
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
+	FInputKeyShortcut GetKeyShortcut(const FGameplayTag& InTag) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMappings
-protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Context")
-	TArray<FInputContextMapping> ContextMappings;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Key")
-	TMap<FName, FInputKeyMapping> KeyMappings;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Touch")
-	TArray<FInputTouchMapping> TouchMappings;
-	
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Context")
-	TMap<FName, FKey> CustomKeyMappings;
-
 public:
-	TArray<FInputContextMapping>& GetContextMappings() { return ContextMappings; }
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	void AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping);
 
-	UFUNCTION(BlueprintPure)
-	TMap<FName, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
-
-	UFUNCTION(BlueprintPure)
-	TArray<FInputTouchMapping>& GetTouchMappings() { return TouchMappings; }
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	void RemoveKeyMapping(const FGameplayTag& InTag);
 
 	UFUNCTION(BlueprintCallable)
-	void AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping);
-
+	void AddTouchMapping(const FInputTouchMapping& InTouchMapping);
+	
 	UFUNCTION(BlueprintCallable)
-	void RemoveKeyMapping(const FName InName);
+	void AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintCallable)
-	void AddTouchMapping(const FInputTouchMapping& InKeyMapping);
-
+protected:
 	UFUNCTION(BlueprintCallable)
 	void ApplyKeyMappings();
 
 	UFUNCTION(BlueprintCallable)
 	void ApplyTouchMappings();
-	
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InInputTag"))
-	const UInputActionBase* FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured = true) const;
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "InputSteups|Context")
+	TArray<FInputContextMapping> ContextMappings;
+
+	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Key")
+	TMap<FGameplayTag, FInputKeyMapping> KeyMappings;
+
+	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Touch")
+	TArray<FInputTouchMapping> TouchMappings;
+
+public:
+	TArray<FInputContextMapping>& GetContextMappings() { return ContextMappings; }
+
+	UFUNCTION(BlueprintPure)
+	TMap<FGameplayTag, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<FInputTouchMapping>& GetTouchMappings() { return TouchMappings; }
 
 	UFUNCTION(BlueprintPure)
 	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex = 0);
@@ -141,12 +141,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintCallable)
-	void AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
-
 	UFUNCTION(BlueprintPure)
-	const TMap<FName, FKey>& GetAllCustomKeyMappings() const { return CustomKeyMappings; }
+	bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0) const;
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
+	UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true) const;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraInputs
 protected:
@@ -197,6 +197,9 @@ protected:
 
 	UFUNCTION()
 	virtual void JumpPlayer();
+
+	UFUNCTION()
+	virtual void SystemOperation();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TouchInputs

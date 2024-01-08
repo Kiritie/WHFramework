@@ -30,44 +30,59 @@ int32 UInputModuleStatics::GetTouchPressedCount()
 	return UInputModule::Get().GetTouchPressedCount();
 }
 
-FInputKeyShortcut UInputModuleStatics::GetKeyShortcutByName(const FName InName)
+void UInputModuleStatics::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
 {
-	return UInputModule::Get().GetKeyShortcutByName(InName);
+	UInputModule::Get().AddKeyShortcut(InTag, InKeyShortcut);
 }
 
-void UInputModuleStatics::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
+void UInputModuleStatics::RemoveKeyShortcut(const FGameplayTag& InTag)
 {
-	UInputModule::Get().AddKeyShortcut(InName, InKeyShortcut);
+	UInputModule::Get().RemoveKeyShortcut(InTag);
 }
 
-void UInputModuleStatics::RemoveKeyShortcut(const FName InName)
+FInputKeyShortcut UInputModuleStatics::GetKeyShortcut(const FGameplayTag& InTag)
 {
-	UInputModule::Get().RemoveKeyShortcut(InName);
+	return UInputModule::Get().GetKeyShortcut(InTag);
 }
 
-void UInputModuleStatics::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
+void UInputModuleStatics::AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping)
 {
-	UInputModule::Get().AddKeyMapping(InName, InKeyMapping);
+	UInputModule::Get().AddKeyMapping(InTag, InKeyMapping);
 }
 
-void UInputModuleStatics::RemoveKeyMapping(const FName InName)
+void UInputModuleStatics::RemoveKeyMapping(const FGameplayTag& InTag)
 {
-	UInputModule::Get().RemoveKeyMapping(InName);
+	UInputModule::Get().RemoveKeyMapping(InTag);
 }
 
-void UInputModuleStatics::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
+void UInputModuleStatics::AddTouchMapping(const FInputTouchMapping& InTouchMapping)
 {
-	UInputModule::Get().AddTouchMapping(InKeyMapping);
+	UInputModule::Get().AddTouchMapping(InTouchMapping);
 }
 
-const UInputActionBase* UInputModuleStatics::FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured)
+void UInputModuleStatics::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
-	return UInputModule::Get().FindInputActionForTag(InInputTag, bEnsured);
+	UInputModule::Get().AddPlayerKeyMapping(InName, InKey, InSlot, InPlayerIndex);
 }
 
-void UInputModuleStatics::AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetAllPlayerKeyMappings(int32 InPlayerIndex)
 {
-	UInputModule::Get().AddOrUpdateCustomKeyBindings(InName, InKey, InSlot, InPlayerIndex);
+	return UInputModule::Get().GetAllPlayerKeyMappings(InPlayerIndex);
+}
+
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
+{
+	return UInputModule::Get().GetPlayerKeyMappingsByName(InName, InPlayerIndex);
+}
+
+bool UInputModuleStatics::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex)
+{
+	return UInputModule::Get().IsPlayerMappedKeyByName(InName, InKey, InPlayerIndex);
+}
+
+const UInputActionBase* UInputModuleStatics::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured)
+{
+	return UInputModule::Get().GetInputActionByTag(InTag, bEnsured);
 }
 
 EInputMode UInputModuleStatics::GetGlobalInputMode()

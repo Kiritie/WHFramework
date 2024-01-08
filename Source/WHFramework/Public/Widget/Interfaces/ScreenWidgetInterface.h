@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "BaseWidgetInterface.h"
+#include "PanelWidgetInterface.h"
 
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
@@ -10,7 +10,7 @@
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UScreenWidgetInterface : public UBaseWidgetInterface
+class UScreenWidgetInterface : public UPanelWidgetInterface
 {
 	GENERATED_BODY()
 };
@@ -18,7 +18,7 @@ class UScreenWidgetInterface : public UBaseWidgetInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IScreenWidgetInterface : public IBaseWidgetInterface
+class WHFRAMEWORK_API IScreenWidgetInterface : public IPanelWidgetInterface
 {
 	GENERATED_BODY()
 
@@ -89,6 +89,8 @@ public:
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) = 0;
 	
+	virtual UPanelWidget* GetParentPanelWidget() const = 0;
+
 	virtual IScreenWidgetInterface* GetTemporaryChild() const = 0;
 	
 	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) = 0;

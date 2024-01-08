@@ -18,10 +18,10 @@ enum class EWorldMiniMapMode : uint8
 	None,
 	// 固定位置
 	FixedPoint,
+	// 视角位置
+	ViewPoint,
 	// 相机位置
-	CameraPoint,
-	// 玩家位置
-	PlayerPoint
+	CameraPoint
 };
 
 /**

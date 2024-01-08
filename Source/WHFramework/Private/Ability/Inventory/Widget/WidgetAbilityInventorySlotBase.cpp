@@ -129,7 +129,7 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = Owner->CreateSubWidget<UWidgetAbilityItemBase>({ &GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
+		OutOperation->DefaultDragVisual = OwnerWidget->CreateSubWidget<UWidgetAbilityItemBase>({ &GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
 	}
 }
 

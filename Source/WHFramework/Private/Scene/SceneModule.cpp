@@ -46,6 +46,8 @@ USceneModule::USceneModule()
 	MiniMapMode = EWorldMiniMapMode::None;
 	MiniMapPoint = FTransform::Identity;
 	MiniMapRange = 512.f;
+	MiniMapMinRange = 128.f;
+	MiniMapMaxRange = -1.f;
 	
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
 	if(MiniMapTexFinder.Succeeded())
@@ -256,19 +258,19 @@ void USceneModule::OnRefresh(float DeltaSeconds)
 				MiniMapCapture->SetActorLocationAndRotation(MiniMapPoint.GetLocation(), bMiniMapRotatable ? FRotator(0.f, MiniMapPoint.GetRotation().Z, 0.f) : FRotator::ZeroRotator);
 				break;
 			}
+			case EWorldMiniMapMode::ViewPoint:
+			{
+				if(const AActor* ViewTarget = UCommonStatics::GetPlayerController()->GetViewTarget())
+				{
+					MiniMapCapture->SetActorLocationAndRotation(ViewTarget->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, ViewTarget->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
+				}
+				break;
+			}
 			case EWorldMiniMapMode::CameraPoint:
 			{
 				if(const ACameraActorBase* CameraActor = UCameraModuleStatics::GetCurrentCamera())
 				{
 					MiniMapCapture->SetActorLocationAndRotation(CameraActor->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, CameraActor->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
-				}
-				break;
-			}
-			case EWorldMiniMapMode::PlayerPoint:
-			{
-				if(const APawn* PlayerPawn = UCommonStatics::GetPlayerPawn())
-				{
-					MiniMapCapture->SetActorLocationAndRotation(PlayerPawn->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, PlayerPawn->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
 				}
 				break;
 			}
@@ -328,16 +330,15 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
-		
-			if(WorldTimer && WorldTimer->IsAutoSave())
-			{
-				WorldTimer->LoadSaveData(&SaveData.TimerData);
-			}
-		
-			if(WorldWeather && WorldWeather->IsAutoSave())
-			{
-				WorldWeather->LoadSaveData(&SaveData.WeatherData);
-			}
+		}
+		if(WorldTimer && WorldTimer->IsAutoSave())
+		{
+			WorldTimer->LoadSaveData(&SaveData.TimerData);
+		}
+	
+		if(WorldWeather && WorldWeather->IsAutoSave())
+		{
+			WorldWeather->LoadSaveData(&SaveData.WeatherData);
 		}
 	}
 }

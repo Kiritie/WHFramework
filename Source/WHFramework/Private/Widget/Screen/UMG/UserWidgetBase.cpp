@@ -157,7 +157,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	for(const auto Iter : GetAllSubWidgets())
 	{
-		Iter->OnCreate(this, Iter->GetParams());
+		Iter->OnCreate(this, Iter->GetWidgetParams());
 	}
 }
 
@@ -222,39 +222,27 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		default: break;
 	}
 
-	if(const auto ParentUserWidget = GetParentWidgetN<UUserWidgetBase>())
-	{
-		UPanelWidget* ParentSlotWidget;
-		if(ParentSlot.IsNone())
-		{
-			ParentSlotWidget = ParentUserWidget->GetRootPanelWidget();
-		}
-		else
-		{
-			ParentSlotWidget = Cast<UPanelWidget>(ParentUserWidget->WidgetTree->FindWidget(ParentSlot));
-		}
-		if(ParentSlotWidget)
-		{
-			if(GetParent() != ParentSlotWidget)
-			{
-				UPanelSlot* PanelSlot = ParentSlotWidget->AddChild(this);
-				if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
-				{
-					CanvasPanelSlot->SetZOrder(WidgetZOrder);
-					CanvasPanelSlot->SetAnchors(WidgetAnchors);
-					CanvasPanelSlot->SetOffsets(WidgetOffsets);
-					CanvasPanelSlot->SetAlignment(WidgetAlignment);
-				}
-			}
-		}
-	}
-	else
+	if(!GetParentWidgetN<UUserWidgetBase>())
 	{
 		if(GetParent())
 		{
 			RemoveFromParent();
 		}
 		AddToViewport(WidgetZOrder);
+	}
+	else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
+	{
+		if(GetParent() != ParentPanelWidget)
+		{
+			UPanelSlot* PanelSlot = ParentPanelWidget->AddChild(this);
+			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
+			{
+				CanvasPanelSlot->SetZOrder(WidgetZOrder);
+				CanvasPanelSlot->SetAnchors(WidgetAnchors);
+				CanvasPanelSlot->SetOffsets(WidgetOffsets);
+				CanvasPanelSlot->SetAlignment(WidgetAlignment);
+			}
+		}
 	}
 	switch(WidgetOpenType)
 	{
@@ -490,10 +478,6 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		}
 		case EWidgetCloseType::Remove:
 		{
-			if(ParentWidget)
-			{
-				ParentWidget->RemoveChild(this);
-			}
 			RemoveFromParent();
 			break;
 		}
@@ -576,4 +560,13 @@ void UUserWidgetBase::RemoveAllChild()
 UPanelWidget* UUserWidgetBase::GetRootPanelWidget() const
 {
 	return Cast<UPanelWidget>(GetRootWidget());
+}
+
+UPanelWidget* UUserWidgetBase::GetParentPanelWidget() const
+{
+	if(const auto ParentUserWidget = GetParentWidgetN<UUserWidgetBase>())
+	{
+		return ParentSlot.IsNone() ? ParentUserWidget->GetRootPanelWidget() : Cast<UPanelWidget>(ParentUserWidget->WidgetTree->FindWidget(ParentSlot));
+	}
+	return nullptr;
 }

@@ -79,4 +79,9 @@ TArray<FParameter> UWidgetSettingItemBase::GetValues() const
 
 void UWidgetSettingItemBase::SetValues(const TArray<FParameter>& InValues)
 {
+	if(OnValuesChanged.IsBound())
+	{
+		OnValuesChanged.Broadcast(this, InValues);
+	}
+	Refresh();
 }

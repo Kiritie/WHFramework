@@ -29,12 +29,12 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 
 	for (const auto& Iter : UInputModule::Get().GetKeyShortcuts())
 	{
-		if (Iter.Key != NAME_None && !Iter.Value.DisplayName.IsEmpty())
+		if (Iter.Key.GetTagName() != NAME_None && !Iter.Value.DisplayName.IsEmpty() && !Iter.Value.Keys.IsEmpty())
 		{
-			if(!ShortcutSettingItems.Contains(Iter.Key))
+			if(!ShortcutSettingItems.Contains(Iter.Key.GetTagName()))
 			{
-				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.Value.DisplayName, 1 }, USettingModule::Get().GetKeySettingItemClass());
-				AddShortcutSettingItem(Iter.Key, SettingItem, Iter.Value.Category);
+				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.Value.DisplayName, Iter.Value.Keys.Num(), true }, USettingModule::Get().GetKeySettingItemClass());
+				AddShortcutSettingItem(Iter.Key.GetTagName(), SettingItem, Iter.Value.Category);
 			}
 		}
 	}
@@ -45,7 +45,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 		{
 			if(!MappingSettingItems.Contains(Iter.GetMappingName()))
 			{
-				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.GetDisplayName(), 2 }, USettingModule::Get().GetKeySettingItemClass());
+				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.GetDisplayName(), 2, !Iter.GetMappingName().IsEqual(FName("SystemOperation")) }, USettingModule::Get().GetKeySettingItemClass());
 				AddMappingSettingItem(Iter.GetMappingName(), SettingItem, Iter.GetDisplayCategory());
 			}
 		}
@@ -58,8 +58,13 @@ void UWidgetInputSettingPageBase::OnOpen(const TArray<FParameter>& InParams, boo
 
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[Iter.Key];
-		Iter.Value->SetValues({ KeyShortcut.Key.ToString() });
+		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[FGameplayTag::RequestGameplayTag(Iter.Key)];
+		TArray<FParameter> Values;
+		for(auto& Iter2 : KeyShortcut.Keys)
+		{
+			Values.Add(Iter2);
+		}
+		Iter.Value->SetValues(Values);
 	}
 
 	for(auto& Iter1 : MappingSettingItems)
@@ -68,7 +73,7 @@ void UWidgetInputSettingPageBase::OnOpen(const TArray<FParameter>& InParams, boo
 		TArray<FParameter> Values;
 		for(auto& Iter2 : Mappings)
 		{
-			Values.Add(Iter2.GetCurrentKey().ToString());
+			Values.Add(Iter2.GetCurrentKey());
 		}
 		Iter1.Value->SetValues(Values);
 	}
@@ -80,9 +85,15 @@ void UWidgetInputSettingPageBase::OnApply()
 
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[Iter.Key];
+		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[FGameplayTag::RequestGameplayTag(Iter.Key)];
 		TArray<FParameter> Values = Iter.Value->GetValues();
-		KeyShortcut.Key = *Values[0].GetStringValue();
+		for(int32 i = 0; i < Values.Num(); i++)
+		{
+			if(!KeyShortcut.Keys.IsValidIndex(i) || Values[i].GetKeyValue() != KeyShortcut.Keys[i])
+			{
+				KeyShortcut.Keys[i] = Values[i].GetKeyValue();
+			}
+		}
 	}
 
 	for(auto& Iter : MappingSettingItems)
@@ -91,9 +102,9 @@ void UWidgetInputSettingPageBase::OnApply()
 		TArray<FParameter> Values = Iter.Value->GetValues();
 		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if(!Mappings.IsValidIndex(i) || *Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
+			if(!Mappings.IsValidIndex(i) || Values[i].GetKeyValue() != Mappings[i].GetCurrentKey())
 			{
-				UInputModule::Get().AddOrUpdateCustomKeyBindings(Iter.Key, *Values[i].GetStringValue(), i);
+				UInputModule::Get().AddPlayerKeyMapping(Iter.Key, Values[i].GetKeyValue(), i);
 			}
 		}
 	}
@@ -105,8 +116,13 @@ void UWidgetInputSettingPageBase::OnReset(bool bForce)
 
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[Iter.Key];
-		Iter.Value->SetValues({ KeyShortcut.Key.ToString() });
+		FInputKeyShortcut& KeyShortcut = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[FGameplayTag::RequestGameplayTag(Iter.Key)];
+		TArray<FParameter> Values;
+		for(auto& Iter2 : KeyShortcut.Keys)
+		{
+			Values.Add(Iter2);
+		}
+		Iter.Value->SetValues(Values);
 	}
 
 	for(auto& Iter : MappingSettingItems)
@@ -115,7 +131,7 @@ void UWidgetInputSettingPageBase::OnReset(bool bForce)
 		TArray<FParameter> Values;
 		for(auto& Iter2 : Mappings)
 		{
-			Values.Add(Iter2.GetDefaultKey().ToString());
+			Values.Add(Iter2.GetDefaultKey());
 		}
 		Iter.Value->SetValues(Values);
 	}
@@ -135,11 +151,21 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 {
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[Iter.Key];
+		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[FGameplayTag::RequestGameplayTag(Iter.Key)];
 		TArray<FParameter> Values = Iter.Value->GetValues();
-		if(!Values[0].GetStringValue().Equals(KeyShortcut.Key.ToString()))
+		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			return true;
+			if(!KeyShortcut.Keys.IsValidIndex(i))
+			{
+				if(Values[i].GetKeyValue().IsValid())
+				{
+					return true;
+				}
+			}
+			else if(Values[i].GetKeyValue() != KeyShortcut.Keys[i])
+			{
+				return true;
+			}
 		}
 	}
 	
@@ -151,12 +177,12 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 		{
 			if(!Mappings.IsValidIndex(i))
 			{
-				if(!Values[i].GetStringValue().Equals(TEXT("None")))
+				if(Values[i].GetKeyValue().IsValid())
 				{
 					return true;
 				}
 			}
-			else if(*Values[i].GetStringValue() != Mappings[i].GetCurrentKey())
+			else if(Values[i].GetKeyValue() != Mappings[i].GetCurrentKey())
 			{
 				return true;
 			}
@@ -169,11 +195,14 @@ bool UWidgetInputSettingPageBase::CanReset_Implementation() const
 {
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[Iter.Key];
+		FInputKeyShortcut& KeyShortcut = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[FGameplayTag::RequestGameplayTag(Iter.Key)];
 		TArray<FParameter> Values = Iter.Value->GetValues();
-		if(!Values[0].GetStringValue().Equals(KeyShortcut.Key.ToString()))
+		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			return true;
+			if(KeyShortcut.Keys.IsValidIndex(i) && KeyShortcut.Keys[i] != Values[i].GetKeyValue())
+			{
+				return true;
+			}
 		}
 	}
 	

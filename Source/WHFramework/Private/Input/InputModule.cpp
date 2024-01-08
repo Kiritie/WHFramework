@@ -17,12 +17,14 @@
 #include "InputMappingContext.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Input/Base/InputActionBase.h"
 #include "SaveGame/Module/InputSaveGame.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
+#include "Input/Widget/WidgetKeyTipsItemBase.h"
 
 IMPLEMENTATION_MODULE(UInputModule)
 
@@ -34,12 +36,12 @@ UInputModule::UInputModule()
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
-	AddKeyShortcut(FName("InteractSelect"), FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
+	AddKeyShortcut(GameplayTags::InputTag_InteractSelect, FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
 	
-	AddKeyShortcut(FName("CameraPanMove"), FInputKeyShortcut(FText::FromString("Camera Pan Move"), FText::FromString("Camera Control")));
-	AddKeyShortcut(FName("CameraRotate"), FInputKeyShortcut(FText::FromString("Camera Rotate"), FText::FromString("Camera Control")));
-	AddKeyShortcut(FName("CameraZoom"), FInputKeyShortcut(FText::FromString("Camera Zoom"), FText::FromString("Camera Control")));
-	AddKeyShortcut(FName("CameraSprint"), FInputKeyShortcut(FText::FromString("Camera Sprint"), FText::FromString("Camera Control")));
+	AddKeyShortcut(GameplayTags::InputTag_CameraPanMove, FInputKeyShortcut(FText::FromString("Camera Pan Move"), FText::FromString("Camera Control")));
+	AddKeyShortcut(GameplayTags::InputTag_CameraRotate, FInputKeyShortcut(FText::FromString("Camera Rotate"), FText::FromString("Camera Control")));
+	AddKeyShortcut(GameplayTags::InputTag_CameraZoom, FInputKeyShortcut(FText::FromString("Camera Zoom"), FText::FromString("Camera Control")));
+	AddKeyShortcut(GameplayTags::InputTag_CameraSprint, FInputKeyShortcut(FText::FromString("Camera Sprint"), FText::FromString("Camera Control")));
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
 	if(CameraMovementMapping.Succeeded())
@@ -62,6 +64,14 @@ UInputModule::UInputModule()
 	{
 		FInputContextMapping ContextMapping;
 		ContextMapping.InputMapping = CharacterActionMapping.Object;
+		ContextMappings.Add(ContextMapping);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> SystemActionMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_SystemAction.IMC_SystemAction'"));
+	if(SystemActionMapping.Succeeded())
+	{
+		FInputContextMapping ContextMapping;
+		ContextMapping.InputMapping = SystemActionMapping.Object;
 		ContextMappings.Add(ContextMapping);
 	}
 
@@ -170,6 +180,7 @@ void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
 	InInputComponent->BindInputAction(GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
+	
 	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
@@ -177,6 +188,8 @@ void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UInputModule::JumpPlayer);
+
+	InInputComponent->BindInputAction(GameplayTags::InputTag_SystemOperation, ETriggerEvent::Started, this, &UInputModule::SystemOperation);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -204,12 +217,22 @@ void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 void UInputModule::UnloadData(EPhase InPhase)
 {
-	CustomKeyMappings.Empty();
+	
 }
 
 void UInputModule::RefreshData()
 {
 	LocalSaveData = GetSaveDataRef<FInputModuleSaveData>(true);
+
+	TArray<UUserWidget*> KeyTipsItems;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, KeyTipsItems, UWidgetKeyTipsItemBase::StaticClass(), false);
+	for(auto Iter : KeyTipsItems)
+	{
+		if(UWidgetKeyTipsItemBase* KeyTipsItem = Cast<UWidgetKeyTipsItemBase>(Iter))
+		{
+			KeyTipsItem->Refresh();
+		}
+	}
 }
 
 FSaveData* UInputModule::ToData()
@@ -243,46 +266,66 @@ FSaveData* UInputModule::GetData()
 	return &LocalSaveData;
 }
 
-FInputKeyShortcut UInputModule::GetKeyShortcutByName(const FName InName) const
+void UInputModule::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
 {
-	if(KeyShortcuts.Contains(InName))
+	if(!KeyShortcuts.Contains(InTag))
 	{
-		return KeyShortcuts[InName];
+		KeyShortcuts.Add(InTag, InKeyShortcut);
+	}
+}
+
+void UInputModule::RemoveKeyShortcut(const FGameplayTag& InTag)
+{
+	if(KeyShortcuts.Contains(InTag))
+	{
+		KeyShortcuts.Remove(InTag);
+	}
+}
+
+FInputKeyShortcut UInputModule::GetKeyShortcut(const FGameplayTag& InTag) const
+{
+	if(KeyShortcuts.Contains(InTag))
+	{
+		return KeyShortcuts[InTag];
 	}
 	return FInputKeyShortcut();
 }
 
-void UInputModule::AddKeyShortcut(const FName InName, const FInputKeyShortcut& InKeyShortcut)
+void UInputModule::AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping)
 {
-	const FName Name = !InName.IsNone() ? InName : InKeyShortcut.Key.GetFName();
-	if(!KeyShortcuts.Contains(Name))
+	if(!KeyMappings.Contains(InTag))
 	{
-		KeyShortcuts.Add(Name, InKeyShortcut);
+		KeyMappings.Add(InTag, InKeyMapping);
 	}
 }
 
-void UInputModule::RemoveKeyShortcut(const FName InName)
+void UInputModule::RemoveKeyMapping(const FGameplayTag& InTag)
 {
-	if(KeyShortcuts.Contains(InName))
+	if(KeyMappings.Contains(InTag))
 	{
-		KeyShortcuts.Remove(InName);
+		KeyMappings.Remove(InTag);
 	}
 }
 
-void UInputModule::AddKeyMapping(const FName InName, const FInputKeyMapping& InKeyMapping)
+void UInputModule::AddTouchMapping(const FInputTouchMapping& InTouchMapping)
 {
-	const FName Name = !InName.IsNone() ? InName : InKeyMapping.Key.GetFName();
-	if(!KeyMappings.Contains(Name))
-	{
-		KeyMappings.Add(Name, InKeyMapping);
-	}
+	TouchMappings.Add(InTouchMapping);
 }
 
-void UInputModule::RemoveKeyMapping(const FName InName)
+void UInputModule::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
-	if(KeyMappings.Contains(InName))
+	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
+	if (!InKey.IsGamepadKey())
 	{
-		KeyMappings.Remove(InName);
+		FMapPlayerKeyArgs Args = {};
+		Args.MappingName = InName;
+		Args.Slot = (EPlayerMappableKeySlot)InSlot;
+		Args.NewKey = InKey;
+	
+		FGameplayTagContainer FailureReason;
+		Settings->MapPlayerKey(Args, FailureReason);
+
+		RefreshData();
 	}
 }
 
@@ -308,12 +351,7 @@ void UInputModule::ApplyTouchMappings()
 	}
 }
 
-void UInputModule::AddTouchMapping(const FInputTouchMapping& InKeyMapping)
-{
-	TouchMappings.Add(InKeyMapping);
-}
-
-const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& InInputTag, bool bEnsured) const
+UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
 {
 	for (const auto& Iter1 : ContextMappings)
 	{
@@ -323,7 +361,7 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 			{
 				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
 				{
-					if(InputAction->ActionTag == InInputTag)
+					if(InputAction->ActionTag == InTag)
 					{
 						return InputAction;
 					}
@@ -334,7 +372,7 @@ const UInputActionBase* UInputModule::FindInputActionForTag(const FGameplayTag& 
 	
 	if (bEnsured)
 	{
-		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InInputTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
+		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
 	}
 
 	return nullptr;
@@ -417,28 +455,23 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 	return Mappings;
 }
 
-void UInputModule::AddOrUpdateCustomKeyBindings(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
+bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex) const
 {
-	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
-	if (!InKey.IsGamepadKey())
+	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(FName("SystemOperation")))
 	{
-		FMapPlayerKeyArgs Args = {};
-		Args.MappingName = InName;
-		Args.Slot = (EPlayerMappableKeySlot)InSlot;
-		Args.NewKey = InKey;
-	
-		FGameplayTagContainer FailureReason;
-		Settings->MapPlayerKey(Args, FailureReason);
-
-		RefreshData();
+		if(InKey == Iter.GetCurrentKey())
+		{
+			return true;
+		}
 	}
+	return false;
 }
 
 void UInputModule::TurnCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
-	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
+	if(GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController(), true))
 	{
 		UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>(), 0.f);
 	}
@@ -448,7 +481,7 @@ void UInputModule::LookUpCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
-	if(GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController(), true))
+	if(GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController(), true))
 	{
 		UCameraModule::Get().AddCameraRotationInput(0.f, UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
 	}
@@ -458,7 +491,7 @@ void UInputModule::PanHCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
+	if(GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
@@ -470,7 +503,7 @@ void UInputModule::PanVCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()))
+	if(GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()))
 	{
 		const FRotator Rotation = GetPlayerController()->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
@@ -482,7 +515,7 @@ void UInputModule::ZoomCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController(), true))
+	if(GetKeyShortcut(GameplayTags::InputTag_CameraZoom).IsPressing(GetPlayerController(), true))
 	{
 		UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>());
 	}
@@ -493,7 +526,7 @@ void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
@@ -501,14 +534,14 @@ void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (GetKeyShortcutByName(FName("CameraSprint")).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
+	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
 void UInputModule::TurnPlayer(const FInputActionValue& InValue)
@@ -589,6 +622,10 @@ void UInputModule::JumpPlayer()
 	{
 		IWHPlayerInterface::Execute_JumpN(GetPlayerController()->GetPawn());
 	}
+}
+
+void UInputModule::SystemOperation()
+{
 }
 
 void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)

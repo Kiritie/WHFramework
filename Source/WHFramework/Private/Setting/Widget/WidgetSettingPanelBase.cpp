@@ -56,6 +56,8 @@ void UWidgetSettingPanelBase::OnInitialize(UObject* InOwner, const TArray<FParam
 void UWidgetSettingPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
+	
+	SetCurrentPage(0);
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)

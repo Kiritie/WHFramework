@@ -128,45 +128,47 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
 
-	TArray<UUserWidget*> InterfaceWidgets;
-	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, InterfaceWidgets, UTickAbleWidgetInterface::StaticClass(), false);
-	for (auto Iter : InterfaceWidgets)
+	TArray<UUserWidget*> TickAbleWidgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
+	for (auto Iter : TickAbleWidgets)
 	{
-		if(ITickAbleWidgetInterface* InterfaceWidget = Cast<ITickAbleWidgetInterface>(Iter))
+		if(ITickAbleWidgetInterface* TickAbleWidget = Cast<ITickAbleWidgetInterface>(Iter))
 		{
-			if(InterfaceWidget->Execute_IsTickAble(Iter))
+			if(TickAbleWidget->Execute_IsTickAble(Iter))
 			{
-				InterfaceWidget->Execute_OnTick(Iter, DeltaSeconds);
+				TickAbleWidget->Execute_OnTick(Iter, DeltaSeconds);
 			}
 		}
 	}
 
-	for (auto Iter : AllUserWidget)
+	for (auto& Iter : AllUserWidget)
 	{
-		if(!Iter.Value) continue;
 		UUserWidgetBase* UserWidget = Iter.Value;
 		if (UserWidget && UserWidget->GetWidgetState() == EScreenWidgetState::Opened && UserWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{
 			UserWidget->Refresh();
 		}
 	}
-	for (auto Iter : AllSlateWidgets)
+	for (auto& Iter : AllSlateWidgets)
 	{
-		if(!Iter.Value) continue;
 		TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
 		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && SlateWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{
 			SlateWidget->Refresh();
 		}
 	}
-	for (auto Iter1 : AllWorldWidgets)
+	for (auto& Iter1 : AllWorldWidgets)
 	{
 		for (auto Iter2 : Iter1.Value.WorldWidgets)
 		{
 			UWorldWidgetBase* WorldWidget = Iter2;
-			if (WorldWidget && WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+			if (WorldWidget)
 			{
-				WorldWidget->Refresh();
+				WorldWidget->RefreshLocationAndVisibility();
+				if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+				{
+					WorldWidget->Refresh();
+				}
 			}
 		}
 	}

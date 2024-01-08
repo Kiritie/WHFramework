@@ -157,7 +157,7 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
 		
-		if(UInputModuleStatics::GetKeyShortcutByName(FName("InteractSelect")).IsPressed(this))
+		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_InteractSelect).IsPressing(this))
 		{
 			if(HoveringInteraction.GetObject())
 			{

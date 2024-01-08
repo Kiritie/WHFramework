@@ -15,6 +15,7 @@
 
 UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bWidgetTickAble = false;
 	WidgetName = NAME_None;
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
@@ -84,22 +85,6 @@ FReply UWorldWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const F
 
 void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
-	if(GetWidgetSpace() == EWidgetSpace::Screen)
-	{
-		if(BindWidgetMap.Contains(this))
-		{
-			RefreshLocation(this, BindWidgetMap[this]);
-		}
-		if(BindWidgetMap.Num() > 1)
-		{
-			for(const auto& Iter : BindWidgetMap)
-			{
-				if(Iter.Key == this) continue;
-				RefreshLocation(Iter.Key, Iter.Value);
-			}
-		}
-	}
-	RefreshVisibility();
 }
 
 void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -191,6 +176,26 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	K2_OnDestroy(bRecovery);
 }
 
+void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
+{
+	if(GetWidgetSpace() == EWidgetSpace::Screen)
+	{
+		if(BindWidgetMap.Contains(this))
+		{
+			RefreshLocation(this, BindWidgetMap[this]);
+		}
+		if(BindWidgetMap.Num() > 1)
+		{
+			for(const auto& Iter : BindWidgetMap)
+			{
+				if(Iter.Key == this) continue;
+				RefreshLocation(Iter.Key, Iter.Value);
+			}
+		}
+	}
+	RefreshVisibility();
+}
+
 void UWorldWidgetBase::Refresh_Implementation()
 {
 	if(WidgetRefreshType == EWidgetRefreshType::None) return;
@@ -201,11 +206,6 @@ void UWorldWidgetBase::Refresh_Implementation()
 void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 {
 	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
-}
-
-void UWorldWidgetBase::RefreshVisibility_Implementation()
-{
-	SetVisibility(IsWidgetVisible(true) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
 void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
@@ -219,6 +219,11 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 			CanvasPanelSlot->SetPosition(ScreenPos);
 		}
 	}
+}
+
+void UWorldWidgetBase::RefreshVisibility_Implementation()
+{
+	SetVisibility(IsWidgetVisible(true) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
 void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)

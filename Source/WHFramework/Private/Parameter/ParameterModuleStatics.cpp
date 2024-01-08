@@ -85,6 +85,11 @@ FParameter UParameterModuleStatics::MakeColorParameter(FColor InValue)
 	return FParameter::MakeColor(InValue);
 }
 
+FParameter UParameterModuleStatics::MakeKeyParameter(const FKey& InValue)
+{
+	return FParameter::MakeKey(InValue);
+}
+
 FParameter UParameterModuleStatics::MakeTagParameter(const FGameplayTag& InValue)
 {
 	return FParameter::MakeTag(InValue);

@@ -87,6 +87,12 @@ protected:
 	float MiniMapRange;
 
 	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	float MiniMapMinRange;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
+	float MiniMapMaxRange;
+
+	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
 	UTextureRenderTarget2D* MiniMapTexture;
 
 public:
@@ -115,10 +121,10 @@ public:
 	void SetMiniMapPoint(const FTransform& InMiniMapPoint) { MiniMapPoint = InMiniMapPoint; }
 
 	UFUNCTION(BlueprintPure)
-	float GetMiniMapRange() const { return FMath::Max(MiniMapRange, 0.f); }
+	float GetMiniMapRange() const { return MiniMapRange; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = InMiniMapRange; }
+	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = FMathf::Clamp(InMiniMapRange, MiniMapMinRange, MiniMapMaxRange != -1.f ? MiniMapMaxRange : InMiniMapRange); }
 
 	UFUNCTION(BlueprintPure)
 	UTextureRenderTarget2D* GetMiniMapTexture() const { return MiniMapTexture; }

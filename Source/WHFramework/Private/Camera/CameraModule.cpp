@@ -830,7 +830,7 @@ void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
 	if(!bCameraZoomAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::Distance))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMathf::Abs(USceneModuleStatics::GetAltitude()) / 1000.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMathf::Abs(FMathf::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / 1000.f)) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
 	{
@@ -980,17 +980,17 @@ void UCameraModule::OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCa
 
 bool UCameraModule::IsControllingMove()
 {
-	return UInputModuleStatics::GetKeyShortcutByName(FName("CameraPanMove")).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
 }
 
 bool UCameraModule::IsControllingRotate()
 {
-	return UInputModuleStatics::GetKeyShortcutByName(FName("CameraRotate")).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
 }
 
 bool UCameraModule::IsControllingZoom()
 {
-	return UInputModuleStatics::GetKeyShortcutByName(FName("CameraZoom")).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
 }
 
 bool UCameraModule::IsTrackingTarget()

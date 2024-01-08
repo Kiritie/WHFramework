@@ -3,6 +3,7 @@
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
 #include "Setting/SettingModule.h"
@@ -13,9 +14,11 @@
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	ParentName = FName("SettingPanel");
+	ParentSlot = FName("Slot_SettingPage");
 	WidgetType = EWidgetType::Temporary;
 	WidgetInputMode = EInputMode::UIOnly;
 	WidgetCreateType = EWidgetCreateType::AutoCreate;
+	WidgetCloseType = EWidgetCloseType::Remove;
 
 	bWidgetPenetrable = true;
 }
@@ -28,6 +31,10 @@ void UWidgetSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParame
 void UWidgetSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
+
+	ContentBox = NewObject<UScrollBox>(this, UScrollBox::StaticClass(), FName("ContentBox"));
+
+	WidgetTree->RootWidget = ContentBox;
 }
 
 void UWidgetSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
