@@ -43,7 +43,7 @@ void UWidgetAbilityItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetAbilityItemBase::OnDestroy()
+void UWidgetAbilityItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }

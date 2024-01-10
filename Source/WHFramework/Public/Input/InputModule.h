@@ -150,56 +150,56 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraInputs
 protected:
-	UFUNCTION()
-	virtual void TurnCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void TurnCamera(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void LookUpCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void LookUpCamera(const FInputActionValue& InValue);
 	
-	UFUNCTION()
-	virtual void PanHCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void PanHCamera(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void PanVCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void PanVCamera(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void ZoomCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void ZoomCamera(const FInputActionValue& InValue);
 	
-	UFUNCTION()
-	virtual void MoveForwardCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveForwardCamera(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveRightCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveRightCamera(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveUpCamera(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveUpCamera(const FInputActionValue& InValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// PlayerInputs
 protected:
-	UFUNCTION()
-	virtual void TurnPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void TurnPlayer(const FInputActionValue& InValue);
 	
-	UFUNCTION()
-	virtual void MoveHPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveHPlayer(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveVPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveVPlayer(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveForwardPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveForwardPlayer(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveRightPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveRightPlayer(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void MoveUpPlayer(const FInputActionValue& InValue);
+	UFUNCTION(BlueprintNativeEvent)
+	void MoveUpPlayer(const FInputActionValue& InValue);
 
-	UFUNCTION()
-	virtual void JumpPlayer();
+	UFUNCTION(BlueprintNativeEvent)
+	void JumpPlayer();
 
-	UFUNCTION()
-	virtual void SystemOperation();
+	UFUNCTION(BlueprintNativeEvent)
+	void SystemOperation();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TouchInputs
@@ -208,20 +208,20 @@ protected:
 	float TouchInputRate;
 
 protected:
-	UFUNCTION()
-	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
-	UFUNCTION()
-	virtual void TouchPressedImpl();
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchPressedImpl();
 
-	UFUNCTION()
-	virtual void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
-	UFUNCTION()
-	virtual void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
 
-	UFUNCTION()
-	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// InputStates
@@ -269,7 +269,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 
+	UFUNCTION(BlueprintPure)
 	virtual int32 GetNativeInputPriority() const override { return 0; }
 
+	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 };

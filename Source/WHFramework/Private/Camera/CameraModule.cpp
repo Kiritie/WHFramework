@@ -3,8 +3,10 @@
 
 #include "Camera/CameraModule.h"
 
+#include "Camera/CameraComponent.h"
 #include "Camera/CameraModuleNetworkComponent.h"
 #include "Camera/CameraModuleStatics.h"
+#include "Camera/Actor/CCTVCameraActor.h"
 #include "Camera/Actor/RoamCameraActor.h"
 #include "Camera/Interface/CameraTrackableInterface.h"
 #include "Camera/Manager/CameraManagerBase.h"
@@ -40,8 +42,11 @@ UCameraModule::UCameraModule()
 
 	DefaultCamera = nullptr;
 	DefaultInstantSwitch = false;
+	
 	CameraClasses = TArray<TSubclassOf<ACameraActorBase>>();
 	CameraClasses.Add(ARoamCameraActor::StaticClass());
+	CameraClasses.Add(ACCTVCameraActor::StaticClass());
+	
 	Cameras = TArray<ACameraActorBase*>();
 	CameraMap = TMap<FName, ACameraActorBase*>();
 	CurrentCamera = nullptr;
@@ -59,7 +64,7 @@ UCameraModule::UCameraModule()
 
 	CameraMoveRate = 600.f;
 	bSmoothCameraMove = true;
-	CameraMoveSpeed = 6.f;
+	CameraMoveSpeed = 5.f;
 
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
@@ -67,7 +72,7 @@ UCameraModule::UCameraModule()
 	CameraTurnRate = 90.f;
 	CameraLookUpRate = 90.f;
 	bSmoothCameraRotate = true;
-	CameraRotateSpeed = 6.f;
+	CameraRotateSpeed = 5.f;
 	MinCameraPitch = -90.f;
 	MaxCameraPitch = 90.f;
 	InitCameraPitch = -1.f;
@@ -77,7 +82,7 @@ UCameraModule::UCameraModule()
 	bNormalizeCameraZoom = false;
 	CameraZoomRate = 300.f;
 	bSmoothCameraZoom = true;
-	CameraZoomSpeed = 6.f;
+	CameraZoomSpeed = 5.f;
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
 	InitCameraDistance = 0.f;
@@ -214,9 +219,10 @@ void UCameraModule::OnInitialize()
 
 	for(auto Iter : Cameras)
 	{
-		if(Iter && !CameraMap.Contains(Iter->GetCameraName()))
+		if(Iter)
 		{
-			CameraMap.Add(Iter->GetCameraName(), Iter);
+			CameraMap.Emplace(Iter->GetCameraName(), Iter);
+			Iter->GetCameraBoom()->TargetArmLength = InitCameraDistance;
 		}
 	}
 	
@@ -331,6 +337,11 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 		{
 			StopDoCameraDistance();
 		}
+	}
+
+	if(CurrentCamera && CurrentCamera->GetCamera()->ProjectionMode == ECameraProjectionMode::Orthographic)
+	{
+		CurrentCamera->GetCamera()->SetOrthoWidth(USceneModuleStatics::GetAltitude() * CurrentCamera->GetCameraOrthoFactor());
 	}
 
 #if WITH_EDITOR
@@ -453,7 +464,7 @@ void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 		TargetSocketOffset = InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 		SetCameraLocation(InCamera->GetActorLocation(), bInstant);
 		SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
-		SetCameraDistance(InitCameraDistance, bInstant);
+		SetCameraDistance(InCamera->GetCameraBoom()->TargetArmLength, bInstant);
 	}
 	else if(CurrentCamera)
 	{
@@ -745,6 +756,10 @@ void UCameraModule::SetCameraDistance(float InDistance, bool bInstant)
 	if(!CurrentCamera) return;
 
 	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
+	while(CameraMoveRange.IsValid && !CameraMoveRange.IsInsideOrOn(CurrentCameraLocation - CurrentCameraRotation.Vector() * TargetCameraDistance) && TargetCameraDistance > 0.f)
+	{
+		TargetCameraDistance = FMath::Max(0.f, TargetCameraDistance - 100.f);
+	}
 	if(bInstant)
 	{
 		CurrentCameraDistance = TargetCameraDistance;
@@ -816,7 +831,7 @@ void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
 	if(!bCameraMoveAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::Location))) return;
 
-	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMathf::Abs(USceneModuleStatics::GetAltitude()) / 5000.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude()) / 5000.f)) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
@@ -830,7 +845,7 @@ void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
 	if(!bCameraZoomAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::Distance))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMathf::Abs(FMathf::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / 1000.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / 1000.f)) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
 	{

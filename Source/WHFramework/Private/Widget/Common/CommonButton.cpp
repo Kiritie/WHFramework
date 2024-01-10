@@ -31,7 +31,6 @@ void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 	bClicked = false;
 
 	SetTitle(FText::GetEmpty());
-	SetIconBrush(FSlateBrush());
 
 	if(GetSelected())
 	{

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "TickAbleWidgetInterface.h"
+#include "BaseWidgetInterface.h"
 
 #include "Input/InputModuleTypes.h"
 #include "UObject/Interface.h"
@@ -14,7 +14,7 @@ class UPanelWidget;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UPanelWidgetInterface : public UTickAbleWidgetInterface
+class UPanelWidgetInterface : public UBaseWidgetInterface
 {
 	GENERATED_BODY()
 };
@@ -22,22 +22,11 @@ class UPanelWidgetInterface : public UTickAbleWidgetInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IPanelWidgetInterface : public ITickAbleWidgetInterface
+class WHFRAMEWORK_API IPanelWidgetInterface : public IBaseWidgetInterface
 {
 	GENERATED_BODY()
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
-
-public:
-	virtual void OnRefresh() = 0;
-
-	virtual void OnDestroy(bool bRecovery = false) = 0;
-
-public:
-	virtual void Refresh() = 0;
-
-	virtual void Destroy(bool bRecovery = false) = 0;
-
 public:
 	virtual FName GetWidgetName() const = 0;
 

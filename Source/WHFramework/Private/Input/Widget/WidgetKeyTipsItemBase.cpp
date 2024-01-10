@@ -100,7 +100,7 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetKeyTipsItemBase::OnDestroy()
+void UWidgetKeyTipsItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }

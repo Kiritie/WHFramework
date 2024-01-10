@@ -4,6 +4,7 @@
 #include "Widget/World/WorldWidgetBase.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Blueprint/WidgetTree.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
@@ -27,7 +28,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetAlignment = FVector2D(0.f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0;
-	WidgetVisibilityMode = EWorldWidgetVisibilityMode::AlwaysShow;
+	WidgetVisibility = EWorldWidgetVisibility::AlwaysShow;
 	WidgetShowDistance = -1;
 	WidgetParams = TArray<FParameter>();
 	WidgetInputMode = EInputMode::None;
@@ -147,6 +148,11 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 		}
 	}
 
+	for(auto Iter : GetAllPoolWidgets())
+	{
+		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+	}
+
 	RefreshVisibility();
 
 	K2_OnCreate(InOwner, InParams);
@@ -264,26 +270,36 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
 			const FVector Location = Mapping.SceneComp ? (Mapping.SocketName.IsNone() ? Mapping.SceneComp->GetComponentLocation() : Mapping.SceneComp->GetSocketLocation(Mapping.SocketName)) + Mapping.Location : Mapping.Location;
 
-			switch(WidgetVisibilityMode)
+			switch(WidgetVisibility)
 			{
-				case EWorldWidgetVisibilityMode::AlwaysShow:
+				case EWorldWidgetVisibility::AlwaysShow:
 				{
 					bVisible = true;
 					break;
 				}
-				case EWorldWidgetVisibilityMode::RenderOnly:
+				case EWorldWidgetVisibility::RenderOnly:
 				{
-					bVisible = OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location);
+					bVisible = !OwnerActor || OwnerActor->WasRecentlyRendered();
 					break;
 				}
-				case EWorldWidgetVisibilityMode::DistanceOnly:
+				case EWorldWidgetVisibility::ScreenOnly:
+				{
+					bVisible = UCommonStatics::IsInScreenViewport(Location);
+					break;
+				}
+				case EWorldWidgetVisibility::DistanceOnly:
 				{
 					bVisible = WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance;
 					break;
 				}
-				case EWorldWidgetVisibilityMode::RenderAndDistance:
+				case EWorldWidgetVisibility::RenderAndDistance:
 				{
-					bVisible = (OwnerActor ? OwnerActor->WasRecentlyRendered() : UCommonStatics::IsInScreenViewport(Location)) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+					bVisible = (!OwnerActor || OwnerActor->WasRecentlyRendered()) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+					break;
+				}
+				case EWorldWidgetVisibility::ScreenAndDistance:
+				{
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
 					break;
 				}
 				default: break;
@@ -306,4 +322,19 @@ EWidgetSpace UWorldWidgetBase::GetWidgetSpace() const
 UPanelWidget* UWorldWidgetBase::GetRootPanelWidget() const
 {
 	return Cast<UPanelWidget>(GetRootWidget());
+}
+
+TArray<UWidget*> UWorldWidgetBase::GetAllPoolWidgets() const
+{
+	TArray<UWidget*> PoolWidgets;
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(Iter->Implements<UObjectPoolInterface>())
+		{
+			PoolWidgets.Add(Iter);
+		}
+	}
+	return PoolWidgets;
 }

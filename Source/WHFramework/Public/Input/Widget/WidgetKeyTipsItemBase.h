@@ -23,7 +23,7 @@ public:
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy() override;
+	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))

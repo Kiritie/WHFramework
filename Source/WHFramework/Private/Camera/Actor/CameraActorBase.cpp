@@ -14,6 +14,8 @@ ACameraActorBase::ACameraActorBase()
 	bIsSpatiallyLoaded = false;
 #endif
 
+	PrimaryActorTick.bCanEverTick = true;
+
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
@@ -23,6 +25,8 @@ ACameraActorBase::ACameraActorBase()
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
 	Camera->bUsePawnControlRotation = false;
+
+	CameraOrthoFactor = 1.93f;
 
 	CameraCollisionMode = ECameraCollisionMode::None;
 }

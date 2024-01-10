@@ -286,12 +286,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Input
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FText GetInputActionKeyCodeByName(const FString& InInputActionName);
-
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FKey MakeKeyFromName(const FName InKeyName);
-	
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool HasMouseCapture();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -356,6 +350,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static const UObject* GetWorldContext(bool bInEditor = false);
+
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static UObject* GetMutableWorldContext(bool bInEditor = false);
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static UWorld* GetCurrentWorld(bool bInEditor = false)

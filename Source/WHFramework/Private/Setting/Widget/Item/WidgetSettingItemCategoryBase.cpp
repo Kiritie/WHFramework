@@ -41,9 +41,9 @@ void UWidgetSettingItemCategoryBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetSettingItemCategoryBase::OnDestroy()
+void UWidgetSettingItemCategoryBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 FText UWidgetSettingItemCategoryBase::GetCategory() const

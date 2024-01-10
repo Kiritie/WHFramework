@@ -34,7 +34,7 @@ public:
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy() override;
+	virtual void OnDestroy(bool bRecovery) override;
 
 public:
 	virtual bool NativeOnDrop( const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation ) override;

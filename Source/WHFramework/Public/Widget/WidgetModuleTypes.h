@@ -133,7 +133,7 @@ enum class EScreenWidgetState : uint8
 * 世界Widget可见类型
 */
 UENUM(BlueprintType)
-enum class EWorldWidgetVisibilityMode : uint8
+enum class EWorldWidgetVisibility : uint8
 {
 	/// 无
 	None,
@@ -141,10 +141,14 @@ enum class EWorldWidgetVisibilityMode : uint8
 	AlwaysShow,
 	/// 仅渲染
 	RenderOnly,
+	/// 仅屏幕
+	ScreenOnly,
 	/// 仅距离
 	DistanceOnly,
 	/// 渲染和距离
 	RenderAndDistance,
+	/// 屏幕和距离
+	ScreenAndDistance
 };
 
 USTRUCT(BlueprintType)

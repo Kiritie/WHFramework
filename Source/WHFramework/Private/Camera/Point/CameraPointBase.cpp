@@ -2,6 +2,8 @@
 
 #include "Camera/Point/CameraPointBase.h"
 
+#include "Camera/CameraModuleStatics.h"
+
 ACameraPointBase::ACameraPointBase()
 {
 	bCameraTrack = false;
@@ -31,6 +33,16 @@ void ACameraPointBase::OnRefresh_Implementation(float DeltaSeconds)
 void ACameraPointBase::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+}
+
+void ACameraPointBase::OnSwitch_Implementation()
+{
+	
+}
+
+void ACameraPointBase::Switch_Implementation(bool bCachePoint, bool bSetAsDefault)
+{
+	UCameraModuleStatics::SwitchCameraPoint(this, bCachePoint, bSetAsDefault);
 }
 
 #if WITH_EDITOR

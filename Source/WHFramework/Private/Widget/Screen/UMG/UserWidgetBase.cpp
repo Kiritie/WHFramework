@@ -141,6 +141,11 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 		WidgetCloseAnimator->Execute_OnSpawn(WidgetCloseAnimator, this, {});
 	}
 
+	for(auto Iter : GetAllPoolWidgets())
+	{
+		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+	}
+
 	K2_OnCreate(InOwner, InParams);
 
 	for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
@@ -525,7 +530,7 @@ TArray<USubWidgetBase*> UUserWidgetBase::GetAllSubWidgets() const
 {
 	TArray<USubWidgetBase*> SubWidgets;
 	TArray<UWidget*> Widgets;
-	UWidgetTree::GetChildWidgets(GetRootPanelWidget(), Widgets);
+	WidgetTree->GetAllWidgets(Widgets);
 	for(auto Iter : Widgets)
 	{
 		if(USubWidgetBase* SubWidget = Cast<USubWidgetBase>(Iter))
@@ -534,6 +539,21 @@ TArray<USubWidgetBase*> UUserWidgetBase::GetAllSubWidgets() const
 		}
 	}
 	return SubWidgets;
+}
+
+TArray<UWidget*> UUserWidgetBase::GetAllPoolWidgets() const
+{
+	TArray<UWidget*> PoolWidgets;
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(Iter->Implements<UObjectPoolInterface>())
+		{
+			PoolWidgets.Add(Iter);
+		}
+	}
+	return PoolWidgets;
 }
 
 void UUserWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)

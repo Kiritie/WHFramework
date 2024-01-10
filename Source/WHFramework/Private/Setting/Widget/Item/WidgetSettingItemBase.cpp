@@ -43,9 +43,9 @@ void UWidgetSettingItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetSettingItemBase::OnDestroy()
+void UWidgetSettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 FText UWidgetSettingItemBase::GetLabel() const

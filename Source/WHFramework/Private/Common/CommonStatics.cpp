@@ -11,7 +11,6 @@
 #include "Blueprint/SlateBlueprintLibrary.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "GameFramework/InputSettings.h"
 #include "Gameplay/WHGameInstance.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHGameState.h"
@@ -58,7 +57,6 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 		case EPauseMode::Default:
 		{
 			SetPaused(true);
-			UMainModuleStatics::PauseAllModule();
 			break;
 		}
 		case EPauseMode::OnlyTime:
@@ -68,6 +66,12 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 		}
 		case EPauseMode::OnlyModules:
 		{
+			UMainModuleStatics::PauseAllModule();
+			break;
+		}
+		case EPauseMode::TimeAndModules:
+		{
+			SetTimeScale(0.f);
 			UMainModuleStatics::PauseAllModule();
 			break;
 		}
@@ -92,6 +96,12 @@ void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
 		}
 		case EPauseMode::OnlyModules:
 		{
+			UMainModuleStatics::UnPauseAllModule();
+			break;
+		}
+		case EPauseMode::TimeAndModules:
+		{
+			SetTimeScale(1.f);
 			UMainModuleStatics::UnPauseAllModule();
 			break;
 		}
@@ -400,22 +410,6 @@ bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSha
     return FJsonSerializer::Deserialize(JsonReader, OutJsonObject);
 }
 
-FText UCommonStatics::GetInputActionKeyCodeByName(const FString& InInputActionName)
-{
-	TArray<FInputActionKeyMapping> KeyMappings;
-	UInputSettings::GetInputSettings()->GetActionMappingByName(*InInputActionName, KeyMappings);
-	for(const auto& Iter : KeyMappings)
-	{
-		return FText::FromString(Iter.Key.GetFName().ToString());
-	}
-	return FText::GetEmpty();
-}
-
-FKey UCommonStatics::MakeKeyFromName(const FName InKeyName)
-{
-	return FKey(InKeyName);
-}
-
 bool UCommonStatics::HasMouseCapture()
 {
 	return GetCurrentWorld()->GetGameViewport()->GetGameViewportWidget()->HasMouseCapture();
@@ -684,6 +678,11 @@ FVector2D UCommonStatics::GetGeometryViewportPosition(const FGeometry& InGeometr
 }
 
 const UObject* UCommonStatics::GetWorldContext(bool bInEditor)
+{
+	return AMainModule::GetPtr(bInEditor);
+}
+
+UObject* UCommonStatics::GetMutableWorldContext(bool bInEditor)
 {
 	return AMainModule::GetPtr(bInEditor);
 }

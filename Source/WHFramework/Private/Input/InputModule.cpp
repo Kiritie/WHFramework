@@ -351,33 +351,6 @@ void UInputModule::ApplyTouchMappings()
 	}
 }
 
-UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
-{
-	for (const auto& Iter1 : ContextMappings)
-	{
-		if(UInputMappingContext* IMC = Iter1.InputMapping)
-		{
-			for(auto Iter2 : IMC->GetMappings())
-			{
-				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
-				{
-					if(InputAction->ActionTag == InTag)
-					{
-						return InputAction;
-					}
-				}
-			}
-		}
-	}
-	
-	if (bEnsured)
-	{
-		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
-	}
-
-	return nullptr;
-}
-
 TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FEnhancedActionKeyMapping> Mappings;
@@ -457,7 +430,7 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 
 bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex) const
 {
-	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(FName("SystemOperation")))
+	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(InName))
 	{
 		if(InKey == Iter.GetCurrentKey())
 		{
@@ -467,7 +440,34 @@ bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey
 	return false;
 }
 
-void UInputModule::TurnCamera(const FInputActionValue& InValue)
+UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
+{
+	for (const auto& Iter1 : ContextMappings)
+	{
+		if(UInputMappingContext* IMC = Iter1.InputMapping)
+		{
+			for(auto Iter2 : IMC->GetMappings())
+			{
+				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
+				{
+					if(InputAction->ActionTag == InTag)
+					{
+						return InputAction;
+					}
+				}
+			}
+		}
+	}
+	
+	if (bEnsured)
+	{
+		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
+	}
+
+	return nullptr;
+}
+
+void UInputModule::TurnCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
@@ -477,7 +477,7 @@ void UInputModule::TurnCamera(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::LookUpCamera(const FInputActionValue& InValue)
+void UInputModule::LookUpCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
@@ -487,7 +487,7 @@ void UInputModule::LookUpCamera(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::PanHCamera(const FInputActionValue& InValue)
+void UInputModule::PanHCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -499,7 +499,7 @@ void UInputModule::PanHCamera(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::PanVCamera(const FInputActionValue& InValue)
+void UInputModule::PanVCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -511,7 +511,7 @@ void UInputModule::PanVCamera(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::ZoomCamera(const FInputActionValue& InValue)
+void UInputModule::ZoomCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -521,7 +521,7 @@ void UInputModule::ZoomCamera(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
+void UInputModule::MoveForwardCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -529,7 +529,7 @@ void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
 	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
-void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
+void UInputModule::MoveRightCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -537,14 +537,14 @@ void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
 	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
-void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
+void UInputModule::MoveUpCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
 	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
 }
 
-void UInputModule::TurnPlayer(const FInputActionValue& InValue)
+void UInputModule::TurnPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -554,7 +554,7 @@ void UInputModule::TurnPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveHPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveHPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -564,7 +564,7 @@ void UInputModule::MoveHPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveVPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveVPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -574,7 +574,7 @@ void UInputModule::MoveVPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveForwardPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -588,7 +588,7 @@ void UInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveRightPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveRightPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -602,7 +602,7 @@ void UInputModule::MoveRightPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::MoveUpPlayer(const FInputActionValue& InValue)
+void UInputModule::MoveUpPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -616,7 +616,7 @@ void UInputModule::MoveUpPlayer(const FInputActionValue& InValue)
 	}
 }
 
-void UInputModule::JumpPlayer()
+void UInputModule::JumpPlayer_Implementation()
 {
 	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
 	{
@@ -624,11 +624,11 @@ void UInputModule::JumpPlayer()
 	}
 }
 
-void UInputModule::SystemOperation()
+void UInputModule::SystemOperation_Implementation()
 {
 }
 
-void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchPressed_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
@@ -663,7 +663,7 @@ void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocati
 	}
 }
 
-void UInputModule::TouchPressedImpl()
+void UInputModule::TouchPressedImpl_Implementation()
 {
 	TouchPressedCount++;
 
@@ -671,7 +671,7 @@ void UInputModule::TouchPressedImpl()
 	TouchPinchValuePrevious = -1.f;
 }
 
-void UInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchReleased_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
@@ -700,7 +700,7 @@ void UInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocat
 	}
 }
 
-void UInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
+void UInputModule::TouchReleasedImpl_Implementation(ETouchIndex::Type InTouchIndex)
 {
 	TouchPressedCount--;
 	if(TouchPressedCount < 0)
@@ -732,7 +732,7 @@ void UInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 	}
 }
 
-void UInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	if(TouchPressedCount <= 0) return;
 	
