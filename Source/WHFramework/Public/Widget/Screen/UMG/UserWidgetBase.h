@@ -160,6 +160,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	TArray<USubWidgetBase*> GetAllSubWidgets() const;
 
+	UFUNCTION(BlueprintPure)
+	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
+
 public:
 	void AddChild(IScreenWidgetInterface* InChildWidget) override;
 

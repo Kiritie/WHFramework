@@ -26,6 +26,16 @@ public:
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 	
+	//////////////////////////////////////////////////////////////////////////
+	/// CameraPoint
+public:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSwitch();
+
+public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void Switch(bool bCachePoint = true, bool bSetAsDefault = false);
+
 public:
 #if WITH_EDITOR
 	void GetCameraView();

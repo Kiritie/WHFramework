@@ -3,6 +3,7 @@
 
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 
 USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -24,6 +25,12 @@ void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
 {
 	OwnerWidget = InOwner;
+
+	for(auto Iter : GetAllPoolWidgets())
+	{
+		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+	}
+
 	K2_OnCreate(InOwner, InParams);
 
 	OnInitialize(InParams);
@@ -42,9 +49,9 @@ void USubWidgetBase::OnRefresh()
 	K2_OnRefresh();
 }
 
-void USubWidgetBase::OnDestroy()
+void USubWidgetBase::OnDestroy(bool bRecovery)
 {
-	K2_OnDestroy();
+	K2_OnDestroy(bRecovery);
 }
 
 void USubWidgetBase::Refresh()
@@ -58,4 +65,19 @@ void USubWidgetBase::Destroy(bool bRecovery)
 	{
 		OwnerWidget->DestroySubWidget(this, bRecovery);
 	}
+}
+
+TArray<UWidget*> USubWidgetBase::GetAllPoolWidgets() const
+{
+	TArray<UWidget*> PoolWidgets;
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(Iter->Implements<UObjectPoolInterface>())
+		{
+			PoolWidgets.Add(Iter);
+		}
+	}
+	return PoolWidgets;
 }

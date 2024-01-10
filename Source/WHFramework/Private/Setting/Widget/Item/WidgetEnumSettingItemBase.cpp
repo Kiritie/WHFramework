@@ -59,9 +59,9 @@ void UWidgetEnumSettingItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetEnumSettingItemBase::OnDestroy()
+void UWidgetEnumSettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged(FString InSelectedItem, ESelectInfo::Type InSelectionType)

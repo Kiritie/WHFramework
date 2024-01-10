@@ -404,8 +404,15 @@ class WHFRAMEWORK_API FCancelableDelayAction : public FPendingLatentAction
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
 	{
-		TimeRemaining -= Response.ElapsedTime();
-		Response.FinishAndTriggerIf(TimeRemaining <= 0.0f && bExecute, ExecutionFunction, OutputLink, CallbackTarget);
+		if(bExecute)
+		{
+			TimeRemaining -= Response.ElapsedTime();
+			Response.FinishAndTriggerIf(TimeRemaining <= 0.0f, ExecutionFunction, OutputLink, CallbackTarget);
+		}
+		else
+		{
+			Response.FinishAndTriggerIf(true, ExecutionFunction, OutputLink, nullptr);
+		}
 	}
 
 #if WITH_EDITOR

@@ -34,7 +34,7 @@ protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Camera
+	/// CameraActor
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnSwitch();
@@ -43,13 +43,13 @@ public:
 	void OnUnSwitch();
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void Switch();
 
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void UnSwitch();
 
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
 
 public:
@@ -71,6 +71,9 @@ protected:
 	FName CameraName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
+	float CameraOrthoFactor;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	ECameraCollisionMode CameraCollisionMode;
 
 public:
@@ -82,6 +85,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCameraOrthoFactor() const { return CameraOrthoFactor; }
 
 	UFUNCTION(BlueprintPure)
 	ECameraCollisionMode GetCameraCollisionMode() const { return CameraCollisionMode; }

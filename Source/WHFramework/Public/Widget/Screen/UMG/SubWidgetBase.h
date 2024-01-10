@@ -13,7 +13,7 @@
  * 
  */
 UCLASS(BlueprintType, meta = (DisableNativeTick))
-class WHFRAMEWORK_API USubWidgetBase : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API USubWidgetBase : public UUserWidget, public IBaseWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
@@ -41,19 +41,19 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
 	UFUNCTION()
-	virtual void OnRefresh();
+	virtual void OnRefresh() override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy();
+	void K2_OnDestroy(bool bRecovery = false);
 	UFUNCTION()
-	virtual void OnDestroy();
+	virtual void OnDestroy(bool bRecovery = false) override;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void Refresh();
+	void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	void Destroy(bool bRecovery = false);
+	void Destroy(bool bRecovery = false) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -74,4 +74,7 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
 };

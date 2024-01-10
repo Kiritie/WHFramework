@@ -124,7 +124,7 @@ public:
 	float GetMiniMapRange() const { return MiniMapRange; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = FMathf::Clamp(InMiniMapRange, MiniMapMinRange, MiniMapMaxRange != -1.f ? MiniMapMaxRange : InMiniMapRange); }
+	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = FMath::Clamp(InMiniMapRange, MiniMapMinRange, MiniMapMaxRange != -1.f ? MiniMapMaxRange : InMiniMapRange); }
 
 	UFUNCTION(BlueprintPure)
 	UTextureRenderTarget2D* GetMiniMapTexture() const { return MiniMapTexture; }

@@ -43,9 +43,9 @@ void UWidgetTextSettingItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetTextSettingItemBase::OnDestroy()
+void UWidgetTextSettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetTextSettingItemBase::OnTextBoxContentChanged(const FText& InText)

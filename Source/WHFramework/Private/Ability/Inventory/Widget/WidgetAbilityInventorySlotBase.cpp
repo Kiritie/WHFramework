@@ -81,9 +81,9 @@ void UWidgetAbilityInventorySlotBase::OnRefresh()
 	}
 }
 
-void UWidgetAbilityInventorySlotBase::OnDestroy()
+void UWidgetAbilityInventorySlotBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

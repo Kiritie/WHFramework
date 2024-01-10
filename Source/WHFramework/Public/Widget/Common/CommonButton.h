@@ -70,7 +70,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsClicked() const { return bClicked; }
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = InBrush))
 	void SetIconBrush(const FSlateBrush& InBrush);
 
 	UFUNCTION(BlueprintCallable)

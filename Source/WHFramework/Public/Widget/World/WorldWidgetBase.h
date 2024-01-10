@@ -144,9 +144,9 @@ protected:
 	float WidgetRefreshTime;
 	
 	UPROPERTY(EditDefaultsOnly)
-	EWorldWidgetVisibilityMode WidgetVisibilityMode;
+	EWorldWidgetVisibility WidgetVisibility;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetVisibilityMode == EWidgetVisibilityMode::DistanceOnly || WidgetVisibilityMode == EWidgetVisibilityMode::RenderAndDistance"))
+	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetVisibility == EWorldWidgetVisibility::DistanceOnly || WidgetVisibility == EWorldWidgetVisibility::RenderAndDistance || WidgetVisibility == EWorldWidgetVisibility::ScreenAndDistance"))
 	float WidgetShowDistance;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -229,4 +229,7 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	virtual UPanelWidget* GetRootPanelWidget() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
 };

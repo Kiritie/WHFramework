@@ -59,9 +59,9 @@ void UWidgetKeySettingItemBase::OnRefresh()
 	}
 }
 
-void UWidgetKeySettingItemBase::OnDestroy()
+void UWidgetKeySettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)

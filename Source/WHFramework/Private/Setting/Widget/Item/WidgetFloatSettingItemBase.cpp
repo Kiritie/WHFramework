@@ -82,9 +82,9 @@ void UWidgetFloatSettingItemBase::OnRefresh()
 	}
 }
 
-void UWidgetFloatSettingItemBase::OnDestroy()
+void UWidgetFloatSettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetFloatSettingItemBase::OnSliderValueChanged(float InValue)

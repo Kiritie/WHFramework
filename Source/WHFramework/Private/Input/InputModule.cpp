@@ -17,7 +17,6 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Input/Base/InputActionBase.h"
 #include "SaveGame/Module/InputSaveGame.h"
-#include "Debug/DebugModuleTypes.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
@@ -357,33 +356,6 @@ void UInputModule::ApplyTouchMappings()
 	}
 }
 
-UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
-{
-	for (const auto& Iter1 : ContextMappings)
-	{
-		if(UInputMappingContext* IMC = Iter1.InputMapping)
-		{
-			for(auto Iter2 : IMC->GetMappings())
-			{
-				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
-				{
-					if(InputAction->ActionTag == InTag)
-					{
-						return InputAction;
-					}
-				}
-			}
-		}
-	}
-	
-	if (bEnsured)
-	{
-		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
-	}
-
-	return nullptr;
-}
-
 TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FEnhancedActionKeyMapping> Mappings;
@@ -463,7 +435,7 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 
 bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex) const
 {
-	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(FName("SystemOperation")))
+	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(InName))
 	{
 		if(InKey == Iter.GetCurrentKey())
 		{
@@ -471,6 +443,33 @@ bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey
 		}
 	}
 	return false;
+}
+
+UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
+{
+	for (const auto& Iter1 : ContextMappings)
+	{
+		if(UInputMappingContext* IMC = Iter1.InputMapping)
+		{
+			for(auto Iter2 : IMC->GetMappings())
+			{
+				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
+				{
+					if(InputAction->ActionTag == InTag)
+					{
+						return InputAction;
+					}
+				}
+			}
+		}
+	}
+	
+	if (bEnsured)
+	{
+		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
+	}
+
+	return nullptr;
 }
 
 void UInputModule::TouchPressed_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)

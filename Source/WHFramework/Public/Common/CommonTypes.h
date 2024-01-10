@@ -21,7 +21,8 @@ enum class EPauseMode : uint8
 {
 	Default,
 	OnlyTime,
-	OnlyModules
+	OnlyModules,
+	TimeAndModules
 };
 
 UENUM(BlueprintType)

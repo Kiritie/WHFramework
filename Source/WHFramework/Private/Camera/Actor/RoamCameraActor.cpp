@@ -29,8 +29,6 @@ ARoamCameraActor::ARoamCameraActor()
 void ARoamCameraActor::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
-
-	SetCameraCollisionMode(CameraCollisionMode);
 }
 
 void ARoamCameraActor::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)

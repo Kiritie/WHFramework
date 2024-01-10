@@ -30,7 +30,7 @@ public:
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy() override;
+	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
 	UFUNCTION()

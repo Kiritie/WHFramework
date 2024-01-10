@@ -36,9 +36,9 @@ void UWidgetBoolSettingItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetBoolSettingItemBase::OnDestroy()
+void UWidgetBoolSettingItemBase::OnDestroy(bool bRecovery)
 {
-	Super::OnDestroy();
+	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetBoolSettingItemBase::OnCheckBoxStateChanged(bool bIsChecked)

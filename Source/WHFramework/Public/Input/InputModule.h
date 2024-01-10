@@ -233,7 +233,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 
+	UFUNCTION(BlueprintPure)
 	virtual int32 GetNativeInputPriority() const override { return 0; }
 
+	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 };
