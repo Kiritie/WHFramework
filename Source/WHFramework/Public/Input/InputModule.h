@@ -3,19 +3,20 @@
 #pragma once
 
 
-#include "InputManager.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
+#include "Manager/InputManagerInterface.h"
 
 #include "InputModule.generated.h"
 
+class UInputManagerBase;
 class UInputComponentBase;
 class UInputMappingContext;
 class UInputActionBase;
 class UEnhancedInputComponent;
 
 UCLASS()
-class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManager
+class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInterface
 {
 	GENERATED_BODY()
 			
@@ -49,11 +50,6 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnBindAction")
-	void K2_OnBindAction(UInputComponentBase* InInputComponent);
-	UFUNCTION()
-	virtual void OnBindAction(UInputComponentBase* InInputComponent);
-
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -67,6 +63,28 @@ protected:
 
 protected:
 	FInputModuleSaveData LocalSaveData;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Input Manager
+protected:
+	UPROPERTY(EditAnywhere)
+	TArray<TSubclassOf<UInputManagerBase>> InputManagers;
+
+	UPROPERTY(Transient)
+	TMap<FName, UInputManagerBase*> InputManagerRefs;
+
+public:
+	template<class T>
+	T* GetInputManager() const
+	{
+		return Cast<T>(GetInputManager(T::StaticClass()));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass) const;
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UInputManagerBase* GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
@@ -146,60 +164,6 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
 	UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true) const;
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// CameraInputs
-protected:
-	UFUNCTION()
-	virtual void TurnCamera(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void LookUpCamera(const FInputActionValue& InValue);
-	
-	UFUNCTION()
-	virtual void PanHCamera(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void PanVCamera(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void ZoomCamera(const FInputActionValue& InValue);
-	
-	UFUNCTION()
-	virtual void MoveForwardCamera(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveRightCamera(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveUpCamera(const FInputActionValue& InValue);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// PlayerInputs
-protected:
-	UFUNCTION()
-	virtual void TurnPlayer(const FInputActionValue& InValue);
-	
-	UFUNCTION()
-	virtual void MoveHPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveVPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveForwardPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveRightPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void MoveUpPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION()
-	virtual void JumpPlayer();
-
-	UFUNCTION()
-	virtual void SystemOperation();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TouchInputs
@@ -208,20 +172,20 @@ protected:
 	float TouchInputRate;
 
 protected:
-	UFUNCTION()
-	virtual void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
-	UFUNCTION()
-	virtual void TouchPressedImpl();
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchPressedImpl();
 
-	UFUNCTION()
-	virtual void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
-	UFUNCTION()
-	virtual void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
 
-	UFUNCTION()
-	virtual void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintNativeEvent)
+	void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// InputStates

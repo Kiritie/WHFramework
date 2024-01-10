@@ -45,6 +45,19 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
 	static UInputComponentBase* GetInputComponent(int32 InPlayerIndex = 0, TSubclassOf<UInputComponentBase> InClass = nullptr);
 
+public:
+	template<class T>
+	static T* GetInputManager()
+	{
+		return Cast<T>(GetInputManager(T::StaticClass()));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
+	static UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass);
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
+	static UInputManagerBase* GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass = nullptr);
+
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
 public:

@@ -3,13 +3,13 @@
 #pragma once
 
 
-#include "InputModuleTypes.h"
+#include "Input/InputModuleTypes.h"
 #include "UObject/Interface.h"
-#include "InputManager.generated.h"
+#include "InputManagerInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UInputManager : public UInterface
+class UInputManagerInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -17,13 +17,13 @@ class UInputManager : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IInputManager
+class WHFRAMEWORK_API IInputManagerInterface
 {
 	GENERATED_BODY()
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 	virtual int32 GetNativeInputPriority() const = 0;
-		
+	
 	virtual EInputMode GetNativeInputMode() const = 0;
 };

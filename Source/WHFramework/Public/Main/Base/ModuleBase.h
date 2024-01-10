@@ -8,8 +8,8 @@
 #include "SaveGame/Base/SaveDataInterface.h"
 #include "ModuleBase.generated.h"
 
-class UModuleSaveGame;
 class AMainModule;
+class UModuleSaveGame;
 class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);

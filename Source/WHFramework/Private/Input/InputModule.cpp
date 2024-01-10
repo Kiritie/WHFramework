@@ -9,13 +9,10 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Input/EventHandle_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Gameplay/WHPlayerInterface.h"
-#include "Input/InputManager.h"
 #include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
 #include "InputMappingContext.h"
-#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Input/Base/InputActionBase.h"
@@ -24,7 +21,9 @@
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
+#include "Input/Manager/InputManagerBase.h"
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 IMPLEMENTATION_MODULE(UInputModule)
 
@@ -109,6 +108,15 @@ void UInputModule::OnDestroy()
 void UInputModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	for(auto Iter : InputManagers)
+	{
+		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, Iter))
+		{
+			InputManager->OnInitialize();
+			InputManagerRefs.Add(InputManager->GetInputManagerName(), InputManager);
+		}
+	}
 }
 
 void UInputModule::OnPreparatory(EPhase InPhase)
@@ -134,7 +142,11 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 				Subsystem->AddMappingContext(Iter.InputMapping, Iter.Priority, Options);
 			}
 		}
-		OnBindAction(Component);
+
+		for(auto Iter : InputManagerRefs)
+		{
+			Iter.Value->OnBindAction(Component);
+		}
 		
 		UpdateInputMode();
 	}
@@ -169,27 +181,6 @@ void UInputModule::OnUnPause()
 void UInputModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-}
-
-void UInputModule::OnBindAction(UInputComponentBase* InInputComponent)
-{
-	K2_OnBindAction(InInputComponent);
-
-	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UInputModule::TurnCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UInputModule::LookUpCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UInputModule::PanHCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UInputModule::PanVCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UInputModule::ZoomCamera);
-	
-	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UInputModule::TurnPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveHPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveVPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveForwardPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveRightPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UInputModule::MoveUpPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UInputModule::JumpPlayer);
-
-	InInputComponent->BindInputAction(GameplayTags::InputTag_SystemOperation, ETriggerEvent::Started, this, &UInputModule::SystemOperation);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -264,6 +255,21 @@ FSaveData* UInputModule::GetData()
 		LocalSaveData = ToData()->CastRef<FInputModuleSaveData>();
 	}
 	return &LocalSaveData;
+}
+
+UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass) const
+{
+	const FName InputManagerName = InClass->GetDefaultObject<UInputManagerBase>()->GetInputManagerName();
+	return GetInputManagerByName(InputManagerName, InClass);
+}
+
+UInputManagerBase* UInputModule::GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass) const
+{
+	if(InputManagerRefs.Contains(InName))
+	{
+		return GetDeterminesOutputObject(InputManagerRefs[InName], InClass);
+	}
+	return nullptr;
 }
 
 void UInputModule::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
@@ -467,168 +473,7 @@ bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey
 	return false;
 }
 
-void UInputModule::TurnCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
-
-	if(GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController(), true))
-	{
-		UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>(), 0.f);
-	}
-}
-
-void UInputModule::LookUpCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
-
-	if(GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController(), true))
-	{
-		UCameraModule::Get().AddCameraRotationInput(0.f, UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
-	}
-}
-
-void UInputModule::PanHCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()))
-	{
-		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
-		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
-	}
-}
-
-void UInputModule::PanVCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()))
-	{
-		const FRotator Rotation = GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f);
-		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
-	}
-}
-
-void UInputModule::ZoomCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetKeyShortcut(GameplayTags::InputTag_CameraZoom).IsPressing(GetPlayerController(), true))
-	{
-		UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>());
-	}
-}
-
-void UInputModule::MoveForwardCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
-}
-
-void UInputModule::MoveRightCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
-}
-
-void UInputModule::MoveUpCamera(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (GetKeyShortcut(GameplayTags::InputTag_CameraSprint).IsPressing(GetPlayerController()) ? 3.f : 1.5f));
-}
-
-void UInputModule::TurnPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_Turn(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UInputModule::MoveHPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveH(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UInputModule::MoveVPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveV(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UInputModule::MoveForwardPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveForward(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-	else
-	{
-		MoveForwardCamera(InValue);
-	}
-}
-
-void UInputModule::MoveRightPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveRight(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-	else
-	{
-		MoveRightCamera(InValue);
-	}
-}
-
-void UInputModule::MoveUpPlayer(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveUp(GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-	else
-	{
-		MoveUpCamera(InValue);
-	}
-}
-
-void UInputModule::JumpPlayer()
-{
-	if(GetPlayerController()->GetPawn() && GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_JumpN(GetPlayerController()->GetPawn());
-	}
-}
-
-void UInputModule::SystemOperation()
-{
-}
-
-void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchPressed_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
@@ -663,7 +508,7 @@ void UInputModule::TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocati
 	}
 }
 
-void UInputModule::TouchPressedImpl()
+void UInputModule::TouchPressedImpl_Implementation()
 {
 	TouchPressedCount++;
 
@@ -671,7 +516,7 @@ void UInputModule::TouchPressedImpl()
 	TouchPinchValuePrevious = -1.f;
 }
 
-void UInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchReleased_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	switch (InTouchIndex)
 	{
@@ -700,7 +545,7 @@ void UInputModule::TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocat
 	}
 }
 
-void UInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
+void UInputModule::TouchReleasedImpl_Implementation(ETouchIndex::Type InTouchIndex)
 {
 	TouchPressedCount--;
 	if(TouchPressedCount < 0)
@@ -732,7 +577,7 @@ void UInputModule::TouchReleasedImpl(ETouchIndex::Type InTouchIndex)
 	}
 }
 
-void UInputModule::TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation)
+void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
 {
 	if(TouchPressedCount <= 0) return;
 	
@@ -797,12 +642,8 @@ AWHPlayerController* UInputModule::GetPlayerController()
 
 void UInputModule::UpdateInputMode()
 {
-	TArray<IInputManager*> InputManagers = AMainModule::GetAllModule<IInputManager>();
-	// InputManagers.Sort([](const IInputManager& A, const IInputManager& B){
-	// 	return A.GetNativeInputPriority() < B.GetNativeInputPriority();
-	// });
 	EInputMode InputMode = EInputMode::None;
-	for (const auto Iter : InputManagers)
+	for (const auto Iter : AMainModule::GetAllModule<IInputManagerInterface>())
 	{
 		if ((int32)Iter->GetNativeInputMode() > (int32)InputMode)
 		{

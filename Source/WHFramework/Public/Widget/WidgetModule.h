@@ -4,8 +4,6 @@
 
 
 #include "Main/Base/ModuleBase.h"
-#include "Input/InputManager.h"
-#include "Input/InputModule.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
@@ -13,13 +11,14 @@
 #include "Widget/Screen/UMG/UserWidgetBase.h"
 #include "World/WorldWidgetBase.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Input/Manager/InputManagerInterface.h"
 #include "WidgetModule.generated.h"
 
 class UEventHandle_CloseUserWidget;
 class UEventHandle_OpenUserWidget;
 
 UCLASS()
-class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManager
+class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManagerInterface
 {
 	GENERATED_BODY()
 			
