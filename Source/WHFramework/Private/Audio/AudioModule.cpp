@@ -143,6 +143,11 @@ void UAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	BackgroundSoundParams = SaveData.BackgroundSoundParams;
 	EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
 	EffectSoundParams = SaveData.EffectSoundParams;
+
+	SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, 0.f);
+	SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, 0.f);
+	SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, 0.f);
+	SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, 0.f);
 }
 
 void UAudioModule::UnloadData(EPhase InPhase)
@@ -210,7 +215,7 @@ FSingleSoundInfo UAudioModule::GetSingleSoundInfo(const FSingleSoundHandle& InHa
 {
 	if(SingleSoundInfos.Contains(InHandle))
 	{
-		SingleSoundInfos[InHandle];
+		return SingleSoundInfos[InHandle];
 	}
 	return FSingleSoundInfo();
 }

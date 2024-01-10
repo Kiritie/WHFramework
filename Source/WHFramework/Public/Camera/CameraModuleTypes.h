@@ -33,26 +33,26 @@ UENUM(BlueprintType)
 enum class ECameraSmoothMode : uint8
 {
 	None = 0,
-	Location = 1 << 0,
-	Rotation = 1 << 1,
-	Distance = 1 << 2,
-	LocationAndRotation = Location | Rotation,
-	RotationAndDistance = Rotation | Distance,
-	LocationAndDistance = Location | Distance,
-	All = Location | Rotation | Distance
+	LocationOnly = 1 << 0,
+	RotationOnly = 1 << 1,
+	DistanceOnly = 1 << 2,
+	LocationAndRotation = LocationOnly | RotationOnly,
+	RotationAndDistance = RotationOnly | DistanceOnly,
+	LocationAndDistance = LocationOnly | DistanceOnly,
+	All = LocationOnly | RotationOnly | DistanceOnly
 };
 
 UENUM(BlueprintType)
 enum class ECameraControlMode : uint8
 {
 	None = 0,
-	Location = 1 << 0,
-	Rotation = 1 << 1,
-	Distance = 1 << 2,
-	LocationAndRotation = Location | Rotation,
-	RotationAndDistance = Rotation | Distance,
-	LocationAndDistance = Location | Distance,
-	All = Location | Rotation | Distance
+	LocationOnly = 1 << 0,
+	RotationOnly = 1 << 1,
+	DistanceOnly = 1 << 2,
+	LocationAndRotation = LocationOnly | RotationOnly,
+	RotationAndDistance = RotationOnly | DistanceOnly,
+	LocationAndDistance = LocationOnly | DistanceOnly,
+	All = LocationOnly | RotationOnly | DistanceOnly
 };
 
 UENUM(BlueprintType)

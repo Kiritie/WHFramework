@@ -59,17 +59,17 @@ void UCommonStatics::PauseGame(EPauseMode PauseMode)
 			SetPaused(true);
 			break;
 		}
-		case EPauseMode::OnlyTime:
+		case EPauseMode::TimeOnly:
 		{
 			SetTimeScale(0.f);
 			break;
 		}
-		case EPauseMode::OnlyModules:
+		case EPauseMode::ModuleOnly:
 		{
 			UMainModuleStatics::PauseAllModule();
 			break;
 		}
-		case EPauseMode::TimeAndModules:
+		case EPauseMode::TimeAndModule:
 		{
 			SetTimeScale(0.f);
 			UMainModuleStatics::PauseAllModule();
@@ -89,17 +89,17 @@ void UCommonStatics::UnPauseGame(EPauseMode PauseMode)
 			UMainModuleStatics::UnPauseAllModule();
 			break;
 		}
-		case EPauseMode::OnlyTime:
+		case EPauseMode::TimeOnly:
 		{
 			SetTimeScale(1.f);
 			break;
 		}
-		case EPauseMode::OnlyModules:
+		case EPauseMode::ModuleOnly:
 		{
 			UMainModuleStatics::UnPauseAllModule();
 			break;
 		}
-		case EPauseMode::TimeAndModules:
+		case EPauseMode::TimeAndModule:
 		{
 			SetTimeScale(1.f);
 			UMainModuleStatics::UnPauseAllModule();

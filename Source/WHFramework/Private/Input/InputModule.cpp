@@ -20,6 +20,7 @@
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
+#include "Input/Manager/DefaultInputManagerBase.h"
 #include "Input/Manager/InputManagerBase.h"
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -33,6 +34,8 @@ UInputModule::UInputModule()
 	ModuleDisplayName = FText::FromString(TEXT("Input Module"));
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
+
+	InputManagers.Add(UDefaultInputManagerBase::StaticClass());
 	
 	AddKeyShortcut(GameplayTags::InputTag_InteractSelect, FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
 	

@@ -2,10 +2,11 @@
 
 #pragma once
 
-#include "InputActionValue.h"
 #include "Common/Base/WHObject.h"
 
 #include "InputManagerBase.generated.h"
+
+class UInputComponentBase;
 
 UCLASS()
 class WHFRAMEWORK_API UInputManagerBase : public UWHObject
