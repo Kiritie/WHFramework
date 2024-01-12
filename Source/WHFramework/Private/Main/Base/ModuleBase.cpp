@@ -22,6 +22,7 @@ UModuleBase::UModuleBase()
 	ModuleSavePhase = EPhase::Final;
 	ModuleSaveGame = nullptr;
 	ModuleNetworkComponent = nullptr;
+	ModuleDependencies = TArray<FName>();
 }
 
 #if WITH_EDITOR

@@ -138,7 +138,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 		PlayerController->Possess(CurrentCharacter);
 		CurrentCharacter->OnSwitch();
 		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(CurrentCharacter, ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce, bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentCharacter) * CurrentCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentCharacter));
+		UCameraModuleStatics::StartTrackTarget(CurrentCharacter, ICameraTrackableInterface::Execute_GetCameraTrackMode(CurrentCharacter), bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentCharacter) * CurrentCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentCharacter));
 	}
 	else if(CurrentCharacter)
 	{

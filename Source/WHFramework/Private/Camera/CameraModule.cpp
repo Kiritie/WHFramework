@@ -87,7 +87,7 @@ UCameraModule::UCameraModule()
 	CameraZoomSpeed = 5.f;
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
-	InitCameraDistance = 0.f;
+	InitCameraDistance = -1.f;
 
 	CachedCameraPoint = nullptr;
 	CachedCameraViewData = FCameraViewData();
@@ -221,11 +221,15 @@ void UCameraModule::OnInitialize()
 
 	for(auto Iter : Cameras)
 	{
-		if(Iter)
+		if(InitCameraDistance != -1.f)
 		{
-			CameraMap.Emplace(Iter->GetCameraName(), Iter);
 			Iter->GetCameraBoom()->TargetArmLength = InitCameraDistance;
 		}
+		if(InitCameraPitch != -1.f)
+		{
+			Iter->SetActorRotation(FRotator(InitCameraPitch, Iter->GetActorRotation().Yaw, Iter->GetActorRotation().Roll));
+		}
+		CameraMap.Emplace(Iter->GetCameraName(), Iter);
 	}
 	
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, FName("OnSetCameraView"));

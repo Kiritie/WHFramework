@@ -51,7 +51,7 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 
 void APawnBase::OnInitialize_Implementation()
 {
-	
+	Execute_SetActorVisible(this, bVisible);
 }
 
 void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
@@ -63,13 +63,16 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
 
-	if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		Chunk->AddSceneActor(this);
-	}
-	else if(Container)
-	{
-		Container->RemoveSceneActor(this);
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		{
+			Chunk->AddSceneActor(this);
+		}
+		else if(Container)
+		{
+			Container->RemoveSceneActor(this);
+		}
 	}
 }
 
@@ -229,6 +232,11 @@ float APawnBase::GetCameraMinPitch_Implementation() const
 float APawnBase::GetCameraMaxPitch_Implementation() const
 {
 	return -1.f;
+}
+
+ECameraTrackMode APawnBase::GetCameraTrackMode_Implementation() const
+{
+	return ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce;
 }
 
 ECameraSmoothMode APawnBase::GetCameraSmoothMode_Implementation() const

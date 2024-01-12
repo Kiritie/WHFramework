@@ -28,12 +28,15 @@ public:
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	float GetCameraDistance() const;
-		
+	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	float GetCameraMinPitch() const;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	float GetCameraMaxPitch() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	ECameraTrackMode GetCameraTrackMode() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	ECameraSmoothMode GetCameraSmoothMode() const;

@@ -171,16 +171,16 @@ protected:
 	/// 模块索引（决定模块执行顺序）
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 ModuleIndex;
-	/// 必须的
+	/// 是否是必须的
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleRequired;
-	/// 自动运行
+	/// 是否自动运行
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoRun;
-	/// 自动保存
+	/// 是否自动保存
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoSave;
-	/// 保存时机
+	/// 自动保存时机
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	EPhase ModuleSavePhase;
 	/// 模块存档
@@ -189,6 +189,9 @@ protected:
 	/// 模块网络组件
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UModuleNetworkComponentBase> ModuleNetworkComponent;
+	/// 依赖模块名称
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FName> ModuleDependencies;
 
 public:
 	UPROPERTY(BlueprintAssignable)
@@ -252,6 +255,11 @@ public:
 	}
 	UFUNCTION(BlueprintPure)
 	UModuleNetworkComponentBase* GetModuleNetworkComponent() const;
+	/**
+	* 获取依赖模块名称
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<FName> GetModuleDependencies() const { return ModuleDependencies; }
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

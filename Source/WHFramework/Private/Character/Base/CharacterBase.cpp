@@ -63,6 +63,8 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 
 void ACharacterBase::OnInitialize_Implementation()
 {
+	Execute_SetActorVisible(this, bVisible);
+
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
@@ -75,13 +77,16 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
 
-	if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		Chunk->AddSceneActor(this);
-	}
-	else if(Container)
-	{
-		Container->RemoveSceneActor(this);
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		{
+			Chunk->AddSceneActor(this);
+		}
+		else if(Container)
+		{
+			Container->RemoveSceneActor(this);
+		}
 	}
 }
 
@@ -241,6 +246,11 @@ float ACharacterBase::GetCameraMinPitch_Implementation() const
 float ACharacterBase::GetCameraMaxPitch_Implementation() const
 {
 	return -1.f;
+}
+
+ECameraTrackMode ACharacterBase::GetCameraTrackMode_Implementation() const
+{
+	return ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce;
 }
 
 ECameraSmoothMode ACharacterBase::GetCameraSmoothMode_Implementation() const

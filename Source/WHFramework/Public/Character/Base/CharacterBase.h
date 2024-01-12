@@ -115,6 +115,8 @@ public:
 
 	virtual float GetCameraMaxPitch_Implementation() const override;
 
+	virtual ECameraTrackMode GetCameraTrackMode_Implementation() const override;
+
 	virtual ECameraSmoothMode GetCameraSmoothMode_Implementation() const override;
 
 	virtual ECameraControlMode GetCameraControlMode_Implementation() const override;
