@@ -139,7 +139,7 @@ public:
 	void SwitchCameraByName(const FName InName, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false);
+	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false, bool bInstant = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control
@@ -280,17 +280,17 @@ private:
 	AWHPlayerController* PlayerController;
 
 protected:
-	virtual void DoTrackTarget();
+	virtual void DoTrackTarget(bool bInstant = false);
 	
-	virtual void DoTrackTargetLocation();
+	virtual void DoTrackTargetLocation(bool bInstant = false);
 	
-	virtual void DoTrackTargetRotation();
+	virtual void DoTrackTargetRotation(bool bInstant = false);
 	
-	virtual void DoTrackTargetDistance();
+	virtual void DoTrackTargetDistance(bool bInstant = false);
 
 public:
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration"))
-	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f);
+	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration,bInstant"))
+	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -348,14 +348,14 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
-	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true);
+	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint);
+	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint, bool bInstant = false);
 
 protected:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams);
+	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams, bool bInstant = false);
 
 protected:
 	UFUNCTION()

@@ -13,6 +13,8 @@ UDebugModule::UDebugModule()
 	ModuleName = FName("DebugModule");
 	ModuleDisplayName = FText::FromString(TEXT("Debug Module"));
 
+	bModuleRequired = true;
+
 	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
 	DON_WITHINDEX((int32)EDC_Custom1, i, 
 		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));

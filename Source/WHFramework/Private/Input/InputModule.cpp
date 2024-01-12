@@ -33,6 +33,8 @@ UInputModule::UInputModule()
 	ModuleName = FName("InputModule");
 	ModuleDisplayName = FText::FromString(TEXT("Input Module"));
 
+	bModuleRequired = true;
+
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 
 	InputManagers.Add(UDefaultInputManagerBase::StaticClass());

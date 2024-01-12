@@ -60,7 +60,7 @@ FParameter UParameterModuleStatics::MakeNameParameter(const FName InValue)
 	return FParameter::MakeName(InValue);
 }
 
-FParameter UParameterModuleStatics::MakeTextParameter(const FText InValue)
+FParameter UParameterModuleStatics::MakeTextParameter(const FText& InValue)
 {
 	return FParameter::MakeText(InValue);
 }
@@ -70,12 +70,12 @@ FParameter UParameterModuleStatics::MakeBooleanParameter(bool InValue)
 	return FParameter::MakeBoolean(InValue);
 }
 
-FParameter UParameterModuleStatics::MakeVectorParameter(FVector InValue)
+FParameter UParameterModuleStatics::MakeVectorParameter(const FVector& InValue)
 {
 	return FParameter::MakeVector(InValue);
 }
 
-FParameter UParameterModuleStatics::MakeRotatorParameter(FRotator InValue)
+FParameter UParameterModuleStatics::MakeRotatorParameter(const FRotator& InValue)
 {
 	return FParameter::MakeRotator(InValue);
 }

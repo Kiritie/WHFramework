@@ -21,6 +21,7 @@ void SProcedureListItemWidget::Construct(const FArguments& InArgs, const TShared
 		[
 			SNew(STextBlock)
 			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), Item->Procedure->ProcedureIndex + 1, *Item->Procedure->ProcedureDisplayName.ToString())); })
+			.ColorAndOpacity(FSlateColor(FLinearColor(0.8f, 0.8f, 0.8f)))
 			.HighlightText_Lambda([this](){ return ListWidget->ActiveFilterText; })
 		],
 		InOwnerTableView

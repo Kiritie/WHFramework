@@ -14,6 +14,8 @@ UFSMModule::UFSMModule()
 	ModuleName = FName("FSMModule");
 	ModuleDisplayName = FText::FromString(TEXT("FSM Module"));
 
+	bModuleRequired = true;
+
 	ModuleNetworkComponent = UFSMModuleNetworkComponent::StaticClass();
 
 	GroupMap = TMap<FName, FFSMGroupInfo>();

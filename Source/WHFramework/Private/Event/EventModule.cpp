@@ -20,6 +20,8 @@ UEventModule::UEventModule()
 	ModuleName = FName("EventModule");
 	ModuleDisplayName = FText::FromString(TEXT("Event Module"));
 
+	bModuleRequired = true;
+
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
 
 	EventManagers = TArray<TSubclassOf<UEventManagerBase>>();

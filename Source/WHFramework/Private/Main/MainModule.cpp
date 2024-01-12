@@ -66,7 +66,7 @@ void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
 			{
 				Modules[i]->OnPreparatory(InPhase);
 			}
-			else if(Modules[i]->IsAutoRunModule())
+			else if(Modules[i]->IsModuleAutoRun())
 			{
 				Modules[i]->Run();
 			}
@@ -151,12 +151,9 @@ void AMainModule::GenerateModules()
 
 void AMainModule::DestroyModules()
 {
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
-		{
-			Modules[i]->OnDestroy();
-		}
+		Iter->OnDestroy();
 	}
 	Modules.Empty();
 	ModuleMap.Empty();
@@ -166,23 +163,17 @@ void AMainModule::DestroyModules()
 
 void AMainModule::PauseModules_Implementation()
 {
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
-		{
-			Modules[i]->Pause();
-		}
+		Iter->Pause();
 	}
 }
 
 void AMainModule::UnPauseModules_Implementation()
 {
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
-		{
-			Modules[i]->UnPause();
-		}
+		Iter->UnPause();
 	}
 }
 
@@ -206,10 +197,10 @@ void AMainModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 void AMainModule::GenerateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutModuleListItems, const FString& InFilterText)
 {
 	OutModuleListItems = TArray<TSharedPtr<FModuleListItem>>();
-	for (int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
 		auto Item = MakeShared<FModuleListItem>();
-		if(Modules[i]->GenerateListItem(Item, InFilterText))
+		if(Iter->GenerateListItem(Item, InFilterText))
 		{
 			OutModuleListItems.Add(Item);
 		}

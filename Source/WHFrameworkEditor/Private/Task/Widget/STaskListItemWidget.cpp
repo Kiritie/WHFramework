@@ -21,6 +21,7 @@ void STaskListItemWidget::Construct(const FArguments& InArgs, const TSharedRef<S
 		[
 			SNew(STextBlock)
 			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%d.%s"), Item->Task->TaskIndex + 1, *Item->Task->TaskDisplayName.ToString())); })
+			.ColorAndOpacity(FSlateColor(FLinearColor(0.8f, 0.8f, 0.8f)))
 			.HighlightText_Lambda([this](){ return ListWidget->ActiveFilterText; })
 		],
 		InOwnerTableView

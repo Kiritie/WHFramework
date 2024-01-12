@@ -2,8 +2,10 @@
 
 #include "Camera/Actor/CCTVCameraActor.h"
 
+#include "Animation/AnimationModuleStatics.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Point/CameraPointBase.h"
+#include "Common/CommonStatics.h"
 #include "Kismet/GameplayStatics.h"
 
 ACCTVCameraActor::ACCTVCameraActor()
@@ -13,14 +15,14 @@ ACCTVCameraActor::ACCTVCameraActor()
 	ChangePointInterval = 5.f;
 	ChangePointIntervalDelta = 3.f;
 	
-	ChangePointViewPitch = -90.f;
-	ChangePointViewDistance = 1000.f;
-	
 	ChangePointRemainTime = 0.f;
 
-	CameraRotateSpeed = 2.f;
-	CameraViewData = FCameraViewData();
+	CameraRotateSpeed = 0.1f;
+	CameraZoomSpeed = 0.05f;
+	
+	DefaultCameraPoints = TArray<ACameraPointBase*>();
 	CameraPointQueue = TArray<ACameraPointBase*>();
+	CurrentCameraViewData = FCameraViewData();
 }
 
 void ACCTVCameraActor::OnInitialize_Implementation()
@@ -39,44 +41,68 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(!IsCurrent()) return;
 	
-	ChangePointRemainTime -= DeltaSeconds;
 	if(ChangePointRemainTime <= 0.f)
 	{
 		if(CameraPointQueue.IsEmpty())
 		{
-			TArray<AActor*> CameraPoints;
-			UGameplayStatics::GetAllActorsOfClass(this, ACameraPointBase::StaticClass(), CameraPoints);
-			for(auto Iter : CameraPoints)
+			if(DefaultCameraPoints.IsEmpty())
 			{
-				CameraPointQueue.Add(Cast<ACameraPointBase>(Iter));
+				TArray<AActor*> CameraPoints;
+				UGameplayStatics::GetAllActorsOfClass(this, ACameraPointBase::StaticClass(), CameraPoints);
+				for(auto Iter : CameraPoints)
+				{
+					CameraPointQueue.Add(Cast<ACameraPointBase>(Iter));
+				}
 			}
+			else
+			{
+				CameraPointQueue = DefaultCameraPoints;
+			}
+			UCommonStatics::ShuffleArray(CameraPointQueue);
 		}
 		if(CameraPointQueue.Num() > 0)
 		{
-			if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(CameraPointQueue[FMath::RandRange(0, CameraPointQueue.Num() - 1)]))
+			if(ACameraPointBase* CameraPoint = CameraPointQueue[0])
 			{
-				CameraViewData = CameraPoint->GetCameraViewData();
-				UCameraModuleStatics::SetCameraTransform(CameraPoint->GetActorLocation(), CameraViewData.CameraViewParams.CameraViewYaw, ChangePointViewPitch, ChangePointViewDistance, true);
-				UCameraModuleStatics::SetCameraView(CameraViewData, false);
-				CameraPointQueue.Remove(CameraPoint);
+				CurrentCameraViewData = CameraPoint->GetCameraViewData();
+				if(CurrentCameraViewData.bTrackTarget)
+				{
+					CurrentCameraViewData.CameraViewParams.CameraViewYaw = FMath::RandRange(0.f, 360.f);
+					CurrentCameraViewData.CameraViewParams.CameraViewPitch = FMath::RandRange(-65.f, -90.f);
+				}
+				if(ChangePointRemainTime == -1.f)
+				{
+					UCameraModuleStatics::ResetCameraView(ECameraResetMode::UseDefaultPoint, true);
+					UCameraModuleStatics::SetCameraView(CurrentCameraViewData, false, true);
+				}
+				else
+				{
+					UAnimationModuleStatics::ExecuteWithTransition(2.f, [this]
+					{
+						UCameraModuleStatics::SetCameraView(CurrentCameraViewData, false, true);
+					});
+				}
 			}
+			CameraPointQueue.RemoveAt(0);
 		}
 		ChangePointRemainTime = FMath::RandRange(ChangePointInterval - ChangePointIntervalDelta, ChangePointInterval + ChangePointIntervalDelta);
 	}
 	else
 	{
-		if(!CameraViewData.bTrackTarget)
+		if(!CurrentCameraViewData.bTrackTarget)
 		{
 			UCameraModuleStatics::AddCameraRotationInput(CameraRotateSpeed, 0.f);
 		}
+		UCameraModuleStatics::AddCameraDistanceInput(CameraZoomSpeed);
 	}
+	ChangePointRemainTime -= DeltaSeconds;
 }
 
 void ACCTVCameraActor::OnSwitch_Implementation()
 {
 	Super::OnSwitch_Implementation();
 
-	ChangePointRemainTime = 0.f;
+	ChangePointRemainTime = -1.f;
 }
 
 void ACCTVCameraActor::OnUnSwitch_Implementation()

@@ -46,6 +46,8 @@ private:
 
 	UModuleBase* DuplicateModule(UModuleBase* InModule);
 
+	void GenerateRequireModules();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Class Picker
 private:
@@ -82,6 +84,8 @@ public:
 
 	int32 GetSelectedModuleNum() const;
 
+	TArray<UClass*> GetUnAddedModuleClasses() const;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// List View
 private:
@@ -96,8 +100,6 @@ private:
 	void ListSelectionChanged(TSharedPtr<FModuleListItem> ListItem, ESelectInfo::Type SelectInfo);
 
 	void SetListItemSelectionRecursive(TSharedPtr<FModuleListItem> ListItem);
-
-	TArray<UClass*> GetUnAddedModuleClasses() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Buttons

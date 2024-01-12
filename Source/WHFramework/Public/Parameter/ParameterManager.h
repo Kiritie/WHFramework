@@ -36,5 +36,7 @@ public:
 
 	virtual void RemoveParameters(FName InName) = 0;
 
+	virtual TArray<FParameterSet> GetAllParameter() = 0;
+
 	virtual void ClearAllParameter() = 0;
 };

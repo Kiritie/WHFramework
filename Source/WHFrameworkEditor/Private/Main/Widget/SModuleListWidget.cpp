@@ -332,6 +332,8 @@ void SModuleListWidget::OnInitialize()
 {
 	SEditorWidgetBase::OnInitialize();
 
+	GenerateRequireModules();
+
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
 
@@ -391,6 +393,31 @@ UModuleBase* SModuleListWidget::DuplicateModule(UModuleBase* InModule)
 	NewModule->OnGenerate();
 
 	return NewModule;
+}
+
+void SModuleListWidget::GenerateRequireModules()
+{
+	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return;
+
+	bool bModify = false;
+	
+	for (auto Iter : GetUnAddedModuleClasses())
+	{
+		if(Iter->GetDefaultObject<UModuleBase>()->IsModuleRequired())
+		{
+			UModuleBase* NewModule = GenerateModule(Iter);
+
+			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
+			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+
+			bModify = true;
+		}
+	}
+
+	if(bModify)
+	{
+		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+	}
 }
 
 TSharedRef<SWidget> SModuleListWidget::GenerateClassPicker()
@@ -514,6 +541,19 @@ int32 SModuleListWidget::GetSelectedModuleNum() const
 	return SelectedModuleListItems.Num();
 }
 
+TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const
+{
+	TArray<UClass*> ReturnValues;
+	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass()))
+	{
+		if (ModuleClassFilter->IsClassAllowed(Iter) && !FKismetEditorUtilities::IsClassABlueprintSkeleton(Iter) && !UCommonStatics::IsClassHasChildren(Iter))
+		{
+			ReturnValues.Add(Iter);
+		}
+	}
+	return ReturnValues;
+}
+
 void SModuleListWidget::UpdateListView(bool bRegenerate)
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return;
@@ -597,19 +637,6 @@ void SModuleListWidget::ListSelectionChanged(TSharedPtr<FModuleListItem> ListIte
 void SModuleListWidget::SetListItemSelectionRecursive(TSharedPtr<FModuleListItem> ListItem)
 {
 	ListView->SetItemSelection(ListItem, ListItem->GetStates().bSelected);
-}
-
-TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const
-{
-	TArray<UClass*> ReturnValues;
-	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass()))
-	{
-		if (ModuleClassFilter->IsClassAllowed(Iter) && !FKismetEditorUtilities::IsClassABlueprintSkeleton(Iter) && !UCommonStatics::IsClassHasChildren(Iter))
-		{
-			ReturnValues.Add(Iter);
-		}
-	}
-	return ReturnValues;
 }
 
 FReply SModuleListWidget::OnEditModuleItemButtonClicked()
@@ -759,6 +786,12 @@ FReply SModuleListWidget::OnRemoveModuleItemButtonClicked()
 	{
 		for(auto Iter : SelectedModuleListItems)
 		{
+			if(Iter->Module->IsModuleRequired())
+			{
+				FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(FString::Printf(TEXT("The %s is required and cannot be removed!"), *Iter->Module->GetModuleDisplayName().ToString())));
+				continue;
+			}
+
 			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[Iter->GetModuleIndex()]->OnDestroy();
 			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(Iter->GetModuleIndex());
 			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Remove(Iter->Module->GetModuleName());

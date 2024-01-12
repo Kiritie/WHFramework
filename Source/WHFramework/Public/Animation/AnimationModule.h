@@ -44,16 +44,22 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Translation
-public:
-	void MoveActorTo(AActor* InActor, ATargetPoint* InTargetPoint, FTransform InTargetTransform,bool bUseRotator, bool bUseScale, float ApplicationTime, bool bEaseIn, bool bEaseOut, float BlendExp, bool bForceShortestRotationPath, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
-
-	void RotatorActorTo(AActor* InActor, FRotator InRotator, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
-
-	void ScaleActorTo(AActor* InActor, FVector InScale, float ApplicationTime, EMoveActorAction::Type MoveAction, FLatentActionInfo LatentInfo);
-
-	//////////////////////////////////////////////////////////////////////////
 	/// Flow
 public:
-	void CancelableDelay(UObject* InWorldContext, float Duration, ECancelableDelayAction::Type CancelableDelayAction, FLatentActionInfo LatentInfo);
+	void CancelableDelay(float Duration, ECancelableDelayAction::Type CancelableDelayAction, const FLatentActionInfo& LatentInfo);
+
+	void ExecuteWithDelay(float Duration, TFunction<void()> OnFinish);
+
+	void ExecuteWithTransition(float Duration, TFunction<void()> OnFinish);
+
+protected:
+	UFUNCTION()
+	void OnExecuteWithDelayFinish();
+
+	UFUNCTION()
+	void OnExecuteWithTransitionFinish();
+
+protected:
+	TFunction<void()> _OnExecuteWithDelayFinish;
+	TFunction<void()> _OnExecuteWithTransitionFinish;
 };

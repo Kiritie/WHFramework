@@ -18,6 +18,8 @@ USaveGameModule::USaveGameModule()
 	ModuleName = FName("SaveGameModule");
 	ModuleDisplayName = FText::FromString(TEXT("Save Game Module"));
 
+	bModuleRequired = true;
+
 	bModuleAutoSave = true;
 	ModuleSavePhase = EPhase::Primary;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();

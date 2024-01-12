@@ -13,6 +13,8 @@ UReferencePoolModule::UReferencePoolModule()
 	ModuleName = FName("ReferencePoolModule");
 	ModuleDisplayName = FText::FromString(TEXT("Reference Pool Module"));
 
+	bModuleRequired = true;
+
 	ReferencePools = TMap<TSubclassOf<UObject>, UReferencePool*>();
 }
 

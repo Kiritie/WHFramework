@@ -74,6 +74,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void RemoveParameters(FName InName) override;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	virtual TArray<FParameterSet> GetAllParameter() override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void ClearAllParameter() override;
 

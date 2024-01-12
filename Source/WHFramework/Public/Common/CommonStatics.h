@@ -235,6 +235,16 @@ public:
 			}
 		}
 	}
+
+	template <typename T>
+	static void ShuffleArray(TArray<T>& InArray)
+	{
+		int32 N = InArray.Num();
+		for (int32 I = 0; I < N; ++I)
+		{
+			InArray.Swap(I, FMath::RandRange(I, N - 1));
+		}
+	}
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Text

@@ -35,6 +35,8 @@ USceneModule::USceneModule()
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 
+	bModuleRequired = true;
+
 	ModuleSaveGame = USceneSaveGame::StaticClass();
 
 	SeaLevel = 0.f;

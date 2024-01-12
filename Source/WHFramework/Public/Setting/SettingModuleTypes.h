@@ -21,6 +21,7 @@ public:
 		VideoData = FVideoModuleSaveData();
 		CameraData = FCameraModuleSaveData();
 		InputData = FInputModuleSaveData();
+		ParameterData = FParameterModuleSaveData();
 	}
 
 public:
@@ -36,6 +37,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	FInputModuleSaveData InputData;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	FParameterModuleSaveData ParameterData;
+
 public:
 	virtual void MakeSaved() override
 	{
@@ -45,5 +49,6 @@ public:
 		VideoData.MakeSaved();
 		CameraData.MakeSaved();
 		InputData.MakeSaved();
+		ParameterData.MakeSaved();
 	}
 };

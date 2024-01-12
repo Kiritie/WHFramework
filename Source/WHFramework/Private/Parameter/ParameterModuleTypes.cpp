@@ -21,7 +21,7 @@
 
 bool FParameters::HasParameter(FName InName, bool bEnsured) const
 {
-	for (auto& Iter : ParamSets)
+	for (auto& Iter : Sets)
 	{
 		if(Iter.Name == InName)
 		{
@@ -32,32 +32,32 @@ bool FParameters::HasParameter(FName InName, bool bEnsured) const
 	return false;
 }
 
-void FParameters::SetParameter(FName InName, FParameter InParameter)
+void FParameters::SetParameter(FName InName, const FParameter& InParameter)
 {
 	if(HasParameter(InName, false))
 	{
-		for (int32 i = 0; i < ParamSets.Num(); i++)
+		for (int32 i = 0; i < Sets.Num(); i++)
 		{
-			if(ParamSets[i].Name == InName)
+			if(Sets[i].Name == InName)
 			{
-				ParamSets[i].Parameter = InParameter;
+				Sets[i].Parameter = InParameter;
 				break;
 			}
 		}
 	}
 	else
 	{
-		ParamSets.Add(FParameterSet(InName, InParameter));
+		Sets.Add(FParameterSet(InName, InParameter));
 	}
 }
 
 FParameter FParameters::GetParameter(FName InName, bool bEnsured) const
 {
-	for (int32 i = 0; i < ParamSets.Num(); i++)
+	for (int32 i = 0; i < Sets.Num(); i++)
 	{
-		if(ParamSets[i].Name == InName)
+		if(Sets[i].Name == InName)
 		{
-			return ParamSets[i].Parameter;
+			return Sets[i].Parameter;
 		}
 	}
 	return FParameter();
@@ -68,11 +68,11 @@ TArray<FParameter> FParameters::GetParameters(FName InName, bool bEnsured) const
 	TArray<FParameter> TmpArr = TArray<FParameter>();
 	if(HasParameter(InName, bEnsured))
 	{
-		for (int32 i = 0; i < ParamSets.Num(); i++)
+		for (int32 i = 0; i < Sets.Num(); i++)
 		{
-			if(ParamSets[i].Name == InName)
+			if(Sets[i].Name == InName)
 			{
-				TmpArr.Add(ParamSets[i].Parameter);
+				TmpArr.Add(Sets[i].Parameter);
 			}
 		}
 	}
@@ -81,11 +81,11 @@ TArray<FParameter> FParameters::GetParameters(FName InName, bool bEnsured) const
 
 void FParameters::RemoveParameter(FName InName)
 {
-	for (int32 i = 0; i < ParamSets.Num(); i++)
+	for (int32 i = 0; i < Sets.Num(); i++)
 	{
-		if(ParamSets[i].Name == InName)
+		if(Sets[i].Name == InName)
 		{
-			ParamSets.RemoveAt(i);
+			Sets.RemoveAt(i);
 			break;
 		}
 	}
@@ -101,5 +101,5 @@ void FParameters::RemoveParameters(FName InName)
 
 void FParameters::ClearAllParameter()
 {
-	ParamSets.Empty();
+	Sets.Empty();
 }

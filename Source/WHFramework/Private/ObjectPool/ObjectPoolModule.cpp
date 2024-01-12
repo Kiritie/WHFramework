@@ -15,6 +15,8 @@ UObjectPoolModule::UObjectPoolModule()
 	ModuleName = FName("ObjectPoolModule");
 	ModuleDisplayName = FText::FromString(TEXT("Object Pool Module"));
 
+	bModuleRequired = true;
+
 	DefaultLimit = 100;
 	ObjectPools = TMap<TSubclassOf<UObject>, UObjectPool*>();
 }

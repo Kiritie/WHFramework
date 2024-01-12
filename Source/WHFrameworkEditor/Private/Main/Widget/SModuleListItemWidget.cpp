@@ -22,6 +22,7 @@ void SModuleListItemWidget::Construct(const FArguments& InArgs, const TSharedRef
 		[
 			SNew(STextBlock)
 			.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("%s"), *Item->Module->GetModuleDisplayName().ToString())); })
+			.ColorAndOpacity_Lambda([this](){ return !Item->Module->IsModuleRequired() ?  FSlateColor(FLinearColor(0.8f, 0.8f, 0.8f)) : FSlateColor(FLinearColor(1.f, 0.5f, 0.2f)); })
 			.HighlightText_Lambda([this](){ return ListWidget->ActiveFilterText; })
 		],
 		InOwnerTableView

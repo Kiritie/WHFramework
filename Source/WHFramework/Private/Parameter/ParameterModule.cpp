@@ -4,6 +4,8 @@
 
 #include "Parameter/ParameterModule.h"
 
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Parameter/EventHandle_GlobalParameterChanged.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/ParameterSaveGame.h"
@@ -16,6 +18,8 @@ UParameterModule::UParameterModule()
 	ModuleName = FName("ParameterModule");
 	ModuleDisplayName = FText::FromString(TEXT("Parameter Module"));
 	ModuleSaveGame = UParameterSaveGame::StaticClass();
+
+	bModuleRequired = true;
 }
 
 UParameterModule::~UParameterModule()
@@ -71,7 +75,10 @@ void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FParameterModuleSaveData>();
 
-	Parameters = SaveData.Parameters;
+	for(auto& Iter : SaveData.Parameters.Sets)
+	{
+		SetParameter(Iter.Name, Iter.Parameter);
+	}
 }
 
 FSaveData* UParameterModule::ToData()
@@ -91,6 +98,7 @@ bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 void UParameterModule::SetParameter(FName InName, FParameter InParameter)
 {
 	Parameters.SetParameter(InName, InParameter);
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { InName, &InParameter });
 }
 
 FParameter UParameterModule::GetParameter(FName InName, bool bEnsured) const
@@ -111,6 +119,11 @@ void UParameterModule::RemoveParameter(FName InName)
 void UParameterModule::RemoveParameters(FName InName)
 {
 	Parameters.RemoveParameters(InName);
+}
+
+TArray<FParameterSet> UParameterModule::GetAllParameter()
+{
+	return Parameters.Sets;
 }
 
 void UParameterModule::ClearAllParameter()

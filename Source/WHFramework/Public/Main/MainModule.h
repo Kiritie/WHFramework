@@ -244,7 +244,7 @@ public:
 			}
 			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		}
-		return nullptr;
+		return NewObject<T>();
 	}
 	/**
 	* 通过类型获取模块网络组件

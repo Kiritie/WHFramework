@@ -644,10 +644,12 @@ public:
 	FParameterSet()
 	{
 		Name = NAME_None;
+		DisplayName = FText::GetEmpty();
+		Category = FText::GetEmpty();
 		Parameter = FParameter();
 	}
 
-	FParameterSet(FName InName, FParameter InParameter)
+	FParameterSet(FName InName, const FParameter& InParameter)
 	{
 		Name = InName;
 		Parameter = InParameter;
@@ -656,6 +658,12 @@ public:
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FName Name;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FText DisplayName;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FText Category;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FParameter Parameter;
@@ -668,13 +676,13 @@ struct FParameters
 
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	TArray<FParameterSet> ParamSets;
+	TArray<FParameterSet> Sets;
 
 public:
 	//////////////////////////////////////////////////////////////////////////
 	bool HasParameter(FName InName, bool bEnsured = true) const;
 
-	void SetParameter(FName InName, FParameter InParameter);
+	void SetParameter(FName InName, const FParameter& InParameter);
 
 	FParameter GetParameter(FName InName, bool bEnsured = true) const;
 

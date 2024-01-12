@@ -7,6 +7,7 @@
 
 UWidgetTextSettingItemBase::UWidgetTextSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	ParameterType = EParameterType::None;
 }
 
 void UWidgetTextSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -17,6 +18,8 @@ void UWidgetTextSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 void UWidgetTextSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
+
+	ParameterType = EParameterType::None;
 
 	Super::OnDespawn_Implementation(bRecovery);
 }
@@ -31,11 +34,6 @@ void UWidgetTextSettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray
 void UWidgetTextSettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
 {
 	Super::OnInitialize(InParams);
-
-	if(InParams.IsValidIndex(1))
-	{
-		TxtBox_Value->KeyboardType = InParams[1].GetPointerValueRef<EVirtualKeyboardType::Type>();
-	}
 }
 
 void UWidgetTextSettingItemBase::OnRefresh()
@@ -60,16 +58,19 @@ void UWidgetTextSettingItemBase::OnTextBoxContentChanged(const FText& InText)
 FParameter UWidgetTextSettingItemBase::GetValue() const
 {
 	FParameter Value;
-	switch (TxtBox_Value->KeyboardType)
+	switch (ParameterType)
 	{
-		case EVirtualKeyboardType::Default:
-		{
-			Value = TxtBox_Value->GetText().ToString();
-			break;
-		}
-		case EVirtualKeyboardType::Number:
+		case EParameterType::Integer:
+		case EParameterType::Float:
 		{
 			Value = FCString::Atof(*TxtBox_Value->GetText().ToString());
+			break;
+		}
+		case EParameterType::String:
+		case EParameterType::Name:
+		case EParameterType::Text:
+		{
+			Value = TxtBox_Value->GetText().ToString();
 			break;
 		}
 		default: break;
@@ -79,21 +80,42 @@ FParameter UWidgetTextSettingItemBase::GetValue() const
 
 void UWidgetTextSettingItemBase::SetValue(const FParameter& InValue)
 {
-	FText Text;
-	switch (TxtBox_Value->KeyboardType)
+	ParameterType = InValue.GetParameterType();
+	FString Text;
+	switch (ParameterType)
 	{
-		case EVirtualKeyboardType::Default:
+		case EParameterType::Integer:
 		{
-			Text = FText::FromString(InValue.GetStringValue());
+			Text = FString::FromInt(InValue.GetIntegerValue());
+			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
 			break;
 		}
-		case EVirtualKeyboardType::Number:
+		case EParameterType::Float:
 		{
-			Text = FText::FromString(FString::Printf(TEXT("%0.2f"), InValue.GetFloatValue()));
+			Text = FString::Printf(TEXT("%0.2f"), InValue.GetFloatValue());
+			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
+			break;
+		}
+		case EParameterType::String:
+		{
+			Text = InValue.GetStringValue();
+			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
+			break;
+		}
+		case EParameterType::Name:
+		{
+			Text = InValue.GetNameValue().ToString();
+			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
+			break;
+		}
+		case EParameterType::Text:
+		{
+			Text = InValue.GetTextValue().ToString();
+			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
 			break;
 		}
 		default: break;
 	}
-	TxtBox_Value->SetText(Text);
+	TxtBox_Value->SetText(FText::FromString(Text));
 	Super::SetValue(InValue);
 }

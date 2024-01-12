@@ -43,4 +43,7 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UEditableTextBox* TxtBox_Value;
+
+	UPROPERTY(BlueprintReadOnly)
+	EParameterType ParameterType;
 };

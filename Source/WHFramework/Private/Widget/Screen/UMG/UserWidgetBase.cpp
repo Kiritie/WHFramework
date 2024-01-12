@@ -9,6 +9,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetClosed.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetOpened.h"
+#include "Event/Handle/Widget/EventHandle_UserWidgetStateChanged.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -375,6 +376,8 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 {
 	OnWidgetStateChanged.Broadcast(InWidgetState);
+
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetStateChanged>(this, { this, &InWidgetState });
 
 	K2_OnStateChanged(InWidgetState);
 }

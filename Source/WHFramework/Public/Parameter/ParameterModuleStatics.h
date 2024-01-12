@@ -59,16 +59,16 @@ public:
 	static FParameter MakeNameParameter(const FName InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeTextParameter(const FText InValue);
+	static FParameter MakeTextParameter(const FText& InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeBooleanParameter(bool InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeVectorParameter(FVector InValue);
+	static FParameter MakeVectorParameter(const FVector& InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeRotatorParameter(FRotator InValue);
+	static FParameter MakeRotatorParameter(const FRotator& InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeColorParameter(FColor InValue);

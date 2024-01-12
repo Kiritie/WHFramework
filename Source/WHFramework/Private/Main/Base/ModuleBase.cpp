@@ -16,6 +16,7 @@ UModuleBase::UModuleBase()
 	ModuleDescription = FText::GetEmpty();
 	ModuleState = EModuleState::None;
 	ModuleIndex = 0;
+	bModuleRequired = false;
 	bModuleAutoRun = true;
 	bModuleAutoSave = false;
 	ModuleSavePhase = EPhase::Final;

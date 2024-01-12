@@ -33,21 +33,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float ChangePointIntervalDelta;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float ChangePointViewPitch;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float ChangePointViewDistance;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float ChangePointRemainTime;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float CameraRotateSpeed;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float CameraZoomSpeed;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FCameraViewData CameraViewData;
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly)
+	TArray<ACameraPointBase*> DefaultCameraPoints;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<ACameraPointBase*> CameraPointQueue;
+
+private:
+	FCameraViewData CurrentCameraViewData;
 };

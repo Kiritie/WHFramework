@@ -19,6 +19,8 @@ UWidgetModule::UWidgetModule()
 	ModuleName = FName("WidgetModule");
 	ModuleDisplayName = FText::FromString(TEXT("Widget Module"));
 
+	bModuleRequired = true;
+
 	UserWidgetClasses = TArray<TSubclassOf<UUserWidgetBase>>();
 	AllUserWidget = TMap<FName, UUserWidgetBase*>();
 	TemporaryUserWidget = nullptr;

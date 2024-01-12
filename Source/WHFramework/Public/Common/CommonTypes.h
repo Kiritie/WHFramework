@@ -15,6 +15,11 @@ extern WHFRAMEWORK_API bool GIsPlaying;
 extern WHFRAMEWORK_API bool GIsSimulating;
 
 //////////////////////////////////////////////////////////////////////////
+// Delegates
+DECLARE_DYNAMIC_DELEGATE( FSimpleDynamicDelegate );
+DECLARE_DYNAMIC_MULTICAST_DELEGATE( FSimpleDynamicMulticastDelegate );
+
+//////////////////////////////////////////////////////////////////////////
 // Types
 UENUM(BlueprintType)
 enum class EPauseMode : uint8

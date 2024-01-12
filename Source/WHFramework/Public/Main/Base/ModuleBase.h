@@ -171,6 +171,9 @@ protected:
 	/// 模块索引（决定模块执行顺序）
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 ModuleIndex;
+	/// 必须的
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bModuleRequired;
 	/// 自动运行
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoRun;
@@ -193,10 +196,6 @@ public:
 
 public:
 	/**
-	* 是否自动运行
-	*/
-	bool IsAutoRunModule() const { return bModuleAutoRun; }
-	/**
 	* 获取模块名称
 	*/
 	FName GetModuleName() const { return ModuleName; }
@@ -216,6 +215,18 @@ public:
 	* 获取模块索引
 	*/
 	int32 GetModuleIndex() const { return ModuleIndex; }
+	/**
+	* 是否是必须的
+	*/
+	bool IsModuleRequired() const { return bModuleRequired; }
+	/**
+	* 是否自动运行
+	*/
+	bool IsModuleAutoRun() const { return bModuleAutoRun; }
+	/**
+	* 是否自动保存
+	*/
+	bool IsModuleAutoSave() const { return bModuleAutoSave; }
 	/**
 	* 获取模块拥有者
 	*/

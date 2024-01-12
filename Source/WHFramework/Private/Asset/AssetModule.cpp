@@ -13,6 +13,8 @@ UAssetModule::UAssetModule()
 {
 	ModuleName = FName("AssetModule");
 	ModuleDisplayName = FText::FromString(TEXT("Asset Module"));
+
+	bModuleRequired = true;
 }
 
 UAssetModule::~UAssetModule()

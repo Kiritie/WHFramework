@@ -43,7 +43,7 @@ public:
 
 public:
 	virtual void OpenModuleEditor();
-
+	
 private:
 	TSharedRef<SDockTab> OnSpawnModuleEditorTab(const FSpawnTabArgs& SpawnTabArgs);
 
