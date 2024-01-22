@@ -142,7 +142,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 	}
 	else if(CurrentCharacter)
 	{
-		CurrentCharacter->OnSwitch();
+		CurrentCharacter->OnUnSwitch();
 		PlayerController->UnPossess();
 		if(CurrentCharacter->GetDefaultController())
 		{

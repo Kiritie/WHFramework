@@ -89,6 +89,7 @@ FSaveData* UWidgetSettingPageBase::GetDefaultSaveData() const
 
 void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
 {
+	InSettingItem->SetNameS(InName);
 	InSettingItem->OnValueChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValueChange);
 	InSettingItem->OnValuesChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValuesChange);
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
@@ -117,4 +118,13 @@ void UWidgetSettingPageBase::ClearSettingItems_Implementation()
 	}
 	ContentBox->ClearChildren();
 	SettingItems.Empty();
+}
+
+UWidgetSettingItemBase* UWidgetSettingPageBase::GetSettingItemByName(const FName InName)
+{
+	if(SettingItems.Contains(InName))
+	{
+		return SettingItems[InName];
+	}
+	return nullptr;
 }

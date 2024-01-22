@@ -32,6 +32,12 @@ void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 
 	SetTitle(FText::GetEmpty());
 
+	OnSelectedChangedBase.Clear();
+	OnButtonBaseClicked.Clear();
+	OnButtonBaseDoubleClicked.Clear();
+	OnButtonBaseHovered.Clear();
+	OnButtonBaseUnhovered.Clear();
+
 	if(GetSelected())
 	{
 		SetSelectedInternal(false, false, false);

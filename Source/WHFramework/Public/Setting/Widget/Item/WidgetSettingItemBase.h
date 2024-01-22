@@ -1,7 +1,6 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "ObjectPool/ObjectPoolInterface.h"
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 
 #include "WidgetSettingItemBase.generated.h"
@@ -38,7 +37,27 @@ public:
 
 	virtual void OnDestroy(bool bRecovery) override;
 
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UTextBlock* Txt_Label;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName SettingName;
+
 public:
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingItemValueChanged OnValueChanged;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingItemValuesChanged OnValuesChanged;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FName GetNameS() const { return SettingName; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetNameS(const FName InName) { SettingName = InName; }
+
 	UFUNCTION(BlueprintPure)
 	FText GetLabel() const;
 
@@ -57,15 +76,4 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetValues(const TArray<FParameter>& InValues);
-
-protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UTextBlock* Txt_Label;
-
-public:
-	UPROPERTY(BlueprintAssignable)
-	FOnSettingItemValueChanged OnValueChanged;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnSettingItemValuesChanged OnValuesChanged;
 };

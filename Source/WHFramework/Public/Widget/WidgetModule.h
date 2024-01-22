@@ -14,6 +14,7 @@
 #include "Input/Manager/InputManagerInterface.h"
 #include "WidgetModule.generated.h"
 
+class UEventHandle_SetWorldWidgetVisible;
 class UEventHandle_CloseUserWidget;
 class UEventHandle_OpenUserWidget;
 
@@ -534,13 +535,22 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
 	
-private:
+protected:
 	UFUNCTION(CallInEditor, Category = "WorldWidget")
 	void SortWorldWidgetClasses();
+
+	UFUNCTION()
+	void OnSetWorldWidgetVisible(UObject* InSender, UEventHandle_SetWorldWidgetVisible* InEventHandle);
 
 public:
 	UFUNCTION(BlueprintPure)
 	UWorldWidgetContainer* GetWorldWidgetContainer() const { return WorldWidgetContainer; }
+
+	UFUNCTION(BlueprintPure)
+	bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	template<class T>
 	bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass()) const

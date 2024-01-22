@@ -78,8 +78,12 @@ void UWidgetParameterSettingPageBase::OnApply()
 
 	for(auto& Iter : SettingItems)
 	{
+		FParameter Parameter = UParameterModule::Get().GetParameter(Iter.Key);
 		FParameter Value = Iter.Value->GetValue();
-		UParameterModule::Get().SetParameter(Iter.Key, Value);
+		if(Value != Parameter)
+		{
+			UParameterModule::Get().SetParameter(Iter.Key, Value);
+		}
 	}
 }
 
@@ -92,11 +96,6 @@ void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 		FParameter Parameter = GetDefaultSaveData()->CastRef<FParameterModuleSaveData>().Parameters.GetParameter(Iter.Key);
 		Iter.Value->SetValue(Parameter);
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues)
-{
-	Super::OnValuesChange(InSettingItem, InValues);
 }
 
 void UWidgetParameterSettingPageBase::OnClose(bool bInstant)

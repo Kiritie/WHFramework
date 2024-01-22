@@ -177,6 +177,9 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	}
 
 	UInputModule::Get().UpdateInputMode();
+	
+	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
+	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
@@ -266,11 +269,11 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	{
 		bool bVisible = false;
 		FWorldWidgetMapping Mapping;
-		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1)
+		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
 		{
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
 			const FVector Location = Mapping.SceneComp ? (Mapping.SocketName.IsNone() ? Mapping.SceneComp->GetComponentLocation() : Mapping.SceneComp->GetSocketLocation(Mapping.SocketName)) + Mapping.Location : Mapping.Location;
-
+			const float Distance = FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true));
 			switch(WidgetVisibility)
 			{
 				case EWorldWidgetVisibility::AlwaysShow:
@@ -290,17 +293,17 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 				}
 				case EWorldWidgetVisibility::DistanceOnly:
 				{
-					bVisible = WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance;
+					bVisible = WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance));
 					break;
 				}
 				case EWorldWidgetVisibility::RenderAndDistance:
 				{
-					bVisible = (!OwnerActor || OwnerActor->WasRecentlyRendered()) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+					bVisible = (!OwnerActor || OwnerActor->WasRecentlyRendered()) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
 					break;
 				}
 				case EWorldWidgetVisibility::ScreenAndDistance:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location) && (WidgetShowDistance == -1 || FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true)) < WidgetShowDistance);
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
 					break;
 				}
 				default: break;

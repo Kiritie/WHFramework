@@ -59,10 +59,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animator")
 	FGameplayTagContainer AbortTags;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animator")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animator")
 	float Duration;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animator")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animator")
 	EEaseType EaseType;
 
 protected:

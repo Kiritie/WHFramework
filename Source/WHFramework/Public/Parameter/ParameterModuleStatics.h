@@ -59,7 +59,7 @@ public:
 	static FParameter MakeNameParameter(const FName InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeTextParameter(const FText& InValue);
+	static FParameter MakeTextParameter(const FText InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeBooleanParameter(bool InValue);
@@ -93,6 +93,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeDelegateParameter(const FSimpleDynamicDelegate& InValue);
 
 public:
 	//////////////////////////////////////////////////////////////////////////
@@ -213,6 +216,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetObjectPtrValue(UPARAM(ref) FParameter& InParameter, const TSoftObjectPtr<UObject>& InValue) { InParameter.SetObjectPtrValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FSimpleDynamicDelegate GetDelegateValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetDelegateValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetDelegateValue(UPARAM(ref) FParameter& InParameter, const FSimpleDynamicDelegate& InValue) { InParameter.SetDelegateValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameters

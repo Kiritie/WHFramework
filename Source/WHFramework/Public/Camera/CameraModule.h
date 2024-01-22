@@ -75,15 +75,17 @@ protected:
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
 	bool DefaultInstantSwitch;
-	
+
+	UPROPERTY(VisibleAnywhere, Category = "Camera")
+	ACameraActorBase* CurrentCamera;
+		
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	ACameraPointBase* DefaultCameraPoint;
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	ACameraActorBase* CurrentCamera;
+	ACameraPointBase* CurrentCameraPoint;
 
 private:
-	UPROPERTY(Transient)
 	TMap<FName, ACameraActorBase*> CameraMap;
 
 public:
@@ -124,22 +126,22 @@ public:
 	ACameraActorBase* GetCameraByName(const FName InName) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCamera(ACameraActorBase* InCamera, bool bInstant = false);
+	void SwitchCamera(ACameraActorBase* InCamera, bool bReset = true, bool bInstant = false);
 
 	template<class T>
-	void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
+	void SwitchCameraByClass(bool bReset = true, bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
-		SwitchCameraByClass(InClass, bInstant);
+		SwitchCameraByClass(InClass, bReset, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant = false);
+	void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByName(const FName InName, bool bInstant = false);
+	void SwitchCameraByName(const FName InName, bool bReset = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false, bool bInstant = false);
+	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false, bool bInstant = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Control
@@ -173,6 +175,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraMove == true"), Category = "CameraControl|Move")
 	float CameraMoveSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	float CameraMoveAltitude;
 
 	// Rotate
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
@@ -225,6 +230,9 @@ protected:
 	float CameraZoomSpeed;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	float CameraZoomAltitude;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float InitCameraDistance;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -232,6 +240,19 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MaxCameraDistance;
+
+	// Offset
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Offset")
+	bool bCameraOffsetAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Offset")
+	bool bSmoothCameraOffset;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraOffset == true"), Category = "CameraControl|Offset")
+	float CameraOffsetSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Offset")
+	FVector InitCameraOffset;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera Stats
@@ -241,6 +262,12 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
 	FVector TargetCameraLocation;
+
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
+	FVector CurrentCameraOffset;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
+	FVector TargetCameraOffset;
 
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
 	FRotator CurrentCameraRotation;
@@ -255,27 +282,32 @@ protected:
 	float TargetCameraDistance;
 
 private:
-	float CameraDoMoveTime;
-	float CameraDoMoveDuration;
-	FVector CameraDoMoveLocation;
-	EEaseType CameraDoMoveEaseType;
-	float CameraDoRotateTime;
-	float CameraDoRotateDuration;
-	FRotator CameraDoRotateRotation;
-	EEaseType CameraDoRotateEaseType;
-	float CameraDoZoomTime;
-	float CameraDoZoomDuration;
-	float CameraDoZoomDistance;
-	EEaseType CameraDoZoomEaseType;
-	FVector InitSocketOffset;
-	FVector TargetSocketOffset;
-	UPROPERTY(Transient)
-	ACameraPointBase* CachedCameraPoint;
+	float CameraDoLocationTime;
+	float CameraDoLocationDuration;
+	FVector CameraDoLocationLocation;
+	EEaseType CameraDoLocationEaseType;
+	
+	float CameraDoOffsetTime;
+	float CameraDoOffsetDuration;
+	FVector CameraDoOffsetOffset;
+	EEaseType CameraDoOffsetEaseType;
+	
+	float CameraDoRotationTime;
+	float CameraDoRotationDuration;
+	FRotator CameraDoRotationRotation;
+	EEaseType CameraDoRotationEaseType;
+	
+	float CameraDoDistanceTime;
+	float CameraDoDistanceDuration;
+	float CameraDoDistanceDistance;
+	EEaseType CameraDoDistanceEaseType;
+	
 	FCameraViewData CachedCameraViewData;
 	FCameraViewData TrackCameraViewData;
 	bool bTrackAllowControl;
 	ECameraSmoothMode TrackSmoothMode;
 	ECameraControlMode TrackControlMode;
+	
 	UPROPERTY(Transient)
 	AWHPlayerController* PlayerController;
 
@@ -290,7 +322,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration,bInstant"))
-	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
+	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocation = FVector(-1.f), FVector InOffset = FVector(-1.f), float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -303,6 +335,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraLocation();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraOffset(FVector InOffset, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraOffset();
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraRotation(float InYaw = -1.f, float InPitch = -1.f, bool bInstant = false);
@@ -351,7 +392,7 @@ public:
 	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint, bool bInstant = false);
+	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::DefaultPoint, bool bInstant = false);
 
 protected:
 	UFUNCTION(BlueprintCallable)
@@ -538,19 +579,25 @@ public:
 	void SetInitCameraDistance(float InInitCameraDistance) { InitCameraDistance = InInitCameraDistance; }
 	
 	UFUNCTION(BlueprintPure)
-	FVector GetCurrentCameraLocation() const { return CurrentCameraLocation; }
+	FVector GetCurrentCameraLocation(bool bRefresh = false) const;
 
-	UFUNCTION(BlueprintPure)
-	FRotator GetCurrentCameraRotation() const { return CurrentCameraRotation; }
-
-	UFUNCTION(BlueprintPure)
-	float GetCurrentCameraDistance() const { return CurrentCameraDistance; }
-	
 	UFUNCTION(BlueprintPure)
 	FVector GetTargetCameraLocation() const { return TargetCameraLocation; }
+	
+	UFUNCTION(BlueprintPure)
+	FVector GetCurrentCameraOffset(bool bRefresh = false) const;
+
+	UFUNCTION(BlueprintPure)
+	FVector GetTargetCameraOffset() const { return TargetCameraOffset; }
+
+	UFUNCTION(BlueprintPure)
+	FRotator GetCurrentCameraRotation(bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure)
 	FRotator GetTargetCameraRotation() const { return TargetCameraRotation; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCurrentCameraDistance(bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	float GetTargetCameraDistance() const { return TargetCameraDistance; }

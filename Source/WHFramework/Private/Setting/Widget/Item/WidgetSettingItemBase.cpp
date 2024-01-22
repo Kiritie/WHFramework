@@ -17,6 +17,7 @@ void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 void UWidgetSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+	SettingName = NAME_None;
 	SetLabel(FText::GetEmpty());
 	SetValue(FParameter());
 	OnValueChanged.Clear();

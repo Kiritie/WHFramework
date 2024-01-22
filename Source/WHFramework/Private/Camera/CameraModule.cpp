@@ -16,6 +16,7 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonStatics.h"
 #include "Event/EventModuleStatics.h"
+#include "Event/Handle/Camera/EventHandle_CameraPointChanged.h"
 #include "Event/Handle/Camera/EventHandle_ResetCameraView.h"
 #include "Event/Handle/Camera/EventHandle_SetCameraView.h"
 #include "Event/Handle/Camera/EventHandle_SwitchCameraPoint.h"
@@ -52,6 +53,7 @@ UCameraModule::UCameraModule()
 	Cameras = TArray<ACameraActorBase*>();
 	CameraMap = TMap<FName, ACameraActorBase*>();
 	CurrentCamera = nullptr;
+	CurrentCameraPoint = nullptr;
 
 	bCameraControlAble = true;
 
@@ -67,6 +69,12 @@ UCameraModule::UCameraModule()
 	CameraMoveRate = 600.f;
 	bSmoothCameraMove = true;
 	CameraMoveSpeed = 5.f;
+	CameraMoveAltitude = 0.f;
+
+	bCameraOffsetAble = true;
+	bSmoothCameraOffset = true;
+	CameraOffsetSpeed = 5.f;
+	InitCameraOffset = FVector::ZeroVector;
 
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
@@ -88,41 +96,49 @@ UCameraModule::UCameraModule()
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
 	InitCameraDistance = -1.f;
+	CameraZoomAltitude = 0.f;
 
-	CachedCameraPoint = nullptr;
 	CachedCameraViewData = FCameraViewData();
 
-	CameraDoMoveTime = 0.f;
-	CameraDoMoveDuration = 0.f;
-	CameraDoMoveEaseType = EEaseType::Linear;
-	CameraDoMoveLocation = EMPTY_Vector;
-	CameraDoRotateTime = 0.f;
-	CameraDoRotateDuration = 0.f;
-	CameraDoRotateRotation = EMPTY_Rotator;
-	CameraDoRotateEaseType = EEaseType::Linear;
-	CameraDoZoomTime = 0.f;
-	CameraDoZoomDuration = 0.f;
-	CameraDoZoomDistance = EMPTY_Flt;
-	CameraDoZoomEaseType = EEaseType::Linear;
+	CameraDoLocationTime = 0.f;
+	CameraDoLocationDuration = 0.f;
+	CameraDoLocationEaseType = EEaseType::Linear;
+	CameraDoLocationLocation = EMPTY_Vector;
+		
+	CameraDoOffsetTime = 0.f;
+	CameraDoOffsetDuration = 0.f;
+	CameraDoOffsetEaseType = EEaseType::Linear;
+	CameraDoOffsetOffset = EMPTY_Vector;
+
+	CameraDoRotationTime = 0.f;
+	CameraDoRotationDuration = 0.f;
+	CameraDoRotationRotation = EMPTY_Rotator;
+	CameraDoRotationEaseType = EEaseType::Linear;
+	
+	CameraDoDistanceTime = 0.f;
+	CameraDoDistanceDuration = 0.f;
+	CameraDoDistanceDistance = EMPTY_Flt;
+	CameraDoDistanceEaseType = EEaseType::Linear;
 
 	bTrackAllowControl = false;
 	TrackSmoothMode = ECameraSmoothMode::None;
 	TrackControlMode = ECameraControlMode::None;
 	TrackCameraViewData = FCameraViewData();
 
-	InitSocketOffset = FVector::ZeroVector;
-	TargetSocketOffset = FVector::ZeroVector;
-
 	DefaultCameraPoint = nullptr;
 
 	PlayerController = nullptr;
 
 	CurrentCameraLocation = FVector::ZeroVector;
-	CurrentCameraRotation = FRotator::ZeroRotator;
-	CurrentCameraDistance = 0.f;
-
 	TargetCameraLocation = FVector::ZeroVector;
+
+	CurrentCameraOffset = FVector::ZeroVector;
+	TargetCameraOffset = FVector::ZeroVector;
+
+	CurrentCameraRotation = FRotator::ZeroRotator;
 	TargetCameraRotation = FRotator::ZeroRotator;
+
+	CurrentCameraDistance = 0.f;
 	TargetCameraDistance = 0.f;
 }
 
@@ -258,8 +274,6 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
 
-	if(!bCameraControlAble) return;
-
 	DoTrackTarget();
 
 	if(bCameraMoveAble && CurrentCamera)
@@ -267,10 +281,10 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 		CurrentCameraLocation = CurrentCamera->GetActorLocation();
 		if(CurrentCameraLocation != TargetCameraLocation)
 		{
-			if(CameraDoMoveDuration != 0.f)
+			if(CameraDoLocationDuration != 0.f)
 			{
-				CameraDoMoveTime = FMath::Clamp(CameraDoMoveTime + DeltaSeconds, 0.f, CameraDoMoveDuration);
-				CurrentCamera->SetCameraLocation(FMath::Lerp(CameraDoMoveLocation, TargetCameraLocation, UMathStatics::EvaluateByEaseType(CameraDoMoveEaseType, CameraDoMoveTime, CameraDoMoveDuration)));
+				CameraDoLocationTime = FMath::Clamp(CameraDoLocationTime + DeltaSeconds, 0.f, CameraDoLocationDuration);
+				CurrentCamera->SetCameraLocation(FMath::Lerp(CameraDoLocationLocation, TargetCameraLocation, UMathStatics::EvaluateByEaseType(CameraDoLocationEaseType, CameraDoLocationTime, CameraDoLocationDuration)));
 			}
 			else
 			{
@@ -278,14 +292,31 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 			}
 			CurrentCameraLocation = CurrentCamera->GetActorLocation();
 		}
-		else if(CameraDoMoveDuration != 0.f)
+		else if(CameraDoLocationDuration != 0.f)
 		{
 			StopDoCameraLocation();
 		}
+	}
 
-		if(CurrentCamera->GetCameraBoom()->SocketOffset != TargetSocketOffset)
+	if(bCameraOffsetAble && CurrentCamera)
+	{
+		CurrentCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
+		if(CurrentCameraOffset != TargetCameraOffset)
 		{
-			CurrentCamera->GetCameraBoom()->SocketOffset = !bSmoothCameraMove ? TargetSocketOffset : FMath::VInterpTo(CurrentCamera->GetCameraBoom()->SocketOffset, TargetSocketOffset, DeltaSeconds, CameraMoveSpeed);
+			if(CameraDoOffsetDuration != 0.f)
+			{
+				CameraDoOffsetTime = FMath::Clamp(CameraDoOffsetTime + DeltaSeconds, 0.f, CameraDoOffsetDuration);
+				CurrentCamera->GetCameraBoom()->SocketOffset = FMath::Lerp(CameraDoOffsetOffset, TargetCameraOffset, UMathStatics::EvaluateByEaseType(CameraDoOffsetEaseType, CameraDoOffsetTime, CameraDoOffsetDuration));
+			}
+			else
+			{
+				CurrentCamera->GetCameraBoom()->SocketOffset = !bSmoothCameraOffset ? TargetCameraOffset : FMath::VInterpTo(CurrentCameraOffset, TargetCameraOffset, DeltaSeconds, CameraOffsetSpeed);
+			}
+			CurrentCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
+		}
+		else if(CameraDoOffsetDuration != 0.f)
+		{
+			StopDoCameraOffset();
 		}
 	}
 
@@ -294,10 +325,10 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 		CurrentCameraRotation = GetPlayerController()->GetControlRotation();
 		if(CurrentCameraRotation != TargetCameraRotation)
 		{
-			if(CameraDoRotateDuration != 0.f)
+			if(CameraDoRotationDuration != 0.f)
 			{
-				CameraDoRotateTime = FMath::Clamp(CameraDoRotateTime + DeltaSeconds, 0.f, CameraDoRotateDuration);
-				GetPlayerController()->SetControlRotation(UMathStatics::LerpRotator(CameraDoRotateRotation, TargetCameraRotation, UMathStatics::EvaluateByEaseType(CameraDoRotateEaseType, CameraDoRotateTime, CameraDoRotateDuration), !CameraDoRotateRotation.Equals(TargetCameraRotation)));
+				CameraDoRotationTime = FMath::Clamp(CameraDoRotationTime + DeltaSeconds, 0.f, CameraDoRotationDuration);
+				GetPlayerController()->SetControlRotation(UMathStatics::LerpRotator(CameraDoRotationRotation, TargetCameraRotation, UMathStatics::EvaluateByEaseType(CameraDoRotationEaseType, CameraDoRotationTime, CameraDoRotationDuration), !CameraDoRotationRotation.Equals(TargetCameraRotation)));
 			}
 			else
 			{
@@ -305,7 +336,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 			}
 			CurrentCameraRotation = GetPlayerController()->GetControlRotation();
 		}
-		else if(CameraDoRotateDuration != 0.f)
+		else if(CameraDoRotationDuration != 0.f)
 		{
 			StopDoCameraRotation();
 		}
@@ -328,10 +359,10 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 		
 		if(CurrentCameraDistance != TargetDistance)
 		{
-			if(CameraDoZoomDuration != 0.f)
+			if(CameraDoDistanceDuration != 0.f)
 			{
-				CameraDoZoomTime = FMath::Clamp(CameraDoZoomTime + DeltaSeconds, 0.f, CameraDoZoomDuration);
-				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoZoomDistance, TargetDistance, UMathStatics::EvaluateByEaseType(CameraDoZoomEaseType, CameraDoZoomTime, CameraDoZoomDuration));
+				CameraDoDistanceTime = FMath::Clamp(CameraDoDistanceTime + DeltaSeconds, 0.f, CameraDoDistanceDuration);
+				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoDistanceDistance, TargetDistance, UMathStatics::EvaluateByEaseType(CameraDoDistanceEaseType, CameraDoDistanceTime, CameraDoDistanceDuration));
 			}
 			else
 			{
@@ -339,7 +370,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 			}
 			CurrentCameraDistance = CurrentCamera->GetCameraBoom()->TargetArmLength;
 		}
-		else if(CameraDoZoomDuration != 0.f)
+		else if(CameraDoDistanceDuration != 0.f)
 		{
 			StopDoCameraDistance();
 		}
@@ -451,7 +482,7 @@ ACameraActorBase* UCameraModule::GetCameraByName(const FName InName) const
 	return nullptr;
 }
 
-void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
+void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bReset, bool bInstant)
 {
 	if(CurrentCamera == InCamera) return;
 
@@ -467,10 +498,20 @@ void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 		{
 			GetPlayerController()->SetViewTarget(InCamera);
 		}
-		TargetSocketOffset = InitSocketOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
-		SetCameraLocation(InCamera->GetActorLocation(), bInstant);
-		SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
-		SetCameraDistance(InCamera->GetCameraBoom()->TargetArmLength, bInstant);
+		if(bReset)
+		{
+			SetCameraLocation(InCamera->GetActorLocation(), bInstant);
+			SetCameraRotation(InCamera->GetActorRotation().Yaw, InCamera->GetActorRotation().Pitch, bInstant);
+			SetCameraDistance(InCamera->GetCameraBoom()->TargetArmLength, bInstant);
+			SetCameraOffset(InitCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset, bInstant);
+		}
+		else
+		{
+			SetCameraLocation(CurrentCameraLocation, bInstant);
+			SetCameraRotation(CurrentCameraRotation.Yaw, CurrentCameraRotation.Pitch, bInstant);
+			SetCameraDistance(CurrentCameraDistance, bInstant);
+			SetCameraOffset(CurrentCameraOffset, bInstant);
+		}
 	}
 	else if(CurrentCamera)
 	{
@@ -483,24 +524,25 @@ void UCameraModule::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
 	}
 }
 
-void UCameraModule::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant)
+void UCameraModule::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset, bool bInstant)
 {
 	const FName CameraName = InClass ? InClass.GetDefaultObject()->GetCameraName() : NAME_None;
-	SwitchCameraByName(CameraName, bInstant);
+	SwitchCameraByName(CameraName, bReset, bInstant);
 }
 
-void UCameraModule::SwitchCameraByName(const FName InName, bool bInstant)
+void UCameraModule::SwitchCameraByName(const FName InName, bool bReset, bool bInstant)
 {
-	SwitchCamera(GetCameraByName(InName), bInstant);
+	SwitchCamera(GetCameraByName(InName), bReset, bInstant);
 }
 
-void UCameraModule::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint, bool bSetAsDefault, bool bInstant)
+void UCameraModule::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault, bool bInstant)
 {
-	SetCameraView(InCameraPoint->GetCameraViewData(), bInstant);
-	if(bCachePoint)
+	if(CurrentCameraPoint != InCameraPoint)
 	{
-		CachedCameraPoint = InCameraPoint;
+		CurrentCameraPoint = InCameraPoint;
+		UEventModuleStatics::BroadcastEvent<UEventHandle_CameraPointChanged>(this, { CurrentCameraPoint });
 	}
+	SetCameraView(InCameraPoint->GetCameraViewData(), true, bInstant);
 	if(bSetAsDefault)
 	{
 		SetDefaultCameraPoint(InCameraPoint);
@@ -567,17 +609,17 @@ void UCameraModule::DoTrackTargetLocation(bool bInstant)
 		{
 			case ECameraViewMode::Instant:
 			{
-				SetCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewOffset), true);
+				SetCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewLocation), true);
 				break;
 			}
 			case ECameraViewMode::Smooth:
 			{
-				SetCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewOffset), !ENUMWITH(TrackSmoothMode, ECameraSmoothMode::LocationOnly) || TrackCameraViewData.CameraViewParams.CameraViewMode == ECameraViewMode::Instant || bInstant);
+				SetCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewLocation), !ENUMWITH(TrackSmoothMode, ECameraSmoothMode::LocationOnly) || TrackCameraViewData.CameraViewParams.CameraViewMode == ECameraViewMode::Instant || bInstant);
 				break;
 			}
 			case ECameraViewMode::Duration:
 			{
-				DoCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewOffset), TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
+				DoCameraLocation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorLocation() + TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().RotateVector(TrackCameraViewData.CameraViewParams.CameraViewLocation), bInstant ? 0.f : TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
 				break;
 			}
 			default: break;
@@ -605,7 +647,7 @@ void UCameraModule::DoTrackTargetRotation(bool bInstant)
 			}
 			case ECameraViewMode::Duration:
 			{
-				DoCameraRotation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().Yaw + TrackCameraViewData.CameraViewParams.CameraViewYaw, TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().Pitch + TrackCameraViewData.CameraViewParams.CameraViewPitch, TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
+				DoCameraRotation(TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().Yaw + TrackCameraViewData.CameraViewParams.CameraViewYaw, TrackCameraViewData.CameraViewParams.CameraViewTarget->GetActorRotation().Pitch + TrackCameraViewData.CameraViewParams.CameraViewPitch, bInstant ? 0.f : TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
 				break;
 			}
 			default: break;
@@ -633,7 +675,7 @@ void UCameraModule::DoTrackTargetDistance(bool bInstant)
 			}
 			case ECameraViewMode::Duration:
 			{
-				DoCameraDistance(TrackCameraViewData.CameraViewParams.CameraViewDistance, TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
+				DoCameraDistance(TrackCameraViewData.CameraViewParams.CameraViewDistance, bInstant ? 0.f : TrackCameraViewData.CameraViewParams.CameraViewDuration, TrackCameraViewData.CameraViewParams.CameraViewEaseType, false);
 				break;
 			}
 			default: break;
@@ -641,7 +683,7 @@ void UCameraModule::DoTrackTargetDistance(bool bInstant)
 	}
 }
 
-void UCameraModule::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration, bool bInstant)
+void UCameraModule::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocation, FVector InOffset, float InYaw, float InPitch, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration, bool bInstant)
 {
 	if(!InTargetActor || !CurrentCamera || InViewMode == ECameraViewMode::None) return;
 
@@ -655,13 +697,13 @@ void UCameraModule::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InT
 		TrackCameraViewData.CameraViewParams.CameraViewTarget = InTargetActor;
 		TrackCameraViewData.CameraViewParams.CameraViewMode = InViewMode;
 		TrackCameraViewData.CameraViewParams.CameraViewSpace = InViewSpace;
-		TrackCameraViewData.CameraViewParams.CameraViewOffset = InLocationOffset == FVector(-1.f) ? TargetCameraLocation - InTargetActor->GetActorLocation() : InViewSpace == ECameraViewSpace::Local ? InLocationOffset : InLocationOffset - InTargetActor->GetActorLocation();
-		TrackCameraViewData.CameraViewParams.CameraViewYaw = InYawOffset == -1.f ? TargetCameraRotation.Yaw - InTargetActor->GetActorRotation().Yaw : InViewSpace == ECameraViewSpace::Local ? InYawOffset : InYawOffset - InTargetActor->GetActorRotation().Yaw;
-		TrackCameraViewData.CameraViewParams.CameraViewPitch = InPitchOffset == -1.f ? TargetCameraRotation.Pitch - InTargetActor->GetActorRotation().Pitch : InViewSpace == ECameraViewSpace::Local ? InPitchOffset : InPitchOffset - InTargetActor->GetActorRotation().Pitch;
+		TrackCameraViewData.CameraViewParams.CameraViewLocation = InLocation == FVector(-1.f) ? TargetCameraLocation - InTargetActor->GetActorLocation() : InViewSpace == ECameraViewSpace::Local ? InLocation : InLocation - InTargetActor->GetActorLocation();
+		TrackCameraViewData.CameraViewParams.CameraViewYaw = InYaw == -1.f ? TargetCameraRotation.Yaw - InTargetActor->GetActorRotation().Yaw : InViewSpace == ECameraViewSpace::Local ? InYaw : InYaw - InTargetActor->GetActorRotation().Yaw;
+		TrackCameraViewData.CameraViewParams.CameraViewPitch = InPitch == -1.f ? TargetCameraRotation.Pitch - InTargetActor->GetActorRotation().Pitch : InViewSpace == ECameraViewSpace::Local ? InPitch : InPitch - InTargetActor->GetActorRotation().Pitch;
 		TrackCameraViewData.CameraViewParams.CameraViewDistance = InDistance == -1.f ? TargetCameraDistance : InDistance;
 		TrackCameraViewData.CameraViewParams.CameraViewEaseType = InViewEaseType;
 		TrackCameraViewData.CameraViewParams.CameraViewDuration = InViewDuration;
-		TargetSocketOffset = InSocketOffset == FVector(-1.f) ? InitSocketOffset : InSocketOffset;
+		TrackCameraViewData.CameraViewParams.CameraViewOffset = TargetCameraOffset = InOffset == FVector(-1.f) ? InitCameraOffset : InOffset;
 		bTrackAllowControl = bAllowControl;
 		DoTrackTarget(bInstant);
 	}
@@ -678,7 +720,7 @@ void UCameraModule::EndTrackTarget(AActor* InTargetActor)
 			UEventModuleStatics::BroadcastEvent<UEventHandle_CameraTraceEnded>(this, { TrackCameraViewData.CameraViewParams.CameraViewTarget });
 
 			TrackCameraViewData.CameraViewParams.CameraViewTarget = nullptr;
-			TargetSocketOffset = InitSocketOffset;
+			SetCameraOffset(InitCameraOffset);
 		}
 	}
 }
@@ -698,15 +740,15 @@ void UCameraModule::SetCameraLocation(FVector InLocation, bool bInstant)
 
 void UCameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEaseType InEaseType, bool bForce)
 {
-	if(!CurrentCamera || ((CameraDoMoveLocation != EMPTY_Vector || CurrentCameraLocation == InLocation) && !bForce)) return;
+	if(!CurrentCamera || ((CameraDoLocationLocation != EMPTY_Vector || CurrentCameraLocation == InLocation) && !bForce)) return;
 
 	TargetCameraLocation = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InLocation, CameraMoveRange.Min, CameraMoveRange.Max) : InLocation;
 	if(InDuration > 0.f)
 	{
-		CameraDoMoveTime = 0.f;
-		CameraDoMoveDuration = InDuration;
-		CameraDoMoveLocation = CurrentCameraLocation;
-		CameraDoMoveEaseType = InEaseType;
+		CameraDoLocationTime = 0.f;
+		CameraDoLocationDuration = InDuration;
+		CameraDoLocationLocation = CurrentCameraLocation;
+		CameraDoLocationEaseType = InEaseType;
 	}
 	else if(CurrentCamera && CurrentCamera->IsA<ACameraActorBase>())
 	{
@@ -717,9 +759,48 @@ void UCameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEase
 
 void UCameraModule::StopDoCameraLocation()
 {
-	CameraDoMoveTime = 0.f;
-	CameraDoMoveDuration = 0.f;
-	CameraDoMoveLocation = EMPTY_Vector;
+	CameraDoLocationTime = 0.f;
+	CameraDoLocationDuration = 0.f;
+	CameraDoLocationLocation = EMPTY_Vector;
+}
+
+void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant)
+{
+	if(!CurrentCamera) return;
+
+	TargetCameraOffset = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InOffset, CameraMoveRange.Min, CameraMoveRange.Max) : InOffset;
+	if(bInstant)
+	{
+		CurrentCameraOffset = TargetCameraOffset;
+		CurrentCamera->GetCameraBoom()->SocketOffset = TargetCameraOffset;
+	}
+	StopDoCameraOffset();
+}
+
+void UCameraModule::DoCameraOffset(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce)
+{
+	if(!CurrentCamera || ((CameraDoOffsetOffset != EMPTY_Vector || CurrentCameraOffset == InOffset) && !bForce)) return;
+
+	TargetCameraOffset = InOffset;
+	if(InDuration > 0.f)
+	{
+		CameraDoOffsetTime = 0.f;
+		CameraDoOffsetDuration = InDuration;
+		CameraDoOffsetOffset = CurrentCameraOffset;
+		CameraDoOffsetEaseType = InEaseType;
+	}
+	else if(CurrentCamera && CurrentCamera->IsA<ACameraActorBase>())
+	{
+		CurrentCameraOffset = TargetCameraOffset;
+		CurrentCamera->GetCameraBoom()->SocketOffset = TargetCameraOffset;
+	}
+}
+
+void UCameraModule::StopDoCameraOffset()
+{
+	CameraDoOffsetTime = 0.f;
+	CameraDoOffsetDuration = 0.f;
+	CameraDoOffsetOffset = EMPTY_Vector;
 }
 
 void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
@@ -741,15 +822,15 @@ void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 
 void UCameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuration, EEaseType InEaseType, bool bForce)
 {
-	if(!GetPlayerController() || (CameraDoRotateRotation != EMPTY_Rotator || (CurrentCameraRotation.Yaw == InYaw && CurrentCameraRotation.Pitch == InPitch))  && !bForce) return;
+	if(!GetPlayerController() || (CameraDoRotationRotation != EMPTY_Rotator || (CurrentCameraRotation.Yaw == InYaw && CurrentCameraRotation.Pitch == InPitch))  && !bForce) return;
 	
 	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(InDuration > 0.f)
 	{
-		CameraDoRotateTime = 0.f;
-		CameraDoRotateDuration = InDuration;
-		CameraDoRotateRotation = CurrentCameraRotation;
-		CameraDoRotateEaseType = InEaseType;
+		CameraDoRotationTime = 0.f;
+		CameraDoRotationDuration = InDuration;
+		CameraDoRotationRotation = CurrentCameraRotation;
+		CameraDoRotationEaseType = InEaseType;
 	}
 	else
 	{
@@ -764,9 +845,9 @@ void UCameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuratio
 
 void UCameraModule::StopDoCameraRotation()
 {
-	CameraDoRotateTime = 0.f;
-	CameraDoRotateDuration = 0.f;
-	CameraDoRotateRotation = EMPTY_Rotator;
+	CameraDoRotationTime = 0.f;
+	CameraDoRotationDuration = 0.f;
+	CameraDoRotationRotation = EMPTY_Rotator;
 }
 
 void UCameraModule::SetCameraDistance(float InDistance, bool bInstant)
@@ -788,15 +869,15 @@ void UCameraModule::SetCameraDistance(float InDistance, bool bInstant)
 
 void UCameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseType InEaseType, bool bForce)
 {
-	if(!CurrentCamera || (CameraDoZoomDistance != EMPTY_Flt || CurrentCameraDistance == InDistance)  && !bForce) return;
+	if(!CurrentCamera || (CameraDoDistanceDistance != EMPTY_Flt || CurrentCameraDistance == InDistance)  && !bForce) return;
 
 	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
 	if(InDuration > 0.f)
 	{
-		CameraDoZoomTime = 0.f;
-		CameraDoZoomDuration = InDuration;
-		CameraDoZoomDistance = CurrentCameraDistance;
-		CameraDoZoomEaseType = InEaseType;
+		CameraDoDistanceTime = 0.f;
+		CameraDoDistanceDuration = InDuration;
+		CameraDoDistanceDistance = CurrentCameraDistance;
+		CameraDoDistanceEaseType = InEaseType;
 	}
 	else
 	{
@@ -807,9 +888,9 @@ void UCameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseTy
 
 void UCameraModule::StopDoCameraDistance()
 {
-	CameraDoZoomTime = 0.f;
-	CameraDoZoomDuration = 0.f;
-	CameraDoZoomDistance = EMPTY_Flt;
+	CameraDoDistanceTime = 0.f;
+	CameraDoDistanceDuration = 0.f;
+	CameraDoDistanceDistance = EMPTY_Flt;
 }
 
 void UCameraModule::SetCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, bool bInstant)
@@ -847,23 +928,23 @@ void UCameraModule::StopDoCameraTransform()
 
 void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
-	if(!bCameraMoveAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
+	if(!bCameraControlAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
 
-	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude()) / 5000.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude()) / CameraMoveAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
 {
-	if(!bCameraRotateAble || !bCameraRotateControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::RotationOnly))) return;
+	if(!bCameraControlAble || !bCameraRotateControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::RotationOnly))) return;
 
 	SetCameraRotation(TargetCameraRotation.Yaw + InYaw * CameraTurnRate * GetWorld()->GetDeltaSeconds(), TargetCameraRotation.Pitch + InPitch * CameraLookUpRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
-	if(!bCameraZoomAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
+	if(!bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / 1000.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
 	{
@@ -886,7 +967,7 @@ void UCameraModule::SetCameraView(const FCameraViewData& InCameraViewData, bool 
 			if(InCameraViewData.CameraViewTarget.LoadSynchronous())
 			{
 				StartTrackTarget(InCameraViewData.CameraViewTarget.LoadSynchronous(), InCameraViewData.TrackTargetMode, InCameraViewData.CameraViewParams.CameraViewMode, InCameraViewData.CameraViewParams.CameraViewSpace,
-					InCameraViewData.CameraViewParams.CameraViewOffset, FVector(-1.f), InCameraViewData.CameraViewParams.CameraViewYaw,
+					InCameraViewData.CameraViewParams.CameraViewLocation, FVector(-1.f), InCameraViewData.CameraViewParams.CameraViewYaw,
 					InCameraViewData.CameraViewParams.CameraViewPitch, InCameraViewData.CameraViewParams.CameraViewDistance, true, InCameraViewData.CameraViewParams.CameraViewEaseType, InCameraViewData.CameraViewParams.CameraViewDuration, bInstant);
 			}
 			if(bCacheData)
@@ -921,19 +1002,22 @@ void UCameraModule::SetCameraViewParams(const FCameraViewParams& InCameraViewPar
 	}
 
 	FVector CameraLocation;
+	FVector CameraOffset;
 	float CameraYaw;
 	float CameraPitch;
 	float CameraDistance;
 	if(InCameraViewParams.CameraViewSpace == ECameraViewSpace::Local && InCameraViewParams.CameraViewTarget)
 	{
-		CameraLocation = InCameraViewParams.CameraViewTarget->GetActorLocation() + InCameraViewParams.CameraViewOffset;
+		CameraLocation = InCameraViewParams.CameraViewTarget->GetActorLocation() + InCameraViewParams.CameraViewLocation;
+		CameraOffset = InCameraViewParams.CameraViewOffset;
 		CameraYaw = InCameraViewParams.CameraViewTarget->GetActorRotation().Yaw + InCameraViewParams.CameraViewYaw;
 		CameraPitch = InCameraViewParams.CameraViewTarget->GetActorRotation().Pitch + InCameraViewParams.CameraViewPitch;
 		CameraDistance = InCameraViewParams.CameraViewDistance;
 	}
 	else
 	{
-		CameraLocation = InCameraViewParams.CameraViewOffset;
+		CameraLocation = InCameraViewParams.CameraViewLocation;
+		CameraOffset = InCameraViewParams.CameraViewOffset;
 		CameraYaw = InCameraViewParams.CameraViewYaw;
 		CameraPitch = InCameraViewParams.CameraViewPitch;
 		CameraDistance = InCameraViewParams.CameraViewDistance;
@@ -943,6 +1027,7 @@ void UCameraModule::SetCameraViewParams(const FCameraViewParams& InCameraViewPar
 		case ECameraViewMode::Instant:
 		{
 			SetCameraLocation(CameraLocation, true);
+			SetCameraOffset(CameraOffset, true);
 			SetCameraRotation(CameraYaw, CameraPitch, true);
 			SetCameraDistance(CameraDistance, true);
 			break;
@@ -950,15 +1035,17 @@ void UCameraModule::SetCameraViewParams(const FCameraViewParams& InCameraViewPar
 		case ECameraViewMode::Smooth:
 		{
 			SetCameraLocation(CameraLocation, bInstant);
+			SetCameraOffset(CameraOffset, bInstant);
 			SetCameraRotation(CameraYaw, CameraPitch, bInstant);
 			SetCameraDistance(CameraDistance, bInstant);
 			break;
 		}
 		case ECameraViewMode::Duration:
 		{
-			DoCameraLocation(CameraLocation, InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
-			DoCameraRotation(CameraYaw, CameraPitch, InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
-			DoCameraDistance(CameraDistance, InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
+			DoCameraLocation(CameraLocation, bInstant ? 0.f : InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
+			DoCameraOffset(CameraOffset, bInstant ? 0.f : InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
+			DoCameraRotation(CameraYaw, CameraPitch, bInstant ? 0.f : InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
+			DoCameraDistance(CameraDistance, bInstant ? 0.f : InCameraViewParams.CameraViewDuration, InCameraViewParams.CameraViewEaseType);
 			break;
 		}
 		default: break;
@@ -969,7 +1056,7 @@ void UCameraModule::ResetCameraView(ECameraResetMode InCameraResetMode, bool bIn
 {
 	switch(InCameraResetMode)
 	{
-		case ECameraResetMode::UseDefaultPoint:
+		case ECameraResetMode::DefaultPoint:
 		{
 			if(DefaultCameraPoint)
 			{
@@ -977,15 +1064,15 @@ void UCameraModule::ResetCameraView(ECameraResetMode InCameraResetMode, bool bIn
 			}
 			break;
 		}
-		case ECameraResetMode::UseCachedPoint:
+		case ECameraResetMode::CurrentPoint:
 		{
-			if(CachedCameraPoint)
+			if(CurrentCameraPoint)
 			{
-				SwitchCameraPoint(CachedCameraPoint);
+				SwitchCameraPoint(CurrentCameraPoint);
 			}
 			break;
 		}
-		case ECameraResetMode::UseCachedData:
+		case ECameraResetMode::CachedData:
 		{
 			if(CachedCameraViewData.IsValid())
 			{
@@ -1039,6 +1126,42 @@ float UCameraModule::GetMinCameraPitch() const
 float UCameraModule::GetMaxCameraPitch() const
 {
 	return GetTrackingTarget() && GetTrackingTarget()->Implements<UCameraTrackableInterface>() && ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) != -1.f ? ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) : MaxCameraPitch;
+}
+
+FVector UCameraModule::GetCurrentCameraLocation(bool bRefresh) const
+{
+	if(bRefresh)
+	{
+		return CurrentCamera ? CurrentCamera->GetActorLocation() : FVector::ZeroVector;
+	}
+	return CurrentCameraLocation;
+}
+
+FVector UCameraModule::GetCurrentCameraOffset(bool bRefresh) const
+{
+	if(bRefresh)
+	{
+		return CurrentCamera ? CurrentCamera->GetCameraBoom()->SocketOffset : FVector::ZeroVector;
+	}
+	return CurrentCameraOffset;
+}
+
+FRotator UCameraModule::GetCurrentCameraRotation(bool bRefresh)
+{
+	if(bRefresh)
+	{
+		return GetPlayerController() ? GetPlayerController()->GetControlRotation() : FRotator::ZeroRotator;
+	}
+	return CurrentCameraRotation;
+}
+
+float UCameraModule::GetCurrentCameraDistance(bool bRefresh) const
+{
+	if(bRefresh)
+	{
+		return CurrentCamera ? CurrentCamera->GetCameraBoom()->TargetArmLength : 0;
+	}
+	return CurrentCameraDistance;
 }
 
 AWHPlayerController* UCameraModule::GetPlayerController()

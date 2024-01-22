@@ -203,7 +203,7 @@ void ACharacterBase::MoveForward_Implementation(float InValue)
 {
 	const FRotator Rotation = GetControlRotation();
 	const FRotator YawRotation = FRotator(0, Rotation.Yaw, 0);
-	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector Direction = FRotationMatrix(GetCharacterMovement()->IsMovingOnGround() ? YawRotation : Rotation).GetUnitAxis(EAxis::X);
 	AddMovementInput(Direction, InValue);
 }
 
@@ -217,6 +217,8 @@ void ACharacterBase::MoveRight_Implementation(float InValue)
 
 void ACharacterBase::MoveUp_Implementation(float InValue)
 {
+	if(GetCharacterMovement()->IsMovingOnGround()) return;
+
 	const FRotator Rotation = GetControlRotation();
 	const FRotator YawRotation(0, Rotation.Yaw, 0);
 	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);

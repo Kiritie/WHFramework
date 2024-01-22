@@ -4,12 +4,12 @@
 
 UEventHandle_ResetCameraView::UEventHandle_ResetCameraView()
 {
-	CameraResetMode = ECameraResetMode::UseDefaultPoint;
+	CameraResetMode = ECameraResetMode::DefaultPoint;
 }
 
 void UEventHandle_ResetCameraView::OnDespawn_Implementation(bool bRecovery)
 {
-	CameraResetMode = ECameraResetMode::UseDefaultPoint;
+	CameraResetMode = ECameraResetMode::DefaultPoint;
 }
 
 void UEventHandle_ResetCameraView::Parse_Implementation(const TArray<FParameter>& InParams)

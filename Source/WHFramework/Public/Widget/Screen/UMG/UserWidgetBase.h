@@ -296,9 +296,14 @@ public:
 	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnClosed"))
 	FK2_OnWidgetClosed K2_OnClosed;
 
+	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnClosed"))
+	FK2_OnWidgetDestroyed K2_OnDestroyed;
+
 	FOnWidgetOpened OnOpened;
 
 	FOnWidgetClosed OnClosed;
+	
+	FOnWidgetClosed OnDestroyed;
 
 private:
 	FTimerHandle WidgetFinishOpenTimerHandle;
@@ -349,8 +354,14 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
 
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual UWidgetAnimatorBase* GetWidgetOpenAnimator(TSubclassOf<UWidgetAnimatorBase> InClass = nullptr) const;
+
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual UWidgetAnimatorBase* GetWidgetCloseAnimator(TSubclassOf<UWidgetAnimatorBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }

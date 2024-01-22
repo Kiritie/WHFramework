@@ -83,6 +83,16 @@ UWorldWidgetContainer* UWidgetModuleStatics::GetWorldWidgetContainer()
 	return UWidgetModule::Get().GetWorldWidgetContainer();
 }
 
+bool UWidgetModuleStatics::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
+{
+	return UWidgetModule::Get().GetWorldWidgetVisible(InClass);
+}
+
+void UWidgetModuleStatics::SetWorldWidgetVisible(bool bVisible)
+{
+	UWidgetModule::Get().SetWorldWidgetVisible(bVisible);
+}
+
 bool UWidgetModuleStatics::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
 {
 	return UWidgetModule::Get().HasWorldWidget(InClass, InIndex);

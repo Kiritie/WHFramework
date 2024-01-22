@@ -61,6 +61,11 @@ void ACameraPointBase::SetCameraView(const FCameraParams& InCameraParams)
 }
 #endif
 
+bool ACameraPointBase::IsDefault() const
+{
+	return UCameraModuleStatics::GetDefaultCameraPoint() == this;
+}
+
 FCameraViewData ACameraPointBase::GetCameraViewData()
 {
 	return FCameraViewData(this, bCameraTrack, CameraTrackMode, CameraViewParams);

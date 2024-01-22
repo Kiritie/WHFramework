@@ -157,7 +157,7 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
 		
-		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_InteractSelect).IsPressing(this))
+		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_InteractSelect).IsPressed(this))
 		{
 			if(HoveringInteraction.GetObject())
 			{
@@ -190,6 +190,29 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 	{
 		IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
 		HoveringInteraction = nullptr;
+	}
+}
+
+void AWHPlayerController::SetSelectedInteraction(TScriptInterface<IInteractionAgentInterface> InInteractionAgent)
+{
+	if(InInteractionAgent.GetObject())
+	{
+		if(!SelectedInteraction.GetObject())
+		{
+			SelectedInteraction = InInteractionAgent;
+			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+		}
+		else if(SelectedInteraction != InInteractionAgent)
+		{
+			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+			SelectedInteraction = InInteractionAgent;
+			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+		}
+	}
+	else if(SelectedInteraction.GetObject())
+	{
+		IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+		SelectedInteraction = nullptr;
 	}
 }
 

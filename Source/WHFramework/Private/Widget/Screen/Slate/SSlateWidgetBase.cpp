@@ -3,6 +3,7 @@
 
 #include "Widget/Screen/Slate/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
+#include "Input/InputModule.h"
 #include "Widget/WidgetModule.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION

@@ -102,6 +102,9 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	virtual TScriptInterface<IInteractionAgentInterface> GetSelectedInteraction() { return SelectedInteraction; }
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetSelectedInteraction(TScriptInterface<IInteractionAgentInterface> InInteractionAgent);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Raycast

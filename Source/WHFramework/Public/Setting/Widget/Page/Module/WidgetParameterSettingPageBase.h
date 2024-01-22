@@ -28,8 +28,6 @@ public:
 
 	virtual void OnReset(bool bForce) override;
 
-	virtual void OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues) override;
-
 	virtual void OnClose(bool bInstant) override;
 
 public:

@@ -167,6 +167,12 @@ protected:
 	UPROPERTY(Transient)
 	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
 
+public:
+	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnDestroyed"))
+	FK2_OnWidgetDestroyed K2_OnDestroyed;
+
+	FOnWidgetDestroyed OnDestroyed;
+
 private:
 	FTimerHandle RefreshTimerHandle;
 	

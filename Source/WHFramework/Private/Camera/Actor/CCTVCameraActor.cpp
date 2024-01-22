@@ -12,17 +12,23 @@ ACCTVCameraActor::ACCTVCameraActor()
 {
 	CameraName = FName("CCTVCamera");
 
-	ChangePointInterval = 5.f;
-	ChangePointIntervalDelta = 3.f;
+	CameraShotMinInterval = 7.f;
+	CameraShotMaxInterval = 10.f;
 	
-	ChangePointRemainTime = 0.f;
+	CameraShotRemainTime = 0.f;
 
-	CameraRotateSpeed = 0.1f;
-	CameraZoomSpeed = 0.05f;
+	CameraShotMinPitch = -30.f;
+	CameraShotMaxPitch = -90.f;
+
+	CameraShotZoomSpeed = 0.05f;
 	
-	DefaultCameraPoints = TArray<ACameraPointBase*>();
-	CameraPointQueue = TArray<ACameraPointBase*>();
-	CurrentCameraViewData = FCameraViewData();
+	CameraShotRotateSpeed = 0.1f;
+
+	CameraShotFadeTime = 2.f;
+	
+	DefaultCameraShotPoints = TArray<ACameraPointBase*>();
+	CurrentCameraShotPoints = TArray<ACameraPointBase*>();
+	CurrentCameraShotData = FCCTVCameraShotData();
 }
 
 void ACCTVCameraActor::OnInitialize_Implementation()
@@ -41,73 +47,124 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(!IsCurrent()) return;
 	
-	if(ChangePointRemainTime <= 0.f)
+	if(CameraShotRemainTime <= 0.f)
 	{
-		if(CameraPointQueue.IsEmpty())
+		if(CurrentCameraShotPoints.IsEmpty())
 		{
-			if(DefaultCameraPoints.IsEmpty())
+			if(DefaultCameraShotPoints.IsEmpty())
 			{
 				TArray<AActor*> CameraPoints;
 				UGameplayStatics::GetAllActorsOfClass(this, ACameraPointBase::StaticClass(), CameraPoints);
 				for(auto Iter : CameraPoints)
 				{
-					CameraPointQueue.Add(Cast<ACameraPointBase>(Iter));
+					if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(Iter))
+					{
+						if(!CameraPoint->IsDefault())
+						{
+							CurrentCameraShotPoints.Add(CameraPoint);
+						}
+					}
 				}
 			}
 			else
 			{
-				CameraPointQueue = DefaultCameraPoints;
+				CurrentCameraShotPoints = DefaultCameraShotPoints;
 			}
-			UCommonStatics::ShuffleArray(CameraPointQueue);
+			UCommonStatics::ShuffleArray(CurrentCameraShotPoints);
 		}
-		if(CameraPointQueue.Num() > 0)
+		if(CurrentCameraShotPoints.Num() > 0)
 		{
-			if(ACameraPointBase* CameraPoint = CameraPointQueue[0])
+			if(ACameraPointBase* CameraPoint = CurrentCameraShotPoints[0])
 			{
-				CurrentCameraViewData = CameraPoint->GetCameraViewData();
-				if(CurrentCameraViewData.bTrackTarget)
+				CurrentCameraShotData.CameraViewData = CameraPoint->GetCameraViewData();
+				CurrentCameraShotData.CameraShotMode = ECCTVCameraShotMode::None;
+				CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewYaw = FMath::RandRange(0.f, 360.f);
+				CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewPitch = FMath::RandRange(CameraShotMinPitch, CameraShotMaxPitch);
+				CurrentCameraShotData.CameraMinDistance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance * 0.5f;
+				CurrentCameraShotData.CameraMaxDistance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance * 2.5f;
+				if(CurrentCameraShotData.CameraViewData.TrackTargetMode > ECameraTrackMode::LocationOnly)
 				{
-					CurrentCameraViewData.CameraViewParams.CameraViewYaw = FMath::RandRange(0.f, 360.f);
-					CurrentCameraViewData.CameraViewParams.CameraViewPitch = FMath::RandRange(-65.f, -90.f);
+					CurrentCameraShotData.CameraViewData.TrackTargetMode = ECameraTrackMode::LocationOnly;
 				}
-				if(ChangePointRemainTime == -1.f)
+				UAnimationModuleStatics::ExecuteWithTransition(CameraShotFadeTime, [this]
 				{
-					UCameraModuleStatics::ResetCameraView(ECameraResetMode::UseDefaultPoint, true);
-					UCameraModuleStatics::SetCameraView(CurrentCameraViewData, false, true);
-				}
-				else
-				{
-					UAnimationModuleStatics::ExecuteWithTransition(2.f, [this]
+					CurrentCameraShotData.CameraShotMode = (ECCTVCameraShotMode)FMath::RandRange(2, 4);
+					switch(CurrentCameraShotData.CameraShotMode)
 					{
-						UCameraModuleStatics::SetCameraView(CurrentCameraViewData, false, true);
-					});
-				}
+						case ECCTVCameraShotMode::Zoom:
+						{
+							CurrentCameraShotData.CameraZoomSpeed = FMath::RandBool() ? -CameraShotZoomSpeed : CameraShotZoomSpeed;
+							CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance = CurrentCameraShotData.CameraZoomSpeed > 0.f ? CurrentCameraShotData.CameraMinDistance : CurrentCameraShotData.CameraMaxDistance;
+							break;
+						}
+						case ECCTVCameraShotMode::Rotate:
+						{
+							CurrentCameraShotData.CameraRotateSpeed = FMath::RandBool() ? -CameraShotRotateSpeed : CameraShotRotateSpeed;
+							CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance = FMath::RandRange(CurrentCameraShotData.CameraMinDistance, CurrentCameraShotData.CameraMaxDistance);
+							break;
+						}
+						case ECCTVCameraShotMode::ZoomAndRotate:
+						{
+							CurrentCameraShotData.CameraZoomSpeed = FMath::RandBool() ? -CameraShotZoomSpeed : CameraShotZoomSpeed;
+							CurrentCameraShotData.CameraRotateSpeed = FMath::RandBool() ? -CameraShotRotateSpeed : CameraShotRotateSpeed;
+							CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance = CurrentCameraShotData.CameraZoomSpeed > 0.f ? CurrentCameraShotData.CameraMinDistance : CurrentCameraShotData.CameraMaxDistance;
+							break;
+						}
+						default: break;
+					}
+					UCameraModuleStatics::SetCameraView(CurrentCameraShotData.CameraViewData, false, true);
+					if(CurrentCameraShotData.CameraViewData.bTrackTarget)
+					{
+						UCameraModuleStatics::SetCameraRotationAndDistance(CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewYaw, CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewPitch, CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance, true);
+					}
+				});
 			}
-			CameraPointQueue.RemoveAt(0);
+			CurrentCameraShotPoints.RemoveAt(0);
 		}
-		ChangePointRemainTime = FMath::RandRange(ChangePointInterval - ChangePointIntervalDelta, ChangePointInterval + ChangePointIntervalDelta);
+		CameraShotRemainTime = FMath::RandRange(CameraShotMinInterval, CameraShotMaxInterval);
 	}
 	else
 	{
-		if(!CurrentCameraViewData.bTrackTarget)
+		switch(CurrentCameraShotData.CameraShotMode)
 		{
-			UCameraModuleStatics::AddCameraRotationInput(CameraRotateSpeed, 0.f);
+			case ECCTVCameraShotMode::Zoom:
+			{
+				if(CurrentCameraShotData.CameraZoomSpeed < 0.f ? UCameraModuleStatics::GetCameraDistance() > CurrentCameraShotData.CameraMinDistance : UCameraModuleStatics::GetCameraDistance() < CurrentCameraShotData.CameraMaxDistance)
+				{
+					UCameraModuleStatics::AddCameraDistanceInput(CurrentCameraShotData.CameraZoomSpeed);
+				}
+				break;
+			}
+			case ECCTVCameraShotMode::Rotate:
+			{
+				UCameraModuleStatics::AddCameraRotationInput(CurrentCameraShotData.CameraRotateSpeed, 0.f);
+				break;
+			}
+			case ECCTVCameraShotMode::ZoomAndRotate:
+			{
+				if(CurrentCameraShotData.CameraZoomSpeed < 0.f ? UCameraModuleStatics::GetCameraDistance() > CurrentCameraShotData.CameraMinDistance : UCameraModuleStatics::GetCameraDistance() < CurrentCameraShotData.CameraMaxDistance)
+				{
+					UCameraModuleStatics::AddCameraDistanceInput(CurrentCameraShotData.CameraZoomSpeed);
+				}
+				UCameraModuleStatics::AddCameraRotationInput(CurrentCameraShotData.CameraRotateSpeed, 0.f);
+				break;
+			}
+			default: break;
 		}
-		UCameraModuleStatics::AddCameraDistanceInput(CameraZoomSpeed);
 	}
-	ChangePointRemainTime -= DeltaSeconds;
+	CameraShotRemainTime -= DeltaSeconds;
 }
 
 void ACCTVCameraActor::OnSwitch_Implementation()
 {
 	Super::OnSwitch_Implementation();
 
-	ChangePointRemainTime = -1.f;
+	CameraShotRemainTime = -1.f;
 }
 
 void ACCTVCameraActor::OnUnSwitch_Implementation()
 {
 	Super::OnUnSwitch_Implementation();
 
-	UCameraModuleStatics::ResetCameraView(ECameraResetMode::UseCachedData);
+	UCameraModuleStatics::EndTrackTarget();
 }

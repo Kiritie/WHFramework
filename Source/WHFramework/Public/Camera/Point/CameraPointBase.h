@@ -55,6 +55,9 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
+	bool IsDefault() const;
+
+	UFUNCTION(BlueprintPure)
 	FCameraViewData GetCameraViewData();
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))

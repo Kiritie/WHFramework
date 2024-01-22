@@ -244,6 +244,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
 	static UWorldWidgetContainer* GetWorldWidgetContainer();
 
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetWorldWidgetVisible(bool bVisible);
+
 	template<class T>
 	static bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{

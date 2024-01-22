@@ -37,13 +37,16 @@ public:
 	static void SetDefaultCameraPoint(ACameraPointBase* InCameraPoint);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FVector GetCameraLocation(bool bReal = false);
+	static FVector GetCameraLocation(bool bReal = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FRotator GetCameraRotation(bool bReal = false);
+	static FRotator GetCameraRotation(bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static float GetCameraDistance(bool bReal = false);
+	static float GetCameraDistance(bool bRefresh = false);
+
+	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
+	static FVector GetCameraOffset(bool bRefresh = false);
 
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
@@ -64,26 +67,26 @@ public:
 	static ACameraActorBase* GetCameraByName(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCamera(ACameraActorBase* InCamera, bool bInstant = false);
+	static void SwitchCamera(ACameraActorBase* InCamera, bool bReset = true, bool bInstant = false);
 
 	template<class T>
-	static void SwitchCameraByClass(bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
+	static void SwitchCameraByClass(bool bReset = true, bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{
-		SwitchCameraByClass(InClass);
+		SwitchCameraByClass(InClass, bReset, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant = false);
+	static void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCameraByName(const FName InName, bool bInstant = false);
+	static void SwitchCameraByName(const FName InName, bool bReset = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint = true, bool bSetAsDefault = false, bool bInstant = false);
+	static void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false, bool bInstant = false);
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration,bInstant"), Category = "CameraModuleStatics")
-	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocationOffset = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYawOffset = -1.f, float InPitchOffset = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
+	static void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocation = FVector(-1.f), FVector InSocketOffset = FVector(-1.f), float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void EndTrackTarget(AActor* InTargetActor = nullptr);
@@ -92,7 +95,7 @@ public:
 	static void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
 	
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::UseDefaultPoint, bool bInstant = false);
+	static void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::DefaultPoint, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void SetCameraLocation(FVector InLocation, bool bInstant = false);
@@ -102,6 +105,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void StopDoCameraLocation();
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetCameraOffset(FVector InOffset, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void StopDoCameraOffset();
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void SetCameraRotation(float InYaw = -1.f, float InPitch = -1.f, bool bInstant = false);

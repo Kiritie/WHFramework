@@ -32,6 +32,14 @@ void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 void UCommonButtonGroup::OnWidgetAdded(UWidget* NewWidget)
 {
 	Super::OnWidgetAdded(NewWidget);
+
+	if(UCommonButton* CommonButton = Cast<UCommonButton>(NewWidget))
+	{
+		if(!CommonButton->bStandalone)
+		{
+			CommonButton->bToggleable = !bSelectionRequired;
+		}
+	}
 }
 
 void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected)
