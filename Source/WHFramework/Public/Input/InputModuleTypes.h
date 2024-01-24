@@ -196,6 +196,30 @@ public:
 	FInputTouchHandlerDynamicSignature DynamicDelegate;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPlayerKeyMappingInfo
+{
+	GENERATED_BODY()
+
+public:
+	FPlayerKeyMappingInfo()
+	{
+		KeyName = FText::GetEmpty();
+		KeyCode = FText::GetEmpty();
+		KeyBrushs = TArray<FSlateBrush>();
+	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FText KeyName;
+
+	UPROPERTY(BlueprintReadOnly)
+	FText KeyCode;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FSlateBrush> KeyBrushs;
+};
+
 struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
 {
 	FInputModeNone()

@@ -3,6 +3,7 @@
 
 #include "Input/InputModule.h"
 
+#include "CommonInputBaseTypes.h"
 #include "Camera/CameraModule.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
@@ -166,6 +167,11 @@ void UInputModule::OnReset()
 void UInputModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+
+	for(auto Iter : InputManagerRefs)
+	{
+		Iter.Value->OnRefresh(DeltaSeconds);
+	}
 }
 
 void UInputModule::OnPause()
@@ -436,6 +442,37 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 		});
 	}
 	return Mappings;
+}
+
+FPlayerKeyMappingInfo UInputModule::GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex) const
+{
+	FPlayerKeyMappingInfo KeyMappingInfo;
+
+	FString KeyName;
+	FString KeyCode;
+
+	auto PlayerKeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(InName);
+	if(PlayerKeyMappings.Num() > 0)
+	{
+		for(auto& Iter2 : PlayerKeyMappings)
+		{
+			FSlateBrush ImageBrush;
+			const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>();
+			if(Settings->TryGetInputBrush(ImageBrush, Iter2.GetCurrentKey(), ECommonInputType::MouseAndKeyboard, FName("XSX")))
+			{
+				ImageBrush.ImageSize = FVector2D(25.f);
+				KeyMappingInfo.KeyBrushs.Add(ImageBrush);
+			}
+			KeyCode.Append(FString::Printf(TEXT("%s/"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString()));
+			KeyName = Iter2.GetDisplayName().ToString();
+		}
+		KeyCode.RemoveFromEnd(TEXT("/"));
+	}
+
+	KeyMappingInfo.KeyName = FText::FromString(KeyName);
+	KeyMappingInfo.KeyCode = FText::FromString(KeyCode);
+
+	return KeyMappingInfo;
 }
 
 bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex) const

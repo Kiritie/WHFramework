@@ -92,6 +92,9 @@ public:
 	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static FPlayerKeyMappingInfo GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")

@@ -16,6 +16,11 @@ void UInputManagerBase::OnInitialize()
 	K2_OnInitialize();
 }
 
+void UInputManagerBase::OnRefresh(float DeltaSeconds)
+{
+	K2_OnRefresh(DeltaSeconds);
+}
+
 void UInputManagerBase::OnBindAction(UInputComponentBase* InInputComponent)
 {
 	K2_OnBindAction(InInputComponent);

@@ -85,6 +85,11 @@ TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByName(const 
 	return UInputModule::Get().GetPlayerKeyMappingsByName(InName, InPlayerIndex);
 }
 
+FPlayerKeyMappingInfo UInputModuleStatics::GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex)
+{
+	return UInputModule::Get().GetPlayerKeyMappingInfoByName(InName, InPlayerIndex);
+}
+
 bool UInputModuleStatics::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex)
 {
 	return UInputModule::Get().IsPlayerMappedKeyByName(InName, InKey, InPlayerIndex);

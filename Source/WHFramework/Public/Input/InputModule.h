@@ -160,6 +160,9 @@ public:
 	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure)
+	FPlayerKeyMappingInfo GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure)
 	bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))

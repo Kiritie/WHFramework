@@ -27,7 +27,16 @@ public:
 	void K2_OnInitialize();
 	UFUNCTION()
 	virtual void OnInitialize();
-	
+	/**
+	* 当刷新
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh(float DeltaSeconds);
+	UFUNCTION()
+	virtual void OnRefresh(float DeltaSeconds);
+	/**
+	* 当绑定
+	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnBindAction")
 	void K2_OnBindAction(UInputComponentBase* InInputComponent);
 	UFUNCTION()
