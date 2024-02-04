@@ -61,7 +61,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
 	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false);
-	
+
+	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
+	static bool IsExistModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor = false);
+
+	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
+	static bool IsExistModuleByName(const FName InName, bool bInEditor = false);
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleStatics")
 	static UModuleBase* GetModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor = false);
 

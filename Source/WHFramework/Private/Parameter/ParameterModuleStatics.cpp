@@ -60,7 +60,7 @@ FParameter UParameterModuleStatics::MakeNameParameter(const FName InValue)
 	return FParameter::MakeName(InValue);
 }
 
-FParameter UParameterModuleStatics::MakeTextParameter(const FText& InValue)
+FParameter UParameterModuleStatics::MakeTextParameter(const FText InValue)
 {
 	return FParameter::MakeText(InValue);
 }
@@ -118,4 +118,9 @@ FParameter UParameterModuleStatics::MakeObjectParameter(UObject* InValue)
 FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue)
 {
 	return FParameter::MakeObjectPtr(InValue);
+}
+
+FParameter UParameterModuleStatics::MakeDelegateParameter(const FSimpleDynamicDelegate& InValue)
+{
+	return FParameter::MakeDelegate(InValue);
 }

@@ -3,7 +3,11 @@
 
 #include "Widget/Screen/Slate/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
+#include "Common/CommonStatics.h"
+#include "Input/InputModule.h"
+#include "Input/InputModuleStatics.h"
 #include "Widget/WidgetModule.h"
+#include "Widget/WidgetModuleStatics.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -12,12 +16,11 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetType = EWidgetType::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
-	ChildNames = TArray<FName>();
+	ParentSlot = NAME_None;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
 	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
-	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetCreateType = EWidgetCreateType::None;
@@ -42,6 +45,7 @@ void SSlateWidgetBase::Construct(const FArguments& InArgs)
 	];
 	*/
 }
+
 FReply SSlateWidgetBase::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
 	return !bWidgetPenetrable ? FReply::Handled() : SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
@@ -89,7 +93,41 @@ FReply SSlateWidgetBase::OnTouchEnded(const FGeometry& MyGeometry, const FPointe
 
 void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	
+	WidgetParams = InParams;
+
+	if(ParentWidget)
+	{
+		ParentWidget->RemoveChild(this);
+	}
+	if(ParentName != NAME_None)
+	{
+		// ParentWidget = UWidgetModuleStatics::GetSlateWidget<UUserWidgetBase>(ParentName);
+	}
+	else if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
+	{
+		ParentWidget = InParent;
+	}
+	if(ParentWidget)
+	{
+		ParentWidget->AddChild(this);
+	}
+
+	for(auto Iter : GetAllPoolWidgets())
+	{
+		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+	}
+	//
+	// for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
+	// {
+	// 	if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
+	// 	{
+	// 		const UUserWidgetBase* DefaultObject = UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
+	// 		if(DefaultObject->ParentName == WidgetName && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
+	// 		{
+	// 			UWidgetModuleStatics::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
+	// 		}
+	// 	}
+	// }
 }
 
 void SSlateWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -99,24 +137,80 @@ void SSlateWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& 
 
 void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	WidgetState = EScreenWidgetState::Opening;
+	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
 	
-	switch (WidgetType)
+	WidgetParams = InParams;
+	WidgetState = EScreenWidgetState::Opening;
+	OnStateChanged(WidgetState);
+
+
+	// if(!GetParentWidget<UUserWidgetBase>())
+	// {
+	// 	if(GetParent())
+	// 	{
+	// 		RemoveFromParent();
+	// 	}
+	// 	AddToViewport(WidgetZOrder);
+	// }
+	// else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
+	// {
+	// 	if(GetParent() != ParentPanelWidget)
+	// 	{
+	// 		UPanelSlot* PanelSlot = ParentPanelWidget->AddChild(this);
+	// 		if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
+	// 		{
+	// 			CanvasPanelSlot->SetZOrder(WidgetZOrder);
+	// 			CanvasPanelSlot->SetAnchors(WidgetAnchors);
+	// 			CanvasPanelSlot->SetOffsets(WidgetOffsets);
+	// 			CanvasPanelSlot->SetAlignment(WidgetAlignment);
+	// 		}
+	// 	}
+	// }
+
+	UCommonStatics::GetCurrentWorld()->GetGameViewport()->AddGameLayerWidget(SharedThis(this), WidgetZOrder);
+
+	switch(WidgetOpenType)
 	{
-		case EWidgetType::Permanent:
+		case EWidgetOpenType::Visible:
+		{
+			SetVisibility(EVisibility::Visible);
+			break;
+		}
+		case EWidgetOpenType::HitTestInvisible:
+		{
+			SetVisibility(EVisibility::HitTestInvisible);
+			break;
+		}
+		case EWidgetOpenType::SelfHitTestInvisible:
 		{
 			SetVisibility(EVisibility::SelfHitTestInvisible);
-		}
-		case EWidgetType::Temporary:
-		{
-			//AddToViewport(WidgetZOrder);
+			break;
 		}
 		default: break;
 	}
-	
+		
+	Refresh();
+
+	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	{
+		// UCommonStatics::GetCurrentTimerManager()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+	}
 	if(bInstant)
 	{
 		FinishOpen(bInstant);
+	}
+
+	UInputModuleStatics::UpdateGlobalInputMode();
+
+	// if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
+	// if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
+
+	for(const auto Iter : ChildWidgets)
+	{
+		if(Iter->GetParentName() == GetWidgetName() && Iter->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
+		{
+			Iter->Open(nullptr, bInstant);
+		}
 	}
 }
 
@@ -163,16 +257,17 @@ void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams
 
 void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
+	UWidgetModuleStatics::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant, GetWidgetName());
 }
 
 void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	//UWidgetModuleStatics::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant);
+	UWidgetModuleStatics::OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant, GetWidgetName());
 }
 
 void SSlateWidgetBase::Close(bool bInstant)
 {
-	//UWidgetModuleStatics::CloseSlateWidget<SSlateWidgetBase>(bInstant);
+	UWidgetModuleStatics::CloseSlateWidget<SSlateWidgetBase>(bInstant, GetWidgetName());
 }
 
 void SSlateWidgetBase::Toggle(bool bInstant)
@@ -236,7 +331,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 			{
 				GetLastTemporary()->Open();
 			}
-			//RemoveFromViewport();
+			UCommonStatics::GetCurrentWorld()->GetGameViewport()->RemoveGameLayerWidget(SharedThis(this));
 		}
 		default: break;
 	}
@@ -264,6 +359,11 @@ UPanelWidget* SSlateWidgetBase::GetRootPanelWidget() const
 UPanelWidget* SSlateWidgetBase::GetParentPanelWidget() const
 {
 	return nullptr;
+}
+
+TArray<UWidget*> SSlateWidgetBase::GetAllPoolWidgets() const
+{
+	return {};
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

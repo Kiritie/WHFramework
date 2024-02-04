@@ -374,13 +374,29 @@ public:
 	{
 		return GetCurrentWorld(bInEditor)->GetTimerManager();
 	}
+	
+	template<class T>
+	static TArray<T*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer)
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetAllActorsOfDataLayer(InDataLayer, T::StaticClass()))
+		{
+			if(T* Actor = Cast<T>(Iter))
+			{
+				ReturnValues.Add(Actor);
+			}
+		}
+		return ReturnValues;
+	}
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
+	static TArray<AActor*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass = nullptr);
 
 	template<class T>
 	static T* GetGameInstance()
 	{
 		return Cast<T>(GetGameInstance());
 	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetGameInstance", DeterminesOutputType = "InClass"), Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
 
 	template<class T>

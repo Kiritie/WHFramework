@@ -41,17 +41,17 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 				case EParameterType::Name:
 				case EParameterType::Text:
 				{
-					SettingItem = CreateSubWidget<UWidgetTextSettingItemBase>({ Iter.DisplayName }, USettingModule::Get().GetTextSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.DisplayName }, USettingModule::Get().GetTextSettingItemClass());
 					break;
 				}
 				case EParameterType::Boolean:
 				{
-					SettingItem = CreateSubWidget<UWidgetBoolSettingItemBase>({ Iter.DisplayName }, USettingModule::Get().GetBoolSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.DisplayName }, USettingModule::Get().GetBoolSettingItemClass());
 					break;
 				}
 				case EParameterType::Key:
 				{
-					SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.DisplayName, 1, true }, USettingModule::Get().GetKeySettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.DisplayName, 1, true }, USettingModule::Get().GetKeySettingItemClass());
 					break;
 				}
 				default: break;
@@ -78,8 +78,12 @@ void UWidgetParameterSettingPageBase::OnApply()
 
 	for(auto& Iter : SettingItems)
 	{
+		FParameter Parameter = UParameterModule::Get().GetParameter(Iter.Key);
 		FParameter Value = Iter.Value->GetValue();
-		UParameterModule::Get().SetParameter(Iter.Key, Value);
+		if(Value != Parameter)
+		{
+			UParameterModule::Get().SetParameter(Iter.Key, Value);
+		}
 	}
 }
 
@@ -92,11 +96,6 @@ void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 		FParameter Parameter = GetDefaultSaveData()->CastRef<FParameterModuleSaveData>().Parameters.GetParameter(Iter.Key);
 		Iter.Value->SetValue(Parameter);
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues)
-{
-	Super::OnValuesChange(InSettingItem, InValues);
 }
 
 void UWidgetParameterSettingPageBase::OnClose(bool bInstant)

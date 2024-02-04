@@ -3,7 +3,6 @@
 
 #include "Setting/Widget/Item/WidgetSettingItemBase.h"
 #include "Widget/WidgetModuleStatics.h"
-#include "Components/TextBlock.h"
 
 UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -12,50 +11,30 @@ UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectI
 void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);;
+
+	if(InParams.IsValidIndex(0))
+	{
+		SetTitle(InParams[0].GetTextValue());
+	}
 }
 
 void UWidgetSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-	SetLabel(FText::GetEmpty());
+	
+	SettingName = NAME_None;
 	SetValue(FParameter());
 	OnValueChanged.Clear();
 	OnValuesChanged.Clear();
 }
 
-void UWidgetSettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnCreate(InOwner, InParams);
-}
-
-void UWidgetSettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InParams);
-
-	if(InParams.IsValidIndex(0))
-	{
-		SetLabel(InParams[0].GetTextValue());
-	}
-}
-
 void UWidgetSettingItemBase::OnRefresh()
 {
-	Super::OnRefresh();
 }
 
-void UWidgetSettingItemBase::OnDestroy(bool bRecovery)
+void UWidgetSettingItemBase::Refresh()
 {
-	Super::OnDestroy(bRecovery);
-}
-
-FText UWidgetSettingItemBase::GetLabel() const
-{
-	return Txt_Label->GetText();
-}
-
-void UWidgetSettingItemBase::SetLabel(FText InText)
-{
-	Txt_Label->SetText(InText);
+	OnRefresh();
 }
 
 FParameter UWidgetSettingItemBase::GetValue() const

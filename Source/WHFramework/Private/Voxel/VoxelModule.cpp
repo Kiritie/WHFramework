@@ -44,6 +44,8 @@ UVoxelModule::UVoxelModule()
 	ModuleDisplayName = FText::FromString(TEXT("Voxel Module"));
 	ModuleSaveGame = UVoxelSaveGame::StaticClass();
 
+	ModuleDependencies = { FName("AbilityModule"), FName("AudioModule"), FName("SceneModule") };
+
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;

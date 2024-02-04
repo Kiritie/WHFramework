@@ -21,3 +21,15 @@ void UVideoModuleNetworkComponent::ServerStopMovieMulticast_Implementation(AMedi
 {
 	InMediaPlayer->StopMovie(bSkip);
 }
+
+bool UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer) { return true; }
+void UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer)
+{
+	InMediaPlayer->PauseMovie();
+}
+
+bool UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan) { return true; }
+void UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan)
+{
+	InMediaPlayer->SeekMovie(InTimespan);
+}

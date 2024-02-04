@@ -9,6 +9,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
+#include "Event/Handle/Widget/EventHandle_SetWorldWidgetVisible.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
 IMPLEMENTATION_MODULE(UWidgetModule)
@@ -31,7 +32,7 @@ UWidgetModule::UWidgetModule()
 
 	WorldWidgetClasses = TArray<TSubclassOf<UWorldWidgetBase>>();
 
-	static ConstructorHelpers::FClassFinder<UWorldWidgetContainer> WorldWidgetContainerClassFinder(TEXT("/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer.WBP_WorldWidgetContainer_C"));
+	static ConstructorHelpers::FClassFinder<UWorldWidgetContainer> WorldWidgetContainerClassFinder(TEXT("/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer_Base.WBP_WorldWidgetContainer_Base_C"));
 	if(WorldWidgetContainerClassFinder.Succeeded())
 	{
 		WorldWidgetContainerClass = WorldWidgetContainerClassFinder.Class;
@@ -67,6 +68,7 @@ void UWidgetModule::OnInitialize()
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, FName("OnOpenUserWidget"));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, FName("OnCloseUserWidget"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetWorldWidgetVisible>(this, FName("OnSetWorldWidgetVisible"));
 
 	for(auto& Iter : UserWidgetClasses)
 	{
@@ -337,6 +339,44 @@ void UWidgetModule::SortWorldWidgetClasses()
 			return InClass->GetName();
 		});
 	Modify();
+}
+
+void UWidgetModule::OnSetWorldWidgetVisible(UObject* InSender, UEventHandle_SetWorldWidgetVisible* InEventHandle)
+{
+	SetWorldWidgetVisible(InEventHandle->bVisible, InEventHandle->WidgetClass);
+}
+
+bool UWidgetModule::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
+{
+	if(InClass)
+	{
+		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		if(AllWorldWidgets.Contains(WidgetName))
+		{
+			return AllWorldWidgets[WidgetName].bVisible;
+		}
+	}
+	else
+	{
+		return WorldWidgetContainer->GetVisibility() == ESlateVisibility::SelfHitTestInvisible;
+	}
+	return false;
+}
+
+void UWidgetModule::SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass)
+{
+	if(InClass)
+	{
+		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		if(AllWorldWidgets.Contains(WidgetName))
+		{
+			AllWorldWidgets[WidgetName].bVisible = bVisible;
+		}
+	}
+	else
+	{
+		WorldWidgetContainer->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
 }
 
 bool UWidgetModule::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex) const

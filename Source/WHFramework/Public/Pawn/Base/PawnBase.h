@@ -118,6 +118,8 @@ public:
 
 	virtual float GetCameraMaxPitch_Implementation() const override;
 
+	virtual ECameraTrackMode GetCameraTrackMode_Implementation() const override;
+
 	virtual ECameraSmoothMode GetCameraSmoothMode_Implementation() const override;
 
 	virtual ECameraControlMode GetCameraControlMode_Implementation() const override;
@@ -148,7 +150,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Controller
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }

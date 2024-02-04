@@ -160,11 +160,15 @@ public:
 	FWorldWidgets()
 	{
 		WorldWidgets = TArray<class UWorldWidgetBase*>();
+		bVisible = true;
 	}
 	
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<class UWorldWidgetBase*> WorldWidgets;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bVisible;
 };
 
 USTRUCT(BlueprintType)
@@ -209,6 +213,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FK2_OnWidgetOpened, const TArray<FP
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetClosed, bool, bInstant);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetDestroyed, bool, bRecovery);
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWidgetOpened, const TArray<FParameter>&, bool);
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetClosed, bool);
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetDestroyed, bool);

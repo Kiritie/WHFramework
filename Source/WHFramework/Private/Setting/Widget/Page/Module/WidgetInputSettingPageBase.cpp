@@ -33,7 +33,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 		{
 			if(!ShortcutSettingItems.Contains(Iter.Key.GetTagName()))
 			{
-				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.Value.DisplayName, Iter.Value.Keys.Num(), true }, USettingModule::Get().GetKeySettingItemClass());
+				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Value.DisplayName, Iter.Value.Keys.Num(), true }, USettingModule::Get().GetKeySettingItemClass());
 				AddShortcutSettingItem(Iter.Key.GetTagName(), SettingItem, Iter.Value.Category);
 			}
 		}
@@ -45,7 +45,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 		{
 			if(!MappingSettingItems.Contains(Iter.GetMappingName()))
 			{
-				UWidgetSettingItemBase* SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.GetDisplayName(), 2, !Iter.GetMappingName().IsEqual(FName("SystemOperation")) }, USettingModule::Get().GetKeySettingItemClass());
+				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.GetDisplayName(), 2, !Iter.GetMappingName().IsEqual(FName("SystemOperation")) }, USettingModule::Get().GetKeySettingItemClass());
 				AddMappingSettingItem(Iter.GetMappingName(), SettingItem, Iter.GetDisplayCategory());
 			}
 		}
@@ -195,11 +195,11 @@ bool UWidgetInputSettingPageBase::CanReset_Implementation() const
 {
 	for(auto& Iter : ShortcutSettingItems)
 	{
-		FInputKeyShortcut& KeyShortcut = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[FGameplayTag::RequestGameplayTag(Iter.Key)];
-		TArray<FParameter> Values = Iter.Value->GetValues();
-		for(int32 i = 0; i < Values.Num(); i++)
+		FInputKeyShortcut& KeyShortcut1 = UInputModule::Get().GetKeyShortcuts()[FGameplayTag::RequestGameplayTag(Iter.Key)];
+		FInputKeyShortcut& KeyShortcut2 = GetDefaultSaveData()->CastRef<FInputModuleSaveData>().KeyShortcuts[FGameplayTag::RequestGameplayTag(Iter.Key)];
+		for(int32 i = 0; i < KeyShortcut1.Keys.Num(); i++)
 		{
-			if(KeyShortcut.Keys.IsValidIndex(i) && KeyShortcut.Keys[i] != Values[i].GetKeyValue())
+			if(KeyShortcut2.Keys.IsValidIndex(i) && KeyShortcut1.Keys[i] != KeyShortcut2.Keys[i])
 			{
 				return true;
 			}

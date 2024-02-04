@@ -671,20 +671,39 @@ FReply SModuleListWidget::OnAddModuleItemButtonClicked()
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
 
-	UModuleBase* NewModule = GenerateModule(SelectedModuleClass);
+	TArray<FName> ModuleNames;
+	const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
+	ModuleNames.Add(ModuleName);
+	while (ModuleNames.Num() > 0)
+	{
+		for (auto Iter : GetUnAddedModuleClasses())
+		{
+			if(Iter->GetDefaultObject<UModuleBase>()->GetModuleName() == ModuleNames[0])
+			{
+				UModuleBase* NewModule = GenerateModule(Iter);
 
-	const auto Item = MakeShared<FModuleListItem>();
-	Item->Module = NewModule;
+				const auto Item = MakeShared<FModuleListItem>();
+				Item->Module = NewModule;
 
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
-	ModuleListItems.Add(Item);
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+				ModuleListItems.Add(Item);
+
+				if(ModuleNames[0] == ModuleName)
+				{
+					ListView->SetSelection(Item);
+				}
+
+				ModuleNames.Append(NewModule->GetModuleDependencies());
+			}
+		}
+		ModuleNames.RemoveAt(0);
+	}
 
 	GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
 	
 	SelectedModuleClass = nullptr;
-	
-	ListView->SetSelection(Item);
+
 	UpdateListView();
 
 	return FReply::Handled();
@@ -721,20 +740,42 @@ FReply SModuleListWidget::OnInsertModuleItemButtonClicked()
 
 	if(SelectedModuleListItems.Num() > 0)
 	{
-		UModuleBase* NewModule = GenerateModule(SelectedModuleClass);
+		TArray<FName> ModuleNames;
+		const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
+		ModuleNames.Add(ModuleName);
+		int32 ModuleIndex = SelectedModuleListItems[0]->GetModuleIndex();
+		while (ModuleNames.Num() > 0)
+		{
+			for (auto Iter : GetUnAddedModuleClasses())
+			{
+				if(Iter->GetDefaultObject<UModuleBase>()->GetModuleName() == ModuleNames[0])
+				{
+					UModuleBase* NewModule = GenerateModule(Iter);
 
-		const auto Item = MakeShared<FModuleListItem>();
-		Item->Module = NewModule;
+					const auto Item = MakeShared<FModuleListItem>();
+					Item->Module = NewModule;
 
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, SelectedModuleListItems[0]->GetModuleIndex());
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
-		ModuleListItems.Insert(Item, SelectedModuleListItems[0]->GetModuleIndex());
+					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, ModuleIndex);
+					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+					ModuleListItems.Insert(Item, ModuleIndex);
+
+					ModuleIndex++;
+					
+					if(ModuleNames[0] == ModuleName)
+					{
+						ListView->SetSelection(Item);
+					}
+
+					ModuleNames.Append(NewModule->GetModuleDependencies());
+				}
+			}
+			ModuleNames.RemoveAt(0);
+		}
 
 		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
 
 		SelectedModuleClass = nullptr;
 
-		ListView->SetSelection(Item);
 		UpdateListView();
 	}
 
@@ -747,20 +788,42 @@ FReply SModuleListWidget::OnAppendModuleItemButtonClicked()
 
 	if(SelectedModuleListItems.Num() > 0)
 	{
-		UModuleBase* NewModule = GenerateModule(SelectedModuleClass);
+		TArray<FName> ModuleNames;
+		const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
+		ModuleNames.Add(ModuleName);
+		int32 ModuleIndex = SelectedModuleListItems[0]->GetModuleIndex() + 1;
+		while (ModuleNames.Num() > 0)
+		{
+			for (auto Iter : GetUnAddedModuleClasses())
+			{
+				if(Iter->GetDefaultObject<UModuleBase>()->GetModuleName() == ModuleNames[0])
+				{
+					UModuleBase* NewModule = GenerateModule(Iter);
 
-		const auto Item = MakeShared<FModuleListItem>();
-		Item->Module = NewModule;
+					const auto Item = MakeShared<FModuleListItem>();
+					Item->Module = NewModule;
 
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, SelectedModuleListItems[0]->GetModuleIndex() + 1);
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
-		ModuleListItems.Insert(Item, SelectedModuleListItems[0]->GetModuleIndex() + 1);
+					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, ModuleIndex);
+					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+					ModuleListItems.Insert(Item, ModuleIndex);
+
+					ModuleIndex++;
+
+					if(ModuleNames[0] == ModuleName)
+					{
+						ListView->SetSelection(Item);
+					}
+
+					ModuleNames.Append(NewModule->GetModuleDependencies());
+				}
+			}
+			ModuleNames.RemoveAt(0);
+		}
 
 		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
 
 		SelectedModuleClass = nullptr;
 
-		ListView->SetSelection(Item);
 		UpdateListView();
 	}
 
@@ -786,19 +849,31 @@ FReply SModuleListWidget::OnRemoveModuleItemButtonClicked()
 	{
 		for(auto Iter : SelectedModuleListItems)
 		{
+			bool bCanRemove = true;
 			if(Iter->Module->IsModuleRequired())
 			{
 				FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(FString::Printf(TEXT("The %s is required and cannot be removed!"), *Iter->Module->GetModuleDisplayName().ToString())));
-				continue;
+				bCanRemove = false;
 			}
+			for(auto Iter1 : GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules())
+			{
+				if(Iter1->GetModuleDependencies().Contains(Iter->Module->GetModuleName()))
+				{
+					FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(FString::Printf(TEXT("The %s is dependent on %s and cannot be removed!"), *Iter->Module->GetModuleDisplayName().ToString(), *Iter1->GetModuleDisplayName().ToString())));
+					bCanRemove = false;
+					break;
+				}
+			}
+			if(bCanRemove)
+			{
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[Iter->GetModuleIndex()]->OnDestroy();
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(Iter->GetModuleIndex());
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Remove(Iter->Module->GetModuleName());
+				ModuleListItems.RemoveAt(Iter->GetModuleIndex());
+				//ListView->SetSelection(ModuleListItems[FMath::Min(SelectedModuleListItem->GetModuleIndex(),ModuleListItems.Num() - 1)]);
 
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[Iter->GetModuleIndex()]->OnDestroy();
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(Iter->GetModuleIndex());
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Remove(Iter->Module->GetModuleName());
-			ModuleListItems.RemoveAt(Iter->GetModuleIndex());
-			//ListView->SetSelection(ModuleListItems[FMath::Min(SelectedModuleListItem->GetModuleIndex(),ModuleListItems.Num() - 1)]);
-
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+				GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+			}
 		}
 		UpdateListView();
 	}

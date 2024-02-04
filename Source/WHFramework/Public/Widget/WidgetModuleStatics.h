@@ -199,13 +199,9 @@ public:
 
 	////////////////////////////////////////////////////
 	// SlateWidget
+protected:
+	
 public:
-	template<class T>
-	static TSharedPtr<T> CreateSlateWidget()
-	{
-		return UWidgetModule::Get().CreateSlateWidget<T>();
-	}
-
 	template<class T>
 	static TSharedPtr<T> GetSlateWidget()
 	{
@@ -213,36 +209,54 @@ public:
 	}
 
 	template<class T>
-	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
+	static TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
 	{
-		return UWidgetModule::Get().OpenSlateWidget<T>(InParams, bInstant);
-	}
-	
-	template<class T>
-	static bool CloseSlateWidget(bool bInstant = false)
-	{
-		return UWidgetModule::Get().CloseSlateWidget<T>(bInstant);
-	}
-	
-	template<class T>
-	static bool ToggleSlateWidget(bool bInstant = false)
-	{
-		return UWidgetModule::Get().ToggleSlateWidget<T>(bInstant);
+		return UWidgetModule::Get().CreateSlateWidget<T>(InOwner, InParams);
 	}
 
 	template<class T>
-	static bool DestroySlateWidget()
+	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = typeid(T).name())
 	{
-		return UWidgetModule::Get().DestroySlateWidget<T>();
+		return UWidgetModule::Get().OpenSlateWidget<T>(InParams, bInstant, InName);
+	}
+	
+	template<class T>
+	static bool OpenSlateWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = typeid(T).name())
+	{
+		return UWidgetModule::Get().OpenSlateWidget<T>(&InParams, bInstant, InName);
+	}
+
+	template<class T>
+	static bool CloseSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
+	{
+		return UWidgetModule::Get().CloseSlateWidget<T>(bInstant, InName);
+	}
+	
+	template<class T>
+	static bool ToggleSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
+	{
+		return UWidgetModule::Get().ToggleSlateWidget<T>(bInstant, InName);
+	}
+
+	template<class T>
+	static bool DestroySlateWidget(FName InName = typeid(T).name())
+	{
+		return UWidgetModule::Get().DestroySlateWidget<T>(InName);
 	}
 
 	static void CloseAllSlateWidget(bool bInstant = false);
 	
 	////////////////////////////////////////////////////
-	// Widget
+	// WorldWidget
 public:
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
 	static UWorldWidgetContainer* GetWorldWidgetContainer();
+
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetWorldWidgetVisible(bool bVisible);
 
 	template<class T>
 	static bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
@@ -359,7 +373,7 @@ public:
 	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidgetsByName(FName InName, bool bRecovery = false)
+	static void DestroyWorldWidgetsByName(FName InName, bool bRecovery = false)
 	{
 		UWidgetModule::Get().DestroyWorldWidgetsByName(InName, bRecovery);
 	}

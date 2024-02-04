@@ -8,6 +8,7 @@
 #include "Components/PanelWidget.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetClosed.h"
+#include "Event/Handle/Widget/EventHandle_UserWidgetCreated.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetOpened.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetStateChanged.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -148,6 +149,8 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	}
 
 	K2_OnCreate(InOwner, InParams);
+
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetCreated>(this, { this });
 
 	for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
 	{
@@ -368,6 +371,9 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 
+	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
+	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
+
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
 	K2_OnDestroy(bRecovery);
@@ -578,6 +584,16 @@ void UUserWidgetBase::RemoveChild(IScreenWidgetInterface* InChildWidget)
 void UUserWidgetBase::RemoveAllChild()
 {
 	ChildWidgets.Empty();
+}
+
+UWidgetAnimatorBase* UUserWidgetBase::GetWidgetOpenAnimator(TSubclassOf<UWidgetAnimatorBase> InClass) const
+{
+	return GetDeterminesOutputObject(WidgetOpenAnimator, InClass);
+}
+
+UWidgetAnimatorBase* UUserWidgetBase::GetWidgetCloseAnimator(TSubclassOf<UWidgetAnimatorBase> InClass) const
+{
+	return GetDeterminesOutputObject(WidgetCloseAnimator, InClass);
 }
 
 UPanelWidget* UUserWidgetBase::GetRootPanelWidget() const

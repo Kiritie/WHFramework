@@ -17,6 +17,8 @@ UAchievementModule::UAchievementModule()
 	ModuleName = FName("AchievementModule");
 	ModuleDisplayName = FText::FromString(TEXT("Achievement Module"));
 	ModuleSaveGame = UAchievementSaveGame::StaticClass();
+
+	ModuleDependencies = { FName("AudioModule"), FName("WidgetModule") };
 	
 	static ConstructorHelpers::FClassFinder<UWidgetAchievement> AchievementWidgetClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Achievement/Blueprints/Widget/WBP_Achievement.WBP_Achievement_C'"));
 	if(AchievementWidgetClassHelper.Succeeded())

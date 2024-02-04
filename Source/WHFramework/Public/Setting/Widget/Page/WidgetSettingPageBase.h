@@ -5,7 +5,8 @@
 
 #include "WidgetSettingPageBase.generated.h"
 
-class UScrollBox;
+class UVerticalBox;
+class UCommonButtonStyle;
 class UWidgetSettingItemBase;
 /**
  * 
@@ -41,7 +42,7 @@ protected:
 	UFUNCTION()
 	virtual void OnValueChange(UWidgetSettingItemBase* InSettingItem, const FParameter& InValue);
 
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnValueChange")
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnValuesChange")
 	void K2_OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues);
 	UFUNCTION()
 	virtual void OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues);
@@ -69,15 +70,22 @@ protected:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UScrollBox* ContentBox;
+	UVerticalBox* ContentBox;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Title;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSubclassOf<UCommonButtonStyle> PageItemStyle;
 
 protected:
 	FText LastCategory;
 
 	UPROPERTY()
 	TMap<FName, UWidgetSettingItemBase*> SettingItems;
+
+public:
+	UFUNCTION(BlueprintPure)
+	UWidgetSettingItemBase* GetSettingItemByName(const FName InName);
 };

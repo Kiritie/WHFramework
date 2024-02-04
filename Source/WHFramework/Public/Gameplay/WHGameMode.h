@@ -32,6 +32,9 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
+protected:
+	virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
+
 public:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 

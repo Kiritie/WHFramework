@@ -16,7 +16,7 @@ UTargetingComponent::UTargetingComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 
-	LockedOnWidgetClass = StaticLoadClass(UObject::StaticClass(), nullptr, TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Common/Blueprints/Widget/WBP_LockOn.WBP_LockOn_C'"));
+	LockedOnWidgetClass = StaticLoadClass(UObject::StaticClass(), nullptr, TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Common/Blueprints/Widget/WBP_LockOn_Base.WBP_LockOn_Base_C'"));
 	TargetableActors = APawn::StaticClass();
 	TargetableCollisionChannel = ECC_Pawn;
 }

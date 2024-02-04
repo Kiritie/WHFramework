@@ -60,6 +60,10 @@ protected:
 	UPROPERTY(EditAnywhere, Replicated, Category = "MediaPlayer")
 	TArray<AMediaPlayerBase*> MediaPlayers;
 
+private:
+	UPROPERTY(Transient)
+	TMap<FName, AMediaPlayerBase*> MediaPlayerMap;
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer);
@@ -77,13 +81,19 @@ public:
 	/// Movie
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast = false);
+	void PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable)
-	void PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	void PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable)
-	void StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast = false);
+	void PauseMovieForMediaPlayer(const FName InName, bool bMulticast = false);
+	
+	UFUNCTION(BlueprintCallable)
+	void SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable)
+	void StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// VideoSetting

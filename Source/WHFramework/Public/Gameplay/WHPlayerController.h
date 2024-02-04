@@ -24,7 +24,7 @@ enum class EInteractionRaycastMode : uint8
 /**
  * 
  */
-UCLASS(hidecategories = (Tick, ComponentTick, Replication, ComponentReplication, Activation, Variable, Game, Physics, Rendering, Collision, Actor, Input, Tags, LOD, Cooking, Hidden, WorldPartition, Hlod), meta=(ShortTooltip="A Player Controller is an actor responsible for controlling a Pawn used by the player."))
+UCLASS(hidecategories = (Tick, ComponentTick, Replication, ComponentReplication, Activation, Variable, Game, Physics, Rendering, Collision, Actor, Input, Tags, LOD, Cooking, Hidden, Hlod), meta=(ShortTooltip="A Player Controller is an actor responsible for controlling a Pawn used by the player."))
 class WHFRAMEWORK_API AWHPlayerController : public APlayerController, public IWHActorInterface
 {
 
@@ -102,6 +102,9 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	virtual TScriptInterface<IInteractionAgentInterface> GetSelectedInteraction() { return SelectedInteraction; }
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetSelectedInteraction(TScriptInterface<IInteractionAgentInterface> InInteractionAgent);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Raycast

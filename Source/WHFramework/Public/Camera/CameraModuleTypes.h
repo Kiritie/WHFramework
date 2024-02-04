@@ -74,9 +74,9 @@ enum class ECameraViewSpace : uint8
 UENUM(BlueprintType)
 enum class ECameraResetMode : uint8
 {
-	UseDefaultPoint,
-	UseCachedPoint,
-	UseCachedData
+	DefaultPoint,
+	CurrentPoint,
+	CachedData
 };
 
 USTRUCT(BlueprintType)
@@ -131,6 +131,7 @@ public:
 		CameraViewSpace = ECameraViewSpace::Local;
 		CameraViewEaseType = EEaseType::Linear;
 		CameraViewDuration = 1.f;
+		CameraViewLocation = FVector::ZeroVector;
 		CameraViewOffset = FVector::ZeroVector;
 		CameraViewYaw = 0.f;
 		CameraViewPitch = 0.f;
@@ -165,6 +166,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "CameraViewMode == ECameraViewMode::Duration"))
 	float CameraViewDuration;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector CameraViewLocation;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector CameraViewOffset;

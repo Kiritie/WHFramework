@@ -59,10 +59,10 @@ public:
 	void SetDateTime(FDateTime InDataTime) const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
-	float GetTimeOfDay() const;
+	float GetCurrentTime() const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
-	void SetTimeOfDay(float InTime) const;
+	void SetCurrentTime(float InTime) const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetDayLength() const;
@@ -75,6 +75,12 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
 	void SetNightLength(float InLength) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	void GetTimeRange(float& OutMinTime, float& OutMaxTime) const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	float GetTimePercent() const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunriseTime() const;

@@ -2,7 +2,6 @@
 
 #include "Setting/Widget/Item/WidgetBoolSettingItemBase.h"
 
-#include "Components/CheckBox.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetBoolSettingItemBase::UWidgetBoolSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -12,33 +11,20 @@ UWidgetBoolSettingItemBase::UWidgetBoolSettingItemBase(const FObjectInitializer&
 void UWidgetBoolSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	Btn_Value->OnIsSelectedChanged().AddUObject(this, &UWidgetBoolSettingItemBase::OnCheckBoxStateChanged);
 }
 
 void UWidgetBoolSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-}
-
-void UWidgetBoolSettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnCreate(InOwner, InParams);
 	
-	CheckBox_Value->OnCheckStateChanged.AddDynamic(this, &UWidgetBoolSettingItemBase::OnCheckBoxStateChanged);
-}
-
-void UWidgetBoolSettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InParams);
+	Btn_Value->OnIsSelectedChanged().RemoveAll(this);
 }
 
 void UWidgetBoolSettingItemBase::OnRefresh()
 {
 	Super::OnRefresh();
-}
-
-void UWidgetBoolSettingItemBase::OnDestroy(bool bRecovery)
-{
-	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetBoolSettingItemBase::OnCheckBoxStateChanged(bool bIsChecked)
@@ -52,11 +38,11 @@ void UWidgetBoolSettingItemBase::OnCheckBoxStateChanged(bool bIsChecked)
 
 FParameter UWidgetBoolSettingItemBase::GetValue() const
 {
-	return CheckBox_Value->IsChecked();
+	return Btn_Value->GetSelected();
 }
 
 void UWidgetBoolSettingItemBase::SetValue(const FParameter& InValue)
 {
-	CheckBox_Value->SetIsChecked(InValue.GetBooleanValue());
+	Btn_Value->SetIsSelected(InValue.GetBooleanValue());
 	Super::SetValue(InValue);
 }

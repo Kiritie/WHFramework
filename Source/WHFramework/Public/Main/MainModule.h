@@ -222,6 +222,26 @@ public:
 		return TArray<UModuleBase*>();
 	}
 	/**
+	 * 是否存在指定类型的模块
+	 */
+	template<class T>
+	static bool IsExistModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
+	{
+		const FName ModuleName = InClass.GetDefaultObject()->GetModuleName();
+		return IsExistModuleByName(ModuleName, bInEditor);
+	}
+	/**
+	 * 是否存在指定名称的模块
+	 */
+	static bool IsExistModuleByName(const FName InName, bool bInEditor = false)
+	{
+		if(AMainModule* MainModule = GetPtr(bInEditor))
+		{
+			return MainModule->ModuleMap.Contains(InName);
+		}
+		return false;
+	}
+	/**
 	 * 通过类型获取模块
 	 */
 	template<class T>

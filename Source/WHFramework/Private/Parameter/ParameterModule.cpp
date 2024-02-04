@@ -90,6 +90,19 @@ FSaveData* UParameterModule::ToData()
 	return &SaveData;
 }
 
+void UParameterModule::Load_Implementation()
+{
+	Super::Load_Implementation();
+
+	if(!bModuleAutoSave)
+	{
+		for(auto& Iter : Parameters.Sets)
+		{
+			UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { Iter.Name, &Iter.Parameter });
+		}
+	}
+}
+
 bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.HasParameter(InName, bEnsured);

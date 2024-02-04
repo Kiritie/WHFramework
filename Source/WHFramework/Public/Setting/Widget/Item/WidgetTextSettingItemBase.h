@@ -23,17 +23,11 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
 	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
 	UFUNCTION()
-	virtual void OnTextBoxContentChanged(const FText& InText);
+	virtual void OnTextBoxValueChanged(const FText& InText);
 
 public:
 	virtual FParameter GetValue() const override;

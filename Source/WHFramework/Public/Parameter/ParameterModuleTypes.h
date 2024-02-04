@@ -4,6 +4,7 @@
 
 #include "Json.h"
 #include "GameplayTagContainer.h"
+#include "Common/CommonTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "ParameterModuleTypes.generated.h"
@@ -129,6 +130,7 @@ enum class EParameterType : uint8
 	ClassPtr,
 	Object,
 	ObjectPtr,
+	Delegate,
 	Pointer
 };
 
@@ -286,6 +288,7 @@ public:
 			case EParameterType::ClassPtr: return A.ClassPtrValue == B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue == B.ObjectValue;
 			case EParameterType::ObjectPtr: return A.ObjectPtrValue == B.ObjectPtrValue;
+			case EParameterType::Delegate: return A.DelegateValue == B.DelegateValue;
 			case EParameterType::Pointer: return A.PointerValue == B.PointerValue;
 			default: ;
 		}
@@ -311,6 +314,7 @@ public:
 			case EParameterType::ClassPtr: return A.ClassPtrValue != B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue != B.ObjectValue;
 			case EParameterType::ObjectPtr: return A.ObjectPtrValue != B.ObjectPtrValue;
+			case EParameterType::Delegate: return A.DelegateValue != B.DelegateValue;
 			case EParameterType::Pointer: return A.PointerValue != B.PointerValue;
 			default: ;
 		}
@@ -368,6 +372,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::ObjectPtr"))
 	TSoftObjectPtr<UObject> ObjectPtrValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Delegate"))
+	FSimpleDynamicDelegate DelegateValue;
 
 	void* PointerValue;
 
@@ -467,6 +474,11 @@ public:
 
 	template<class T = UObject>
 	void SetObjectPtrValue(const TSoftObjectPtr<T>& InValue) { ObjectPtrValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FSimpleDynamicDelegate GetDelegateValue() const { return DelegateValue; }
+
+	void SetDelegateValue(const FSimpleDynamicDelegate& InValue) { DelegateValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	void* GetPointerValue() const { return PointerValue; }
@@ -623,6 +635,14 @@ public:
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::ObjectPtr;
 		Parameter.SetObjectPtrValue<T>(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeDelegate(const FSimpleDynamicDelegate& InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Delegate;
+		Parameter.SetDelegateValue(InValue);
 		return Parameter;
 	}
 

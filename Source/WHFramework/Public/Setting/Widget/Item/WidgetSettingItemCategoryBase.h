@@ -1,7 +1,8 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "Widget/Screen/UMG/SubWidgetBase.h"
+#include "Blueprint/UserWidget.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 
 #include "WidgetSettingItemCategoryBase.generated.h"
 
@@ -10,7 +11,7 @@ class UTextBlock;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetSettingItemCategoryBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetSettingItemCategoryBase : public UUserWidget, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
@@ -23,15 +24,6 @@ public:
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
-	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
 
 public:
 	UFUNCTION(BlueprintPure)

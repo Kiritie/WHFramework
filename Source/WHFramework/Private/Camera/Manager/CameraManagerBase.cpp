@@ -4,6 +4,7 @@
 
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Actor/CameraActorBase.h"
+#include "Common/CommonStatics.h"
 
 ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -12,7 +13,7 @@ ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializ
 
 void ACameraManagerBase::SetViewTarget(AActor* NewViewTarget, FViewTargetTransitionParams TransitionParams)
 {
-	if(UCameraModuleStatics::GetCurrentCamera())
+	if(GetOwningPlayerController() == UCommonStatics::GetPlayerController() && UCameraModuleStatics::GetCurrentCamera())
 	{
 		NewViewTarget = UCameraModuleStatics::GetCurrentCamera();
 	}

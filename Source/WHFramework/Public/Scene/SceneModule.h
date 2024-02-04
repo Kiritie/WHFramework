@@ -10,6 +10,7 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_SetDataLayerOwnerPlayer;
 class ATargetPoint;
 class AMiniMapCapture;
 class UEventHandle_SetDataLayerRuntimeState;
@@ -55,10 +56,6 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
-
-protected:
-	UFUNCTION()
-	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
 	
 #if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
@@ -70,6 +67,9 @@ protected:
 protected:
 	UPROPERTY(EditAnywhere, Category = "World|Coordinate")
 	float SeaLevel;
+	
+	UPROPERTY(VisibleAnywhere, Category = "World|Coordinate")
+	float Altitude;
 	
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "World|MiniMap")
 	AMiniMapCapture* MiniMapCapture;
@@ -103,7 +103,7 @@ public:
 	void SetSeaLevel(float InSeaLevel) { SeaLevel = InSeaLevel; }
 
 	UFUNCTION(BlueprintPure)
-	float GetAltitude(bool bUnsigned = false) const;
+	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
@@ -151,6 +151,19 @@ protected:
 public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr) const;
+
+	//////////////////////////////////////////////////////////////////////////
+	// DataLayer
+protected:
+	UPROPERTY(EditAnywhere, Category = "DataLayer")
+	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
+	
+protected:
+	UFUNCTION()
+	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
+	
+	UFUNCTION()
+	void OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor

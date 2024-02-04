@@ -5,7 +5,7 @@
 
 #include "WidgetBoolSettingItemBase.generated.h"
 
-class UCheckBox;
+class UCommonButton;
 /**
  * 
  */
@@ -23,13 +23,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
 	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
 	UFUNCTION()
@@ -42,5 +36,5 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UCheckBox* CheckBox_Value;
+	UCommonButton* Btn_Value;
 };

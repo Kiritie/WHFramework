@@ -25,17 +25,27 @@ AMediaPlayerBase* UVideoModuleStatics::GetMediaPlayerByName(const FName InName)
 	return UVideoModule::Get().GetMediaPlayerByName(InName);
 }
 
-void UVideoModuleStatics::PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast)
+void UVideoModuleStatics::PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast)
 {
-	UVideoModule::Get().PlayMediaPlayerMovie(InName, InMovieName, bMulticast);
+	UVideoModule::Get().PlayMovieForMediaPlayer(InName, InMovieName, bMulticast);
 }
 
-void UVideoModuleStatics::PlayMediaPlayerMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
+void UVideoModuleStatics::PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
 {
-	UVideoModule::Get().PlayMovieWithDelegate(InName, InMovieName, InOnPlayFinished, bMulticast);
+	UVideoModule::Get().PlayMovieForMediaPlayerWithDelegate(InName, InMovieName, InOnPlayFinished, bMulticast);
 }
 
-void UVideoModuleStatics::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast)
+void UVideoModuleStatics::PauseMovieForMediaPlayer(const FName InName, bool bMulticast)
 {
-	UVideoModule::Get().StopMediaPlayerMovie(InName, bSkip, bMulticast);
+	UVideoModule::Get().PauseMovieForMediaPlayer(InName, bMulticast);
+}
+
+void UVideoModuleStatics::SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast)
+{
+	UVideoModule::Get().SeekMovieForMediaPlayer(InName, InTimespan, bMulticast);
+}
+
+void UVideoModuleStatics::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast)
+{
+	UVideoModule::Get().StopMovieForMediaPlayer(InName, bSkip, bMulticast);
 }

@@ -50,6 +50,14 @@ void UVideoModule::OnDestroy()
 void UVideoModule::OnInitialize()
 {
 	Super::OnInitialize();
+	
+	for(auto Iter : MediaPlayers)
+	{
+		if(Iter && !MediaPlayerMap.Contains(Iter->GetNameP()))
+		{
+			MediaPlayerMap.Add(Iter->GetNameP(), Iter);
+		}
+	}
 
 	UAssetModuleStatics::AddStaticObject(FName("EVideoQuality"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVideoQuality")));
 }
@@ -139,6 +147,10 @@ void UVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)
 	{
 		MediaPlayers.Add(InMediaPlayer);
 	}
+	if(!MediaPlayerMap.Contains(InMediaPlayer->GetNameP()))
+	{
+		MediaPlayerMap.Add(InMediaPlayer->GetNameP(), InMediaPlayer);
+	}
 }
 
 void UVideoModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
@@ -146,6 +158,10 @@ void UVideoModule::RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer)
 	if(MediaPlayers.Contains(InMediaPlayer))
 	{
 		MediaPlayers.Remove(InMediaPlayer);
+	}
+	if(MediaPlayerMap.Contains(InMediaPlayer->GetNameP()))
+	{
+		MediaPlayerMap.Remove(InMediaPlayer->GetNameP());
 	}
 }
 
@@ -156,17 +172,14 @@ void UVideoModule::RemoveMediaPlayerFromListByName(const FName InName)
 
 AMediaPlayerBase* UVideoModule::GetMediaPlayerByName(const FName InName) const
 {
-	for (auto Iter : MediaPlayers)
+	if(MediaPlayerMap.Contains(InName))
 	{
-		if(Iter->GetPlayerName() == InName)
-		{
-			return Iter;
-		}
+		return MediaPlayerMap[InName];
 	}
 	return nullptr;
 }
 
-void UVideoModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast)
+void UVideoModule::PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
@@ -174,7 +187,7 @@ void UVideoModule::PlayMediaPlayerMovie(const FName InName, const FName InMovieN
 	}
 }
 
-void UVideoModule::PlayMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
+void UVideoModule::PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
@@ -182,7 +195,23 @@ void UVideoModule::PlayMovieWithDelegate(const FName InName, const FName InMovie
 	}
 }
 
-void UVideoModule::StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast)
+void UVideoModule::PauseMovieForMediaPlayer(const FName InName, bool bMulticast)
+{
+	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
+	{
+		MediaPlayer->PauseMovie(bMulticast);
+	}
+}
+
+void UVideoModule::SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast)
+{
+	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
+	{
+		MediaPlayer->SeekMovie(InTimespan, bMulticast);
+	}
+}
+
+void UVideoModule::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{

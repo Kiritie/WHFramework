@@ -12,6 +12,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
+#include "Event/Handle/Scene/EventHandle_SetDataLayerOwnerPlayer.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -40,6 +41,7 @@ USceneModule::USceneModule()
 	ModuleSaveGame = USceneSaveGame::StaticClass();
 
 	SeaLevel = 0.f;
+	Altitude = 0.f;
 
 	MiniMapCapture = nullptr;
 
@@ -145,6 +147,7 @@ void USceneModule::OnInitialize()
 	Super::OnInitialize();
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, FName("OnSetDataLayerRuntimeState"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, FName("OnSetDataLayerOwnerPlayer"));
 
 	if(WorldTimer)
 	{
@@ -250,6 +253,8 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 void USceneModule::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+	
+	Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
 
 	if(MiniMapCapture)
 	{
@@ -287,6 +292,24 @@ void USceneModule::OnRefresh(float DeltaSeconds)
 	if(WorldWeather)
 	{
 		WorldWeather->OnRefresh(DeltaSeconds);
+	}
+
+	for(const auto& Iter : DataLayerPlayerMappings)
+	{
+		UDataLayerAsset* DataLayer = Iter.Key;
+		const int32 PlayerIndex = Iter.Value;
+		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfDataLayer(DataLayer);
+		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(PlayerIndex);
+		for(const auto Iter1 : Actors)
+		{
+			Iter1->SetOwner(PlayerController->GetViewTarget());
+			TArray<UPrimitiveComponent*> Components;
+			Iter1->GetComponents<UPrimitiveComponent>(Components);
+			for(const auto Iter2 : Components)
+			{
+				Iter2->SetOnlyOwnerSee(true);
+			}
+		}
 	}
 }
 
@@ -365,11 +388,6 @@ FSaveData* USceneModule::ToData()
 	return SaveData;
 }
 
-void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle)
-{
-	UDataLayerManager::GetDataLayerManager(this)->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
-}
-
 #if WITH_EDITOR
 bool USceneModule::CanEditChange(const FProperty* InProperty) const
 {
@@ -401,10 +419,10 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 }
 #endif
 
-float USceneModule::GetAltitude(bool bUnsigned) const
+float USceneModule::GetAltitude(bool bUnsigned, bool bRefresh) const
 {
-	const float Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
-	return bUnsigned ? FMath::Max(Altitude, 0.f) : Altitude;
+	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel : Altitude;
+	return bUnsigned ? FMath::Max(ReturnValue, 0.f) : ReturnValue;
 }
 
 void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
@@ -431,6 +449,34 @@ UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
 UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass) const
 {
 	return GetDeterminesOutputObject(WorldWeather, InClass);
+}
+
+void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle)
+{
+	UDataLayerManager::GetDataLayerManager(this)->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
+}
+
+void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle)
+{
+	if(InEventHandle->PlayerIndex != -1)
+	{
+		DataLayerPlayerMappings.Emplace(InEventHandle->DataLayer, InEventHandle->PlayerIndex);
+	}
+	else if(DataLayerPlayerMappings.Contains(InEventHandle->DataLayer))
+	{
+		DataLayerPlayerMappings.Remove(InEventHandle->DataLayer);
+	}
+	// const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(InEventHandle->PlayerIndex);
+	// for(const auto Iter1 : UCommonStatics::GetAllActorsOfDataLayer(InEventHandle->DataLayer))
+	// {
+	// 	Iter1->SetOwner(PlayerController ? PlayerController->GetViewTarget() : nullptr);
+	// 	TArray<UPrimitiveComponent*> Components;
+	// 	Iter1->GetComponents<UPrimitiveComponent>(Components);
+	// 	for(const auto Iter2 : Components)
+	// 	{
+	// 		Iter2->SetOnlyOwnerSee(PlayerController != nullptr);
+	// 	}
+	// }
 }
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const

@@ -2,6 +2,7 @@
 
 #include "Setting/Widget/Item/WidgetFloatSettingItemBase.h"
 
+#include "Components/EditableTextBox.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Kismet/KismetTextLibrary.h"
@@ -19,28 +20,10 @@ UWidgetFloatSettingItemBase::UWidgetFloatSettingItemBase(const FObjectInitialize
 void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
-}
-
-void UWidgetFloatSettingItemBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Super::OnDespawn_Implementation(bRecovery);
-
-	MinValue = 0.f;
-	MaxValue = 1.f;
-
-	DecimalNum = 2;
-	ScaleFactor = 1.f;
-}
-
-void UWidgetFloatSettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnCreate(InOwner, InParams);
 
 	Slider_Value->OnValueChanged.AddDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
-}
+	TxtBox_Value->OnTextCommitted.AddDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
 
-void UWidgetFloatSettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
-{
 	if(InParams.IsValidIndex(1))
 	{
 		MinValue = InParams[1].GetFloatValue();
@@ -61,39 +44,51 @@ void UWidgetFloatSettingItemBase::OnInitialize(const TArray<FParameter>& InParam
 		ScaleFactor = InParams[4].GetFloatValue();
 	}
 
-	Super::OnInitialize(InParams);
+	if(Txt_MinValue)
+	{
+		Txt_MinValue->SetText(UKismetTextLibrary::Conv_DoubleToText(MinValue * ScaleFactor, ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
+	}
+	if(Txt_MaxValue)
+	{
+		Txt_MaxValue->SetText(UKismetTextLibrary::Conv_DoubleToText(MaxValue * ScaleFactor, ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
+	}
+}
+
+void UWidgetFloatSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Super::OnDespawn_Implementation(bRecovery);
+
+	MinValue = 0.f;
+	MaxValue = 1.f;
+
+	DecimalNum = 2;
+	ScaleFactor = 1.f;
+
+	Slider_Value->OnValueChanged.RemoveDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
+	TxtBox_Value->OnTextCommitted.RemoveDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
 }
 
 void UWidgetFloatSettingItemBase::OnRefresh()
 {
 	Super::OnRefresh();
-
-	if(Txt_MinValue)
-	{
-		Txt_MinValue->SetText(UKismetTextLibrary::Conv_DoubleToText(MinValue * ScaleFactor, ERoundingMode::HalfToEven, false, true, 1, 324, 0, DecimalNum));
-	}
-	if(Txt_MaxValue)
-	{
-		Txt_MaxValue->SetText(UKismetTextLibrary::Conv_DoubleToText(MaxValue * ScaleFactor, ERoundingMode::HalfToEven, false, true, 1, 324, 0, DecimalNum));
-	}
-	if(Txt_CurrentValue)
-	{
-		Txt_CurrentValue->SetText(UKismetTextLibrary::Conv_DoubleToText(GetValue().GetFloatValue() * ScaleFactor, ERoundingMode::HalfToEven, false, true, 1, 324, 0, DecimalNum));
-	}
-}
-
-void UWidgetFloatSettingItemBase::OnDestroy(bool bRecovery)
-{
-	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetFloatSettingItemBase::OnSliderValueChanged(float InValue)
 {
+	TxtBox_Value->SetText(UKismetTextLibrary::Conv_DoubleToText(FMath::Lerp(MinValue * ScaleFactor, MaxValue * ScaleFactor, InValue), ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
 	if(OnValueChanged.IsBound())
 	{
 		OnValueChanged.Broadcast(this, GetValue());
 	}
-	Refresh();
+}
+
+void UWidgetFloatSettingItemBase::OnTextBoxValueCommitted(const FText& InText, ETextCommit::Type InCommitMethod)
+{
+	Slider_Value->SetValue(FMath::Clamp((FCString::Atof(*InText.ToString()) - MinValue * ScaleFactor) /  (MaxValue * ScaleFactor - MinValue * ScaleFactor), 0.f, 1.f));
+	if(OnValueChanged.IsBound())
+	{
+		OnValueChanged.Broadcast(this, GetValue());
+	}
 }
 
 FParameter UWidgetFloatSettingItemBase::GetValue() const

@@ -4,6 +4,7 @@
 #include "Common/CommonStatics.h"
 
 #include "BlueprintGameplayTagLibrary.h"
+#include "EngineUtils.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 #include "ImageUtils.h"
@@ -685,6 +686,28 @@ const UObject* UCommonStatics::GetWorldContext(bool bInEditor)
 UObject* UCommonStatics::GetMutableWorldContext(bool bInEditor)
 {
 	return AMainModule::GetPtr(bInEditor);
+}
+
+TArray<AActor*> UCommonStatics::GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass)
+{
+	if(!InClass) InClass = AActor::StaticClass();
+	
+	TArray<AActor*> ReturnValues;
+	if(InDataLayer)
+	{
+		if (UWorld* World = GEngine->GetWorldFromContextObject(GetWorldContext(), EGetWorldErrorMode::LogAndReturnNull))
+		{
+			for (TActorIterator<AActor> It(World, InClass); It; ++It)
+			{
+				AActor* Actor = *It;
+				if (Actor->ContainsDataLayer(InDataLayer))
+				{
+					ReturnValues.Add(Actor);
+				}
+			}
+		}
+	}
+	return ReturnValues;
 }
 
 UWHGameInstance* UCommonStatics::GetGameInstance(TSubclassOf<UWHGameInstance> InClass)

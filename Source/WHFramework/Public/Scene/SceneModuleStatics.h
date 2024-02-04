@@ -30,7 +30,7 @@ public:
 	static void SetSeaLevel(float InSeaLevel);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static float GetAltitude(bool bUnsigned = false);
+	static float GetAltitude(bool bUnsigned = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static AMiniMapCapture* GetMiniMapCapture();

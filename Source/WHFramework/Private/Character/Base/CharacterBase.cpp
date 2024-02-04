@@ -63,6 +63,8 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 
 void ACharacterBase::OnInitialize_Implementation()
 {
+	Execute_SetActorVisible(this, bVisible);
+
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
@@ -75,13 +77,16 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
 
-	if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		Chunk->AddSceneActor(this);
-	}
-	else if(Container)
-	{
-		Container->RemoveSceneActor(this);
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		{
+			Chunk->AddSceneActor(this);
+		}
+		else if(Container)
+		{
+			Container->RemoveSceneActor(this);
+		}
 	}
 }
 
@@ -198,7 +203,7 @@ void ACharacterBase::MoveForward_Implementation(float InValue)
 {
 	const FRotator Rotation = GetControlRotation();
 	const FRotator YawRotation = FRotator(0, Rotation.Yaw, 0);
-	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector Direction = FRotationMatrix(GetCharacterMovement()->IsMovingOnGround() ? YawRotation : Rotation).GetUnitAxis(EAxis::X);
 	AddMovementInput(Direction, InValue);
 }
 
@@ -212,6 +217,8 @@ void ACharacterBase::MoveRight_Implementation(float InValue)
 
 void ACharacterBase::MoveUp_Implementation(float InValue)
 {
+	if(GetCharacterMovement()->IsMovingOnGround()) return;
+
 	const FRotator Rotation = GetControlRotation();
 	const FRotator YawRotation(0, Rotation.Yaw, 0);
 	const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
@@ -241,6 +248,11 @@ float ACharacterBase::GetCameraMinPitch_Implementation() const
 float ACharacterBase::GetCameraMaxPitch_Implementation() const
 {
 	return -1.f;
+}
+
+ECameraTrackMode ACharacterBase::GetCameraTrackMode_Implementation() const
+{
+	return ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce;
 }
 
 ECameraSmoothMode ACharacterBase::GetCameraSmoothMode_Implementation() const

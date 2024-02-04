@@ -4,6 +4,7 @@
 #include "Camera/CameraModuleStatics.h"
 
 #include "Camera/CameraModule.h"
+#include "Camera/Actor/CameraActorBase.h"
 #include "Camera/Manager/CameraManagerBase.h"
 
 ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass)
@@ -21,19 +22,24 @@ void UCameraModuleStatics::SetDefaultCameraPoint(ACameraPointBase* InCameraPoint
 	UCameraModule::Get().SetDefaultCameraPoint(InCameraPoint);
 }
 
-FVector UCameraModuleStatics::GetCameraLocation(bool bReal)
+FVector UCameraModuleStatics::GetCameraLocation(bool bReal, bool bRefresh)
 {
-	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation();
+	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation(bRefresh);
 }
 
-FRotator UCameraModuleStatics::GetCameraRotation(bool bReal)
+FRotator UCameraModuleStatics::GetCameraRotation(bool bRefresh)
 {
-	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraRotation() : UCameraModule::Get().GetCurrentCameraRotation();
+	return UCameraModule::Get().GetCurrentCameraRotation(bRefresh);
 }
 
-float UCameraModuleStatics::GetCameraDistance(bool bReal)
+float UCameraModuleStatics::GetCameraDistance(bool bRefresh)
 {
-	return bReal ? 0.f : UCameraModule::Get().GetCurrentCameraDistance();
+	return UCameraModule::Get().GetCurrentCameraDistance(bRefresh);
+}
+
+FVector UCameraModuleStatics::GetCameraOffset(bool bRefresh)
+{
+	return UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
 }
 
 ACameraActorBase* UCameraModuleStatics::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)
@@ -46,29 +52,29 @@ ACameraActorBase* UCameraModuleStatics::GetCameraByName(const FName InName)
 	return UCameraModule::Get().GetCameraByName(InName);
 }
 
-void UCameraModuleStatics::SwitchCamera(ACameraActorBase* InCamera, bool bInstant)
+void UCameraModuleStatics::SwitchCamera(ACameraActorBase* InCamera, bool bReset, bool bInstant)
 {
-	UCameraModule::Get().SwitchCamera(InCamera, bInstant);
+	UCameraModule::Get().SwitchCamera(InCamera, bReset, bInstant);
 }
 
-void UCameraModuleStatics::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bInstant)
+void UCameraModuleStatics::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset, bool bInstant)
 {
-	UCameraModule::Get().SwitchCameraByClass(InClass, bInstant);
+	UCameraModule::Get().SwitchCameraByClass(InClass, bReset, bInstant);
 }
 
-void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bInstant)
+void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bReset, bool bInstant)
 {
-	UCameraModule::Get().SwitchCameraByName(InName, bInstant);
+	UCameraModule::Get().SwitchCameraByName(InName, bReset, bInstant);
 }
 
-void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bCachePoint, bool bSetAsDefault, bool bInstant)
+void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault, bool bInstant)
 {
-	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bCachePoint, bSetAsDefault, bInstant);
+	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bSetAsDefault, bInstant);
 }
 
-void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocationOffset, FVector InSocketOffset, float InYawOffset, float InPitchOffset, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration, bool bInstant)
+void UCameraModuleStatics::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocation, FVector InSocketOffset, float InYaw, float InPitch, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration, bool bInstant)
 {
-	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocationOffset, InSocketOffset, InYawOffset, InPitchOffset, InDistance, bAllowControl, InViewEaseType, InViewDuration, bInstant);
+	UCameraModule::Get().StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocation, InSocketOffset, InYaw, InPitch, InDistance, bAllowControl, InViewEaseType, InViewDuration, bInstant);
 }
 
 void UCameraModuleStatics::EndTrackTarget(AActor* InTargetActor)
@@ -99,6 +105,21 @@ void UCameraModuleStatics::DoCameraLocation(FVector InLocation, float InDuration
 void UCameraModuleStatics::StopDoCameraLocation()
 {
 	UCameraModule::Get().StopDoCameraLocation();
+}
+
+void UCameraModuleStatics::SetCameraOffset(FVector InOffset, bool bInstant)
+{
+	UCameraModule::Get().SetCameraOffset(InOffset, bInstant);
+}
+
+void UCameraModuleStatics::DoCameraOffset(FVector InOffset, float InDuration, EEaseType InEaseType)
+{
+	UCameraModule::Get().DoCameraOffset(InOffset, InDuration, InEaseType);
+}
+
+void UCameraModuleStatics::StopDoCameraOffset()
+{
+	UCameraModule::Get().StopDoCameraOffset();
 }
 
 void UCameraModuleStatics::SetCameraRotation(float InYaw, float InPitch, bool bInstant)

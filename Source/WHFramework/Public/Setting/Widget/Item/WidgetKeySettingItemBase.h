@@ -25,14 +25,8 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
 	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
-
+	
 protected:
 	void OnValueButtonClicked(int32 InIndex);
 

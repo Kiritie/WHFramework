@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "ObjectPool/ObjectPoolInterface.h"
-#include "Widget/Screen/UMG/SubWidgetBase.h"
+#include "Widget/Common/CommonButton.h"
 
 #include "WidgetSettingItemBase.generated.h"
 
@@ -15,7 +14,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSettingItemValuesChanged, UWidge
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetSettingItemBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetSettingItemBase : public UCommonButton
 {
 	GENERATED_BODY()
 	
@@ -30,20 +29,30 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+	UFUNCTION()
+	virtual void OnRefresh();
 
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
+public:
+	UFUNCTION()
+	void Refresh();
 
-	virtual void OnRefresh() override;
+protected:
+	UPROPERTY(BlueprintReadOnly)
+	FName SettingName;
 
-	virtual void OnDestroy(bool bRecovery) override;
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingItemValueChanged OnValueChanged;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingItemValuesChanged OnValuesChanged;
 
 public:
 	UFUNCTION(BlueprintPure)
-	FText GetLabel() const;
+	FName GetNameS() const { return SettingName; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetLabel(FText InText);
+	void SetNameS(const FName InName) { SettingName = InName; }
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -57,15 +66,4 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetValues(const TArray<FParameter>& InValues);
-
-protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UTextBlock* Txt_Label;
-
-public:
-	UPROPERTY(BlueprintAssignable)
-	FOnSettingItemValueChanged OnValueChanged;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnSettingItemValuesChanged OnValuesChanged;
 };

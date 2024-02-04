@@ -423,6 +423,22 @@ TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIn
 
 TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
 {
+	for(auto& Iter : KeyShortcuts)
+	{
+		FString TagName = Iter.Key.ToString();
+		TagName = TagName.Mid(TagName.Find(".", ESearchCase::IgnoreCase, ESearchDir::FromEnd) + 1, TagName.Len());
+		if(TagName == InName)
+		{
+			TArray<FPlayerKeyMapping> _KeyMappings;
+			for(auto& Iter2 : Iter.Value.Keys)
+			{
+				FPlayerKeyMapping KeyMapping;
+				KeyMapping.SetCurrentKey(Iter2);
+				_KeyMappings.Add(KeyMapping);
+			}
+			return _KeyMappings;
+		}
+	}
 	TArray<FPlayerKeyMapping> Mappings;
 	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
 	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())

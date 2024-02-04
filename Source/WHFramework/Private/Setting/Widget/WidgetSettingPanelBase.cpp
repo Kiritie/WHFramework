@@ -27,8 +27,6 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 
 void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnCreate(InOwner, InParams);
-
 	if(Btn_Apply)
 	{
 		Btn_Apply->OnClicked().AddUObject(this, &UWidgetSettingPanelBase::OnApplyButtonClicked);
@@ -41,6 +39,8 @@ void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter
 	PageItemGroup = UObjectPoolModuleStatics::SpawnObject<UCommonButtonGroup>();
 	PageItemGroup->SetSelectionRequired(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
+
+	Super::OnCreate(InOwner, InParams);
 
 	for(const auto Iter : ChildWidgets)
 	{
@@ -86,6 +86,10 @@ UWidgetSettingPageItemBase* UWidgetSettingPanelBase::SpawnPageItem_Implementatio
 	if(UWidgetSettingPageItemBase* PageItem = UObjectPoolModuleStatics::SpawnObject<UWidgetSettingPageItemBase>(InPage, nullptr, PageItemClass))
 	{
 		PageItem->SetTitle(InPage->Title);
+		if(InPage->PageItemStyle)
+		{
+			PageItem->SetStyle(InPage->PageItemStyle);
+		}
 		PageItemGroup->AddWidget(PageItem);
 		return PageItem;
 	}
