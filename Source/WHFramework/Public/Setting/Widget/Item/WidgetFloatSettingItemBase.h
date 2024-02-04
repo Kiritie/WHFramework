@@ -5,6 +5,7 @@
 
 #include "WidgetFloatSettingItemBase.generated.h"
 
+class UEditableTextBox;
 class USlider;
 class UTextBlock;
 /**
@@ -24,17 +25,14 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
 	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
 	UFUNCTION()
 	virtual void OnSliderValueChanged(float InValue);
+	
+	UFUNCTION()
+	virtual void OnTextBoxValueCommitted(const FText& InText, ETextCommit::Type InCommitMethod);
 
 public:
 	virtual FParameter GetValue() const override;
@@ -52,7 +50,7 @@ protected:
 	UTextBlock* Txt_MaxValue;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UTextBlock* Txt_CurrentValue;
+	UEditableTextBox* TxtBox_Value;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

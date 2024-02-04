@@ -21,23 +21,30 @@ class WHFRAMEWORK_API UVideoModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void AddMediaPlayerToList(class AMediaPlayerBase* InMediaPlayer);
+	static void AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void RemoveMediaPlayerFromList(class AMediaPlayerBase* InMediaPlayer);
+	static void RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
 	static void RemoveMediaPlayerFromListByName(const FName InName);
 
 	UFUNCTION(BlueprintPure, Category = "VideoModuleStatics")
 	static AMediaPlayerBase* GetMediaPlayerByName(const FName InName);
-	
+
+public:
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void PlayMediaPlayerMovie(const FName InName, const FName InMovieName, bool bMulticast = false);
+	static void PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast = false);
 
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void PlayMediaPlayerMovieWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	static void PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+		
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
+	static void PauseMovieForMediaPlayer(const FName InName, bool bMulticast = false);
 	
 	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void StopMediaPlayerMovie(const FName InName, bool bSkip, bool bMulticast = false);
+	static void SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast = false);
+
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
+	static void StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast = false);
 };

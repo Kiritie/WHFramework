@@ -41,17 +41,17 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 				case EParameterType::Name:
 				case EParameterType::Text:
 				{
-					SettingItem = CreateSubWidget<UWidgetTextSettingItemBase>({ Iter.DisplayName }, USettingModule::Get().GetTextSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.DisplayName }, USettingModule::Get().GetTextSettingItemClass());
 					break;
 				}
 				case EParameterType::Boolean:
 				{
-					SettingItem = CreateSubWidget<UWidgetBoolSettingItemBase>({ Iter.DisplayName }, USettingModule::Get().GetBoolSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.DisplayName }, USettingModule::Get().GetBoolSettingItemClass());
 					break;
 				}
 				case EParameterType::Key:
 				{
-					SettingItem = CreateSubWidget<UWidgetKeySettingItemBase>({ Iter.DisplayName, 1, true }, USettingModule::Get().GetKeySettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.DisplayName, 1, true }, USettingModule::Get().GetKeySettingItemClass());
 					break;
 				}
 				default: break;

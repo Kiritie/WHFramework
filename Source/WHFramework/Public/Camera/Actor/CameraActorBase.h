@@ -7,6 +7,7 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "CameraActorBase.generated.h"
 
+class UWorldPartitionStreamingSourceComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -65,6 +66,9 @@ protected:
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	USpringArmComponent* CameraBoom;
+	
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UWorldPartitionStreamingSourceComponent* StreamingSource;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")

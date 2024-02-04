@@ -147,7 +147,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Anim
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	UCharacterAnimBase* Anim;
 public:
 	virtual UCharacterAnimBase* GetAnim() const override { return Anim; }
@@ -155,7 +155,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Controller
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }

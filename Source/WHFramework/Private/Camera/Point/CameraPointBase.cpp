@@ -3,21 +3,31 @@
 #include "Camera/Point/CameraPointBase.h"
 
 #include "Camera/CameraModuleStatics.h"
+#include "Components/WorldPartitionStreamingSourceComponent.h"
 
 ACameraPointBase::ACameraPointBase()
 {
-	bCameraTrack = false;
-	CameraTrackMode = ECameraTrackMode::LocationOnly;
-	CameraViewParams = FCameraViewParams();
-
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
+
+	StreamingSource = CreateDefaultSubobject<UWorldPartitionStreamingSourceComponent>(FName("StreamingSource"));
+	StreamingSource->Priority = EStreamingSourcePriority::Default;
+	StreamingSource->DisableStreamingSource();
+
+	bCameraTrack = false;
+	CameraTrackMode = ECameraTrackMode::LocationOnly;
+	CameraViewParams = FCameraViewParams();
 }
 
 void ACameraPointBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	if(!bCameraTrack)
+	{
+		// StreamingSource->EnableStreamingSource();
+	}
 }
 
 void ACameraPointBase::OnPreparatory_Implementation(EPhase InPhase)

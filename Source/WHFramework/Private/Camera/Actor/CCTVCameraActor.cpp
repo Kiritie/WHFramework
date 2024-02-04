@@ -80,7 +80,7 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 				CurrentCameraShotData.CameraShotMode = ECCTVCameraShotMode::None;
 				CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewYaw = FMath::RandRange(0.f, 360.f);
 				CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewPitch = FMath::RandRange(CameraShotMinPitch, CameraShotMaxPitch);
-				CurrentCameraShotData.CameraMinDistance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance * 0.5f;
+				CurrentCameraShotData.CameraMinDistance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance * 0.7f;
 				CurrentCameraShotData.CameraMaxDistance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance * 2.5f;
 				if(CurrentCameraShotData.CameraViewData.TrackTargetMode > ECameraTrackMode::LocationOnly)
 				{
@@ -88,9 +88,14 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 				}
 				UAnimationModuleStatics::ExecuteWithTransition(CameraShotFadeTime, [this]
 				{
-					CurrentCameraShotData.CameraShotMode = (ECCTVCameraShotMode)FMath::RandRange(2, 4);
+					CurrentCameraShotData.CameraShotMode = (ECCTVCameraShotMode)FMath::RandRange(CurrentCameraShotData.CameraViewData.bTrackTarget ? 1 : 2, 4);
 					switch(CurrentCameraShotData.CameraShotMode)
 					{
+						case ECCTVCameraShotMode::Fixed:
+						{
+							CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance = FMath::RandRange(CurrentCameraShotData.CameraMinDistance, CurrentCameraShotData.CameraMaxDistance);
+							break;
+						}
 						case ECCTVCameraShotMode::Zoom:
 						{
 							CurrentCameraShotData.CameraZoomSpeed = FMath::RandBool() ? -CameraShotZoomSpeed : CameraShotZoomSpeed;

@@ -5,6 +5,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraModuleStatics.h"
+#include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
 // Sets default values
@@ -25,6 +26,10 @@ ACameraActorBase::ACameraActorBase()
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
 	Camera->bUsePawnControlRotation = false;
+	
+	StreamingSource = CreateDefaultSubobject<UWorldPartitionStreamingSourceComponent>(FName("StreamingSource"));
+	StreamingSource->Priority = EStreamingSourcePriority::Highest;
+	StreamingSource->DisableStreamingSource();
 
 	CameraOrthoFactor = 1.93f;
 
@@ -53,12 +58,12 @@ void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 
 void ACameraActorBase::OnSwitch_Implementation()
 {
-	
+	StreamingSource->EnableStreamingSource();
 }
 
 void ACameraActorBase::OnUnSwitch_Implementation()
 {
-	
+	StreamingSource->DisableStreamingSource();
 }
 
 void ACameraActorBase::Switch_Implementation()

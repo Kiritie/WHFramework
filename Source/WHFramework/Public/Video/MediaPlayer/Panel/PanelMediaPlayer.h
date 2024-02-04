@@ -24,29 +24,16 @@ public:
 public:
 	virtual void OnInitialize_Implementation() override;
 
-public:
-	virtual void PlayMovieImpl_Implementation(const FName InMovieName) override;
-
-	virtual void StopMovieImpl_Implementation(bool bSkip) override;
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Components)
-	UStaticMeshComponent* PanelMediaMesh;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* Mesh;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Components)
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UArrowComponent* Arrow;
 
-	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "Media")
-	UMediaPlayer* PanelMediaPlayer;
-
-	UPROPERTY()
-	FName MediaName;
-	
-public:
-	UPROPERTY(BlueprintReadOnly, EditInstanceOnly, Category = "Media")
-	TMap<FName, class UMediaSource*> MediaList;
-
 protected:
-	UFUNCTION()
-	virtual void PanelMediaOnEndReached();
+	UPROPERTY(EditAnywhere, Category = "MediaPlayerStats")
+	bool bOrientCamera;
 };

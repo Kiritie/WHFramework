@@ -150,7 +150,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Controller
 protected:
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Component")
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }

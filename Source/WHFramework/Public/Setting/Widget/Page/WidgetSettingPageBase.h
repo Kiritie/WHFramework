@@ -5,7 +5,8 @@
 
 #include "WidgetSettingPageBase.generated.h"
 
-class UScrollBox;
+class UVerticalBox;
+class UCommonButtonStyle;
 class UWidgetSettingItemBase;
 /**
  * 
@@ -69,11 +70,14 @@ protected:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UScrollBox* ContentBox;
+	UVerticalBox* ContentBox;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Title;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSubclassOf<UCommonButtonStyle> PageItemStyle;
 
 protected:
 	FText LastCategory;

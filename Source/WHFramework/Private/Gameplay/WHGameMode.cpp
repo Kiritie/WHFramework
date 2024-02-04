@@ -2,8 +2,10 @@
 
 #include "Gameplay/WHGameMode.h"
 
+#include "Debug/Widget/SDebugPanelWidget.h"
 #include "Gameplay/WHGameState.h"
 #include "Gameplay/WHPlayerController.h"
+#include "Widget/WidgetModuleStatics.h"
 
 AWHGameMode::AWHGameMode()
 {
@@ -32,6 +34,16 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
 	
+}
+
+bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor)
+{
+	if(FPlatformString::Stricmp(Cmd, TEXT("WH.Debug")) == 0)
+	{
+		UWidgetModuleStatics::ToggleSlateWidget<SDebugPanelWidget>(true);
+		return true;
+	}
+	return Super::ProcessConsoleExec(Cmd, Ar, Executor);
 }
 
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)

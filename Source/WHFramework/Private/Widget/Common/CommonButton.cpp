@@ -14,7 +14,7 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 
 	bStandalone = false;
 
-	static ConstructorHelpers::FClassFinder<UCommonButtonStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/_Style/CBS_Default.CBS_Default_C'"));
+	static ConstructorHelpers::FClassFinder<UCommonButtonStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/_Style/Button/CBS_Default.CBS_Default_C'"));
 	if(StyleClassFinder.Succeeded())
 	{
 		Style = StyleClassFinder.Class;

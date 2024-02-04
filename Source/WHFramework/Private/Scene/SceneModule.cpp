@@ -419,9 +419,10 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 }
 #endif
 
-float USceneModule::GetAltitude(bool bUnsigned) const
+float USceneModule::GetAltitude(bool bUnsigned, bool bRefresh) const
 {
-	return bUnsigned ? FMath::Max(Altitude, 0.f) : Altitude;
+	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel : Altitude;
+	return bUnsigned ? FMath::Max(ReturnValue, 0.f) : ReturnValue;
 }
 
 void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)

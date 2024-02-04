@@ -15,9 +15,9 @@ void USceneModuleStatics::SetSeaLevel(float InSeaLevel)
 	USceneModule::Get().SetSeaLevel(InSeaLevel);
 }
 
-float USceneModuleStatics::GetAltitude(bool bUnsigned)
+float USceneModuleStatics::GetAltitude(bool bUnsigned, bool bRefresh)
 {
-	return USceneModule::Get().GetAltitude(bUnsigned);
+	return USceneModule::Get().GetAltitude(bUnsigned, bRefresh);
 }
 
 AMiniMapCapture* USceneModuleStatics::GetMiniMapCapture()

@@ -6,6 +6,8 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Setting/SettingModule.h"
 #include "Setting/Widget/Item/WidgetSettingItemBase.h"
 #include "Setting/Widget/Item/WidgetSettingItemCategoryBase.h"
@@ -32,7 +34,10 @@ void UWidgetSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>
 {
 	Super::OnCreate(InOwner, InParams);
 
-	ContentBox = NewObject<UScrollBox>(this, UScrollBox::StaticClass(), FName("ContentBox"));
+	if(!ContentBox)
+	{
+		ContentBox = NewObject<UVerticalBox>(this, UVerticalBox::StaticClass(), FName("ContentBox"));
+	}
 
 	WidgetTree->RootWidget = ContentBox;
 }
@@ -95,27 +100,21 @@ void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, U
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
 	{
 		LastCategory = InCategory;
-		if(UScrollBoxSlot* ScrollBoxSlot = Cast<UScrollBoxSlot>(ContentBox->AddChild(CreateSubWidget<UWidgetSettingItemCategoryBase>({ InCategory }, USettingModule::Get().GetSettingItemCategoryClass()))))
+		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(nullptr, { InCategory }, USettingModule::Get().GetSettingItemCategoryClass())))
 		{
-			ScrollBoxSlot->SetPadding(FMargin(2.5f, 0.f));
+			VerticalBoxSlot->SetPadding(FMargin(2.5f));
 		}
 	}
-	if(UScrollBoxSlot* ScrollBoxSlot = Cast<UScrollBoxSlot>(ContentBox->AddChild(InSettingItem)))
+	if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(InSettingItem))
 	{
-		ScrollBoxSlot->SetPadding(FMargin(2.5f));
+		VerticalBoxSlot->SetPadding(FMargin(2.5f));
 	}
 	SettingItems.Add(InName, InSettingItem);
 }
 
 void UWidgetSettingPageBase::ClearSettingItems_Implementation()
 {
-	for(auto Iter : ContentBox->GetAllChildren())
-	{
-		if(UWidgetSettingItemBase* SettingItem = Cast<UWidgetSettingItemBase>(Iter))
-		{
-			SettingItem->Destroy(true);
-		}
-	}
+	UObjectPoolModuleStatics::DespawnObjects(ContentBox->GetAllChildren());
 	ContentBox->ClearChildren();
 	SettingItems.Empty();
 }

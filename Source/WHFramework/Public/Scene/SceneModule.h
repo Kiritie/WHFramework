@@ -103,7 +103,7 @@ public:
 	void SetSeaLevel(float InSeaLevel) { SeaLevel = InSeaLevel; }
 
 	UFUNCTION(BlueprintPure)
-	float GetAltitude(bool bUnsigned = false) const;
+	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }

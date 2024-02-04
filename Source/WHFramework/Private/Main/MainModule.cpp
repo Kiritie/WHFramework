@@ -8,6 +8,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 #include "Event/Handle/Common/Game/EventHandle_GameInited.h"
+#include "Event/Handle/Common/Game/EventHandle_GamePreExit.h"
 #include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
 #include "Net/UnrealNetwork.h"
 
@@ -95,7 +96,12 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 void AMainModule::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
-	
+		
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		UEventModuleStatics::BroadcastEvent<UEventHandle_GamePreExit>(this);
+	}
+
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
 		if(Modules[i])

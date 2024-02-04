@@ -7,6 +7,8 @@
 #include "Common/Base/WHActor.h"
 #include "CameraPointBase.generated.h"
 
+class UWorldPartitionStreamingSourceComponent;
+
 UCLASS()
 class WHFRAMEWORK_API ACameraPointBase : public AWHActor
 {
@@ -44,6 +46,9 @@ public:
 #endif
 
 protected:
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UWorldPartitionStreamingSourceComponent* StreamingSource;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bCameraTrack;
 	

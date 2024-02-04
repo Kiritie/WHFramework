@@ -112,17 +112,15 @@ protected:
 
 	FName ParentName;
 
-	TArray<FName> ChildNames;
+	FName ParentSlot;
 
 	int32 WidgetZOrder;
 
-	FAnchors WidgetAnchors;
-
 	bool bWidgetPenetrable;
 
-	bool bWidgetAutoSize;
+	FAnchors WidgetAnchors;
 
-	FVector2D WidgetDrawSize;
+	bool bWidgetAutoSize;
 	
 	FMargin WidgetOffsets;
 
@@ -135,6 +133,8 @@ protected:
 	EWidgetCloseType WidgetCloseType;
 	
 	EWidgetRefreshType WidgetRefreshType;
+
+	TArray<FParameter> WidgetParams;
 
 	EInputMode WidgetInputMode;
 
@@ -161,6 +161,8 @@ public:
 
 	virtual FName GetParentName() const override { return ParentName; }
 
+	virtual FName GetParentSlot() const override { return ParentSlot; }
+
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
@@ -169,7 +171,7 @@ public:
 
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 
-	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
+	virtual FVector2D GetWidgetDrawSize() const override { return FVector2D(WidgetOffsets.Right, WidgetOffsets.Bottom); }
 
 	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
 
@@ -215,4 +217,6 @@ public:
 	virtual UPanelWidget* GetRootPanelWidget() const override;
 
 	virtual UPanelWidget* GetParentPanelWidget() const override;
+
+	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
 };

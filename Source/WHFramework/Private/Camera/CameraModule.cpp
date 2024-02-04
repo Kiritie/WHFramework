@@ -378,7 +378,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(CurrentCamera && CurrentCamera->GetCamera()->ProjectionMode == ECameraProjectionMode::Orthographic)
 	{
-		CurrentCamera->GetCamera()->SetOrthoWidth(USceneModuleStatics::GetAltitude() * CurrentCamera->GetCameraOrthoFactor());
+		CurrentCamera->GetCamera()->SetOrthoWidth(USceneModuleStatics::GetAltitude(false, true) * CurrentCamera->GetCameraOrthoFactor());
 	}
 
 #if WITH_EDITOR
@@ -930,7 +930,7 @@ void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
 	if(!bCameraControlAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
 
-	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude()) / CameraMoveAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / CameraMoveAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
@@ -944,7 +944,7 @@ void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
 	if(!bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
 	{

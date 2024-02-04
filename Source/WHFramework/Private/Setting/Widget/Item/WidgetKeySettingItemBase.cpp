@@ -13,18 +13,6 @@ UWidgetKeySettingItemBase::UWidgetKeySettingItemBase(const FObjectInitializer& O
 void UWidgetKeySettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
-}
-
-void UWidgetKeySettingItemBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Super::OnDespawn_Implementation(bRecovery);
-
-	Keys.Empty();
-}
-
-void UWidgetKeySettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnCreate(InOwner, InParams);
 
 	for(int32 i = 0; i < Btn_Values.Num(); i++)
 	{
@@ -32,9 +20,16 @@ void UWidgetKeySettingItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<
 	}
 }
 
-void UWidgetKeySettingItemBase::OnInitialize(const TArray<FParameter>& InParams)
+void UWidgetKeySettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnInitialize(InParams);
+	Super::OnDespawn_Implementation(bRecovery);
+
+	Keys.Empty();
+
+	for(int32 i = 0; i < Btn_Values.Num(); i++)
+	{
+		Btn_Values[i]->OnClicked().RemoveAll(this);
+	}
 }
 
 void UWidgetKeySettingItemBase::OnRefresh()
@@ -57,11 +52,6 @@ void UWidgetKeySettingItemBase::OnRefresh()
 			Btn_Values[i]->SetTitle(Keys[i].GetDisplayName(false));
 		}
 	}
-}
-
-void UWidgetKeySettingItemBase::OnDestroy(bool bRecovery)
-{
-	Super::OnDestroy(bRecovery);
 }
 
 void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)

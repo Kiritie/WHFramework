@@ -354,7 +354,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool ToggleUserWidgetByName(FName InName, bool bInstant = false)
 	{
-		if(UUserWidgetBase* UserWidget = GetUserWidgetByName<UUserWidgetBase>(InName))
+		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InName) ? GetUserWidgetByName<UUserWidgetBase>(InName) : CreateUserWidgetByName<UUserWidgetBase>(InName))
 		{
 			UserWidget->Toggle(bInstant);
 			return true;
@@ -401,51 +401,48 @@ public:
 	////////////////////////////////////////////////////
 	// SlateWidget
 protected:
-	TMap<FName, TSharedPtr<class SSlateWidgetBase>> AllSlateWidgets;
+	TMap<FName, TSharedPtr<SSlateWidgetBase>> AllSlateWidgets;
 
-	TSharedPtr<class SSlateWidgetBase> TemporarySlateWidget;
+	TSharedPtr<SSlateWidgetBase> TemporarySlateWidget;
 
 public:
 	template<class T>
-	bool HasSlateWidget() const
+	bool HasSlateWidget(FName InName = typeid(T).name()) const
 	{
-		// const FName WidgetName = typeid(T).name();
-		// return AllSlateWidgets.Contains(WidgetName);
-		return false;
+		return AllSlateWidgets.Contains(InName);
 	}
 
 	template<class T>
-	TSharedPtr<T> GetSlateWidget() const
+	TSharedPtr<T> GetSlateWidget(FName InName = typeid(T).name()) const
 	{
-		// const FName WidgetName = typeid(T).name();
-		// if(AllSlateWidgets.Contains(WidgetName))
-		// {
-		// 	return AllSlateWidgets[WidgetName];
-		// }
+		if(AllSlateWidgets.Contains(InName))
+		{
+			return StaticCastSharedPtr<T>(AllSlateWidgets[InName]);
+		}
 		return nullptr;
 	}
 
 	template<class T>
 	TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = &SNew(T))
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = SNew(T))
 		{
 			SlateWidget->OnCreate(InOwner, InParams ? *InParams : TArray<FParameter>());
 			SlateWidget->Init(InOwner, InParams);
-			// const FName WidgetName = typeid(SlateWidget).name();
-			// if(!AllSlateWidgets.Contains(WidgetName))
-			// {
-			// 	AllSlateWidgets.Add(WidgetName, SlateWidget);
-			// }
-			return Cast<T>(SlateWidget);
+			const FName WidgetName = SlateWidget->GetWidgetName();
+			if(!AllSlateWidgets.Contains(WidgetName))
+			{
+				AllSlateWidgets.Add(WidgetName, SlateWidget);
+			}
+			return StaticCastSharedPtr<T>(SlateWidget);
 		}
 		return nullptr;
 	}
 
 	template<class T>
-	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false)
+	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = typeid(T).name())
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = (TSharedPtr<SSlateWidgetBase>)(HasSlateWidget<T>() ? GetSlateWidget<T>() : CreateSlateWidget<T>(nullptr)))
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr, InParams))
 		{
 			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
@@ -456,16 +453,16 @@ public:
 				//SlateWidget->SetLastTemporary(TemporarySlateWidget);
 				TemporarySlateWidget = SlateWidget;
 			}
-			SlateWidget->OnOpen(*InParams, bInstant);
+			SlateWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
 			return true;
 		}
 		return false;
 	}
 	
 	template<class T>
-	bool CloseSlateWidget(bool bInstant = false)
+	bool CloseSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>(InName))
 		{
 			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
@@ -478,9 +475,9 @@ public:
 	}
 	
 	template<class T>
-	bool ToggleSlateWidget(bool bInstant = false)
+	bool ToggleSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
 	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>())
+		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr))
 		{
 			SlateWidget->Toggle(bInstant);
 			return true;
@@ -489,23 +486,22 @@ public:
 	}
 
 	template<class T>
-	bool DestroySlateWidget()
+	bool DestroySlateWidget(FName InName = typeid(T).name())
 	{
-		// const FName WidgetName = typeid(T).name();
-		// if(AllSlateWidgets.Contains(WidgetName))
-		// {
-		// 	if(TSharedPtr<SSlateWidgetBase> SlateWidget = AllSlateWidgets[WidgetName])
-		// 	{
-		// 		AllSlateWidgets.Remove(WidgetName);
-		// 		if(TemporarySlateWidget == SlateWidget)
-		// 		{
-		// 			TemporarySlateWidget = nullptr;
-		// 		}
-		// 		SlateWidget->OnDestroy();
-		// 		SlateWidget = nullptr;
-		// 	}
-		// 	return true;
-		// }
+		if(AllSlateWidgets.Contains(InName))
+		{
+			if(TSharedPtr<SSlateWidgetBase> SlateWidget = AllSlateWidgets[InName])
+			{
+				AllSlateWidgets.Remove(InName);
+				if(TemporarySlateWidget == SlateWidget)
+				{
+					TemporarySlateWidget = nullptr;
+				}
+				SlateWidget->OnDestroy();
+				SlateWidget = nullptr;
+			}
+			return true;
+		}
 		return false;
 	}
 
@@ -514,7 +510,7 @@ public:
 	void ClearAllSlateWidget();
 
 	////////////////////////////////////////////////////
-	// Widget
+	// WorldWidget
 protected:
 	UPROPERTY(EditAnywhere, Category = "WorldWidget")
 	TArray<TSubclassOf<UWorldWidgetBase>> WorldWidgetClasses;

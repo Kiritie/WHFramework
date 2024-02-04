@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "Widget/Screen/UMG/SubWidgetBase.h"
+#include "Widget/Common/CommonButton.h"
 
 #include "WidgetSettingItemBase.generated.h"
 
@@ -14,7 +14,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSettingItemValuesChanged, UWidge
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetSettingItemBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetSettingItemBase : public UCommonButton
 {
 	GENERATED_BODY()
 	
@@ -29,18 +29,14 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+	UFUNCTION()
+	virtual void OnRefresh();
 
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
-
-	virtual void OnRefresh() override;
-
-	virtual void OnDestroy(bool bRecovery) override;
+public:
+	UFUNCTION()
+	void Refresh();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UTextBlock* Txt_Label;
-
 	UPROPERTY(BlueprintReadOnly)
 	FName SettingName;
 
@@ -57,12 +53,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetNameS(const FName InName) { SettingName = InName; }
-
-	UFUNCTION(BlueprintPure)
-	FText GetLabel() const;
-
-	UFUNCTION(BlueprintCallable)
-	void SetLabel(FText InText);
 
 public:
 	UFUNCTION(BlueprintPure)
