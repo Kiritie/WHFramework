@@ -5,6 +5,7 @@
 #include "Widget/Screen/UMG/SubWidgetBase.h"
 #include "WidgetKeyTipsItemBase.generated.h"
 
+class UBorder;
 class UHorizontalBox;
 class UCommonTextBlockN;
 
@@ -28,6 +29,9 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UHorizontalBox* Box_KeyIcon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UBorder* Border_KeyCode;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UCommonTextBlockN* Txt_KeyCode;

@@ -3,6 +3,7 @@
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
 
 #include "CommonInputBaseTypes.h"
+#include "Components/Border.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
@@ -15,6 +16,7 @@ UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectI
 	WidgetParams.Add(FText());
 
 	Box_KeyIcon = nullptr;
+	Border_KeyCode = nullptr;
 	Txt_KeyCode = nullptr;
 }
 
@@ -85,10 +87,10 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 		Cast<UHorizontalBoxSlot>(Box_KeyIcon->GetChildAt(Box_KeyIcon->GetChildrenCount() - 1)->Slot)->SetPadding(FMargin(0.f));
 	}
 
-	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	
 	Txt_KeyCode->SetText(FText::FromString(KeyCode));
-	Txt_KeyCode->SetVisibility(Box_KeyIcon->GetChildrenCount() == 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+
+	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	Border_KeyCode->SetVisibility(Box_KeyIcon->GetChildrenCount() == 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 
 	Super::OnRefresh();
 }
