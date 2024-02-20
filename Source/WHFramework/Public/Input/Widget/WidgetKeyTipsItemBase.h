@@ -32,6 +32,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UCommonTextBlockN* Txt_KeyCode;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
-	UCommonTextBlockN* Txt_KeyName;
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KeyMapping")
+	FString KeyMappingName;
 };

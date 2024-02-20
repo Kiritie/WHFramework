@@ -16,7 +16,6 @@ UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectI
 
 	Box_KeyIcon = nullptr;
 	Txt_KeyCode = nullptr;
-	Txt_KeyName = nullptr;
 }
 
 void UWidgetKeyTipsItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -32,70 +31,64 @@ void UWidgetKeyTipsItemBase::OnInitialize(const TArray<FParameter>& InParams)
 void UWidgetKeyTipsItemBase::OnRefresh()
 {
 	FString KeyCode;
-	FString KeyName;
 
-	Box_KeyIcon->ClearChildren();
+	const UImage* Img_KeyIcon = Cast<UImage>(Box_KeyIcon->GetChildAt(0));
+
+	while(Box_KeyIcon->GetChildrenCount() > 1)
+	{
+		Box_KeyIcon->RemoveChildAt(1);
+	}
 	
-	if(WidgetParams.IsValidIndex(0))
-	{
-		KeyCode.Append(TEXT("["));
-		
-		const FString KeyMappingName = WidgetParams[0].GetStringValue();
-		TArray<FString> KeyMappingNames;
-		KeyMappingName.ParseIntoArray(KeyMappingNames, TEXT(","));
-
-		#define EXPRESSION1(Key, Code) \
-		FSlateBrush ImageBrush; \
-		const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>(); \
-		if(Settings->TryGetInputBrush(ImageBrush, Key, ECommonInputType::MouseAndKeyboard, FName("XSX"))) \
+	TArray<FString> KeyMappingNames;
+	KeyMappingName.ParseIntoArray(KeyMappingNames, TEXT(","));
+	
+	#define EXPRESSION1(Key, Code) \
+	FSlateBrush ImageBrush; \
+	const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>(); \
+	if(Settings->TryGetInputBrush(ImageBrush, Key, ECommonInputType::MouseAndKeyboard, FName("XSX"))) \
+	{ \
+		ImageBrush.ImageSize = Img_KeyIcon->GetBrush().ImageSize; \
+		UImage* Image = NewObject<UImage>(GetWorld()); \
+		Image->SetBrush(ImageBrush); \
+		if(const auto ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image)) \
 		{ \
-			ImageBrush.ImageSize = FVector2D(25.f); \
-			UImage* Image = NewObject<UImage>(GetWorld()); \
-			Image->SetBrush(ImageBrush); \
-			if(const auto ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image)) \
-			{ \
-				ImageSlot->SetPadding(FMargin(0.f, 0.f, 5.f, 0.f)); \
-				ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic)); \
-			} \
+			ImageSlot->SetPadding(Cast<UHorizontalBoxSlot>(Img_KeyIcon->Slot)->GetPadding()); \
+			ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic)); \
 		} \
-		else \
-		{ \
-			KeyCode.Append(Code); \
-		}
-
-		for(auto& Iter1 : KeyMappingNames)
-		{
-			auto KeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(*Iter1);
-			if(KeyMappings.Num() > 0)
-			{
-				for(auto& Iter2 : KeyMappings)
-				{
-					EXPRESSION1(Iter2.GetCurrentKey(), FString::Printf(TEXT("%s/"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString()))
-					KeyName = Iter2.GetDisplayName().ToString();
-				}
-			}
-			else
-			{
-				EXPRESSION1(FKey(*Iter1), Iter1)
-				KeyName = Iter1;
-			}
-			KeyCode.RemoveFromEnd(TEXT("/"));
-			KeyCode.Append(TEXT("."));
-		}
-		KeyCode.RemoveFromEnd(TEXT("."));
-		KeyCode.Append(TEXT("]"));
+	} \
+	else \
+	{ \
+		KeyCode.Append(Code); \
 	}
-	if(WidgetParams.IsValidIndex(1))
+
+	for(auto& Iter1 : KeyMappingNames)
 	{
-		KeyName = !WidgetParams[1].GetTextValue().IsEmpty() ? WidgetParams[1].GetTextValue().ToString() : KeyName;
+		auto KeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(*Iter1);
+		if(KeyMappings.Num() > 0)
+		{
+			for(auto& Iter2 : KeyMappings)
+			{
+				EXPRESSION1(Iter2.GetCurrentKey(), FString::Printf(TEXT("%s/"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString()))
+			}
+		}
+		else
+		{
+			EXPRESSION1(FKey(*Iter1), Iter1)
+		}
+		KeyCode.RemoveFromEnd(TEXT("/"));
+		KeyCode.Append(TEXT("."));
+	}
+	KeyCode.RemoveFromEnd(TEXT("."));
+
+	if(Box_KeyIcon->GetChildrenCount() > 1)
+	{
+		Cast<UHorizontalBoxSlot>(Box_KeyIcon->GetChildAt(Box_KeyIcon->GetChildrenCount() - 1)->Slot)->SetPadding(FMargin(0.f));
 	}
 
-	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 0 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	
 	Txt_KeyCode->SetText(FText::FromString(KeyCode));
-	Txt_KeyCode->SetVisibility(Box_KeyIcon->GetChildrenCount() == 0 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	
-	Txt_KeyName->SetText(FText::FromString(KeyName));
+	Txt_KeyCode->SetVisibility(Box_KeyIcon->GetChildrenCount() == 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 
 	Super::OnRefresh();
 }
