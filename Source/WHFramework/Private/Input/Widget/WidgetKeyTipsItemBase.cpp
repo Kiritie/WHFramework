@@ -55,7 +55,7 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 			ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic)); \
 		} \
 	} \
-	else \
+	else if(!Code.StartsWith(TEXT("None"))) \
 	{ \
 		KeyCode.Append(Code); \
 	}
