@@ -50,6 +50,9 @@ protected:
 	UTextBlock* Txt_MaxValue;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UTextBlock* Txt_Value;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UEditableTextBox* TxtBox_Value;
 
 protected:

@@ -22,7 +22,10 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const
 	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	Slider_Value->OnValueChanged.AddDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
-	TxtBox_Value->OnTextCommitted.AddDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
+	if(TxtBox_Value)
+	{
+		TxtBox_Value->OnTextCommitted.AddDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
+	}
 
 	if(InParams.IsValidIndex(1))
 	{
@@ -65,7 +68,10 @@ void UWidgetFloatSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 	ScaleFactor = 1.f;
 
 	Slider_Value->OnValueChanged.RemoveDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
-	TxtBox_Value->OnTextCommitted.RemoveDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
+	if(TxtBox_Value)
+	{
+		TxtBox_Value->OnTextCommitted.RemoveDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
+	}
 }
 
 void UWidgetFloatSettingItemBase::OnRefresh()
@@ -75,7 +81,14 @@ void UWidgetFloatSettingItemBase::OnRefresh()
 
 void UWidgetFloatSettingItemBase::OnSliderValueChanged(float InValue)
 {
-	TxtBox_Value->SetText(UKismetTextLibrary::Conv_DoubleToText(FMath::Lerp(MinValue * ScaleFactor, MaxValue * ScaleFactor, InValue), ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
+	if(Txt_Value)
+	{
+		Txt_Value->SetText(UKismetTextLibrary::Conv_DoubleToText(FMath::Lerp(MinValue * ScaleFactor, MaxValue * ScaleFactor, InValue), ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
+	}
+	if(TxtBox_Value)
+	{
+		TxtBox_Value->SetText(UKismetTextLibrary::Conv_DoubleToText(FMath::Lerp(MinValue * ScaleFactor, MaxValue * ScaleFactor, InValue), ERoundingMode::HalfToEven, false, false, 1, 324, 0, DecimalNum));
+	}
 	if(OnValueChanged.IsBound())
 	{
 		OnValueChanged.Broadcast(this, GetValue());

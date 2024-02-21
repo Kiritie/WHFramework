@@ -12,9 +12,6 @@
 
 UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetParams.Add(FString());
-	WidgetParams.Add(FText());
-
 	Box_KeyIcon = nullptr;
 	Border_KeyCode = nullptr;
 	Txt_KeyCode = nullptr;
@@ -43,11 +40,11 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 	
 	TArray<FString> KeyMappingNames;
 	KeyMappingName.ParseIntoArray(KeyMappingNames, TEXT(","));
-	
+
 	#define EXPRESSION1(Key, Code) \
 	FSlateBrush ImageBrush; \
 	const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>(); \
-	if(Settings->TryGetInputBrush(ImageBrush, Key, ECommonInputType::MouseAndKeyboard, FName("XSX"))) \
+	if(Settings->TryGetInputBrush(ImageBrush, Key, ECommonInputType::MouseAndKeyboard, FName("XSX")) && ImageBrush.GetResourceObject()) \
 	{ \
 		ImageBrush.ImageSize = Img_KeyIcon->GetBrush().ImageSize; \
 		UImage* Image = NewObject<UImage>(GetWorld()); \
@@ -63,23 +60,19 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 		KeyCode.Append(Code); \
 	}
 
-	for(auto& Iter1 : KeyMappingNames)
-	{
+	ITER_ARRAY(KeyMappingNames, Iter1,
 		auto KeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(*Iter1);
 		if(KeyMappings.Num() > 0)
 		{
-			for(auto& Iter2 : KeyMappings)
-			{
-				EXPRESSION1(Iter2.GetCurrentKey(), FString::Printf(TEXT("%s/"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString()))
-			}
+			ITER_ARRAY_WITHINDEX(KeyMappings, i, Iter2,
+				EXPRESSION1(Iter2.GetCurrentKey(), FString::Printf(TEXT("%s%s"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString(), i == KeyMappings.Num() - 1 ? TEXT(".") : TEXT("/")))
+			)
 		}
 		else
 		{
-			EXPRESSION1(FKey(*Iter1), Iter1)
+			EXPRESSION1(FKey(*Iter1), FString::Printf(TEXT("%s."), *FKey(*Iter1).GetDisplayName(false).ToString()))
 		}
-		KeyCode.RemoveFromEnd(TEXT("/"));
-		KeyCode.Append(TEXT("."));
-	}
+	)
 	KeyCode.RemoveFromEnd(TEXT("."));
 
 	if(Box_KeyIcon->GetChildrenCount() > 1)
@@ -90,7 +83,7 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 	Txt_KeyCode->SetText(FText::FromString(KeyCode));
 
 	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	Border_KeyCode->SetVisibility(Box_KeyIcon->GetChildrenCount() == 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	Border_KeyCode->SetVisibility(!KeyCode.IsEmpty() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 
 	Super::OnRefresh();
 }
