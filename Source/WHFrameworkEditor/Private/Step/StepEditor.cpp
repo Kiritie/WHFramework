@@ -294,6 +294,8 @@ FEditorModuleBase* FStepEditor::GetEditorModule() const
 void FStepEditor::OnBlueprintCompiled()
 {
 	FAssetEditorBase::OnBlueprintCompiled();
+
+	ListWidget->Refresh();
 }
 
 void FStepEditor::OnDefaultsToggled()

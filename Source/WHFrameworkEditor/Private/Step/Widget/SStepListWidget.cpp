@@ -576,6 +576,8 @@ void SStepListWidget::UpdateTreeView(bool bRegenerate)
 {
 	if(!StepEditor.Pin()->GetEditingAsset<UStepAsset>()) return;
 
+	ClearSelection();
+
 	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
 		if(bRegenerate)
@@ -616,6 +618,11 @@ void SStepListWidget::UpdateSelection()
 	}
 
 	StepEditor.Pin()->DetailsWidget->Refresh();
+}
+
+void SStepListWidget::ClearSelection()
+{
+	TreeView->ClearSelection();
 }
 
 TSharedRef<ITableRow> SStepListWidget::GenerateTreeRow(TSharedPtr<FStepListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)

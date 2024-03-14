@@ -309,13 +309,13 @@ FActiveGameplayEffectHandle UAbilitySystemComponentBase::BP_ApplyGameplayEffectT
 {
 	if (Target == nullptr)
 	{
-		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDC_Ability, EDV_Error);
+		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null Target. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDC_Ability, EDV_Warning);
 		return FActiveGameplayEffectHandle();
 	}
 
 	if (GameplayEffectClass == nullptr)
 	{
-		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDC_Ability, EDV_Error);
+		WHLog(FString::Printf(TEXT("UAbilitySystemComponent::BP_ApplyGameplayEffectToTargetWithPrediction called with null GameplayEffectClass. %s. Context: %s"), *GetFullName(), *Context.ToString()), EDC_Ability, EDV_Warning);
 		return FActiveGameplayEffectHandle();
 	}
 
@@ -766,7 +766,7 @@ void UAbilitySystemComponentBase::AnimMontage_UpdateReplicatedDataForMesh(FGamep
 			if (NextSectionID >= (256 - 1))
 			{
 				WHLog(FString::Printf(TEXT("AnimMontage_UpdateReplicatedData. NextSectionID = %d.  RepAnimMontageInfo.Position: %.2f, CurrentSectionID: %d. LocalAnimMontageInfo.AnimMontage %s"),
-					NextSectionID, OutRepAnimMontageInfo.RepMontageInfo.Position, CurrentSectionID, *GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage)), EDC_Ability, EDV_Error);
+					NextSectionID, OutRepAnimMontageInfo.RepMontageInfo.Position, CurrentSectionID, *GetNameSafe(AnimMontageInfo.LocalMontageInfo.AnimMontage)), EDC_Ability, EDV_Warning);
 				ensure(NextSectionID < (256 - 1));
 			}
 			OutRepAnimMontageInfo.RepMontageInfo.NextSectionID = uint8(NextSectionID + 1);

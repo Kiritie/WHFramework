@@ -143,6 +143,20 @@ FSaveData* USaveGameModule::ToData()
 	return &SaveData;
 }
 
+FString USaveGameModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	for(auto Iter : SaveGameInfos)
+	{
+		if(Iter.Value.ActiveIndex >= 0)
+		{
+			DebugMessage.Appendf(TEXT("%s-%d(%s)\n"), *Iter.Key.ToString(), Iter.Value.ActiveIndex, Iter.Value.SaveGames[Iter.Value.ActiveIndex]->bSaved ? TEXT("Saved") : TEXT("Unsaved"));
+		}
+	}
+	DebugMessage.RemoveFromEnd(TEXT("\n"));
+	return DebugMessage;
+}
+
 FString USaveGameModule::GetSlotName(FName InSaveName, int32 InIndex) const
 {
 	return InIndex != 0 ? FString::Printf(TEXT("SaveGame_%s%d"), *InSaveName.ToString(), InIndex) : FString::Printf(TEXT("SaveGame_%s"), *InSaveName.ToString());

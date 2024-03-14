@@ -91,6 +91,8 @@ private:
 
 	void UpdateSelection();
 
+	void ClearSelection();
+
 	TSharedRef<ITableRow> GenerateTreeRow(TSharedPtr<FTaskListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable);
 
 	void TreeItemScrolledIntoView(TSharedPtr<FTaskListItem> TreeItem, const TSharedPtr<ITableRow>& Widget);

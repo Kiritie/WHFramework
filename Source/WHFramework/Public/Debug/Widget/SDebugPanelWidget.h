@@ -25,4 +25,14 @@ public:
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
+
+public:
+	static FName WidgetName;
+
+	static FName ParentName;
+
+public:
+	virtual FName GetWidgetName() const override { return WidgetName; }
+
+	virtual FName GetParentName() const override { return ParentName; }
 };

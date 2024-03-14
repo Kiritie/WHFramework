@@ -6,6 +6,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 #include "Scene/SceneModuleStatics.h"
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
@@ -23,12 +24,19 @@ UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& obj
 void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
+	
+	LoadProgress = 0.f;
+	CurrentProgress = 0.f;
+
 	if(InParams.IsValidIndex(0))
 	{
 		LoadingLevelPath = *InParams[0].GetStringValue();
 	}
-	LoadProgress = 0.f;
-	CurrentProgress = 0.f;
+	if(InParams.IsValidIndex(1))
+	{
+		LoadProgress = InParams[1].GetFloatValue();
+		CurrentProgress = LoadProgress;
+	}
 }
 
 void UWidgetLoadingLevelPanel::OnClose(bool bInstant)
@@ -40,22 +48,38 @@ void UWidgetLoadingLevelPanel::OnRefresh()
 {
 	Super::OnRefresh();
 
-	const float Progress = USceneModuleStatics::GetAsyncLoadLevelProgress(LoadingLevelPath);
-	if(Progress > LoadProgress)
+	if(!LoadingLevelPath.IsNone())
 	{
-		LoadProgress = Progress;
+		const float Progress = USceneModuleStatics::GetAsyncLoadLevelProgress(LoadingLevelPath) * 0.5f;
+		if(Progress > LoadProgress)
+		{
+			LoadProgress = Progress;
+		}
 	}
 	if(LoadProgress >= 0)
 	{
-		CurrentProgress = FMath::FInterpConstantTo(CurrentProgress, LoadProgress, GetWorld()->GetDeltaSeconds(), 1.f);
-		if(ProgressBar_Progress)
+		if(!FMath::IsNearlyEqual(CurrentProgress, LoadProgress))
 		{
-			ProgressBar_Progress->SetPercent(CurrentProgress);
+			CurrentProgress = FMath::FInterpConstantTo(CurrentProgress, LoadProgress, GetWorld()->GetDeltaSeconds(), 1.f);
 		}
-		if(TextBlock_Progress)
+		if(PBar_Progress)
 		{
-			TextBlock_Progress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
+			PBar_Progress->SetPercent(CurrentProgress);
+		}
+		if(Txt_Progress)
+		{
+			Txt_Progress->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::FloorToInt(CurrentProgress * 100.f))));
 		}
 		WHLog(FString::Printf(TEXT("Load level progress: %f"), CurrentProgress));
+	}
+}
+
+void UWidgetLoadingLevelPanel::SetLoadProgress(float InLoadProgress, bool bSmoothness)
+{
+	InLoadProgress = FMath::Clamp(InLoadProgress, 0.f, 1.f);
+	LoadProgress = InLoadProgress;
+	if(!bSmoothness)
+	{
+		CurrentProgress = LoadProgress;
 	}
 }

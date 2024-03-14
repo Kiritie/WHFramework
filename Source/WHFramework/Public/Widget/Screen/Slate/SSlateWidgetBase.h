@@ -105,12 +105,13 @@ public:
 		return ChildWidgets.Find(InChildWidget);
 	}
 
+public:
+	static FName WidgetName;
+
+	static FName ParentName;
+
 protected:
 	EWidgetType WidgetType;
-
-	FName WidgetName;
-
-	FName ParentName;
 
 	FName ParentSlot;
 
@@ -214,9 +215,7 @@ public:
 
 	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
 
-	virtual UPanelWidget* GetRootPanelWidget() const override;
+	virtual TSharedPtr<SPanel> GetRootPanelWidget() const;
 
-	virtual UPanelWidget* GetParentPanelWidget() const override;
-
-	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
+	virtual TSharedPtr<SPanel> GetParentPanelWidget() const;
 };

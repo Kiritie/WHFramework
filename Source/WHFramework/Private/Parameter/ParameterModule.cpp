@@ -103,6 +103,11 @@ void UParameterModule::Load_Implementation()
 	}
 }
 
+FString UParameterModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("Parameter Count: %d"), Parameters.Sets.Num());
+}
+
 bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 {
 	return Parameters.HasParameter(InName, bEnsured);

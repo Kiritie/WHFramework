@@ -71,10 +71,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncLoadLevelFinished"), Category = "SceneModuleStatics")
 	static void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncUnloadLevelFinished"), Category = "SceneModuleStatics")
 	static void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")

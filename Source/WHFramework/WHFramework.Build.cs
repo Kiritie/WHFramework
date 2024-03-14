@@ -24,7 +24,8 @@ public class WHFramework : ModuleRules
 				"EnhancedInput",
 				"GameplayTags",
 				"GameplayTasks",
-				"GameplayAbilities"
+				"GameplayAbilities",
+				"WHFrameworkCore"
 			});
 			
 		
@@ -36,6 +37,8 @@ public class WHFramework : ModuleRules
 				"Slate",
 				"Paper2D",
 				"Sockets",
+				"Media",
+				"MediaUtils",
 				"MediaAssets",
 				"SlateCore",
 				"InputCore",

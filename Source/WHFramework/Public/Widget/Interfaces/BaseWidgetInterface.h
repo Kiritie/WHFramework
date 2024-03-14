@@ -38,6 +38,4 @@ public:
 	virtual void Refresh() = 0;
 
 	virtual void Destroy(bool bRecovery = false) = 0;
-
-	virtual TArray<UWidget*> GetAllPoolWidgets() const = 0;
 };

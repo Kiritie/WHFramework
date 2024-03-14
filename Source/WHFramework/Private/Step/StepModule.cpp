@@ -138,6 +138,11 @@ void UStepModule::OnTermination(EPhase InPhase)
 	}
 }
 
+FString UStepModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentStep: %s"), CurrentStep ? *CurrentStep->StepDisplayName.ToString() : TEXT("None"));
+}
+
 void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 {
 	InRootStepIndex = InRootStepIndex != -1 ? InRootStepIndex : GetFirstStep() ? GetFirstStep()->StepIndex : -1;
@@ -349,7 +354,7 @@ void UStepModule::SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirs
 	CurrentAsset = DuplicateObject<UStepAsset>(InStepAsset, this);
 	CurrentAsset->Initialize(InStepAsset);
 
-	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Step, EDV_Log, FColor::Green, 5.f);
 
 	if(bInAutoStartFirst)
 	{

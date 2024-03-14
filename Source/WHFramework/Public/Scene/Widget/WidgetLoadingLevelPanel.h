@@ -27,11 +27,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	FName LoadingLevelPath;
 
-	UPROPERTY(meta = (BindWidget))
-	class UProgressBar* ProgressBar_Progress;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	class UProgressBar* PBar_Progress;
 
-	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* TextBlock_Progress;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	class UTextBlock* Txt_Progress;
 
 private:
 	float LoadProgress;
@@ -43,5 +43,5 @@ public:
 	float GetLoadProgress(bool bSmoothness = false) const { return bSmoothness ? CurrentProgress : LoadProgress; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetLoadProgress(float InLoadProgress) { this->LoadProgress = InLoadProgress; }
+	void SetLoadProgress(float InLoadProgress, bool bSmoothness = false);
 };

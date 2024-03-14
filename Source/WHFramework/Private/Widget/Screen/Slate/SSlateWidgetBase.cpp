@@ -11,11 +11,12 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SSlateWidgetBase::WidgetName = NAME_None;
+FName SSlateWidgetBase::ParentName = NAME_None;
+
 SSlateWidgetBase::SSlateWidgetBase()
 {
 	WidgetType = EWidgetType::Permanent;
-	WidgetName = NAME_None;
-	ParentName = NAME_None;
 	ParentSlot = NAME_None;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
@@ -111,11 +112,6 @@ void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPa
 	{
 		ParentWidget->AddChild(this);
 	}
-
-	for(auto Iter : GetAllPoolWidgets())
-	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
-	}
 	//
 	// for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
 	// {
@@ -143,31 +139,10 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
-
-	// if(!GetParentWidget<UUserWidgetBase>())
-	// {
-	// 	if(GetParent())
-	// 	{
-	// 		RemoveFromParent();
-	// 	}
-	// 	AddToViewport(WidgetZOrder);
-	// }
-	// else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
-	// {
-	// 	if(GetParent() != ParentPanelWidget)
-	// 	{
-	// 		UPanelSlot* PanelSlot = ParentPanelWidget->AddChild(this);
-	// 		if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
-	// 		{
-	// 			CanvasPanelSlot->SetZOrder(WidgetZOrder);
-	// 			CanvasPanelSlot->SetAnchors(WidgetAnchors);
-	// 			CanvasPanelSlot->SetOffsets(WidgetOffsets);
-	// 			CanvasPanelSlot->SetAlignment(WidgetAlignment);
-	// 		}
-	// 	}
-	// }
-
-	UCommonStatics::GetCurrentWorld()->GetGameViewport()->AddGameLayerWidget(SharedThis(this), WidgetZOrder);
+	if(!GetParentWidget())
+	{
+		UCommonStatics::GetCurrentWorld()->GetGameViewport()->AddViewportWidgetContent(SharedThis(this), WidgetZOrder);
+	}
 
 	switch(WidgetOpenType)
 	{
@@ -234,6 +209,17 @@ void SSlateWidgetBase::OnRefresh()
 
 void SSlateWidgetBase::OnDestroy(bool bRecovery)
 {
+	if(UCommonStatics::GetCurrentWorld()->GetGameViewport())
+	{
+		UCommonStatics::GetCurrentWorld()->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
+	}
+
+	if(ParentWidget)
+	{
+		ParentWidget->RemoveChild(this);
+	}
+
+	UInputModuleStatics::UpdateGlobalInputMode();
 }
 
 void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
@@ -299,7 +285,7 @@ void SSlateWidgetBase::Refresh()
 
 void SSlateWidgetBase::Destroy(bool bRecovery)
 {
-	//UWidgetModuleStatics::DestroySlateWidget<SSlateWidgetBase>();
+	UWidgetModuleStatics::DestroySlateWidget<SSlateWidgetBase>(GetWidgetName());
 }
 
 bool SSlateWidgetBase::CanOpen() const
@@ -331,7 +317,7 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 			{
 				GetLastTemporary()->Open();
 			}
-			UCommonStatics::GetCurrentWorld()->GetGameViewport()->RemoveGameLayerWidget(SharedThis(this));
+			UCommonStatics::GetCurrentWorld()->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
 		}
 		default: break;
 	}
@@ -351,19 +337,14 @@ void SSlateWidgetBase::RemoveAllChild()
 {
 }
 
-UPanelWidget* SSlateWidgetBase::GetRootPanelWidget() const
+TSharedPtr<SPanel> SSlateWidgetBase::GetRootPanelWidget() const
 {
 	return nullptr;
 }
 
-UPanelWidget* SSlateWidgetBase::GetParentPanelWidget() const
+TSharedPtr<SPanel> SSlateWidgetBase::GetParentPanelWidget() const
 {
 	return nullptr;
-}
-
-TArray<UWidget*> SSlateWidgetBase::GetAllPoolWidgets() const
-{
-	return {};
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

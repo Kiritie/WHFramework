@@ -234,8 +234,8 @@ public:
 	EWidgetSpace GetWidgetSpace() const;
 	
 	UFUNCTION(BlueprintPure)
-	virtual UPanelWidget* GetRootPanelWidget() const override;
+	UPanelWidget* GetRootPanelWidget() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
+	TArray<UWidget*> GetAllPoolWidgets() const;
 };

@@ -6,6 +6,7 @@
 #include "Components/AudioComponent.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Audio/AudioModuleNetworkComponent.h"
+#include "Common/CommonStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Audio/EventHandle_SoundParamsChanged.h"
 #include "Kismet/GameplayStatics.h"
@@ -165,6 +166,17 @@ FSaveData* UAudioModule::ToData()
 	SaveData.EffectSoundParams = EffectSoundParams;
 	
 	return &SaveData;
+}
+
+FString UAudioModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	for(auto Iter : SingleSoundInfos)
+	{
+		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
+	}
+	DebugMessage.RemoveFromEnd(TEXT("\n"));
+	return DebugMessage;
 }
 
 void UAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)

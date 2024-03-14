@@ -63,6 +63,9 @@ public:
 
 	virtual void Save_Implementation() override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	// Capture
 protected:

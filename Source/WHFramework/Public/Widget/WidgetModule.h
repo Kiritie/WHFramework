@@ -51,6 +51,9 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 protected:
 	UFUNCTION()
 	void OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle);
@@ -106,6 +109,15 @@ public:
 		return UserWidgetClassMap.Contains(InName);
 	}
 
+	template<class T>
+	TSubclassOf<UUserWidgetBase> GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
+	{
+		if(!InClass) return nullptr;
+
+		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		return GetUserWidgetClassByName(WidgetName);
+	}
+
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UUserWidgetBase> GetUserWidgetClassByName(FName InName) const
 	{
@@ -114,6 +126,15 @@ public:
 			return UserWidgetClassMap[InName];
 		}
 		return nullptr;
+	}
+
+	template<class T>
+	TArray<FName> GetUserWidgetChildren(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
+	{
+		if(!InClass) return TArray<FName>();
+
+		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		return GetUserWidgetChildrenByName(WidgetName);
 	}
 
 	UFUNCTION(BlueprintPure)
@@ -129,6 +150,24 @@ public:
 			}
 		}
 		return ReturnValues;
+	}
+
+	template<class T>
+	FName GetUserWidgetParent(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
+	{
+		if(!InClass) return NAME_None;
+
+		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		return GetUserWidgetParentByName(WidgetName);
+	}
+
+	UFUNCTION(BlueprintPure)
+	FName GetUserWidgetParentByName(FName InName) const
+	{
+		if(!HasUserWidgetClassByName(InName)) return NAME_None;
+		
+		const FName ParentName = GetUserWidgetClassByName(InName).GetDefaultObject()->GetParentName();
+		return ParentName;
 	}
 
 	template<class T>
@@ -208,7 +247,7 @@ public:
 		
 		if(!UserWidgetClassMap.Contains(InName))
 		{
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create user widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Error);
 			return nullptr;
 		}
 
@@ -407,13 +446,13 @@ protected:
 
 public:
 	template<class T>
-	bool HasSlateWidget(FName InName = typeid(T).name()) const
+	bool HasSlateWidget(FName InName = T::WidgetName) const
 	{
 		return AllSlateWidgets.Contains(InName);
 	}
 
 	template<class T>
-	TSharedPtr<T> GetSlateWidget(FName InName = typeid(T).name()) const
+	TSharedPtr<T> GetSlateWidget(FName InName = T::WidgetName) const
 	{
 		if(AllSlateWidgets.Contains(InName))
 		{
@@ -440,7 +479,7 @@ public:
 	}
 
 	template<class T>
-	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = typeid(T).name())
+	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr, InParams))
 		{
@@ -460,7 +499,7 @@ public:
 	}
 	
 	template<class T>
-	bool CloseSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
+	bool CloseSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>(InName))
 		{
@@ -475,7 +514,7 @@ public:
 	}
 	
 	template<class T>
-	bool ToggleSlateWidget(bool bInstant = false, FName InName = typeid(T).name())
+	bool ToggleSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr))
 		{
@@ -486,7 +525,7 @@ public:
 	}
 
 	template<class T>
-	bool DestroySlateWidget(FName InName = typeid(T).name())
+	bool DestroySlateWidget(FName InName = T::WidgetName)
 	{
 		if(AllSlateWidgets.Contains(InName))
 		{
@@ -641,7 +680,7 @@ public:
 	{
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Warning);
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Error);
 			return nullptr;
 		}
 		

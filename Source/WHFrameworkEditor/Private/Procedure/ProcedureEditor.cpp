@@ -294,6 +294,8 @@ FEditorModuleBase* FProcedureEditor::GetEditorModule() const
 void FProcedureEditor::OnBlueprintCompiled()
 {
 	FAssetEditorBase::OnBlueprintCompiled();
+
+	ListWidget->Refresh();
 }
 
 void FProcedureEditor::OnDefaultsToggled()

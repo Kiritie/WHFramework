@@ -76,7 +76,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	float CameraOrthoFactor;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
+	float CameraStreamingAltitude;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	ECameraCollisionMode CameraCollisionMode;
 

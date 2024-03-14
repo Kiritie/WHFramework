@@ -267,6 +267,11 @@ FSaveData* UInputModule::GetData()
 	return &LocalSaveData;
 }
 
+FString UInputModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EInputMode"), (int32)GlobalInputMode));
+}
+
 UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass) const
 {
 	const FName InputManagerName = InClass->GetDefaultObject<UInputManagerBase>()->GetInputManagerName();
@@ -358,13 +363,17 @@ void UInputModule::ApplyKeyMappings()
 
 void UInputModule::ApplyTouchMappings()
 {
-	GetPlayerController()->InputComponent->TouchBindings.Empty();
-	for(auto& Iter : TouchMappings)
-	{
-		FInputTouchBinding TB(Iter.Event);
-		TB.TouchDelegate.BindDelegate(Iter.Delegate.IsBound() ? Iter.Delegate.GetUObject() : Iter.DynamicDelegate.GetUObject(), Iter.Delegate.IsBound() ? Iter.Delegate.TryGetBoundFunctionName() : Iter.DynamicDelegate.GetFunctionName());
-		GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
-	}
+	// GetPlayerController()->InputComponent->TouchBindings.Empty();
+	// for(auto& Iter : TouchMappings)
+	// {
+	// 	FInputTouchBinding TB(Iter.Event);
+	// 	TB.TouchDelegate.BindDelegate(Iter.Delegate.IsBound() ? Iter.Delegate.GetUObject() : Iter.DynamicDelegate.GetUObject(), Iter.Delegate.IsBound() ? Iter.Delegate.TryGetBoundFunctionName() : Iter.DynamicDelegate.GetFunctionName());
+	// 	GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
+	// }
+
+	GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &UInputModule::TouchPressed);
+	GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Released, this, &UInputModule::TouchReleased);
+	GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &UInputModule::TouchMoved);
 }
 
 TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
@@ -521,11 +530,7 @@ UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, b
 			}
 		}
 	}
-	
-	if (bEnsured)
-	{
-		WHLog(FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Warning);
-	}
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Error);
 
 	return nullptr;
 }
@@ -647,7 +652,7 @@ void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVe
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			UCameraModule::Get().AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, -(TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate);
+			UCameraModule::Get().AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, (TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate * (UCameraModule::Get().IsReverseCameraPitch() ? 1.f : -1.f));
 		}
 		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
 	}
@@ -666,7 +671,7 @@ void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVe
 		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
 		if(TouchPinchValuePrevious != -1.f)
 		{
-			UCameraModuleStatics::AddCameraDistanceInput(-(TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate);
+			UCameraModuleStatics::AddCameraDistanceInput((TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate * -0.2f);
 		}
 		TouchPinchValuePrevious = TouchCurrentPinchValue;
 	}

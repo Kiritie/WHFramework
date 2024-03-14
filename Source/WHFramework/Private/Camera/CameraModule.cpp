@@ -44,7 +44,7 @@ UCameraModule::UCameraModule()
 	ModuleNetworkComponent = UCameraModuleNetworkComponent::StaticClass();
 
 	DefaultCamera = nullptr;
-	DefaultInstantSwitch = false;
+	bDefaultInstantSwitch = false;
 	
 	CameraClasses = TArray<TSubclassOf<ACameraActorBase>>();
 	CameraClasses.Add(ARoamCameraActor::StaticClass());
@@ -257,11 +257,17 @@ void UCameraModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		CurrentCameraLocation = UCameraModuleStatics::GetCameraLocation(true);
+		CurrentCameraRotation = UCameraModuleStatics::GetCameraRotation(true);
+		CurrentCameraDistance = UCameraModuleStatics::GetCameraDistance(true);
+	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		if(DefaultCamera)
 		{
-			SwitchCamera(DefaultCamera, DefaultInstantSwitch);
+			SwitchCamera(DefaultCamera, true, bDefaultInstantSwitch);
 		}
 		if(DefaultCameraPoint)
 		{
@@ -278,7 +284,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraMoveAble && CurrentCamera)
 	{
-		CurrentCameraLocation = CurrentCamera->GetActorLocation();
+		// CurrentCameraLocation = CurrentCamera->GetActorLocation();
 		if(CurrentCameraLocation != TargetCameraLocation)
 		{
 			if(CameraDoLocationDuration != 0.f)
@@ -300,7 +306,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraOffsetAble && CurrentCamera)
 	{
-		CurrentCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
+		// CurrentCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 		if(CurrentCameraOffset != TargetCameraOffset)
 		{
 			if(CameraDoOffsetDuration != 0.f)
@@ -322,8 +328,8 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraRotateAble && GetPlayerController())
 	{
-		CurrentCameraRotation = GetPlayerController()->GetControlRotation();
-		if(CurrentCameraRotation != TargetCameraRotation)
+		// CurrentCameraRotation = GetPlayerController()->GetControlRotation();
+		if(!CurrentCameraRotation.Equals(TargetCameraRotation))
 		{
 			if(CameraDoRotationDuration != 0.f)
 			{
@@ -449,6 +455,11 @@ FSaveData* UCameraModule::ToData()
 	SaveData.CameraZoomSpeed = CameraZoomSpeed;
 	
 	return &SaveData;
+}
+
+FString UCameraModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentCamera: %s"), CurrentCamera ? *CurrentCamera->GetCameraName().ToString() : TEXT("None"));
 }
 
 ACameraActorBase* UCameraModule::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass) const
@@ -807,7 +818,12 @@ void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 {
 	if(!GetPlayerController()) return;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+	const FRotator TargetRotator = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+
+	if(TargetRotator.Equals(TargetCameraRotation)) return;
+
+	TargetCameraRotation = TargetRotator;
+
 	if(bInstant)
 	{
 		CurrentCameraRotation = TargetCameraRotation;
@@ -823,8 +839,13 @@ void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant)
 void UCameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuration, EEaseType InEaseType, bool bForce)
 {
 	if(!GetPlayerController() || (CameraDoRotationRotation != EMPTY_Rotator || (CurrentCameraRotation.Yaw == InYaw && CurrentCameraRotation.Pitch == InPitch))  && !bForce) return;
+
+	const FRotator TargetRotator = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
+
+	if(TargetRotator.Equals(TargetCameraRotation)) return;
+
+	TargetCameraRotation = TargetRotator;
 	
-	TargetCameraRotation = FRotator(FMath::Clamp(InPitch == -1.f ? (InitCameraPitch == -1.f ? CurrentCameraRotation.Pitch : InitCameraPitch) : InPitch, GetMinCameraPitch(), GetMaxCameraPitch()), InYaw == -1.f ? CurrentCameraRotation.Yaw : InYaw, CurrentCameraRotation.Roll);
 	if(InDuration > 0.f)
 	{
 		CameraDoRotationTime = 0.f;
@@ -930,7 +951,7 @@ void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
 	if(!bCameraControlAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
 
-	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / CameraMoveAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + (CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / CameraMoveAltitude) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
@@ -944,7 +965,7 @@ void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
 {
 	if(!bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
 	{

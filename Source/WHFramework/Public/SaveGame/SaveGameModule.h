@@ -56,6 +56,9 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 protected:
 	UPROPERTY(EditAnywhere, Category = "UserData")
 	int32 UserIndex;

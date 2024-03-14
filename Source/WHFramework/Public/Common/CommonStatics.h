@@ -341,6 +341,8 @@ public:
 	{
 		for(const FWorldContext& Context : GEngine->GetWorldContexts())
 		{
+			if(!Context.World()) continue;
+			
 			if(!bInEditor && Context.World()->IsGameWorld() || bInEditor && Context.World()->IsEditorWorld())
 			{
 				if(T* Object = Cast<T>(Callback(Context.World())))

@@ -11,7 +11,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UWebInterfaceBase : public UWHObject
 {
 	GENERATED_BODY()
@@ -48,7 +48,7 @@ protected:
 	FOnWebRequestCompleteMulti OnWebRequestComplete;
 	
 public:
-	FName GetName() const { return Name; }
+	FName GetNameN() const { return Name; }
 	
 	FString GetUrl() const { return Url; }
 		

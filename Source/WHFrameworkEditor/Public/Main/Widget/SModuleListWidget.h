@@ -93,6 +93,8 @@ private:
 
 	void UpdateSelection();
 
+	void ClearSelection();
+
 	TSharedRef<ITableRow> GenerateListRow(TSharedPtr<FModuleListItem> ListItem, const TSharedRef<STableViewBase>& OwnerTable);
 
 	void ListItemScrolledIntoView(TSharedPtr<FModuleListItem> ListItem, const TSharedPtr<ITableRow>& Widget);

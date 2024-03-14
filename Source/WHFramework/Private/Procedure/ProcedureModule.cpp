@@ -100,6 +100,11 @@ void UProcedureModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+FString UProcedureModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentProcedure: %s"), CurrentProcedure ? *CurrentProcedure->ProcedureDisplayName.ToString() : TEXT("None"));
+}
+
 void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle)
 {
 	SwitchProcedureByClass(InEventHandle->ProcedureClass);

@@ -577,6 +577,8 @@ void STaskListWidget::UpdateTreeView(bool bRegenerate)
 {
 	if(!TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()) return;
 
+	ClearSelection();
+
 	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
 		if(bRegenerate)
@@ -617,6 +619,11 @@ void STaskListWidget::UpdateSelection()
 	}
 
 	TaskEditor.Pin()->DetailsWidget->Refresh();
+}
+
+void STaskListWidget::ClearSelection()
+{
+	TreeView->ClearSelection();
 }
 
 TSharedRef<ITableRow> STaskListWidget::GenerateTreeRow(TSharedPtr<FTaskListItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)

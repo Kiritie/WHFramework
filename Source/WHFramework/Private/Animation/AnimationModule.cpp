@@ -15,6 +15,8 @@ UAnimationModule::UAnimationModule()
 {
 	ModuleName = FName("AnimationModule");
 	ModuleDisplayName = FText::FromString(TEXT("Animation Module"));
+
+	bModuleRequired = true;
 }
 
 UAnimationModule::~UAnimationModule()

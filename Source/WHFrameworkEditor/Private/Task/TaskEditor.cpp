@@ -294,6 +294,8 @@ FEditorModuleBase* FTaskEditor::GetEditorModule() const
 void FTaskEditor::OnBlueprintCompiled()
 {
 	FAssetEditorBase::OnBlueprintCompiled();
+
+	ListWidget->Refresh();
 }
 
 void FTaskEditor::OnDefaultsToggled()

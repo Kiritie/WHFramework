@@ -210,6 +210,11 @@ void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(UModuleBase, ModuleState);
 }
 
+FString UModuleBase::GetModuleDebugMessage()
+{
+	return TEXT("No message...");
+}
+
 #if WITH_EDITOR
 bool UModuleBase::GenerateListItem(TSharedPtr<FModuleListItem> OutModuleListItem, const FString& InFilterText)
 {

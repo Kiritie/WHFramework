@@ -94,6 +94,11 @@ void UPawnModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+FString UPawnModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentPawn: %s"), CurrentPawn ? *CurrentPawn->GetNameP().ToString() : TEXT("None"));
+}
+
 void UPawnModule::AddPawnToList(APawnBase* InPawn)
 {
 	if(!Pawns.Contains(InPawn))

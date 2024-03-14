@@ -3,7 +3,13 @@
 
 #include "Video/VideoModule.h"
 
+#include "IMediaControls.h"
+#include "IMediaPlayer.h"
+#include "MediaHelpers.h"
+#include "MediaPlayer.h"
+#include "MediaPlayerFacade.h"
 #include "Asset/AssetModuleStatics.h"
+#include "Common/CommonStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -139,6 +145,17 @@ void UVideoModule::Load_Implementation()
 	{
 		SetGlobalVideoQuality(GlobalVideoQuality, true);
 	}
+}
+
+FString UVideoModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	for(auto Iter : MediaPlayerMap)
+	{
+		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value->GetMovieName().ToString(), *MediaUtils::StateToString(Iter.Value->GetMediaPlayer()->GetPlayerFacade()->GetPlayer() ? Iter.Value->GetMediaPlayer()->GetPlayerFacade()->GetPlayer()->GetControls().GetState() : EMediaState::Stopped));
+	}
+	DebugMessage.RemoveFromEnd(TEXT("\n"));
+	return DebugMessage;
 }
 
 void UVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)

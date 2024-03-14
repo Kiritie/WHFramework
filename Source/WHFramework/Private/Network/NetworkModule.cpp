@@ -72,9 +72,17 @@ void UNetworkModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+FString UNetworkModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	DebugMessage.Appendf(TEXT("ServerURL: %s\n"), !bLocalMode ? (!ServerURL.IsEmpty() ? *ServerURL : TEXT("None")) : TEXT("127.0.0.1"));
+	DebugMessage.Appendf(TEXT("ServerPort: %d"), ServerPort);
+	return DebugMessage;
+}
+
 FString UNetworkModule::GetServerURL() const
 {
-	return FString::Printf(TEXT("%s:%d"), *(!bLocalMode ? ServerURL : TEXT("127.0.0.1")), ServerPort);
+	return FString::Printf(TEXT("%s:%d"), !bLocalMode ? *ServerURL : TEXT("127.0.0.1"), ServerPort);
 }
 
 FString UNetworkModule::GetServerLocalURL() const

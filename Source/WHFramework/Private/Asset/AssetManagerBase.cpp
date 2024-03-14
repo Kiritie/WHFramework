@@ -58,10 +58,7 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 		}
 	}
 
-	if(bEnsured && !LoadedAsset)
-	{
-		WHLog(FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDC_Asset, EDV_Warning);
-	}
+	ensureEditorMsgf(!bEnsured || LoadedAsset, FString::Printf(TEXT("Failed to load asset for identifier %s!"), *InPrimaryAssetId.ToString()), EDC_Asset, EDV_Error);
 	return LoadedAsset;
 }
 
@@ -88,10 +85,7 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 		}
 	}
 	
-	if(bEnsured && LoadedAssets.IsEmpty())
-	{
-		WHLog(FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Warning);
-	}
+	ensureEditorMsgf(!bEnsured || !LoadedAssets.IsEmpty(), FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Error);
 	return LoadedAssets;
 }
 

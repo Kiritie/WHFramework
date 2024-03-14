@@ -67,6 +67,17 @@ void UReferencePoolModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+FString UReferencePoolModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	for(auto Iter : ReferencePools)
+	{
+		DebugMessage.Appendf(TEXT("%s: %s\n"), *Iter.Key->GetName(), *Iter.Value->Get().GetName());
+	}
+	DebugMessage.RemoveFromEnd(TEXT("\n"));
+	return DebugMessage;
+}
+
 void UReferencePoolModule::ClearAllReference()
 {
 	for (auto Iter : ReferencePools)

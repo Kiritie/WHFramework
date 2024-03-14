@@ -61,6 +61,9 @@ protected:
 
 	virtual bool HasArchive() const override { return true; }
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskModule
 protected:

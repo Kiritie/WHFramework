@@ -52,6 +52,9 @@ protected:
 public:
 	virtual void Load_Implementation() override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameter
 protected:

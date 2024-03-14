@@ -558,6 +558,8 @@ void SModuleListWidget::UpdateListView(bool bRegenerate)
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return;
 
+	ClearSelection();
+
 	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
 		if(bRegenerate)
@@ -602,6 +604,11 @@ void SModuleListWidget::UpdateSelection()
 	}
 
 	GetParentWidgetN<SModuleEditorWidget>()->DetailsWidget->Refresh();
+}
+
+void SModuleListWidget::ClearSelection()
+{
+	ListView->ClearSelection();
 }
 
 TSharedRef<ITableRow> SModuleListWidget::GenerateListRow(TSharedPtr<FModuleListItem> ListItem, const TSharedRef<STableViewBase>& OwnerTable)

@@ -26,13 +26,13 @@ void UTargetingComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	OwnerActor = GetOwner();
-	if (!ensureEditorMsgf(OwnerActor, FString::Printf(TEXT("[%s] TargetingComponent: Cannot get Owner reference ..."), *GetName()), EDC_Ability, EDV_Error))
+	if (!ensureEditorMsgf(OwnerActor, FString::Printf(TEXT("[%s] TargetingComponent: Cannot get Owner reference ..."), *GetName()), EDC_Default, EDV_Error))
 	{
 		return;
 	}
 
 	OwnerPawn = Cast<APawn>(OwnerActor);
-	if (!ensureEditorMsgf(OwnerPawn, FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Ability, EDV_Error))
+	if (!ensureEditorMsgf(OwnerPawn, FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Default, EDV_Error))
 	{
 		return;
 	}
@@ -385,7 +385,7 @@ void UTargetingComponent::CreateAndAttachTargetLockedOnWidgetComponent(AActor* T
 {
 	if (!LockedOnWidgetClass)
 	{
-		WHLog(TEXT("TargetingComponent: Cannot get LockedOnWidgetClass, please ensure it is a valid reference in the Component Properties."), EDC_Ability, EDV_Error);
+		WHLog(TEXT("TargetingComponent: Cannot get LockedOnWidgetClass, please ensure it is a valid reference in the Component Properties."), EDC_Default, EDV_Warning);
 		return;
 	}
 
@@ -426,7 +426,7 @@ void UTargetingComponent::SetupLocalPlayerController()
 {
 	if (!IsValid(OwnerPawn))
 	{
-		WHLog(FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Ability, EDV_Error);
+		WHLog(FString::Printf(TEXT("[%s] TargetingComponent: Component is meant to be added to Pawn only ..."), *GetName()), EDC_Default, EDV_Warning);
 		return;
 	}
 
@@ -508,7 +508,7 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 {
 	if (!IsValid(OwnerPlayerController))
 	{
-		WHLog(TEXT("UTargetingComponent::GetControlRotationOnTarget - OwnerPlayerController is not valid ..."), EDC_Ability, EDV_Error);
+		WHLog(TEXT("UTargetingComponent::GetControlRotationOnTarget - OwnerPlayerController is not valid ..."), EDC_Default, EDV_Warning);
 		return FRotator::ZeroRotator;
 	}
 

@@ -29,6 +29,16 @@
 			]
 		},
 		{
+			"Name": "WHFrameworkCore",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "WHFrameworkSlate",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
 			"Name": "WHFrameworkEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default"

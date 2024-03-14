@@ -161,7 +161,7 @@ public:
 	TArray<USubWidgetBase*> GetAllSubWidgets() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
+	virtual TArray<UWidget*> GetAllPoolWidgets() const;
 
 public:
 	void AddChild(IScreenWidgetInterface* InChildWidget) override;
@@ -432,10 +432,10 @@ public:
 	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
 
 	UFUNCTION(BlueprintPure)
-	virtual UPanelWidget* GetRootPanelWidget() const override;
+	UPanelWidget* GetRootPanelWidget() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual UPanelWidget* GetParentPanelWidget() const override;
+	UPanelWidget* GetParentPanelWidget() const;
 
 private:
 	UFUNCTION()

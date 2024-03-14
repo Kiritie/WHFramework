@@ -40,6 +40,9 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 protected:
 	UPROPERTY(EditAnywhere)
 	bool bLocalMode;

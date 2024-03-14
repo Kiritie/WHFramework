@@ -136,12 +136,9 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
 	for (auto Iter : TickAbleWidgets)
 	{
-		if(ITickAbleWidgetInterface* TickAbleWidget = Cast<ITickAbleWidgetInterface>(Iter))
+		if(ITickAbleWidgetInterface::Execute_IsTickAble(Iter))
 		{
-			if(TickAbleWidget->Execute_IsTickAble(Iter))
-			{
-				TickAbleWidget->Execute_OnTick(Iter, DeltaSeconds);
-			}
+			ITickAbleWidgetInterface::Execute_OnTick(Iter, DeltaSeconds);
 		}
 	}
 
@@ -198,6 +195,11 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 		ClearAllSlateWidget();
 		ClearAllWorldWidget();
 	}
+}
+
+FString UWidgetModule::GetModuleDebugMessage()
+{
+	return Super::GetModuleDebugMessage();
 }
 
 void UWidgetModule::OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle)
@@ -328,6 +330,13 @@ void UWidgetModule::CloseAllSlateWidget(bool bInstant)
 
 void UWidgetModule::ClearAllSlateWidget()
 {
+	for (auto Iter : AllSlateWidgets)
+	{
+		if(Iter.Value)
+		{
+			Iter.Value->OnDestroy();
+		}
+	}
 	AllSlateWidgets.Empty();
 }
 

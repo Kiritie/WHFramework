@@ -51,6 +51,9 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 public:

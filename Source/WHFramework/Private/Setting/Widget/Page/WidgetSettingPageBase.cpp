@@ -94,6 +94,8 @@ FSaveData* UWidgetSettingPageBase::GetDefaultSaveData() const
 
 void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
 {
+	if(!InSettingItem) return;
+	
 	InSettingItem->SetNameS(InName);
 	InSettingItem->OnValueChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValueChange);
 	InSettingItem->OnValuesChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValuesChange);

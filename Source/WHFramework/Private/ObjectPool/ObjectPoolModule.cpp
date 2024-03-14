@@ -75,6 +75,20 @@ void UObjectPoolModule::OnTermination(EPhase InPhase)
 	}
 }
 
+FString UObjectPoolModule::GetModuleDebugMessage()
+{
+	FString DebugMessage;
+	for(auto Iter : ObjectPools)
+	{
+		if(Iter.Value->GetCount() > 0)
+		{
+			DebugMessage.Appendf(TEXT("%s: %d\n"), *Iter.Key->GetName(), Iter.Value->GetCount());
+		}
+	}
+	DebugMessage.RemoveFromEnd(TEXT("\n"));
+	return DebugMessage;
+}
+
 bool UObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
 {
 	return ObjectPools.Contains(InType);

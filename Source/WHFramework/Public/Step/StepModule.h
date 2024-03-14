@@ -58,6 +58,9 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// StepModule
 protected:

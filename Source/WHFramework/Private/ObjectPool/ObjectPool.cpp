@@ -31,7 +31,10 @@ UObject* UObjectPool::Spawn(UObject* InOwner, const TArray<FParameter>& InParams
 	{
 		Object = OnSpawn(nullptr);
 	}
-	IObjectPoolInterface::Execute_OnSpawn(Object, InOwner, InParams);
+	if(Object)
+	{
+		IObjectPoolInterface::Execute_OnSpawn(Object, InOwner, InParams);
+	}
 	return Object;
 }
 

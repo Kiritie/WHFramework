@@ -91,6 +91,8 @@ private:
 
 	void UpdateSelection();
 
+	void ClearSelection();
+
 	TSharedRef<ITableRow> GenerateListRow(TSharedPtr<FProcedureListItem> ListItem, const TSharedRef<STableViewBase>& OwnerTable);
 
 	void ListItemScrolledIntoView(TSharedPtr<FProcedureListItem> ListItem, const TSharedPtr<ITableRow>& Widget);

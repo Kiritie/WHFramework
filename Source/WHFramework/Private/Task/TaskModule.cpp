@@ -186,6 +186,11 @@ FSaveData* UTaskModule::ToData()
 	return &SaveData;
 }
 
+FString UTaskModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentTask: %s"), CurrentTask ? *CurrentTask->TaskDisplayName.ToString() : TEXT("None"));
+}
+
 void UTaskModule::RestoreTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->GetTaskState() != ETaskState::None)
@@ -301,7 +306,7 @@ void UTaskModule::SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirs
 	CurrentAsset = DuplicateObject<UTaskAsset>(InTaskAsset, this);
 	CurrentAsset->Initialize(InTaskAsset);
 
-	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
 
 	if(bInAutoEnterFirst)
 	{

@@ -28,7 +28,7 @@ bool FParameters::HasParameter(FName InName, bool bEnsured) const
 			return true;
 		}
 	}
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("Parameter not exist, parameter name: %s"), *InName.ToString()), EDC_Parameter, EDV_Error);
 	return false;
 }
 
@@ -60,22 +60,21 @@ FParameter FParameters::GetParameter(FName InName, bool bEnsured) const
 			return Sets[i].Parameter;
 		}
 	}
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("Failed to get parameter, parameter name: %s"), *InName.ToString()), EDC_Parameter, EDV_Error);
 	return FParameter();
 }
 
 TArray<FParameter> FParameters::GetParameters(FName InName, bool bEnsured) const
 {
 	TArray<FParameter> TmpArr = TArray<FParameter>();
-	if(HasParameter(InName, bEnsured))
+	for (int32 i = 0; i < Sets.Num(); i++)
 	{
-		for (int32 i = 0; i < Sets.Num(); i++)
+		if(Sets[i].Name == InName)
 		{
-			if(Sets[i].Name == InName)
-			{
-				TmpArr.Add(Sets[i].Parameter);
-			}
+			TmpArr.Add(Sets[i].Parameter);
 		}
 	}
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("Failed to get parameters, parameters name: %s"), *InName.ToString()), EDC_Parameter, EDV_Error);
 	return TmpArr;
 }
 

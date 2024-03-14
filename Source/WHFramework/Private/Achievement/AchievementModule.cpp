@@ -113,6 +113,11 @@ FSaveData* UAchievementModule::ToData()
 	return &SaveData;
 }
 
+FString UAchievementModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("Totle achievements: %d\nUnlocked achievements: %d"), States.Num(), GetAchievedAchievementCount());
+}
+
 bool UAchievementModule::IsAchievementExists(FName InKey) const
 {
 	AchievementStorageData Temp = GetAchievementLocation(InKey);

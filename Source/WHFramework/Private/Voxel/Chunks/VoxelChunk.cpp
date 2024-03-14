@@ -926,7 +926,7 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 bool AVoxelChunk::HasSceneActor(const FString& InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(FGuid(InID))) return true;
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No SceneActor, Actor name: %s"), *InID), EDC_Voxel, EDV_Error);
 	return false;
 }
 

@@ -35,39 +35,39 @@ void UWebRequestModuleStatics::SetWebServerPort(int32 InServerPort)
 	UWebRequestModule::Get().SetServerPort(InServerPort);
 }
 
-bool UWebRequestModuleStatics::HasWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
+bool UWebRequestModuleStatics::HasWebInterface(const FName InName)
 {
-	return UWebRequestModule::Get().HasWebInterface(InClass);
+	return UWebRequestModule::Get().HasWebInterface(InName);
 }
 
-UWebInterfaceBase* UWebRequestModuleStatics::GetWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
+UWebInterfaceBase* UWebRequestModuleStatics::GetWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
 {
-	return UWebRequestModule::Get().GetWebInterface(InClass);
+	return UWebRequestModule::Get().GetWebInterface(InName, InClass);
 }
 
-UWebInterfaceBase* UWebRequestModuleStatics::CreateWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
+UWebInterfaceBase* UWebRequestModuleStatics::CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
 {
-	return UWebRequestModule::Get().CreateWebInterface(InClass);
+	return UWebRequestModule::Get().CreateWebInterface(InName, InClass);
 }
 
-bool UWebRequestModuleStatics::RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
+bool UWebRequestModuleStatics::RegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	return UWebRequestModule::Get().RegisterWebInterface(InClass, InOnRequestComplete);
+	return UWebRequestModule::Get().RegisterWebInterface(InName, InOnRequestComplete);
 }
 
-bool UWebRequestModuleStatics::UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete)
+bool UWebRequestModuleStatics::UnRegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	return UWebRequestModule::Get().UnRegisterWebInterface(InClass, InOnRequestComplete);
+	return UWebRequestModule::Get().UnRegisterWebInterface(InName, InOnRequestComplete);
 }
 
-bool UWebRequestModuleStatics::UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
+bool UWebRequestModuleStatics::UnRegisterAllWebInterface(const FName InName)
 {
-	return UWebRequestModule::Get().UnRegisterAllWebInterface(InClass);
+	return UWebRequestModule::Get().UnRegisterAllWebInterface(InName);
 }
 
-bool UWebRequestModuleStatics::ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass)
+bool UWebRequestModuleStatics::ClearWebInterface(const FName InName)
 {
-	return UWebRequestModule::Get().ClearWebInterface(InClass);
+	return UWebRequestModule::Get().ClearWebInterface(InName);
 }
 
 void UWebRequestModuleStatics::ClearAllWebInterface()
@@ -75,17 +75,17 @@ void UWebRequestModuleStatics::ClearAllWebInterface()
 	UWebRequestModule::Get().ClearAllWebInterface();
 }
 
-bool UWebRequestModuleStatics::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
+	return UWebRequestModule::Get().SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
 }
 
-bool UWebRequestModuleStatics::SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
+	return UWebRequestModule::Get().SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
 }
 
-bool UWebRequestModuleStatics::K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().K2_SendWebRequest(InClass, InMethod, InParams, InHeadMap, InContent);
+	return UWebRequestModule::Get().K2_SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
 }

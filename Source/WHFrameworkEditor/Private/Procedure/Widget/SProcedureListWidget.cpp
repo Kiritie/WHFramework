@@ -491,6 +491,8 @@ void SProcedureListWidget::UpdateListView(bool bRegenerate)
 {
 	if(!ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()) return;
 
+	ClearSelection();
+	
 	if(ActiveFilterText.IsEmptyOrWhitespace())
 	{
 		if(bRegenerate)
@@ -530,6 +532,11 @@ void SProcedureListWidget::UpdateSelection()
 	}
 
 	ProcedureEditor.Pin()->DetailsWidget->Refresh();
+}
+
+void SProcedureListWidget::ClearSelection()
+{
+	ListView->ClearSelection();
 }
 
 TSharedRef<ITableRow> SProcedureListWidget::GenerateListRow(TSharedPtr<FProcedureListItem> ListItem, const TSharedRef<STableViewBase>& OwnerTable)

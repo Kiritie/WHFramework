@@ -30,7 +30,7 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 
 	for (const auto& Iter : UParameterModule::Get().GetAllParameter())
 	{
-		if (Iter.Name != NAME_None && !Iter.DisplayName.IsEmpty())
+		if (Iter.Name != NAME_None && Iter.bRegistered && !Iter.DisplayName.IsEmpty())
 		{
 			UWidgetSettingItemBase* SettingItem = nullptr;
 			switch (Iter.Parameter.GetParameterType())

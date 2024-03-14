@@ -247,6 +247,11 @@ void UVoxelModule::Save_Implementation()
 	}
 }
 
+FString UVoxelModule::GetModuleDebugMessage()
+{
+	return Super::GetModuleDebugMessage();
+}
+
 void UVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
 {
 	if(WorldMode != InWorldMode)

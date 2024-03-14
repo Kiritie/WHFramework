@@ -49,6 +49,4 @@ public:
 	virtual EInputMode GetWidgetInputMode() const = 0;
 
 	virtual UObject* GetOwnerObject() const = 0;
-
-	virtual UPanelWidget* GetRootPanelWidget() const = 0;
 };

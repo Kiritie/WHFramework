@@ -264,6 +264,8 @@ public:
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	virtual FString GetModuleDebugMessage();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ModuleListItem
 public:

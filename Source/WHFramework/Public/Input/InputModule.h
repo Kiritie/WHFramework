@@ -64,6 +64,9 @@ protected:
 protected:
 	FInputModuleSaveData LocalSaveData;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Input Manager
 protected:

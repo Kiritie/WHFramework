@@ -88,8 +88,6 @@ public:
 	virtual IScreenWidgetInterface* GetParentWidgetN() const = 0;
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) = 0;
-	
-	virtual UPanelWidget* GetParentPanelWidget() const = 0;
 
 	virtual IScreenWidgetInterface* GetTemporaryChild() const = 0;
 	

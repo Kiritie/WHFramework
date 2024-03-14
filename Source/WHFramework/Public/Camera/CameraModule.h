@@ -61,6 +61,9 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+public:
+	virtual FString GetModuleDebugMessage() override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
 protected:
@@ -74,7 +77,7 @@ protected:
 	ACameraActorBase* DefaultCamera;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCamera != nullptr"), Category = "Camera")
-	bool DefaultInstantSwitch;
+	bool bDefaultInstantSwitch;
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	ACameraActorBase* CurrentCamera;

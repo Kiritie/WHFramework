@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WebRequestModuleTypes.h"
+#include "Http/WebRequestManager.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "WebRequestModuleStatics.generated.h"
@@ -37,82 +38,40 @@ public:
 	static void SetWebServerPort(int32 InServerPort);
 
 public:
-	template<class T>
-	static bool HasWebInterface()
-	{
-		return HasWebInterface(T::StaticClass());
-	}
 	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static bool HasWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
+	static bool HasWebInterface(const FName InName);
 
-	template<class T>
-	static T* GetWebInterface()
-	{
-		return Cast<T>(GetWebInterface(T::StaticClass()));
-	}
 	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static UWebInterfaceBase* GetWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
+	static UWebInterfaceBase* GetWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass = nullptr);
 
 	template<class T>
-	static T* CreateWebInterface()
+	static T* CreateWebInterface(const FName InName)
 	{
-		return Cast<T>(CreateWebInterface(T::StaticClass()));
+		return Cast<T>(CreateWebInterface(InName, T::StaticClass()));
 	}
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static UWebInterfaceBase* CreateWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
+	static UWebInterfaceBase* CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass);
 
-	template<class T>
-	static bool RegisterWebInterface(const FOnWebRequestComplete& InOnRequestComplete)
-	{
-		return RegisterWebInterface(T::StaticClass(), InOnRequestComplete);
-	}
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool RegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete);
+	static bool RegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
 
-	template<class T>
-	static bool UnRegisterWebInterface(const FOnWebRequestComplete& InOnRequestComplete)
-	{
-		return UnRegisterWebInterface(T::StaticClass(), InOnRequestComplete);
-	}
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool UnRegisterWebInterface(TSubclassOf<UWebInterfaceBase> InClass, const FOnWebRequestComplete& InOnRequestComplete);
+	static bool UnRegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
 
-	template<class T>
-	static bool UnRegisterAllWebInterface()
-	{
-		return UnRegisterAllWebInterface(T::StaticClass());
-	}
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool UnRegisterAllWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
+	static bool UnRegisterAllWebInterface(const FName InName);
 
-	template<class T>
-	static bool ClearWebInterface()
-	{
-		return ClearWebInterface(T::StaticClass());
-	}
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool ClearWebInterface(TSubclassOf<UWebInterfaceBase> InClass);
+	static bool ClearWebInterface(const FName InName);
 
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
 	static void ClearAllWebInterface();
 
 public:
-	template<class T>
-	static bool SendWebRequest(EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent())
-	{
-		return SendWebRequest(T::StaticClass(), InMethod, InParams, InHeadMap, InContent);
-	}
+	static bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
-	template<class T>
-	static bool SendWebRequest(EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent())
-	{
-		return SendWebRequest(T::StaticClass(), InMethod, InParams, InHeadMap, InContent);
-	}
+	static bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
-	static bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
-
-	static bool SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request"), Category = "WebRequestModuleStatics")
-	static bool K2_SendWebRequest(TSubclassOf<UWebInterfaceBase> InClass, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request", AutoCreateRefTerm = "InParams"), Category = "WebRequestModuleStatics")
+	static bool K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
 };

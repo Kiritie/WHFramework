@@ -7,6 +7,7 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Scene/SceneModuleStatics.h"
 
 // Sets default values
 ACameraActorBase::ACameraActorBase()
@@ -32,6 +33,7 @@ ACameraActorBase::ACameraActorBase()
 	StreamingSource->DisableStreamingSource();
 
 	CameraOrthoFactor = 1.93f;
+	CameraStreamingAltitude = -1.f;
 
 	CameraCollisionMode = ECameraCollisionMode::None;
 }
@@ -48,7 +50,14 @@ void ACameraActorBase::OnPreparatory_Implementation(EPhase InPhase)
 
 void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	
+	if(IsCurrent() && (CameraStreamingAltitude == -1.f || USceneModuleStatics::GetAltitude() < CameraStreamingAltitude))
+	{
+		StreamingSource->EnableStreamingSource();
+	}
+	else
+	{
+		StreamingSource->DisableStreamingSource();
+	}
 }
 
 void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
@@ -58,12 +67,12 @@ void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 
 void ACameraActorBase::OnSwitch_Implementation()
 {
-	StreamingSource->EnableStreamingSource();
+	// StreamingSource->EnableStreamingSource();
 }
 
 void ACameraActorBase::OnUnSwitch_Implementation()
 {
-	StreamingSource->DisableStreamingSource();
+	// StreamingSource->DisableStreamingSource();
 }
 
 void ACameraActorBase::Switch_Implementation()

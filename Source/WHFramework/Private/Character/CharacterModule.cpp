@@ -94,6 +94,11 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+FString UCharacterModule::GetModuleDebugMessage()
+{
+	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameC().ToString() : TEXT("None"));
+}
+
 void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 {
 	if(!Characters.Contains(InCharacter))

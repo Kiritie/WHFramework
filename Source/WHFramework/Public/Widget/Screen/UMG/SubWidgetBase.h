@@ -76,5 +76,5 @@ public:
 	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<UWidget*> GetAllPoolWidgets() const override;
+	TArray<UWidget*> GetAllPoolWidgets() const;
 };

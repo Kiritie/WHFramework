@@ -58,6 +58,9 @@ protected:
 	virtual FSaveData* ToData() override;
 
 public:
+	virtual FString GetModuleDebugMessage() override;
+
+public:
 	UFUNCTION(BlueprintPure, Category="Achievements")
 	bool IsAchievementExists(FName InKey) const;
 

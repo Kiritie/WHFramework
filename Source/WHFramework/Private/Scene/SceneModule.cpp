@@ -388,6 +388,11 @@ FSaveData* USceneModule::ToData()
 	return SaveData;
 }
 
+FString USceneModule::GetModuleDebugMessage()
+{
+	return Super::GetModuleDebugMessage();
+}
+
 #if WITH_EDITOR
 bool USceneModule::CanEditChange(const FProperty* InProperty) const
 {
@@ -482,7 +487,7 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(FGuid(InID))) return true;
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No scene actor, actor name: %s"), *InID), EDC_Scene, EDV_Error);
 	return false;
 }
 
@@ -522,7 +527,7 @@ bool USceneModule::RemoveSceneActor(AActor* InActor)
 bool USceneModule::HasTargetPointByName(FName InName, bool bEnsured) const
 {
 	if(TargetPoints.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No TargetPoint, TargetPoint name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
@@ -558,7 +563,7 @@ void USceneModule::RemoveTargetPointByName(FName InName)
 bool USceneModule::HasScenePointByName(FName InName, bool bEnsured) const
 {
 	if(ScenePoints.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No ScenePoint, ScenePoint name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
@@ -601,7 +606,7 @@ bool USceneModule::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InCla
 bool USceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
 {
 	if(PhysicsVolumes.Contains(InName)) return true;
-	ensureEditor(!bEnsured);
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No PhysicsVolume, PhysicsVolume name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
@@ -690,16 +695,15 @@ void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 			TArray<FParameter> Parameters { InLevelPath.ToString(), false };
 			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
 		}
-		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([&](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-			WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
+		WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
+		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, LoadPackagePath, InLevelPath, InOnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
 			if(Result == EAsyncLoadingResult::Failed)
 			{
 				WHLog(TEXT("Load level failed!"));
 			}
 			else if(Result == EAsyncLoadingResult::Succeeded)
 			{
-				FLatentActionInfo LatentActionInfo;
-				UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedPackage, true, false, LatentActionInfo);
+				WHLog(TEXT("Load level successed!"));
 				if(InFinishDelayTime > 0.f)
 				{
 					FTimerHandle TimerHandle;
@@ -710,10 +714,6 @@ void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 				else
 				{
 					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
-				}
-				if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
-				{
-					UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
 				}
 				LoadedLevels.Add(InLevelPath, LoadedPackage);
 			}
@@ -774,13 +774,15 @@ void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 {
 	WHLog(TEXT("Load level Succeeded!"));
 
-	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
-
 	if(InOnAsyncLoadLevelFinished.IsBound())
 	{
 		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
 	}
 	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
+
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true);
+
+	//UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
 }
 
 void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
