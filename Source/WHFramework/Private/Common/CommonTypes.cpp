@@ -64,6 +64,9 @@ namespace GameplayTags
 
 	////////////////////////////////////////////////////
 	// Input_Player
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_TurnPlayer, "Input.Player.Turn", "Turn Player");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveHPlayer, "Input.Player.MoveH", "Move H Player");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveVPlayer, "Input.Player.MoveV", "Move V Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveForwardPlayer, "Input.Player.MoveForward", "Move Forward Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveRightPlayer, "Input.Player.MoveRight", "Move Right Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_MoveUpPlayer, "Input.Player.MoveUp", "Move Up Player");

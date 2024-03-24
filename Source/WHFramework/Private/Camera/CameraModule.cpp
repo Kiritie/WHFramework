@@ -988,7 +988,7 @@ void UCameraModule::SetCameraView(const FCameraViewData& InCameraViewData, bool 
 			if(InCameraViewData.CameraViewTarget.LoadSynchronous())
 			{
 				StartTrackTarget(InCameraViewData.CameraViewTarget.LoadSynchronous(), InCameraViewData.TrackTargetMode, InCameraViewData.CameraViewParams.CameraViewMode, InCameraViewData.CameraViewParams.CameraViewSpace,
-					InCameraViewData.CameraViewParams.CameraViewLocation, FVector(-1.f), InCameraViewData.CameraViewParams.CameraViewYaw,
+					InCameraViewData.CameraViewParams.CameraViewLocation, InCameraViewData.CameraViewParams.CameraViewOffset, InCameraViewData.CameraViewParams.CameraViewYaw,
 					InCameraViewData.CameraViewParams.CameraViewPitch, InCameraViewData.CameraViewParams.CameraViewDistance, true, InCameraViewData.CameraViewParams.CameraViewEaseType, InCameraViewData.CameraViewParams.CameraViewDuration, bInstant);
 			}
 			if(bCacheData)

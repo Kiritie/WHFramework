@@ -26,16 +26,19 @@ void UDefaultInputManagerBase::OnBindAction(UInputComponentBase* InInputComponen
 
 	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::TurnCamera);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_LookUpCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::LookUpCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanHCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanVCamera);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::ZoomCamera);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_PanHCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanHCamera, false);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_PanVCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanVCamera, false);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::ZoomCamera, false);
 	
+	InInputComponent->BindInputAction(GameplayTags::InputTag_TurnPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::TurnPlayer, false);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveHPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveHPlayer, false);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveVPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveVPlayer, false);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveForwardPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveRightPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveUpPlayer);
-	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::JumpPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::JumpPlayer, false);
 
-	InInputComponent->BindInputAction(GameplayTags::InputTag_SystemOperation, ETriggerEvent::Started, this, &UDefaultInputManagerBase::SystemOperation);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_SystemOperation, ETriggerEvent::Started, this, &UDefaultInputManagerBase::SystemOperation, false);
 }
 
 void UDefaultInputManagerBase::SystemOperation_Implementation()
