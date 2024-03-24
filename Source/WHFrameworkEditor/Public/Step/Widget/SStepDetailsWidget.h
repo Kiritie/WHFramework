@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Step/StepEditor.h"
 
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class SStepListWidget;
 class UStepModule;

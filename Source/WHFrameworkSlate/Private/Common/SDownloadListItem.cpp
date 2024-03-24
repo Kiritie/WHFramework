@@ -18,7 +18,7 @@ SDownloadListItem::SDownloadListItem()
 	UpdateRemainTime = 0.f;
 }
 
-void SDownloadListItem::Construct(const FArguments& InArgs, TSharedPtr<SBasePanel> InDownloadPanel, const TSharedRef<STableViewBase>& InOwnerTableView)
+void SDownloadListItem::Construct(const FArguments& InArgs, TSharedPtr<SEditorWidgetBase> InDownloadPanel, const TSharedRef<STableViewBase>& InOwnerTableView)
 {
 	DownloadPanel = InDownloadPanel;
 	

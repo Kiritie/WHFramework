@@ -4,7 +4,7 @@
 #include "ClassViewerFilter.h"
 #include "Common/CommonStatics.h"
 #include "Kismet2/KismetEditorUtilities.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 #define GENERATED_EDITOR_MODULE(ModuleClass) \
 protected: \
@@ -88,27 +88,3 @@ public:
 		return IsClassAllowed(StaticLoadClass(UObject::StaticClass(), nullptr, *InUnloadedClassData->GetClassPathName().ToString()));
 	}
 };
-
-#define SNewEd( WidgetType, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, nullptr, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SNewEdN( WidgetType, ParentWidget, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SAssignNewEd( ExposeAs, WidgetType, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, nullptr, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SAssignNewEdN( ExposeAs, WidgetType, ParentWidget, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-template<typename WidgetType, typename RequiredArgsPayloadType>
-TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InType, const TSharedPtr<SEditorWidgetBase>& InParentWidget, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
-{
-	LLM_SCOPE_BYTAG(UI_Slate);
-	TSlateDecl<WidgetType, RequiredArgsPayloadType> SlateDecl(InType, InFile, OnLine, Forward<RequiredArgsPayloadType>(InRequiredArgs));
-	if(InParentWidget)
-	{
-		InParentWidget->AddChild(SlateDecl._Widget);
-	}
-	return SlateDecl;
-}

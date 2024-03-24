@@ -3,12 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "SBasePanel.h"
+#include "Base/SEditorWidgetBase.h"
 #include "Http/FileDownloader/FileDownloader.h"
 
-class SDownloadsPanel;
+class SDownloadsPanelWidget;
 
-struct FDownloadListItem : public TSharedFromThis<FDownloadListItem>
+struct WHFRAMEWORKSLATE_API FDownloadListItem : public TSharedFromThis<FDownloadListItem>
 {
 public:
 	FDownloadListItem()
@@ -28,7 +28,7 @@ public:
 	TSharedPtr<FFileDownloader> FileDownloader;
 };
 
-class SDownloadListItem : public STableRow<TSharedPtr<FDownloadListItem>>
+class WHFRAMEWORKSLATE_API SDownloadListItem : public STableRow<TSharedPtr<FDownloadListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(SDownloadListItem) {}
@@ -44,7 +44,7 @@ public:
 	SDownloadListItem();
 
 	/** Constructs this widget with InArgs */
-	void Construct(const FArguments& InArgs, TSharedPtr<SBasePanel> InDownloadPanel, const TSharedRef<STableViewBase>& InOwnerTableView);
+	void Construct(const FArguments& InArgs, TSharedPtr<SEditorWidgetBase> InDownloadPanel, const TSharedRef<STableViewBase>& InOwnerTableView);
 
 private:
 	void HandleDownloadProgress(int64 BytesSent, int64 BytesReceived, int64 FullSize);
@@ -54,7 +54,7 @@ private:
 	FReply OnClearButtonClicked();
 
 private:
-	TSharedPtr<SBasePanel> DownloadPanel;
+	TSharedPtr<SEditorWidgetBase> DownloadPanel;
 	
 	TSharedPtr<FDownloadListItem> DownloadListItem;
 

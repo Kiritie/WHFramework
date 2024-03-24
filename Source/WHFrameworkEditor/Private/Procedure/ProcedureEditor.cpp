@@ -4,6 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
+#include "WHFrameworkSlateTypes.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBlueprint.h"
@@ -135,13 +136,13 @@ void FProcedureEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, SProcedureListWidget)
+	SAssignNewEd(ListWidget, SProcedureListWidget, true)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, SProcedureDetailsWidget)
+	SAssignNewEd(DetailsWidget, SProcedureDetailsWidget, true)
 		.ProcedureEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, SProcedureStatusWidget)
+	SAssignNewEd(StatusWidget, SProcedureStatusWidget, true)
 		.ProcedureEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FProcedureEditor::SpawnListWidgetTab))

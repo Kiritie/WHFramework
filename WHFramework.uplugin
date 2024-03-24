@@ -35,8 +35,8 @@
 		},
 		{
 			"Name": "WHFrameworkSlate",
-			"Type": "Runtime",
-			"LoadingPhase": "PreDefault"
+			"Type": "DeveloperTool",
+			"LoadingPhase": "Default"
 		},
 		{
 			"Name": "WHFrameworkEditor",

@@ -4,6 +4,7 @@
 
 #include "IAssetTools.h"
 #include "ISettingsSection.h"
+#include "WHFrameworkSlateTypes.h"
 #include "Main/MainEditorTypes.h"
 #include "Main/Base/ModuleBlueprint.h"
 #include "Main/Blueprint/ModuleBlueprintActions.h"
@@ -106,7 +107,7 @@ TSharedRef<SDockTab> FMainEditorModule::OnSpawnModuleEditorTab(const FSpawnTabAr
 		.TabRole(ETabRole::NomadTab)
 		.Label(NSLOCTEXT("ModuleEditor", "ModuleEditorTabTitle", "Module Editor"));
 
-	SAssignNewEd(ModuleEditorWidget, SModuleEditorWidget, NomadTab);
+	SAssignNewEd(ModuleEditorWidget, SModuleEditorWidget, true, NomadTab);
 
 	NomadTab->SetContent(ModuleEditorWidget->TakeWidget());
 	

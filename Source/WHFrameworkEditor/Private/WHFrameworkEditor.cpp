@@ -21,7 +21,6 @@
 #include "Procedure/ProcedureEditor.h"
 #include "Step/StepEditor.h"
 #include "Task/TaskEditor.h"
-#include "Widget/WidgetEditor.h"
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -105,7 +104,6 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 	STARTUP_MODULE(FProcedureEditorModule);
 	STARTUP_MODULE(FStepEditorModule);
 	STARTUP_MODULE(FTaskEditorModule);
-	STARTUP_MODULE(FWidgetEditorModule);
 }
 
 void FWHFrameworkEditorModule::ShutdownEditorModules()
@@ -128,7 +126,6 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FProcedureEditorModule);
 	SHUTDOWN_MODULE(FStepEditorModule);
 	SHUTDOWN_MODULE(FTaskEditorModule);
-	SHUTDOWN_MODULE(FWidgetEditorModule);
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{
@@ -173,7 +170,6 @@ void FWHFrameworkEditorModule::RegisterMenus()
 	FProcedureEditorModule::Get().RegisterMenus(PluginCommands);
 	FStepEditorModule::Get().RegisterMenus(PluginCommands);
 	FTaskEditorModule::Get().RegisterMenus(PluginCommands);
-	FWidgetEditorModule::Get().RegisterMenus(PluginCommands);
 }
 
 void FWHFrameworkEditorModule::UnRegisterMenus()

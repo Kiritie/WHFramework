@@ -3,13 +3,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SMainEditorWidgetBase : public SEditorWidgetBase
+class WHFRAMEWORKSLATE_API SMainEditorWidgetBase : public SEditorWidgetBase
 {
 public:
 	SMainEditorWidgetBase();

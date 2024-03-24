@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Main/MainEditorTypes.h"
 #include "Main/Base/ModuleBase.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class UModuleBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectModuleListItemsDelegate, TArray<TSharedPtr<FModuleListItem>>)

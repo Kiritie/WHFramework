@@ -4,6 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
+#include "WHFrameworkSlateTypes.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBlueprint.h"
@@ -135,13 +136,13 @@ void FTaskEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, STaskListWidget)
+	SAssignNewEd(ListWidget, STaskListWidget, true)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, STaskDetailsWidget)
+	SAssignNewEd(DetailsWidget, STaskDetailsWidget, true)
 		.TaskEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, STaskStatusWidget)
+	SAssignNewEd(StatusWidget, STaskStatusWidget, true)
 		.TaskEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnListWidgetTab))

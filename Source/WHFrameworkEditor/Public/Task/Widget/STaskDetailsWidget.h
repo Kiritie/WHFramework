@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Task/TaskEditor.h"
 
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class STaskListWidget;
 class UTaskModule;

@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskBase.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class UTaskBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectTaskListItemsDelegate, TArray<TSharedPtr<FTaskListItem>>)

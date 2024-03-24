@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-class SEditorWindowBase : public SWindow
+class WHFRAMEWORKSLATE_API SEditorWindowBase : public SWindow
 {
 public:
 	SEditorWindowBase();

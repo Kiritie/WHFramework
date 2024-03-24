@@ -8,7 +8,7 @@
 
 DECLARE_DELEGATE_TwoParams(FOnSortLabelIndexAndAscendingChanged, int32, bool);
 
-struct FSortLabel
+struct WHFRAMEWORKSLATE_API FSortLabel
 {
 public:
 	FSortLabel()
@@ -28,7 +28,7 @@ public:
 	float Fill;
 };
 
-class SSoftLabelBar : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SSoftLabelBar : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SSoftLabelBar) {}

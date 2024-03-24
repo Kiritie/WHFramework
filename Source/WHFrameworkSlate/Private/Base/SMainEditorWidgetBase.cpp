@@ -1,9 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/Base/SMainEditorWidgetBase.h"
-
-#include "LevelEditorActions.h"
+#include "Base/SMainEditorWidgetBase.h"
 
 #define LOCTEXT_NAMESPACE "SMainEditorWidgetBase"
 
@@ -47,8 +45,6 @@ void SMainEditorWidgetBase::OnCreate()
 void SMainEditorWidgetBase::OnSave()
 {
 	SEditorWidgetBase::OnSave();
-
-	FLevelEditorActionCallbacks::Save();
 }
 
 void SMainEditorWidgetBase::OnReset()
@@ -150,10 +146,7 @@ void SMainEditorWidgetBase::OnTabSpawned(const FName& TabIdentifier, const TShar
 
 void SMainEditorWidgetBase::OnPersistLayout(const TSharedRef<FTabManager::FLayout>& LayoutToSave)
 {
-	if (FUnrealEdMisc::Get().IsSavingLayoutOnClosedAllowed())
-	{
-		FLayoutSaveRestore::SaveToConfig(GEditorLayoutIni, LayoutToSave);
-	}
+	FLayoutSaveRestore::SaveToConfig(GEditorLayoutIni, LayoutToSave);
 }
 
 FTabSpawnerEntry& SMainEditorWidgetBase::RegisterTabSpawner(const FName& TabId, const FOnSpawnTab& OnSpawnTab)

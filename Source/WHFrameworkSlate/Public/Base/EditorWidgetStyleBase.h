@@ -12,7 +12,7 @@
  * 
  */
 USTRUCT()
-struct WHFRAMEWORKEDITOR_API FEditorWidgetStyle : public FSlateWidgetStyle
+struct WHFRAMEWORKSLATE_API FEditorWidgetStyle : public FSlateWidgetStyle
 {
 	GENERATED_USTRUCT_BODY()
 
@@ -28,8 +28,8 @@ struct WHFRAMEWORKEDITOR_API FEditorWidgetStyle : public FSlateWidgetStyle
 
 /**
  */
-UCLASS(hidecategories=Object, MinimalAPI)
-class UEditorWidgetStyleBase : public USlateWidgetStyleContainerBase
+UCLASS(hidecategories=Object)
+class WHFRAMEWORKSLATE_API UEditorWidgetStyleBase : public USlateWidgetStyleContainerBase
 {
 	GENERATED_BODY()
 

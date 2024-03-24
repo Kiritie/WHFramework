@@ -8,7 +8,7 @@
 
 DECLARE_DELEGATE_OneParam(FOnTabGroupActiveIndexChanged, int32);
 
-class STabGroup : public SCompoundWidget
+class WHFRAMEWORKSLATE_API STabGroup : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(STabGroup) {}

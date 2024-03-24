@@ -6,7 +6,7 @@
 
 #include "Widgets/SCompoundWidget.h"
 
-struct FTabListItem : public TSharedFromThis<FTabListItem>
+struct WHFRAMEWORKSLATE_API FTabListItem : public TSharedFromThis<FTabListItem>
 {
 public:
 	FTabListItem()
@@ -26,7 +26,7 @@ public:
 	const FSlateBrush* TabIcon;
 };
 
-class STabListItem : public STableRow<TSharedPtr<FTabListItem>>
+class WHFRAMEWORKSLATE_API STabListItem : public STableRow<TSharedPtr<FTabListItem>>
 {
 public:
 	SLATE_BEGIN_ARGS(STabListItem) {}

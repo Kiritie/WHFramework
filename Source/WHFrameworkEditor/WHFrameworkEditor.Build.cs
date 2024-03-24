@@ -14,7 +14,8 @@ public class WHFrameworkEditor : ModuleRules
 			new string[]
 			{
 				"Core",
-				"WHFramework"
+				"WHFramework",
+				"WHFrameworkSlate"
 			});
 			
 		PrivateDependencyModuleNames.AddRange(

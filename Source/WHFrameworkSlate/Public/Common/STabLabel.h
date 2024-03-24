@@ -6,7 +6,7 @@
 
 #include "Widgets/SCompoundWidget.h"
 
-class STabLabel : public SCompoundWidget
+class WHFRAMEWORKSLATE_API STabLabel : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(STabLabel) {}

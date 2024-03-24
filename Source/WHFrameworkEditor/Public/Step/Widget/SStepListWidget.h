@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepBase.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class UStepBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectStepListItemsDelegate, TArray<TSharedPtr<FStepListItem>>)

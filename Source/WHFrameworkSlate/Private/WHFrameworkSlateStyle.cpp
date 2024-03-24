@@ -10,6 +10,7 @@
 #include "Styling/SlateTypes.h"
 #include "Styling/CoreStyle.h"
 #include "Application/SlateWindowHelper.h"
+#include "Interfaces/IPluginManager.h"
 #include "Styling/StyleColors.h"
 
 
@@ -50,7 +51,16 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 {
 	TSharedRef< FSlateStyleSet > Style = MakeShareable(new FSlateStyleSet("WHFrameworkSlateStyle"));
 
-	Style->SetContentRoot(FPaths::ProjectPluginsDir() / TEXT("WHFramework/Content/Slate/Core"));
+	TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("WHFramework"));
+
+	if(Plugin)
+	{
+		Style->SetContentRoot(Plugin->GetBaseDir() / TEXT("Content/Slate"));
+	}
+	else
+	{
+		Style->SetContentRoot(FPaths::ProjectContentDir() / TEXT("Slate"));
+	}
 
 	// Note, these sizes are in Slate Units.
 	// Slate Units do NOT have to map to pixels.

@@ -13,6 +13,9 @@
 #include "Main/Widget/SModuleStatusWidget.h"
 #include "Main/Widget/SModuleToolbarWidget.h"
 #include "Subsystems/EditorActorSubsystem.h"
+#include "LevelEditorActions.h"
+#include "UnrealEdMisc.h"
+#include "WHFrameworkSlateTypes.h"
 
 #define LOCTEXT_NAMESPACE "ModuleEditorWidget"
 
@@ -54,6 +57,8 @@ void SModuleEditorWidget::OnCreate()
 void SModuleEditorWidget::OnSave()
 {
 	SMainEditorWidgetBase::OnSave();
+
+	FLevelEditorActionCallbacks::Save();
 }
 
 void SModuleEditorWidget::OnReset()
@@ -141,13 +146,13 @@ void SModuleEditorWidget::RegisterMenuBar(FMenuBarBuilder& InMenuBarBuilder)
 
 void SModuleEditorWidget::RegisterTabSpawners()
 {
-	SAssignNewEdN(ListWidget, SModuleListWidget, SharedThis(this));
+	SAssignNewEdN(ListWidget, SModuleListWidget, SharedThis(this), false);
 
-	SAssignNewEdN(DetailsWidget, SModuleDetailsWidget, SharedThis(this));
+	SAssignNewEdN(DetailsWidget, SModuleDetailsWidget, SharedThis(this), false);
 
-	SAssignNewEdN(StatusWidget, SModuleStatusWidget, SharedThis(this));
+	SAssignNewEdN(StatusWidget, SModuleStatusWidget, SharedThis(this), false);
 
-	SAssignNewEdN(ToolbarWidget, SModuleToolbarWidget, SharedThis(this));
+	SAssignNewEdN(ToolbarWidget, SModuleToolbarWidget, SharedThis(this), false);
 
 	RegisterTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnToolbarWidgetTab))
 		.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 #include "SlateOptMacros.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -11,8 +11,11 @@ SEditorWidgetBase::SEditorWidgetBase()
 {
 	WidgetName = NAME_None;
 	WidgetType = EEditorWidgetType::Main;
+	WidgetState = EEditorWidgetState::None;
 	ChildWidgets = TArray<TSharedPtr<SEditorWidgetBase>>();
 	ChildWidgetMap = TMap<FName, TSharedPtr<SEditorWidgetBase>>();
+
+	bInitialized = false;
 }
 
 void SEditorWidgetBase::Construct(const FArguments& InArgs)
@@ -34,6 +37,10 @@ void SEditorWidgetBase::OnCreate()
 
 void SEditorWidgetBase::OnInitialize()
 {
+	bInitialized = true;
+	
+	SlatePrepass();
+
 	OnBindCommands(WidgetCommands);
 	
 	if(WidgetType == EEditorWidgetType::Main)
@@ -45,6 +52,18 @@ void SEditorWidgetBase::OnInitialize()
 			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
 		}
 	}
+}
+
+void SEditorWidgetBase::OnOpen()
+{
+	WidgetState = EEditorWidgetState::Opened;
+	SetVisibility(EVisibility::SelfHitTestInvisible);
+}
+
+void SEditorWidgetBase::OnClose()
+{
+	WidgetState = EEditorWidgetState::Closed;
+	SetVisibility(EVisibility::Collapsed);
 }
 
 void SEditorWidgetBase::OnSave()
@@ -117,6 +136,34 @@ FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 		return FReply::Handled();
 	}
 	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
+}
+
+void SEditorWidgetBase::Open()
+{
+	if(WidgetState != EEditorWidgetState::Opened)
+	{
+		OnOpen();
+	}
+}
+
+void SEditorWidgetBase::Close()
+{
+	if(WidgetState != EEditorWidgetState::Closed)
+	{
+		OnClose();
+	}
+}
+
+void SEditorWidgetBase::Toggle()
+{
+	if(WidgetState == EEditorWidgetState::Opened)
+	{
+		Close();
+	}
+	else
+	{
+		Open();
+	}
 }
 
 void SEditorWidgetBase::Save()
@@ -199,9 +246,9 @@ TSharedPtr<SWindow> SEditorWidgetBase::GetOwnerWindow()
 	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
 }
 
-TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget(bool bInit)
+TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget()
 {
-	if(bInit)
+	if(!bInitialized)
 	{
 		OnInitialize();
 	}

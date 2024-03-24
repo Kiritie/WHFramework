@@ -4,13 +4,13 @@
 
 #include "SlateOptMacros.h"
 #include "WHFrameworkSlateStyle.h"
-#include "Common/SBasePanel.h"
+#include "Base/SEditorWidgetBase.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void SMaskPanel::Construct(const FArguments& InArgs)
 {
-	PanelWidget = InArgs._PanelWidget;
+	ParentWidget = InArgs._ParentWidget;
 	
 	ChildSlot
 	[
@@ -31,8 +31,9 @@ void SMaskPanel::Construct(const FArguments& InArgs)
 		]
 
 		+SOverlay::Slot()
-		.HAlign(InArgs._HAlign)
-		.VAlign(InArgs._VAlign)
+		.HAlign(InArgs._ContentHAlign)
+		.VAlign(InArgs._ContentVAlign)
+		.Padding(InArgs._ContentPadding)
 		[
 			InArgs._Content.Widget->AsShared()
 		]
@@ -41,9 +42,9 @@ void SMaskPanel::Construct(const FArguments& InArgs)
 
 FReply SMaskPanel::OnMaskButtonClicked()
 {
-	if(PanelWidget)
+	if(ParentWidget)
 	{
-		PanelWidget->Close();
+		ParentWidget->Close();
 	}
 	else
 	{

@@ -6,17 +6,18 @@
 
 #include "Widgets/SCompoundWidget.h"
 
-class SBasePanel;
+class SEditorWidgetBase;
 
-class SMaskPanel : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SMaskPanel : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SMaskPanel) {}
 
 		SLATE_ARGUMENT(FSlateColor, MaskColor)
-		SLATE_ARGUMENT(EHorizontalAlignment, HAlign)
-		SLATE_ARGUMENT(EVerticalAlignment, VAlign)
-		SLATE_ARGUMENT(TSharedPtr<SBasePanel>, PanelWidget)
+		SLATE_ARGUMENT(EHorizontalAlignment, ContentHAlign)
+		SLATE_ARGUMENT(EVerticalAlignment, ContentVAlign)
+		SLATE_ARGUMENT(FMargin, ContentPadding)
+		SLATE_ARGUMENT(TSharedPtr<SEditorWidgetBase>, ParentWidget)
 		SLATE_DEFAULT_SLOT(FArguments, Content)
 
 	SLATE_END_ARGS()
@@ -28,5 +29,5 @@ private:
 	FReply OnMaskButtonClicked();
 
 private:
-	TSharedPtr<SBasePanel> PanelWidget;
+	TSharedPtr<SEditorWidgetBase> ParentWidget;
 };

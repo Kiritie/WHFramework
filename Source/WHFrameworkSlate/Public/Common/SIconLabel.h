@@ -6,7 +6,7 @@
 
 #include "Widgets/SCompoundWidget.h"
 
-class SIconLabel : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SIconLabel : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SIconLabel) {}

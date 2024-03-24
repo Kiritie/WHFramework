@@ -7,7 +7,7 @@
 /**
  * WHFrameworkKit slate style
  */
-class FWHFrameworkSlateStyle
+class WHFRAMEWORKSLATE_API FWHFrameworkSlateStyle
 {
 public:
 

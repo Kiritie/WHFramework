@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Widget/Base/SEditorWidgetBase.h"
+#include "Base/SEditorWidgetBase.h"
 
 class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)

@@ -6,7 +6,7 @@
 
 #include "Widgets/SCompoundWidget.h"
 
-class SSplitLine : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SSplitLine : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SSplitLine)

@@ -12,10 +12,17 @@ enum class EEditorWidgetType : uint8
 	Child
 };
 
+enum class EEditorWidgetState : uint8
+{
+	None,
+	Opened,
+	Closed
+};
+
 /**
  * 
  */
-class WHFRAMEWORKEDITOR_API SEditorWidgetBase : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SEditorWidgetBase : public SCompoundWidget
 {
 public:
 	SEditorWidgetBase();
@@ -30,6 +37,10 @@ public:
 	virtual void OnCreate();
 
 	virtual void OnInitialize();
+
+	virtual void OnOpen();
+
+	virtual void OnClose();
 
 	virtual void OnSave();
 	
@@ -52,6 +63,12 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 public:
+	virtual void Open();
+
+	virtual void Close();
+
+	virtual void Toggle();
+
 	virtual void Save();
 
 	virtual void Reset();
@@ -77,6 +94,8 @@ protected:
 
 	EEditorWidgetType WidgetType;
 
+	EEditorWidgetState WidgetState;
+
 	TSharedPtr<SEditorWidgetBase> ParentWidget;
 
 	TArray<TSharedPtr<SEditorWidgetBase>> ChildWidgets;
@@ -86,6 +105,8 @@ protected:
 	TSharedRef<FUICommandList> WidgetCommands;
 
 private:
+	bool bInitialized;
+	
 	FDelegateHandle OnWindowActivatedHandle;
 	FDelegateHandle OnWindowDeactivatedHandle;
 	FDelegateHandle OnWindowClosedHandle;
@@ -93,11 +114,13 @@ private:
 public:
 	TSharedPtr<SWindow> GetOwnerWindow();
 
-	TSharedRef<SEditorWidgetBase> TakeWidget(bool bInit = true);
+	TSharedRef<SEditorWidgetBase> TakeWidget();
 
 	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;
 
 	FName GetWidgetName() const { return WidgetName; }
+
+	EEditorWidgetState GetWidgetState() const { return WidgetState; }
 
 	int32 GetChildNum() const { return ChildWidgets.Num(); }
 

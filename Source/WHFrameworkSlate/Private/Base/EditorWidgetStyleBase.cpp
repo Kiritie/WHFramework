@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/Base/EditorWidgetStyleBase.h"
+#include "Base/EditorWidgetStyleBase.h"
 
 FEditorWidgetStyle::FEditorWidgetStyle()
 {

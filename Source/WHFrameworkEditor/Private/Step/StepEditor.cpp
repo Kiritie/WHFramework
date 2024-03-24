@@ -4,6 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
+#include "WHFrameworkSlateTypes.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBlueprint.h"
@@ -135,13 +136,13 @@ void FStepEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, SStepListWidget)
+	SAssignNewEd(ListWidget, SStepListWidget, true)
 		.StepEditor(SharedThis(this));
 
-	SAssignNewEd(DetailsWidget, SStepDetailsWidget)
+	SAssignNewEd(DetailsWidget, SStepDetailsWidget, true)
 		.StepEditor(SharedThis(this));
 
-	SAssignNewEd(StatusWidget, SStepStatusWidget)
+	SAssignNewEd(StatusWidget, SStepStatusWidget, true)
 		.StepEditor(SharedThis(this));
 
 	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnListWidgetTab))
