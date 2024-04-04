@@ -95,7 +95,10 @@ void UAssetManagerBase::ReleaseRuntimeData()
 	{
 		for(auto& Iter2 : Iter1.Value.Assets)
 		{
-			Iter2.Value->ResetData();
+			if(Iter2.Value)
+			{
+				Iter2.Value->ResetData();
+			}
 		}
 	}
 }
