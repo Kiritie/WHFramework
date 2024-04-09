@@ -25,7 +25,8 @@ public class WHFramework : ModuleRules
 				"GameplayTags",
 				"GameplayTasks",
 				"GameplayAbilities",
-				"WHFrameworkCore"
+				"WHFrameworkCore",
+				"WHFrameworkSlate"
 			});
 			
 		

@@ -8,9 +8,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SProcedureStatusWidget::WidgetName = FName("ProcedureStatusWidget");
+
 SProcedureStatusWidget::SProcedureStatusWidget()
 {
-	WidgetName = FName("ProcedureStatusWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

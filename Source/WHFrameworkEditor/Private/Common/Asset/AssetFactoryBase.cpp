@@ -4,7 +4,7 @@
 
 #include "ClassViewerModule.h"
 #include "Editor.h"
-#include "..\..\..\Public\Common\CommonEditorTypes.h"
+#include "Common/CommonEditorTypes.h"
 
 #include "Modules/ModuleManager.h"
 

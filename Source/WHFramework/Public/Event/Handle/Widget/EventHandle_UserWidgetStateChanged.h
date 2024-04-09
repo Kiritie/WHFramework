@@ -2,9 +2,9 @@
 
 #pragma once
 
+#include "WHFrameworkSlateTypes.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Parameter/ParameterModuleTypes.h"
-#include "Widget/WidgetModuleTypes.h"
 
 #include "EventHandle_UserWidgetStateChanged.generated.h"
 

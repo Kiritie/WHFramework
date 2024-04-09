@@ -3,7 +3,7 @@
 #pragma once
 
 #include "WebRequestModuleTypes.h"
-#include "Http/WebRequestManager.h"
+#include "WebRequest/WebRequestManager.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Main/Base/ModuleBase.h"
 #include "Parameter/ParameterModuleTypes.h"

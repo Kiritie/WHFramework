@@ -5,13 +5,11 @@
 
 #include "Main/Base/ModuleBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
-#include "Widget/Screen/Slate/SSlateWidgetBase.h"
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 #include "World/WorldWidgetBase.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Input/Manager/InputManagerInterface.h"
+#include "Slate/SlateWidgetManager.h"
 #include "WidgetModule.generated.h"
 
 class UEventHandle_SetWorldWidgetVisible;
@@ -19,7 +17,7 @@ class UEventHandle_CloseUserWidget;
 class UEventHandle_OpenUserWidget;
 
 UCLASS()
-class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManagerInterface
+class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public FSlateWidgetManager
 {
 	GENERATED_BODY()
 			
@@ -62,12 +60,12 @@ protected:
 	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
 
 	////////////////////////////////////////////////////
-	// UserWidget
+	// ScreenWidget
 protected:
-	UPROPERTY(EditAnywhere, Category = "UserWidget")
+	UPROPERTY(EditAnywhere, Category = "ScreenWidget")
 	TArray<TSubclassOf<UUserWidgetBase>> UserWidgetClasses;
 
-	UPROPERTY(EditAnywhere, Category = "UserWidget")
+	UPROPERTY(EditAnywhere, Category = "ScreenWidget")
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 private:
@@ -78,7 +76,7 @@ private:
 	TMap<FName, UUserWidgetBase*> AllUserWidget;
 
 private:
-	UFUNCTION(CallInEditor, Category = "UserWidget")
+	UFUNCTION(CallInEditor, Category = "ScreenWidget")
 	void SortUserWidgetClasses();
 
 public:
@@ -436,117 +434,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllUserWidget();
-
-	////////////////////////////////////////////////////
-	// SlateWidget
-protected:
-	TMap<FName, TSharedPtr<SSlateWidgetBase>> AllSlateWidgets;
-
-	TSharedPtr<SSlateWidgetBase> TemporarySlateWidget;
-
-public:
-	template<class T>
-	bool HasSlateWidget(FName InName = T::WidgetName) const
-	{
-		return AllSlateWidgets.Contains(InName);
-	}
-
-	template<class T>
-	TSharedPtr<T> GetSlateWidget(FName InName = T::WidgetName) const
-	{
-		if(AllSlateWidgets.Contains(InName))
-		{
-			return StaticCastSharedPtr<T>(AllSlateWidgets[InName]);
-		}
-		return nullptr;
-	}
-
-	template<class T>
-	TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
-	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = SNew(T))
-		{
-			SlateWidget->OnCreate(InOwner, InParams ? *InParams : TArray<FParameter>());
-			SlateWidget->Init(InOwner, InParams);
-			const FName WidgetName = SlateWidget->GetWidgetName();
-			if(!AllSlateWidgets.Contains(WidgetName))
-			{
-				AllSlateWidgets.Add(WidgetName, SlateWidget);
-			}
-			return StaticCastSharedPtr<T>(SlateWidget);
-		}
-		return nullptr;
-	}
-
-	template<class T>
-	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
-	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr, InParams))
-		{
-			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
-			{
-				if(TemporarySlateWidget)
-				{
-					TemporarySlateWidget->OnClose(true);
-				}
-				//SlateWidget->SetLastTemporary(TemporarySlateWidget);
-				TemporarySlateWidget = SlateWidget;
-			}
-			SlateWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
-			return true;
-		}
-		return false;
-	}
-	
-	template<class T>
-	bool CloseSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
-	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = GetSlateWidget<T>(InName))
-		{
-			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
-			{
-				TemporarySlateWidget = nullptr;
-			}
-			SlateWidget->OnClose(bInstant);
-			return true;
-		}
-		return false;
-	}
-	
-	template<class T>
-	bool ToggleSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
-	{
-		if(TSharedPtr<SSlateWidgetBase> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr))
-		{
-			SlateWidget->Toggle(bInstant);
-			return true;
-		}
-		return false;
-	}
-
-	template<class T>
-	bool DestroySlateWidget(FName InName = T::WidgetName)
-	{
-		if(AllSlateWidgets.Contains(InName))
-		{
-			if(TSharedPtr<SSlateWidgetBase> SlateWidget = AllSlateWidgets[InName])
-			{
-				AllSlateWidgets.Remove(InName);
-				if(TemporarySlateWidget == SlateWidget)
-				{
-					TemporarySlateWidget = nullptr;
-				}
-				SlateWidget->OnDestroy();
-				SlateWidget = nullptr;
-			}
-			return true;
-		}
-		return false;
-	}
-
-	void CloseAllSlateWidget(bool bInstant = false);
-	
-	void ClearAllSlateWidget();
 
 	////////////////////////////////////////////////////
 	// WorldWidget

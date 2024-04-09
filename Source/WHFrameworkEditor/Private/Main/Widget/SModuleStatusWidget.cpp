@@ -8,9 +8,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SModuleStatusWidget::WidgetName = FName("ModuleStatusWidget");
+
 SModuleStatusWidget::SModuleStatusWidget()
 {
-	WidgetName = FName("ModuleStatusWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

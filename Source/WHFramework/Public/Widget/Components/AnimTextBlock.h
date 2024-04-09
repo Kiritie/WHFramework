@@ -8,7 +8,7 @@
 #include "Widgets/SWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Common/CommonStatics.h"
-#include "Widget/Interfaces/TickAbleWidgetInterface.h"
+#include "Slate/Runtime/Interfaces/TickAbleWidgetInterface.h"
 
 #include "AnimTextBlock.generated.h"
 

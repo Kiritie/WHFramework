@@ -3,7 +3,7 @@
 #pragma once
 
 #include "WebRequestModuleTypes.h"
-#include "Http/WebRequestManager.h"
+#include "WebRequest/WebRequestManager.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "WebRequestModuleStatics.generated.h"

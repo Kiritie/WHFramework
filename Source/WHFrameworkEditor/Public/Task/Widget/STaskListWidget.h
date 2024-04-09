@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskBase.h"
-#include "Base/SEditorWidgetBase.h"
+#include "Slate/Editor/Base/SEditorWidgetBase.h"
 
 class UTaskBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectTaskListItemsDelegate, TArray<TSharedPtr<FTaskListItem>>)
@@ -26,6 +26,9 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+
+public:
+	static FName WidgetName;
 
 public:
 	virtual void OnCreate() override;

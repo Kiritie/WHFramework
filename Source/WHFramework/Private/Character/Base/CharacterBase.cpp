@@ -464,7 +464,7 @@ void ACharacterBase::MultiStopAIMove_Implementation()
 
 UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID, false);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
 }
 
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const

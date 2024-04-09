@@ -15,6 +15,7 @@ public class WHFrameworkEditor : ModuleRules
 			{
 				"Core",
 				"WHFramework",
+				"WHFrameworkCore",
 				"WHFrameworkSlate"
 			});
 			

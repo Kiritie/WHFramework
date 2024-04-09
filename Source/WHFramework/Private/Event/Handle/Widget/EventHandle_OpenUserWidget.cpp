@@ -4,7 +4,7 @@
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
 
 #include "Widget/WidgetModuleStatics.h"
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 
 UEventHandle_OpenUserWidget::UEventHandle_OpenUserWidget()
 {

@@ -10,7 +10,7 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
-#include "Widget/Interfaces/PanelWidgetInterface.h"
+#include "Slate/Runtime/Interfaces/PanelWidgetInterface.h"
 
 #include "WorldWidgetBase.generated.h"
 

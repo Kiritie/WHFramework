@@ -7,7 +7,7 @@
 #include "Achievement/AchievementModuleTypes.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/CanvasPanel.h"
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 #include "WidgetAchievementHUD.generated.h"
 
 USTRUCT()

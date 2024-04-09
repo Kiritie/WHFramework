@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Main/MainEditorTypes.h"
 #include "Main/Base/ModuleBase.h"
-#include "Base/SEditorWidgetBase.h"
+#include "Slate/Editor/Base/SEditorWidgetBase.h"
 
 class UModuleBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectModuleListItemsDelegate, TArray<TSharedPtr<FModuleListItem>>)
@@ -24,6 +24,9 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+
+public:
+	static FName WidgetName;
 
 public:
 	virtual void OnCreate() override;

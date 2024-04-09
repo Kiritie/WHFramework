@@ -15,7 +15,6 @@
 #include "Subsystems/EditorActorSubsystem.h"
 #include "LevelEditorActions.h"
 #include "UnrealEdMisc.h"
-#include "WHFrameworkSlateTypes.h"
 
 #define LOCTEXT_NAMESPACE "ModuleEditorWidget"
 

@@ -7,9 +7,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SStepStatusWidget::WidgetName = FName("StepStatusWidget");
+
 SStepStatusWidget::SStepStatusWidget()
 {
-	WidgetName = FName("StepStatusWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Screen/Slate/SSlateWidgetBase.h"
+#include "Slate/Runtime/Base/SSlateWidgetBase.h"
 
 /**
  * 
@@ -20,19 +20,16 @@ public:
 	void Construct(const FArguments& InArgs);
 
 public:
+	static FName WidgetName;
+	
+	static FName ParentName;
+
+public:
 	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
-
-public:
-	static FName WidgetName;
-
-	static FName ParentName;
-
-public:
-	virtual FName GetWidgetName() const override { return WidgetName; }
 
 	virtual FName GetParentName() const override { return ParentName; }
 };

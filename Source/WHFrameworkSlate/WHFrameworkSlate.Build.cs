@@ -32,7 +32,9 @@ public class WHFrameworkSlate : ModuleRules
 				"InputCore",
 				"zlib",
 				"DesktopPlatform",
-				"ImageWrapper"
+				"ImageWrapper",
+				"Engine",
+				"GameplayTags"
 			}
 		);
 	}

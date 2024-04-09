@@ -3,15 +3,14 @@
 #pragma once
 
 
-#include "ParameterManager.h"
-#include "ParameterModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
+#include "Parameter/ParameterManager.h"
 #include "ParameterModule.generated.h"
 
 class ATargetPoint;
 
 UCLASS()
-class WHFRAMEWORK_API UParameterModule : public UModuleBase, public IParameterManager
+class WHFRAMEWORK_API UParameterModule : public UModuleBase, public FParameterManager
 {
 	GENERATED_BODY()
 				

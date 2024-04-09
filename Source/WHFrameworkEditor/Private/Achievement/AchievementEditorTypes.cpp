@@ -1,6 +1,6 @@
 // Copyright 2021 Sam Carey. All Rights Reserved.
 
-#include "..\..\Public\Achievement\AchievementEditorTypes.h"
+#include "Achievement\AchievementEditorTypes.h"
 
 #include "EdGraphSchema_K2.h"
 #include "SGraphPin.h"

@@ -73,18 +73,3 @@ bool FInputKeyShortcut::IsPressing(APlayerController* InPlayerController, bool b
 	}
 	return ReturnValue;
 }
-
-void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
-{
-	const TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();
-	if (ViewportWidget.IsValid())
-	{
-		const TSharedRef<SViewport> ViewportWidgetRef = ViewportWidget.ToSharedRef();
-		SlateOperations.UseHighPrecisionMouseMovement(ViewportWidgetRef);
-		SlateOperations.SetUserFocus(ViewportWidgetRef);
-		SlateOperations.LockMouseToWidget(ViewportWidgetRef);
-		GameViewportClient.SetMouseLockMode(EMouseLockMode::LockAlways);
-		GameViewportClient.SetIgnoreInput(true);
-		GameViewportClient.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
-	}
-}

@@ -2,6 +2,7 @@
 
 #include "Camera/Actor/CCTVCameraActor.h"
 
+#include "WHFrameworkCoreStatics.h"
 #include "Animation/AnimationModuleStatics.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Point/CameraPointBase.h"
@@ -70,7 +71,7 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 			{
 				CurrentCameraShotPoints = DefaultCameraShotPoints;
 			}
-			UCommonStatics::ShuffleArray(CurrentCameraShotPoints);
+			FCoreStatics::ShuffleArray(CurrentCameraShotPoints);
 		}
 		if(CurrentCameraShotPoints.Num() > 0)
 		{

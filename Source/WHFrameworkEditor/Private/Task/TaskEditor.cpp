@@ -4,7 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
-#include "WHFrameworkSlateTypes.h"
+#include "WHFrameworkSlateStatics.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBlueprint.h"

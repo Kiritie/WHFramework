@@ -9,9 +9,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName STaskDetailsWidget::WidgetName = FName("TaskDetailsWidget");
+
 STaskDetailsWidget::STaskDetailsWidget()
 {
-	WidgetName = FName("TaskDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

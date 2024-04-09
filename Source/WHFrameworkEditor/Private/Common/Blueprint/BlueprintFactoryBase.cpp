@@ -3,7 +3,7 @@
 #include "Common/Blueprint/BlueprintFactoryBase.h"
 
 #include "BlueprintEditorSettings.h"
-#include "..\..\..\Public\Common\CommonEditorTypes.h"
+#include "Common/CommonEditorTypes.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 
 #define LOCTEXT_NAMESPACE "BlueprintFactoryBase"

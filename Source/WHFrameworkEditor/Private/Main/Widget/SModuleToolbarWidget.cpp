@@ -10,9 +10,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SModuleToolbarWidget::WidgetName = FName("ModuleToolbarWidget");
+
 SModuleToolbarWidget::SModuleToolbarWidget()
 {
-	WidgetName = FName("ModuleToolbarWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 #include "WidgetLoadingLevelPanel.generated.h"
 
 /**

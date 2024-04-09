@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Widget/Screen/UMG/SubWidgetBase.h"
+#include "Widget/Screen/SubWidgetBase.h"
 #include "WidgetAbilityInventorySlotBase.generated.h"
 
 class UAbilityInventorySlot;

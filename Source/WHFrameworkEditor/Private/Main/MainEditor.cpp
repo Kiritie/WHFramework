@@ -4,7 +4,7 @@
 
 #include "IAssetTools.h"
 #include "ISettingsSection.h"
-#include "WHFrameworkSlateTypes.h"
+#include "WHFrameworkSlateStatics.h"
 #include "Main/MainEditorTypes.h"
 #include "Main/Base/ModuleBlueprint.h"
 #include "Main/Blueprint/ModuleBlueprintActions.h"

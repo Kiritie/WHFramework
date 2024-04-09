@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Base/SMainEditorWidgetBase.h"
+#include "Slate/Editor/Base/SMainEditorWidgetBase.h"
 
 class AMainModule;
 

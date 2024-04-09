@@ -4,7 +4,6 @@
 #include "Debug/DebugModuleStatics.h"
 
 #include "Debug/DebugModule.h"
-#include "Debug/DebugModuleTypes.h"
 
 bool UDebugModuleStatics::EnsureEditor(bool InExpression)
 {

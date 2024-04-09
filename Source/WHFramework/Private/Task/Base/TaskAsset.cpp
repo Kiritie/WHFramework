@@ -25,9 +25,9 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 	{
 		if(!Iter) continue;
 
-		RecursiveItems<UTaskBase>(Iter, [this](UTaskBase* Task)
+		RecursiveArrayItems<UTaskBase>(Iter, [this](const UTaskBase* Task)
 		{
-			TaskMap.Add(Task->TaskGUID, Task);
+			TaskMap.Add(Task->TaskGUID, const_cast<UTaskBase*>(Task));
 			return Task->SubTasks;
 		});
 

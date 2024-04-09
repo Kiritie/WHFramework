@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "NativeGameplayTags.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "WHFrameworkCoreTypes.h"
 
 #include "CommonTypes.generated.h"
 
@@ -13,11 +14,6 @@
 // Variables
 extern WHFRAMEWORK_API bool GIsPlaying;
 extern WHFRAMEWORK_API bool GIsSimulating;
-
-//////////////////////////////////////////////////////////////////////////
-// Delegates
-DECLARE_DYNAMIC_DELEGATE( FSimpleDynamicDelegate );
-DECLARE_DYNAMIC_MULTICAST_DELEGATE( FSimpleDynamicMulticastDelegate );
 
 //////////////////////////////////////////////////////////////////////////
 // Types
@@ -72,14 +68,6 @@ enum class EInteractAction : uint8
 	Custom10 = 19
 };
 
-struct FSaveDataArchive : public FObjectAndNameAsStringProxyArchive
-{
-	FSaveDataArchive(FArchive& InInnerArchive) : FObjectAndNameAsStringProxyArchive(InInnerArchive, false)
-	{
-		ArIsSaveGame = true;
-	}
-};
-
 //////////////////////////////////////////////////////////////////////////
 // Functions
 extern const UObject* GetWorldContext(bool bInEditor = false);
@@ -93,72 +81,6 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 		return Value;
 	}
 	return nullptr;
-}
-
-template<typename T>
-extern void RecursiveItems(T* Value, TFunction<TArray<T*>(T*)> Func)
-{
-	for(auto Iter : Func(Value))
-	{
-		RecursiveItems(Iter, Func);
-	}
-}
-
-template<typename T>
-extern void RecursiveItems(T& Value, TFunction<TArray<T>(T&)> Func)
-{
-	for(auto Iter : Func(Value))
-	{
-		RecursiveItems(Iter, Func);
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////
-// MACROS
-#define PHASEC(A, B) \
-((uint8)A & (uint8)B) != 0
-
-#define ENUMWITH(A, B) \
-((uint8)A & (uint8)B) != 0
-
-#define DON(Count, Expression) \
-for(int32 _Index = 0; _Index < Count; _Index++) \
-{ \
-	Expression \
-}
-
-#define DON_WITHINDEX(Count, Index, Expression) \
-for(int32 Index = 0; Index < Count; Index++) \
-{ \
-	Expression \
-}
-
-#define ITER_ARRAY(Array, Item, Expression) \
-for(auto& Item : Array) \
-{ \
-	Expression \
-}
-
-#define ITER_ARRAY_WITHINDEX(Array, Index, Item, Expression) \
-int32 Index = 0; \
-for(auto& Item : Array) \
-{ \
-	Expression \
-	Index++; \
-}
-
-#define ITER_MAP(Map, Item, Expression) \
-for(auto& Item : Map) \
-{ \
-	Expression \
-}
-
-#define ITER_MAP_WITHINDEX(Map, Index, Item, Expression) \
-int32 Index = 0; \
-for(auto& Item : Map) \
-{ \
-	Expression \
-	Index++; \
 }
 
 namespace GameplayTags
@@ -184,9 +106,6 @@ namespace GameplayTags
 	
 	////////////////////////////////////////////////////
 	// Input_Player
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_TurnPlayer);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveHPlayer);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveVPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveForwardPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveRightPlayer);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_MoveUpPlayer);

@@ -11,9 +11,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SModuleDetailsWidget::WidgetName = FName("ModuleDetailsWidget");
+
 SModuleDetailsWidget::SModuleDetailsWidget()
 {
-	WidgetName = FName("ModuleDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

@@ -1,36 +1,192 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-#include "Base/SEditorWidgetBase.h"
+#include "WHFrameworkSlateTypes.generated.h"
 
-#define SNewEd( WidgetType, bAutoOpen, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SNewEdN( WidgetType, ParentWidget, bAutoOpen, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SAssignNewEd( ExposeAs, WidgetType, bAutoOpen, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-#define SAssignNewEdN( ExposeAs, WidgetType, ParentWidget, bAutoOpen, ... ) \
-MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
-
-template<typename WidgetType, typename RequiredArgsPayloadType>
-TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InType, const TSharedPtr<SEditorWidgetBase>& InParentWidget, bool bInAutoOpen, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
+USTRUCT(BlueprintType)
+struct WHFRAMEWORKSLATE_API FActivableIconStyle : public FSlateWidgetStyle
 {
-	LLM_SCOPE_BYTAG(UI_Slate);
-	TSlateDecl<WidgetType, RequiredArgsPayloadType> SlateDecl(InType, InFile, OnLine, Forward<RequiredArgsPayloadType>(InRequiredArgs));
-	if(InParentWidget)
+	GENERATED_USTRUCT_BODY()
+
+	FActivableIconStyle();
+
+	virtual ~FActivableIconStyle() {}
+
+	virtual void GetResources( TArray< const FSlateBrush* >& OutBrushes ) const override;
+
+	static const FName TypeName;
+	virtual const FName GetTypeName() const override { return TypeName; };
+
+	static const FActivableIconStyle& GetDefault();
+
+	/** Brush used when a selected row is active */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Appearance)
+	FSlateBrush ActiveBrush;
+	FActivableIconStyle& SetActiveBrush( const FSlateBrush& InActiveBrush ){ ActiveBrush = InActiveBrush; return *this; }
+
+	/** Brush used when a selected row is inactive */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Appearance)
+	FSlateBrush InactiveBrush;
+	FActivableIconStyle& SetInactiveBrush( const FSlateBrush& InInactiveBrush ){ InactiveBrush = InInactiveBrush; return *this; }
+
+	/**
+	 * Unlinks all colors in this style.
+	 * @see FSlateColor::Unlink
+	 */
+	void UnlinkColors()
 	{
-		InParentWidget->AddChild(SlateDecl._Widget);
+		ActiveBrush.UnlinkColors();
+		InactiveBrush.UnlinkColors();
 	}
-	if(bInAutoOpen)
-	{
-		SlateDecl._Widget->Open();
-	}
-	else
-	{
-		SlateDecl._Widget->SetVisibility(EVisibility::Collapsed);
-	}
-	return SlateDecl;
-}
+};
+
+/**
+* Widget类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetType : uint8
+{
+	/// 常驻
+	Permanent,
+	/// 临时
+	Temporary
+};
+
+/**
+* Widget创建类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCreateType : uint8
+{
+	/// 无
+	None,
+	/// 自动创建
+	AutoCreate,
+	/// 自动创建并打开
+	AutoCreateAndOpen
+};
+
+/**
+* Widget打开类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetOpenType : uint8
+{
+	/// 无
+	None,
+	/// 显示
+	Visible,
+	/// 显示并禁用点击
+	HitTestInvisible,
+	/// 显示并禁用自身点击
+	SelfHitTestInvisible
+};
+
+/**
+* Widget打开完成类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetOpenFinishType : uint8
+{
+	/// 瞬间
+	Instant,
+	/// 延时
+	Delay,
+	/// 动画
+	Animator,
+	/// 程序调用
+	Procedure
+};
+
+/**
+* Widget关闭类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCloseType : uint8
+{
+	/// 无
+	None,
+	/// 隐藏
+	Hidden,
+	/// 塌陷
+	Collapsed,
+	/// 移除
+	Remove
+};
+
+/**
+* Widget关闭完成类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetCloseFinishType : uint8
+{
+	/// 瞬间
+	Instant,
+	/// 延时
+	Delay,
+	/// 动画
+	Animator,
+	/// 程序调用
+	Procedure
+};
+
+/**
+* Widget刷新类型
+*/
+UENUM(BlueprintType)
+enum class EWidgetRefreshType : uint8
+{
+	/// 无
+	None,
+	/// 帧更新
+	Tick,
+	/// 计时器
+	Timer,
+	/// 程序
+	Procedure
+};
+
+/**
+* 屏幕Widget状态
+*/
+UENUM(BlueprintType)
+enum class EScreenWidgetState : uint8
+{
+	/// 无
+	None,
+	/// 打开中
+	Opening,
+	/// 已打开
+	Opened,
+	/// 关闭中
+	Closing,
+	/// 已关闭
+	Closed
+};
+
+enum class EEditorWidgetType : uint8
+{
+	Main,
+	Child
+};
+
+enum class EEditorWidgetState : uint8
+{
+	None,
+	Opened,
+	Closed
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FK2_OnWidgetOpened, const TArray<FParameter>&, InParams, bool, bInstant);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetClosed, bool, bInstant);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetDestroyed, bool, bRecovery);
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWidgetOpened, const TArray<FParameter>&, bool);
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetClosed, bool);
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetDestroyed, bool);

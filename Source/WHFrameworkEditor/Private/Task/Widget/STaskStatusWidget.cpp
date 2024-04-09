@@ -7,9 +7,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName STaskStatusWidget::WidgetName = FName("TaskStatusWidget");
+
 STaskStatusWidget::STaskStatusWidget()
 {
-	WidgetName = FName("TaskStatusWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

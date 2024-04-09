@@ -26,9 +26,9 @@ void UStepAsset::Initialize(UAssetBase* InSource)
 	{
 		if(!Iter) continue;
 
-		RecursiveItems<UStepBase>(Iter, [this](UStepBase* Step)
+		RecursiveArrayItems<UStepBase>(Iter, [this](const UStepBase* Step)
 		{
-			StepMap.Add(Step->StepGUID, Step);
+			StepMap.Add(Step->StepGUID, const_cast<UStepBase*>(Step));
 			return Step->SubSteps;
 		});
 

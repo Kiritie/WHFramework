@@ -2,7 +2,7 @@
 
 #pragma once
 
-
+#include "Input/InputTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
@@ -10,26 +10,6 @@
 #include "InputModuleTypes.generated.h"
 
 class UPlayerMappableKeyProfileBase;
-
-/**
-* 输入模式
-*/
-UENUM(BlueprintType)
-enum class EInputMode : uint8
-{
-	/// 无
-	None,
-	/// 游戏模式
-	GameOnly,
-	/// 游戏模式_不隐藏光标
-	GameOnly_NotHideCursor,
-	/// 游戏和UI模式
-	GameAndUI,
-	/// 游戏和UI模式_不隐藏光标
-	GameAndUI_NotHideCursor,
-	/// UI模式
-	UIOnly
-};
 
 UENUM(BlueprintType)
 enum class EInputInteractAction : uint8
@@ -218,31 +198,6 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FSlateBrush> KeyBrushs;
-};
-
-struct WHFRAMEWORK_API FInputModeNone : public FInputModeDataBase
-{
-	FInputModeNone()
-	{}
-
-protected:
-	virtual void ApplyInputMode(class FReply& SlateOperations, class UGameViewportClient& GameViewportClient) const override;
-};
-
-struct WHFRAMEWORK_API FInputModeGameOnly_NotHideCursor : public FInputModeGameOnly
-{
-	FInputModeGameOnly_NotHideCursor()
-	{
-		bConsumeCaptureMouseDown = false;
-	}
-};
-
-struct WHFRAMEWORK_API FInputModeGameAndUI_NotHideCursor : public FInputModeGameAndUI
-{
-	FInputModeGameAndUI_NotHideCursor()
-	{
-		bHideCursorDuringCapture = false;
-	}
 };
 
 USTRUCT(BlueprintType)

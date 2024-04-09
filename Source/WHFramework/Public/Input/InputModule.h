@@ -2,10 +2,9 @@
 
 #pragma once
 
-
+#include "Input/InputManager.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
-#include "Manager/InputManagerInterface.h"
 
 #include "InputModule.generated.h"
 
@@ -16,7 +15,7 @@ class UInputActionBase;
 class UEnhancedInputComponent;
 
 UCLASS()
-class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInterface
+class WHFRAMEWORK_API UInputModule : public UModuleBase, public FInputManager
 {
 	GENERATED_BODY()
 			
@@ -25,7 +24,7 @@ class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInt
 public:	
 	UInputModule();
 
-	~UInputModule();
+	virtual ~UInputModule() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Module
@@ -223,7 +222,7 @@ protected:
 	// InputMode
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void UpdateInputMode();
+	virtual void UpdateInputMode() override;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputMode")
@@ -234,10 +233,10 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void SetGlobalInputMode(EInputMode InInputMode);
+	virtual bool SetGlobalInputMode(EInputMode InInputMode) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
+	virtual EInputMode GetGlobalInputMode() const override { return GlobalInputMode; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetNativeInputPriority() const override { return 0; }

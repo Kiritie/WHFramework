@@ -5,6 +5,7 @@
 
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "WHFrameworkCoreStatics.h"
 #include "Common/CommonEditorStatics.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Base/TaskAsset.h"
@@ -16,9 +17,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName STaskListWidget::WidgetName = FName("TaskListWidget");
+
 STaskListWidget::STaskListWidget()
 {
-	WidgetName = FName("TaskListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
 	bDefaults = false;
@@ -474,7 +476,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 
 			if(NewTask && OldTask)
 			{
-				UCommonStatics::ExportPropertiesToObject(OldTask, NewTask);
+				FCoreStatics::ExportPropertiesToObject(OldTask, NewTask);
 				if(OldTask->ParentTask)
 				{
 					OldTask->ParentTask->SubTasks[OldTask->TaskIndex] = NewTask;
@@ -685,7 +687,7 @@ void STaskListWidget::TreeSelectionChanged(TSharedPtr<FTaskListItem> TreeItem, E
 		{
 			for(auto Iter : TaskListItems)
 			{
-				RecursiveItems<TSharedPtr<FTaskListItem>>(Iter, [this](TSharedPtr<FTaskListItem>& Item)
+				RecursiveArrayItems<TSharedPtr<FTaskListItem>>(Iter, [this](const TSharedPtr<FTaskListItem>& Item)
 				{
 					Item->GetStates().bSelected = false;
 					return Item->SubListItems;
@@ -694,7 +696,7 @@ void STaskListWidget::TreeSelectionChanged(TSharedPtr<FTaskListItem> TreeItem, E
 		}
 		for(auto Iter : VisibleTaskListItems)
 		{
-			RecursiveItems<TSharedPtr<FTaskListItem>>(Iter, [this](TSharedPtr<FTaskListItem>& Item)
+			RecursiveArrayItems<TSharedPtr<FTaskListItem>>(Iter, [this](const TSharedPtr<FTaskListItem>& Item)
 			{
 				Item->GetStates().bSelected = TreeView->IsItemSelected(Item);
 				return Item->SubListItems;

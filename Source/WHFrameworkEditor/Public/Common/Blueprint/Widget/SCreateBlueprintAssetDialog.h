@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Base/Window/SEditorWindowBase.h"
+#include "Slate/Editor/Base/Window/SEditorWindowBase.h"
 
 class UBlueprintFactoryBase;
 

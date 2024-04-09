@@ -4,6 +4,7 @@
 #include "HAL/PlatformFilemanager.h"
 #include "Misc/Paths.h"
 #include "Async/Async.h"
+#include "Main/MainManager.h"
 #if PLATFORM_WINDOWS
 #include <windows.h>
 #endif
@@ -11,73 +12,85 @@
 #define ZIP_THREAD_MAX 10
 #define ZIP_BUFFER_MAX 1024
 
+const FUniqueType FZipManager::Type = FUniqueType();
+
+IMPLEMENTATION_MANAGER(FZipManager)
+
+FZipManager::FZipManager()
+{
+}
+
+FZipManager::~FZipManager()
+{
+}
+
 bool FZipManager::IsUTF8(const char* InChars)
 {
-        unsigned int nBytes = 0;    // UFT8可用1-6个字节编码,ASCII用一个字节
-        unsigned char chr = *InChars;
-        bool bAllAscii = true;
-        for (unsigned int i = 0; InChars[i] != '\0'; ++i)
+    unsigned int nBytes = 0;    // UFT8可用1-6个字节编码,ASCII用一个字节
+    unsigned char chr = *InChars;
+    bool bAllAscii = true;
+    for (unsigned int i = 0; InChars[i] != '\0'; ++i)
+    {
+        chr = *(InChars + i);
+        //判断是否ASCII编码,如果不是,说明有可能是UTF8,ASCII用7位编码,最高位标记为0,0xxxxxxx
+        if (nBytes == 0 && (chr & 0x80) != 0)
         {
-            chr = *(InChars + i);
-            //判断是否ASCII编码,如果不是,说明有可能是UTF8,ASCII用7位编码,最高位标记为0,0xxxxxxx
-            if (nBytes == 0 && (chr & 0x80) != 0)
+            bAllAscii = false;
+        }
+        if (nBytes == 0)
+        {
+            //如果不是ASCII码,应该是多字节符,计算字节数
+            if (chr >= 0x80)
             {
-                bAllAscii = false;
-            }
-            if (nBytes == 0)
-            {
-                //如果不是ASCII码,应该是多字节符,计算字节数
-                if (chr >= 0x80)
+                if (chr >= 0xFC && chr <= 0xFD)
                 {
-                    if (chr >= 0xFC && chr <= 0xFD)
-                    {
-                        nBytes = 6;
-                    }
-                    else if (chr >= 0xF8)
-                    {
-                        nBytes = 5;
-                    }
-                    else if (chr >= 0xF0)
-                    {
-                        nBytes = 4;
-                    }
-                    else if (chr >= 0xE0)
-                    {
-                        nBytes = 3;
-                    }
-                    else if (chr >= 0xC0)
-                    {
-                        nBytes = 2;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                    nBytes--;
+                    nBytes = 6;
                 }
-            }
-            else
-            {
-                //多字节符的非首字节,应为 10xxxxxx
-                if ((chr & 0xC0) != 0x80)
+                else if (chr >= 0xF8)
+                {
+                    nBytes = 5;
+                }
+                else if (chr >= 0xF0)
+                {
+                    nBytes = 4;
+                }
+                else if (chr >= 0xE0)
+                {
+                    nBytes = 3;
+                }
+                else if (chr >= 0xC0)
+                {
+                    nBytes = 2;
+                }
+                else
                 {
                     return false;
                 }
-                //减到为零为止
                 nBytes--;
             }
         }
-        //违返UTF8编码规则
-        if (nBytes != 0)
+        else
         {
-            return false;
+            //多字节符的非首字节,应为 10xxxxxx
+            if ((chr & 0xC0) != 0x80)
+            {
+                return false;
+            }
+            //减到为零为止
+            nBytes--;
         }
-        if (bAllAscii)
-        {
-            //如果全部都是ASCII, 也是UTF8
-            return true;
-        }
+    }
+    //违返UTF8编码规则
+    if (nBytes != 0)
+    {
+        return false;
+    }
+    if (bAllAscii)
+    {
+        //如果全部都是ASCII, 也是UTF8
         return true;
+    }
+    return true;
 }
 
 FString FZipManager::ANSIToUTF8ToFString(const char* InChars)

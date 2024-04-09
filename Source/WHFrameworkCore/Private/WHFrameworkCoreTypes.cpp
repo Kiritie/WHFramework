@@ -1,3 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "WHFrameworkCoreTypes.h"
+
+//////////////////////////////////////////////////////////////////////////
+// FUniqueType
+uint32 FUniqueType::NextUniqueID = 0;
+
+//////////////////////////////////////////////////////////////////////////
+// FUniqueClass
+const FUniqueType FUniqueClass::Type = FUniqueType();

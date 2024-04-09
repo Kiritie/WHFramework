@@ -6,7 +6,7 @@
 #include "ClassViewerModule.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Base/SEditorWidgetBase.h"
+#include "Slate/Editor/Base/SEditorWidgetBase.h"
 
 class UProcedureBlueprintFactory;
 DECLARE_DELEGATE_OneParam(FOnSelectProcedureListItemsDelegate, TArray<TSharedPtr<FProcedureListItem>>)
@@ -26,6 +26,9 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+
+public:
+	static FName WidgetName;
 
 public:
 	virtual void OnCreate() override;

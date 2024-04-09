@@ -226,8 +226,6 @@ public:
 
 	////////////////////////////////////////////////////
 	// SlateWidget
-protected:
-	
 public:
 	template<class T>
 	static TSharedPtr<T> GetSlateWidget()
@@ -295,7 +293,7 @@ public:
 	static bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
 
 	UFUNCTION(BlueprintPure)
-	bool HasWorldWidgetByName(FName InName, int32 InIndex) const
+	static bool HasWorldWidgetByName(FName InName, int32 InIndex)
 	{
 		return UWidgetModule::Get().HasWorldWidgetByName(InName, InIndex);
 	}

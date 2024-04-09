@@ -284,6 +284,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraMoveAble && CurrentCamera)
 	{
+		// CurrentCameraLocation = CurrentCamera->GetActorLocation();
 		if(CurrentCameraLocation != TargetCameraLocation)
 		{
 			if(CameraDoLocationDuration != 0.f)
@@ -305,6 +306,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraOffsetAble && CurrentCamera)
 	{
+		// CurrentCameraOffset = CurrentCamera->GetCameraBoom()->SocketOffset;
 		if(CurrentCameraOffset != TargetCameraOffset)
 		{
 			if(CameraDoOffsetDuration != 0.f)
@@ -326,6 +328,7 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 
 	if(bCameraRotateAble && GetPlayerController())
 	{
+		// CurrentCameraRotation = GetPlayerController()->GetControlRotation();
 		if(!CurrentCameraRotation.Equals(TargetCameraRotation))
 		{
 			if(CameraDoRotationDuration != 0.f)
@@ -985,14 +988,14 @@ void UCameraModule::SetCameraView(const FCameraViewData& InCameraViewData, bool 
 			if(InCameraViewData.CameraViewTarget.LoadSynchronous())
 			{
 				StartTrackTarget(InCameraViewData.CameraViewTarget.LoadSynchronous(), InCameraViewData.TrackTargetMode, InCameraViewData.CameraViewParams.CameraViewMode, InCameraViewData.CameraViewParams.CameraViewSpace,
-					InCameraViewData.CameraViewParams.CameraViewLocation, InCameraViewData.CameraViewParams.CameraViewOffset, InCameraViewData.CameraViewParams.CameraViewYaw,
+					InCameraViewData.CameraViewParams.CameraViewLocation, FVector(-1.f), InCameraViewData.CameraViewParams.CameraViewYaw,
 					InCameraViewData.CameraViewParams.CameraViewPitch, InCameraViewData.CameraViewParams.CameraViewDistance, true, InCameraViewData.CameraViewParams.CameraViewEaseType, InCameraViewData.CameraViewParams.CameraViewDuration, bInstant);
-				if(bCacheData)
-				{
-					const ECameraTrackMode TrackTargetMode = InCameraViewData.TrackTargetMode;
-					CachedCameraViewData = TrackCameraViewData;
-					CachedCameraViewData.TrackTargetMode = TrackTargetMode;
-				}
+			}
+			if(bCacheData)
+			{
+				const ECameraTrackMode TrackTargetMode = InCameraViewData.TrackTargetMode;
+				CachedCameraViewData = TrackCameraViewData;
+				CachedCameraViewData.TrackTargetMode = TrackTargetMode;
 			}
 		}
 		else

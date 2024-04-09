@@ -10,9 +10,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SProcedureDetailsWidget::WidgetName = FName("SModuleToolbarWidget");
+
 SProcedureDetailsWidget::SProcedureDetailsWidget()
 {
-	WidgetName = FName("ProcedureDetailsWidget");
 	WidgetType = EEditorWidgetType::Child;
 }
 

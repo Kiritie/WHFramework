@@ -5,6 +5,7 @@
 
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "WHFrameworkCoreStatics.h"
 #include "Common/CommonEditorStatics.h"
 #include "Common/CommonStatics.h"
 #include "Procedure/ProcedureEditorTypes.h"
@@ -17,9 +18,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SProcedureListWidget::WidgetName = FName("ProcedureListWidget");
+
 SProcedureListWidget::SProcedureListWidget()
 {
-	WidgetName = FName("ProcedureListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
 	bDefaults = false;
@@ -401,7 +403,7 @@ void SProcedureListWidget::OnClassPicked(UClass* InClass)
 
 			if(NewProcedure && OldProcedure)
 			{
-				UCommonStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
+				FCoreStatics::ExportPropertiesToObject(OldProcedure, NewProcedure);
 				ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->GetProcedures()[OldProcedure->ProcedureIndex] = NewProcedure;
 				OldProcedure->OnUnGenerate();
 			}

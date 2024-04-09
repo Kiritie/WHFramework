@@ -4,7 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
-#include "WHFrameworkSlateTypes.h"
+#include "WHFrameworkSlateStatics.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBlueprint.h"

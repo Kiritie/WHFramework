@@ -4,7 +4,7 @@
 #include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
 
 #include "Widget/WidgetModule.h"
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 
 UEventHandle_CloseUserWidget::UEventHandle_CloseUserWidget()
 {

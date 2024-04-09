@@ -5,6 +5,7 @@
 
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "WHFrameworkCoreStatics.h"
 #include "Common/CommonEditorStatics.h"
 #include "Common/CommonStatics.h"
 #include "Main/MainModule.h"
@@ -17,9 +18,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SModuleListWidget::WidgetName = FName("ModuleListWidget");
+
 SModuleListWidget::SModuleListWidget()
 {
-	WidgetName = FName("ModuleListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
 	bDefaults = false;
@@ -454,7 +456,7 @@ void SModuleListWidget::OnClassPicked(UClass* InClass)
 
 			if(NewModule && OldModule)
 			{
-				UCommonStatics::ExportPropertiesToObject(OldModule, NewModule);
+				FCoreStatics::ExportPropertiesToObject(OldModule, NewModule);
 				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[OldModule->GetModuleIndex()] = NewModule;
 				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Emplace(OldModule->GetModuleName(), NewModule);
 				OldModule->OnDestroy();

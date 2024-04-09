@@ -4,7 +4,7 @@
 
 #include "Editor.h"
 #include "ISettingsSection.h"
-#include "WHFrameworkSlateTypes.h"
+#include "WHFrameworkSlateStatics.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBlueprint.h"

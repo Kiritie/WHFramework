@@ -7,7 +7,7 @@
 #include "Ability/Item/Widget/WidgetAbilityItemBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Widget/Screen/UMG/UserWidgetBase.h"
+#include "Widget/Screen/UserWidgetBase.h"
 
 UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {

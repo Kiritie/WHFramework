@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Task/TaskEditor.h"
-#include "Base/SEditorWidgetBase.h"
+#include "Slate/Editor/Base/SEditorWidgetBase.h"
 
 /**
  * 
@@ -21,6 +21,9 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+
+public:
+	static FName WidgetName;
 
 public:
 	virtual void OnCreate() override;

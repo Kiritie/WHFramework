@@ -31,7 +31,9 @@ public class WHFrameworkCore : ModuleRules
 				"InputCore",
 				"zlib",
 				"DesktopPlatform",
-				"ImageWrapper"
+				"ImageWrapper",
+				"Engine",
+				"GameplayTags"
 			}
 		);
 		

@@ -4,7 +4,7 @@
 #include "ClassViewerFilter.h"
 #include "Common/CommonStatics.h"
 #include "Kismet2/KismetEditorUtilities.h"
-#include "Base/SEditorWidgetBase.h"
+#include "Slate/Editor/Base/SEditorWidgetBase.h"
 
 #define GENERATED_EDITOR_MODULE(ModuleClass) \
 protected: \

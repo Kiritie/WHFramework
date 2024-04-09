@@ -5,6 +5,7 @@
 
 #include "SlateOptMacros.h"
 #include "SourceCodeNavigation.h"
+#include "WHFrameworkCoreStatics.h"
 #include "Common/CommonEditorStatics.h"
 #include "Step/StepEditorTypes.h"
 #include "Step/Base/StepAsset.h"
@@ -15,9 +16,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+FName SStepListWidget::WidgetName = FName("StepListWidget");
+
 SStepListWidget::SStepListWidget()
 {
-	WidgetName = FName("StepListWidget");
 	WidgetType = EEditorWidgetType::Child;
 
 	bDefaults = false;
@@ -473,7 +475,7 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 
 			if(NewStep && OldStep)
 			{
-				UCommonStatics::ExportPropertiesToObject(OldStep, NewStep);
+				FCoreStatics::ExportPropertiesToObject(OldStep, NewStep);
 				if(OldStep->ParentStep)
 				{
 					OldStep->ParentStep->SubSteps[OldStep->StepIndex] = NewStep;
@@ -684,7 +686,7 @@ void SStepListWidget::TreeSelectionChanged(TSharedPtr<FStepListItem> TreeItem, E
 		{
 			for(auto Iter : StepListItems)
 			{
-				RecursiveItems<TSharedPtr<FStepListItem>>(Iter, [this](TSharedPtr<FStepListItem>& Item)
+				RecursiveArrayItems<TSharedPtr<FStepListItem>>(Iter, [this](const TSharedPtr<FStepListItem>& Item)
 				{
 					Item->GetStates().bSelected = false;
 					return Item->SubListItems;
@@ -693,7 +695,7 @@ void SStepListWidget::TreeSelectionChanged(TSharedPtr<FStepListItem> TreeItem, E
 		}
 		for(auto Iter : VisibleStepListItems)
 		{
-			RecursiveItems<TSharedPtr<FStepListItem>>(Iter, [this](TSharedPtr<FStepListItem>& Item)
+			RecursiveArrayItems<TSharedPtr<FStepListItem>>(Iter, [this](const TSharedPtr<FStepListItem>& Item)
 			{
 				Item->GetStates().bSelected = TreeView->IsItemSelected(Item);
 				return Item->SubListItems;
