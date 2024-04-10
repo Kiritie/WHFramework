@@ -175,10 +175,10 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<SEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false)
+	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<SEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false, bool bForce = true)
 	{
 		const FName WidgetName = T::WidgetName;
-		if(!AllEditorWidgets.Contains(WidgetName))
+		if(!AllEditorWidgets.Contains(WidgetName) || bForce)
 		{
 			AllEditorWidgets.Add(WidgetName, InWidget);
 			InWidget->_WidgetName = WidgetName;
@@ -239,8 +239,18 @@ public:
 	{
 		if(TSharedPtr<T> EditorWidget = GetEditorWidget<T>(InName))
 		{
-			AllEditorWidgets.Remove(InName);
 			EditorWidget->OnDestroy();
+			return true;
+		}
+		return false;
+	}
+
+	template<class T>
+	bool RemoveEditorWidget(FName InName = T::WidgetName)
+	{
+		if(TSharedPtr<T> EditorWidget = GetEditorWidget<T>(InName))
+		{
+			AllEditorWidgets.Remove(InName);
 			return true;
 		}
 		return false;

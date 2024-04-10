@@ -58,9 +58,8 @@ public:
 	template<typename T>
 	static void UnRegisterManager()
 	{
-		if(IsExistManager<T>())
+		if(T* Manager = GetManager<T>())
 		{
-			T* Manager = GetManager<T>();
 			Manager->OnTermination();
 			Get().ManagerMap.Remove(T::Type);
 		}
@@ -78,7 +77,7 @@ public:
 		return nullptr;
 	}
 	/**
-	* 获取所有管理器
+	* 获取指定类型的管理器列表
 	*/
 	template<typename T>
 	static TArray<T*> GetAllManager()
@@ -90,6 +89,18 @@ public:
 			{
 				Managers.Add(Iter.Value->CastTo<T>());
 			}
+		}
+		return Managers;
+	}
+	/**
+	* 获取所有管理器
+	*/
+	static TArray<FManagerBase*> GetAllManager()
+	{
+		TArray<FManagerBase*> Managers;
+		for(auto Iter : Get().ManagerMap)
+		{
+			Managers.Add(Iter.Value);
 		}
 		return Managers;
 	}

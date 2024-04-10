@@ -94,14 +94,16 @@ void SEditorWidgetBase::OnRefresh()
 
 void SEditorWidgetBase::OnDestroy()
 {
+	FSlateWidgetManager::Get().RemoveEditorWidget<SEditorWidgetBase>(GetWidgetName());
+
 	switch(WidgetType)
 	{
 		case EEditorWidgetType::Main:
 		{
-			if(GetOwnerWindow().IsValid())
-			{
-				GetOwnerWindow()->RequestDestroyWindow();
-			}
+			// if(GetOwnerWindow().IsValid())
+			// {
+			// 	GetOwnerWindow()->RequestDestroyWindow();
+			// }
 			break;
 		}
 		case EEditorWidgetType::Child:
@@ -132,7 +134,6 @@ void SEditorWidgetBase::OnWindowDeactivated()
 
 void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 {
-	OnDestroy();
 	if(OnWindowActivatedHandle.IsValid())
 	{
 		InOwnerWindow->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
@@ -145,6 +146,8 @@ void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 	{
 		InOwnerWindow->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
 	}
+
+	Destroy();
 }
 
 FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
