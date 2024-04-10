@@ -18,4 +18,12 @@ public:
 	* 当初始化
 	*/
 	virtual void OnInitialize();
+	/**
+	* 当刷新
+	*/
+	virtual void OnRefresh(float DeltaSeconds);
+	/**
+	* 当销毁
+	*/
+	virtual void OnTermination();
 };

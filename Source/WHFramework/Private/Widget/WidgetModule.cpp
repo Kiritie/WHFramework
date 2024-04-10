@@ -140,21 +140,12 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 			ITickAbleWidgetInterface::Execute_OnTick(Iter, DeltaSeconds);
 		}
 	}
-
 	for (auto& Iter : AllUserWidget)
 	{
 		UUserWidgetBase* UserWidget = Iter.Value;
 		if (UserWidget && UserWidget->GetWidgetState() == EScreenWidgetState::Opened && UserWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 		{
 			UserWidget->Refresh();
-		}
-	}
-	for (auto& Iter : AllSlateWidgets)
-	{
-		TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
-		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && SlateWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
-		{
-			SlateWidget->Refresh();
 		}
 	}
 	for (auto& Iter1 : AllWorldWidgets)
@@ -191,7 +182,6 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		ClearAllUserWidget();
-		ClearAllSlateWidget();
 		ClearAllWorldWidget();
 	}
 }
@@ -467,7 +457,7 @@ void UWidgetModule::ClearAllWorldWidget()
 
 EInputMode UWidgetModule::GetNativeInputMode() const
 {
-	EInputMode InputMode = FSlateWidgetManager::GetNativeInputMode();
+	EInputMode InputMode = FSlateWidgetManager::Get().GetNativeInputMode();
     for (const auto& Iter : AllUserWidget)
     {
     	if (Iter.Value && (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening || Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened) && (int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)

@@ -75,7 +75,7 @@ void UWidgetModuleStatics::CloseAllUserWidget(bool bInstant)
 
 void UWidgetModuleStatics::CloseAllSlateWidget(bool bInstant)
 {
-	UWidgetModule::Get().CloseAllSlateWidget(bInstant);
+	FSlateWidgetManager::Get().CloseAllSlateWidget(bInstant);
 }
 
 UWorldWidgetContainer* UWidgetModuleStatics::GetWorldWidgetContainer()

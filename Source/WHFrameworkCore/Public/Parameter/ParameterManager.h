@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ParameterManagerInterface.h"
 #include "ParameterTypes.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
@@ -9,7 +10,7 @@
 /**
  * 
  */
-class WHFRAMEWORKCORE_API FParameterManager : public FManagerBase
+class WHFRAMEWORKCORE_API FParameterManager : public FManagerBase, public IParameterManagerInterface
 {
 	GENERATED_MANAGER(FParameterManager)
 
@@ -22,19 +23,19 @@ public:
 	static const FUniqueType Type;
 
 public:
-	virtual bool HasParameter(FName InName, bool bEnsured = true) const { return false; }
+	virtual bool HasParameter(FName InName, bool bEnsured = true) const override { return false; }
 
-	virtual void SetParameter(FName InName, FParameter InParameter) { }
+	virtual void SetParameter(FName InName, FParameter InParameter) override { }
 
-	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const { return FParameter(); }
+	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const override { return FParameter(); }
 
-	virtual TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const { return TArray<FParameter>(); }
+	virtual TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const override { return TArray<FParameter>(); }
 
-	virtual void RemoveParameter(FName InName) { }
+	virtual void RemoveParameter(FName InName) override { }
 
-	virtual void RemoveParameters(FName InName) { }
+	virtual void RemoveParameters(FName InName) override { }
 
-	virtual TArray<FParameterSet> GetAllParameter() { return TArray<FParameterSet>(); }
+	virtual TArray<FParameterSet> GetAllParameter() override { return TArray<FParameterSet>(); }
 
-	virtual void ClearAllParameter() { }
+	virtual void ClearAllParameter() override { }
 };

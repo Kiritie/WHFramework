@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Input/InputManager.h"
+#include "Input/InputManagerInterface.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
 
@@ -15,7 +15,7 @@ class UInputActionBase;
 class UEnhancedInputComponent;
 
 UCLASS()
-class WHFRAMEWORK_API UInputModule : public UModuleBase, public FInputManager
+class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInterface
 {
 	GENERATED_BODY()
 			
@@ -219,28 +219,21 @@ protected:
 	AWHPlayerController* GetPlayerController();
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputMode
+	// InputManager
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual void UpdateInputMode() override;
+	virtual void UpdateInputMode();
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "InputMode")
 	EInputMode NativeInputMode;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputMode")
-	EInputMode GlobalInputMode;
 	
+	UPROPERTY(EditAnywhere, Category = "InputMode")
+	EInputMode GlobalInputMode;
+
 public:
-	UFUNCTION(BlueprintCallable)
-	virtual bool SetGlobalInputMode(EInputMode InInputMode) override;
-
-	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetGlobalInputMode() const override { return GlobalInputMode; }
-
-	UFUNCTION(BlueprintPure)
 	virtual int32 GetNativeInputPriority() const override { return 0; }
 
-	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
+
+	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 };

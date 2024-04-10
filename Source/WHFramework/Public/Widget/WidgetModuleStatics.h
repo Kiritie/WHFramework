@@ -5,6 +5,7 @@
 
 #include "WidgetModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Slate/SlateWidgetManager.h"
 #include "WidgetModuleStatics.generated.h"
 
 /**
@@ -230,43 +231,43 @@ public:
 	template<class T>
 	static TSharedPtr<T> GetSlateWidget()
 	{
-		return UWidgetModule::Get().GetSlateWidget<T>();
+		return FSlateWidgetManager::Get().GetSlateWidget<T>();
 	}
 
 	template<class T>
 	static TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
 	{
-		return UWidgetModule::Get().CreateSlateWidget<T>(InOwner, InParams);
+		return FSlateWidgetManager::Get().CreateSlateWidget<T>(InOwner, InParams);
 	}
 
 	template<class T>
 	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return UWidgetModule::Get().OpenSlateWidget<T>(InParams, bInstant, InName);
+		return FSlateWidgetManager::Get().OpenSlateWidget<T>(InParams, bInstant, InName);
 	}
 	
 	template<class T>
 	static bool OpenSlateWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return UWidgetModule::Get().OpenSlateWidget<T>(&InParams, bInstant, InName);
+		return FSlateWidgetManager::Get().OpenSlateWidget<T>(&InParams, bInstant, InName);
 	}
 
 	template<class T>
 	static bool CloseSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return UWidgetModule::Get().CloseSlateWidget<T>(bInstant, InName);
+		return FSlateWidgetManager::Get().CloseSlateWidget<T>(bInstant, InName);
 	}
 	
 	template<class T>
 	static bool ToggleSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return UWidgetModule::Get().ToggleSlateWidget<T>(bInstant, InName);
+		return FSlateWidgetManager::Get().ToggleSlateWidget<T>(bInstant, InName);
 	}
 
 	template<class T>
 	static bool DestroySlateWidget(FName InName = T::WidgetName)
 	{
-		return UWidgetModule::Get().DestroySlateWidget<T>(InName);
+		return FSlateWidgetManager::Get().DestroySlateWidget<T>(InName);
 	}
 
 	static void CloseAllSlateWidget(bool bInstant = false);

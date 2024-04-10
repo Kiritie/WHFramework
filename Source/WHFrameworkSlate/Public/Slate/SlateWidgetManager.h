@@ -21,6 +21,13 @@ public:
 	
 	static FUniqueType Type;
 
+public:
+	virtual void OnInitialize() override;
+
+	virtual void OnRefresh(float DeltaSeconds) override;
+
+	virtual void OnTermination() override;
+
 	////////////////////////////////////////////////////
 	// SlateWidget
 protected:
@@ -244,7 +251,7 @@ public:
 	void ClearAllEditorWidget();
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputMode
+	// InputManager
 public:
 	virtual int32 GetNativeInputPriority() const override { return 1; }
 	

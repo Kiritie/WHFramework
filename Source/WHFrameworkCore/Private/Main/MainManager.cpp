@@ -20,4 +20,25 @@ FMainManager::~FMainManager()
 void FMainManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
+
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaSeconds)
+	{
+		OnRefresh(DeltaSeconds);
+		return true;
+	}));
+}
+
+void FMainManager::OnRefresh(float DeltaSeconds)
+{
+	FManagerBase::OnRefresh(DeltaSeconds);
+
+	for(const auto Iter : ManagerMap)
+	{
+		Iter.Value->OnRefresh(DeltaSeconds);
+	}
+}
+
+void FMainManager::OnTermination()
+{
+	FManagerBase::OnTermination();
 }

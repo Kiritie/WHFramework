@@ -22,6 +22,10 @@ public:
 public:
 	virtual void OnInitialize() override;
 
+	virtual void OnRefresh(float DeltaSeconds) override;
+
+	virtual void OnTermination() override;
+
 protected:
 	/// 管理器列表
 	TMap<FUniqueType, FManagerBase*> ManagerMap;
@@ -56,6 +60,8 @@ public:
 	{
 		if(IsExistManager<T>())
 		{
+			T* Manager = GetManager<T>();
+			Manager->OnTermination();
 			Get().ManagerMap.Remove(T::Type);
 		}
 	}

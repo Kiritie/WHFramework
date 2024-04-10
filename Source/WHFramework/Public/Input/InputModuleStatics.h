@@ -113,8 +113,5 @@ public:
 	static EInputMode GetGlobalInputMode();
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void SetGlobalInputMode(EInputMode InInputMode);
-
-	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
 	static void UpdateGlobalInputMode();
 };

@@ -3,10 +3,8 @@
 
 #include "WebRequest/WebRequestModule.h"
 
-#include "HttpModule.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Common/CommonStatics.h"
-#include "Interfaces/IHttpResponse.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 		
@@ -211,55 +209,10 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 {
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InName))
 	{
-		const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
-
-		HttpRequest->SetURL(WebInterface->GetFullUrl());
-
-		FString ContentType;
-		switch(InContent.ContentType)
+		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, &InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 		{
-			case EWebContentType::Form:
-			{
-				ContentType = TEXT("application/x-www-form-urlencoded; charset=utf-8");
-				break;
-			}
-			case EWebContentType::Text:
-			{
-				ContentType = TEXT("text/plain; charset=utf-8");
-				break;
-			}
-			case EWebContentType::Json:
-			{
-				ContentType = TEXT("application/json; charset=utf-8");
-				break;
-			}
-			case EWebContentType::Data:
-			{
-				ContentType = TEXT("multipart/form-data; charset=utf-8; boundary =---------------------------" + FString::FromInt(FDateTime::Now().GetTicks()));
-				break;
-			}
-		}
-		InHeadMap.Add(TEXT("Content-Type"), ContentType);
-		InHeadMap.Add(TEXT("timestamp"), FString::FromInt(FDateTime::UtcNow().ToUnixTimestamp()));
-
-		for(auto& Iter : InHeadMap.GetMap())
-		{
-			HttpRequest->SetHeader(Iter.Key, Iter.Value);
-		}
-
-		HttpRequest->SetContentAsString(InContent.ToString());
-
-		HttpRequest->SetVerb(UCommonStatics::GetEnumValueDisplayName(TEXT("/Script/WHFramework.EWebRequestMethod"), (int32)InMethod).ToString());
-
-		HttpRequest->OnProcessRequestComplete().BindUObject(this, &UWebRequestModule::OnWebRequestComplete, WebInterface, InContent.ToString(), InParams);
-
-		WHLog(FString::Printf(TEXT("Start send web request: %s"), *WebInterface->GetNameN().ToString()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> Method: %s"), *HttpRequest->GetVerb()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> Head: %s"), *InHeadMap.ToString()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> Content: %s"), *InContent.ToString()), EDC_WebRequest);
-
-		return HttpRequest->ProcessRequest();
+			OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
+		});
 	}
 	else
 	{
@@ -275,44 +228,5 @@ bool UWebRequestModule::K2_SendWebRequest(const FName InName, EWebRequestMethod 
 
 void UWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams)
 {
-	if(!HttpResponse.IsValid())
-	{
-		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *InWebInterface->GetNameN().ToString()), EDC_WebRequest, EDV_Warning);
-		
-		InWebInterface->RequestComplete(FWebRequestResult(InContent, false, HttpRequest, HttpResponse), InParams);
-		return;
-	}
-
-	if(HttpRequest.IsValid())
-	{
-		FString Timestamp = HttpRequest->GetHeader("timestamp");
-		if(!Timestamp.IsEmpty())
-		{
-			const int64 RequestTime = FCString::Atoi64(*Timestamp);
-			const int64 Now = FDateTime::UtcNow().ToUnixTimestamp();
-			const int64 SpendTime = Now - RequestTime;
-			if(SpendTime > 8000)
-			{
-				WHLog(FString::Printf(TEXT("Web request: %s, Spendtime to long: %d"), *InWebInterface->GetNameN().ToString(), (int)SpendTime), EDC_WebRequest, EDV_Warning);
-				WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
-			}
-		}
-	}
-
-	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
-	{
-		WHLog(FString::Printf(TEXT("Web request successed: %s"), *InWebInterface->GetNameN().ToString()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
-		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest);
-		
-		InWebInterface->RequestComplete(FWebRequestResult(InContent, true, HttpRequest, HttpResponse), InParams);
-	}
-	else
-	{
-		WHLog(FString::Printf(TEXT("Web response returned error code: %d , Web request: %s"), HttpResponse->GetResponseCode(), *InWebInterface->GetNameN().ToString()), EDC_WebRequest, EDV_Error);
-		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Error);
-		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest, EDV_Error);
-		
-		InWebInterface->RequestComplete(FWebRequestResult(InContent, false, HttpRequest, HttpResponse), InParams);
-	}
+	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse), InParams);
 }

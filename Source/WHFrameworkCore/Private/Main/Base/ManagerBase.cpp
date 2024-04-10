@@ -16,5 +16,15 @@ FManagerBase::~FManagerBase()
 
 void FManagerBase::OnInitialize()
 {
-	int32 a = 0;
+	
+}
+
+void FManagerBase::OnRefresh(float DeltaSeconds)
+{
+	
+}
+
+void FManagerBase::OnTermination()
+{
+	
 }

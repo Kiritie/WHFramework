@@ -18,21 +18,18 @@ public:
 	static const FUniqueType Type;
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputMode
+	// InputManager
 public:
 	virtual void UpdateInputMode();
 
 protected:
-	EInputMode NativeInputMode;
+	EInputMode _NativeInputMode;
+	EInputMode _GlobalInputMode;
 
-	EInputMode GlobalInputMode;
-	
 public:
-	virtual bool SetGlobalInputMode(EInputMode InInputMode);
-
-	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
-
 	virtual int32 GetNativeInputPriority() const override { return 0; }
 
-	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
+	virtual EInputMode GetNativeInputMode() const override { return _NativeInputMode; }
+
+	virtual EInputMode GetGlobalInputMode() const { return _GlobalInputMode; }
 };

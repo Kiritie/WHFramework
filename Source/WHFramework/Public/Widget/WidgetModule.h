@@ -9,7 +9,7 @@
 #include "Widget/Screen/UserWidgetBase.h"
 #include "World/WorldWidgetBase.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Slate/SlateWidgetManager.h"
+#include "Input/InputManagerInterface.h"
 #include "WidgetModule.generated.h"
 
 class UEventHandle_SetWorldWidgetVisible;
@@ -17,7 +17,7 @@ class UEventHandle_CloseUserWidget;
 class UEventHandle_OpenUserWidget;
 
 UCLASS()
-class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public FSlateWidgetManager
+class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManagerInterface
 {
 	GENERATED_BODY()
 			

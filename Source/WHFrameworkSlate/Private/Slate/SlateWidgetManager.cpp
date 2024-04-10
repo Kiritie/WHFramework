@@ -23,6 +23,32 @@ FSlateWidgetManager::~FSlateWidgetManager()
 	
 }
 
+void FSlateWidgetManager::OnInitialize()
+{
+	FManagerBase::OnInitialize();
+}
+
+void FSlateWidgetManager::OnRefresh(float DeltaSeconds)
+{
+	FManagerBase::OnRefresh(DeltaSeconds);
+
+	for (auto& Iter : AllSlateWidgets)
+	{
+		TSharedPtr<SSlateWidgetBase> SlateWidget = Iter.Value;
+		if (SlateWidget && SlateWidget->GetWidgetState() == EScreenWidgetState::Opened && SlateWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+		{
+			SlateWidget->Refresh();
+		}
+	}
+}
+
+void FSlateWidgetManager::OnTermination()
+{
+	FManagerBase::OnTermination();
+
+	ClearAllSlateWidget();
+}
+
 void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
 {
 	for (auto Iter : AllSlateWidgets)

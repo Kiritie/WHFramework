@@ -704,15 +704,57 @@ AWHPlayerController* UInputModule::GetPlayerController()
 
 void UInputModule::UpdateInputMode()
 {
-	FInputManager::UpdateInputMode();
-}
-
-bool UInputModule::SetGlobalInputMode(EInputMode InInputMode)
-{
-	if(FInputManager::SetGlobalInputMode(InInputMode))
+	EInputMode InputMode = EInputMode::None;
+	for (const auto Iter : AMainModule::GetAllModule<IInputManagerInterface>())
 	{
-		UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
-		return true;
+		if ((int32)Iter->GetNativeInputMode() > (int32)InputMode)
+		{
+			InputMode = Iter->GetNativeInputMode();
+		}
 	}
-	return false;
+	if(GlobalInputMode != InputMode)
+	{
+		GlobalInputMode = InputMode;
+		switch (InputMode)
+		{
+			case EInputMode::None:
+			{
+				GetPlayerController()->SetInputMode(FInputModeNone());
+				GetPlayerController()->bShowMouseCursor = false;
+				break;
+			}
+			case EInputMode::GameOnly:
+			{
+				GetPlayerController()->SetInputMode(FInputModeGameOnly());
+				GetPlayerController()->bShowMouseCursor = false;
+				break;
+			}
+			case EInputMode::GameOnly_NotHideCursor:
+			{
+				GetPlayerController()->SetInputMode(FInputModeGameOnly_NotHideCursor());
+				GetPlayerController()->bShowMouseCursor = true;
+				break;
+			}
+			case EInputMode::GameAndUI:
+			{
+				GetPlayerController()->SetInputMode(FInputModeGameAndUI());
+				GetPlayerController()->bShowMouseCursor = true;
+				break;
+			}
+			case EInputMode::GameAndUI_NotHideCursor:
+			{
+				GetPlayerController()->SetInputMode(FInputModeGameAndUI_NotHideCursor());
+				GetPlayerController()->bShowMouseCursor = true;
+				break;
+			}
+			case EInputMode::UIOnly:
+			{
+				GetPlayerController()->SetInputMode(FInputModeUIOnly());
+				GetPlayerController()->bShowMouseCursor = true;
+				break;
+			}
+			default: break;
+		}
+		UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
+	}
 }

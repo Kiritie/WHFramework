@@ -105,11 +105,6 @@ EInputMode UInputModuleStatics::GetGlobalInputMode()
 	return UInputModule::Get().GetGlobalInputMode();
 }
 
-void UInputModuleStatics::SetGlobalInputMode(EInputMode InInputMode)
-{
-	UInputModule::Get().SetGlobalInputMode(InInputMode);
-}
-
 void UInputModuleStatics::UpdateGlobalInputMode()
 {
 	UInputModule::Get().UpdateInputMode();

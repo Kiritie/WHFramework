@@ -3,6 +3,7 @@
 #include "WebRequest/WebRequestManager.h"
 
 #include "HttpModule.h"
+#include "Debug/DebugTypes.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Main/MainManager.h"
 #include "Serialization/JsonReader.h"
@@ -33,29 +34,7 @@ FString FWebRequestManager::GetServerURL() const
 	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
 }
 
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete)
-{
-	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpResponsePtr Response, bool bSuccess)
-	{
-		OnComplete.Execute(bSuccess ? Response->GetContentAsString() : TEXT(""));
-	});
-}
-
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete)
-{
-	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpResponsePtr Response, bool bSuccess)
-	{
-		TSharedPtr<FJsonObject> Json;
-		if(bSuccess)
-		{
-			const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
-			FJsonSerializer::Deserialize(JsonReader, Json);
-		}
-		OnComplete.Execute(Json);
-	});
-}
-
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpResponsePtr, bool)> OnComplete)
+bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
 {
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
@@ -111,21 +90,43 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 
 	HttpRequest->OnProcessRequestComplete().BindRaw(this, &FWebRequestManager::OnWebRequestComplete, OnComplete);
 
-	UE_LOG(LogTemp, Log, TEXT("Start send web request:"));
-	UE_LOG(LogTemp, Log, TEXT("------> URL: %s"), *HttpRequest->GetURL());
-	UE_LOG(LogTemp, Log, TEXT("------> Method: %s"), *HttpRequest->GetVerb());
-	UE_LOG(LogTemp, Log, TEXT("------> Head: %s"), *InHeadMap.ToString());
-	UE_LOG(LogTemp, Log, TEXT("------> Content: %s"), *InContent.ToString());
+	WHLog(TEXT("Start send web request"), EDC_WebRequest);
+	WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
+	WHLog(FString::Printf(TEXT("------> Method: %s"), *HttpRequest->GetVerb()), EDC_WebRequest);
+	WHLog(FString::Printf(TEXT("------> Head: %s"), *InHeadMap.ToString()), EDC_WebRequest);
+	WHLog(FString::Printf(TEXT("------> Content: %s"), *InContent.ToString()), EDC_WebRequest);
 
 	return HttpRequest->ProcessRequest();
 }
 
-void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpResponsePtr, bool)> OnComplete)
+bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete)
+{
+	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+	{
+		OnComplete.Execute(bSuccess ? Response->GetContentAsString() : TEXT(""));
+	});
+}
+
+bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete)
+{
+	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+	{
+		TSharedPtr<FJsonObject> Json;
+		if(bSuccess)
+		{
+			const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+			FJsonSerializer::Deserialize(JsonReader, Json);
+		}
+		OnComplete.Execute(Json);
+	});
+}
+
+void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
 {
 	if(!HttpResponse.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Unable to process web request: %s"), *HttpRequest->GetURL());
-		OnComplete(nullptr, false);
+		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
+		OnComplete(nullptr, nullptr, false);
 		return;
 	}
 
@@ -139,26 +140,26 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 			const int64 SpendTime = Now - RequestTime;
 			if(SpendTime > 8000)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Web request spendtime to long: %d"), (int)SpendTime);
-				UE_LOG(LogTemp, Warning, TEXT("------> URL: %s"), *HttpRequest->GetURL());
+				WHLog(FString::Printf(TEXT("Web request spendtime to long: %d"), (int)SpendTime), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
 			}
 		}
 	}
 
 	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
 	{
-		UE_LOG(LogTemp, Log, TEXT("Web request successed"));
-		UE_LOG(LogTemp, Log, TEXT("------> URL: %s"), *HttpRequest->GetURL());
-		UE_LOG(LogTemp, Log, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
+		WHLog(TEXT("Web request successed"), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest);
 
-		OnComplete(HttpResponse, true);
+		OnComplete(HttpRequest, HttpResponse, true);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Web response returned error code: %d"), HttpResponse->GetResponseCode());
-		UE_LOG(LogTemp, Warning, TEXT("------> URL: %s"), *HttpRequest->GetURL());
-		UE_LOG(LogTemp, Warning, TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString());
+		WHLog(FString::Printf(TEXT("Web response returned error code: %d"), HttpResponse->GetResponseCode()), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest, EDV_Error);
 
-		OnComplete(HttpResponse, false);
+		OnComplete(HttpRequest, HttpResponse, false);
 	}
 }

@@ -4,13 +4,13 @@
 
 
 #include "Main/Base/ModuleBase.h"
-#include "Parameter/ParameterManager.h"
+#include "Parameter/ParameterManagerInterface.h"
 #include "ParameterModule.generated.h"
 
 class ATargetPoint;
 
 UCLASS()
-class WHFRAMEWORK_API UParameterModule : public UModuleBase, public FParameterManager
+class WHFRAMEWORK_API UParameterModule : public UModuleBase, public IParameterManagerInterface
 {
 	GENERATED_BODY()
 				

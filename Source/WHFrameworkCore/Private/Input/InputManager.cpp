@@ -13,8 +13,8 @@ IMPLEMENTATION_MANAGER(FInputManager)
 // Sets default values
 FInputManager::FInputManager()
 {
-	NativeInputMode = EInputMode::GameOnly;
-	GlobalInputMode = EInputMode::GameOnly;
+	_NativeInputMode = EInputMode::GameOnly;
+	_GlobalInputMode = EInputMode::GameOnly;
 }
 
 FInputManager::~FInputManager()
@@ -31,17 +31,12 @@ void FInputManager::UpdateInputMode()
 			InputMode = Iter->GetNativeInputMode();
 		}
 	}
-	SetGlobalInputMode(InputMode);
-}
-
-bool FInputManager::SetGlobalInputMode(EInputMode InInputMode)
-{
-	if(GlobalInputMode != InInputMode)
+	if(_GlobalInputMode != InputMode)
 	{
-		GlobalInputMode = InInputMode;
+		_GlobalInputMode = InputMode;
 
 		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GWorld, 0);
-		switch (InInputMode)
+		switch (InputMode)
 		{
 			case EInputMode::None:
 			{
@@ -81,7 +76,5 @@ bool FInputManager::SetGlobalInputMode(EInputMode InInputMode)
 			}
 			default: break;
 		}
-		return true;
 	}
-	return false;
 }
