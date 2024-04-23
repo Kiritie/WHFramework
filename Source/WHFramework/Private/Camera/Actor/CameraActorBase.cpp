@@ -34,6 +34,10 @@ ACameraActorBase::ACameraActorBase()
 
 	CameraOrthoFactor = 1.93f;
 	CameraStreamingAltitude = -1.f;
+	CameraStreamingVelocity = -1.f;
+
+	LastCameraLocation = FVector::ZeroVector;
+	CameraStayDuration = 0.f;
 
 	CameraCollisionMode = ECameraCollisionMode::None;
 }
@@ -45,19 +49,36 @@ void ACameraActorBase::OnInitialize_Implementation()
 
 void ACameraActorBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	
+	LastCameraLocation = GetActorLocation();
 }
 
 void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(IsCurrent() && (CameraStreamingAltitude == -1.f || USceneModuleStatics::GetAltitude() < CameraStreamingAltitude))
+	CameraVelocity = GetActorLocation() - LastCameraLocation;
+
+	if(!GetActorLocation().Equals(LastCameraLocation, 0.1f))
 	{
-		StreamingSource->EnableStreamingSource();
+		CameraStayDuration = 0.f;
 	}
 	else
 	{
-		StreamingSource->DisableStreamingSource();
+		CameraStayDuration += DeltaSeconds;
 	}
+	
+	if(IsCurrent())
+	{
+		if((CameraStreamingAltitude == -1.f || USceneModuleStatics::GetAltitude() < CameraStreamingAltitude)
+			&& (CameraStreamingVelocity == -1.f || (CameraVelocity.Length() < CameraStreamingVelocity && CameraStayDuration >= 1.f)))
+		{
+			StreamingSource->EnableStreamingSource();
+		}
+		else
+		{
+			StreamingSource->DisableStreamingSource();
+		}
+	}
+
+	LastCameraLocation = GetActorLocation();
 }
 
 void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
@@ -67,12 +88,12 @@ void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 
 void ACameraActorBase::OnSwitch_Implementation()
 {
-	// StreamingSource->EnableStreamingSource();
+	
 }
 
 void ACameraActorBase::OnUnSwitch_Implementation()
 {
-	// StreamingSource->DisableStreamingSource();
+	StreamingSource->DisableStreamingSource();
 }
 
 void ACameraActorBase::Switch_Implementation()

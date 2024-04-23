@@ -3,6 +3,7 @@
 
 #include "Debug/DebugModuleStatics.h"
 
+#include "Debug/DebugManager.h"
 #include "Debug/DebugModule.h"
 
 bool UDebugModuleStatics::EnsureEditor(bool InExpression)
@@ -17,12 +18,12 @@ bool UDebugModuleStatics::EnsureEditorMsgf(bool InExpression, const FString& InM
 
 void UDebugModuleStatics::LogMessage(const FString& InMessage, EDebugCategory InCategory, EDebugVerbosity InVerbosity)
 {
-	UDebugModule::Get().LogMessage(InMessage, InCategory, InVerbosity);
+	FDebugManager::Get().LogMessage(InMessage, InCategory, InVerbosity);
 }
 
 void UDebugModuleStatics::DebugMessage(const FString& InMessage, EDebugMode InMode, EDebugCategory InCategory, EDebugVerbosity InVerbosity, const FLinearColor InDisplayColor, float InDuration, int32 InKey, bool bNewerOnTop)
 {
-	UDebugModule::Get().DebugMessage(InMessage, InMode, InCategory, InVerbosity, InDisplayColor, InDuration, InKey, bNewerOnTop);
+	FDebugManager::Get().DebugMessage(InMessage, InMode, InCategory, InVerbosity, InDisplayColor, InDuration, InKey, bNewerOnTop);
 }
 
 FDebugCategoryState UDebugModuleStatics::GetDebugCategoryState(EDebugCategory InCategory)

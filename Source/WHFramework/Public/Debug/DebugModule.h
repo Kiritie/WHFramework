@@ -4,12 +4,11 @@
 
 #include "Main/Base/ModuleBase.h"
 #include "DebugModuleStatics.h"
-#include "Debug/DebugManager.h"
 
 #include "DebugModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API UDebugModule : public UModuleBase, public FDebugManager
+class WHFRAMEWORK_API UDebugModule : public UModuleBase
 {
 	GENERATED_BODY()
 		
@@ -41,6 +40,17 @@ public:
 	virtual void OnUnPause() override;
 
 	virtual void OnTermination(EPhase InPhase) override;
+	
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+public:
+	UFUNCTION(BlueprintPure)
+	virtual FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory) const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState);
 
 protected:
 	UPROPERTY(EditAnywhere)

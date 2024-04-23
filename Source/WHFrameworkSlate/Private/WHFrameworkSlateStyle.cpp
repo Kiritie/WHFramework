@@ -175,9 +175,9 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 		);
 	}
 
-	// Lists
+	// TableRows
 	{
-		Style->Set("Lists.Default", FTableRowStyle(NormalTableRowStyle)
+		Style->Set("TableRows.Lists.Default", FTableRowStyle(NormalTableRowStyle)
 			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
 			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
 			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
@@ -191,7 +191,7 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 			.SetSelectedTextColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
 		);
 
-		Style->Set("Lists.Tab", FTableRowStyle(NormalTableRowStyle)
+		Style->Set("TableRows.Lists.Tab", FTableRowStyle(NormalTableRowStyle)
 			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
 			.SetEvenRowBackgroundHoveredBrush(FSlateColorBrush(FStyleColors::Transparent))
 			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
@@ -203,6 +203,20 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 			.SetInactiveHoveredBrush(FSlateNoResource())
 			.SetTextColor(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
 			.SetSelectedTextColor(FSlateColor(FLinearColor(0.f, 0.4f, 1.f)))
+		);
+		
+		Style->Set("TableRows.Tiles.Default", FTableRowStyle(NormalTableRowStyle)
+			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
+			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
+			.SetOddRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetSelectorFocusedBrush(FSlateColorBrush(FStyleColors::Transparent))
+			.SetActiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetActiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetTextColor(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
+			.SetSelectedTextColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
 		);
 	}
 

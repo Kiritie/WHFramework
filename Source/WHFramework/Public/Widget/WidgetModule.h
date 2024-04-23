@@ -2,7 +2,7 @@
 
 #pragma once
 
-
+#include "Components/RichTextBlockDecorator.h"
 #include "Main/Base/ModuleBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModuleTypes.h"
@@ -60,6 +60,34 @@ protected:
 	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
 
 	////////////////////////////////////////////////////
+	// CommonWidget
+protected:
+	UPROPERTY(EditAnywhere, Category = "CommonWidget|RichText")
+	UDataTable* CommonRichTextStyle;
+
+	UPROPERTY(EditAnywhere, Category = "CommonWidget|RichText")
+	TArray<TSubclassOf<URichTextBlockDecorator>> CommonRichTextDecorators;
+
+public:
+	UFUNCTION(BlueprintPure)
+	UDataTable* GetCommonRichTextStyle() const { return CommonRichTextStyle; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCommonRichTextStyle(UDataTable* InCommonRichTextStyle) { CommonRichTextStyle = InCommonRichTextStyle; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<TSubclassOf<URichTextBlockDecorator>> GetCommonRichTextDecorators() const { return CommonRichTextDecorators; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCommonRichTextDecorators(const TArray<TSubclassOf<URichTextBlockDecorator>>& InCommonRichTextDecorators) { CommonRichTextDecorators = InCommonRichTextDecorators; }
+
+	UFUNCTION(BlueprintCallable)
+	void AddCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator) { CommonRichTextDecorators.Add(InCommonRichTextDecorator); }
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator) { CommonRichTextDecorators.Remove(InCommonRichTextDecorator); }
+
+	////////////////////////////////////////////////////
 	// ScreenWidget
 protected:
 	UPROPERTY(EditAnywhere, Category = "ScreenWidget")
@@ -88,7 +116,7 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	TMap<FName, UUserWidgetBase*> GetAllUserWidget() const { return AllUserWidget; }
-
+	
 	template<class T>
 	bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass()) const
 	{

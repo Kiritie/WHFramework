@@ -17,7 +17,28 @@ class WHFRAMEWORK_API UWidgetModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 	////////////////////////////////////////////////////
-	// UserWidget
+	// CommonWidget
+public:
+	UFUNCTION(BlueprintPure)
+	static UDataTable* GetCommonRichTextStyle();
+
+	UFUNCTION(BlueprintCallable)
+	static void SetCommonRichTextStyle(UDataTable* InCommonRichTextStyle);
+
+	UFUNCTION(BlueprintPure)
+	static TArray<TSubclassOf<URichTextBlockDecorator>> GetCommonRichTextDecorators();
+
+	UFUNCTION(BlueprintCallable)
+	static void SetCommonRichTextDecorators(const TArray<TSubclassOf<URichTextBlockDecorator>>& InCommonRichTextDecorators);
+
+	UFUNCTION(BlueprintCallable)
+	static void AddCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
+
+	UFUNCTION(BlueprintCallable)
+	static void RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
+
+	////////////////////////////////////////////////////
+	// ScreenWidget
 public:
 	template<class T>
 	static T* GetTemporaryUserWidget()

@@ -3,6 +3,36 @@
 
 #include "Widget/WidgetModuleStatics.h"
 
+UDataTable* UWidgetModuleStatics::GetCommonRichTextStyle()
+{
+	return UWidgetModule::Get().GetCommonRichTextStyle();
+}
+
+void UWidgetModuleStatics::SetCommonRichTextStyle(UDataTable* InCommonRichTextStyle)
+{
+	UWidgetModule::Get().SetCommonRichTextStyle(InCommonRichTextStyle);
+}
+
+TArray<TSubclassOf<URichTextBlockDecorator>> UWidgetModuleStatics::GetCommonRichTextDecorators()
+{
+	return UWidgetModule::Get().GetCommonRichTextDecorators();
+}
+
+void UWidgetModuleStatics::SetCommonRichTextDecorators(const TArray<TSubclassOf<URichTextBlockDecorator>>& InCommonRichTextDecorators)
+{
+	UWidgetModule::Get().SetCommonRichTextDecorators(InCommonRichTextDecorators);
+}
+
+void UWidgetModuleStatics::AddCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator)
+{
+	UWidgetModule::Get().AddCommonRichTextDecorator(InCommonRichTextDecorator);
+}
+
+void UWidgetModuleStatics::RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator)
+{
+	UWidgetModule::Get().RemoveCommonRichTextDecorator(InCommonRichTextDecorator);
+}
+
 UUserWidgetBase* UWidgetModuleStatics::GetTemporaryUserWidget()
 {
 	return UWidgetModule::Get().GetTemporaryUserWidget();

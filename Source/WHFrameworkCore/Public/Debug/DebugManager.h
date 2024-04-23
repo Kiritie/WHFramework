@@ -15,17 +15,14 @@ public:
 	FDebugManager();
 
 	virtual ~FDebugManager() override;
-	
+
 	static const FUniqueType Type;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void LogMessage(const FString& InMessage, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log);
+	void LogMessage(const FString& InMessage, EDebugCategory InCategory, EDebugVerbosity InVerbosity);
+	
+	void DebugMessage(const FString& InMessage, EDebugMode InMode, EDebugCategory InCategory, EDebugVerbosity InVerbosity, FLinearColor InDisplayColor, float InDuration, int32 InKey, bool bNewerOnTop);
 
-	UFUNCTION(BlueprintCallable)
-	void DebugMessage(const FString& InMessage, EDebugMode InMode = EDM_Screen, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log, const FLinearColor InDisplayColor = FLinearColor(0,255,255), float InDuration = 1.5f, int InKey = -1, bool bNewerOnTop = true);
-
-public:
 	UFUNCTION(BlueprintPure)
 	FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory) const;
 
@@ -33,5 +30,5 @@ public:
 	void SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState);
 
 protected:
-	TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState> _DebugCategoryStates;
+	TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState> DebugCategoryStates;
 };

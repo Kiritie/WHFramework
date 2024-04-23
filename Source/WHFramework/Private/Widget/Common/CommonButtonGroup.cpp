@@ -44,9 +44,9 @@ void UCommonButtonGroup::OnWidgetAdded(UWidget* NewWidget)
 
 void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButton, bool bIsSelected)
 {
-	const UCommonButton* _BaseButton = Cast<UCommonButton>(BaseButton);
+	const UCommonButton* CommonButton = Cast<UCommonButton>(BaseButton);
 
-	if (!_BaseButton || _BaseButton->IsStandalone()) return;
+	if (!CommonButton || CommonButton->IsStandalone()) return;
 
 	if (bIsSelected)
 	{

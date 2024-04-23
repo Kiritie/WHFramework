@@ -13,9 +13,9 @@ IMPLEMENTATION_MANAGER(FDebugManager)
 // Sets default values
 FDebugManager::FDebugManager()
 {
-	_DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
+	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
 	DON_WITHINDEX((int32)EDC_Custom1, i, 
-		_DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
+		DebugCategoryStates.Add((EDebugCategory)i, FDebugCategoryState(true, true));
 	)
 }
 
@@ -98,17 +98,14 @@ void FDebugManager::DebugMessage(const FString& InMessage, EDebugMode InMode, ED
 
 FDebugCategoryState FDebugManager::GetDebugCategoryState(EDebugCategory InCategory) const
 {
-	if(_DebugCategoryStates.Contains(InCategory))
+	if(DebugCategoryStates.Contains(InCategory))
 	{
-		return _DebugCategoryStates[InCategory];
+		return DebugCategoryStates[InCategory];
 	}
 	return FDebugCategoryState();
 }
 
 void FDebugManager::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
 {
-	if(_DebugCategoryStates.Contains(InCategory))
-	{
-		_DebugCategoryStates[InCategory] = InState;
-	}
+	DebugCategoryStates.Emplace(InCategory, InState);
 }

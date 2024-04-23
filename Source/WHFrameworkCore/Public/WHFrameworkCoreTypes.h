@@ -216,3 +216,25 @@ extern void RecursiveArrayItems(const T& Value, TFunction<TArray<T>(const T&)> F
 		RecursiveArrayItems(Iter, Func);
 	}
 }
+
+template<typename TOut, typename TIn>
+extern TArray<TOut> CastArrayItems(const TArray<TIn>& InArray)
+{
+	TArray<TOut> OutArray;
+	for(auto Iter : InArray)
+	{
+		OutArray.Add(Cast<TOut>(Iter));
+	}
+	return OutArray;
+}
+
+template<typename TOut, typename TIn>
+extern TArray<TSharedPtr<TOut>> CastSharedPtrArrayItems(const TArray<TSharedPtr<TIn>>& InArray)
+{
+	TArray<TSharedPtr<TOut>> OutArray;
+	for(auto Iter : InArray)
+	{
+		OutArray.Add(StaticCastSharedPtr<TOut>(Iter));
+	}
+	return OutArray;
+}

@@ -81,7 +81,17 @@ protected:
 	float CameraStreamingAltitude;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
+	float CameraStreamingVelocity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraStats")
 	ECameraCollisionMode CameraCollisionMode;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CameraStats")
+	FVector CameraVelocity;
+
+private:
+	FVector LastCameraLocation;
+	float CameraStayDuration;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -104,4 +114,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCameraLocation(FVector InLocation);
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector GetCameraVelocity() { return CameraVelocity; }
 };

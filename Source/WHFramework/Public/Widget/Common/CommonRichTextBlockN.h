@@ -23,4 +23,15 @@ public:
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+public:
+	virtual void SetText(const FText& InText) override;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void RefreshRichStyle();
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Appearance)
+	bool bUseCommonRichStyle;
 };
