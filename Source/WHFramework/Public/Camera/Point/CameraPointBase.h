@@ -36,7 +36,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch(bool bCachePoint = true, bool bSetAsDefault = false);
+	void Switch(bool bSetAsDefault = false, bool bInstant = false);
 
 public:
 #if WITH_EDITOR

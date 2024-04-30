@@ -53,6 +53,9 @@ public:
 	static FParameter MakeFloatParameter(float InValue);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeByteParameter(uint8 InValue);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeStringParameter(const FString& InValue);
 	
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -118,6 +121,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetFloatValue(UPARAM(ref) FParameter& InParameter, float InValue) { InParameter.SetFloatValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static uint8 GetByteValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetByteValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetByteValue(UPARAM(ref) FParameter& InParameter, uint8 InValue) { InParameter.SetByteValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

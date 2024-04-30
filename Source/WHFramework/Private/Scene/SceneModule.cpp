@@ -471,17 +471,6 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 	{
 		DataLayerPlayerMappings.Remove(InEventHandle->DataLayer);
 	}
-	// const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(InEventHandle->PlayerIndex);
-	// for(const auto Iter1 : UCommonStatics::GetAllActorsOfDataLayer(InEventHandle->DataLayer))
-	// {
-	// 	Iter1->SetOwner(PlayerController ? PlayerController->GetViewTarget() : nullptr);
-	// 	TArray<UPrimitiveComponent*> Components;
-	// 	Iter1->GetComponents<UPrimitiveComponent>(Components);
-	// 	for(const auto Iter2 : Components)
-	// 	{
-	// 		Iter2->SetOnlyOwnerSee(PlayerController != nullptr);
-	// 	}
-	// }
 }
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const

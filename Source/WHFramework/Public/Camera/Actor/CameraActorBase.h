@@ -4,7 +4,7 @@
 
 #include "Camera/CameraModuleTypes.h"
 #include "Common/Base/WHActor.h"
-#include "Voxel/Agent/VoxelAgentInterface.h"
+#include "Debug/DebuggerInterface.h"
 #include "CameraActorBase.generated.h"
 
 class UWorldPartitionStreamingSourceComponent;
@@ -12,7 +12,7 @@ class UCameraComponent;
 class USpringArmComponent;
 
 UCLASS()
-class WHFRAMEWORK_API ACameraActorBase : public AWHActor
+class WHFRAMEWORK_API ACameraActorBase : public AWHActor, public IDebuggerInterface
 {
 	GENERATED_BODY()
 
@@ -33,6 +33,18 @@ public:
 
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Debugger
+protected:
+	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bDrawDebug;
+
+public:
+	virtual bool IsDrawDebug() override { return bDrawDebug; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraActor
@@ -116,5 +128,8 @@ public:
 	virtual void SetCameraLocation(FVector InLocation);
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector GetCameraVelocity() { return CameraVelocity; }
+	virtual float GetCameraDistance() const;
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector GetCameraVelocity() const { return CameraVelocity; }
 };

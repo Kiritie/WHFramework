@@ -704,6 +704,8 @@ AWHPlayerController* UInputModule::GetPlayerController()
 
 void UInputModule::UpdateInputMode()
 {
+	if(!GetPlayerController()) return;
+	
 	EInputMode InputMode = EInputMode::None;
 	for (const auto Iter : AMainModule::GetAllModule<IInputManagerInterface>())
 	{

@@ -50,9 +50,9 @@ void ACameraPointBase::OnSwitch_Implementation()
 	
 }
 
-void ACameraPointBase::Switch_Implementation(bool bCachePoint, bool bSetAsDefault)
+void ACameraPointBase::Switch_Implementation(bool bSetAsDefault, bool bInstant)
 {
-	UCameraModuleStatics::SwitchCameraPoint(this, bCachePoint, bSetAsDefault);
+	UCameraModuleStatics::SwitchCameraPoint(this, bSetAsDefault, bInstant);
 }
 
 #if WITH_EDITOR

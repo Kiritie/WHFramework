@@ -50,6 +50,11 @@ FParameter UParameterModuleStatics::MakeFloatParameter(float InValue)
 	return FParameter::MakeFloat(InValue);
 }
 
+FParameter UParameterModuleStatics::MakeByteParameter(uint8 InValue)
+{
+	return FParameter::MakeByte(InValue);
+}
+
 FParameter UParameterModuleStatics::MakeStringParameter(const FString& InValue)
 {
 	return FParameter::MakeString(InValue);

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Camera/Actor/CameraActorBase.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "RoamCameraActor.generated.h"
 
 UCLASS()
@@ -19,7 +20,7 @@ public:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	class USphereComponent* Sphere;
-
+	
 public:
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode) override;
 

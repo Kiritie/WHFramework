@@ -299,10 +299,12 @@ int32 UCommonStatics::GetTagIndexForContainer(const FGameplayTag& InTag, const F
 FGameplayTagContainer UCommonStatics::GetTagChildren(const FGameplayTag& InTag)
 {
 	FGameplayTagContainer ReturnValue;
-	const TSharedPtr<FGameplayTagNode> TagNode = UGameplayTagsManager::Get().FindTagNode(InTag.GetTagName());
-	for(const auto Iter : TagNode->GetChildTagNodes())
+	if(const TSharedPtr<FGameplayTagNode> TagNode = UGameplayTagsManager::Get().FindTagNode(InTag.GetTagName()))
 	{
-		ReturnValue.AddTag(Iter->GetCompleteTag());
+		for(const auto Iter : TagNode->GetChildTagNodes())
+		{
+			ReturnValue.AddTag(Iter->GetCompleteTag());
+		}
 	}
 	return ReturnValue;
 }

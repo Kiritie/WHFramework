@@ -50,6 +50,12 @@ void FCameraPointDetailCustomization::CustomizeDetails(IDetailLayoutBuilder& Det
 				.Text(FText::FromString(TEXT("Paste Camera View")))
 				.OnClicked_Raw(this, &FCameraPointDetailCustomization::OnClickPasteCameraViewButton)
 			]
+			+SWrapBox::Slot()
+			[
+				SNew(SButton)
+				.Text(FText::FromString(TEXT("Switch Camera Point")))
+				.OnClicked_Raw(this, &FCameraPointDetailCustomization::OnClickSwitchCameraPointButton)
+			]
 		];
 }
 
@@ -75,6 +81,19 @@ FReply FCameraPointDetailCustomization::OnClickPasteCameraViewButton()
 			FString CameraParams;
 			FPlatformApplicationMisc::ClipboardPaste(CameraParams);
 			CameraPoint->SetCameraView(FCameraParams(CameraParams));
+		}
+	}
+
+	return FReply::Handled();
+}
+
+FReply FCameraPointDetailCustomization::OnClickSwitchCameraPointButton()
+{
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	{
+		if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
+		{
+			CameraPoint->Switch();
 		}
 	}
 

@@ -202,73 +202,73 @@ public:
 	}
 
 protected:
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetType WidgetType;
 
 	UPROPERTY(EditDefaultsOnly)
 	FName WidgetName;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FName ParentName;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FName ParentSlot;
 		
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bWidgetPenetrable;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FAnchors WidgetAnchors;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	bool bWidgetAutoSize;
 	
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
 	FMargin WidgetOffsets;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FVector2D WidgetAlignment;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetCreateType WidgetCreateType;
 	
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetOpenType WidgetOpenType;
 	
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetOpenFinishType WidgetOpenFinishType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
 	float WidgetOpenFinishTime;
 
-	UPROPERTY(EditDefaultsOnly, Instanced, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Animator"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Instanced, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Animator"))
 	UWidgetAnimatorBase* WidgetOpenAnimator;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetCloseType WidgetCloseType;
 	
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetCloseFinishType WidgetCloseFinishType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Delay"))
 	float WidgetCloseFinishTime;
 
-	UPROPERTY(EditDefaultsOnly, Instanced, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Animator"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Instanced, meta = (EditConditionHides, EditCondition = "WidgetCloseFinishType == EWidgetCloseFinishType::Animator"))
 	UWidgetAnimatorBase* WidgetCloseAnimator;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetRefreshType WidgetRefreshType;
 
-	UPROPERTY(EditDefaultsOnly, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<FParameter> WidgetParams;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EInputMode WidgetInputMode;
 
 	UPROPERTY(Transient)

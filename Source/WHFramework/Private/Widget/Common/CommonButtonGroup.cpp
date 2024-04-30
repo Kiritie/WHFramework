@@ -31,13 +31,40 @@ void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 
 void UCommonButtonGroup::OnWidgetAdded(UWidget* NewWidget)
 {
-	Super::OnWidgetAdded(NewWidget);
-
 	if(UCommonButton* CommonButton = Cast<UCommonButton>(NewWidget))
 	{
-		if(!CommonButton->bStandalone)
+		CommonButton->OnSelectedChangedBase.AddUniqueDynamic(this, &UCommonButtonGroup::OnSelectionStateChangedBase);
+		CommonButton->OnButtonBaseClicked.AddUniqueDynamic(this, &UCommonButtonGroup::OnHandleButtonBaseClicked);
+		CommonButton->OnButtonBaseDoubleClicked.AddUniqueDynamic(this, &UCommonButtonGroup::OnHandleButtonBaseDoubleClicked);
+		CommonButton->OnButtonBaseHovered.AddUniqueDynamic(this, &UCommonButtonGroup::OnButtonBaseHovered);
+		CommonButton->OnButtonBaseUnhovered.AddUniqueDynamic(this, &UCommonButtonGroup::OnButtonBaseUnhovered);
+
+		Buttons.Emplace(CommonButton);
+
+		if(CommonButton->bStandalone)
+		{
+			CommonButton->bToggleable = true;
+		}
+		else
 		{
 			CommonButton->bToggleable = !bSelectionRequired;
+			
+			if(CommonButton->GetSelected())
+			{
+				for (auto& Iter : Buttons)
+				{
+					UCommonButton* Button = Cast<UCommonButton>(Iter.Get());
+					if (Button && Button->GetSelected() && !Button->IsStandalone() && Button != CommonButton)
+					{
+						Button->SetSelectedInternal(false);
+					}
+				}
+				SelectedButtonIndex = Buttons.Find(CommonButton);
+			}
+			else if (bSelectionRequired && GetSelectedButtonIndex() == INDEX_NONE)
+			{
+				CommonButton->SetSelectedInternal(true, false);
+			}
 		}
 	}
 }
@@ -88,6 +115,21 @@ void UCommonButtonGroup::OnSelectionStateChangedBase(UCommonButtonBase* BaseButt
 	}
 }
 
+void UCommonButtonGroup::SetSelectionRequiredN(bool bRequireSelection)
+{
+	if (bSelectionRequired != bRequireSelection)
+	{
+		bSelectionRequired = bRequireSelection;
+		
+		if (bSelectionRequired && 
+			GetButtonBaseAtIndexN(0) && !GetButtonBaseAtIndexN(0)->bStandalone)
+		{
+			// Selection is now required and nothing is selected, so select the first button
+			SelectButtonAtIndex(0);
+		}
+	}
+}
+
 void UCommonButtonGroup::DeselectAllN()
 {
 	if(bSelectionRequired) return;
@@ -106,4 +148,13 @@ void UCommonButtonGroup::DeselectAllN()
 		SelectedButtonIndex = INDEX_NONE;
 		OnSelectionCleared.Broadcast();
 	}
+}
+
+UCommonButton* UCommonButtonGroup::GetButtonBaseAtIndexN(int32 Index) const
+{
+	if (Buttons.IsValidIndex(Index))
+	{
+		return Cast<UCommonButton>(Buttons[Index].Get());
+	}
+	return nullptr;
 }

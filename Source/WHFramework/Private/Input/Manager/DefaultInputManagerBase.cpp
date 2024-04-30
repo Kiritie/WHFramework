@@ -68,7 +68,7 @@ void UDefaultInputManagerBase::PanHCamera_Implementation(const FInputActionValue
 
 	if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(UCommonStatics::GetPlayerController()))
 	{
-		const FRotator Rotation = UCommonStatics::GetPlayerController()->GetControlRotation();
+		const FRotator Rotation = FRotator(0.f, UCommonStatics::GetPlayerController()->GetControlRotation().Yaw, 0.f);
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
 		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
@@ -80,8 +80,8 @@ void UDefaultInputManagerBase::PanVCamera_Implementation(const FInputActionValue
 
 	if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(UCommonStatics::GetPlayerController()))
 	{
-		const FRotator Rotation = UCommonStatics::GetPlayerController()->GetControlRotation();
-		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
+		const FRotator Rotation = FRotator(UCameraModule::Get().IsEnableCameraPanZMove() ? UCommonStatics::GetPlayerController()->GetControlRotation().Pitch : 0.f, UCommonStatics::GetPlayerController()->GetControlRotation().Yaw, 0.f);
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(UCameraModule::Get().IsEnableCameraPanZMove() ? EAxis::Z : EAxis::X) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
 		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
 	}
 }

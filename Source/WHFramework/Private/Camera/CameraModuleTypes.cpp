@@ -42,6 +42,43 @@ void FCameraViewParams::SetCameraParams(const FCameraParams& InCameraParams, AAc
 	CameraViewDistance = InCameraParams.CameraDistance;
 }
 
+FVector FCameraViewParams::GetCameraLocation() const
+{
+	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	{
+		return CameraViewTarget->GetActorLocation() + CameraViewLocation;
+	}
+	return CameraViewLocation;
+}
+
+FVector FCameraViewParams::GetCameraOffset() const
+{
+	return CameraViewOffset;
+}
+
+float FCameraViewParams::GetCameraYaw() const
+{
+	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	{
+		return CameraViewTarget->GetActorRotation().Yaw + CameraViewYaw;
+	}
+	return CameraViewYaw;
+}
+
+float FCameraViewParams::GetCameraPitch() const
+{
+	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	{
+		return CameraViewTarget->GetActorRotation().Pitch + CameraViewPitch;
+	}
+	return CameraViewPitch;
+}
+
+float FCameraViewParams::GetCameraDistance() const
+{
+	return CameraViewDistance;
+}
+
 void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 {
 	if(InParams.Num() < 12) return;
@@ -49,7 +86,7 @@ void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 	CameraViewTarget = InParams[i++].GetObjectPtrValue<AActor>();
 	bTrackTarget = InParams[i++].GetBooleanValue();
 	TrackTargetMode = (ECameraTrackMode)InParams[i++].GetIntegerValue();
-	CameraViewParams.CameraViewTarget = CameraViewTarget.Get();
+	CameraViewParams.CameraViewTarget = CameraViewTarget.LoadSynchronous();
 	CameraViewParams.CameraViewActor = InParams[i++].GetObjectValue<ACameraActorBase>();
 	CameraViewParams.CameraViewMode = (ECameraViewMode)InParams[i++].GetIntegerValue();
 	CameraViewParams.CameraViewSpace = (ECameraViewSpace)InParams[i++].GetIntegerValue();

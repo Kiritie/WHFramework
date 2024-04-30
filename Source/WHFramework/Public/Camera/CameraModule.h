@@ -4,6 +4,7 @@
 
 
 #include "CameraModuleTypes.h"
+#include "Debug/DebuggerInterface.h"
 #include "Main/Base/ModuleBase.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/Base/SaveDataInterface.h"
@@ -21,7 +22,7 @@ class ACameraActorBase;
 class ACameraManagerBase;
 
 UCLASS()
-class WHFRAMEWORK_API UCameraModule : public UModuleBase
+class WHFRAMEWORK_API UCameraModule : public UModuleBase, public IDebuggerInterface
 {
 	GENERATED_BODY()
 	
@@ -63,6 +64,11 @@ protected:
 
 public:
 	virtual FString GetModuleDebugMessage() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Debugger
+protected:
+	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
@@ -160,15 +166,16 @@ protected:
 	bool bCameraMoveControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bEnableCameraPanZMove;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bReverseCameraPanMove;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	FBox CameraMoveRange;
 
-#if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = EDC_DrawCameraRange), Category = "CameraControl|Move")
 	bool bDrawCameraRange;
-#endif
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	float CameraMoveRate;
@@ -266,12 +273,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
 	FVector TargetCameraLocation;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
-	FVector CurrentCameraOffset;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
-	FVector TargetCameraOffset;
-
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
 	FRotator CurrentCameraRotation;
 	
@@ -283,6 +284,12 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
 	float TargetCameraDistance;
+
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
+	FVector CurrentCameraOffset;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
+	FVector TargetCameraOffset;
 
 private:
 	float CameraDoLocationTime;
@@ -450,10 +457,28 @@ public:
 	void SetCameraMoveControlAble(bool bInCameraMoveControlAble) { bCameraMoveControlAble = bInCameraMoveControlAble; }
 
 	UFUNCTION(BlueprintPure)
+	bool IsEnableCameraPanZMove() const { return bEnableCameraPanZMove; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetEnableCameraPanZMove(bool bInEnableCameraPanZMove) { bEnableCameraPanZMove = bInEnableCameraPanZMove; }
+
+	UFUNCTION(BlueprintPure)
 	bool IsReverseCameraPanMove() const { return bReverseCameraPanMove; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetReverseCameraPanMove(bool bInReverseCameraPanMove) { bReverseCameraPanMove = bInReverseCameraPanMove; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsClampCameraMove() const { return CameraMoveRange.IsValid != 0; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetClampCameraMove(bool bInClampCameraMove) { CameraMoveRange.IsValid = bInClampCameraMove; }
+
+	UFUNCTION(BlueprintPure)
+	FBox GetCameraMoveRange() const { return CameraMoveRange; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetCameraMoveRange(const FBox InCameraMoveRange) { CameraMoveRange = InCameraMoveRange; }
 
 	UFUNCTION(BlueprintPure)
 	float GetCameraMoveRate() const { return CameraMoveRate; }

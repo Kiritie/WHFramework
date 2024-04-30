@@ -148,6 +148,16 @@ public:
 
 	void SetCameraParams(const FCameraParams& InCameraParams, AActor* InCameraViewTarget = nullptr);
 
+	FVector GetCameraLocation() const;
+	
+	FVector GetCameraOffset() const;
+	
+	float GetCameraYaw() const;
+	
+	float GetCameraPitch() const;
+	
+	float GetCameraDistance() const;
+
 public:
 	UPROPERTY(BlueprintReadOnly, Transient)
 	AActor* CameraViewTarget;
@@ -238,6 +248,7 @@ struct WHFRAMEWORK_API FCameraModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FCameraModuleSaveData()
 	{
+		bEnableCameraPanZMove = true;
 		bReverseCameraPanMove = false;
 		CameraMoveRate = 300.f;
 		bSmoothCameraMove = true;
@@ -256,6 +267,9 @@ public:
 
 public:
 	// Move
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	bool bEnableCameraPanZMove;
+	
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
 	bool bReverseCameraPanMove;
 	

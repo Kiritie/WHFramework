@@ -37,7 +37,7 @@ void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter
 	}
 
 	PageItemGroup = UObjectPoolModuleStatics::SpawnObject<UCommonButtonGroup>();
-	PageItemGroup->SetSelectionRequired(true);
+	PageItemGroup->SetSelectionRequiredN(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
 
 	Super::OnCreate(InOwner, InParams);
@@ -58,6 +58,8 @@ void UWidgetSettingPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bI
 	Super::OnOpen(InParams, bInstant);
 	
 	SetCurrentPage(0);
+
+	GetCurrentPage()->Open();
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)

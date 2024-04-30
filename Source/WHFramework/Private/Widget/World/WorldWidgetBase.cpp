@@ -120,6 +120,8 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 		WidgetComponent = Cast<UWorldWidgetComponent>(InMapping.SceneComp);
 	}
 
+	K2_OnCreate(InOwner, InParams);
+
 	if(GetWidgetSpace() == EWidgetSpace::Screen && !IsInViewport())
 	{
 		if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
@@ -155,8 +157,6 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 	}
 
 	RefreshVisibility();
-
-	K2_OnCreate(InOwner, InParams);
 }
 
 void UWorldWidgetBase::OnRefresh()

@@ -47,6 +47,9 @@ void UWidgetCameraSettingPageBase::OnCreate(UObject* InOwner, const TArray<FPara
 {
 	Super::OnCreate(InOwner, InParams);
 	
+	SettingItem_EnableCameraPanZMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("垂直平移")) }, USettingModule::Get().GetBoolSettingItemClass());
+	AddSettingItem(FName("EnableCameraPanZMove"), SettingItem_EnableCameraPanZMove, FText::FromString(TEXT("移动")));
+	
 	SettingItem_ReverseCameraPanMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("平移反转")) }, USettingModule::Get().GetBoolSettingItemClass());
 	AddSettingItem(FName("ReverseCameraPanMove"), SettingItem_ReverseCameraPanMove, FText::FromString(TEXT("移动")));
 
@@ -88,6 +91,7 @@ void UWidgetCameraSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bo
 {
 	Super::OnOpen(InParams, bInstant);
 
+	SettingItem_EnableCameraPanZMove->SetValue(UCameraModule::Get().IsEnableCameraPanZMove());
 	SettingItem_ReverseCameraPanMove->SetValue(UCameraModule::Get().IsReverseCameraPanMove());
 	SettingItem_CameraMoveRate->SetValue(UCameraModule::Get().GetCameraMoveRate());
 	SettingItem_SmoothCameraMove->SetValue(UCameraModule::Get().IsSmoothCameraMove());
@@ -106,6 +110,7 @@ void UWidgetCameraSettingPageBase::OnApply()
 {
 	Super::OnApply();
 
+	UCameraModule::Get().SetEnableCameraPanZMove(SettingItem_EnableCameraPanZMove->GetValue().GetBooleanValue());
 	UCameraModule::Get().SetReverseCameraPanMove(SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue());
 	UCameraModule::Get().SetCameraMoveRate(SettingItem_CameraMoveRate->GetValue().GetFloatValue());
 	UCameraModule::Get().SetSmoothCameraMove(SettingItem_SmoothCameraMove->GetValue().GetBooleanValue());
@@ -124,6 +129,7 @@ void UWidgetCameraSettingPageBase::OnReset(bool bForce)
 {
 	Super::OnReset(bForce);
 
+	SettingItem_EnableCameraPanZMove->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bEnableCameraPanZMove);
 	SettingItem_ReverseCameraPanMove->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bReverseCameraPanMove);
 	SettingItem_CameraMoveRate->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().CameraMoveRate);
 	SettingItem_SmoothCameraMove->SetValue(GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bSmoothCameraMove);
@@ -163,7 +169,8 @@ void UWidgetCameraSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSetti
 
 bool UWidgetCameraSettingPageBase::CanApply_Implementation() const
 {
-	return UCameraModule::Get().IsReverseCameraPanMove() != SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue() ||
+	return UCameraModule::Get().IsEnableCameraPanZMove() != SettingItem_EnableCameraPanZMove->GetValue().GetBooleanValue() ||
+		UCameraModule::Get().IsReverseCameraPanMove() != SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue() ||
 		UCameraModule::Get().GetCameraMoveRate() != SettingItem_CameraMoveRate->GetValue().GetFloatValue() ||
 		UCameraModule::Get().IsSmoothCameraMove() != SettingItem_SmoothCameraMove->GetValue().GetBooleanValue() ||
 		UCameraModule::Get().GetCameraMoveSpeed() != SettingItem_CameraMoveSpeed->GetValue().GetFloatValue() ||
@@ -179,7 +186,8 @@ bool UWidgetCameraSettingPageBase::CanApply_Implementation() const
 
 bool UWidgetCameraSettingPageBase::CanReset_Implementation() const
 {
-	return UCameraModule::Get().IsReverseCameraPanMove() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bReverseCameraPanMove ||
+	return UCameraModule::Get().IsEnableCameraPanZMove() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bEnableCameraPanZMove ||
+		UCameraModule::Get().IsReverseCameraPanMove() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bReverseCameraPanMove ||
 		UCameraModule::Get().GetCameraMoveRate() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().CameraMoveRate ||
 		UCameraModule::Get().IsSmoothCameraMove() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().bSmoothCameraMove ||
 		UCameraModule::Get().GetCameraMoveSpeed() != GetDefaultSaveData()->CastRef<FCameraModuleSaveData>().CameraMoveSpeed ||

@@ -83,7 +83,14 @@ void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 {
-	
+	IDebuggerInterface::UnRegister();
+}
+
+void ACameraActorBase::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
+{
+	DrawDebugCanvasWireSphere(InCanvas, GetActorLocation(), FColor::Red, GetCameraDistance() * 0.01f, 100);
+
+	DrawDebugCanvasLine(InCanvas, GetActorLocation(), Camera->GetComponentLocation(), FLinearColor::Red);
 }
 
 void ACameraActorBase::OnSwitch_Implementation()
@@ -123,4 +130,9 @@ void ACameraActorBase::SetCameraCollisionMode(ECameraCollisionMode InCameraColli
 void ACameraActorBase::SetCameraLocation(FVector InLocation)
 {
 	SetActorLocation(InLocation, CameraCollisionMode == ECameraCollisionMode::All || CameraCollisionMode == ECameraCollisionMode::PhysicsOnly);
+}
+
+float ACameraActorBase::GetCameraDistance() const
+{
+	return CameraBoom->TargetArmLength;
 }

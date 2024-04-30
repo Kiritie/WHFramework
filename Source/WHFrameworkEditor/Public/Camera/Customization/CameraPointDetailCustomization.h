@@ -19,4 +19,6 @@ protected:
 	FReply OnClickGetCameraViewButton();
 	
 	FReply OnClickPasteCameraViewButton();
+	
+	FReply OnClickSwitchCameraPointButton();
 };

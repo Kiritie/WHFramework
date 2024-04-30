@@ -60,6 +60,7 @@ UCameraModule::UCameraModule()
 	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
 	bReverseCameraPanMove = false;
+	bEnableCameraPanZMove = true;
 	CameraMoveRange = FBox(EForceInit::ForceInitToZero);
 
 #if WITH_EDITORONLY_DATA
@@ -132,14 +133,14 @@ UCameraModule::UCameraModule()
 	CurrentCameraLocation = FVector::ZeroVector;
 	TargetCameraLocation = FVector::ZeroVector;
 
-	CurrentCameraOffset = FVector::ZeroVector;
-	TargetCameraOffset = FVector::ZeroVector;
-
 	CurrentCameraRotation = FRotator::ZeroRotator;
 	TargetCameraRotation = FRotator::ZeroRotator;
 
 	CurrentCameraDistance = 0.f;
 	TargetCameraDistance = 0.f;
+
+	CurrentCameraOffset = FVector::ZeroVector;
+	TargetCameraOffset = FVector::ZeroVector;
 }
 
 UCameraModule::~UCameraModule()
@@ -234,6 +235,8 @@ void UCameraModule::OnDestroy()
 void UCameraModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	IDebuggerInterface::Register();
 
 	for(auto Iter : Cameras)
 	{
@@ -386,13 +389,6 @@ void UCameraModule::OnRefresh(float DeltaSeconds)
 	{
 		CurrentCamera->GetCamera()->SetOrthoWidth(USceneModuleStatics::GetAltitude(false, true) * CurrentCamera->GetCameraOrthoFactor());
 	}
-
-#if WITH_EDITOR
-	if(bDrawCameraRange)
-	{
-		UKismetSystemLibrary::DrawDebugBox(this, CameraMoveRange.GetCenter(), CameraMoveRange.GetExtent(), FLinearColor::Red);
-	}
-#endif
 }
 
 void UCameraModule::OnPause()
@@ -408,12 +404,15 @@ void UCameraModule::OnUnPause()
 void UCameraModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+
+	IDebuggerInterface::UnRegister();
 }
 
 void UCameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FCameraModuleSaveData>();
 
+	bEnableCameraPanZMove = SaveData.bEnableCameraPanZMove;
 	bReverseCameraPanMove = SaveData.bReverseCameraPanMove;
 	CameraMoveRate = SaveData.CameraMoveRate;
 	bSmoothCameraMove = SaveData.bSmoothCameraMove;
@@ -439,6 +438,7 @@ FSaveData* UCameraModule::ToData()
 	static FCameraModuleSaveData SaveData;
 	SaveData = FCameraModuleSaveData();
 
+	SaveData.bEnableCameraPanZMove = bEnableCameraPanZMove;
 	SaveData.bReverseCameraPanMove = bReverseCameraPanMove;
 	SaveData.CameraMoveRate = CameraMoveRate;
 	SaveData.bSmoothCameraMove = bSmoothCameraMove;
@@ -460,6 +460,14 @@ FSaveData* UCameraModule::ToData()
 FString UCameraModule::GetModuleDebugMessage()
 {
 	return FString::Printf(TEXT("CurrentCamera: %s"), CurrentCamera ? *CurrentCamera->GetCameraName().ToString() : TEXT("None"));
+}
+
+void UCameraModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
+{
+	if(bDrawCameraRange)
+	{
+		UKismetSystemLibrary::DrawDebugBox(this, CameraMoveRange.GetCenter(), CameraMoveRange.GetExtent(), FLinearColor::Red);
+	}
 }
 
 ACameraActorBase* UCameraModule::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass) const
@@ -1022,27 +1030,12 @@ void UCameraModule::SetCameraViewParams(const FCameraViewParams& InCameraViewPar
 		SwitchCamera(CameraActor);
 	}
 
-	FVector CameraLocation;
-	FVector CameraOffset;
-	float CameraYaw;
-	float CameraPitch;
-	float CameraDistance;
-	if(InCameraViewParams.CameraViewSpace == ECameraViewSpace::Local && InCameraViewParams.CameraViewTarget)
-	{
-		CameraLocation = InCameraViewParams.CameraViewTarget->GetActorLocation() + InCameraViewParams.CameraViewLocation;
-		CameraOffset = InCameraViewParams.CameraViewOffset;
-		CameraYaw = InCameraViewParams.CameraViewTarget->GetActorRotation().Yaw + InCameraViewParams.CameraViewYaw;
-		CameraPitch = InCameraViewParams.CameraViewTarget->GetActorRotation().Pitch + InCameraViewParams.CameraViewPitch;
-		CameraDistance = InCameraViewParams.CameraViewDistance;
-	}
-	else
-	{
-		CameraLocation = InCameraViewParams.CameraViewLocation;
-		CameraOffset = InCameraViewParams.CameraViewOffset;
-		CameraYaw = InCameraViewParams.CameraViewYaw;
-		CameraPitch = InCameraViewParams.CameraViewPitch;
-		CameraDistance = InCameraViewParams.CameraViewDistance;
-	}
+	const FVector CameraLocation = InCameraViewParams.GetCameraLocation();
+	const FVector CameraOffset = InCameraViewParams.GetCameraOffset();
+	const float CameraYaw = InCameraViewParams.GetCameraYaw();
+	const float CameraPitch = InCameraViewParams.GetCameraPitch();
+	const float CameraDistance = InCameraViewParams.GetCameraDistance();
+
 	switch(InCameraViewParams.CameraViewMode)
 	{
 		case ECameraViewMode::Instant:

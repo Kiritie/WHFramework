@@ -14,6 +14,7 @@ enum class EParameterType : uint8
 	None,
 	Integer,
 	Float,
+	Byte,
 	String,
 	Name,
 	Text,
@@ -43,6 +44,7 @@ public:
 		ParameterType = EParameterType::None;
 		IntegerValue = 0;
 		FloatValue = 0.f;
+		ByteValue = 0;
 		StringValue = TEXT("");
 		NameValue = NAME_None;
 		TextValue = FText::GetEmpty();
@@ -74,7 +76,12 @@ public:
 	{
 		*this = MakeFloat(InValue);
 	}
-	
+		
+	FParameter(uint8 InValue)
+	{
+		*this = MakeByte(InValue);
+	}
+
 	FParameter(const FString& InValue)
 	{
 		*this = MakeString(InValue);
@@ -173,6 +180,7 @@ public:
 		{
 			case EParameterType::Integer: return A.IntegerValue == B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue == B.FloatValue;
+			case EParameterType::Byte: return A.ByteValue == B.ByteValue;
 			case EParameterType::String: return A.StringValue == B.StringValue;
 			case EParameterType::Name: return A.NameValue == B.NameValue;
 			case EParameterType::Text: return A.TextValue.EqualTo(B.TextValue);
@@ -199,6 +207,7 @@ public:
 		{
 			case EParameterType::Integer: return A.IntegerValue != B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue != B.FloatValue;
+			case EParameterType::Byte: return A.ByteValue != B.ByteValue;
 			case EParameterType::String: return A.StringValue != B.StringValue;
 			case EParameterType::Name: return A.NameValue != B.NameValue;
 			case EParameterType::Text: return !A.TextValue.EqualTo(B.TextValue);
@@ -228,6 +237,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Float"))
 	float FloatValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Byte"))
+	uint8 ByteValue;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::String"))
 	FString StringValue;
@@ -291,6 +303,11 @@ public:
 	float GetFloatValue() const { return FloatValue; }
 
 	void SetFloatValue(float InValue) { FloatValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	uint8 GetByteValue() const { return ByteValue; }
+
+	void SetByteValue(uint8 InValue) { ByteValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FString GetStringValue() const { return StringValue; }
@@ -368,7 +385,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	template<class T = UObject>
-	TSoftObjectPtr<T> GetObjectPtrValue() const { return ObjectPtrValue.LoadSynchronous(); }
+	TSoftObjectPtr<T> GetObjectPtrValue() const { return TSoftObjectPtr<T>(ObjectPtrValue.ToSoftObjectPath()); }
 
 	template<class T = UObject>
 	void SetObjectPtrValue(const TSoftObjectPtr<T>& InValue) { ObjectPtrValue = InValue; }
@@ -403,6 +420,14 @@ public:
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Float;
 		Parameter.SetFloatValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeByte(uint8 InValue)
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Byte;
+		Parameter.SetByteValue(InValue);
 		return Parameter;
 	}
 

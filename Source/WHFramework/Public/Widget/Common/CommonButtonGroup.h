@@ -7,6 +7,8 @@
 
 #include "CommonButtonGroup.generated.h"
 
+class UCommonButton;
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UCommonButtonGroup : public UCommonButtonGroupBase, public IObjectPoolInterface
 {
@@ -31,6 +33,9 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
+	void SetSelectionRequiredN(bool bRequireSelection);
+
+	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
 	void DeselectAllN();
 	
 protected:
@@ -54,4 +59,7 @@ public:
 		}
 		return  ReturnValues;
 	}
+	
+	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
+	UCommonButton* GetButtonBaseAtIndexN(int32 Index) const;
 };

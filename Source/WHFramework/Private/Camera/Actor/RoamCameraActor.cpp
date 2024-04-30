@@ -24,11 +24,15 @@ ARoamCameraActor::ARoamCameraActor()
 
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
+
+	bDrawDebug = false;
 }
 
 void ARoamCameraActor::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+
+	IDebuggerInterface::Register();
 }
 
 void ARoamCameraActor::SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode)
