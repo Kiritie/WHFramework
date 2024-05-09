@@ -5,7 +5,8 @@ You need to do some initial configuration before you can use it:
 
 Do it in your project Settings:
 
-==Change GameInstanceClass to WHGameInstance;
+#==
+Change GameInstanceClass to WHGameInstance;
 
 Change GameModeClass to WHGameMode;
 
