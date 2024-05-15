@@ -3,7 +3,7 @@
 #include "Common/Asset/AssetEditorBase.h"
 
 #include "Editor.h"
-#include "Procedure/Widget/SProcedureListWidget.h"
+#include "Main/Module/EditorModuleBase.h"
 
 #define LOCTEXT_NAMESPACE "FAssetEditorBase"
 

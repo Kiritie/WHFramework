@@ -25,7 +25,7 @@ public:
 	~UWebRequestModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -37,7 +37,7 @@ public:
 
 	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
 	virtual void OnPause() override;
 
@@ -122,7 +122,7 @@ public:
 	void ClearAllWebInterface();
 
 public:
-	bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
+	bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
 	bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 

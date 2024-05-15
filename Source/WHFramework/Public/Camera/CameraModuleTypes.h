@@ -136,6 +136,7 @@ public:
 		CameraViewYaw = 0.f;
 		CameraViewPitch = 0.f;
 		CameraViewDistance = 0.f;
+		CameraViewFov = -1.f;
 	}
 
 public:
@@ -148,7 +149,7 @@ public:
 
 	void SetCameraParams(const FCameraParams& InCameraParams, AActor* InCameraViewTarget = nullptr);
 
-	FVector GetCameraLocation() const;
+	FVector GetCameraLocation(bool bApplyViewSpace = false) const;
 	
 	FVector GetCameraOffset() const;
 	
@@ -157,6 +158,8 @@ public:
 	float GetCameraPitch() const;
 	
 	float GetCameraDistance() const;
+	
+	float GetCameraFov() const;
 
 public:
 	UPROPERTY(BlueprintReadOnly, Transient)
@@ -191,6 +194,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CameraViewDistance;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CameraViewFov;
 };
 
 USTRUCT(BlueprintType)

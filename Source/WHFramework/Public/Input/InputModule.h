@@ -27,7 +27,7 @@ public:
 	virtual ~UInputModule() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -41,7 +41,7 @@ public:
 
 	virtual void OnReset() override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
 	virtual void OnPause() override;
 
@@ -67,15 +67,27 @@ public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Input Manager
+	/// InputManager
 protected:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "InputSteups|Mode")
+	EInputMode NativeInputMode;
+
+	UPROPERTY(EditAnywhere, Category = "InputSteups|Manager")
 	TArray<TSubclassOf<UInputManagerBase>> InputManagers;
 
 	UPROPERTY(Transient)
 	TMap<FName, UInputManagerBase*> InputManagerRefs;
 
 public:
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetNativeInputPriority() const override { return 0; }
+
+	UFUNCTION(BlueprintPure)
+	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetNativeInputMode(EInputMode InInputMode) override { NativeInputMode = InInputMode; }
+
 	template<class T>
 	T* GetInputManager() const
 	{
@@ -217,23 +229,4 @@ protected:
 protected:
 	UFUNCTION(BlueprintPure)
 	AWHPlayerController* GetPlayerController();
-
-	//////////////////////////////////////////////////////////////////////////
-	// InputManager
-public:
-	virtual void UpdateInputMode();
-
-protected:
-	UPROPERTY(EditAnywhere, Category = "InputMode")
-	EInputMode NativeInputMode;
-	
-	UPROPERTY(EditAnywhere, Category = "InputMode")
-	EInputMode GlobalInputMode;
-
-public:
-	virtual int32 GetNativeInputPriority() const override { return 0; }
-
-	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
-
-	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 };

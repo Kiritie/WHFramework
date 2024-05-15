@@ -24,6 +24,8 @@ public:
 public:
 	virtual void OnInitialize() override;
 
+	virtual void OnReset() override;
+
 	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual void OnTermination() override;
@@ -129,7 +131,7 @@ public:
 	}
 
 	template<class T>
-	bool DestroySlateWidget(FName InName = T::WidgetName)
+	bool DestroySlateWidget(bool bRecovery = false, FName InName = T::WidgetName)
 	{
 		if(AllSlateWidgets.Contains(InName))
 		{
@@ -140,7 +142,7 @@ public:
 				{
 					TemporarySlateWidget = nullptr;
 				}
-				SlateWidget->OnDestroy();
+				SlateWidget->OnDestroy(bRecovery);
 				SlateWidget = nullptr;
 			}
 			return true;
@@ -150,7 +152,7 @@ public:
 
 	void CloseAllSlateWidget(bool bInstant = false);
 	
-	void ClearAllSlateWidget();
+	void ClearAllSlateWidget(bool bRecovery = false);
 
 	////////////////////////////////////////////////////
 	// EditorWidget

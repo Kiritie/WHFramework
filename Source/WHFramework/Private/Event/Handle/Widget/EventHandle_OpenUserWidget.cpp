@@ -95,4 +95,33 @@ void UEventHandle_OpenUserWidget::PostEditChangeProperty(FPropertyChangedEvent& 
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
+
+void UEventHandle_OpenUserWidget::OnEditorRefresh()
+{
+	Super::OnEditorRefresh();
+
+	TArray<FParameter> _WdigetParams;
+	
+	if(WidgetClass)
+	{
+		_WdigetParams = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetParams();
+	}
+	else if(!WidgetName.IsNone())
+	{
+		const auto _WidgetClass = UWidgetModule::Get(true).GetUserWidgetClassByName(WidgetName);
+		_WdigetParams = _WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetParams();
+	}
+
+	for(int32 i = 0; i < _WdigetParams.Num(); i++)
+	{
+		if(WidgetParams.IsValidIndex(i))
+		{
+			WidgetParams[i].SetDescription(_WdigetParams[i].GetDescription());
+		}
+		else
+		{
+			WidgetParams.EmplaceAt(i, _WdigetParams[i]);
+		}
+	}
+}
 #endif

@@ -30,7 +30,7 @@ public:
 	~UAchievementModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -42,7 +42,7 @@ public:
 
 	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
 	virtual void OnPause() override;
 

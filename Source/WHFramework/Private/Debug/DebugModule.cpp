@@ -56,9 +56,9 @@ void UDebugModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UDebugModule::OnRefresh(float DeltaSeconds)
+void UDebugModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UDebugModule::OnPause()

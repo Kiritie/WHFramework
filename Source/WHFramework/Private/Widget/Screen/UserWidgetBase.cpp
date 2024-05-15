@@ -54,47 +54,92 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 FReply UUserWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UUserWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -145,7 +190,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	for(auto Iter : GetAllPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+		IObjectPoolInterface::Execute_OnSpawn(Iter, this, {});
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -517,7 +562,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 
 USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, InClass))
+	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, false, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;
@@ -529,7 +574,7 @@ bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, 
 {
 	if(!InWidget) return false;
 
-	InWidget->OnDestroy();
+	InWidget->OnDestroy(bRecovery);
 
 	UObjectPoolModuleStatics::DespawnObject(InWidget, bRecovery);
 	return true;

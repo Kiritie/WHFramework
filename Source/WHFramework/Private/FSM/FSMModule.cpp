@@ -50,9 +50,9 @@ void UFSMModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UFSMModule::OnRefresh(float DeltaSeconds)
+void UFSMModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UFSMModule::OnPause()

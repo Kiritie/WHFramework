@@ -250,10 +250,12 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void USceneModule::OnRefresh(float DeltaSeconds)
+void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 	
+	if(bInEditor) return;
+
 	Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
 
 	if(MiniMapCapture)

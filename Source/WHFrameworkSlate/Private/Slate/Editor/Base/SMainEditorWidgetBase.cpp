@@ -108,7 +108,7 @@ TSharedRef<SWidget> SMainEditorWidgetBase::CreateMainWidget()
 			+ SVerticalBox::Slot()
 			.Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 			[
-				CreateTabManagerWidget()
+				CreateDefaultWidget()
 			]
 		];
 }
@@ -126,7 +126,7 @@ TSharedRef<SWidget> SMainEditorWidgetBase::CreateMenuBarWidget()
 	return MenuWidget;
 }
 
-TSharedRef<SWidget> SMainEditorWidgetBase::CreateTabManagerWidget()
+TSharedRef<SWidget> SMainEditorWidgetBase::CreateDefaultWidget()
 {
 	return TabManager->RestoreFrom(CreateDefaultLayout(), nullptr).ToSharedRef();
 }

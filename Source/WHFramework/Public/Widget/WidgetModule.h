@@ -12,6 +12,7 @@
 #include "Input/InputManagerInterface.h"
 #include "WidgetModule.generated.h"
 
+class UWorldWidgetContainer;
 class UEventHandle_SetWorldWidgetVisible;
 class UEventHandle_CloseUserWidget;
 class UEventHandle_OpenUserWidget;
@@ -29,7 +30,7 @@ public:
 	~UWidgetModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -41,7 +42,7 @@ public:
 
 	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
 	virtual void OnPause() override;
 
@@ -97,10 +98,10 @@ protected:
 	TMap<FName, TSubclassOf<UUserWidgetBase>> UserWidgetClassMap;
 
 private:
-	UPROPERTY(Transient)
+	UPROPERTY(VisibleAnywhere, Transient, Category = "ScreenWidget")
 	UUserWidgetBase* TemporaryUserWidget;
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, Transient, Category = "ScreenWidget")
 	TMap<FName, UUserWidgetBase*> AllUserWidget;
 
 private:
@@ -281,7 +282,7 @@ public:
 		
 		if(!HasUserWidgetByName(InName))
 		{
-			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, UserWidgetClassMap[InName]);
+			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, IsModuleInEditor(), UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
 				AllUserWidget.Add(InName, UserWidget);
@@ -461,7 +462,7 @@ public:
 	void CloseAllUserWidget(bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearAllUserWidget();
+	void ClearAllUserWidget(bool bRecovery = false);
 
 	////////////////////////////////////////////////////
 	// WorldWidget
@@ -470,21 +471,21 @@ protected:
 	TArray<TSubclassOf<UWorldWidgetBase>> WorldWidgetClasses;
 
 	UPROPERTY(EditAnywhere, Category = "WorldWidget")
-	TSubclassOf<class UWorldWidgetContainer> WorldWidgetContainerClass;
+	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
 	
+	UPROPERTY(EditAnywhere, Category = "WorldWidget")
+	TSubclassOf<UWorldWidgetContainer> WorldWidgetContainerClass;
+
 	UPROPERTY(EditAnywhere, Category = "WorldWidget")
 	int32 WorldWidgetContainerZOrder;
 
 private:
-	UPROPERTY(Transient)
-	TMap<FName, FWorldWidgets> AllWorldWidgets;
+	UPROPERTY(VisibleAnywhere, Transient, Category = "WorldWidget")
+	UWorldWidgetContainer* WorldWidgetContainer;
 
-	UPROPERTY(Transient)
-	class UWorldWidgetContainer* WorldWidgetContainer;
+	UPROPERTY(VisibleAnywhere, Transient, Category = "WorldWidget")
+	TMap<FName, FWorldWidgets> AllWorldWidget;
 
-	UPROPERTY(Transient)
-	TMap<FName, TSubclassOf<UWorldWidgetBase>> WorldWidgetClassMap;
-	
 protected:
 	UFUNCTION(CallInEditor, Category = "WorldWidget")
 	void SortWorldWidgetClasses();
@@ -518,7 +519,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool HasWorldWidgetByName(FName InName, int32 InIndex) const
 	{
-		return AllWorldWidgets.Contains(InName) && AllWorldWidgets[InName].WorldWidgets.IsValidIndex(InIndex);
+		return AllWorldWidget.Contains(InName) && AllWorldWidget[InName].WorldWidgets.IsValidIndex(InIndex);
 	}
 
 	template<class T>
@@ -536,9 +537,9 @@ public:
 	template<class T>
 	T* GetWorldWidgetByName(FName InName, int32 InIndex) const
 	{
-		if(AllWorldWidgets.Contains(InName) && AllWorldWidgets[InName].WorldWidgets.IsValidIndex(InIndex))
+		if(AllWorldWidget.Contains(InName) && AllWorldWidget[InName].WorldWidgets.IsValidIndex(InIndex))
 		{
-			return Cast<T>(AllWorldWidgets[InName].WorldWidgets[InIndex]);
+			return Cast<T>(AllWorldWidget[InName].WorldWidgets[InIndex]);
 		}
 		return nullptr;
 	}
@@ -564,9 +565,9 @@ public:
 		if(InName.IsNone()) return TArray<T*>();
 
 		TArray<T*> Widgets;
-		if(AllWorldWidgets.Contains(InName))
+		if(AllWorldWidget.Contains(InName))
 		{
-			for(auto Iter : AllWorldWidgets[InName].WorldWidgets)
+			for(auto Iter : AllWorldWidget[InName].WorldWidgets)
 			{
 				Widgets.Add(Cast<T>(Iter));
 			}
@@ -584,36 +585,51 @@ public:
 		
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
 		
-		return CreateWorldWidgetByName<T>(WidgetName, InOwner, InMapping, InParams, InClass);
+		return CreateWorldWidgetByName<T>(WidgetName, InOwner, InMapping, InParams);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
 	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
 	template<class T>
-	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr)
 	{
+		if(IsModuleInEditor())
+		{
+			WorldWidgetClassMap.Empty();
+			for(auto& Iter : WorldWidgetClasses)
+			{
+				if(!Iter) continue;
+				const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
+				if(!WorldWidgetClassMap.Contains(WidgetName))
+				{
+					WorldWidgetClassMap.Add(WidgetName, Iter);
+				}
+			}
+		}
+		
 		if(!WorldWidgetClassMap.Contains(InName))
 		{
 			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to create world widget. Module does not contain this type: %s"), *InName.ToString()), EDC_Widget, EDV_Error);
 			return nullptr;
 		}
 		
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, WorldWidgetClassMap[InName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, IsModuleInEditor(), WorldWidgetClassMap[InName]))
 		{
-			if(!AllWorldWidgets.Contains(InName))
+			if(!AllWorldWidget.Contains(InName))
 			{
-				AllWorldWidgets.Add(InName);
+				AllWorldWidget.Add(InName);
 			}
-			WorldWidget->SetWidgetIndex(AllWorldWidgets[InName].WorldWidgets.Add(WorldWidget));
+			WorldWidget->WidgetIndex = AllWorldWidget[InName].WorldWidgets.Add(WorldWidget);
+			WorldWidget->bWidgetInEditor = IsModuleInEditor();
 			WorldWidget->OnCreate(InOwner, InMapping, *InParams);
 			return Cast<T>(WorldWidget);
 		}
 		return nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	UWorldWidgetBase* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
 	bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{
@@ -657,7 +673,7 @@ public:
 	void DestroyWorldWidgetsByName(FName InName, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearAllWorldWidget();
+	void ClearAllWorldWidget(bool bRecovery = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode

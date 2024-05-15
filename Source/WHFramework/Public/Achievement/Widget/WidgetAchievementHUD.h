@@ -40,7 +40,7 @@ public:
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy(bool bRecovery = false) override;
+	virtual void OnDestroy(bool bRecovery) override;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Achievement HUD")

@@ -54,9 +54,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
 	bool bStandalone;
 
-	UPROPERTY(BlueprintReadOnly)
-	bool bClicked;
-
 public:
 	UFUNCTION(BlueprintPure)
 	FText GetTitle() const { return Title; }
@@ -66,9 +63,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsStandalone() const { return bStandalone; }
-
-	UFUNCTION(BlueprintPure)
-	bool IsClicked() const { return bClicked; }
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = InBrush))
 	void SetIconBrush(const FSlateBrush& InBrush);

@@ -45,7 +45,7 @@ void UWorldWidgetComponent::BeginPlay()
 
 	if(bAutoCreate)
 	{
-		CreateWorldWidget();
+		CreateWorldWidget(WidgetParams);
 	}
 }
 
@@ -104,7 +104,7 @@ void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
 	}
 	else if(WorldWidget)
 	{
-		WorldWidget->OnDestroy();
+		WorldWidget->OnDestroy(false);
 		WorldWidget = nullptr;
 	}
 }
@@ -191,18 +191,17 @@ void UWorldWidgetComponent::RefreshParams()
 			Space = DefaultObject->GetWidgetSpace();
 			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
 			Pivot = DefaultObject->GetWidgetAlignment();
-			if(WidgetParams.Num() != DefaultObject->GetWidgetParams().Num())
-			{
-				WidgetParams = DefaultObject->GetWidgetParams();
-			}
+			WidgetParams = DefaultObject->GetWidgetParams();
 		}
 	}
 }
 #endif
 
-void UWorldWidgetComponent::CreateWorldWidget()
+void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor)
 {
-	if(!WorldWidget && WorldWidgetClass)
+	DestroyWorldWidget(false, bInEditor);
+	
+	if(WorldWidgetClass)
 	{
 		switch(Space)
 		{
@@ -213,14 +212,14 @@ void UWorldWidgetComponent::CreateWorldWidget()
 			}
 			case EWidgetSpace::Screen:
 			{
-				SetWorldWidget(UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, &WidgetParams, WorldWidgetClass));
+				SetWorldWidget(UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, bInEditor, WorldWidgetClass));
 				break;
 			}
 		}
 	}
 }
 
-void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery)
+void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
 {
 	if(WorldWidget)
 	{
@@ -233,7 +232,7 @@ void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery)
 			}
 			case EWidgetSpace::Screen:
 			{
-				UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery);
+				UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery, bInEditor);
 				WorldWidget = nullptr;
 				break;
 			}
@@ -300,7 +299,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass
 				{
 					if(WorldWidgetClass)
 					{
-						CreateWorldWidget();
+						CreateWorldWidget(WidgetParams);
 					}
 					else
 					{
@@ -325,5 +324,10 @@ USceneComponent* UWorldWidgetComponent::GetWidgetPoint(FName InPointName) const
 		return WidgetPoints[InPointName];
 	}
 	return nullptr;
+}
+
+bool UWorldWidgetComponent::EDC_AutoCreate() const
+{
+	return !GetOwner() || !GetOwner()->IsA<AWorldWidgetActor>();
 }
 

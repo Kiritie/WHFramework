@@ -19,6 +19,11 @@ const UObject* GetWorldContext(bool bInEditor)
 	return UCommonStatics::GetWorldContext(bInEditor);
 }
 
+UObject* GetMutableWorldContext(bool bInEditor)
+{
+	return UCommonStatics::GetMutableWorldContext(bInEditor);
+}
+
 namespace GameplayTags
 {
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)

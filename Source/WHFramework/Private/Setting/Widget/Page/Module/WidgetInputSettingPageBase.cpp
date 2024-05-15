@@ -33,7 +33,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 		{
 			if(!ShortcutSettingItems.Contains(Iter.Key.GetTagName()))
 			{
-				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Value.DisplayName, Iter.Value.Keys.Num(), true }, USettingModule::Get().GetKeySettingItemClass());
+				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Value.DisplayName, Iter.Value.Keys.Num(), true }, false, USettingModule::Get().GetKeySettingItemClass());
 				AddShortcutSettingItem(Iter.Key.GetTagName(), SettingItem, Iter.Value.Category);
 			}
 		}
@@ -45,7 +45,7 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 		{
 			if(!MappingSettingItems.Contains(Iter.GetMappingName()))
 			{
-				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.GetDisplayName(), 2, !Iter.GetMappingName().IsEqual(FName("SystemOperation")) }, USettingModule::Get().GetKeySettingItemClass());
+				UWidgetSettingItemBase* SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.GetDisplayName(), 2, !Iter.GetMappingName().IsEqual(FName("SystemOperation")) }, false, USettingModule::Get().GetKeySettingItemClass());
 				AddMappingSettingItem(Iter.GetMappingName(), SettingItem, Iter.GetDisplayCategory());
 			}
 		}

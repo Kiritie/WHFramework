@@ -2,13 +2,27 @@
 
 #include "Camera/Point/CameraPointBase.h"
 
+#include "Camera/CameraComponent.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 
 ACameraPointBase::ACameraPointBase()
 {
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
+#endif
+	
+#if WITH_EDITORONLY_DATA
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(FName("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetRelativeTransform(FTransform::Identity);
+	CameraBoom->bUsePawnControlRotation = false;
+
+	Camera = CreateDefaultSubobject<UCameraComponent>(FName("Camera"));
+	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));
+	Camera->bUsePawnControlRotation = false;
 #endif
 
 	StreamingSource = CreateDefaultSubobject<UWorldPartitionStreamingSourceComponent>(FName("StreamingSource"));
@@ -43,6 +57,27 @@ void ACameraPointBase::OnRefresh_Implementation(float DeltaSeconds)
 void ACameraPointBase::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
+}
+
+void ACameraPointBase::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+#if WITH_EDITORONLY_DATA
+	const FVector CameraLocation = CameraViewParams.GetCameraLocation();
+	const FVector CameraOffset = CameraViewParams.GetCameraOffset();
+	const float CameraYaw = CameraViewParams.GetCameraYaw();
+	const float CameraPitch = CameraViewParams.GetCameraPitch();
+	const float CameraDistance = CameraViewParams.GetCameraDistance();
+	const float CameraFov = CameraViewParams.GetCameraFov();
+
+	CameraBoom->SetRelativeLocation(CameraLocation);
+	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
+	CameraBoom->SocketOffset = CameraOffset;
+	CameraBoom->TargetArmLength = CameraDistance;
+	
+	Camera->SetFieldOfView(CameraFov != -1.f ? CameraFov : 90.f);
+#endif
 }
 
 void ACameraPointBase::OnSwitch_Implementation()

@@ -48,9 +48,9 @@ void UAnimationModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UAnimationModule::OnRefresh(float DeltaSeconds)
+void UAnimationModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UAnimationModule::OnPause()

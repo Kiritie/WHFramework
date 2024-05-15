@@ -43,8 +43,10 @@ public:
 	 * 注册指定类型的管理器
 	 */
 	template<typename T>
-	static void RegisterManager()
+	static void RegisterManager(bool bForce = false)
 	{
+		if(bForce) UnRegisterManager<T>();
+		
 		if(!IsExistManager<T>())
 		{
 			T* Manager = new T();
@@ -75,22 +77,6 @@ public:
 			return Get().ManagerMap[T::Type]->template CastTo<T>();
 		}
 		return nullptr;
-	}
-	/**
-	* 获取指定类型的管理器列表
-	*/
-	template<typename T>
-	static TArray<T*> GetAllManager()
-	{
-		TArray<T*> Managers;
-		for(auto Iter : Get().ManagerMap)
-		{
-			if(Iter.Value->IsA<T>())
-			{
-				Managers.Add(Iter.Value->CastTo<T>());
-			}
-		}
-		return Managers;
 	}
 	/**
 	* 获取所有管理器

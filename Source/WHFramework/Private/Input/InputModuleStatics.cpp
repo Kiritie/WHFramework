@@ -7,6 +7,7 @@
 #include "Gameplay/WHLocalPlayer.h"
 #include "Input/InputModule.h"
 #include "EnhancedInputSubsystems.h"
+#include "Input/InputManager.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
 
@@ -102,10 +103,10 @@ const UInputActionBase* UInputModuleStatics::GetInputActionByTag(const FGameplay
 
 EInputMode UInputModuleStatics::GetGlobalInputMode()
 {
-	return UInputModule::Get().GetGlobalInputMode();
+	return FInputManager::Get().GetGlobalInputMode();
 }
 
 void UInputModuleStatics::UpdateGlobalInputMode()
 {
-	UInputModule::Get().UpdateInputMode();
+	FInputManager::Get().UpdateInputMode();
 }

@@ -5,12 +5,12 @@
 #include "Input/InputManager.h"
 #include "Main/MainManager.h"
 
-FUniqueType FSlateWidgetManager::Type = FUniqueType(FInputManager::Type);
+FUniqueType FSlateWidgetManager::Type = FUniqueType();
 
 IMPLEMENTATION_MANAGER(FSlateWidgetManager)
 
 // Sets default values
-FSlateWidgetManager::FSlateWidgetManager()
+FSlateWidgetManager::FSlateWidgetManager() : FManagerBase(Type)
 {
 	AllSlateWidgets = TMap<FName, TSharedPtr<SSlateWidgetBase>>();
 	TemporarySlateWidget = nullptr;
@@ -26,6 +26,15 @@ FSlateWidgetManager::~FSlateWidgetManager()
 void FSlateWidgetManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
+
+	FInputManager::Get().AddInputManager(this);
+}
+
+void FSlateWidgetManager::OnReset()
+{
+	FManagerBase::OnReset();
+
+	ClearAllSlateWidget();
 }
 
 void FSlateWidgetManager::OnRefresh(float DeltaSeconds)
@@ -45,8 +54,6 @@ void FSlateWidgetManager::OnRefresh(float DeltaSeconds)
 void FSlateWidgetManager::OnTermination()
 {
 	FManagerBase::OnTermination();
-
-	ClearAllSlateWidget();
 }
 
 void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
@@ -61,13 +68,13 @@ void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
 	}
 }
 
-void FSlateWidgetManager::ClearAllSlateWidget()
+void FSlateWidgetManager::ClearAllSlateWidget(bool bRecovery)
 {
 	for (auto Iter : AllSlateWidgets)
 	{
 		if(Iter.Value)
 		{
-			Iter.Value->OnDestroy();
+			Iter.Value->OnDestroy(bRecovery);
 		}
 	}
 	AllSlateWidgets.Empty();

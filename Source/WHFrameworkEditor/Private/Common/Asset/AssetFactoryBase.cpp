@@ -4,7 +4,7 @@
 
 #include "ClassViewerModule.h"
 #include "Editor.h"
-#include "Common/CommonEditorTypes.h"
+#include "WHFrameworkEditorTypes.h"
 
 #include "Modules/ModuleManager.h"
 

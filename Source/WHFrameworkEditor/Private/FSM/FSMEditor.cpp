@@ -6,7 +6,7 @@
 #include "FSM/Base/FiniteStateBlueprint.h"
 #include "FSM/Blueprint/FiniteStateBlueprintActions.h"
 #include "FSM/Blueprint/FiniteStateGraphSchema.h"
-#include "FSM/Customization/FSMComponentDetailCustomization.h"
+#include "FSM/Customization/FSMComponentCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FFSMEditor"
 
@@ -61,14 +61,14 @@ void FFSMEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTy
 	AssetTypeActions.Add(AssetAction);
 }
 
-void FFSMEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FFSMEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	FEditorModuleBase::RegisterCustomization(PropertyEditor);
 	
-	PropertyEditor.RegisterCustomClassLayout(FName("FSMComponent"), FOnGetDetailCustomizationInstance::CreateStatic(&FFSMComponentDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("FSMComponent"), FOnGetDetailCustomizationInstance::CreateStatic(&FFSMComponentCustomization::MakeInstance));
 }
 
-void FFSMEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FFSMEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("FSMComponent"));
 }

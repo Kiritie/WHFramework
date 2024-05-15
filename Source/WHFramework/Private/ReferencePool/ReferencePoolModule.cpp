@@ -47,9 +47,9 @@ void UReferencePoolModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UReferencePoolModule::OnRefresh(float DeltaSeconds)
+void UReferencePoolModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UReferencePoolModule::OnPause()

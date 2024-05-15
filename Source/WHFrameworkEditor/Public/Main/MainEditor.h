@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonEditorTypes.h"
-#include "Common/Module/EditorModuleBase.h"
+#include "WHFrameworkEditorTypes.h"
+#include "Main/Module/EditorModuleBase.h"
 #include "Common/Blueprint/BlueprintEditorBase.h"
 
 class SModuleEditorWidget;
@@ -37,9 +37,9 @@ public:
 
 	virtual void RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions) override;
 
-	virtual void RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+	virtual void RegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
 
-	virtual void UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+	virtual void UnRegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
 
 public:
 	virtual void OpenModuleEditor();

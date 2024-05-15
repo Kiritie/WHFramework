@@ -52,12 +52,12 @@ void FAchievementEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, 
 	
 }
 
-void FAchievementEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FAchievementEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	
 }
 
-void FAchievementEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FAchievementEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("AchievementBase"));
 }

@@ -48,6 +48,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
 	static FVector GetCameraOffset(bool bRefresh = false);
 
+	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
+	static float GetCameraFov(bool bRefresh = false);
+
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
 	{

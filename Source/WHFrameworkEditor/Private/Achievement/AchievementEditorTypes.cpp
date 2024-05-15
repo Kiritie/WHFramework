@@ -1,10 +1,10 @@
 // Copyright 2021 Sam Carey. All Rights Reserved.
 
-#include "Achievement\AchievementEditorTypes.h"
+#include "Achievement/AchievementEditorTypes.h"
 
 #include "EdGraphSchema_K2.h"
 #include "SGraphPin.h"
-#include "Achievement/Widget/SGraphPinAchievementNames.h"
+#include "Achievement/Slate/SGraphPinAchievementNames.h"
 
 TSharedPtr<SGraphPin> FAchievementPinFactory::CreatePin(UEdGraphPin* InPin) const
 {

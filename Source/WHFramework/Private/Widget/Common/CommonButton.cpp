@@ -9,8 +9,6 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 {
 	Img_Icon = nullptr;
 	Txt_Title = nullptr;
-	
-	bClicked = false;
 
 	bStandalone = false;
 
@@ -28,8 +26,6 @@ void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParam
 
 void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 {
-	bClicked = false;
-
 	SetTitle(FText::GetEmpty());
 
 	OnSelectedChangedBase.Clear();
@@ -70,15 +66,11 @@ void UCommonButton::NativeOnClicked()
 
 void UCommonButton::NativeOnSelected(bool bBroadcast)
 {
-	bClicked = bBroadcast;
-
 	Super::NativeOnSelected(bBroadcast);
 }
 
 void UCommonButton::NativeOnDeselected(bool bBroadcast)
 {
-	bClicked = bBroadcast;
-
 	Super::NativeOnDeselected(bBroadcast);
 }
 

@@ -72,9 +72,11 @@ void UProcedureModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UProcedureModule::OnRefresh(float DeltaSeconds)
+void UProcedureModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(bInEditor) return;
 
 	if(CurrentProcedure)
 	{

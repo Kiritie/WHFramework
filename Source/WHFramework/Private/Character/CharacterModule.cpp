@@ -74,9 +74,9 @@ void UCharacterModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UCharacterModule::OnRefresh(float DeltaSeconds)
+void UCharacterModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UCharacterModule::OnPause()

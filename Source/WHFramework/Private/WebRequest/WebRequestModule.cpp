@@ -58,9 +58,9 @@ void UWebRequestModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UWebRequestModule::OnRefresh(float DeltaSeconds)
+void UWebRequestModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UWebRequestModule::OnPause()
@@ -114,7 +114,7 @@ UWebInterfaceBase* UWebRequestModule::CreateWebInterface(const FName InName, TSu
 {
 	if(!HasWebInterface(InName))
 	{
-		return CreateWebInterface(UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, nullptr, InClass));
+		return CreateWebInterface(UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, nullptr, false, InClass));
 	}
 	return nullptr;
 }
@@ -209,7 +209,7 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 {
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InName))
 	{
-		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, &InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 		{
 			OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
 		});

@@ -10,10 +10,11 @@
 #include "Task/Base/TaskBlueprint.h"
 #include "Task/Blueprint/TaskBlueprintActions.h"
 #include "Task/Blueprint/TaskGraphSchema.h"
-#include "Task/Customization/TaskDetailCustomization.h"
-#include "Task/Widget/STaskDetailsWidget.h"
-#include "Task/Widget/STaskListWidget.h"
-#include "Task/Widget/STaskStatusWidget.h"
+#include "Task/Customization/TaskCustomization.h"
+#include "Task/TaskEditorTypes.h"
+#include "Task/Slate/STaskDetailsWidget.h"
+#include "Task/Slate/STaskListWidget.h"
+#include "Task/Slate/STaskStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FTaskEditor"
 
@@ -80,14 +81,14 @@ void FTaskEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetT
 	AssetTypeActions.Add(AssetAction);
 }
 
-void FTaskEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FTaskEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	FEditorModuleBase::RegisterCustomization(PropertyEditor);
 	
-	PropertyEditor.RegisterCustomClassLayout(FName("TaskBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FTaskDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("TaskBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FTaskCustomization::MakeInstance));
 }
 
-void FTaskEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FTaskEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("TaskBase"));
 }

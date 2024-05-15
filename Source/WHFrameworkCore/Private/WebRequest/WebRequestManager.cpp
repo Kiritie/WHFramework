@@ -14,7 +14,7 @@ const FUniqueType FWebRequestManager::Type = FUniqueType();
 IMPLEMENTATION_MANAGER(FWebRequestManager)
 
 // Sets default values
-FWebRequestManager::FWebRequestManager()
+FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 {
 	bLocalMode = false;
 	ServerURL = TEXT("http://192.168.2.177/airt_service");
@@ -126,7 +126,7 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 	if(!HttpResponse.IsValid())
 	{
 		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
-		OnComplete(nullptr, nullptr, false);
+		OnComplete(HttpRequest, HttpResponse, false);
 		return;
 	}
 

@@ -3,6 +3,7 @@
 
 #include "Input/Manager/InputManagerBase.h"
 
+#include "Input/InputManager.h"
 #include "Input/Components/InputComponentBase.h"
 
 // ParamSets default values
@@ -14,6 +15,8 @@ UInputManagerBase::UInputManagerBase()
 void UInputManagerBase::OnInitialize()
 {
 	K2_OnInitialize();
+
+	FInputManager::Get().AddInputManager(this);
 }
 
 void UInputManagerBase::OnRefresh(float DeltaSeconds)
@@ -24,4 +27,21 @@ void UInputManagerBase::OnRefresh(float DeltaSeconds)
 void UInputManagerBase::OnBindAction(UInputComponentBase* InInputComponent)
 {
 	K2_OnBindAction(InInputComponent);
+}
+
+void UInputManagerBase::OnTermination()
+{
+	K2_OnTermination();
+	
+	FInputManager::Get().RemoveInputManager(this);
+}
+
+EInputMode UInputManagerBase::GetNativeInputMode_Implementation() const
+{
+	return EInputMode::None;
+}
+
+int32 UInputManagerBase::GetNativeInputPriority_Implementation() const
+{
+	return 0;
 }

@@ -28,5 +28,5 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	ACameraPointBase* CameraPoint;
+	TSoftObjectPtr<ACameraPointBase> CameraPoint;
 };

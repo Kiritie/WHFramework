@@ -16,6 +16,10 @@ struct FMyStruct
 };
 
 //////////////////////////////////////////////////////////////////////////
+// Variables
+extern  WHFRAMEWORKCORE_API UObject* GWorldContext;
+
+//////////////////////////////////////////////////////////////////////////
 // Delegates
 DECLARE_DYNAMIC_DELEGATE( FSimpleDynamicDelegate );
 DECLARE_DYNAMIC_MULTICAST_DELEGATE( FSimpleDynamicMulticastDelegate );

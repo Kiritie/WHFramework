@@ -114,7 +114,7 @@ public:
 	TArray<uint8> ContentData;
 
 public:
-	FString ToString()
+	FString ToString() const
 	{
 		if(!Content.IsEmpty())
 		{

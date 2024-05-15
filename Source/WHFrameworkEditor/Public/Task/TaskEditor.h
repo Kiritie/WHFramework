@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonEditorTypes.h"
+#include "WHFrameworkEditorTypes.h"
 #include "Common/Asset/AssetEditorBase.h"
-#include "Common/Module/EditorModuleBase.h"
+#include "Main/Module/EditorModuleBase.h"
 #include "Common/Blueprint/BlueprintEditorBase.h"
 
 class FTaskEditor;
@@ -38,9 +38,9 @@ public:
 
 	virtual void RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetTypeCategories::Type AssetCategory, TArray<TSharedPtr<IAssetTypeActions>>& AssetTypeActions) override;
 
-	virtual void RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+	virtual void RegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
 
-	virtual void UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor) override;
+	virtual void UnRegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
 	
 public:
 	TSharedRef<FTaskEditor> CreateTaskEditor( const EToolkitMode::Type Mode, const TSharedPtr< class IToolkitHost >& InitToolkitHost, UTaskAsset* Task );

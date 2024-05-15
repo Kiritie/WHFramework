@@ -8,7 +8,7 @@ const FUniqueType FMainManager::Type = FUniqueType();
 IMPLEMENTATION_MAIN_MANAGER(FMainManager)
 
 // ParamSets default values
-FMainManager::FMainManager()
+FMainManager::FMainManager() : FManagerBase(Type)
 {
 	ManagerMap = TMap<FUniqueType, FManagerBase*>();
 }

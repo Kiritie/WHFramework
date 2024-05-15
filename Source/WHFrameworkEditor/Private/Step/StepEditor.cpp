@@ -5,15 +5,16 @@
 #include "Editor.h"
 #include "ISettingsSection.h"
 #include "WHFrameworkSlateStatics.h"
+#include "Step/StepEditorTypes.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBlueprint.h"
 #include "Step/Blueprint/StepBlueprintActions.h"
 #include "Step/Blueprint/StepGraphSchema.h"
-#include "Step/Customization/StepDetailCustomization.h"
-#include "Step/Widget/SStepDetailsWidget.h"
-#include "Step/Widget/SStepListWidget.h"
-#include "Step/Widget/SStepStatusWidget.h"
+#include "Step/Customization/StepCustomization.h"
+#include "Step/Slate/SStepDetailsWidget.h"
+#include "Step/Slate/SStepListWidget.h"
+#include "Step/Slate/SStepStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FStepEditor"
 
@@ -80,14 +81,14 @@ void FStepEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetT
 	AssetTypeActions.Add(AssetAction);
 }
 
-void FStepEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FStepEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	FEditorModuleBase::RegisterCustomization(PropertyEditor);
 	
-	PropertyEditor.RegisterCustomClassLayout(FName("StepBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FStepDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("StepBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FStepCustomization::MakeInstance));
 }
 
-void FStepEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FStepEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("StepBase"));
 }

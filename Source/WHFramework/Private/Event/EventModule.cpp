@@ -53,7 +53,7 @@ void UEventModule::OnInitialize()
 	
 	for(auto Iter : EventManagers)
 	{
-		if(UEventManagerBase* EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, nullptr, Iter))
+		if(UEventManagerBase* EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, nullptr, false, Iter))
 		{
 			EventManager->OnInitialize();
 			EventManagerRefs.Add(EventManager->GetEventManagerName(), EventManager);
@@ -71,9 +71,11 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UEventModule::OnRefresh(float DeltaSeconds)
+void UEventModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(bInEditor) return;
 
 	for(auto Iter : EventManagerRefs)
 	{
@@ -231,7 +233,7 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 {
 	if(!EventMappings.Contains(InClass)) return;
 	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleStatics::SpawnObject<UEventHandleBase>(nullptr, nullptr, InClass))
+	if(UEventHandleBase* EventHandle = UObjectPoolModuleStatics::SpawnObject<UEventHandleBase>(nullptr, nullptr, false, InClass))
 	{
 		EventHandle->Parse(InParams);
 		

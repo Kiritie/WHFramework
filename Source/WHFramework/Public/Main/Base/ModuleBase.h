@@ -42,7 +42,7 @@ public:
 	UModuleBase();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	/**
@@ -93,9 +93,9 @@ public:
 	* 当刷新
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
-	void K2_OnRefresh(float DeltaSeconds);
+	void K2_OnRefresh(float DeltaSeconds, bool bInEditor);
 	UFUNCTION()
-	virtual void OnRefresh(float DeltaSeconds);
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor);
 	/**
 	* 当销毁
 	*/
@@ -230,6 +230,11 @@ public:
 	* 是否自动保存
 	*/
 	bool IsModuleAutoSave() const { return bModuleAutoSave; }
+	/**
+	* 是否在编辑器下
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsModuleInEditor() const;
 	/**
 	* 获取模块拥有者
 	*/

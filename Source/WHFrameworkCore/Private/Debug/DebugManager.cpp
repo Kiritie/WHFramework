@@ -11,7 +11,7 @@ const FUniqueType FDebugManager::Type = FUniqueType();
 IMPLEMENTATION_MANAGER(FDebugManager)
 
 // Sets default values
-FDebugManager::FDebugManager()
+FDebugManager::FDebugManager() : FManagerBase(Type)
 {
 	DebugCategoryStates = TMap<TEnumAsByte<EDebugCategory>, FDebugCategoryState>();
 	DON_WITHINDEX((int32)EDC_Custom1, i, 

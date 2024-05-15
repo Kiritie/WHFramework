@@ -77,9 +77,11 @@ void UStepModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UStepModule::OnRefresh(float DeltaSeconds)
+void UStepModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(bInEditor) return;
 
 	if(StepModuleState == EStepModuleState::Running)
 	{

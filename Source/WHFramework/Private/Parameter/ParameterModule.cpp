@@ -51,9 +51,9 @@ void UParameterModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UParameterModule::OnRefresh(float DeltaSeconds)
+void UParameterModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UParameterModule::OnPause()

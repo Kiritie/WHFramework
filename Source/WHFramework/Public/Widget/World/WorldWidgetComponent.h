@@ -9,9 +9,11 @@
 
 class UWorldWidgetBase;
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), hidecategories=(Physics, Collision, HLOD, PathTracing, Natigation, VirtualTexture, Tags, Cooking, MaterialParameters, TextureStreaming, Mobile, RayTracing, AssetUserData))
 class WHFRAMEWORK_API UWorldWidgetComponent : public UWidgetComponent
 {
+	friend class AWorldWidgetActor;
+	
 	GENERATED_BODY()
 
 public:	
@@ -26,7 +28,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	TSubclassOf<UWorldWidgetBase> WorldWidgetClass;
 	
-	UPROPERTY(EditAnywhere, Category = "UserInterface")
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "EDC_AutoCreate"), Category = "UserInterface")
 	bool bAutoCreate;
 
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
@@ -63,11 +65,11 @@ public:
 #endif
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void CreateWorldWidget();
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidget(bool bRecovery = false);
+	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
 
 	UFUNCTION(BlueprintCallable)
 	void SetWorldWidget(UUserWidget* InWidget);
@@ -99,4 +101,8 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	USceneComponent* GetWidgetPoint(FName InPointName) const;
+
+protected:
+	UFUNCTION()
+	bool EDC_AutoCreate() const;
 };

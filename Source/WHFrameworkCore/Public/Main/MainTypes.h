@@ -15,7 +15,7 @@ protected: \
 public: \
 	static ManagerClass& Get(); \
 	static ManagerClass* GetPtr(); \
-	static void Register(); \
+	static void Register(bool bForce = false); \
 	static void UnRegister();
 
 #define IMPLEMENTATION_MANAGER(ManagerClass) \
@@ -28,13 +28,13 @@ ManagerClass* ManagerClass::GetPtr() \
 { \
 	if(!Instance) \
 	{ \
-		Instance = FMainManager::GetManager<ManagerClass>() ? FMainManager::GetManager<ManagerClass>() : new ManagerClass(); \
+		Instance = FMainManager::GetManager<ManagerClass>(); \
 	} \
 	return Instance; \
 } \
-void ManagerClass::Register() \
+void ManagerClass::Register(bool bForce) \
 { \
-	FMainManager::RegisterManager<ManagerClass>(); \
+	FMainManager::RegisterManager<ManagerClass>(bForce); \
 } \
 void ManagerClass::UnRegister() \
 { \

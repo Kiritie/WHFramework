@@ -23,10 +23,8 @@ public:
 	
 	void DebugMessage(const FString& InMessage, EDebugMode InMode, EDebugCategory InCategory, EDebugVerbosity InVerbosity, FLinearColor InDisplayColor, float InDuration, int32 InKey, bool bNewerOnTop);
 
-	UFUNCTION(BlueprintPure)
 	FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory) const;
 
-	UFUNCTION(BlueprintCallable)
 	void SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState);
 
 protected:
