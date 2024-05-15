@@ -11,31 +11,80 @@ const FUniqueType FInputManager::Type = FUniqueType();
 IMPLEMENTATION_MANAGER(FInputManager)
 
 // Sets default values
-FInputManager::FInputManager()
+FInputManager::FInputManager() : FManagerBase(Type)
 {
-	_NativeInputMode = EInputMode::GameOnly;
-	_GlobalInputMode = EInputMode::GameOnly;
+	NativeInputMode = EInputMode::GameOnly;
+	
+	GlobalInputMode = EInputMode::GameOnly;
+
+	InputManagers = TArray<IInputManagerInterface*>();
 }
 
 FInputManager::~FInputManager()
 {
 }
 
+void FInputManager::OnInitialize()
+{
+	FManagerBase::OnInitialize();
+
+	AddInputManager(this);
+}
+
+void FInputManager::OnReset()
+{
+	FManagerBase::OnReset();
+	
+	GlobalInputMode = EInputMode::GameOnly;
+}
+
+void FInputManager::OnRefresh(float DeltaSeconds)
+{
+	FManagerBase::OnRefresh(DeltaSeconds);
+}
+
+void FInputManager::OnTermination()
+{
+	FManagerBase::OnTermination();
+
+	RemoveInputManager(this);
+}
+
+void FInputManager::AddInputManager(IInputManagerInterface* InInputManager)
+{
+	if(!InputManagers.Contains(InInputManager))
+	{
+		InputManagers.Add(InInputManager);
+	}
+}
+
+void FInputManager::RemoveInputManager(IInputManagerInterface* InInputManager)
+{
+	if(InputManagers.Contains(InInputManager))
+	{
+		InputManagers.Remove(InInputManager);
+	}
+}
+
 void FInputManager::UpdateInputMode()
 {
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GWorldContext, 0);
+
+	if(!PlayerController) return;
+	
 	EInputMode InputMode = EInputMode::None;
-	for (const auto Iter : FMainManager::GetAllManager<FInputManager>())
+	for (auto Iter : InputManagers)
 	{
 		if ((int32)Iter->GetNativeInputMode() > (int32)InputMode)
 		{
 			InputMode = Iter->GetNativeInputMode();
 		}
 	}
-	if(_GlobalInputMode != InputMode)
-	{
-		_GlobalInputMode = InputMode;
 
-		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GWorld, 0);
+	if(GlobalInputMode != InputMode)
+	{
+		GlobalInputMode = InputMode;
+
 		switch (InputMode)
 		{
 			case EInputMode::None:
@@ -76,5 +125,6 @@ void FInputManager::UpdateInputMode()
 			}
 			default: break;
 		}
+		// UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
 	}
 }

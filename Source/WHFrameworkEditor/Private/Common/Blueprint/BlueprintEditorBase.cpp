@@ -4,7 +4,6 @@
 
 #include "Editor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
-#include "Procedure/Widget/SProcedureListWidget.h"
 
 #define LOCTEXT_NAMESPACE "FBlueprintEditorBase"
 

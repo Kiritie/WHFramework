@@ -42,6 +42,11 @@ FVector UCameraModuleStatics::GetCameraOffset(bool bRefresh)
 	return UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
 }
 
+float UCameraModuleStatics::GetCameraFov(bool bRefresh)
+{
+	return UCameraModule::Get().GetCurrentCameraFov(bRefresh);
+}
+
 ACameraActorBase* UCameraModuleStatics::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)
 {
 	return UCameraModule::Get().GetCameraByClass(InClass);

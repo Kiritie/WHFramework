@@ -9,10 +9,10 @@
 #include "MainModule.generated.h"
 
 UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cooking, Hidden, Hlod, Networking, Physics, LevelInstance))
-class WHFRAMEWORK_API AMainModule : public AWHActor
+class WHFRAMEWORK_API AMainModule : public AWHActor, public FTickableGameObject
 {
 #if WITH_EDITOR
-	friend class FMainModuleDetailCustomization;
+	friend class FMainModuleCustomization;
 #endif
 	
 	GENERATED_BODY()
@@ -26,7 +26,7 @@ public:
 	~AMainModule();
 	
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate();
@@ -49,6 +49,19 @@ protected:
 	virtual void BeginPlay() override;
 	
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
+	virtual UWorld* GetTickableGameObjectWorld() const override { return GetWorld(); }
+
+	virtual ETickableTickType GetTickableTickType() const override;
+
+	virtual TStatId GetStatId() const override;
+	
+	virtual bool IsTickableInEditor() const override { return true; }
+
+	virtual bool IsTickable() const override { return true; }
 
 public:
 #if WITH_EDITOR
@@ -82,6 +95,10 @@ protected:
 	TMap<FName, UModuleBase*> ModuleMap;
 
 public:
+	/**
+	 * 是否在编辑器下
+	 */
+	bool IsInEditor() const { return this == InstanceEditor; }
 	/**
 	 * 获取模块列表
 	 */

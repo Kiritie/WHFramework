@@ -11,6 +11,7 @@
 #include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
 #include "Event/Handle/Widget/EventHandle_SetWorldWidgetVisible.h"
+#include "Input/InputManager.h"
 #include "Slate/SlateWidgetManager.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
@@ -37,7 +38,7 @@ UWidgetModule::UWidgetModule()
 		WorldWidgetContainerClass = WorldWidgetContainerClassFinder.Class;
 	}
 	WorldWidgetContainerZOrder = -1;
-	AllWorldWidgets = TMap<FName, FWorldWidgets>();
+	AllWorldWidget = TMap<FName, FWorldWidgets>();
 	WorldWidgetContainer = nullptr;
 	WorldWidgetClassMap = TMap<FName, TSubclassOf<UWorldWidgetBase>>();
 }
@@ -64,6 +65,8 @@ void UWidgetModule::OnDestroy()
 void UWidgetModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	FInputManager::Get().AddInputManager(this);
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, FName("OnOpenUserWidget"));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, FName("OnCloseUserWidget"));
@@ -127,9 +130,11 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UWidgetModule::OnRefresh(float DeltaSeconds)
+void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(IsModuleInEditor()) return;
 
 	TArray<UUserWidget*> TickAbleWidgets;
 	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
@@ -140,6 +145,7 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 			ITickAbleWidgetInterface::Execute_OnTick(Iter, DeltaSeconds);
 		}
 	}
+	
 	for (auto& Iter : AllUserWidget)
 	{
 		UUserWidgetBase* UserWidget = Iter.Value;
@@ -148,7 +154,8 @@ void UWidgetModule::OnRefresh(float DeltaSeconds)
 			UserWidget->Refresh();
 		}
 	}
-	for (auto& Iter1 : AllWorldWidgets)
+	
+	for (auto& Iter1 : AllWorldWidget)
 	{
 		for (auto Iter2 : Iter1.Value.WorldWidgets)
 		{
@@ -183,6 +190,10 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	{
 		ClearAllUserWidget();
 		ClearAllWorldWidget();
+	}
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		FInputManager::Get().RemoveInputManager(this);
 	}
 }
 
@@ -293,13 +304,13 @@ void UWidgetModule::CloseAllUserWidget(bool bInstant)
 	}
 }
 
-void UWidgetModule::ClearAllUserWidget()
+void UWidgetModule::ClearAllUserWidget(bool bRecovery)
 {
 	for (auto Iter : AllUserWidget)
 	{
 		if(Iter.Value)
 		{
-			Iter.Value->OnDestroy();
+			Iter.Value->OnDestroy(bRecovery);
 		}
 	}
 	AllUserWidget.Empty();
@@ -325,9 +336,9 @@ bool UWidgetModule::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
 	if(InClass)
 	{
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
-		if(AllWorldWidgets.Contains(WidgetName))
+		if(AllWorldWidget.Contains(WidgetName))
 		{
-			return AllWorldWidgets[WidgetName].bVisible;
+			return AllWorldWidget[WidgetName].bVisible;
 		}
 	}
 	else
@@ -342,9 +353,9 @@ void UWidgetModule::SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidge
 	if(InClass)
 	{
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
-		if(AllWorldWidgets.Contains(WidgetName))
+		if(AllWorldWidget.Contains(WidgetName))
 		{
-			AllWorldWidgets[WidgetName].bVisible = bVisible;
+			AllWorldWidget[WidgetName].bVisible = bVisible;
 		}
 	}
 	else
@@ -383,9 +394,9 @@ UWorldWidgetBase* UWidgetModule::CreateWorldWidget(TSubclassOf<UWorldWidgetBase>
 	return CreateWorldWidget<UWorldWidgetBase>(InOwner, InMapping, &InParams, InClass);
 }
 
-UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
-	return CreateWorldWidgetByName<UWorldWidgetBase>(InName, InOwner, InMapping, &InParams, InClass);
+	return CreateWorldWidgetByName<UWorldWidgetBase>(InName, InOwner, InMapping, &InParams);
 }
 
 bool UWidgetModule::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery)
@@ -395,22 +406,22 @@ bool UWidgetModule::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, in
 
 bool UWidgetModule::DestroyWorldWidgetByName(FName InName, int32 InIndex, bool bRecovery)
 {
-	if(AllWorldWidgets.Contains(InName) && AllWorldWidgets[InName].WorldWidgets.IsValidIndex(InIndex))
+	if(AllWorldWidget.Contains(InName) && AllWorldWidget[InName].WorldWidgets.IsValidIndex(InIndex))
 	{
-		if(UWorldWidgetBase* WorldWidget = AllWorldWidgets[InName].WorldWidgets[InIndex])
+		if(UWorldWidgetBase* WorldWidget = AllWorldWidget[InName].WorldWidgets[InIndex])
 		{
-			AllWorldWidgets[InName].WorldWidgets.RemoveAt(InIndex);
+			AllWorldWidget[InName].WorldWidgets.RemoveAt(InIndex);
 
-			if(AllWorldWidgets[InName].WorldWidgets.Num() > 0)
+			if(AllWorldWidget[InName].WorldWidgets.Num() > 0)
 			{
-				for(int32 i = 0; i < AllWorldWidgets[InName].WorldWidgets.Num(); i++)
+				for(int32 i = 0; i < AllWorldWidget[InName].WorldWidgets.Num(); i++)
 				{
-					AllWorldWidgets[InName].WorldWidgets[i]->SetWidgetIndex(i);
+					AllWorldWidget[InName].WorldWidgets[i]->WidgetIndex = i;
 				}
 			}
 			else
 			{
-				AllWorldWidgets.Remove(InName);
+				AllWorldWidget.Remove(InName);
 			}
 			WorldWidget->OnDestroy(bRecovery);
 		}
@@ -426,33 +437,32 @@ void UWidgetModule::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, b
 
 void UWidgetModule::DestroyWorldWidgetsByName(FName InName, bool bRecovery)
 {
-	if(AllWorldWidgets.Contains(InName))
+	if(AllWorldWidget.Contains(InName))
 	{
-		for(auto Iter : AllWorldWidgets[InName].WorldWidgets)
+		for(auto Iter : AllWorldWidget[InName].WorldWidgets)
 		{
 			if(Iter)
 			{
 				Iter->OnDestroy(bRecovery);
 			}
 		}
-		AllWorldWidgets.Remove(InName);
+		AllWorldWidget.Remove(InName);
 	}
 }
 
-void UWidgetModule::ClearAllWorldWidget()
+void UWidgetModule::ClearAllWorldWidget(bool bRecovery)
 {
-	for(auto Iter1 : AllWorldWidgets)
+	for(auto Iter1 : AllWorldWidget)
 	{
 		for(auto Iter2 : Iter1.Value.WorldWidgets)
 		{
 			if(Iter2)
 			{
-				UObjectPoolModuleStatics::DespawnObject(Iter2, false);
+				Iter2->OnDestroy(bRecovery);
 			}
 		}
-		Iter1.Value.WorldWidgets.Empty();
 	}
-	AllWorldWidgets.Empty();
+	AllWorldWidget.Empty();
 }
 
 EInputMode UWidgetModule::GetNativeInputMode() const
@@ -465,7 +475,7 @@ EInputMode UWidgetModule::GetNativeInputMode() const
     		InputMode = Iter.Value->GetWidgetInputMode();
     	}
     }
-	for (const auto& Iter1 : AllWorldWidgets)
+	for (const auto& Iter1 : AllWorldWidget)
 	{
 		for (const auto& Iter2 : Iter1.Value.WorldWidgets)
 		{

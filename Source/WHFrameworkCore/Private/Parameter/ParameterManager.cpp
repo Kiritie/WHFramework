@@ -11,7 +11,7 @@ const FUniqueType FParameterManager::Type = FUniqueType();
 
 IMPLEMENTATION_MANAGER(FParameterManager)
 
-FParameterManager::FParameterManager()
+FParameterManager::FParameterManager() : FManagerBase(Type)
 {
 }
 

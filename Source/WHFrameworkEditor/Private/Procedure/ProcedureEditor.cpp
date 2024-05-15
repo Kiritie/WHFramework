@@ -10,10 +10,11 @@
 #include "Procedure/Base/ProcedureBlueprint.h"
 #include "Procedure/Blueprint/ProcedureBlueprintActions.h"
 #include "Procedure/Blueprint/ProcedureGraphSchema.h"
-#include "Procedure/Customization/ProcedureDetailCustomization.h"
-#include "Procedure/Widget/SProcedureDetailsWidget.h"
-#include "Procedure/Widget/SProcedureListWidget.h"
-#include "Procedure/Widget/SProcedureStatusWidget.h"
+#include "Procedure/Customization/ProcedureCustomization.h"
+#include "Procedure/ProcedureEditorTypes.h"
+#include "Procedure/Slate/SProcedureDetailsWidget.h"
+#include "Procedure/Slate/SProcedureListWidget.h"
+#include "Procedure/Slate/SProcedureStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FProcedureEditor"
 
@@ -80,14 +81,14 @@ void FProcedureEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EA
 	AssetTypeActions.Add(AssetAction);
 }
 
-void FProcedureEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FProcedureEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	FEditorModuleBase::RegisterCustomization(PropertyEditor);
 	
-	PropertyEditor.RegisterCustomClassLayout(FName("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("ProcedureBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FProcedureCustomization::MakeInstance));
 }
 
-void FProcedureEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FProcedureEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("ProcedureBase"));
 }

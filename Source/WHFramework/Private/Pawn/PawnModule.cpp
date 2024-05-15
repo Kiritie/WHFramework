@@ -74,9 +74,9 @@ void UPawnModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UPawnModule::OnRefresh(float DeltaSeconds)
+void UPawnModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UPawnModule::OnPause()

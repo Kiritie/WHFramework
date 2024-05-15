@@ -7,15 +7,14 @@
 #include "Camera/CameraModule.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
-#include "Event/EventModuleStatics.h"
 #include "Event/Handle/Input/EventHandle_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonStatics.h"
-#include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Input/InputManager.h"
 #include "Input/Base/InputActionBase.h"
 #include "SaveGame/Module/InputSaveGame.h"
 #include "Input/InputModuleStatics.h"
@@ -114,9 +113,13 @@ void UInputModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	FInputManager::Get().AddInputManager(this);
+	
+	FInputManager::Get().SetNativeInputMode(NativeInputMode);
+
 	for(auto Iter : InputManagers)
 	{
-		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, Iter))
+		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, false, Iter))
 		{
 			InputManager->OnInitialize();
 			InputManagerRefs.Add(InputManager->GetInputManagerName(), InputManager);
@@ -152,8 +155,8 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 		{
 			Iter.Value->OnBindAction(Component);
 		}
-		
-		UpdateInputMode();
+
+		UInputModuleStatics::UpdateGlobalInputMode();
 	}
 }
 
@@ -164,9 +167,11 @@ void UInputModule::OnReset()
 	TouchPressedCount = 0;
 }
 
-void UInputModule::OnRefresh(float DeltaSeconds)
+void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(bInEditor) return;
 
 	for(auto Iter : InputManagerRefs)
 	{
@@ -191,6 +196,16 @@ void UInputModule::OnUnPause()
 void UInputModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		FInputManager::Get().RemoveInputManager(this);
+
+		for(auto Iter : InputManagerRefs)
+		{
+			Iter.Value->OnTermination();
+		}
+	}
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -269,7 +284,7 @@ FSaveData* UInputModule::GetData()
 
 FString UInputModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EInputMode"), (int32)GlobalInputMode));
+	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
 }
 
 UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass) const
@@ -700,63 +715,4 @@ AWHPlayerController* UInputModule::GetPlayerController()
 		PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
 	}
 	return PlayerController;
-}
-
-void UInputModule::UpdateInputMode()
-{
-	if(!GetPlayerController()) return;
-	
-	EInputMode InputMode = EInputMode::None;
-	for (const auto Iter : AMainModule::GetAllModule<IInputManagerInterface>())
-	{
-		if ((int32)Iter->GetNativeInputMode() > (int32)InputMode)
-		{
-			InputMode = Iter->GetNativeInputMode();
-		}
-	}
-	if(GlobalInputMode != InputMode)
-	{
-		GlobalInputMode = InputMode;
-		switch (InputMode)
-		{
-			case EInputMode::None:
-			{
-				GetPlayerController()->SetInputMode(FInputModeNone());
-				GetPlayerController()->bShowMouseCursor = false;
-				break;
-			}
-			case EInputMode::GameOnly:
-			{
-				GetPlayerController()->SetInputMode(FInputModeGameOnly());
-				GetPlayerController()->bShowMouseCursor = false;
-				break;
-			}
-			case EInputMode::GameOnly_NotHideCursor:
-			{
-				GetPlayerController()->SetInputMode(FInputModeGameOnly_NotHideCursor());
-				GetPlayerController()->bShowMouseCursor = true;
-				break;
-			}
-			case EInputMode::GameAndUI:
-			{
-				GetPlayerController()->SetInputMode(FInputModeGameAndUI());
-				GetPlayerController()->bShowMouseCursor = true;
-				break;
-			}
-			case EInputMode::GameAndUI_NotHideCursor:
-			{
-				GetPlayerController()->SetInputMode(FInputModeGameAndUI_NotHideCursor());
-				GetPlayerController()->bShowMouseCursor = true;
-				break;
-			}
-			case EInputMode::UIOnly:
-			{
-				GetPlayerController()->SetInputMode(FInputModeUIOnly());
-				GetPlayerController()->bShowMouseCursor = true;
-				break;
-			}
-			default: break;
-		}
-		UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
-	}
 }

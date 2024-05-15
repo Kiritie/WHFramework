@@ -9,6 +9,8 @@ public:
 	// ParamSets default values for this actor's properties
 	FManagerBase();
 
+	FManagerBase(FUniqueType InType);
+
 	virtual ~FManagerBase() override;
 
 	static const FUniqueType Type;
@@ -18,6 +20,10 @@ public:
 	* 当初始化
 	*/
 	virtual void OnInitialize();
+	/**
+	* 当重置
+	*/
+	virtual void OnReset();
 	/**
 	* 当刷新
 	*/

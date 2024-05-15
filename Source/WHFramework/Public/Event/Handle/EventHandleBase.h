@@ -28,6 +28,11 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
+#if WITH_EDITOR
+	virtual void OnEditorRefresh();
+#endif
+
+public:
 	UFUNCTION(BlueprintNativeEvent)
 	bool Filter(UObject* InOwner, const FName InFuncName) const;
 

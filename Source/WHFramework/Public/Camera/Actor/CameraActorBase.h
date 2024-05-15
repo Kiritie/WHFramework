@@ -103,6 +103,7 @@ protected:
 
 private:
 	FVector LastCameraLocation;
+	
 	float CameraStayDuration;
 
 public:

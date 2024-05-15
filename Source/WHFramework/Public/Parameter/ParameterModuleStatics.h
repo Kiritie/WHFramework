@@ -47,58 +47,58 @@ public:
 	/// Parameter
 public:
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeIntegerParameter(int32 InValue);
+	static FParameter MakeIntegerParameter(int32 InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeFloatParameter(float InValue);
+	static FParameter MakeFloatParameter(float InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeByteParameter(uint8 InValue);
+	static FParameter MakeByteParameter(uint8 InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeStringParameter(const FString& InValue);
+	static FParameter MakeStringParameter(const FString& InValue, const FText InDescription = FText::GetEmpty());
 	
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeNameParameter(const FName InValue);
+	static FParameter MakeNameParameter(const FName InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeTextParameter(const FText InValue);
+	static FParameter MakeTextParameter(const FText InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeBooleanParameter(bool InValue);
+	static FParameter MakeBooleanParameter(bool InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeVectorParameter(const FVector& InValue);
+	static FParameter MakeVectorParameter(const FVector& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeRotatorParameter(const FRotator& InValue);
+	static FParameter MakeRotatorParameter(const FRotator& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeColorParameter(FColor InValue);
+	static FParameter MakeColorParameter(FColor InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
-	static FParameter MakeKeyParameter(const FKey& InValue);
+	static FParameter MakeKeyParameter(const FKey& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
-	static FParameter MakeTagParameter(const FGameplayTag& InValue);
+	static FParameter MakeTagParameter(const FGameplayTag& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue);
+	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeClassParameter(UClass* InValue);
+	static FParameter MakeClassParameter(UClass* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue);
+	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeObjectParameter(UObject* InValue);
+	static FParameter MakeObjectParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue);
+	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeDelegateParameter(const FSimpleDynamicDelegate& InValue);
+	static FParameter MakeDelegateParameter(const FSimpleDynamicDelegate& InValue, const FText InDescription = FText::GetEmpty());
 
 public:
 	//////////////////////////////////////////////////////////////////////////
@@ -107,6 +107,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetParameterType(UPARAM(ref) FParameter& InParameter, EParameterType InParameterType) { InParameter.SetParameterType(InParameterType); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FText GetDescription(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetDescription(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetDescription(UPARAM(ref) FParameter& InParameter, const FText InDescription) { InParameter.SetDescription(InDescription); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -128,6 +135,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetByteValue(UPARAM(ref) FParameter& InParameter, uint8 InValue) { InParameter.SetByteValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FEnumParameterValue GetEnumValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetEnumValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetEnumValue(UPARAM(ref) FParameter& InParameter, const FEnumParameterValue& InValue) { InParameter.SetEnumValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

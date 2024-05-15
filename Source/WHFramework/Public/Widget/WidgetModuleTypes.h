@@ -73,6 +73,9 @@ public:
 	}
 
 public:
+	FVector GetLocation() const;
+
+public:
 	UPROPERTY(BlueprintReadWrite)
 	USceneComponent* SceneComp;
 

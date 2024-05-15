@@ -10,7 +10,7 @@ const FUniqueType FFileDownloadManager::Type = FUniqueType();
 IMPLEMENTATION_MANAGER(FFileDownloadManager)
 
 // Sets default values
-FFileDownloadManager::FFileDownloadManager()
+FFileDownloadManager::FFileDownloadManager() : FManagerBase(Type)
 {
 
 }

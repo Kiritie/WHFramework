@@ -10,6 +10,10 @@ FManagerBase::FManagerBase() : FUniqueClass(Type)
 {
 }
 
+FManagerBase::FManagerBase(FUniqueType InType)  : FUniqueClass(InType)
+{
+}
+
 FManagerBase::~FManagerBase()
 {
 }
@@ -17,6 +21,10 @@ FManagerBase::~FManagerBase()
 void FManagerBase::OnInitialize()
 {
 	
+}
+
+void FManagerBase::OnReset()
+{
 }
 
 void FManagerBase::OnRefresh(float DeltaSeconds)

@@ -44,6 +44,8 @@ void AMainModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
+	GWorldContext = this;
+
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
 		if(Modules[i])
@@ -88,7 +90,7 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 	{
 		if(Modules[i] && Modules[i]->GetModuleState() == EModuleState::Running)
 		{
-			Modules[i]->OnRefresh(DeltaSeconds);
+			Modules[i]->OnRefresh(DeltaSeconds, false);
 		}
 	}
 }
@@ -141,6 +143,33 @@ void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Execute_OnTermination(this, EPhase::Primary);
 	Execute_OnTermination(this, EPhase::Lesser);
 	Execute_OnTermination(this, EPhase::Final);
+}
+
+void AMainModule::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	for(int32 i = 0; i < Modules.Num(); i++)
+	{
+		if(Modules[i])
+		{
+			Modules[i]->OnRefresh(DeltaSeconds, true);
+		}
+	}
+}
+
+ETickableTickType AMainModule::GetTickableTickType() const
+{
+	return
+#if WITH_EDITOR
+		IsTickable() ? ETickableTickType::Conditional : 
+#endif // WITH_EDITOR
+		ETickableTickType::Never;
+}
+
+TStatId AMainModule::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(AMainModule, STATGROUP_Tickables);
 }
 
 #if WITH_EDITOR

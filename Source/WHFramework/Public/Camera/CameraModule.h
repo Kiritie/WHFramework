@@ -35,7 +35,7 @@ public:
 	~UCameraModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Module
+	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -47,7 +47,7 @@ public:
 
 	virtual void OnPreparatory(EPhase InPhase) override;
 
-	virtual void OnRefresh(float DeltaSeconds) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
 	virtual void OnPause() override;
 
@@ -251,6 +251,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	float MaxCameraDistance;
 
+	// Fov
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Fov")
+	float InitCameraFov;
+
 	// Offset
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Offset")
 	bool bCameraOffsetAble;
@@ -291,6 +295,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
 	FVector TargetCameraOffset;
 
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Fov")
+	float CurrentCameraFov;
+	
+	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Fov")
+	float TargetCameraFov;
+
 private:
 	float CameraDoLocationTime;
 	float CameraDoLocationDuration;
@@ -311,7 +321,12 @@ private:
 	float CameraDoDistanceDuration;
 	float CameraDoDistanceDistance;
 	EEaseType CameraDoDistanceEaseType;
-	
+		
+	float CameraDoFovTime;
+	float CameraDoFovDuration;
+	float CameraDoFovFov;
+	EEaseType CameraDoFovEaseType;
+
 	FCameraViewData CachedCameraViewData;
 	FCameraViewData TrackCameraViewData;
 	bool bTrackAllowControl;
@@ -387,6 +402,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraTransform();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetCameraFov(float InFov = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DoCameraFov(float InFov = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void StopDoCameraFov();
 
 	UFUNCTION(BlueprintCallable)
 	virtual void AddCameraMovementInput(FVector InDirection, float InValue);
@@ -629,6 +653,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	float GetTargetCameraDistance() const { return TargetCameraDistance; }
+
+	UFUNCTION(BlueprintPure)
+	float GetCurrentCameraFov(bool bRefresh = false) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetTargetCameraFov() const { return TargetCameraFov; }
 
 	UFUNCTION(BlueprintPure)
 	AActor* GetTrackingTarget() const { return TrackCameraViewData.CameraViewParams.CameraViewTarget; }

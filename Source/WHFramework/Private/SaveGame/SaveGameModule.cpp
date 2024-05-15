@@ -58,9 +58,9 @@ void USaveGameModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void USaveGameModule::OnRefresh(float DeltaSeconds)
+void USaveGameModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void USaveGameModule::OnPause()

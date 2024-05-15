@@ -53,9 +53,9 @@ void USettingModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void USettingModule::OnRefresh(float DeltaSeconds)
+void USettingModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void USettingModule::OnPause()

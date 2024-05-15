@@ -42,9 +42,9 @@ void FCameraViewParams::SetCameraParams(const FCameraParams& InCameraParams, AAc
 	CameraViewDistance = InCameraParams.CameraDistance;
 }
 
-FVector FCameraViewParams::GetCameraLocation() const
+FVector FCameraViewParams::GetCameraLocation(bool bApplyViewSpace) const
 {
-	if(CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
+	if(bApplyViewSpace && CameraViewSpace == ECameraViewSpace::Local && CameraViewTarget)
 	{
 		return CameraViewTarget->GetActorLocation() + CameraViewLocation;
 	}
@@ -79,6 +79,11 @@ float FCameraViewParams::GetCameraDistance() const
 	return CameraViewDistance;
 }
 
+float FCameraViewParams::GetCameraFov() const
+{
+	return CameraViewFov;
+}
+
 void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 {
 	if(InParams.Num() < 12) return;
@@ -95,12 +100,13 @@ void FCameraViewData::FromParams(const TArray<FParameter>& InParams)
 	CameraViewParams.CameraViewLocation = InParams[i++].GetVectorValue();
 	CameraViewParams.CameraViewYaw = InParams[i++].GetFloatValue();
 	CameraViewParams.CameraViewPitch = InParams[i++].GetFloatValue();
-	CameraViewParams.CameraViewDistance = InParams[i].GetFloatValue();
+	CameraViewParams.CameraViewDistance = InParams[i++].GetFloatValue();
+	CameraViewParams.CameraViewFov = InParams[i++].GetFloatValue();
 }
 
 TArray<FParameter> FCameraViewData::ToParams() const
 {
 	return { CameraViewTarget, bTrackTarget, (int32)TrackTargetMode, CameraViewParams.CameraViewActor.LoadSynchronous(), (int32)CameraViewParams.CameraViewMode,
 		(int32)CameraViewParams.CameraViewSpace, (int32)CameraViewParams.CameraViewEaseType, CameraViewParams.CameraViewDuration, CameraViewParams.CameraViewLocation,
-		CameraViewParams.CameraViewYaw, CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance };
+		CameraViewParams.CameraViewYaw, CameraViewParams.CameraViewPitch, CameraViewParams.CameraViewDistance, CameraViewParams.CameraViewFov };
 }

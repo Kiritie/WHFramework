@@ -71,9 +71,11 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UTaskModule::OnRefresh(float DeltaSeconds)
+void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(bInEditor) return;
 
 	if(CurrentTask)
 	{

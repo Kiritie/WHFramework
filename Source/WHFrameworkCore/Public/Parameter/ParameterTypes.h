@@ -15,6 +15,7 @@ enum class EParameterType : uint8
 	Integer,
 	Float,
 	Byte,
+	Enum,
 	String,
 	Name,
 	Text,
@@ -30,21 +31,61 @@ enum class EParameterType : uint8
 	Object,
 	ObjectPtr,
 	Delegate,
-	Pointer
+	Pointer UMETA(Hidden)
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORKCORE_API FEnumParameterValue
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FEnumParameterValue()
+	{
+		EnumType = nullptr;
+		EnumName = TEXT("");
+		EnumValue = 0;
+	}
+
+	friend bool operator==(const FEnumParameterValue& A, const FEnumParameterValue& B)
+	{
+		return A.EnumType == B.EnumType && A.EnumName == B.EnumName && A.EnumValue == B.EnumValue;
+	}
+
+	friend bool operator!=(const FEnumParameterValue& A, const FEnumParameterValue& B)
+	{
+		return A.EnumType != B.EnumType || A.EnumName != B.EnumName || A.EnumValue != B.EnumValue;
+	}
+
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UEnum* EnumType;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString EnumName;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	uint8 EnumValue;
 };
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORKCORE_API FParameter
 {
+#if WITH_EDITOR
+	friend class FParameterCustomization;
+#endif
+	
 	GENERATED_USTRUCT_BODY()
 
 public:
 	FParameter()
 	{
 		ParameterType = EParameterType::None;
+		Description = FText::GetEmpty();
 		IntegerValue = 0;
 		FloatValue = 0.f;
 		ByteValue = 0;
+		EnumValue = FEnumParameterValue();
 		StringValue = TEXT("");
 		NameValue = NAME_None;
 		TextValue = FText::GetEmpty();
@@ -126,7 +167,7 @@ public:
 	{
 		*this = MakeColor(InValue);
 	}
-				
+	
 	FParameter(const FKey& InValue)
 	{
 		*this = MakeKey(InValue);
@@ -181,6 +222,7 @@ public:
 			case EParameterType::Integer: return A.IntegerValue == B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue == B.FloatValue;
 			case EParameterType::Byte: return A.ByteValue == B.ByteValue;
+			case EParameterType::Enum: return A.EnumValue == B.EnumValue;
 			case EParameterType::String: return A.StringValue == B.StringValue;
 			case EParameterType::Name: return A.NameValue == B.NameValue;
 			case EParameterType::Text: return A.TextValue.EqualTo(B.TextValue);
@@ -208,6 +250,7 @@ public:
 			case EParameterType::Integer: return A.IntegerValue != B.IntegerValue;
 			case EParameterType::Float: return A.FloatValue != B.FloatValue;
 			case EParameterType::Byte: return A.ByteValue != B.ByteValue;
+			case EParameterType::Enum: return A.EnumValue != B.EnumValue;
 			case EParameterType::String: return A.StringValue != B.StringValue;
 			case EParameterType::Name: return A.NameValue != B.NameValue;
 			case EParameterType::Text: return !A.TextValue.EqualTo(B.TextValue);
@@ -232,58 +275,64 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EParameterType ParameterType;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Integer"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FText Description;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int32 IntegerValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Float"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float FloatValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Byte"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	uint8 ByteValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::String"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FEnumParameterValue EnumValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString StringValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Name"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FName NameValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Text", MultiLine = "true"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (MultiLine))
 	FText TextValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Boolean"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool BooleanValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Vector"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FVector VectorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Rotator"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FRotator RotatorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Color"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FColor ColorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Key"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FKey KeyValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Tag"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FGameplayTag TagValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Tags"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FGameplayTagContainer TagsValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Class"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UClass* ClassValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::ClassPtr"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TSoftClassPtr<UObject> ClassPtrValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Object"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UObject* ObjectValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::ObjectPtr"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TSoftObjectPtr<UObject> ObjectPtrValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "ParameterType == EParameterType::Delegate"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FSimpleDynamicDelegate DelegateValue;
 
 	void* PointerValue;
@@ -293,6 +342,11 @@ public:
 	EParameterType GetParameterType() const { return ParameterType; }
 
 	void SetParameterType(EParameterType InParameterType) { ParameterType = InParameterType; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FText GetDescription() const { return Description; }
+
+	void SetDescription(const FText& InDescription) { Description = InDescription; }
 
 	//////////////////////////////////////////////////////////////////////////
 	int32 GetIntegerValue() const { return IntegerValue; }
@@ -308,6 +362,11 @@ public:
 	uint8 GetByteValue() const { return ByteValue; }
 
 	void SetByteValue(uint8 InValue) { ByteValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FEnumParameterValue GetEnumValue() const { return EnumValue; }
+
+	void SetEnumValue(const FEnumParameterValue& InValue) { EnumValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FString GetStringValue() const { return StringValue; }
@@ -407,172 +466,202 @@ public:
 	void SetPointerValue(void* InValue) { PointerValue = InValue; }
 
 public:
-	static FParameter MakeInteger(int32 InValue)
+	static FParameter MakeInteger(int32 InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Integer;
+		Parameter.Description = InDescription;
 		Parameter.SetIntegerValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeFloat(float InValue)
+	static FParameter MakeFloat(float InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Float;
+		Parameter.Description = InDescription;
 		Parameter.SetFloatValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeByte(uint8 InValue)
+	static FParameter MakeByte(uint8 InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Byte;
+		Parameter.Description = InDescription;
 		Parameter.SetByteValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeString(const FString& InValue)
+	static FParameter MakeEnum(const FEnumParameterValue& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Enum;
+		Parameter.Description = InDescription;
+		Parameter.SetEnumValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeString(const FString& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::String;
+		Parameter.Description = InDescription;
 		Parameter.SetStringValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeName(const FName InValue)
+	static FParameter MakeName(const FName InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Name;
+		Parameter.Description = InDescription;
 		Parameter.SetNameValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeText(const FText InValue)
+	static FParameter MakeText(const FText& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Text;
+		Parameter.Description = InDescription;
 		Parameter.SetTextValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeBoolean(bool InValue)
+	static FParameter MakeBoolean(bool InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Boolean;
+		Parameter.Description = InDescription;
 		Parameter.SetBooleanValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeVector(const FVector& InValue)
+	static FParameter MakeVector(const FVector& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Vector;
+		Parameter.Description = InDescription;
 		Parameter.SetVectorValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeVector(const FVector2D& InValue)
+	static FParameter MakeVector(const FVector2D& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Vector;
+		Parameter.Description = InDescription;
 		Parameter.SetVectorValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeRotator(const FRotator& InValue)
+	static FParameter MakeRotator(const FRotator& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Rotator;
+		Parameter.Description = InDescription;
 		Parameter.SetRotatorValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeColor(const FColor& InValue)
+	static FParameter MakeColor(const FColor& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Color;
+		Parameter.Description = InDescription;
 		Parameter.SetColorValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeColor(const FLinearColor& InValue)
+	static FParameter MakeColor(const FLinearColor& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Color;
+		Parameter.Description = InDescription;
 		Parameter.SetColorValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeKey(const FKey& InValue)
+	static FParameter MakeKey(const FKey& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Key;
+		Parameter.Description = InDescription;
 		Parameter.SetKeyValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeTag(const FGameplayTag& InValue)
+	static FParameter MakeTag(const FGameplayTag& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Tag;
+		Parameter.Description = InDescription;
 		Parameter.SetTagValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeTags(const FGameplayTagContainer& InValue)
+	static FParameter MakeTags(const FGameplayTagContainer& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Tags;
+		Parameter.Description = InDescription;
 		Parameter.SetTagsValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeClass(UClass* InValue)
+	static FParameter MakeClass(UClass* InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Class;
+		Parameter.Description = InDescription;
 		Parameter.SetClassValue(InValue);
 		return Parameter;
 	}
 
 	template<class T>
-	static FParameter MakeClassPtr(const TSoftClassPtr<T>& InValue)
+	static FParameter MakeClassPtr(const TSoftClassPtr<T>& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::ClassPtr;
+		Parameter.Description = InDescription;
 		Parameter.SetClassPtrValue<T>(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeObject(UObject* InValue)
+	static FParameter MakeObject(UObject* InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Object;
+		Parameter.Description = InDescription;
 		Parameter.SetObjectValue(InValue);
 		return Parameter;
 	}
 
 	template<class T>
-	static FParameter MakeObjectPtr(const TSoftObjectPtr<T>& InValue)
+	static FParameter MakeObjectPtr(const TSoftObjectPtr<T>& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::ObjectPtr;
+		Parameter.Description = InDescription;
 		Parameter.SetObjectPtrValue<T>(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakeDelegate(const FSimpleDynamicDelegate& InValue)
+	static FParameter MakeDelegate(const FSimpleDynamicDelegate& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Delegate;
+		Parameter.Description = InDescription;
 		Parameter.SetDelegateValue(InValue);
 		return Parameter;
 	}
 
-	static FParameter MakePointer(void* InValue)
+	static FParameter MakePointer(void* InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
 		Parameter.ParameterType = EParameterType::Pointer;
+		Parameter.Description = InDescription;
 		Parameter.SetPointerValue(InValue);
 		return Parameter;
 	}
@@ -731,7 +820,7 @@ public:
 		return TEXT("");
 	}
 
-	TMap<FString, FString>& GetMap()
+	const TMap<FString, FString>& GetMap() const
 	{
 		return Map;
 	}

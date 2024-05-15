@@ -6,7 +6,6 @@
 #include "Blueprint/UserWidget.h"
 #include "Common/CommonTypes.h"
 #include "Components/WidgetComponent.h"
-#include "Input/InputModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
@@ -72,12 +71,12 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
 	UFUNCTION()
-	virtual void OnRefresh();
+	virtual void OnRefresh() override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy(bool bRecovery = false);
+	void K2_OnDestroy(bool bRecovery);
 	UFUNCTION()
-	virtual void OnDestroy(bool bRecovery = false);
+	virtual void OnDestroy(bool bRecovery) override;
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -155,16 +154,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EInputMode WidgetInputMode;
 
-	UPROPERTY(Transient)
+	UPROPERTY()
 	UObject* OwnerObject;
 	
-	UPROPERTY(Transient)
+	UPROPERTY()
 	int32 WidgetIndex;
-	
-	UPROPERTY(Transient)
+		
+	UPROPERTY()
+	bool bWidgetInEditor;
+
+	UPROPERTY()
 	class UWorldWidgetComponent* WidgetComponent;
 
-	UPROPERTY(Transient)
+	UPROPERTY()
 	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
 
 public:
@@ -175,6 +177,8 @@ public:
 
 private:
 	FTimerHandle RefreshTimerHandle;
+
+	TSharedPtr<SWidget> WorldWidget;
 	
 public:
 	UFUNCTION(BlueprintPure)
@@ -224,8 +228,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetIndex() const { return WidgetIndex; }
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetWidgetIndex(int32 InIndex) { WidgetIndex = InIndex; }
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetInEditor() const { return bWidgetInEditor; }
 
 	UFUNCTION(BlueprintPure)
 	UWorldWidgetComponent* GetWidgetComponent() const { return WidgetComponent; }

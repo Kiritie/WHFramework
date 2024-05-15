@@ -73,9 +73,9 @@ void UVideoModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UVideoModule::OnRefresh(float DeltaSeconds)
+void UVideoModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UVideoModule::OnPause()

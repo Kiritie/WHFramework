@@ -97,6 +97,8 @@ void AWHActor::BeginPlay()
 
 void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	Super::EndPlay(EndPlayReason);
+	
 	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::None);

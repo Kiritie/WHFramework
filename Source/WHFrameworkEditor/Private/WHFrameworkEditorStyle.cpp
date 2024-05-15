@@ -5,6 +5,7 @@
 #include "Styling/SlateStyleRegistry.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Interfaces/IPluginManager.h"
+#include "Styling/SlateStyleMacros.h"
 
 #define IMAGE_BRUSH(RelativePath, ...) FSlateImageBrush(Style->RootToContentDir(RelativePath, TEXT(".png")), __VA_ARGS__)
 #define IMAGE_BRUSH_SVG(RelativePath, ...) FSlateVectorImageBrush(Style->RootToContentDir(RelativePath, TEXT(".svg")), __VA_ARGS__)
@@ -68,6 +69,8 @@ TSharedRef<FSlateStyleSet> FWHFrameworkEditorStyle::Create()
 	Style->Set("StepEditor.OpenStepEditorWindow", new IMAGE_BRUSH(TEXT("Icon_StepEditor_40"), Icon40x40));
 
 	Style->Set("TaskEditor.OpenTaskEditorWindow", new IMAGE_BRUSH(TEXT("Icon_TaskEditor_40"), Icon40x40));
+
+	Style->Set("AssetModifierEditor.OpenAssetModifierEditorWindow", new IMAGE_BRUSH_SVG(TEXT("Icon_AssetModifierEditor_40"), Icon40x40));
 
 	return Style;
 }

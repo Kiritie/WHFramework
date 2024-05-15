@@ -82,9 +82,9 @@ void UAssetModule::OnPreparatory(EPhase InPhase)
 	}
 }
 
-void UAssetModule::OnRefresh(float DeltaSeconds)
+void UAssetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UAssetModule::OnPause()

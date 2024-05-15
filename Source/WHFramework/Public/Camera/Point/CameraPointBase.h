@@ -7,6 +7,8 @@
 #include "Common/Base/WHActor.h"
 #include "CameraPointBase.generated.h"
 
+class USpringArmComponent;
+class UCameraComponent;
 class UWorldPartitionStreamingSourceComponent;
 
 UCLASS()
@@ -27,6 +29,9 @@ public:
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
+public:
+	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// CameraPoint
@@ -46,6 +51,14 @@ public:
 #endif
 
 protected:
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UCameraComponent* Camera;
+	
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	USpringArmComponent* CameraBoom;
+#endif
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UWorldPartitionStreamingSourceComponent* StreamingSource;
 
@@ -61,6 +74,12 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsDefault() const;
+
+#if WITH_EDITORONLY_DATA
+	UCameraComponent* GetCamera() const { return Camera; }
+
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+#endif
 
 	UFUNCTION(BlueprintPure)
 	FCameraViewData GetCameraViewData();

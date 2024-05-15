@@ -70,7 +70,9 @@ enum class EInteractAction : uint8
 
 //////////////////////////////////////////////////////////////////////////
 // Functions
-extern const UObject* GetWorldContext(bool bInEditor = false);
+extern WHFRAMEWORK_API const UObject* GetWorldContext(bool bInEditor = false);
+
+extern WHFRAMEWORK_API UObject* GetMutableWorldContext(bool bInEditor = false);
 
 template<class T = UObject>
 extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
@@ -83,6 +85,8 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 	return nullptr;
 }
 
+//////////////////////////////////////////////////////////////////////////
+// Tags
 namespace GameplayTags
 {
 	WHFRAMEWORK_API	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString = false);

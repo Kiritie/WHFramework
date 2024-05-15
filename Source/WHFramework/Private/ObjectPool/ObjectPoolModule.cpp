@@ -50,9 +50,9 @@ void UObjectPoolModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UObjectPoolModule::OnRefresh(float DeltaSeconds)
+void UObjectPoolModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UObjectPoolModule::OnPause()

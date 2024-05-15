@@ -3,7 +3,7 @@
 #pragma once
 #include "MainEditor.h"
 #include "WHFrameworkEditorStyle.h"
-#include "Common/CommonEditorTypes.h"
+#include "WHFrameworkEditorTypes.h"
 #include "MainEditorTypes.generated.h"
 
 class UModuleBase;

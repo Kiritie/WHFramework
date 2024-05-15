@@ -52,9 +52,9 @@ void UNetworkModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UNetworkModule::OnRefresh(float DeltaSeconds)
+void UNetworkModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UNetworkModule::OnPause()

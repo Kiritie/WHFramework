@@ -40,92 +40,92 @@ void UParameterModuleStatics::ClearAllGlobalParameter()
 	UParameterModule::Get().ClearAllParameter();
 }
 
-FParameter UParameterModuleStatics::MakeIntegerParameter(int32 InValue)
+FParameter UParameterModuleStatics::MakeIntegerParameter(int32 InValue, const FText InDescription)
 {
-	return FParameter::MakeInteger(InValue);
+	return FParameter::MakeInteger(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeFloatParameter(float InValue)
+FParameter UParameterModuleStatics::MakeFloatParameter(float InValue, const FText InDescription)
 {
-	return FParameter::MakeFloat(InValue);
+	return FParameter::MakeFloat(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeByteParameter(uint8 InValue)
+FParameter UParameterModuleStatics::MakeByteParameter(uint8 InValue, const FText InDescription)
 {
-	return FParameter::MakeByte(InValue);
+	return FParameter::MakeByte(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeStringParameter(const FString& InValue)
+FParameter UParameterModuleStatics::MakeStringParameter(const FString& InValue, const FText InDescription)
 {
-	return FParameter::MakeString(InValue);
+	return FParameter::MakeString(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeNameParameter(const FName InValue)
+FParameter UParameterModuleStatics::MakeNameParameter(const FName InValue, const FText InDescription)
 {
-	return FParameter::MakeName(InValue);
+	return FParameter::MakeName(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeTextParameter(const FText InValue)
+FParameter UParameterModuleStatics::MakeTextParameter(const FText InValue, const FText InDescription)
 {
-	return FParameter::MakeText(InValue);
+	return FParameter::MakeText(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeBooleanParameter(bool InValue)
+FParameter UParameterModuleStatics::MakeBooleanParameter(bool InValue, const FText InDescription)
 {
-	return FParameter::MakeBoolean(InValue);
+	return FParameter::MakeBoolean(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeVectorParameter(const FVector& InValue)
+FParameter UParameterModuleStatics::MakeVectorParameter(const FVector& InValue, const FText InDescription)
 {
-	return FParameter::MakeVector(InValue);
+	return FParameter::MakeVector(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeRotatorParameter(const FRotator& InValue)
+FParameter UParameterModuleStatics::MakeRotatorParameter(const FRotator& InValue, const FText InDescription)
 {
-	return FParameter::MakeRotator(InValue);
+	return FParameter::MakeRotator(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeColorParameter(FColor InValue)
+FParameter UParameterModuleStatics::MakeColorParameter(FColor InValue, const FText InDescription)
 {
-	return FParameter::MakeColor(InValue);
+	return FParameter::MakeColor(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeKeyParameter(const FKey& InValue)
+FParameter UParameterModuleStatics::MakeKeyParameter(const FKey& InValue, const FText InDescription)
 {
-	return FParameter::MakeKey(InValue);
+	return FParameter::MakeKey(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeTagParameter(const FGameplayTag& InValue)
+FParameter UParameterModuleStatics::MakeTagParameter(const FGameplayTag& InValue, const FText InDescription)
 {
-	return FParameter::MakeTag(InValue);
+	return FParameter::MakeTag(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeTagsParameter(const FGameplayTagContainer& InValue)
+FParameter UParameterModuleStatics::MakeTagsParameter(const FGameplayTagContainer& InValue, const FText InDescription)
 {
-	return FParameter::MakeTags(InValue);
+	return FParameter::MakeTags(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeClassParameter(UClass* InValue)
+FParameter UParameterModuleStatics::MakeClassParameter(UClass* InValue, const FText InDescription)
 {
-	return FParameter::MakeClass(InValue);
+	return FParameter::MakeClass(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue)
+FParameter UParameterModuleStatics::MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue, const FText InDescription)
 {
-	return FParameter::MakeClassPtr(InValue);
+	return FParameter::MakeClassPtr(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeObjectParameter(UObject* InValue)
+FParameter UParameterModuleStatics::MakeObjectParameter(UObject* InValue, const FText InDescription)
 {
-	return FParameter::MakeObject(InValue);
+	return FParameter::MakeObject(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue)
+FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue, const FText InDescription)
 {
-	return FParameter::MakeObjectPtr(InValue);
+	return FParameter::MakeObjectPtr(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeDelegateParameter(const FSimpleDynamicDelegate& InValue)
+FParameter UParameterModuleStatics::MakeDelegateParameter(const FSimpleDynamicDelegate& InValue, const FText InDescription)
 {
-	return FParameter::MakeDelegate(InValue);
+	return FParameter::MakeDelegate(InValue, InDescription);
 }

@@ -37,6 +37,10 @@ protected:
 protected:
 	const TArray<FClassPickerDefaults>& GetNewAssetDefaultClasses();
 
+	void OnBlueprintCompiled();
+
+	void OnLevelViewportClientListChanged();
+
 private:
 	TArray<FClassPickerDefaults> DefaultClassPickers;
 

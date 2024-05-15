@@ -9,8 +9,8 @@
 #include "Main/Base/ModuleBlueprint.h"
 #include "Main/Blueprint/ModuleBlueprintActions.h"
 #include "Main/Blueprint/ModuleGraphSchema.h"
-#include "Main/Customization/MainModuleDetailCustomization.h"
-#include "Main/Widget/SModuleEditorWidget.h"
+#include "Main/Customization/MainModuleCustomization.h"
+#include "Main/Slate/SModuleEditorWidget.h"
 
 #define LOCTEXT_NAMESPACE "FModuleEditor"
 
@@ -84,14 +84,14 @@ void FMainEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAssetT
 	AssetTypeActions.Add(AssetAction);
 }
 
-void FMainEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FMainEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	FEditorModuleBase::RegisterCustomClassLayout(PropertyEditor);
+	FEditorModuleBase::RegisterCustomization(PropertyEditor);
 	
-	PropertyEditor.RegisterCustomClassLayout(FName("MainModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FMainModuleDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("MainModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FMainModuleCustomization::MakeInstance));
 }
 
-void FMainEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FMainEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("MainModule"));
 }

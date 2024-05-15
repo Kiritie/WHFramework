@@ -60,7 +60,7 @@ public:
 	
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy(bool bRecovery = false) override;
+	virtual void OnDestroy(bool bRecovery) override;
 
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 

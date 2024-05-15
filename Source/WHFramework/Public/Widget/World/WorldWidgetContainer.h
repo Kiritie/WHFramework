@@ -7,6 +7,9 @@
 
 #include "WorldWidgetContainer.generated.h"
 
+class UCanvasPanelSlot;
+class UWorldWidgetBase;
+
 /**
  * 
  */
@@ -20,8 +23,8 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	class UCanvasPanelSlot* AddWorldWidget(class UWorldWidgetBase* InWidget);
+	UCanvasPanelSlot* AddWorldWidget(UWorldWidgetBase* InWidget);
 
 	UFUNCTION(BlueprintNativeEvent)
-	bool RemoveWorldWidget(class UWorldWidgetBase* InWidget);
+	bool RemoveWorldWidget(UWorldWidgetBase* InWidget);
 };

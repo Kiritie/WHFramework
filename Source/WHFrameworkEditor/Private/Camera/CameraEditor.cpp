@@ -3,8 +3,8 @@
 #include "Camera/CameraEditor.h"
 
 #include "Editor.h"
-#include "Camera/Customization/CameraModuleDetailCustomization.h"
-#include "Camera/Customization/CameraPointDetailCustomization.h"
+#include "Camera/Customization/CameraModuleCustomization.h"
+#include "Camera/Customization/CameraPointCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FCameraEditor"
 
@@ -55,13 +55,13 @@ void FCameraEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAsse
 
 }
 
-void FCameraEditorModule::RegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FCameraEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	PropertyEditor.RegisterCustomClassLayout(FName("CameraModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraModuleDetailCustomization::MakeInstance));
-	PropertyEditor.RegisterCustomClassLayout(FName("CameraPointBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraPointDetailCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CameraModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraModuleCustomization::MakeInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CameraPointBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraPointCustomization::MakeInstance));
 }
 
-void FCameraEditorModule::UnRegisterCustomClassLayout(FPropertyEditorModule& PropertyEditor)
+void FCameraEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.UnregisterCustomClassLayout(FName("CameraModule"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("CameraPointBase"));

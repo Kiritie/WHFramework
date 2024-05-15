@@ -3,13 +3,14 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
+#include "Input/InputManagerInterface.h"
 
 #include "InputManagerBase.generated.h"
 
 class UInputComponentBase;
 
 UCLASS()
-class WHFRAMEWORK_API UInputManagerBase : public UWHObject
+class WHFRAMEWORK_API UInputManagerBase : public UWHObject, public IInputManagerInterface
 {
 	GENERATED_BODY()
 	
@@ -41,12 +42,25 @@ public:
 	void K2_OnBindAction(UInputComponentBase* InInputComponent);
 	UFUNCTION()
 	virtual void OnBindAction(UInputComponentBase* InInputComponent);
+	/**
+	* 当销毁
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
+	void K2_OnTermination();
+	UFUNCTION()
+	virtual void OnTermination();
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Input")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName InputManagerName;
 
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetInputManagerName() const { return InputManagerName; }
+
+	UFUNCTION(BlueprintNativeEvent)
+	int32 GetNativeInputPriority() const override;
+
+	UFUNCTION(BlueprintNativeEvent)
+	EInputMode GetNativeInputMode() const override;
 };

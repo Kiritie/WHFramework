@@ -67,9 +67,9 @@ void UModuleBase::OnUnPause()
 	K2_OnUnPause();
 }
 
-void UModuleBase::OnRefresh(float DeltaSeconds)
+void UModuleBase::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	K2_OnRefresh(DeltaSeconds);
+	K2_OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UModuleBase::OnTermination(EPhase InPhase)
@@ -139,7 +139,7 @@ void UModuleBase::Pause_Implementation()
 	{
 		case EModuleState::None:
 		{
-			ModuleState = EModuleState::RunningPaused;
+			ModuleState = EModuleState::UnRunning;
 			OnStateChanged(ModuleState);
 			OnPause();
 			break;
@@ -159,7 +159,7 @@ void UModuleBase::UnPause_Implementation()
 {
 	switch(ModuleState)
 	{
-		case EModuleState::RunningPaused:
+		case EModuleState::UnRunning:
 		{
 			ModuleState = EModuleState::Running;
 			OnStateChanged(ModuleState);
@@ -186,6 +186,11 @@ void UModuleBase::Termination_Implementation()
 		OnStateChanged(ModuleState);
 		OnTermination(EPhase::Final);
 	}
+}
+
+bool UModuleBase::IsModuleInEditor() const
+{
+	return GetModuleOwner()->IsInEditor();
 }
 
 AMainModule* UModuleBase::GetModuleOwner() const

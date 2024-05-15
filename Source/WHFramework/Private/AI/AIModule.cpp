@@ -45,9 +45,9 @@ void UAIModule::OnPreparatory(EPhase InPhase)
 	Super::OnPreparatory(InPhase);
 }
 
-void UAIModule::OnRefresh(float DeltaSeconds)
+void UAIModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
-	Super::OnRefresh(DeltaSeconds);
+	Super::OnRefresh(DeltaSeconds, bInEditor);
 }
 
 void UAIModule::OnPause()

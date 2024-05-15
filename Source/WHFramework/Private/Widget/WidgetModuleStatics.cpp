@@ -3,6 +3,8 @@
 
 #include "Widget/WidgetModuleStatics.h"
 
+#include "Widget/Common/CommonToolTip.h"
+
 UDataTable* UWidgetModuleStatics::GetCommonRichTextStyle()
 {
 	return UWidgetModule::Get().GetCommonRichTextStyle();
@@ -31,6 +33,16 @@ void UWidgetModuleStatics::AddCommonRichTextDecorator(const TSubclassOf<URichTex
 void UWidgetModuleStatics::RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator)
 {
 	UWidgetModule::Get().RemoveCommonRichTextDecorator(InCommonRichTextDecorator);
+}
+
+UCommonToolTip* UWidgetModuleStatics::SpawnToolTipForWidget(UWidget* InWidget, TSubclassOf<UCommonToolTip> InToolTipClass)
+{
+	return UObjectPoolModuleStatics::SpawnObject<UCommonToolTip>(InWidget, nullptr, false, InToolTipClass);
+}
+
+void UWidgetModuleStatics::DestroyToolTipForWidget(UWidget* InWidget)
+{
+	UObjectPoolModuleStatics::DespawnObject(InWidget->GetToolTip());
 }
 
 UUserWidgetBase* UWidgetModuleStatics::GetTemporaryUserWidget()
@@ -113,57 +125,57 @@ UWorldWidgetContainer* UWidgetModuleStatics::GetWorldWidgetContainer()
 	return UWidgetModule::Get().GetWorldWidgetContainer();
 }
 
-bool UWidgetModuleStatics::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
+bool UWidgetModuleStatics::GetWorldWidgetVisible(bool bInEditor, TSubclassOf<UWorldWidgetBase> InClass)
 {
-	return UWidgetModule::Get().GetWorldWidgetVisible(InClass);
+	return UWidgetModule::Get(bInEditor).GetWorldWidgetVisible(InClass);
 }
 
-void UWidgetModuleStatics::SetWorldWidgetVisible(bool bVisible)
+void UWidgetModuleStatics::SetWorldWidgetVisible(bool bVisible, bool bInEditor, TSubclassOf<UWorldWidgetBase> InClass)
 {
-	UWidgetModule::Get().SetWorldWidgetVisible(bVisible);
+	UWidgetModule::Get(bInEditor).SetWorldWidgetVisible(bVisible, InClass);
 }
 
-bool UWidgetModuleStatics::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
+bool UWidgetModuleStatics::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor)
 {
-	return UWidgetModule::Get().HasWorldWidget(InClass, InIndex);
+	return UWidgetModule::Get(bInEditor).HasWorldWidget(InClass, InIndex);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
+UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor)
 {
-	return UWidgetModule::Get().GetWorldWidget(InClass, InIndex);
+	return UWidgetModule::Get(bInEditor).GetWorldWidget(InClass, InIndex);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
+UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor)
 {
-	return UWidgetModule::Get().GetWorldWidgetByName(InName, InClass, InIndex);
+	return UWidgetModule::Get(bInEditor).GetWorldWidgetByName(InName, InClass, InIndex);
 }
 
-TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass)
+TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bInEditor)
 {
-	return UWidgetModule::Get().GetWorldWidgets(InClass);
+	return UWidgetModule::Get(bInEditor).GetWorldWidgets(InClass);
 }
 
-TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgetsByName(FName InName)
+TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgetsByName(FName InName, bool bInEditor)
 {
-	return UWidgetModule::Get().GetWorldWidgetsByName(InName);
+	return UWidgetModule::Get(bInEditor).GetWorldWidgetsByName(InName);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor)
 {
-	return UWidgetModule::Get().CreateWorldWidget(InClass, InOwner, InMapping, InParams);
+	return UWidgetModule::Get(bInEditor).CreateWorldWidget(InClass, InOwner, InMapping, InParams);
 }
 
-UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
+UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor)
 {
-	return UWidgetModule::Get().CreateWorldWidgetByName(InName, InClass, InOwner, InMapping, InParams);
+	return UWidgetModule::Get(bInEditor).CreateWorldWidgetByName(InName, InOwner, InMapping, InParams);
 }
 
-bool UWidgetModuleStatics::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery)
+bool UWidgetModuleStatics::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery, bool bInEditor)
 {
-	return UWidgetModule::Get().DestroyWorldWidget(InClass, InIndex, bRecovery);
+	return UWidgetModule::Get(bInEditor).DestroyWorldWidget(InClass, InIndex, bRecovery);
 }
 
-void UWidgetModuleStatics::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery)
+void UWidgetModuleStatics::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery, bool bInEditor)
 {
-	UWidgetModule::Get().DestroyWorldWidgets(InClass, bRecovery);
+	UWidgetModule::Get(bInEditor).DestroyWorldWidgets(InClass, bRecovery);
 }

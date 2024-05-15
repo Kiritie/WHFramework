@@ -25,4 +25,6 @@ public:
 	virtual int32 GetNativeInputPriority() const = 0;
 	
 	virtual EInputMode GetNativeInputMode() const = 0;
+	
+	virtual void SetNativeInputMode(EInputMode InInputMode) { }
 };

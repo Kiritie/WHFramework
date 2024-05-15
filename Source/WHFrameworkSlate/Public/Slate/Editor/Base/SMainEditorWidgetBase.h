@@ -50,7 +50,7 @@ protected:
 
 	virtual TSharedRef<SWidget> CreateMenuBarWidget();
 
-	virtual TSharedRef<SWidget> CreateTabManagerWidget();
+	virtual TSharedRef<SWidget> CreateDefaultWidget();
 
 protected:
 	void OnTabSpawned(const FName& TabIdentifier, const TSharedRef<SDockTab>& SpawnedTab);

@@ -9,7 +9,8 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Common/CommonStatics.h"
-#include "Input/InputModule.h"
+#include "Input/InputModuleStatics.h"
+#include "Scene/SceneManager.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetComponent.h"
@@ -35,6 +36,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetInputMode = EInputMode::None;
 	OwnerObject = nullptr;
 	WidgetIndex = 0;
+	bWidgetInEditor = false;
 
 	WidgetComponent = nullptr;
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetMapping>();
@@ -42,47 +44,101 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 
 FReply UWorldWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		if(IsWidgetInEditor())
+		{
+#if WITH_EDITOR
+			if(AActor* OwnerActor = GetOwnerObject<AActor>())
+			{
+				FSceneManager::Get().SelectActorsInCurrentWorld({ OwnerActor }, !InMouseEvent.IsControlDown());
+			}
+#endif
+		}
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 FReply UWorldWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
 {
-	return !bWidgetPenetrable ? FReply::Handled() : Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
+	if(!bWidgetPenetrable)
+	{
+		Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -112,42 +168,62 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 	{
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
-	
-	UInputModule::Get().UpdateInputMode();
+
+	if(!IsWidgetInEditor())
+	{
+		UInputModuleStatics::UpdateGlobalInputMode();
+	}
 
 	if(InMapping.SceneComp && InMapping.SceneComp->IsA<UWorldWidgetComponent>())
 	{
 		WidgetComponent = Cast<UWorldWidgetComponent>(InMapping.SceneComp);
 	}
 
+	if(!WidgetComponent)
+	{
+		BindWidgetPoint(this, InMapping);
+	}
+	else if(WidgetComponent->IsBindToSelf())
+	{
+		InMapping.SceneComp = WidgetComponent;
+		BindWidgetPoint(this, InMapping);
+	}
+
 	K2_OnCreate(InOwner, InParams);
 
-	if(GetWidgetSpace() == EWidgetSpace::Screen && !IsInViewport())
+	if(GetWidgetSpace() == EWidgetSpace::Screen)
 	{
-		if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
+		if(IsWidgetInEditor())
 		{
-			if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
+#if WITH_EDITOR
+			if (WorldWidget.IsValid())
 			{
-				CanvasPanelSlot->SetZOrder(WidgetZOrder);
-				CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
-				CanvasPanelSlot->SetAnchors(WidgetAnchors);
-				if(!bWidgetAutoSize)
-				{
-					CanvasPanelSlot->SetOffsets(WidgetOffsets);
-				}
-				CanvasPanelSlot->SetAlignment(WidgetAlignment);
-				SetRenderTransformPivot(WidgetAlignment);
+				FSceneManager::Get().RemoveWidgetFromAllViewport(WorldWidget.ToSharedRef());
+			}
 
-				if(!WidgetComponent)
+			WorldWidget = TakeWidget();
+
+			FSceneManager::Get().AddWidgetToAllViewport(WorldWidget.ToSharedRef());
+#endif
+		}
+		else if(!IsInViewport())
+		{
+			if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
+			{
+				if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
 				{
-					BindWidgetPoint(this, InMapping);
-				}
-				else if(WidgetComponent->IsBindToSelf())
-				{
-					InMapping.SceneComp = WidgetComponent;
-					BindWidgetPoint(this, InMapping);
+					CanvasPanelSlot->SetZOrder(WidgetZOrder);
+					CanvasPanelSlot->SetAutoSize(bWidgetAutoSize);
+					CanvasPanelSlot->SetAnchors(WidgetAnchors);
+					if(!bWidgetAutoSize)
+					{
+						CanvasPanelSlot->SetOffsets(WidgetOffsets);
+					}
+					CanvasPanelSlot->SetAlignment(WidgetAlignment);
+					SetRenderTransformPivot(WidgetAlignment);
 				}
 			}
+			RefreshVisibility();
 		}
 	}
 
@@ -155,8 +231,6 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
 	}
-
-	RefreshVisibility();
 }
 
 void UWorldWidgetBase::OnRefresh()
@@ -166,7 +240,18 @@ void UWorldWidgetBase::OnRefresh()
 
 void UWorldWidgetBase::OnDestroy(bool bRecovery)
 {
-	if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
+	if(IsWidgetInEditor())
+	{
+#if WITH_EDITOR
+		if (WorldWidget.IsValid())
+		{
+			FSceneManager::Get().RemoveWidgetFromAllViewport(WorldWidget.ToSharedRef());
+
+			WorldWidget.Reset();
+		}
+#endif
+	}
+	else if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
 	{
 		Container->RemoveWorldWidget(this);
 	}
@@ -175,8 +260,8 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
-
-	UInputModule::Get().UpdateInputMode();
+	
+	UInputModuleStatics::UpdateGlobalInputMode();
 	
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
@@ -202,8 +287,8 @@ void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
 				RefreshLocation(Iter.Key, Iter.Value);
 			}
 		}
+		RefreshVisibility();
 	}
-	RefreshVisibility();
 }
 
 void UWorldWidgetBase::Refresh_Implementation()
@@ -215,7 +300,7 @@ void UWorldWidgetBase::Refresh_Implementation()
 
 void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 {
-	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
+	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, IsWidgetInEditor(), GetClass());
 }
 
 void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
@@ -223,7 +308,7 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 	if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
 	{
 		FVector2D ScreenPos;
-		const FVector Location = InMapping.SceneComp ? (InMapping.SocketName.IsNone() ? InMapping.SceneComp->GetComponentLocation() : InMapping.SceneComp->GetSocketLocation(InMapping.SocketName)) + InMapping.Location : InMapping.Location;
+		const FVector Location = InMapping.GetLocation();
 		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false))
 		{
 			CanvasPanelSlot->SetPosition(ScreenPos);
@@ -269,10 +354,10 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	{
 		bool bVisible = false;
 		FWorldWidgetMapping Mapping;
-		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
+		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(false, GetClass()))
 		{
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
-			const FVector Location = Mapping.SceneComp ? (Mapping.SocketName.IsNone() ? Mapping.SceneComp->GetComponentLocation() : Mapping.SceneComp->GetSocketLocation(Mapping.SocketName)) + Mapping.Location : Mapping.Location;
+			const FVector Location = Mapping.GetLocation();
 			const float Distance = FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true));
 			switch(WidgetVisibility)
 			{
