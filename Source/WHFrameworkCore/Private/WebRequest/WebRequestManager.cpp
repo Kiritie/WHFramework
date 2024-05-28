@@ -17,8 +17,8 @@ IMPLEMENTATION_MANAGER(FWebRequestManager)
 FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 {
 	bLocalMode = false;
-	ServerURL = TEXT("http://192.168.2.177/airt_service");
-	ServerPort = 8080;
+	ServerURL = TEXT("");
+	ServerPort = 0;
 }
 
 FWebRequestManager::~FWebRequestManager()

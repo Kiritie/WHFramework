@@ -188,10 +188,9 @@ public:
 			{
 				InParent->AddChild(InWidget);
 			}
-			InWidget->SetVisibility(EVisibility::Collapsed);
 			if(bAutoOpen)
 			{
-				InWidget->Open();
+				InWidget->Open(true);
 			}
 		}
 		return InWidget;

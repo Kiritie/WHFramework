@@ -40,6 +40,11 @@ void SEditorWidgetBase::OnCreate()
 void SEditorWidgetBase::OnInitialize()
 {
 	bInitialized = true;
+
+	if(WidgetState == EEditorWidgetState::None)
+	{
+		SetVisibility(EVisibility::Collapsed);
+	}
 	
 	SlatePrepass();
 
@@ -58,14 +63,29 @@ void SEditorWidgetBase::OnInitialize()
 
 void SEditorWidgetBase::OnOpen(bool bInstant)
 {
-	WidgetState = EEditorWidgetState::Opened;
+	WidgetState = EEditorWidgetState::Opening;
 	SetVisibility(EVisibility::SelfHitTestInvisible);
+	if(bInstant)
+	{
+		FinishOpen(bInstant);
+	}
+	else
+	{
+		WidgetAnimSequence.Play(SharedThis(this));
+	}
 }
 
 void SEditorWidgetBase::OnClose(bool bInstant)
 {
-	WidgetState = EEditorWidgetState::Closed;
-	SetVisibility(EVisibility::Collapsed);
+	WidgetState = EEditorWidgetState::Closing;
+	if(bInstant)
+	{
+		FinishClose(bInstant);
+	}
+	else
+	{
+		WidgetAnimSequence.Reverse();
+	}
 }
 
 void SEditorWidgetBase::OnSave()
@@ -150,6 +170,29 @@ void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 	Destroy();
 }
 
+void SEditorWidgetBase::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+
+	if(!WidgetAnimSequence.IsPlaying())
+	{
+		switch(WidgetState)
+		{
+			case EEditorWidgetState::Opening:
+			{
+				FinishOpen(false);
+				break;
+			}
+			case EEditorWidgetState::Closing:
+			{
+				FinishClose(false);
+				break;
+			}
+			default: break;
+		}
+	}
+}
+
 FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	if(WidgetCommands->ProcessCommandBindings(InKeyEvent))
@@ -205,6 +248,17 @@ void SEditorWidgetBase::Refresh()
 void SEditorWidgetBase::Destroy()
 {
 	FSlateWidgetManager::Get().DestroyEditorWidget<SEditorWidgetBase>(GetWidgetName());
+}
+
+void SEditorWidgetBase::FinishOpen(bool bInstant)
+{
+	WidgetState = EEditorWidgetState::Opened;
+}
+
+void SEditorWidgetBase::FinishClose(bool bInstant)
+{
+	WidgetState = EEditorWidgetState::Closed;
+	SetVisibility(EVisibility::Collapsed);
 }
 
 bool SEditorWidgetBase::CanSave()

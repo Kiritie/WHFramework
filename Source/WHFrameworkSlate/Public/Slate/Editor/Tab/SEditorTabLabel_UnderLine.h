@@ -9,13 +9,19 @@ class WHFRAMEWORKSLATE_API SEditorTabLabel_UnderLine : public SEditorTabLabel
 {
 public:
 	SLATE_BEGIN_ARGS(SEditorTabLabel_UnderLine)
-		:_Color(FSlateColor::UseForeground())
+		: _LabelFont(FCoreStyle::GetDefaultFontStyle("Regular", 11))
+		, _LabelColor(FSlateColor::UseForeground())
+		, _LabelPadding(FMargin(10.f, 0.f, 10.f, 15.f))
 	{}
 		SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
 
-		SLATE_ARGUMENT(FText, Label)
+		SLATE_ATTRIBUTE(FText, Label)
 
-		SLATE_ARGUMENT(FSlateColor, Color)
+		SLATE_ATTRIBUTE(FSlateFontInfo, LabelFont)
+
+		SLATE_ATTRIBUTE(FSlateColor, LabelColor)
+
+		SLATE_ATTRIBUTE(FMargin, LabelPadding)
 
 		SLATE_ATTRIBUTE(bool, bActived)
 

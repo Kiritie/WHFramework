@@ -31,7 +31,10 @@ public:
 class WHFRAMEWORKSLATE_API SEditorSoftLabelBar : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SEditorSoftLabelBar) {}
+	SLATE_BEGIN_ARGS(SEditorSoftLabelBar)
+		: _SortLabelIndex(0)
+		, _SortLabelAscending(false)
+	{}
 
 		SLATE_ARGUMENT(FMargin, Padding)
 
@@ -50,12 +53,17 @@ public:
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
 
+public:
+	float GetSortLabelFill(int32 InIndex) const;
+
 private:
 	TSharedPtr<SHorizontalBox> HBox_Labels;
 
 	int32 SortLabelIndex;
 	
 	bool SortLabelAscending;
+
+	TArray<FEditorSortLabel> SortLabels;
 
 	FOnSortLabelIndexAndAscendingChanged OnSortLabelIndexAndAscendingChanged;
 

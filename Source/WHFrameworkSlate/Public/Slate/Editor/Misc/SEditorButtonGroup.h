@@ -44,7 +44,7 @@ public:
 
 		SLATE_ATTRIBUTE(FOptionalSize, ButtonHeight)
 
-		SLATE_ARGUMENT(FMargin, ButtonPadding)
+		SLATE_ATTRIBUTE(FMargin, ButtonPadding)
 
 		SLATE_ARGUMENT(int32, DefaultActivedButtonIndex)
 

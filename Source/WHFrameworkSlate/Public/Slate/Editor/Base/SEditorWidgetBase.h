@@ -53,6 +53,8 @@ protected:
 	virtual void OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow);
 
 protected:
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+	
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 public:
@@ -71,6 +73,11 @@ public:
 	virtual void Refresh();
 
 	virtual void Destroy();
+
+protected:
+	virtual void FinishOpen(bool bInstant = false);
+
+	virtual void FinishClose(bool bInstant = false);
 
 public:
 	virtual bool CanSave();
@@ -96,6 +103,8 @@ protected:
 	TMap<FName, TSharedPtr<SEditorWidgetBase>> ChildWidgetMap;
 	
 	TSharedRef<FUICommandList> WidgetCommands;
+	
+	FCurveSequence WidgetAnimSequence;
 
 private:
 	bool bInitialized;

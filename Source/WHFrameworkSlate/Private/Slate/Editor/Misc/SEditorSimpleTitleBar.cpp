@@ -17,12 +17,13 @@ void SEditorSimpleTitleBar::Construct(const FArguments& InArgs)
 
 		+SHorizontalBox::Slot()
 		.HAlign(HAlign_Left)
-		.VAlign(VAlign_Fill)
+		.VAlign(VAlign_Center)
 		.AutoWidth()
+		.Padding(FMargin(8.f, 0.f, 0.f, 0.f))
 		[
 			SNew(STextBlock)
-			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 20))
-			.ColorAndOpacity(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
+			.Font(InArgs._TitleFont)
+			.ColorAndOpacity(InArgs._TitleColor)
 			.Text(InArgs._Title)
 		]
 
@@ -44,18 +45,14 @@ void SEditorSimpleTitleBar::Construct(const FArguments& InArgs)
 			.HeightOverride(30.f)
 			[
 				SNew(SButton)
-				.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.DefaultNoBorder"))
+				.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.DefaultNoBorder_Error"))
 				.OnClicked(this, &SEditorSimpleTitleBar::OnCloseButtonClicked)
+				.HAlign(HAlign_Fill)
+				.VAlign(VAlign_Fill)
+				.ContentPadding(FMargin(10.f))
 				[
-					SNew(SHorizontalBox)
-
-					+SHorizontalBox::Slot()
-					.HAlign(HAlign_Center)
-					.VAlign(VAlign_Center)
-					[
-						SNew(SImage)
-						.Image(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Close"))
-					]
+					SNew(SImage)
+					.Image(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Close_2"))
 				]
 			]
 		]

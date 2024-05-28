@@ -31,11 +31,13 @@ public class WHFrameworkSlate : ModuleRules
 				"SlateCore",
 				"InputCore",
 				"zlib",
-				"DesktopPlatform",
 				"ImageWrapper",
 				"Engine",
-				"GameplayTags"
+				"GameplayTags", "DesktopPlatform"
 			}
 		);
+		
+		const string ResourcesDir = "$(PluginDir)/Resources/Slate/...";
+		RuntimeDependencies.Add(ResourcesDir, StagedFileType.NonUFS);
 	}
 }

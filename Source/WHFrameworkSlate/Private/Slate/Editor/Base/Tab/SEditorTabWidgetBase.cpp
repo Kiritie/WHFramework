@@ -1,4 +1,4 @@
-﻿#include "Slate/Editor/Tab/SEditorTabWidgetBase.h"
+﻿#include "Slate/Editor/Base/Tab/SEditorTabWidgetBase.h"
 
 #include "WHFrameworkSlateStyle.h"
 #include "Slate/Editor/Misc/SEditorSplitLine.h"
@@ -23,12 +23,13 @@ void SEditorTabWidgetBase::Construct(const FArguments& InArgs, const TSharedPtr<
 		+SOverlay::Slot()
 		.HAlign(HAlign_Fill)
 		.VAlign(VAlign_Fill)
-		.Padding(FMargin(20.f, 0.f))
+		.Padding(InArgs._Padding)
 		[
 			SNew(SBorder)
-			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.White"))
-			.BorderBackgroundColor(FLinearColor(0.01f, 0.01f, 0.01f))
+			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Box"))
+			.BorderBackgroundColor(InArgs._BackgroundColor)
 			.Padding(FMargin(0.f))
+			.Visibility(EVisibility::SelfHitTestInvisible)
 			[
 				SNew(SVerticalBox)
 
@@ -39,6 +40,7 @@ void SEditorTabWidgetBase::Construct(const FArguments& InArgs, const TSharedPtr<
 				[
 					SNew(SBox)
 					.HeightOverride(InArgs._LabelHeight)
+					.Visibility_Lambda([InArgs](){ return InArgs._ShowLabel ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 					[
 						SNew(SHorizontalBox)
 
@@ -54,7 +56,7 @@ void SEditorTabWidgetBase::Construct(const FArguments& InArgs, const TSharedPtr<
 								SNew(SEditorTabLabel)
 								.Icon(&TabListItem->TabIcon->InactiveBrush)
 								.Label(FText::FromString(TabListItem->TabName))
-								.Color(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
+								.LabelColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
 							]
 						]
 
@@ -73,7 +75,7 @@ void SEditorTabWidgetBase::Construct(const FArguments& InArgs, const TSharedPtr<
 				.AutoHeight()
 				[
 					SNew(SEditorSplitLine)
-					.Visibility_Lambda([InArgs](){ return InArgs._ShowSplitLine ? EVisibility::SelfHitTestInvisible : EVisibility::Hidden; })
+					.Visibility_Lambda([InArgs](){ return InArgs._ShowSplitLine ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 					.Height(1.f)
 				]
 

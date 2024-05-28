@@ -16,6 +16,7 @@
 #define IMAGE_BRUSH(RelativePath, ...) FSlateImageBrush(Style->RootToContentDir(RelativePath, TEXT(".png")), __VA_ARGS__)
 #define IMAGE_BRUSH_SVG(RelativePath, ...) FSlateVectorImageBrush(Style->RootToContentDir(RelativePath, TEXT(".svg")), __VA_ARGS__)
 #define BOX_BRUSH(RelativePath, ...) FSlateBoxBrush(Style->RootToContentDir(RelativePath, TEXT(".png")), __VA_ARGS__)
+#define BOX_BRUSH_SVG( RelativePath, ... ) FSlateVectorBoxBrush(Style->RootToContentDir(RelativePath, TEXT(".svg")), __VA_ARGS__)
 #define BORDER_BRUSH(RelativePath, ...) FSlateBorderBrush(Style->RootToContentDir(RelativePath, TEXT(".png")), __VA_ARGS__)
 #define DEFAULT_FONT(...) FCoreStyle::GetDefaultFontStyle(__VA_ARGS__)
 
@@ -49,17 +50,10 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 {
 	TSharedRef< FSlateStyleSet > Style = MakeShareable(new FSlateStyleSet("WHFrameworkSlateStyle"));
 
-	TArray<FString> PluginPaths;
-	IPluginManager::Get().FindPluginsUnderDirectory(FPaths::ProjectPluginsDir(), PluginPaths);
-	for(auto Iter : PluginPaths)
+	TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("WHFramework"));
+	if(Plugin.IsValid())
 	{
-		FString Path, Filename, Extension;
-		FPaths::Split(Iter, Path, Filename, Extension);
-		if(Filename == TEXT("WHFramework"))
-		{
-			Style->SetContentRoot(Path / TEXT("Content/Slate"));
-			break;
-		}
+		Style->SetContentRoot(FPaths::Combine(Plugin->GetBaseDir(), TEXT("Resources/Slate")));
 	}
 	
 	// Note, these sizes are in Slate Units.
@@ -101,10 +95,10 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 		.SetDisabledForeground(FStyleColors::Foreground);
 		
 	const FButtonStyle PrimaryButtonStyle = FButtonStyle()
-		.SetNormal(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FStyleColors::Primary))
-		.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FStyleColors::PrimaryHover))
-		.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FStyleColors::PrimaryPress))
-		.SetDisabled(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FStyleColors::Dropdown))
+		.SetNormal(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::Primary))
+		.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::PrimaryHover))
+		.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::PrimaryPress))
+		.SetDisabled(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::Dropdown))
 		.SetNormalForeground(FStyleColors::ForegroundHover)
 		.SetHoveredForeground(FStyleColors::ForegroundHover)
 		.SetPressedForeground(FStyleColors::ForegroundHover)
@@ -116,31 +110,27 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 
 	// Icons
 	{
-		Style->Set("Icons.White", new IMAGE_BRUSH("Common/white-1x1", FVector2D(1.f, 1.f)));
+		Style->Set("Icons.Box", new IMAGE_BRUSH("Common/box", FVector2D(1.f, 1.f)));
 	
-		Style->Set("Icons.Border_Outline_1", new BOX_BRUSH("Common/border-10x10", FMargin(0.1f)));
+		Style->Set("Icons.Circle", new IMAGE_BRUSH_SVG("Common/circle", FVector2D(6.f)));
+	
+		Style->Set("Icons.Border_Outline_1", new BOX_BRUSH("Common/outline_border-1x1", FMargin(0.1f)));
 
-		Style->Set("Icons.Fillet_Border_4", new BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f)));
+		Style->Set("Icons.Border_Fillet_4", new BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f)));
 
-		Style->Set("Icons.Fillet_Border_16", new BOX_BRUSH("Common/fillet-border-16x16", FMargin(0.4f)));
+		Style->Set("Icons.Border_Fillet_8", new BOX_BRUSH("Common/fillet-border-8x8", FMargin(8.f / 24.f)));
+
+		Style->Set("Icons.Border_Fillet_16", new BOX_BRUSH("Common/fillet-border-16x16", FMargin(16.f / 48.f)));
 
 		Style->Set("Icons.Arrow_Up", new IMAGE_BRUSH("Common/arrow-up", FVector2D(12.f, 7.f)));
 	
 		Style->Set("Icons.Arrow_Down", new IMAGE_BRUSH("Common/arrow-down", FVector2D(12.f, 7.f)));
-
-		Style->Set("Icons.Download", new IMAGE_BRUSH_SVG("Common/download", Icon16x16));
 		
-		Style->Set("Icons.Close", new IMAGE_BRUSH("Common/close", Icon16x16));
-
-		Style->Set("Icons.Clear", new IMAGE_BRUSH("Common/close", Icon16x16));
-
-		Style->Set("Icons.Setting", new IMAGE_BRUSH("Common/setting", Icon32x32));
-
-		Style->Set("Icons.Package", new IMAGE_BRUSH_SVG("Common/package", Icon32x32));
-
-		Style->Set("Icons.Visibility", new IMAGE_BRUSH_SVG("Common/visibility", Icon32x32));
-
-		Style->Set("Icons.Extension", new IMAGE_BRUSH_SVG("Common/extension", Icon32x32));
+		Style->Set("Icons.Close_1", new IMAGE_BRUSH("Common/close1", Icon16x16));
+		
+		Style->Set("Icons.Close_2", new IMAGE_BRUSH_SVG("Common/close2", Icon16x16));
+		
+		Style->Set("Icons.Folder", new IMAGE_BRUSH_SVG("Common/folder", FVector2D(24.f, 22.f)));
 	}
 	
 	// Buttons
@@ -152,13 +142,33 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 		Style->Set("Buttons.NoBorder", NoBorderButtonStyle);
 
 		Style->Set("Buttons.DefaultNoBorder", FButtonStyle(NoBorderButtonStyle)
-			.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.2f, 0.2f, 0.2f)))
-			.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.15f, 0.15f, 0.15f)))
+			.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.2f, 0.2f, 0.2f)))
+			.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.15f, 0.15f, 0.15f)))
+			.SetDisabled(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::Dropdown))
+		);
+
+		Style->Set("Buttons.DefaultNoBorder_Primary", FButtonStyle(NoBorderButtonStyle)
+			.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::PrimaryHover))
+			.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::PrimaryPress))
+			.SetDisabled(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::Dropdown))
+		);
+
+		Style->Set("Buttons.DefaultNoBorder_Error", FButtonStyle(NoBorderButtonStyle)
+			.SetHovered(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.5f, 0.2f, 0.2f)))
+			.SetPressed(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.75f, 0.15f, 0.15f)))
+			.SetDisabled(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FStyleColors::Dropdown))
 		);
 
 		Style->Set("Buttons.Tab", FButtonStyle(NoBorderButtonStyle)
-			.SetNormalForeground(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
+			.SetNormalForeground(FSlateColor(FLinearColor(0.65f, 0.65f, 0.65f)))
 			.SetHoveredForeground(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
+			.SetDisabledForeground(FSlateColor(FLinearColor(0.45f, 0.45f, 0.45f)))
+		);
+
+		Style->Set("Buttons.SelectPath", FButtonStyle()
+			.SetNormal(IMAGE_BRUSH_SVG("Common/folder", FVector2D(24.f, 22.f), FLinearColor(0.6f, 0.6f, 0.6f)))
+			.SetHovered(IMAGE_BRUSH_SVG("Common/folder", FVector2D(24.f, 22.f), FLinearColor(0.9f, 0.9f, 0.9f)))
+			.SetPressed(IMAGE_BRUSH_SVG("Common/folder", FVector2D(24.f, 22.f), FLinearColor(0.5f, 0.5f, 0.5f)))
 		);
 	}
 	
@@ -167,31 +177,53 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 		Style->Set("CheckBoxes.DefaultNoBorder", FCheckBoxStyle()
 			.SetCheckBoxType(ESlateCheckBoxType::ToggleButton)
 			.SetUncheckedImage(FSlateColorBrush(FStyleColors::Transparent))
-			.SetUncheckedHoveredImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.2f, 0.2f, 0.2f)))
-			.SetUncheckedPressedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.15f, 0.15f, 0.15f)))
-			.SetCheckedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.f, 0.4f, 1.f)))
-			.SetCheckedHoveredImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.f, 0.4f, 1.f)))
-			.SetCheckedPressedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.f, 0.4f, 1.f)))
+			.SetUncheckedHoveredImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.2f, 0.2f, 0.2f)))
+			.SetUncheckedPressedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.15f, 0.15f, 0.15f)))
+			.SetCheckedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.f, 0.4f, 1.f)))
+			.SetCheckedHoveredImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.f, 0.4f, 1.f)))
+			.SetCheckedPressedImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.f, 0.4f, 1.f)))
+		);
+
+		Style->Set("CheckBoxes.Tab", FCheckBoxStyle()
+			.SetCheckBoxType(ESlateCheckBoxType::ToggleButton)
+			.SetUncheckedImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetUncheckedHoveredImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetUncheckedPressedImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetCheckedImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetCheckedHoveredImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetCheckedPressedImage(FSlateColorBrush(FStyleColors::Transparent))
+			.SetUndeterminedForegroundColor(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
+			.SetHoveredForegroundColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
+			.SetCheckedForegroundColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
+		);
+	}
+
+	// ProgressBars
+	{
+		Style->Set("ProgressBars.Default", FProgressBarStyle()
+			.SetBackgroundImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.1f, 0.1f, 0.1f)))
+			.SetFillImage(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.f, 0.3f, 0.9f)))
+			.SetMarqueeImage(FSlateNoResource())
 		);
 	}
 
 	// TableRows
 	{
-		Style->Set("TableRows.Lists.Default", FTableRowStyle(NormalTableRowStyle)
+		Style->Set("TableRows.List.Default", FTableRowStyle(NormalTableRowStyle)
 			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.03f, 0.03f, 0.03f)))
 			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetOddRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetOddRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.03f, 0.03f, 0.03f)))
 			.SetSelectorFocusedBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetActiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetActiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetInactiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetInactiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetTextColor(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
+			.SetActiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetActiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetTextColor(FSlateColor(FLinearColor(0.65f, 0.65f, 0.65f)))
 			.SetSelectedTextColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
 		);
 
-		Style->Set("TableRows.Lists.Tab", FTableRowStyle(NormalTableRowStyle)
+		Style->Set("TableRows.List.Tab", FTableRowStyle(NormalTableRowStyle)
 			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
 			.SetEvenRowBackgroundHoveredBrush(FSlateColorBrush(FStyleColors::Transparent))
 			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
@@ -205,17 +237,17 @@ TSharedRef< ISlateStyle > FWHFrameworkSlateStyle::Create()
 			.SetSelectedTextColor(FSlateColor(FLinearColor(0.f, 0.4f, 1.f)))
 		);
 		
-		Style->Set("TableRows.Tiles.Default", FTableRowStyle(NormalTableRowStyle)
+		Style->Set("TableRows.Tile.Default", FTableRowStyle(NormalTableRowStyle)
 			.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetEvenRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.03f, 0.03f, 0.03f)))
 			.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetOddRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.02f, 0.02f, 0.02f)))
+			.SetOddRowBackgroundHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.03f, 0.03f, 0.03f)))
 			.SetSelectorFocusedBrush(FSlateColorBrush(FStyleColors::Transparent))
-			.SetActiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetActiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetInactiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetInactiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(0.1f), FLinearColor(0.05f, 0.05f, 0.05f)))
-			.SetTextColor(FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f)))
+			.SetActiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetActiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetInactiveHoveredBrush(BOX_BRUSH("Common/fillet-border-4x4", FMargin(4.f / 12.f), FLinearColor(0.05f, 0.05f, 0.05f)))
+			.SetTextColor(FSlateColor(FLinearColor(0.65f, 0.65f, 0.65f)))
 			.SetSelectedTextColor(FSlateColor(FLinearColor(1.f, 1.f, 1.f)))
 		);
 	}

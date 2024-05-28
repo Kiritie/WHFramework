@@ -9,7 +9,7 @@ DECLARE_DELEGATE_OneParam(FOnActivatedTabsChanged, const TArray<TSharedPtr<FEdit
 class WHFRAMEWORKSLATE_API SEditorTabList : public SCompoundWidget
 {
 	SLATE_BEGIN_ARGS(SEditorTabList)
-		:_Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FTableRowStyle>("TableRows.Lists.Tab")),
+		:_Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FTableRowStyle>("TableRows.List.Tab")),
 		 _bKeepOneActivated(false),
 		 _SelectionMode(ESelectionMode::Single)
 	{}

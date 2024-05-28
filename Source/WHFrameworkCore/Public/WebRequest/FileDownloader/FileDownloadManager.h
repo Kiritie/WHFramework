@@ -20,13 +20,30 @@ public:
 	static const FUniqueType Type;
 
 public:
-	void AddDownloader(const TSharedPtr<FFileDownloader>& Downloader);
+	virtual void OnInitialize() override;
 
-	void RemoveDownloader(const TSharedPtr<FFileDownloader>& Downloader);
+public:
+	virtual void AddDownloader(const TSharedPtr<FFileDownloader>& Downloader);
+
+	virtual void RemoveDownloader(const TSharedPtr<FFileDownloader>& Downloader);
 
 protected:
 	TArray<TSharedPtr<FFileDownloader>> DownloaderList;
 
 public:
-	TArray<TSharedPtr<FFileDownloader>> GetDownloaderList() { return DownloaderList; }
+	TArray<TSharedPtr<FFileDownloader>> GetAllDownloader() { return DownloaderList; }
+
+	template<class T>
+	TArray<TSharedPtr<T>> GetAllDownloader()
+	{
+		TArray<TSharedPtr<T>> ReturnValues;
+		for(auto Iter : FFileDownloadManager::Get().GetAllDownloader())
+		{
+			if(TSharedPtr<T> Downloader = StaticCastSharedPtr<T>(Iter))
+			{
+				ReturnValues.Add(Downloader);
+			}
+		}
+		return ReturnValues;
+	}
 };

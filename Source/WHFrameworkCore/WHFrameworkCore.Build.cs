@@ -30,7 +30,6 @@ public class WHFrameworkCore : ModuleRules
 				"SlateCore",
 				"InputCore",
 				"zlib",
-				"DesktopPlatform",
 				"ImageWrapper",
 				"Engine",
 				"GameplayTags"

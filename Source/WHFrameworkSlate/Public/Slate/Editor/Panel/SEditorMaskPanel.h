@@ -13,7 +13,7 @@ class WHFRAMEWORKSLATE_API SEditorMaskPanel : public SCompoundWidget
 public:
 	SLATE_BEGIN_ARGS(SEditorMaskPanel) {}
 
-		SLATE_ARGUMENT(FSlateColor, MaskColor)
+		SLATE_ATTRIBUTE(FSlateColor, MaskColor)
 		SLATE_ARGUMENT(EHorizontalAlignment, ContentHAlign)
 		SLATE_ARGUMENT(EVerticalAlignment, ContentVAlign)
 		SLATE_ARGUMENT(FMargin, ContentPadding)

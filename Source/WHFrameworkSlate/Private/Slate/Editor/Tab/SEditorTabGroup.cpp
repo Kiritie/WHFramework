@@ -8,11 +8,16 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SEditorTabGroup::SEditorTabGroup()
+{
+	ActivedTabIndex = 0;
+}
+
 void SEditorTabGroup::Construct(const FArguments& InArgs)
 {
-	ActivedTabIndex = InArgs._ActivedTabIndex.Get();
+	ActivedTabIndex = InArgs._DefaultActivedTabIndex;
 	
-	OnActiveIndexChanged = InArgs._OnActiveIndexChanged;
+	OnActiveTabIndexChanged = InArgs._OnActiveTabIndexChanged;
 	
 	SAssignNew(HBox_Tabs, SHorizontalBox);
 
@@ -21,23 +26,28 @@ void SEditorTabGroup::Construct(const FArguments& InArgs)
 		HBox_Tabs->AddSlot()
 		.HAlign(HAlign_Left)
 		.AutoWidth()
-		.Padding(FMargin(10.f))
 		[
-			SNew(SButton)
-			.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.Tab"))
-			.ContentPadding(FMargin(0.f, 10.f))
-			.OnClicked_Lambda([this, i]()
+			SNew(SCheckBox)
+			.Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FCheckBoxStyle>("CheckBoxes.Tab"))
+			.Padding(FMargin(0.f))
+			.IsChecked_Lambda([this, i]()
 			{
-				ActivedTabIndex = i;
-				if(OnActiveIndexChanged.IsBound())
+				return ActivedTabIndex == i ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+			})
+			.OnCheckStateChanged_Lambda([this, i](ECheckBoxState State)
+			{
+				if(State == ECheckBoxState::Checked)
 				{
-					OnActiveIndexChanged.Execute(ActivedTabIndex);
+					SetActivedTabIndex(i, ESelectInfo::OnMouseClick);
 				}
-				return FReply::Handled();
 			})
 			[
 				SNew(SEditorTabLabel_UnderLine)
-				.Label(InArgs._TabLabels[i])
+				.Icon(InArgs._TabLabels[i].Icon)
+				.Label(InArgs._TabLabels[i].Label)
+				.LabelFont(InArgs._LabelFont)
+				.LabelColor(InArgs._LabelColor)
+				.LabelPadding(InArgs._LabelPadding)
 				.bActived_Lambda([this, i](){ return ActivedTabIndex == i; })
 			]
 		];
@@ -47,6 +57,15 @@ void SEditorTabGroup::Construct(const FArguments& InArgs)
 	[
 		HBox_Tabs->AsShared()
 	];
+}
+
+void SEditorTabGroup::SetActivedTabIndex(int32 InIndex, ESelectInfo::Type InSelectInfo)
+{
+	ActivedTabIndex = InIndex;
+	if(OnActiveTabIndexChanged.IsBound())
+	{
+		OnActiveTabIndexChanged.Execute(ActivedTabIndex, InSelectInfo);
+	}
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

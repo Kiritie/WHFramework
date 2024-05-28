@@ -20,6 +20,11 @@ FFileDownloadManager::~FFileDownloadManager()
 	
 }
 
+void FFileDownloadManager::OnInitialize()
+{
+	FManagerBase::OnInitialize();
+}
+
 void FFileDownloadManager::AddDownloader(const TSharedPtr<FFileDownloader>& Downloader)
 {
 	if(!DownloaderList.Contains(Downloader))

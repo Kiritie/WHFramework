@@ -157,4 +157,4 @@ public:
 
 DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithText, const FString&/*, Text*/);
 
-DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithJson, const TSharedPtr<FJsonObject>&/*, Json*/);
+DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithJson, const TSharedPtr<FJsonObject>&/*, JsonObject*/);

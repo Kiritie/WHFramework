@@ -58,6 +58,8 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnFileDownloadProgress, int64/* BytesSen
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnFileDownloadComplete, EDownloadToStorageResult/* Result*/, const FString&/* SavePath*/);
 
+DECLARE_MULTICAST_DELEGATE(FOnFileDownloadDestroy)
+
 class WHFRAMEWORKCORE_API FFileDownloader : public TSharedFromThis<FFileDownloader>
 {
 public:
@@ -154,6 +156,8 @@ public:
 protected:
 	virtual void OnComplete_Internal(EDownloadToMemoryResult Result, TArray64<uint8> DownloadedContent);
 
+	virtual void OnDestroy_Internal();
+
 public:
 	TWeakPtr<IHttpRequest, ESPMode::ThreadSafe> HttpRequestPtr;
 
@@ -161,6 +165,8 @@ public:
 	
 	FOnFileDownloadComplete OnComplete;
 
+	FOnFileDownloadDestroy OnDestroy;
+	
 	EDownloadFileType FileType;
 
 	FString FileURL;
