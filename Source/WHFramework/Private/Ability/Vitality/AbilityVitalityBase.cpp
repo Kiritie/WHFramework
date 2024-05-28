@@ -9,7 +9,6 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -79,7 +78,7 @@ void AAbilityVitalityBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InState)
 {
 }
 
@@ -92,10 +91,9 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
 	{
-		FSM->GetStateByClass<UAbilityVitalityState_Death>()->Killer = InKiller;
 		InKiller->Kill(this);
 	}
-	FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
+	FSM->SwitchStateByClass<UAbilityVitalityState_Death>({ InKiller });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)

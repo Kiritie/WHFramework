@@ -768,9 +768,9 @@ bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const
 
 bool UVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
-	FHitResult HitResult;
 	if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController())
 	{
+		FHitResult HitResult;
 		switch (InRaycastType)
 		{
 			case EVoxelRaycastType::FromAimPoint:

@@ -5,7 +5,6 @@
 
 #include "Camera/CameraModule.h"
 #include "Camera/Actor/CameraActorBase.h"
-#include "Camera/Manager/CameraManagerBase.h"
 
 ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass)
 {
@@ -24,27 +23,27 @@ void UCameraModuleStatics::SetDefaultCameraPoint(ACameraPointBase* InCameraPoint
 
 FVector UCameraModuleStatics::GetCameraLocation(bool bReal, bool bRefresh)
 {
-	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation(bRefresh);
+	return bReal ? UCameraModule::Get().GetRealCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation(bRefresh);
 }
 
-FRotator UCameraModuleStatics::GetCameraRotation(bool bRefresh)
+FRotator UCameraModuleStatics::GetCameraRotation(bool bReal, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraRotation(bRefresh);
+	return bReal ? UCameraModule::Get().GetRealCameraRotation() : UCameraModule::Get().GetCurrentCameraRotation(bRefresh);
 }
 
-float UCameraModuleStatics::GetCameraDistance(bool bRefresh)
+float UCameraModuleStatics::GetCameraDistance(bool bReal, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraDistance(bRefresh);
+	return bReal ? UCameraModule::Get().GetRealCameraDistance() : UCameraModule::Get().GetCurrentCameraDistance(bRefresh);
 }
 
-FVector UCameraModuleStatics::GetCameraOffset(bool bRefresh)
+FVector UCameraModuleStatics::GetCameraOffset(bool bReal, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
+	return bReal ? UCameraModule::Get().GetRealCameraOffset() : UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
 }
 
-float UCameraModuleStatics::GetCameraFov(bool bRefresh)
+float UCameraModuleStatics::GetCameraFov(bool bReal, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraFov(bRefresh);
+	return bReal ? UCameraModule::Get().GetRealCameraFov() : UCameraModule::Get().GetCurrentCameraFov(bRefresh);
 }
 
 ACameraActorBase* UCameraModuleStatics::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)

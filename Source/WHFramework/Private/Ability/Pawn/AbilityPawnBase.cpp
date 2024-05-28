@@ -121,7 +121,7 @@ void AAbilityPawnBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityPawnBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityPawnBase::OnFiniteStateChanged(UFiniteStateBase* InState)
 {
 }
 
@@ -164,10 +164,9 @@ void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
 	{
-		FSM->GetStateByClass<UAbilityPawnState_Death>()->Killer = InKiller;
 		InKiller->Kill(this);
 	}
-	FSM->SwitchStateByClass<UAbilityPawnState_Death>();
+	FSM->SwitchStateByClass<UAbilityPawnState_Death>({ InKiller });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -322,7 +321,7 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityPawnBase::IsTargetable_Implementation() const
+bool AAbilityPawnBase::IsTargetable_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
 }

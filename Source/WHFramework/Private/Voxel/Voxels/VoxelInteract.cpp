@@ -65,11 +65,11 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 {
 	switch (InInteractAction)
 	{
-		case EInputInteractAction::Action1:
+		case EInputInteractAction::Primary:
 		{
 			return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
 		}
-		case EInputInteractAction::Action2:
+		case EInputInteractAction::Secondary:
 		{
 			Toggle(InAgent);
 			break;

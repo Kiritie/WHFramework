@@ -271,9 +271,9 @@ void UCameraModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		CurrentCameraLocation = UCameraModuleStatics::GetCameraLocation(true);
-		CurrentCameraRotation = UCameraModuleStatics::GetCameraRotation(true);
-		CurrentCameraDistance = UCameraModuleStatics::GetCameraDistance(true);
+		CurrentCameraLocation = GetRealCameraLocation();
+		CurrentCameraRotation = GetRealCameraRotation();
+		CurrentCameraDistance = GetRealCameraDistance();
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -1195,6 +1195,15 @@ float UCameraModule::GetMaxCameraPitch() const
 	return GetTrackingTarget() && GetTrackingTarget()->Implements<UCameraTrackableInterface>() && ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) != -1.f ? ICameraTrackableInterface::Execute_GetCameraMaxPitch(GetTrackingTarget()) : MaxCameraPitch;
 }
 
+FVector UCameraModule::GetRealCameraLocation()
+{
+	if(GetCurrentCameraManager())
+	{
+		return GetCurrentCameraManager()->GetCameraLocation();
+	}
+	return FVector::ZeroVector;
+}
+
 FVector UCameraModule::GetCurrentCameraLocation(bool bRefresh) const
 {
 	if(bRefresh)
@@ -1202,6 +1211,15 @@ FVector UCameraModule::GetCurrentCameraLocation(bool bRefresh) const
 		return CurrentCamera ? CurrentCamera->GetActorLocation() : FVector::ZeroVector;
 	}
 	return CurrentCameraLocation;
+}
+
+FVector UCameraModule::GetRealCameraOffset() const
+{
+	if(CurrentCamera && CurrentCamera->GetCameraBoom())
+	{
+		return CurrentCamera->GetCameraBoom()->SocketOffset;
+	}
+	return FVector::ZeroVector;
 }
 
 FVector UCameraModule::GetCurrentCameraOffset(bool bRefresh) const
@@ -1213,6 +1231,15 @@ FVector UCameraModule::GetCurrentCameraOffset(bool bRefresh) const
 	return CurrentCameraOffset;
 }
 
+FRotator UCameraModule::GetRealCameraRotation()
+{
+	if(GetCurrentCameraManager())
+	{
+		return GetCurrentCameraManager()->GetCameraRotation();
+	}
+	return FRotator::ZeroRotator;
+}
+
 FRotator UCameraModule::GetCurrentCameraRotation(bool bRefresh)
 {
 	if(bRefresh)
@@ -1222,6 +1249,15 @@ FRotator UCameraModule::GetCurrentCameraRotation(bool bRefresh)
 	return CurrentCameraRotation;
 }
 
+float UCameraModule::GetRealCameraDistance() const
+{
+	if(CurrentCamera && CurrentCamera->GetCameraBoom())
+	{
+		return CurrentCamera->GetCameraBoom()->TargetArmLength;
+	}
+	return 0.f;
+}
+
 float UCameraModule::GetCurrentCameraDistance(bool bRefresh) const
 {
 	if(bRefresh)
@@ -1229,6 +1265,15 @@ float UCameraModule::GetCurrentCameraDistance(bool bRefresh) const
 		return CurrentCamera ? CurrentCamera->GetCameraBoom()->TargetArmLength : 0;
 	}
 	return CurrentCameraDistance;
+}
+
+float UCameraModule::GetRealCameraFov() const
+{
+	if(CurrentCamera && CurrentCamera->GetCameraBoom())
+	{
+		return CurrentCamera->GetCamera()->FieldOfView;
+	}
+	return 0.f;
 }
 
 float UCameraModule::GetCurrentCameraFov(bool bRefresh) const

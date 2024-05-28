@@ -21,14 +21,20 @@ void UAITaskBase::InitializeFromAsset(UBehaviorTree& Asset)
 {
 	Super::InitializeFromAsset(Asset);
 
-	//for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
-	//{
-	//	FStructProperty* Property = CastField<FStructProperty>(*PropertyIt);
-	//	if(Property && Property->Struct == FBlackboardKeySelector::StaticStruct())
-	//	{
-	//		((FBlackboardKeySelector&)Property).ResolveSelectedKey(*Asset.BlackboardAsset);
-	//	}
-	//}
+	// if(HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
+	//
+	// for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
+	// {
+	// 	FStructProperty* Property = CastField<FStructProperty>(*PropertyIt);
+	// 	if(Property && Property->Struct == FBlackboardKeySelector::StaticStruct())
+	// 	{
+	// 		FBlackboardKeySelector& KeySelector = ((FBlackboardKeySelector&)Property);
+	// 		if(KeySelector.IsSet())
+	// 		{
+	// 			KeySelector.ResolveSelectedKey(*Asset.BlackboardAsset);
+	// 		}
+	// 	}
+	// }
 }
 
 bool UAITaskBase::InitTask(UBehaviorTreeComponent& OwnerComp)
@@ -43,26 +49,20 @@ bool UAITaskBase::InitTask(UBehaviorTreeComponent& OwnerComp)
 
 void UAITaskBase::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-	if (!InitTask(OwnerComp)) return;
-
+	
 }
 
 EBTNodeResult::Type UAITaskBase::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if (!InitTask(OwnerComp)) return EBTNodeResult::Failed;
-
 	return EBTNodeResult::Aborted;
 }
 
 EBTNodeResult::Type UAITaskBase::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if(!InitTask(OwnerComp)) return EBTNodeResult::Failed;
-
 	return EBTNodeResult::Succeeded;
 }
 
 void UAITaskBase::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
-	if(!InitTask(OwnerComp)) return;
-
+	
 }

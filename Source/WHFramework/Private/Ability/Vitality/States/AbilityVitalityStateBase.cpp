@@ -7,19 +7,19 @@ UAbilityVitalityStateBase::UAbilityVitalityStateBase()
 	StateName = FName("AbilityVitalityStateBase");
 }
 
-void UAbilityVitalityStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityVitalityStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityVitalityStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityVitalityStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityVitalityStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityVitalityStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 }
 
 void UAbilityVitalityStateBase::OnRefresh()
@@ -27,9 +27,9 @@ void UAbilityVitalityStateBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UAbilityVitalityStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityVitalityStateBase::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 }
 
 void UAbilityVitalityStateBase::OnTermination()

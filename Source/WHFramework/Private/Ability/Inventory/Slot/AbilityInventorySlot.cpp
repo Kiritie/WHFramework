@@ -154,7 +154,8 @@ void UAbilityInventorySlot::AddItem(FAbilityItem& InItem)
 	else
 	{
 		SetItem(InItem);
-		InItem.Count -= GetMaxVolume(InItem);
+		const int32 tmpNum = InItem.Count - GetMaxVolume(InItem);
+		InItem.Count = FMath::Max(tmpNum, 0);
 	}
 }
 

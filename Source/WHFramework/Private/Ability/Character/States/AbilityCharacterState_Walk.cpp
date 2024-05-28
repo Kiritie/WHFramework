@@ -3,29 +3,32 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
 {
 	StateName = FName("Walk");
 }
 
-void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Walking);
+	
+	Character->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityCharacterState_Walk::OnRefresh()
@@ -33,14 +36,14 @@ void UAbilityCharacterState_Walk::OnRefresh()
 	Super::OnRefresh();
 }
 
-bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
+bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextState)
 {
-	return Super::OnLeaveValidate(InNextFiniteState);
+	return Super::OnLeaveValidate(InNextState);
 }
 
-void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

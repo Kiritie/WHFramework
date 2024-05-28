@@ -55,9 +55,9 @@ void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(IsRunningBehaviorTree())
 	{
-		if(BlackboardAsset)
+		if(CurrentBlackboard)
 		{
-			BlackboardAsset->Refresh();
+			CurrentBlackboard->Refresh();
 		}
 	}
 }
@@ -92,11 +92,7 @@ void AAIControllerBase::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	if(const IAIAgentInterface* AIAgent = Cast<IAIAgentInterface>(InPawn))
-	{
-		InitBehaviorTree(AIAgent->GetBehaviorTreeAsset());
-		RunBehaviorTree(BehaviorTreeAsset);
-	}
+	InitBehaviorTree(true);
 }
 
 void AAIControllerBase::OnUnPossess()
@@ -140,29 +136,41 @@ void AAIControllerBase::Tick(float DeltaSeconds)
 	}
 }
 
-void AAIControllerBase::InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset)
+void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 {
-	if(BehaviorTreeAsset) return;
+	IAIAgentInterface* OwnerAgent = GetPawn<IAIAgentInterface>();
 	
-	BehaviorTreeAsset = DuplicateObject<UBehaviorTree>(InBehaviorTreeAsset, this);
-	if(BehaviorTreeAsset)
+	if(!OwnerAgent) return;
+
+	UBehaviorTree* BehaviorTree = OwnerAgent->GetBehaviorTreeAsset();
+	
+	if(!BehaviorTree || SourceBehaviorTree == BehaviorTree) return;
+	
+	SourceBehaviorTree = BehaviorTree;
+	CurrentBehaviorTree = DuplicateObject<UBehaviorTree>(SourceBehaviorTree, this);
+
+	if(SourceBlackboard != CurrentBehaviorTree->BlackboardAsset)
 	{
-		BlackboardAsset = DuplicateObject<UAIBlackboardBase>(Cast<UAIBlackboardBase>(InBehaviorTreeAsset->BlackboardAsset), nullptr);
-		if(BlackboardAsset)
+		SourceBlackboard = Cast<UAIBlackboardBase>(CurrentBehaviorTree->BlackboardAsset);
+		CurrentBlackboard = DuplicateObject<UAIBlackboardBase>(SourceBlackboard, this);
+
+		UBlackboardComponent* BlackboardComp;
+		if(UseBlackboard(CurrentBlackboard, BlackboardComp))
 		{
-			BehaviorTreeAsset->BlackboardAsset = BlackboardAsset;
+			CurrentBlackboard->Initialize(BlackboardComp);
 		}
+	}
+	CurrentBehaviorTree->BlackboardAsset = CurrentBlackboard;
+
+	if(bAutoRun)
+	{
+		RunBehaviorTree(CurrentBehaviorTree);
 	}
 }
 
 bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 {
-	const bool bSuccess = Super::RunBehaviorTree(BTAsset);
-	if(BlackboardAsset)
-	{
-		BlackboardAsset->Initialize(GetBlackboardComponent(), GetPawn<IAIAgentInterface>());
-	}
-	return bSuccess;
+	return Super::RunBehaviorTree(BTAsset);
 }
 
 void AAIControllerBase::StopBehaviorTree()

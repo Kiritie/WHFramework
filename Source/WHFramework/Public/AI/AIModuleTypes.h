@@ -5,11 +5,18 @@
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnBlackboardValuePreChange, FName);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnBlackboardValueChanged, FName);
 
+#define BLACKBOARD_VALUE_RESETTER(PropertyName) \
+	FORCEINLINE void Reset##PropertyName() \
+	{ \
+		OnValueReset(FName(#PropertyName)); \
+	}
+
 //////////////////////////////////////////////////////////////////////////
 /// INT
 #define BLACKBOARD_VALUE_ACCESSORS_INT(PropertyName) \
-BLACKBOARD_VALUE_GETTER_INT(PropertyName) \
-BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
+	BLACKBOARD_VALUE_GETTER_INT(PropertyName) \
+	BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_INT(PropertyName) \
 	FORCEINLINE int32 Get##PropertyName() const \
@@ -36,6 +43,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_FLOAT(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_FLOAT(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_FLOAT(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_FLOAT(PropertyName) \
 	FORCEINLINE float Get##PropertyName() const \
@@ -62,6 +70,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_BOOL(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_BOOL(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_BOOL(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_BOOL(PropertyName) \
 	FORCEINLINE bool Get##PropertyName() const \
@@ -88,6 +97,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_STRING(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_STRING(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_STRING(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_STRING(PropertyName) \
 	FORCEINLINE FString Get##PropertyName() const \
@@ -114,6 +124,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_NAME(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_NAME(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_NAME(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_NAME(PropertyName) \
 	FORCEINLINE FName Get##PropertyName() const \
@@ -140,6 +151,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_VECTOR(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_VECTOR(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_VECTOR(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_VECTOR(PropertyName) \
 	FORCEINLINE FVector Get##PropertyName() const \
@@ -166,6 +178,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_ROTATOR(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_ROTATOR(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_ROTATOR(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_ROTATOR(PropertyName) \
 	FORCEINLINE FRotator Get##PropertyName() const \
@@ -192,6 +205,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_OBJECT(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_OBJECT(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_OBJECT(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_OBJECT(PropertyName) \
 	template<class T> \
@@ -224,6 +238,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_CLASS(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_CLASS(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_CLASS(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_CLASS(PropertyName) \
 	FORCEINLINE UClass* Get##PropertyName() const \
@@ -251,6 +266,7 @@ BLACKBOARD_VALUE_SETTER_INT(PropertyName) \
 #define BLACKBOARD_VALUE_ACCESSORS_ENUM(PropertyName) \
 	BLACKBOARD_VALUE_GETTER_ENUM(PropertyName) \
 	BLACKBOARD_VALUE_SETTER_ENUM(PropertyName) \
+	BLACKBOARD_VALUE_RESETTER(PropertyName)
 
 #define BLACKBOARD_VALUE_GETTER_ENUM(PropertyName) \
 	FORCEINLINE uint8 Get##PropertyName() const \

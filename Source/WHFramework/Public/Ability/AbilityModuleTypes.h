@@ -577,7 +577,7 @@ public:
 		Items = TArray<FAbilityItem>();
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "ID"))
 	TArray<FAbilityItem> Items;
 };
 

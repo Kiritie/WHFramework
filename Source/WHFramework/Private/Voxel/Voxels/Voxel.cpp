@@ -109,11 +109,11 @@ bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction
 {
 	switch (InInteractAction)
 	{
-		case EInputInteractAction::Action1:
+		case EInputInteractAction::Primary:
 		{
 			return InAgent->OnDestroyVoxel(InHitResult);
 		}
-		case EInputInteractAction::Action2:
+		case EInputInteractAction::Secondary:
 		{
 			return InAgent->OnGenerateVoxel(InHitResult);
 		}
