@@ -16,7 +16,7 @@ void SEditorSplitLine::Construct(const FArguments& InArgs)
 		.HeightOverride(InArgs._Height)
 		[
 			SNew(SImage)
-			.Image(FWHFrameworkSlateStyle::Get().GetBrush("Icons.White"))
+			.Image(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Box"))
 			.ColorAndOpacity(InArgs._Color)
 		]
 	];

@@ -7,11 +7,17 @@ class SEditorSoftLabelBar;
 class WHFRAMEWORKSLATE_API SEditorTabWidgetBase : public SEditorWidgetBase
 {
 	SLATE_BEGIN_ARGS(SEditorTabWidgetBase)
-		:_ShowSplitLine(false),
-		_LabelHeight(50.f)
+		: _Padding(FMargin(20.f, 0.f))
+		, _BackgroundColor(FLinearColor(0.01f, 0.01f, 0.01f))
+		, _ShowSplitLine(true)
+		, _ShowLabel(true)
+		, _LabelHeight(50.f)
 	{}
 
+		SLATE_ATTRIBUTE(FMargin, Padding)
+		SLATE_ATTRIBUTE(FSlateColor, BackgroundColor)
 		SLATE_ARGUMENT(bool, ShowSplitLine)
+		SLATE_ARGUMENT(bool, ShowLabel)
 		SLATE_ATTRIBUTE(FOptionalSize, LabelHeight)
 		SLATE_NAMED_SLOT(FArguments, LabelContent)
 		SLATE_EVENT(FOnClicked, OnLabelClicked)

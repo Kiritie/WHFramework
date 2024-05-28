@@ -365,8 +365,6 @@ void UCameraModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bCameraZoomAble && CurrentCamera)
 	{
-		CurrentCameraDistance = CurrentCamera->GetCameraBoom()->TargetArmLength;
-
 		float TargetDistance = TargetCameraDistance;
 
 		while(CameraMoveRange.IsValid && !CameraMoveRange.IsInsideOrOn(CurrentCameraLocation - CurrentCameraRotation.Vector() * TargetDistance) && TargetDistance > 0.f)
@@ -390,6 +388,23 @@ void UCameraModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		else if(CameraDoDistanceDuration != 0.f)
 		{
 			StopDoCameraDistance();
+		}
+	}
+
+	if(CurrentCamera)
+	{
+		if(CurrentCameraFov != TargetCameraFov)
+		{
+			if(CameraDoFovDuration != 0.f)
+			{
+				CameraDoFovTime = FMath::Clamp(CameraDoFovTime + DeltaSeconds, 0.f, CameraDoFovDuration);
+				CurrentCamera->GetCamera()->SetFieldOfView(FMath::Lerp(CameraDoFovFov, TargetCameraFov, UMathStatics::EvaluateByEaseType(CameraDoFovEaseType, CameraDoFovTime, CameraDoFovDuration)));
+			}
+			CurrentCameraFov = CurrentCamera->GetCamera()->FieldOfView;
+		}
+		else if(CameraDoFovDuration != 0.f)
+		{
+			StopDoCameraFov();
 		}
 	}
 
@@ -993,7 +1008,7 @@ void UCameraModule::DoCameraFov(float InFov, float InDuration, EEaseType InEaseT
 	else
 	{
 		CurrentCameraFov = TargetCameraFov;
-		CurrentCamera->GetCameraBoom()->TargetArmLength = TargetCameraFov;
+		CurrentCamera->GetCamera()->SetFieldOfView(TargetCameraFov);
 	}
 }
 

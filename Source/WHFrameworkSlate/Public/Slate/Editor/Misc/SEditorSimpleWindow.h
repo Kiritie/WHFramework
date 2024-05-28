@@ -7,12 +7,15 @@
 #include "CoreMinimal.h"
 #include "Slate/Editor/Base/SEditorWidgetBase.h"
 
-class WHFRAMEWORKSLATE_API SEditorSimpleTitleBar : public SCompoundWidget
+class WHFRAMEWORKSLATE_API SEditorSimpleWindow : public SCompoundWidget
 {
 public:
-    SLATE_BEGIN_ARGS(SEditorSimpleTitleBar)
+    SLATE_BEGIN_ARGS(SEditorSimpleWindow)
         : _TitleFont(FCoreStyle::GetDefaultFontStyle("Regular", 13))
         , _TitleColor(FLinearColor(0.9f, 0.9f, 0.9f))
+        , _WindowWidth(800.f)
+        , _WindowHeight(600.f)
+        , _ContentPadding(FMargin(0.f))
 
     {}
         SLATE_ATTRIBUTE(FText, Title)
@@ -21,16 +24,21 @@ public:
 
         SLATE_ATTRIBUTE(FSlateColor, TitleColor)
         
+        SLATE_ATTRIBUTE(FOptionalSize, WindowWidth)
+        
+        SLATE_ATTRIBUTE(FOptionalSize, WindowHeight)
+           
+        SLATE_ATTRIBUTE(FMargin, ContentPadding)
+
+        SLATE_DEFAULT_SLOT(FArguments, Content)
+ 
         SLATE_ARGUMENT(TSharedPtr<SEditorWidgetBase>, ParentWidget)
-    
+
     SLATE_END_ARGS()
 
-    SEditorSimpleTitleBar();
+    SEditorSimpleWindow();
 
     void Construct(const FArguments& InArgs);
-
-protected:
-    FReply OnCloseButtonClicked();
 
 private:
     TSharedPtr<SEditorWidgetBase> ParentWidget;

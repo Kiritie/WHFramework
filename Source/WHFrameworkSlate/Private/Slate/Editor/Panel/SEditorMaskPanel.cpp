@@ -21,7 +21,7 @@ void SEditorMaskPanel::Construct(const FArguments& InArgs)
 		.VAlign(VAlign_Fill)
 		[
 			SNew(SBorder)
-			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.White"))
+			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Box"))
 			.BorderBackgroundColor(InArgs._MaskColor)
 			[
 				SNew(SButton)

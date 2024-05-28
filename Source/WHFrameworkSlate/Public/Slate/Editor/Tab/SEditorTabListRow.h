@@ -35,7 +35,7 @@ class WHFRAMEWORKSLATE_API SEditorTabListRow : public STableRow<TSharedPtr<FEdit
 {
 public:
 	SLATE_BEGIN_ARGS(SEditorTabListRow)
-		:_Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FTableRowStyle>("TableRows.Lists.Tab")),
+		:_Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FTableRowStyle>("TableRows.List.Tab")),
 		 _bHasUnderLine(false),
 		 _bKeepOneActivated(false)
 	{}

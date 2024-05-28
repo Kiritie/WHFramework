@@ -15,7 +15,7 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 		+SHorizontalBox::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Center)
-		.Padding(FMargin(0.f, 0.f, 5.f, 0.f))
+		.Padding(FMargin(0.f, 0.f, 4.f, 0.f))
 		.AutoWidth()
 		[
 			SNew(SBox)
@@ -23,7 +23,7 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 			.HeightOverride(14.f)
 			[
 				SNew(SImage)
-				.Image_Lambda([InArgs](){ return InArgs._Icon.Get(); })
+				.Image(InArgs._Icon)
 				.Visibility_Lambda([InArgs]() { return InArgs._Icon.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 			]
 		]
@@ -34,9 +34,9 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 		.AutoWidth()
 		[
 			SNew(STextBlock)
-			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 			.Text(InArgs._Label)
-			.ColorAndOpacity(InArgs._Color)
+			.Font(InArgs._LabelFont)
+			.ColorAndOpacity(InArgs._LabelColor)
 		]
 	];
 }

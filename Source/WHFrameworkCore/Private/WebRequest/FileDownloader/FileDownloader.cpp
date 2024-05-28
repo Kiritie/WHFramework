@@ -96,13 +96,11 @@ void FFileDownloader::OnComplete_Internal(EDownloadToMemoryResult Result, TArray
 
 	// Create save directory if it does not exist
 	{
-		FString Path, Filename, Extension;
-		FPaths::Split(FileSavePath, Path, Filename, Extension);
-		if (!PlatformFile.DirectoryExists(*Path))
+		if (!PlatformFile.DirectoryExists(*FilePath))
 		{
-			if (!PlatformFile.CreateDirectoryTree(*Path))
+			if (!PlatformFile.CreateDirectoryTree(*FilePath))
 			{
-				UE_LOG(LogTemp, Error, TEXT("Unable to create a directory '%s' to save the downloaded file"), *Path);
+				UE_LOG(LogTemp, Error, TEXT("Unable to create a directory '%s' to save the downloaded file"), *FilePath);
 				OnComplete.Broadcast(DownloadResult = EDownloadToStorageResult::DirectoryCreationFailed, FileSavePath);
 				return;
 			}
@@ -139,6 +137,11 @@ void FFileDownloader::OnComplete_Internal(EDownloadToMemoryResult Result, TArray
 
 	delete FileHandle;
 	OnComplete.Broadcast(DownloadResult = (Result == EDownloadToMemoryResult::SucceededByPayload ? EDownloadToStorageResult::SucceededByPayload : EDownloadToStorageResult::Success), FileSavePath);
+}
+
+void FFileDownloader::OnDestroy_Internal()
+{
+	FFileDownloadManager::Get().RemoveDownloader(AsShared());
 }
 
 TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL, float Timeout, const FString& ContentType, int64 MaxChunkSize)
@@ -713,5 +716,9 @@ void FFileDownloader::CancelDownload()
 
 void FFileDownloader::DestroyDownload()
 {
-	FFileDownloadManager::Get().RemoveDownloader(AsShared());
+	TSharedPtr<FFileDownloader> SharedThis = AsShared();
+
+	OnDestroy_Internal();
+
+	OnDestroy.Broadcast();
 }
