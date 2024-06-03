@@ -8,6 +8,9 @@
 
 UAIServiceBase::UAIServiceBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bNotifyBecomeRelevant = true;
+	bNotifyCeaseRelevant = true;
+	
 	Controller = nullptr;
 	Agent = nullptr;
 }
@@ -24,28 +27,27 @@ bool UAIServiceBase::InitService(UBehaviorTreeComponent& OwnerComp)
 	}
 	if(Controller && Agent)
 	{
-		return true;	
+		return true;
 	}
 	return false;
 }
 
+void UAIServiceBase::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+{
+	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
+}
+
+void UAIServiceBase::OnSearchStart(FBehaviorTreeSearchData& SearchData)
+{
+	Super::OnSearchStart(SearchData);
+}
+
 void UAIServiceBase::OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if (!InitService(OwnerComp)) return;
-
 	Super::OnBecomeRelevant(OwnerComp, NodeMemory);
 }
 
 void UAIServiceBase::OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if (!InitService(OwnerComp)) return;
-
 	Super::OnCeaseRelevant(OwnerComp, NodeMemory);
-}
-
-void UAIServiceBase::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
-{
-	if(!InitService(OwnerComp)) return;
-
-	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 }

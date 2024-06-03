@@ -19,11 +19,13 @@ class WHFRAMEWORK_API UAIServiceBase : public UBTService
 protected:
 	virtual bool InitService(UBehaviorTreeComponent& OwnerComp);
 
+	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+
+	virtual void OnSearchStart(FBehaviorTreeSearchData& SearchData) override;
+
 	virtual void OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
 	virtual void OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-
-	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 
 protected:
 	UPROPERTY()

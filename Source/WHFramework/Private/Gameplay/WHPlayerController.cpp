@@ -224,7 +224,7 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosi
 	if(DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
 	{
 		const FVector RayStart = PlayerCameraManager->GetCameraLocation();
-		const FVector RayEnd = RayStart + RayDirection * InRayDistance;
+		const FVector RayEnd = RayStart + RayDirection * (InRayDistance + UCameraModuleStatics::GetCameraDistance(true));
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
 		IgnoreActors.AddUnique(GetPlayerPawn());

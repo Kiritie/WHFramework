@@ -66,7 +66,7 @@ FReply UUserWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -76,7 +76,7 @@ FReply UUserWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FP
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -86,7 +86,7 @@ FReply UUserWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeomet
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -96,7 +96,7 @@ FReply UUserWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPo
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+		Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -106,7 +106,7 @@ FReply UUserWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const 
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -116,7 +116,7 @@ FReply UUserWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const 
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -126,7 +126,7 @@ FReply UUserWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FP
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
@@ -136,7 +136,7 @@ FReply UUserWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FP
 {
 	if(!bWidgetPenetrable)
 	{
-		Super::NativeOnMouseButtonDown(InGeometry, InGestureEvent);
+		Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();

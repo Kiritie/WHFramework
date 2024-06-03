@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/CommonTypes.h"
 #include "Common/Base/WHObject.h"
 
 #include "EventManagerBase.generated.h"

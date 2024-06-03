@@ -33,23 +33,25 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
 	UFUNCTION()
-	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex);
+	virtual void OnInitialize(UFSMComponent* InFSM, int32 InStateIndex);
 	/**
 	 * 状态进入验证
-	 * @param InLastFiniteState 上一个状态
+	 * @param InLastState 上一个状态
+	 * @param InParams 参数列表
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnterValidate")
-	bool K2_OnEnterValidate(UFiniteStateBase* InLastFiniteState);
+	bool K2_OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual bool OnEnterValidate(UFiniteStateBase* InLastFiniteState);
+	virtual bool OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	/**
 	 * 状态进入
-	 * @param InLastFiniteState 上一个状态
+	 * @param InLastState 上一个状态
+	 * @param InParams 参数列表
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
-	void K2_OnEnter(UFiniteStateBase* InLastFiniteState);
+	void K2_OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnEnter(UFiniteStateBase* InLastFiniteState);
+	virtual void OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	/**
 	 * 状态帧刷新
 	 */
@@ -59,20 +61,20 @@ public:
 	virtual void OnRefresh();
 	/**
 	 * 状态离开验证
-	 * @param InNextFiniteState 下一个状态
+	 * @param InNextState 下一个状态
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeaveValidate")
-	bool K2_OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
+	bool K2_OnLeaveValidate(UFiniteStateBase* InNextState);
 	UFUNCTION()
-	virtual bool OnLeaveValidate(UFiniteStateBase* InNextFiniteState);
+	virtual bool OnLeaveValidate(UFiniteStateBase* InNextState);
 	/**
 	 * 状态离开
-	 * @param InNextFiniteState 下一个状态
+	 * @param InNextState 下一个状态
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
-	void K2_OnLeave(UFiniteStateBase* InNextFiniteState);
+	void K2_OnLeave(UFiniteStateBase* InNextState);
 	UFUNCTION()
-	virtual void OnLeave(UFiniteStateBase* InNextFiniteState);
+	virtual void OnLeave(UFiniteStateBase* InNextState);
 	/**
 	 * 状态终止
 	 */
@@ -90,23 +92,30 @@ public:
 	/**
 	* 切换到指定状态
 	*/
-	UFUNCTION(BlueprintCallable)
-	void Switch(UFiniteStateBase* InFiniteState);
+	bool Switch(UFiniteStateBase* InState, const TArray<FParameter>* InParams = nullptr)
+	{
+		return Switch(InState, InParams ? *InParams : TArray<FParameter>());
+	}
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool Switch(UFiniteStateBase* InState, const TArray<FParameter>& InParams);
 	/**
 	* 切换到上一个状态
 	*/
-	UFUNCTION(BlueprintCallable)
-	void SwitchLast();
+	bool SwitchLast(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchLast(InParams ? *InParams : TArray<FParameter>());
+	}
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchLast(const TArray<FParameter>& InParams);
 	/**
 	* 切换到下一个状态
 	*/
-	UFUNCTION(BlueprintCallable)
-	void SwitchNext();
-	/**
-	* 是否是当前状态
-	*/
-	UFUNCTION(BlueprintPure)
-	bool IsCurrentState();
+	bool SwitchNext(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchNext(InParams ? *InParams : TArray<FParameter>());
+	}
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchNext(const TArray<FParameter>& InParams);
 
 protected:
 	/// 状态名称
@@ -124,13 +133,17 @@ private:
 	bool bHasBlueprintOnLeaveValidate;
 	
 public:
+	UFUNCTION(BlueprintPure)
 	FName GetStateName() const { return StateName; }
 	
+	UFUNCTION(BlueprintPure)
 	int32 GetStateIndex() const { return StateIndex; }
 	
-	void SetStateIndex(int32 InStateIndex) { this->StateIndex = InStateIndex; }
+	UFUNCTION(BlueprintCallable)
+	void SetStateIndex(int32 InStateIndex) { StateIndex = InStateIndex; }
 	
-	UFSMComponent* GetFSM() const { return FSM; }
+	UFUNCTION(BlueprintPure)
+	UFSMComponent* GetFSMComponent() const { return FSM; }
 
 	template<class T>
 	T* GetAgent() const
@@ -138,6 +151,9 @@ public:
 		return Cast<T>(GetAgent());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
-	AActor* GetAgent(TSubclassOf<AActor> InAgentClass = nullptr) const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsCurrent();
 };

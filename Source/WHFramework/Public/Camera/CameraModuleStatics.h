@@ -40,16 +40,16 @@ public:
 	static FVector GetCameraLocation(bool bReal = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FRotator GetCameraRotation(bool bRefresh = false);
+	static FRotator GetCameraRotation(bool bReal = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static float GetCameraDistance(bool bRefresh = false);
+	static float GetCameraDistance(bool bReal = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FVector GetCameraOffset(bool bRefresh = false);
+	static FVector GetCameraOffset(bool bReal = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static float GetCameraFov(bool bRefresh = false);
+	static float GetCameraFov(bool bReal = false, bool bRefresh = false);
 
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())

@@ -238,7 +238,7 @@ private:
 	void ResetIsSwitchingTarget();
 	bool ShouldSwitchTargetActor(float AxisValue);
 
-	static bool TargetIsTargetable(const AActor* Actor);
+	bool TargetIsTargetable(const AActor* Actor) const;
 
 	/**
 	 *  从Owner Pawn设置缓存的Owner PlayerController

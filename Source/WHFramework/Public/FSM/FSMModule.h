@@ -59,30 +59,72 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// FSMGroup
 public:
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex);
+	void SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupStateByIndex(InGroupName, InStateIndex, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex, const TArray<FParameter>& InParams);
+
+	void SwitchGroupStateByName(const FName InGroupName, const FName InStateName, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupStateByName(InGroupName, InStateName, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupStateByName(const FName InGroupName, const FName InStateName, const TArray<FParameter>& InParams);
 
 	template<class T>
-	void SwitchGroupStateByClass(const FName InGroupName) { SwitchGroupStateByClass(InGroupName, T::StaticClass()); }
+	void SwitchGroupStateByClass(const FName InGroupName, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass())
+	{
+		SwitchGroupStateByClass(InGroupName, InStateClass, InParams ? *InParams : TArray<FParameter>());
+	}
 
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass);
+	template<class T>
+	void SwitchGroupStateByClass(const FName InGroupName, const TArray<FParameter>& InParams, TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass())
+	{
+		SwitchGroupStateByClass(InGroupName, InStateClass, InParams);
+	}
 
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupDefaultState(const FName InGroupName);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupFinalState(const FName InGroupName);
+	void SwitchGroupDefaultState(const FName InGroupName, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupDefaultState(InGroupName, InParams ? *InParams : TArray<FParameter>());
+	}
 
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupLastState(const FName InGroupName);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupDefaultState(const FName InGroupName, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable)
-	void SwitchGroupNextState(const FName InGroupName);
+	void SwitchGroupFinalState(const FName InGroupName, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupFinalState(InGroupName, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupFinalState(const FName InGroupName, const TArray<FParameter>& InParams);
+
+	void SwitchGroupLastState(const FName InGroupName, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupLastState(InGroupName, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupLastState(const FName InGroupName, const TArray<FParameter>& InParams);
+
+	void SwitchGroupNextState(const FName InGroupName, const TArray<FParameter>* InParams = nullptr)
+	{
+		SwitchGroupNextState(InGroupName, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void SwitchGroupNextState(const FName InGroupName, const TArray<FParameter>& InParams);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FSMGroup")
-	TMap<FName, FFSMGroupInfo> GroupMap;
+	TMap<FName, FFSMGroup> GroupMap;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -92,13 +134,13 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	TArray<UFSMComponent*>& GetGroups(const FName InGroupName)
+	FFSMGroup& GetGroup(const FName InGroupName)
 	{
 		if(HasGroup(InGroupName))
 		{
-			return GroupMap[InGroupName].FSMArray;
+			return GroupMap[InGroupName];
 		}
-		static TArray<UFSMComponent*> FSMArray;
-		return FSMArray;
+		static FFSMGroup TempGroup;
+		return TempGroup;
 	}
 };

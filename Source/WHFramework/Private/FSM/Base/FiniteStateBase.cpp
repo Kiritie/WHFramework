@@ -33,27 +33,27 @@ void UFiniteStateBase::OnDespawn_Implementation(bool bRecovery)
 	FSM = nullptr;
 }
 
-void UFiniteStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UFiniteStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	FSM = InFSMComponent;
+	FSM = InFSM;
 	StateIndex = InStateIndex;
 	K2_OnInitialize();
 }
 
-bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(bHasBlueprintOnEnterValidate && !K2_OnEnterValidate(InLastFiniteState)) return false;
+	if(bHasBlueprintOnEnterValidate && !K2_OnEnterValidate(InLastState, InParams)) return false;
 	return true;
 }
 
-void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	if(FSM->bShowDebugMessage)
 	{
 		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
-	K2_OnEnter(InLastFiniteState);
+	K2_OnEnter(InLastState, InParams);
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateEntered::StaticClass(), this, {this, FSM});
 }
@@ -63,20 +63,20 @@ void UFiniteStateBase::OnRefresh()
 	K2_OnRefresh();
 }
 
-bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextFiniteState)
+bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextState)
 {
-	if(bHasBlueprintOnLeaveValidate && !K2_OnLeaveValidate(InNextFiniteState)) return false;
+	if(bHasBlueprintOnLeaveValidate && !K2_OnLeaveValidate(InNextState)) return false;
 	return true;
 }
 
-void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextState)
 {
 	if(FSM->bShowDebugMessage)
 	{
 		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
 	}
 
-	K2_OnLeave(InNextFiniteState);
+	K2_OnLeave(InNextState);
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateLeaved::StaticClass(), this, {this, FSM});
 }
@@ -91,27 +91,27 @@ void UFiniteStateBase::Terminate()
 	FSM->TerminateState(this);
 }
 
-void UFiniteStateBase::Switch(UFiniteStateBase* InFiniteState)
+bool UFiniteStateBase::Switch(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	FSM->SwitchState(InFiniteState);
+	return FSM->SwitchState(InState, InParams);
 }
 
-void UFiniteStateBase::SwitchLast()
+bool UFiniteStateBase::SwitchLast(const TArray<FParameter>& InParams)
 {
-	FSM->SwitchLastState();
+	return FSM->SwitchLastState(InParams);
 }
 
-void UFiniteStateBase::SwitchNext()
+bool UFiniteStateBase::SwitchNext(const TArray<FParameter>& InParams)
 {
-	FSM->SwitchNextState();
+	return FSM->SwitchNextState(InParams);
 }
 
-bool UFiniteStateBase::IsCurrentState()
+AActor* UFiniteStateBase::GetAgent(TSubclassOf<AActor> InClass) const
+{
+	return FSM->GetAgent(InClass);
+}
+
+bool UFiniteStateBase::IsCurrent()
 {
 	return FSM->IsCurrentState(this);
-}
-
-AActor* UFiniteStateBase::GetAgent(TSubclassOf<AActor> InAgentClass) const
-{
-	return FSM->GetAgent(InAgentClass);
 }

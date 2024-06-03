@@ -52,7 +52,7 @@ protected:
 	
 	virtual void ResetData();
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
+	virtual void OnFiniteStateChanged(UFiniteStateBase* InState) override;
 
 public:
 	virtual bool HasArchive() const override { return true; }
@@ -150,7 +150,7 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetable_Implementation() const override;
+	virtual bool IsTargetable_Implementation(APawn* InPlayerPawn) const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;

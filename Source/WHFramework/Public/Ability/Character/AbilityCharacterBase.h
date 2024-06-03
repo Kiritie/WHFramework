@@ -122,7 +122,7 @@ protected:
 
 	virtual void RefreshState();
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
+	virtual void OnFiniteStateChanged(UFiniteStateBase* InState) override;
 
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
@@ -210,7 +210,7 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetable_Implementation() const override;
+	virtual bool IsTargetable_Implementation(APawn* InPlayerPawn) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive(bool bNeedNotDead = false) const;

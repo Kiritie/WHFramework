@@ -15,32 +15,47 @@ void UFSMModuleStatics::UnregisterFSM(UFSMComponent* InFSM)
 	UFSMModule::Get().UnregisterFSM(InFSM);
 }
 
-void UFSMModuleStatics::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateIndex)
+bool UFSMModuleStatics::HasFSMGroup(const FName InGroupName)
 {
-	UFSMModule::Get().SwitchGroupStateByIndex(InGroupName, InStateIndex);
+	return UFSMModule::Get().HasGroup(InGroupName);
 }
 
-void UFSMModuleStatics::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass)
+FFSMGroup UFSMModuleStatics::GetFSMGroup(const FName InGroupName)
 {
-	UFSMModule::Get().SwitchGroupStateByClass(InGroupName, InStateClass);
+	return UFSMModule::Get().GetGroup(InGroupName);
 }
 
-void UFSMModuleStatics::SwitchGroupDefaultState(const FName InGroupName)
+void UFSMModuleStatics::SwitchFSMGroupStateByIndex(const FName InGroupName, int32 InStateIndex, const TArray<FParameter>& InParams)
 {
-	UFSMModule::Get().SwitchGroupDefaultState(InGroupName);
+	UFSMModule::Get().SwitchGroupStateByIndex(InGroupName, InStateIndex, InParams);
 }
 
-void UFSMModuleStatics::SwitchGroupFinalState(const FName InGroupName)
+void UFSMModuleStatics::SwitchFSMGroupStateByName(const FName InGroupName, const FName InStateName, const TArray<FParameter>& InParams)
 {
-	UFSMModule::Get().SwitchGroupFinalState(InGroupName);
+	UFSMModule::Get().SwitchGroupStateByName(InGroupName, InStateName, InParams);
 }
 
-void UFSMModuleStatics::SwitchGroupLastState(const FName InGroupName)
+void UFSMModuleStatics::SwitchFSMGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass, const TArray<FParameter>& InParams)
 {
-	UFSMModule::Get().SwitchGroupLastState(InGroupName);
+	UFSMModule::Get().SwitchGroupStateByClass(InGroupName, InStateClass, InParams);
 }
 
-void UFSMModuleStatics::SwitchGroupNextState(const FName InGroupName)
+void UFSMModuleStatics::SwitchFSMGroupDefaultState(const FName InGroupName, const TArray<FParameter>& InParams)
 {
-	UFSMModule::Get().SwitchGroupNextState(InGroupName);
+	UFSMModule::Get().SwitchGroupDefaultState(InGroupName, InParams);
+}
+
+void UFSMModuleStatics::SwitchFSMGroupFinalState(const FName InGroupName, const TArray<FParameter>& InParams)
+{
+	UFSMModule::Get().SwitchGroupFinalState(InGroupName, InParams);
+}
+
+void UFSMModuleStatics::SwitchFSMGroupLastState(const FName InGroupName, const TArray<FParameter>& InParams)
+{
+	UFSMModule::Get().SwitchGroupLastState(InGroupName, InParams);
+}
+
+void UFSMModuleStatics::SwitchFSMGroupNextState(const FName InGroupName, const TArray<FParameter>& InParams)
+{
+	UFSMModule::Get().SwitchGroupNextState(InGroupName, InParams);
 }

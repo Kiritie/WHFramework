@@ -14,9 +14,9 @@ class UPlayerMappableKeyProfileBase;
 UENUM(BlueprintType)
 enum class EInputInteractAction : uint8
 {
-	Action1,
-	Action2,
-	Action3
+	Primary,
+	Secondary,
+	Third
 };
 
 USTRUCT(BlueprintType)

@@ -8,15 +8,15 @@
 class UFSMComponent;
 class UFiniteStateBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFiniteStateChanged, UFiniteStateBase*, InFiniteState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFiniteStateChanged, UFiniteStateBase*, InState);
 
 USTRUCT(BlueprintType)
-struct FFSMGroupInfo
+struct FFSMGroup
 {
 	GENERATED_BODY()
 
 public:
-	FFSMGroupInfo()
+	FFSMGroup()
 	{
 		FSMArray = TArray<UFSMComponent*>();
 	}

@@ -5,7 +5,6 @@
 #include "Common/CommonTypes.h"
 #include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
-#include "FSM/Base/FSMAgentInterface.h"
 
 #include "FSMComponent.generated.h"
 
@@ -46,29 +45,76 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// State
 public:
-	UFUNCTION(BlueprintCallable)
-	bool SwitchState(UFiniteStateBase* InState);
+	bool SwitchState(UFiniteStateBase* InState, const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchState(InState, InParams ? *InParams : TArray<FParameter>());
+	}
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchStateByIndex(int32 InStateIndex);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchState(UFiniteStateBase* InState, const TArray<FParameter>& InParams);
+
+	bool SwitchStateByIndex(int32 InStateIndex, const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchStateByIndex(InStateIndex, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchStateByIndex(int32 InStateIndex, const TArray<FParameter>& InParams);
+
+	bool SwitchStateByName(const FName InStateName, const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchStateByName(InStateName, InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchStateByName(const FName InStateName, const TArray<FParameter>& InParams);
 
 	template<class T>
-	bool SwitchStateByClass() { return SwitchStateByClass(T::StaticClass()); }
+	bool SwitchStateByClass(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass())
+	{
+		return SwitchStateByClass(InStateClass, InParams ? *InParams : TArray<FParameter>());
+	}
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass);
+	template<class T>
+	bool SwitchStateByClass(const TArray<FParameter>& InParams, TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass())
+	{
+		return SwitchStateByClass(InStateClass, InParams);
+	}
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchDefaultState();
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchFinalState();
+	bool SwitchDefaultState(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchDefaultState(InParams ? *InParams : TArray<FParameter>());
+	}
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchLastState();
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchDefaultState(const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable)
-	bool SwitchNextState();
+	bool SwitchFinalState(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchFinalState(InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchFinalState(const TArray<FParameter>& InParams);
+
+	bool SwitchLastState(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchLastState(InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchLastState(const TArray<FParameter>& InParams);
+
+	bool SwitchNextState(const TArray<FParameter>* InParams = nullptr)
+	{
+		return SwitchNextState(InParams ? *InParams : TArray<FParameter>());
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	bool SwitchNextState(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
 	bool TerminateState(UFiniteStateBase* InState);
@@ -115,25 +161,30 @@ public:
 	bool HasStateByIndex(int32 InStateIndex) const;
 
 	template<class T>
-	T* GetStateByIndex(int32 InStateIndex) const
+	T* GetStateByIndex(int32 InStateIndex, TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass()) const
 	{
-		if(HasStateByIndex(InStateIndex))
-		{
-			return Cast<T>(GetStates()[InStateIndex]);
-		}
-		return nullptr;
+		return Cast<T>(GetStateByIndex(InStateIndex, InStateClass));
 	}
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateIndex"))
 	UFiniteStateBase* GetStateByIndex(int32 InStateIndex, TSubclassOf<UFiniteStateBase> InStateClass) const;
 	
+	UFUNCTION(BlueprintPure)
+	bool HasStateByName(const FName InStateName) const;
+
+	template<class T>
+	T* GetStateByName(const FName InStateName, TSubclassOf<UFiniteStateBase> InStateClass = nullptr) const
+	{
+		return Cast<T>(GetStateByName(InStateName, InStateClass));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateClass"))
+	UFiniteStateBase* GetStateByName(const FName InStateName, TSubclassOf<UFiniteStateBase> InStateClass) const;
+
 	template<class T>
 	bool HasStateByClass(TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass()) const
 	{
-		if(!InStateClass) return false;
-
-		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
-		return StateMap.Contains(StateName);
+		return HasStateByClass(InStateClass);
 	}
 	
 	UFUNCTION(BlueprintPure)
@@ -142,19 +193,12 @@ public:
 	template<class T>
 	T* GetStateByClass(TSubclassOf<UFiniteStateBase> InStateClass = T::StaticClass()) const
 	{
-		if(!InStateClass) return nullptr;
-
-		if(HasStateByClass<T>(InStateClass))
-		{
-			const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
-			return Cast<T>(StateMap[StateName]);
-		}
-		return nullptr;
+		return Cast<T>(GetStateByClass(InStateClass));
 	}
-	
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateClass"))
 	UFiniteStateBase* GetStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const;
-		
+
 	UFUNCTION(BlueprintPure)
 	bool IsCurrentState(UFiniteStateBase* InState) const;
 

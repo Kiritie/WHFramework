@@ -12,19 +12,24 @@ UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 	StateName = FName("Death");
 }
 
-void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityVitalityState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityVitalityState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Killer = InParams[0].GetObjectValue<IAbilityVitalityInterface>();
+	}
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
@@ -46,9 +51,9 @@ void UAbilityVitalityState_Death::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	Killer = nullptr;
 

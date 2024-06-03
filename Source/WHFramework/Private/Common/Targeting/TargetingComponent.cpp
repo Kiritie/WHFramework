@@ -411,12 +411,12 @@ TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActo
 	return Actors;
 }
 
-bool UTargetingComponent::TargetIsTargetable(const AActor* Actor)
+bool UTargetingComponent::TargetIsTargetable(const AActor* Actor) const
 {
 	const bool bIsImplemented = Actor->GetClass()->ImplementsInterface(UTargetingAgentInterface::StaticClass());
 	if (bIsImplemented)
 	{
-		return ITargetingAgentInterface::Execute_IsTargetable(Actor);
+		return ITargetingAgentInterface::Execute_IsTargetable(Actor, OwnerPawn);
 	}
 
 	return true;

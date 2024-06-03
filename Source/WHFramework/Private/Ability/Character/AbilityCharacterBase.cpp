@@ -41,6 +41,7 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetRelativeLocation(FVector(0.f, 0.f, -39.f));
+	Interaction->SetInteractable(false);
 
 	Interaction->AddInteractAction(EInteractAction::Revive);
 
@@ -241,9 +242,9 @@ void AAbilityCharacterBase::RefreshState()
 	}
 }
 
-void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InState)
 {
-	if(!InFiniteState)
+	if(!InState)
 	{
 		RefreshState();
 	}
@@ -263,10 +264,9 @@ void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
 	{
-		FSM->GetStateByClass<UAbilityCharacterState_Death>()->Killer = InKiller;
 		InKiller->Kill(this);
 	}
-	FSM->SwitchStateByClass<UAbilityCharacterState_Death>();
+	FSM->SwitchStateByClass<UAbilityCharacterState_Death>({ InKiller });
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -548,7 +548,7 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 	}
 }
 
-bool AAbilityCharacterBase::IsTargetable_Implementation() const
+bool AAbilityCharacterBase::IsTargetable_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
 }

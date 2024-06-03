@@ -6,8 +6,10 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "AI/AIModuleTypes.h"
 #include "Common/CommonTypes.h"
+#include "AI/Base/AIAgentInterface.h"
 #include "AIBlackboardBase.generated.h"
 
+class AAIControllerBase;
 class IAIAgentInterface;
 /**
  * AI黑板基类
@@ -17,19 +19,32 @@ class WHFRAMEWORK_API UAIBlackboardBase : public UBlackboardData
 {
 	GENERATED_BODY()
 
-public:
+protected:
 	virtual void PostLoad() override;
 
-	virtual void Initialize(UBlackboardComponent* InComponent, IAIAgentInterface* InAgent);
-
-	virtual void Refresh();
+	
 
 protected:
+	virtual void OnInitialize();
+	
+	virtual void OnReset();
+
 	virtual void OnRefresh();
+
+	virtual void OnValueReset(FName InValueName);
 
 	virtual void OnValuePreChange(FName InValueName);
 
 	virtual void OnValueChanged(FName InValueName);
+
+public:
+	virtual void Initialize(UBlackboardComponent* InComponent);
+
+	virtual void Reset();
+
+	virtual void ResetValue(FName InValueName);
+
+	virtual void Refresh();
 
 public:
 	BLACKBOARD_VALUE_ACCESSORS_BOOL(IsLostTarget);
@@ -44,11 +59,23 @@ protected:
 	UPROPERTY()
 	UBlackboardComponent* Component;
 	
+	UPROPERTY()
+	AAIControllerBase* Controller;
+
 	IAIAgentInterface* Agent;
 	
 public:
 	UFUNCTION(BlueprintPure)
 	UBlackboardComponent* GetComponent() const { return Component; }
+
+	template<class T>
+	T* GetController() const
+	{
+		return Cast<T>(Controller);
+	}
+
+	UFUNCTION(BlueprintPure)
+	AAIControllerBase* GetController() const { return Controller; }
 
 	template<class T>
 	T* GetAgent() const
