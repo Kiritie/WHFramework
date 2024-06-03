@@ -37,6 +37,14 @@ void AMainModule::OnGenerate()
 
 void AMainModule::OnDestroy()
 {
+	for(int32 i = 0; i < Modules.Num(); i++)
+	{
+		if(Modules[i])
+		{
+			Modules[i]->OnDestroy();
+		}
+	}
+	Modules.Empty();
 }
 #endif
 

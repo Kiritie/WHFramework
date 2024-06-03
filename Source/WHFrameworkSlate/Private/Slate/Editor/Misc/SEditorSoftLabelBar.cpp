@@ -31,7 +31,7 @@ void SEditorSoftLabelBar::Construct(const FArguments& InArgs)
 		.FillWidth(SortLabels[i].Fill)
 		[
 			SNew(SButton)
-			.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.Tab"))
+			.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.Tab.Default"))
 			.OnClicked_Lambda([this, InArgs, i]()
 			{
 				if(!SortLabels[i].Label.IsEmpty())

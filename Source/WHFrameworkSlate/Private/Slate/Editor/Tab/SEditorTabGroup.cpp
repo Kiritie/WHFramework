@@ -28,7 +28,7 @@ void SEditorTabGroup::Construct(const FArguments& InArgs)
 		.AutoWidth()
 		[
 			SNew(SCheckBox)
-			.Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FCheckBoxStyle>("CheckBoxes.Tab"))
+			.Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FCheckBoxStyle>("CheckBoxes.Tab.Default"))
 			.Padding(FMargin(0.f))
 			.IsChecked_Lambda([this, i]()
 			{

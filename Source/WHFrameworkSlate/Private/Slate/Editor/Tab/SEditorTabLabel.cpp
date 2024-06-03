@@ -3,6 +3,7 @@
 #include "Slate/Editor/Tab/SEditorTabLabel.h"
 
 #include "SlateOptMacros.h"
+#include "WHFrameworkSlateStyle.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -37,6 +38,23 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 			.Text(InArgs._Label)
 			.Font(InArgs._LabelFont)
 			.ColorAndOpacity(InArgs._LabelColor)
+		]
+		
+		+SHorizontalBox::Slot()
+		.HAlign(HAlign_Left)
+		.VAlign(VAlign_Top)
+		.AutoWidth()
+		.Padding(FMargin(2.f, 0.f, 0.f, 0.f))
+		[
+			SNew(SBox)
+			.WidthOverride(6.f)
+			.HeightOverride(6.f)
+			.Visibility_Lambda([InArgs]() { return InArgs._ShowFlag.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+			[
+				SNew(SImage)
+				.Image(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Circle"))
+				.ColorAndOpacity(InArgs._FlagColor)
+			]
 		]
 	];
 }

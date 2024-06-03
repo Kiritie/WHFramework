@@ -14,7 +14,7 @@ void SEditorBoolSettingItem::Construct(const FArguments& InArgs)
 		.DescContent()
 		[
 			SNew(SCheckBox)
-			// .Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FCheckBoxStyle>("CheckBoxes.Tab"))
+			// .Style(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FCheckBoxStyle>("CheckBoxes.Tab.Default"))
 			.Padding(FMargin(0.f))
 			.IsChecked_Lambda([this]()
 			{

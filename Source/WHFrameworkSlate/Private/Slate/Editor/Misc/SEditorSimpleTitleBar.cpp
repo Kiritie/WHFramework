@@ -45,7 +45,7 @@ void SEditorSimpleTitleBar::Construct(const FArguments& InArgs)
 			.HeightOverride(30.f)
 			[
 				SNew(SButton)
-				.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.DefaultNoBorder_Error"))
+				.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.DefaultNoBorder.Error"))
 				.OnClicked(this, &SEditorSimpleTitleBar::OnCloseButtonClicked)
 				.HAlign(HAlign_Fill)
 				.VAlign(VAlign_Fill)

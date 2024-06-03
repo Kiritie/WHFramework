@@ -9,8 +9,8 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SSlateWidgetBase::WidgetName = NAME_None;
-FName SSlateWidgetBase::ParentName = NAME_None;
+const FName SSlateWidgetBase::WidgetName = NAME_None;
+const FName SSlateWidgetBase::ParentName = NAME_None;
 
 SSlateWidgetBase::SSlateWidgetBase()
 {

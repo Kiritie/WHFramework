@@ -15,7 +15,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SModuleListWidget::WidgetName = FName("ModuleListWidget");
+const FName SModuleListWidget::WidgetName = FName("ModuleListWidget");
 
 SModuleListWidget::SModuleListWidget()
 {

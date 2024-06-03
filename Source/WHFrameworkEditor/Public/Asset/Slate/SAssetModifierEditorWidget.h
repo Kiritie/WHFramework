@@ -22,6 +22,8 @@ public:
 
 	void Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab);
 
+	static const FName WidgetName;
+
 public:
 	virtual void OnCreate() override;
 

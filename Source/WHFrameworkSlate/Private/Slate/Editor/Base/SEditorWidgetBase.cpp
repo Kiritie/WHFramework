@@ -7,7 +7,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SEditorWidgetBase::WidgetName = NAME_None;
+const FName SEditorWidgetBase::WidgetName = NAME_None;
 
 SEditorWidgetBase::SEditorWidgetBase()
 	: WidgetCommands(new FUICommandList())

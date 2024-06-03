@@ -40,7 +40,6 @@ void FWHFrameworkEditorModule::StartupModule()
 
 	// Register styles
 	FWHFrameworkEditorStyle::Initialize();
-	FWHFrameworkEditorStyle::ReloadTextures();
 
 	// Register commands
 	FWHFrameworkEditorCommands::Register();

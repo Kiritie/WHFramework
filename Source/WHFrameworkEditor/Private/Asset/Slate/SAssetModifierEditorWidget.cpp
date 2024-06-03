@@ -12,9 +12,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+const FName SAssetModifierEditorWidget::WidgetName = FName("AssetModifierEditorWidget");
+
 SAssetModifierEditorWidget::SAssetModifierEditorWidget()
 {
-	WidgetName = FName("AssetModifierEditorWidget");
 }
 
 void SAssetModifierEditorWidget::Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab)

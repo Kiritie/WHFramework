@@ -21,6 +21,8 @@ public:
 
 	void Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab);
 
+	static const FName WidgetName;
+	
 public:
 	virtual void OnCreate() override;
 
@@ -75,6 +77,10 @@ public:
 	void TogglePreview();
 
 	void SetIsPreview(bool bIsPreview);
+
+	void CreateMainModule(TSubclassOf<AMainModule> InClass);
+
+	void DeleteMainModule();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats

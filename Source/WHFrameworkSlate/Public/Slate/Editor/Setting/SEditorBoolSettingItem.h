@@ -10,14 +10,9 @@
 class WHFRAMEWORKSLATE_API SEditorBoolSettingItem : public SEditorSettingItemBase
 {
 public:
-    SLATE_BEGIN_ARGS(SEditorBoolSettingItem)
-    {}
-
-		SLATE_ATTRIBUTE(FMargin, Padding)
-        SLATE_ARGUMENT(FEditorSettingItem, SettingItem)
-        SLATE_EVENT(FOnEditorSettingItemValueChanged, OnValueChanged)
-
-    SLATE_END_ARGS()
+	struct FArguments : public TEditorSettingItemBaseNamedArgs<SEditorBoolSettingItem>
+	{
+	};
 
     SEditorBoolSettingItem();
 

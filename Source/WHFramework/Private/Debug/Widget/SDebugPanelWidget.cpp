@@ -8,8 +8,8 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SDebugPanelWidget::WidgetName = FName("DebugPanel");
-FName SDebugPanelWidget::ParentName = NAME_None;
+const FName SDebugPanelWidget::WidgetName = FName("DebugPanel");
+const FName SDebugPanelWidget::ParentName = NAME_None;
 
 SDebugPanelWidget::SDebugPanelWidget()
 {

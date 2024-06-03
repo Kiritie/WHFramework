@@ -29,8 +29,7 @@ class WHFRAMEWORKSLATE_API SEditorTabWidgetBase : public SEditorWidgetBase
 
 	void Construct(const FArguments& InArgs, const TSharedPtr<FEditorTabListItem>& InListItem);
 
-public:
-	static FName WidgetName;
+	static const FName WidgetName;
 
 protected:
 	virtual void OnOpen(bool bInstant) override;

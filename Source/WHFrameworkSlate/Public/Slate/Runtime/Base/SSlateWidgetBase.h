@@ -23,10 +23,9 @@ public:
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
 	
-public:
-	static FName WidgetName;
+	static const FName WidgetName;
 
-	static FName ParentName;
+	static const FName ParentName;
 
 protected:
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;

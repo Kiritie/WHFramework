@@ -4,7 +4,7 @@
 #include "Slate/Editor/Misc/SEditorSplitLine.h"
 #include "Slate/Editor/Tab/SEditorTabLabel.h"
 
-FName SEditorTabWidgetBase::WidgetName = FName("EditorTabWidgetBase");
+const FName SEditorTabWidgetBase::WidgetName = FName("EditorTabWidgetBase");
 
 SEditorTabWidgetBase::SEditorTabWidgetBase()
 {

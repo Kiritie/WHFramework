@@ -15,7 +15,7 @@ FInputManager::FInputManager() : FManagerBase(Type)
 {
 	NativeInputMode = EInputMode::GameOnly;
 	
-	GlobalInputMode = EInputMode::GameOnly;
+	GlobalInputMode = EInputMode::None;
 
 	InputManagers = TArray<IInputManagerInterface*>();
 }

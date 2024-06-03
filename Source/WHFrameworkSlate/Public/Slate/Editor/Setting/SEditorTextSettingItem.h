@@ -7,14 +7,14 @@
 #include "CoreMinimal.h"
 #include "SEditorSettingItemBase.h"
 
-class WHFRAMEWORKSLATE_API SEditorPathSettingItem : public SEditorSettingItemBase
+class WHFRAMEWORKSLATE_API SEditorTextSettingItem : public SEditorSettingItemBase
 {
 public:
-	struct FArguments : public TEditorSettingItemBaseNamedArgs<SEditorPathSettingItem>
+	struct FArguments : public TEditorSettingItemBaseNamedArgs<SEditorTextSettingItem>
 	{
 	};
 
-	SEditorPathSettingItem();
+	SEditorTextSettingItem();
 
 	void Construct(const FArguments& InArgs);
 

@@ -19,10 +19,9 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-public:
-	static FName WidgetName;
+	static const FName WidgetName;
 	
-	static FName ParentName;
+	static const FName ParentName;
 
 public:
 	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;

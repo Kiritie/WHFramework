@@ -15,7 +15,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName STaskListWidget::WidgetName = FName("TaskListWidget");
+const FName STaskListWidget::WidgetName = FName("TaskListWidget");
 
 STaskListWidget::STaskListWidget()
 {
