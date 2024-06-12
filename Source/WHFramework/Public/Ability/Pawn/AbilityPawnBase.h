@@ -150,7 +150,7 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetable_Implementation(APawn* InPlayerPawn) const override;
+	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;

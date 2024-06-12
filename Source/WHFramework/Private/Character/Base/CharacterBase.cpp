@@ -12,6 +12,7 @@
 #include "Character/CharacterModuleStatics.h"
 #include "Character/Base/CharacterAnimBase.h"
 #include "Character/Base/CharacterDataBase.h"
+#include "Common/Looking/LookingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Scene/SceneModuleStatics.h"
@@ -49,6 +50,10 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(FName("StimuliSource"));
 	StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
 	StimuliSource->RegisterForSense(UAISense_Damage::StaticClass());
+
+	Looking = CreateDefaultSubobject<ULookingComponent>(FName("Looking"));
+	Looking->LookingMaxDistance = 1500.f;
+	Looking->OnCanLockAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
 
 	Name = NAME_None;
 	Anim = nullptr;
@@ -460,6 +465,16 @@ void ACharacterBase::StopAIMove(bool bMulticast)
 void ACharacterBase::MultiStopAIMove_Implementation()
 {
 	StopAIMove(false);
+}
+
+bool ACharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
+{
+	return true;
+}
+
+bool ACharacterBase::CanLookAtTarget()
+{
+	return true;
 }
 
 UPrimaryAssetBase& ACharacterBase::GetCharacterData() const

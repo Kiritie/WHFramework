@@ -260,7 +260,20 @@ void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
 
 	if(PlayerPawn != InPlayerPawn)
 	{
+		if(PlayerPawn)
+		{
+			PlayerPawn->OnDestroyed.RemoveAll(this);
+		}
 		PlayerPawn = InPlayerPawn;
+		if(PlayerPawn)
+		{
+			PlayerPawn->OnDestroyed.AddDynamic(this, &AWHPlayerController::OnPlayerDestroyed);
+		}
 		OnPlayerPawnChanged.Broadcast(PlayerPawn);
 	}
+}
+
+void AWHPlayerController::OnPlayerDestroyed(AActor* InPlayerActor)
+{
+	SetPlayerPawn(nullptr);
 }

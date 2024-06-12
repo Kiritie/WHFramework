@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
 #include "Common/Base/WHActor.h"
+#include "Common/Looking/LookingAgentInterface.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
@@ -15,13 +16,14 @@
 
 #include "CharacterBase.generated.h"
 
+class ULookingComponent;
 class UCharacterDataBase;
 class UAIPerceptionStimuliSourceComponent;
 /**
  * 
  */
 UCLASS(meta=(ShortTooltip="A character is a type of Pawn that includes the ability to walk around."))
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface, public ILookingAgentInterface
 {
 	GENERATED_BODY()
 	
@@ -82,6 +84,7 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName Name;
+	
 public:
 	virtual FName GetNameP() const override { return Name; }
 
@@ -149,6 +152,7 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	UCharacterAnimBase* Anim;
+	
 public:
 	virtual UCharacterAnimBase* GetAnim() const override { return Anim; }
 
@@ -157,6 +161,7 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
+	
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }
 
@@ -183,6 +188,7 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FSingleSoundHandle SoundHandle;
+	
 public:
 	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	
@@ -225,6 +231,21 @@ public:
 	virtual void StopAIMove(bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
 	virtual void MultiStopAIMove();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Looking
+protected:
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	ULookingComponent* Looking;
+	
+public:
+	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool CanLookAtTarget();
+
+	UFUNCTION(BlueprintPure)
+	virtual ULookingComponent* GetLooking() const { return Looking; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Primary Asset

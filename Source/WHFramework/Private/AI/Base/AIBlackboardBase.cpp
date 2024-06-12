@@ -34,15 +34,15 @@ void UAIBlackboardBase::OnRefresh()
 
 void UAIBlackboardBase::OnValueReset(FName InValueName)
 {
-	if(InValueName.IsEqual(FName("IsLostTarget")))
+	if(InValueName.IsEqual(NAME_IsLostTarget))
 	{
 		SetIsLostTarget(false);
 	}
-	else if(InValueName.IsEqual(FName("TargetLocation")))
+	else if(InValueName.IsEqual(NAME_TargetLocation))
 	{
 		SetTargetLocation(EMPTY_Vector);
 	}
-	else if(InValueName.IsEqual(FName("TargetAgent")))
+	else if(InValueName.IsEqual(NAME_TargetAgent))
 	{
 		SetTargetAgent(nullptr);
 	}
@@ -57,7 +57,7 @@ void UAIBlackboardBase::OnValueChanged(FName InValueName)
 {
 	OnBlackboardValueChanged.Broadcast(InValueName);
 
-	if(InValueName.IsEqual(FName("IsLostTarget")))
+	if(InValueName.IsEqual(NAME_IsLostTarget))
 	{
 		if(GetIsLostTarget())
 		{

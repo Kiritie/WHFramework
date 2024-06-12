@@ -43,6 +43,7 @@ void FCameraPointCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLay
 				SNew(SButton)
 				.Text(FText::FromString(TEXT("Get Camera View")))
 				.OnClicked_Raw(this, &FCameraPointCustomization::OnClickGetCameraViewButton)
+				.IsEnabled_Lambda([](){ return GIsPlaying; })
 			]
 			+SWrapBox::Slot()
 			[
@@ -55,20 +56,18 @@ void FCameraPointCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLay
 				SNew(SButton)
 				.Text(FText::FromString(TEXT("Switch Camera Point")))
 				.OnClicked_Raw(this, &FCameraPointCustomization::OnClickSwitchCameraPointButton)
+				.IsEnabled_Lambda([](){ return GIsPlaying; })
 			]
 		];
 }
 
 FReply FCameraPointCustomization::OnClickGetCameraViewButton()
 {
-	if(GIsPlaying)
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
 	{
-		for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+		if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
 		{
-			if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
-			{
-				CameraPoint->GetCameraView();
-			}
+			CameraPoint->GetCameraView();
 		}
 	}
 
@@ -77,16 +76,13 @@ FReply FCameraPointCustomization::OnClickGetCameraViewButton()
 
 FReply FCameraPointCustomization::OnClickPasteCameraViewButton()
 {
-	if(GIsPlaying)
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
 	{
-		for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+		if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
 		{
-			if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
-			{
-				FString CameraParams;
-				FPlatformApplicationMisc::ClipboardPaste(CameraParams);
-				CameraPoint->SetCameraView(FCameraParams(CameraParams));
-			}
+			FString CameraParams;
+			FPlatformApplicationMisc::ClipboardPaste(CameraParams);
+			CameraPoint->SetCameraView(CameraParams);
 		}
 	}
 
@@ -95,14 +91,11 @@ FReply FCameraPointCustomization::OnClickPasteCameraViewButton()
 
 FReply FCameraPointCustomization::OnClickSwitchCameraPointButton()
 {
-	if(GIsPlaying)
+	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
 	{
-		for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+		if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
 		{
-			if(ACameraPointBase* CameraPoint = Cast<ACameraPointBase>(SelectedObject.Get()))
-			{
-				CameraPoint->Switch();
-			}
+			CameraPoint->Switch();
 		}
 	}
 

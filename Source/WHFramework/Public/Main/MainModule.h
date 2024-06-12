@@ -215,30 +215,6 @@ public:
 
 public:
 	/**
-	* 获取所有模块
-	*/
-	template<class T>
-	static TArray<T*> GetAllModule(bool bInEditor = false)
-	{
-		TArray<T*> Modules;
-		for(auto Iter : GetAllModule(bInEditor))
-		{
-			if(T* Module = Cast<T>(Iter))
-			{
-				Modules.Add(Module);
-			}
-		}
-		return Modules;
-	}
-	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
-	{
-		if(AMainModule* MainModule = GetPtr(bInEditor))
-		{
-			return MainModule->GetModules();
-		}
-		return TArray<UModuleBase*>();
-	}
-	/**
 	 * 是否存在指定类型的模块
 	 */
 	template<class T>
@@ -282,6 +258,17 @@ public:
 			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		}
 		return NewObject<T>();
+	}
+	/**
+	* 获取所有模块
+	*/
+	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
+	{
+		if(AMainModule* MainModule = GetPtr(bInEditor))
+		{
+			return MainModule->GetModules();
+		}
+		return TArray<UModuleBase*>();
 	}
 	/**
 	* 通过类型获取模块网络组件

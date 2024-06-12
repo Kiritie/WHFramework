@@ -321,7 +321,7 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityPawnBase::IsTargetable_Implementation(APawn* InPlayerPawn) const
+bool AAbilityPawnBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
 }

@@ -210,7 +210,11 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetable_Implementation(APawn* InPlayerPawn) const override;
+	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
+
+	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;
+
+	virtual bool CanLookAtTarget() override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive(bool bNeedNotDead = false) const;

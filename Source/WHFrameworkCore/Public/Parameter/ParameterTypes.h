@@ -339,6 +339,14 @@ protected:
 
 public:
 	//////////////////////////////////////////////////////////////////////////
+	void SetParameterValue(const FParameter& InParameter)
+	{
+		const FText _Description = Description;
+		*this = InParameter;
+		Description = _Description;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
 	EParameterType GetParameterType() const { return ParameterType; }
 
 	void SetParameterType(EParameterType InParameterType) { ParameterType = InParameterType; }
@@ -677,14 +685,15 @@ public:
 	{
 		Name = NAME_None;
 		bRegistered = false;
-		DisplayName = FText::GetEmpty();
 		Category = FText::GetEmpty();
 		Parameter = FParameter();
 	}
 
-	FParameterSet(FName InName, const FParameter& InParameter) : FParameterSet()
+	FParameterSet(FName InName, const FParameter& InParameter, const FText& InCategory = FText::GetEmpty(), bool bInRegistered = false)
 	{
 		Name = InName;
+		bRegistered = bInRegistered;
+		Category = InCategory;
 		Parameter = InParameter;
 	}
 
@@ -694,9 +703,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bRegistered;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "bRegistered"))
-	FText DisplayName;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "bRegistered"))
 	FText Category;

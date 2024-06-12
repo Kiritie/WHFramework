@@ -44,6 +44,7 @@ void FCameraModuleCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLa
 				SNew(SButton)
 				.Text(FText::FromString(TEXT("Copy Camera Params")))
 				.OnClicked(FOnClicked::CreateSP(this, &FCameraModuleCustomization::OnClickCopyCameraParamsButton))
+				.IsEnabled_Lambda([](){ return GIsPlaying; })
 			]
 		];
 }

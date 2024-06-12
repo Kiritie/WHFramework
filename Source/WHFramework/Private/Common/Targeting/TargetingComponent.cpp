@@ -49,7 +49,7 @@ void UTargetingComponent::TickComponent(const float DeltaTime, const ELevelTick 
 		return;
 	}
 
-	if (!TargetIsTargetable(LockedOnTargetActor))
+	if (!TargetIsTargetAble(LockedOnTargetActor))
 	{
 		TargetLockOff();
 		return;
@@ -229,7 +229,7 @@ float UTargetingComponent::GetAngleUsingCameraRotation(const AActor* ActorToLook
 	UCameraComponent* CameraComponent = OwnerActor->FindComponentByClass<UCameraComponent>();
 	if (!CameraComponent)
 	{
-		// 如果找不到cameracomcomponent，则退回到CharacterRotation
+		// 如果找不到CameraComponent，则退回到CharacterRotation
 		return GetAngleUsingCharacterRotation(ActorToLook);
 	}
 
@@ -401,8 +401,8 @@ TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActo
 	for (TActorIterator<AActor> ActorIterator(GetWorld(), ActorClass); ActorIterator; ++ActorIterator)
 	{
 		AActor* Actor = *ActorIterator;
-		const bool bIsTargetable = TargetIsTargetable(Actor);
-		if (bIsTargetable)
+		const bool bIsTargetAble = TargetIsTargetAble(Actor);
+		if (bIsTargetAble)
 		{
 			Actors.Add(Actor);
 		}
@@ -411,12 +411,12 @@ TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActo
 	return Actors;
 }
 
-bool UTargetingComponent::TargetIsTargetable(const AActor* Actor) const
+bool UTargetingComponent::TargetIsTargetAble(const AActor* Actor) const
 {
 	const bool bIsImplemented = Actor->GetClass()->ImplementsInterface(UTargetingAgentInterface::StaticClass());
 	if (bIsImplemented)
 	{
-		return ITargetingAgentInterface::Execute_IsTargetable(Actor, OwnerPawn);
+		return ITargetingAgentInterface::Execute_IsTargetAble(Actor, OwnerPawn);
 	}
 
 	return true;
@@ -437,7 +437,7 @@ AActor* UTargetingComponent::FindNearestTarget(TArray<AActor*> Actors) const
 {
 	TArray<AActor*> ActorsHit;
 
-	// 找到所有能追踪到的演员
+	// 找到所有能追踪到的Actor
 	for (AActor* Actor : Actors)
 	{
 		const bool bHit = LineTraceForActor(Actor);
@@ -447,7 +447,7 @@ AActor* UTargetingComponent::FindNearestTarget(TArray<AActor*> Actors) const
 		}
 	}
 
-	// 从命中的演员，检查距离并返回最近的
+	// 从命中的Actor，检查距离并返回最近的
 	if (ActorsHit.Num() == 0)
 	{
 		return nullptr;

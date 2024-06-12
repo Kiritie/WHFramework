@@ -21,6 +21,7 @@
 #include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Camera/CameraModuleStatics.h"
+#include "Common/Looking/LookingComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
@@ -501,6 +502,7 @@ void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, f
 	RotationRate = InRotationRate;
 	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
 	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed() * RotationRate, 0);
+	Looking->LookingRotationSpeed = GetRotationSpeed() * RotationRate;
 }
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
@@ -529,6 +531,7 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetRotationSpeedAttribute())
 	{
 		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
+		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
 	}
 	else if(InAttributeChangeData.Attribute == AttributeSet->GetJumpForceAttribute())
 	{
@@ -548,9 +551,19 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 	}
 }
 
-bool AAbilityCharacterBase::IsTargetable_Implementation(APawn* InPlayerPawn) const
+bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
+}
+
+bool AAbilityCharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
+{
+	return !IsDead();
+}
+
+bool AAbilityCharacterBase::CanLookAtTarget()
+{
+	return Super::CanLookAtTarget() && IsActive(true);
 }
 
 void AAbilityCharacterBase::OnRep_Controller()

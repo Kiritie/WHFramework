@@ -102,6 +102,10 @@ public:
 
 public:
 	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetParameterValue(UPARAM(ref) FParameter& InParameter, const FParameter& InValue) { InParameter.SetParameterValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static EParameterType GetParameterType(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetParameterType(); }
 

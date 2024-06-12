@@ -89,6 +89,7 @@ TSharedRef<SWidget> SAssetModifierEditorWidget::CreateDefaultWidget()
 	
 	FAssetPickerConfig AssetPickerConfig;
 	AssetPickerConfig.GetCurrentSelectionDelegates.Add(&GetCurrentSelectionDelegate);
+	AssetPickerConfig.OnGetAssetContextMenu = FOnGetAssetContextMenu::CreateSP(this, &SAssetModifierEditorWidget::OnGetAssetContextMenu);
 	AssetPickerConfig.OnAssetSelected = FOnAssetSelected::CreateSP(this, &SAssetModifierEditorWidget::OnAssetSelected);
 	AssetPickerConfig.OnAssetDoubleClicked = FOnAssetSelected::CreateSP(this, &SAssetModifierEditorWidget::OnAssetDoubleClicked);
 	AssetPickerConfig.OnAssetEnterPressed = FOnAssetEnterPressed::CreateSP(this, &SAssetModifierEditorWidget::OnAssetEnterPressed);
@@ -192,6 +193,59 @@ FText SAssetModifierEditorWidget::GetPickedClassName() const
 	FString ClassName = SelectedModifierClass ? SelectedModifierClass->GetName() : TEXT("None");
 	ClassName.RemoveFromEnd(TEXT("_C"));
 	return FText::FromString(ClassName);
+}
+
+TSharedPtr<SWidget> SAssetModifierEditorWidget::OnGetAssetContextMenu(const TArray<FAssetData>& _SelectedAssets) const
+{
+	if (_SelectedAssets.Num() <= 0)
+	{
+		return nullptr;
+	}
+	
+	FMenuBuilder MenuBuilder(true, MakeShared<FUICommandList>());
+
+	MenuBuilder.BeginSection(TEXT("Common"), LOCTEXT("CommonSectionLabel", "Common"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("EditAsset", "Edit..."),
+			LOCTEXT("EditAssetTooltip", "Opens the selected item(s) for edit."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Edit"),
+			FUIAction(
+				FExecuteAction::CreateLambda([_SelectedAssets] ()
+				{
+					for(auto& Iter : _SelectedAssets)
+					{
+						if (UObject* ObjectToEdit = Iter.GetAsset())
+						{
+							GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ObjectToEdit);
+						}
+					}
+				}),
+				FCanExecuteAction::CreateLambda([] () { return true; })
+			)
+		);
+	}
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection(TEXT("Asset"), LOCTEXT("AssetSectionLabel", "Asset"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("BrowseAsset", "Browse to Asset"),
+			LOCTEXT("BrowseAssetTooltip", "Browses to the associated asset and selects it in the most recently used Content Browser (summoning one if necessary)"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "SystemWideCommands.FindInContentBrowser.Small"),
+			FUIAction(
+				FExecuteAction::CreateLambda([_SelectedAssets] ()
+				{
+					const FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+					ContentBrowserModule.Get().SyncBrowserToAssets(_SelectedAssets);
+				}),
+				FCanExecuteAction::CreateLambda([] () { return true; })
+			)
+		);
+	}
+	MenuBuilder.EndSection();
+
+	return MenuBuilder.MakeWidget();
 }
 
 void SAssetModifierEditorWidget::OnAssetSelected(const FAssetData& AssetData)
