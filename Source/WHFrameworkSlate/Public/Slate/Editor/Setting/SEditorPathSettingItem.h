@@ -12,6 +12,13 @@ class WHFRAMEWORKSLATE_API SEditorPathSettingItem : public SEditorSettingItemBas
 public:
 	struct FArguments : public TEditorSettingItemBaseNamedArgs<SEditorPathSettingItem>
 	{
+		FArguments()
+			: _Editable(true)
+		{
+		}
+
+		SLATE_ATTRIBUTE(bool, Editable)
+		SLATE_ARGUMENT(FString, AdditionPath)
 	};
 
 	SEditorPathSettingItem();

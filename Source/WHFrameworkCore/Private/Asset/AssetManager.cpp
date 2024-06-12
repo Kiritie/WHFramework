@@ -126,7 +126,7 @@ UTexture2D* FAssetManager::LoadTextureByPath(const FString& InTexturePath, bool 
 
 	if (!TextureMap.Contains(InTexturePath))
 	{
-		Texture = FCoreStatics::LoadTextureFormFile(InTexturePath);
+		Texture = FCoreStatics::LoadTextureFromFile(InTexturePath);
 		if (Texture)
 		{
 			TextureMap.Add(InTexturePath, Texture);

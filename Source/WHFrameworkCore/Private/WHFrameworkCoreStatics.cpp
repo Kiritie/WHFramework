@@ -106,7 +106,7 @@ bool FCoreStatics::RegexMatch(const FString& InSourceStr, const FString& InPatte
 	return OutResult.Num() == 0 ? false : true;
 }
 
-UTexture2D* FCoreStatics::LoadTextureFormFile(const FString& InFilePath)
+UTexture2D* FCoreStatics::LoadTextureFromFile(const FString& InFilePath)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 

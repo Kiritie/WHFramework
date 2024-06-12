@@ -3,44 +3,44 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Slate/Editor/Interfaces/EditorWidgetInterface.h"
-
-#include "Widgets/SCompoundWidget.h"
+#include "Slate/Editor/Base/IEditorWidgetBase.h"
 
 /**
  * 
  */
-class WHFRAMEWORKSLATE_API SEditorWidgetBase : public SCompoundWidget, public IEditorWidgetInterface
+class WHFRAMEWORKSLATE_API SEditorWidgetBase : public IEditorWidgetBase
 {
 	friend class FSlateWidgetManager;
 
 public:
-	SEditorWidgetBase();
-
 	SLATE_BEGIN_ARGS(SEditorWidgetBase) {}
 
 	SLATE_END_ARGS()
+
+	SEditorWidgetBase();
 
 	void Construct(const FArguments& InArgs);
 
 	static const FName WidgetName;
 
 public:
-	virtual void OnCreate();
+	virtual void OnCreate() override;
 
-	virtual void OnInitialize();
+	virtual void OnInitialize() override;
 
-	virtual void OnOpen(bool bInstant = false);
+	virtual void OnOpen(bool bInstant = false) override;
 
-	virtual void OnClose(bool bInstant = false);
+	virtual void OnClose(bool bInstant = false) override;
 
-	virtual void OnSave();
+	virtual void OnSave() override;
 	
-	virtual void OnReset();
+	virtual void OnReset() override;
 
-	virtual void OnRefresh();
+	virtual void OnRefresh() override;
 
-	virtual void OnDestroy();
+	virtual void OnTick(float InDeltaTime) override;
+
+	virtual void OnDestroy() override;
 
 protected:
 	virtual void OnBindCommands(const TSharedRef<FUICommandList>& InCommands);
@@ -57,36 +57,36 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 public:
-	virtual void Open(bool bInstant = false);
+	virtual void Open(bool bInstant = false) override;
 
-	virtual void Close(bool bInstant = false);
+	virtual void Close(bool bInstant = false) override;
 
-	virtual void Toggle(bool bInstant = false);
+	virtual void Toggle(bool bInstant = false) override;
 
-	virtual void Save();
+	virtual void Save() override;
 
-	virtual void Reset();
+	virtual void Reset() override;
 
-	virtual void Rebuild();
+	virtual void Rebuild() override;
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	virtual void Destroy();
+	virtual void Destroy() override;
 
 protected:
-	virtual void FinishOpen(bool bInstant = false);
+	virtual void FinishOpen(bool bInstant = false) override;
 
-	virtual void FinishClose(bool bInstant = false);
-
-public:
-	virtual bool CanSave();
+	virtual void FinishClose(bool bInstant = false) override;
 
 public:
-	virtual void AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget);
+	virtual bool CanSave() override;
 
-	virtual void RemoveChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget);
+public:
+	virtual void AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) override;
 
-	virtual void RemoveAllChild();
+	virtual void RemoveChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) override;
+
+	virtual void RemoveAllChild() override;
 
 protected:
 	FName _WidgetName;
@@ -95,11 +95,11 @@ protected:
 
 	EEditorWidgetState WidgetState;
 
-	TSharedPtr<SEditorWidgetBase> ParentWidget;
+	TSharedPtr<IEditorWidgetBase> ParentWidget;
 
-	TArray<TSharedPtr<SEditorWidgetBase>> ChildWidgets;
+	TArray<TSharedPtr<IEditorWidgetBase>> ChildWidgets;
 
-	TMap<FName, TSharedPtr<SEditorWidgetBase>> ChildWidgetMap;
+	TMap<FName, TSharedPtr<IEditorWidgetBase>> ChildWidgetMap;
 	
 	TSharedRef<FUICommandList> WidgetCommands;
 	
@@ -113,25 +113,25 @@ private:
 	FDelegateHandle OnWindowClosedHandle;
 
 public:
-	TSharedPtr<SWindow> GetOwnerWindow();
+	virtual TSharedPtr<SWindow> GetOwnerWindow() override;
 
-	TSharedRef<SEditorWidgetBase> TakeWidget();
+	virtual TSharedRef<IEditorWidgetBase> TakeWidget() override;
 
-	TSharedPtr<SEditorWidgetBase> GetChild(int32 InIndex) const;
+	virtual TSharedPtr<IEditorWidgetBase> GetChild(int32 InIndex) const override;
 
-	FName GetWidgetName() const { return _WidgetName; }
+	virtual FName GetWidgetName() const override { return _WidgetName; }
 
-	EEditorWidgetState GetWidgetState() const { return WidgetState; }
+	virtual EEditorWidgetState GetWidgetState() const override { return WidgetState; }
 
-	int32 GetChildNum() const { return ChildWidgets.Num(); }
+	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
 
-	TSharedPtr<SEditorWidgetBase> GetParentWidgetN() const { return ParentWidget; }
+	virtual TSharedPtr<IEditorWidgetBase> GetParentWidgetN() const override { return ParentWidget; }
 
 	template<class T>
 	TSharedPtr<T> GetParentWidgetN() const
 	{
-		return StaticCastSharedPtr<T>(ParentWidget);
+		return StaticCastSharedPtr<T>(GetParentWidgetN());
 	}
 
-	TArray<TSharedPtr<SEditorWidgetBase>>& GetChildWidgets() { return ChildWidgets; }
+	virtual TArray<TSharedPtr<IEditorWidgetBase>>& GetChildWidgets() override { return ChildWidgets; }
 };

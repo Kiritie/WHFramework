@@ -364,9 +364,9 @@ TArray<UClass*> UCommonStatics::GetClassChildren(const UClass* InClass, bool bIn
 	return ReturnValues;
 }
 
-UTexture2D* UCommonStatics::LoadTextureFormFile(const FString& InFilePath)
+UTexture2D* UCommonStatics::LoadTextureFromFile(const FString& InFilePath)
 {
-	return FCoreStatics::LoadTextureFormFile(InFilePath);
+	return FCoreStatics::LoadTextureFromFile(InFilePath);
 }
 
 void UCommonStatics::SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath)

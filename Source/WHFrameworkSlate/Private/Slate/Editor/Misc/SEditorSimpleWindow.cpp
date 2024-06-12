@@ -20,7 +20,7 @@ void SEditorSimpleWindow::Construct(const FArguments& InArgs)
 		.HeightOverride(InArgs._WindowHeight)
 		[
 			SNew(SBorder)
-			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Fillet_16"))
+			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Radius_16"))
 			.BorderBackgroundColor(FLinearColor(0.015f, 0.015f, 0.015f))
 			.Padding(FMargin(0.f))
 			[
@@ -29,7 +29,6 @@ void SEditorSimpleWindow::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				.HAlign(HAlign_Fill)
 				.VAlign(VAlign_Fill)
-				.Padding(FMargin(10.f, 5.f))
 				.AutoHeight()
 				[
 					SNew(SEditorSimpleTitleBar)
@@ -44,7 +43,9 @@ void SEditorSimpleWindow::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Fill)
 				.AutoHeight()
 				[
-					SNew(SEditorSplitLine).Height(1.f)
+					SNew(SEditorSplitLine)
+					.Height(1.f)
+					.Color(FLinearColor(0.03f, 0.03f, 0.03f))
 				]
 
 				+SVerticalBox::Slot()

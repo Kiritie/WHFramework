@@ -8,9 +8,15 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+SEditorMaskPanel::SEditorMaskPanel()
+{
+	bAutoClose = false;
+}
+
 void SEditorMaskPanel::Construct(const FArguments& InArgs)
 {
 	ParentWidget = InArgs._ParentWidget;
+	bAutoClose = InArgs._AutoClose;
 	
 	ChildSlot
 	[
@@ -42,13 +48,16 @@ void SEditorMaskPanel::Construct(const FArguments& InArgs)
 
 FReply SEditorMaskPanel::OnMaskButtonClicked()
 {
-	if(ParentWidget)
+	if(bAutoClose)
 	{
-		ParentWidget->Close();
-	}
-	else
-	{
-		SetVisibility(EVisibility::Collapsed);
+		if(ParentWidget)
+		{
+			ParentWidget->Close();
+		}
+		else
+		{
+			SetVisibility(EVisibility::Collapsed);
+		}
 	}
 	return FReply::Handled();
 }

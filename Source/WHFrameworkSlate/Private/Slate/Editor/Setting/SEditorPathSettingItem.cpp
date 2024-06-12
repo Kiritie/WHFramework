@@ -18,7 +18,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 		.Content()
 		[
 			SNew(SBorder)
-			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Fillet_16"))
+			.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Radius_16"))
 			.BorderBackgroundColor(FLinearColor(0.025f, 0.025f, 0.025f))
 			.Padding(FMargin(20.f, 15.f))
 			[
@@ -40,12 +40,17 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 					[
 						SNew(SEditableText)
 						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
+						.Visibility_Lambda([InArgs](){ return InArgs._Editable.Get() ? EVisibility::Visible : EVisibility::HitTestInvisible; })
 						.Text_Lambda([this]()
 						{
 							return FText::FromString(GetSettingValue().GetStringValue());
 						})
+						.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type TextCommitType)
+						{
+							SetSettingValue(Val.ToString());
+						})
 					]
-
+					
 					+SVerticalBox::Slot()
 					.HAlign(HAlign_Fill)
 					.VAlign(VAlign_Fill)
@@ -54,6 +59,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 						SNew(SEditorSplitLine)
 						.Height(1.f)
 						.Color(FLinearColor(0.15f, 0.15f, 0.15f))
+						.Visibility_Lambda([InArgs](){ return InArgs._Editable.Get() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 					]
 				]
 
@@ -68,7 +74,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 					[
 						SNew(SButton)
 						.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.SelectPath"))
-						.OnClicked_Lambda([this]()
+						.OnClicked_Lambda([this, InArgs]()
 						{
 							IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
 							
@@ -78,7 +84,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 							FString Path;
 							if(DesktopPlatform->OpenDirectoryDialog(ParentWindowHandle, GetSettingValue().GetStringValue(), GetSettingValue().GetStringValue(), Path))
 							{
-								SetSettingValue(Path);
+								SetSettingValue(Path + (!Path.EndsWith(TEXT("/")) ? TEXT("/") : TEXT("")) + InArgs._AdditionPath);
 							}
 							return FReply::Handled();
 						})

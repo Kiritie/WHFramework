@@ -850,7 +850,7 @@ public:
 	FString ToJsonString() const
 	{
 		FString JsonString;
-		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
+		const TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
 		JsonWriter->WriteObjectStart();
 		for (auto& Iter : Map)
 		{

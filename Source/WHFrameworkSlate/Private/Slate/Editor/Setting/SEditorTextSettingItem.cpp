@@ -1,4 +1,6 @@
 ﻿#include "Slate/Editor/Setting/SEditorTextSettingItem.h"
+
+#include "WHFrameworkSlateStyle.h"
 #include "Widgets/Input/SEditableTextBox.h"
 
 SEditorTextSettingItem::SEditorTextSettingItem()
@@ -15,7 +17,7 @@ void SEditorTextSettingItem::Construct(const FArguments& InArgs)
 		.Content()
 		[
 			SNew(SEditableTextBox)
-			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
+			.Style(FWHFrameworkSlateStyle::Get(), "EditableTextBoxes.SettingItem")
 			.Text_Lambda([this]()
 			{
 				return FText::FromString(GetSettingValue().GetStringValue());

@@ -11,7 +11,7 @@ class WHFRAMEWORKSLATE_API SEditorSimpleTitleBar : public SCompoundWidget
 {
 public:
     SLATE_BEGIN_ARGS(SEditorSimpleTitleBar)
-        : _TitleFont(FCoreStyle::GetDefaultFontStyle("Regular", 13))
+        : _TitleFont(FCoreStyle::GetDefaultFontStyle("Regular", 12))
         , _TitleColor(FLinearColor(0.9f, 0.9f, 0.9f))
 
     {}
