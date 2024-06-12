@@ -248,7 +248,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Texture
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static UTexture2D* LoadTextureFormFile(const FString& InFilePath);
+	static UTexture2D* LoadTextureFromFile(const FString& InFilePath);
 
 	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
 	static void SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath);

@@ -17,7 +17,7 @@ class FWHFrameworkSlateStatics
 {
 public:
 	template<typename WidgetType, typename RequiredArgsPayloadType>
-	static TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InType, const TSharedPtr<class SEditorWidgetBase>& InParentWidget, bool bInAutoOpen, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
+	static TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDeclEd( const ANSICHAR* InType, const TSharedPtr<class IEditorWidgetBase>& InParentWidget, bool bInAutoOpen, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
 	{
 		LLM_SCOPE_BYTAG(UI_Slate);
 		TSlateDecl<WidgetType, RequiredArgsPayloadType> SlateDecl(InType, InFile, OnLine, Forward<RequiredArgsPayloadType>(InRequiredArgs));

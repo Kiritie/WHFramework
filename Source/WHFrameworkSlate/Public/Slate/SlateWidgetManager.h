@@ -2,7 +2,7 @@
 
 #pragma once
 #include "WHFrameworkSlateTypes.h"
-#include "Editor/Base/SEditorWidgetBase.h"
+#include "Editor/Base/IEditorWidgetBase.h"
 #include "Runtime/Base/SSlateWidgetBase.h"
 #include "Input/InputManagerInterface.h"
 #include "Main/MainTypes.h"
@@ -157,7 +157,7 @@ public:
 	////////////////////////////////////////////////////
 	// EditorWidget
 protected:
-	TMap<FName, TSharedPtr<SEditorWidgetBase>> AllEditorWidgets;
+	TMap<FName, TSharedPtr<IEditorWidgetBase>> AllEditorWidgets;
 
 public:
 	template<class T>
@@ -177,7 +177,7 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<SEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false, bool bForce = true)
+	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<IEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false, bool bForce = true)
 	{
 		const FName WidgetName = T::WidgetName;
 		if(!AllEditorWidgets.Contains(WidgetName) || bForce)

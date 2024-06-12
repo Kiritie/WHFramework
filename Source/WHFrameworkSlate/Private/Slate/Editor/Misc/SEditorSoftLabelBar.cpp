@@ -84,8 +84,8 @@ void SEditorSoftLabelBar::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SBorder)
-		.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Fillet_8"))
-		.BorderBackgroundColor(FLinearColor(0.04f, 0.04f, 0.04f))
+		.BorderImage(FWHFrameworkSlateStyle::Get().GetBrush("Icons.Border_Radius_8"))
+		.BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.08f))
 		.Padding(InArgs._Padding)
 		[
 			HBox_Labels->AsShared()

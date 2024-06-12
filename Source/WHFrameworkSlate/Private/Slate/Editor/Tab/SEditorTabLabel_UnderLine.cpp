@@ -56,7 +56,7 @@ void SEditorTabLabel_UnderLine::Construct(const FArguments& InArgs)
 		[
 			SNew(SEditorSplitLine)
 			.Height(2.f)
-			.Color(FSlateColor(FLinearColor(0.f, 0.4f, 0.95f)))
+			.Color(FSlateColor(FLinearColor(0.f, 0.3f, 0.85f)))
 			.Visibility_Lambda([InArgs](){ return InArgs._bActived.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 		]
 	];

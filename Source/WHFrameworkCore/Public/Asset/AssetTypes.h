@@ -229,6 +229,8 @@ public:
 	virtual FString GetDisplayString() const { return TEXT(""); }
 
 	virtual const FSlateBrush* GetDisplayIcon() const { return nullptr; }
+
+	virtual TSharedPtr<FJsonObject> ToJsonObject() const { return nullptr; }
 };
 
 /*

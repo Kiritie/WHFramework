@@ -14,8 +14,8 @@ SEditorWidgetBase::SEditorWidgetBase()
 {
 	WidgetType = EEditorWidgetType::Main;
 	WidgetState = EEditorWidgetState::None;
-	ChildWidgets = TArray<TSharedPtr<SEditorWidgetBase>>();
-	ChildWidgetMap = TMap<FName, TSharedPtr<SEditorWidgetBase>>();
+	ChildWidgets = TArray<TSharedPtr<IEditorWidgetBase>>();
+	ChildWidgetMap = TMap<FName, TSharedPtr<IEditorWidgetBase>>();
 
 	bInitialized = false;
 }
@@ -112,6 +112,27 @@ void SEditorWidgetBase::OnRefresh()
 	}
 }
 
+void SEditorWidgetBase::OnTick(float InDeltaTime)
+{
+	if(!WidgetAnimSequence.IsPlaying())
+	{
+		switch(WidgetState)
+		{
+			case EEditorWidgetState::Opening:
+			{
+				FinishOpen(false);
+				break;
+			}
+			case EEditorWidgetState::Closing:
+			{
+				FinishClose(false);
+				break;
+			}
+			default: break;
+		}
+	}
+}
+
 void SEditorWidgetBase::OnDestroy()
 {
 	FSlateWidgetManager::Get().RemoveEditorWidget<SEditorWidgetBase>(GetWidgetName());
@@ -174,23 +195,7 @@ void SEditorWidgetBase::Tick(const FGeometry& AllottedGeometry, const double InC
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 
-	if(!WidgetAnimSequence.IsPlaying())
-	{
-		switch(WidgetState)
-		{
-			case EEditorWidgetState::Opening:
-			{
-				FinishOpen(false);
-				break;
-			}
-			case EEditorWidgetState::Closing:
-			{
-				FinishClose(false);
-				break;
-			}
-			default: break;
-		}
-	}
+	OnTick(InDeltaTime);
 }
 
 FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
@@ -266,23 +271,29 @@ bool SEditorWidgetBase::CanSave()
 	return true;
 }
 
-void SEditorWidgetBase::AddChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget)
+void SEditorWidgetBase::AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget)
 {
-	if(!ChildWidgets.Contains(InChildWidget))
+	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InChildWidget))
 	{
-		InChildWidget->ParentWidget = SharedThis(this);
-		ChildWidgets.Add(InChildWidget);
-		ChildWidgetMap.Add(InChildWidget->WidgetName, InChildWidget);
+		if(!ChildWidgets.Contains(ChildWidget))
+		{
+			ChildWidget->ParentWidget = SharedThis(this);
+			ChildWidgets.Add(ChildWidget);
+			ChildWidgetMap.Add(ChildWidget->WidgetName, ChildWidget);
+		}
 	}
 }
 
-void SEditorWidgetBase::RemoveChild(const TSharedPtr<SEditorWidgetBase>& InChildWidget)
+void SEditorWidgetBase::RemoveChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget)
 {
-	if(ChildWidgets.Contains(InChildWidget))
+	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InChildWidget))
 	{
-		InChildWidget->ParentWidget = nullptr;
-		ChildWidgets.Remove(InChildWidget);
-		ChildWidgetMap.Remove(InChildWidget->WidgetName);
+		if(ChildWidgets.Contains(ChildWidget))
+		{
+			ChildWidget->ParentWidget = nullptr;
+			ChildWidgets.Remove(ChildWidget);
+			ChildWidgetMap.Remove(ChildWidget->WidgetName);
+		}
 	}
 }
 
@@ -290,7 +301,10 @@ void SEditorWidgetBase::RemoveAllChild()
 {
 	for(auto Iter : ChildWidgets)
 	{
-		Iter->ParentWidget = nullptr;
+		if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(Iter))
+		{
+			ChildWidget->ParentWidget = nullptr;
+		}
 	}
 	ChildWidgets.Empty();
 	ChildWidgetMap.Empty();
@@ -301,7 +315,7 @@ TSharedPtr<SWindow> SEditorWidgetBase::GetOwnerWindow()
 	return FSlateApplicationBase::Get().FindWidgetWindow(AsShared());
 }
 
-TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget()
+TSharedRef<IEditorWidgetBase> SEditorWidgetBase::TakeWidget()
 {
 	if(!bInitialized)
 	{
@@ -310,7 +324,7 @@ TSharedRef<SEditorWidgetBase> SEditorWidgetBase::TakeWidget()
 	return SharedThis(this);
 }
 
-TSharedPtr<SEditorWidgetBase> SEditorWidgetBase::GetChild(int32 InIndex) const
+TSharedPtr<IEditorWidgetBase> SEditorWidgetBase::GetChild(int32 InIndex) const
 {
 	if(ChildWidgets.IsValidIndex(InIndex))
 	{

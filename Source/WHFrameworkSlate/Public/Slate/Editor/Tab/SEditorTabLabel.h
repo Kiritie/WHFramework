@@ -10,13 +10,19 @@ class WHFRAMEWORKSLATE_API SEditorTabLabel : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SEditorTabLabel)
-		: _LabelFont(FCoreStyle::GetDefaultFontStyle("Regular", 11))
+		: _IconWidth(14.f)
+		, _IconHeight(14.f)
+		, _LabelFont(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 		, _LabelColor(FSlateColor::UseForeground())
 		, _ShowFlag(false)
 		, _FlagColor(FLinearColor(1.f, 0.2f, 0.2f))
 	{}
 
 		SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
+
+		SLATE_ATTRIBUTE(FOptionalSize, IconWidth)
+
+		SLATE_ATTRIBUTE(FOptionalSize, IconHeight)
 
 		SLATE_ATTRIBUTE(FText, Label)
 

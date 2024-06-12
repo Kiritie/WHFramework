@@ -15,7 +15,7 @@ FSlateWidgetManager::FSlateWidgetManager() : FManagerBase(Type)
 	AllSlateWidgets = TMap<FName, TSharedPtr<SSlateWidgetBase>>();
 	TemporarySlateWidget = nullptr;
 
-	AllEditorWidgets = TMap<FName, TSharedPtr<SEditorWidgetBase>>();
+	AllEditorWidgets = TMap<FName, TSharedPtr<IEditorWidgetBase>>();
 }
 
 FSlateWidgetManager::~FSlateWidgetManager()

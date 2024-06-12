@@ -20,8 +20,8 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 		.AutoWidth()
 		[
 			SNew(SBox)
-			.WidthOverride(14.f)
-			.HeightOverride(14.f)
+			.WidthOverride(InArgs._IconWidth)
+			.HeightOverride(InArgs._IconHeight)
 			[
 				SNew(SImage)
 				.Image(InArgs._Icon)
