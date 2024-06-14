@@ -28,9 +28,9 @@ void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastState, const
 	Vitality->ResetData();
 }
 
-void UAbilityVitalityState_Default::OnRefresh()
+void UAbilityVitalityState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityVitalityState_Default::OnLeave(UFiniteStateBase* InNextState)

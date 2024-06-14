@@ -45,9 +45,9 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 	DeathStart();
 }
 
-void UAbilityPawnState_Death::OnRefresh()
+void UAbilityPawnState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)

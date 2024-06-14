@@ -50,7 +50,7 @@ void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	OnRefresh();
+	OnRefresh(DeltaTime);
 }
 
 void UFSMComponent::OnInitialize()
@@ -81,11 +81,11 @@ void UFSMComponent::OnInitialize()
 	}
 }
 
-void UFSMComponent::OnRefresh()
+void UFSMComponent::OnRefresh(float DeltaSeconds)
 {
 	if(CurrentState)
 	{
-		CurrentState->OnRefresh();
+		CurrentState->OnRefresh(DeltaSeconds);
 	}
 }
 
@@ -109,7 +109,7 @@ void UFSMComponent::OnTermination()
 
 bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	if(!bInitialized || InState && !HasState(InState)) return false;
+	if(!bInitialized || (InState && !HasState(InState)) || CurrentState != TargetState) return false;
 	
 	if(InState == CurrentState) return true;
 
@@ -119,26 +119,26 @@ bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParamet
 	{
 		if(!InState || InState->OnEnterValidate(LastState, InParams))
 		{
+			TargetState = InState;
 			if(LastState)
 			{
 				LastState->OnLeave(InState);
-				CurrentState = nullptr;
 			}
+			CurrentState = TargetState;
 			if(InState)
 			{
-				CurrentState = InState;
 				InState->OnEnter(LastState, InParams);
-			}
-			else
-			{
-				CurrentState = nullptr;
 			}
 		}
 	}
 	if(CurrentState != LastState)
 	{
-		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
-		OnStateChanged.Broadcast(CurrentState);
+		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState, LastState);
+		OnStateChanged.Broadcast(CurrentState, LastState);
+		if(!CurrentState)
+		{
+			RefreshState();
+		}
 		return true;
 	}
 	return false;
@@ -226,6 +226,11 @@ bool UFSMComponent::SwitchNextState(const TArray<FParameter>& InParams)
 		return SwitchStateByIndex(CurrentState->GetStateIndex() + 1, InParams);
 	}
 	return false;
+}
+
+void UFSMComponent::RefreshState()
+{
+	GetAgent<IFSMAgentInterface>()->OnFiniteStateRefresh(CurrentState);
 }
 
 bool UFSMComponent::TerminateState(UFiniteStateBase* InState)

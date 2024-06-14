@@ -8,7 +8,7 @@
 class UFSMComponent;
 class UFiniteStateBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFiniteStateChanged, UFiniteStateBase*, InState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnFiniteStateChanged, UFiniteStateBase*, InCurrentState, UFiniteStateBase*, InLastState);
 
 USTRUCT(BlueprintType)
 struct FFSMGroup

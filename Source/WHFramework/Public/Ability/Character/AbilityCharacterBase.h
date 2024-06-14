@@ -120,9 +120,7 @@ protected:
 
 	virtual void ResetData();
 
-	virtual void RefreshState();
-
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InState) override;
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 

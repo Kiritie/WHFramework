@@ -4,6 +4,8 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Scene/SceneModuleStatics.h"
 
 UAbilityCharacterState_Walk::UAbilityCharacterState_Walk()
 {
@@ -29,11 +31,16 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const T
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Walking);
 	
 	Character->GetInteractionComponent()->SetInteractable(true);
+
+	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
+	{
+		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
 }
 
-void UAbilityCharacterState_Walk::OnRefresh()
+void UAbilityCharacterState_Walk::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextState)

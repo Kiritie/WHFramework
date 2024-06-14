@@ -11,7 +11,7 @@ class UVoxel;
 /**
  * 角色部位组件
  */
-UCLASS()
+UCLASS(ClassGroup="Collision", editinlinenew, meta=(DisplayName="Character Part", BlueprintSpawnableComponent))
 class WHFRAMEWORK_API UCharacterPartBase : public UBoxComponent
 {
 	GENERATED_BODY()
@@ -28,7 +28,7 @@ public:
 
 	virtual void UpdateVoxelOverlap();
 
-public:
+protected:
 	virtual void OnHitVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult);
 
 	virtual void OnEnterVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult);
@@ -39,11 +39,11 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FVoxelItem LastOverlapVoxel;
+	FVoxelItem OverlappingVoxel;
 
 public:
 	UFUNCTION(BlueprintPure)
-	FVoxelItem& GetLastOverlapVoxel() { return LastOverlapVoxel; }
+	FVoxelItem& GetOverlappingVoxel() { return OverlappingVoxel; }
 
 	UFUNCTION(BlueprintPure)
 	ACharacterBase* GetOwnerCharacter() const;

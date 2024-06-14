@@ -46,7 +46,7 @@ protected:
 	
 	virtual void ResetData() override;
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InState) override;
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
 	virtual void Serialize(FArchive& Ar) override;

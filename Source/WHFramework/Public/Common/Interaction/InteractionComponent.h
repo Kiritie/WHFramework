@@ -10,7 +10,7 @@ class IInteractionAgentInterface;
 /**
  * 
  */
-UCLASS()
+UCLASS(ClassGroup="Collision", editinlinenew, meta=(DisplayName="Interaction", BlueprintSpawnableComponent))
 class WHFRAMEWORK_API UInteractionComponent : public UBoxComponent
 {
 	GENERATED_BODY()

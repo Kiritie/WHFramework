@@ -37,7 +37,7 @@ public:
 	void OnInitialize();
 
 	UFUNCTION(BlueprintCallable)
-	void OnRefresh();
+	void OnRefresh(float DeltaSeconds);
 
 	UFUNCTION(BlueprintCallable)
 	void OnTermination();
@@ -117,6 +117,9 @@ public:
 	bool SwitchNextState(const TArray<FParameter>& InParams);
 
 	UFUNCTION(BlueprintCallable)
+	void RefreshState();
+
+	UFUNCTION(BlueprintCallable)
 	bool TerminateState(UFiniteStateBase* InState);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -150,6 +153,8 @@ protected:
 	UFiniteStateBase* CurrentState;
 	UPROPERTY()
 	TMap<FName, UFiniteStateBase*> StateMap;
+	UPROPERTY()
+	UFiniteStateBase* TargetState;
 	UPROPERTY()
 	bool bInitialized;
 

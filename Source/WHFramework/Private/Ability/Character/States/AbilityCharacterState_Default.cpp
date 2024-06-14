@@ -36,9 +36,9 @@ void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastState, cons
 	Character->SetMotionRate(1, 1);
 }
 
-void UAbilityCharacterState_Default::OnRefresh()
+void UAbilityCharacterState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 
 	TrySwitchToWalk();
 }

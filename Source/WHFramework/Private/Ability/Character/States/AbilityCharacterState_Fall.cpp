@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 
 UAbilityCharacterState_Fall::UAbilityCharacterState_Fall()
 {
@@ -30,9 +29,9 @@ void UAbilityCharacterState_Fall::OnEnter(UFiniteStateBase* InLastState, const T
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Falling);
 }
 
-void UAbilityCharacterState_Fall::OnRefresh()
+void UAbilityCharacterState_Fall::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 bool UAbilityCharacterState_Fall::OnLeaveValidate(UFiniteStateBase* InNextState)

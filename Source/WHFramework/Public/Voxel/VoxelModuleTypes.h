@@ -381,7 +381,7 @@ public:
 
 	FORCEINLINE friend bool operator!=(const FVoxelItem& A, const FVoxelItem& B)
 	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level) && (A.Index != B.Index);
+		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level) || (A.Index != B.Index);
 	}
 };
 

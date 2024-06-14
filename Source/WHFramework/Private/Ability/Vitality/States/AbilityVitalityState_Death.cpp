@@ -46,9 +46,9 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 	DeathStart();
 }
 
-void UAbilityVitalityState_Death::OnRefresh()
+void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)

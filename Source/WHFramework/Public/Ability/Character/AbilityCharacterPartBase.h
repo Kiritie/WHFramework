@@ -9,7 +9,7 @@
 /**
  * 角色部位组件
  */
-UCLASS()
+UCLASS(ClassGroup="Collision", editinlinenew, meta=(DisplayName="Ability Character Part", BlueprintSpawnableComponent))
 class WHFRAMEWORK_API UAbilityCharacterPartBase : public UCharacterPartBase
 {
 	GENERATED_BODY()

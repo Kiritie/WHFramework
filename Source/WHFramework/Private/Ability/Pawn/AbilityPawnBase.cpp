@@ -121,7 +121,7 @@ void AAbilityPawnBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityPawnBase::OnFiniteStateChanged(UFiniteStateBase* InState)
+void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 }
 

@@ -29,6 +29,4 @@ public:
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
-
-	virtual FName GetParentName() const override { return ParentName; }
 };

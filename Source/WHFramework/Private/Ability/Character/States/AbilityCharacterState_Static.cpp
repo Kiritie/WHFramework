@@ -37,9 +37,9 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
 }
 
-void UAbilityCharacterState_Static::OnRefresh()
+void UAbilityCharacterState_Static::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)

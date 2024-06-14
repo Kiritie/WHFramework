@@ -56,9 +56,9 @@ public:
 	 * 状态帧刷新
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
-	void K2_OnRefresh();
+	void K2_OnRefresh(float DeltaSeconds);
 	UFUNCTION()
-	virtual void OnRefresh();
+	virtual void OnRefresh(float DeltaSeconds);
 	/**
 	 * 状态离开验证
 	 * @param InNextState 下一个状态

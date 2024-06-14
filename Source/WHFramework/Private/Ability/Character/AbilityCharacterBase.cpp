@@ -22,6 +22,7 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Common/Looking/LookingComponent.h"
+#include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
@@ -225,16 +226,19 @@ void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float Scale
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
-void AAbilityCharacterBase::RefreshState()
+void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 	switch (GetCharacterMovement()->MovementMode)
 	{
-		case EMovementMode::MOVE_Walking:
+		case MOVE_Walking:
 		{
-			FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+			if(!IsJumping())
+			{
+				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+			}
 			break;
 		}
-		case EMovementMode::MOVE_Falling:
+		case MOVE_Falling:
 		{
 			FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
 			break;
@@ -243,21 +247,41 @@ void AAbilityCharacterBase::RefreshState()
 	}
 }
 
-void AAbilityCharacterBase::OnFiniteStateChanged(UFiniteStateBase* InState)
-{
-	if(!InState)
-	{
-		RefreshState();
-	}
-}
-
 void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	if(IsActive(true))
+	if(!IsActive(true)) return;
+	
+	FSM->RefreshState();
+
+	switch (GetCharacterMovement()->MovementMode)
 	{
-		RefreshState();
+		case MOVE_Walking:
+		{
+			if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::GetDefaultPhysicsVolume())
+			{
+				GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
+			}
+			break;
+		}
+		case MOVE_Swimming:
+		{
+			if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::HasPhysicsVolumeByName(FName("Water")))
+			{
+				GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")), true);
+			}
+			break;
+		}
+		case MOVE_Flying:
+		{
+			// if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::HasPhysicsVolumeByName(FName("Sky")))
+			// {
+			// 	GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetPhysicsVolumeByName(FName("Sky")), true);
+			// }
+			break;
+		}
+		default: break;
 	}
 }
 

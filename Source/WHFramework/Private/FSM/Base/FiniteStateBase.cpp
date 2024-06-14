@@ -58,9 +58,9 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FPara
 	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateEntered::StaticClass(), this, {this, FSM});
 }
 
-void UFiniteStateBase::OnRefresh()
+void UFiniteStateBase::OnRefresh(float DeltaSeconds)
 {
-	K2_OnRefresh();
+	K2_OnRefresh(DeltaSeconds);
 }
 
 bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextState)

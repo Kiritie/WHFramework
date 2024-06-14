@@ -22,9 +22,9 @@ void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastState, const TA
 	Super::OnEnter(InLastState, InParams);
 }
 
-void UAbilityCharacterStateBase::OnRefresh()
+void UAbilityCharacterStateBase::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityCharacterStateBase::OnLeave(UFiniteStateBase* InNextState)

@@ -28,9 +28,9 @@ void UAbilityPawnState_Default::OnEnter(UFiniteStateBase* InLastState, const TAr
 	Pawn->ResetData();
 }
 
-void UAbilityPawnState_Default::OnRefresh()
+void UAbilityPawnState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityPawnState_Default::OnLeave(UFiniteStateBase* InNextState)

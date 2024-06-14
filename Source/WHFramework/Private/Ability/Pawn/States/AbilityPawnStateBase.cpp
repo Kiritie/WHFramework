@@ -22,9 +22,9 @@ void UAbilityPawnStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<
 	Super::OnEnter(InLastState, InParams);
 }
 
-void UAbilityPawnStateBase::OnRefresh()
+void UAbilityPawnStateBase::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityPawnStateBase::OnLeave(UFiniteStateBase* InNextState)

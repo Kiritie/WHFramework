@@ -26,7 +26,7 @@ public:
 
 	virtual void OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
 	
-	virtual void OnRefresh() override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual bool OnLeaveValidate(UFiniteStateBase* InNextState) override;
 

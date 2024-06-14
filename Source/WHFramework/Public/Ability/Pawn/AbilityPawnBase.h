@@ -52,7 +52,7 @@ protected:
 	
 	virtual void ResetData();
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InState) override;
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
 	virtual bool HasArchive() const override { return true; }

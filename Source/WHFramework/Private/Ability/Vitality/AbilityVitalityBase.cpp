@@ -78,7 +78,7 @@ void AAbilityVitalityBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InState)
+void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 }
 

@@ -15,7 +15,7 @@ UCharacterPartBase::UCharacterPartBase(const FObjectInitializer& ObjectInitializ
 	UPrimitiveComponent::SetCollisionProfileName(TEXT("CharacterPart"));
 	InitBoxExtent(FVector(15, 15, 15));
 
-	LastOverlapVoxel = FVoxelItem();
+	OverlappingVoxel = FVoxelItem();
 }
 
 void UCharacterPartBase::BeginPlay()
@@ -34,34 +34,30 @@ void UCharacterPartBase::UpdateVoxelOverlap()
 {
 	if(!GetOwnerCharacter()) return;
 	
-	if(AVoxelChunk* Chunk = Cast<AVoxelChunk>(GetOwnerCharacter()->Execute_GetContainer(GetOwnerCharacter()).GetObject()))
+	if(AVoxelChunk* Chunk = Cast<AVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
 	{
-		const FVoxelItem& VoxelItem = Chunk->GetVoxelItem(Chunk->LocationToIndex(GetComponentLocation()), true);
-		if(VoxelItem != LastOverlapVoxel)
+		const FVoxelItem& StayingVoxel = Chunk->GetVoxelItem(Chunk->LocationToIndex(GetComponentLocation()), true);
+		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection(false));
+		if(StayingVoxel != OverlappingVoxel)
 		{
-			const FVoxelHitResult VoxelHitResult = FVoxelHitResult(VoxelItem, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection(false));
-			if(VoxelItem.IsValid())
+			if(StayingVoxel.IsValid())
 			{
-				if(LastOverlapVoxel != VoxelItem)
+				if(OverlappingVoxel.IsValid())
 				{
-					if(LastOverlapVoxel.IsValid())
-					{
-						OnExitVoxel(LastOverlapVoxel.GetVoxel(), VoxelHitResult);
-						LastOverlapVoxel = FVoxelItem::Empty;
-					}
-					LastOverlapVoxel = VoxelItem;
-					OnEnterVoxel(VoxelItem.GetVoxel(), VoxelHitResult);
+					OnExitVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
 				}
-				if(LastOverlapVoxel.IsValid())
-				{
-					OnStayVoxel(LastOverlapVoxel.GetVoxel(), VoxelHitResult);
-				}
+				OverlappingVoxel = StayingVoxel;
+				OnEnterVoxel(StayingVoxel.GetVoxel(), VoxelHitResult);
 			}
-			else if(LastOverlapVoxel.IsValid())
+			else if(OverlappingVoxel.IsValid())
 			{
-				OnExitVoxel(LastOverlapVoxel.GetVoxel(), VoxelHitResult);
-				LastOverlapVoxel = FVoxelItem::Empty;
+				OnExitVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
+				OverlappingVoxel = FVoxelItem::Empty;
 			}
+		}
+		else if(OverlappingVoxel.IsValid())
+		{
+			OnStayVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
 		}
 	}
 }

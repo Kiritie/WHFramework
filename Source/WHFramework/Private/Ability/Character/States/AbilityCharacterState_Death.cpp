@@ -53,9 +53,9 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 	Character->SetHealth(0.f);
 }
 
-void UAbilityCharacterState_Death::OnRefresh()
+void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

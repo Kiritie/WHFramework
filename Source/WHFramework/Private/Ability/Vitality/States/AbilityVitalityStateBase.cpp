@@ -22,9 +22,9 @@ void UAbilityVitalityStateBase::OnEnter(UFiniteStateBase* InLastState, const TAr
 	Super::OnEnter(InLastState, InParams);
 }
 
-void UAbilityVitalityStateBase::OnRefresh()
+void UAbilityVitalityStateBase::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
 void UAbilityVitalityStateBase::OnLeave(UFiniteStateBase* InNextState)
