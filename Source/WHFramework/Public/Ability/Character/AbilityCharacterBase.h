@@ -224,10 +224,13 @@ public:
 	virtual bool IsDying() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsFalling(bool bMovementMode = false) const;
+	virtual bool IsMoving() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsWalking(bool bMovementMode = false) const;
+	virtual bool IsFalling(bool bReally = false) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWalking(bool bReally = false) const;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsJumping() const;
@@ -246,10 +249,10 @@ public:
 	virtual void SetRaceID(FName InRaceID) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 	
 	UFUNCTION(BlueprintCallable)
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;

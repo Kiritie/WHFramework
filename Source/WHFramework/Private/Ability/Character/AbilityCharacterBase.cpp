@@ -29,7 +29,7 @@
 AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance ifyou don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
@@ -85,6 +85,23 @@ void AAbilityCharacterBase::OnPreparatory_Implementation(EPhase InPhase)
 void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(IsDead()) return;
+
+	if(IsActive())
+	{
+		if(GetMoveVelocity().Size() > 0.2f)
+		{
+			if(!IsMoving())
+			{
+				AbilitySystem->AddLooseGameplayTag(GameplayTags::StateTag_Character_Moving);
+			}
+		}
+		else if(IsMoving())
+		{
+			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Moving);
+		}
+	}
 }
 
 void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
@@ -165,7 +182,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
+		SetLevelA(SaveData.Level);
 	
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
@@ -212,7 +229,7 @@ void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AAbilityCharacterBase::BindASCInput()
 {
-	if (!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
 	{
 		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
 			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
@@ -448,14 +465,19 @@ bool AAbilityCharacterBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
-bool AAbilityCharacterBase::IsFalling(bool bMovementMode) const
+bool AAbilityCharacterBase::IsMoving() const
 {
-	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Falling) : GetCharacterMovement()->IsFalling();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Moving);
 }
 
-bool AAbilityCharacterBase::IsWalking(bool bMovementMode) const
+bool AAbilityCharacterBase::IsFalling(bool bReally) const
 {
-	return !bMovementMode ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Walking) : GetCharacterMovement()->IsWalking();
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Falling) : GetCharacterMovement()->IsFalling();
+}
+
+bool AAbilityCharacterBase::IsWalking(bool bReally) const
+{
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Walking) : GetCharacterMovement()->IsWalking();
 }
 
 bool AAbilityCharacterBase::IsJumping() const
@@ -473,7 +495,7 @@ void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 	RaceID = InRaceID;
 }
 
-bool AAbilityCharacterBase::SetLevelV(int32 InLevel)
+bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 {
 	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, CharacterData.MaxLevel != -1 ? CharacterData.MaxLevel : InLevel);
@@ -485,7 +507,7 @@ bool AAbilityCharacterBase::SetLevelV(int32 InLevel)
 		auto EffectContext = AbilitySystem->MakeEffectContext();
 		EffectContext.AddSourceObject(this);
 		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(CharacterData.PEClass, InLevel, EffectContext);
-		if (SpecHandle.IsValid())
+		if(SpecHandle.IsValid())
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
@@ -533,31 +555,31 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 {
 	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 	
-	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
-			SetLevelV(GetLevelV() + 1);
+			SetLevelA(GetLevelA() + 1);
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	else if(InAttributeChangeData.Attribute == GetHealthAttribute())
 	{
 		if(DeltaValue > 0.f)
 		{
 			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetMoveSpeedAttribute())
+	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
 	{
 		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetRotationSpeedAttribute())
+	else if(InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
 	{
 		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
 		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetJumpForceAttribute())
+	else if(InAttributeChangeData.Attribute == GetJumpForceAttribute())
 	{
 		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
 	}
@@ -569,7 +591,7 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 
 	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 
-	if (GetHealth() <= 0.f)
+	if(GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}

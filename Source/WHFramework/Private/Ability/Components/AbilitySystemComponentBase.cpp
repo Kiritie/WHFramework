@@ -1039,7 +1039,7 @@ int32 UAbilitySystemComponentBase::GetDefaultAbilityLevel() const
 	AAbilityCharacterBase* OwnerCharacter = Cast<AAbilityCharacterBase>(GetOwnerActor());
 	if (OwnerCharacter)
 	{
-		return OwnerCharacter->GetLevelV();
+		return OwnerCharacter->GetLevelA();
 	}
 	return 1;
 }

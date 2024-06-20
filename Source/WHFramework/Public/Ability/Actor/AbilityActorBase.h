@@ -145,10 +145,10 @@ public:
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const override;

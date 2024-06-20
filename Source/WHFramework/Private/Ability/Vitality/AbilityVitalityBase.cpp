@@ -193,7 +193,7 @@ bool AAbilityVitalityBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
-bool AAbilityVitalityBase::SetLevelV(int32 InLevel)
+bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
 {
 	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
@@ -227,15 +227,15 @@ UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
-			SetLevelV(GetLevelV() + 1);
+			SetLevelA(GetLevelA() + 1);
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
+	else if(InAttributeChangeData.Attribute == GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)

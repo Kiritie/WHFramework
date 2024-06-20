@@ -86,7 +86,7 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
+		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
@@ -254,7 +254,7 @@ bool AAbilityPawnBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
-bool AAbilityPawnBase::SetLevelV(int32 InLevel)
+bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 {
 	const auto& VitalityData = GetPawnData<UAbilityPawnDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
@@ -328,15 +328,15 @@ bool AAbilityPawnBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
-			SetLevelV(GetLevelV() + 1);
+			SetLevelA(GetLevelA() + 1);
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
+	else if(InAttributeChangeData.Attribute == GetHealthAttribute())
 	{
 		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
 		if(DeltaValue > 0.f)

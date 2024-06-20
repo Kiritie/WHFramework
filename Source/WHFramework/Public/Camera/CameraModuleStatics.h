@@ -37,19 +37,19 @@ public:
 	static void SetDefaultCameraPoint(ACameraPointBase* InCameraPoint);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FVector GetCameraLocation(bool bReal = false, bool bRefresh = false);
+	static FVector GetCameraLocation(bool bReally = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FRotator GetCameraRotation(bool bReal = false, bool bRefresh = false);
+	static FRotator GetCameraRotation(bool bReally = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static float GetCameraDistance(bool bReal = false, bool bRefresh = false);
+	static float GetCameraDistance(bool bReally = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static FVector GetCameraOffset(bool bReal = false, bool bRefresh = false);
+	static FVector GetCameraOffset(bool bReally = false, bool bRefresh = false);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModuleStatics")
-	static float GetCameraFov(bool bReal = false, bool bRefresh = false);
+	static float GetCameraFov(bool bReally = false, bool bRefresh = false);
 
 	template<class T>
 	static T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())

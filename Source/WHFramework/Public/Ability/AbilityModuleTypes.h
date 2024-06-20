@@ -64,8 +64,8 @@ class UAbilityInventorySlot;
 		_AttributeSet->Init##PropertyName(InValue); \
 	}
 
-#define ATTRIBUTE_DELTAVALUE_CLAMP(PropertyName, DeltaValue) \
-	DeltaValue > 0.f ? FMath::Min(DeltaValue, GetMax##PropertyName() - Get##PropertyName()) : FMath::Max(DeltaValue, -Get##PropertyName())
+#define ATTRIBUTE_DELTAVALUE_CLAMP(UserObject, PropertyName, DeltaValue) \
+	DeltaValue > 0.f ? FMath::Min(DeltaValue, UserObject->GetMax##PropertyName() - UserObject->Get##PropertyName()) : FMath::Max(DeltaValue, -UserObject->Get##PropertyName())
 
 USTRUCT()
 struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContext

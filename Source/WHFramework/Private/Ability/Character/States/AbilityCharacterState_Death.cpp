@@ -46,7 +46,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 
 	if(Killer)
 	{
-		Killer->ModifyExp(Character->GetLevelV() * 10.f);
+		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}
 
 	Character->SetExp(0);

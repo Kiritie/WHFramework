@@ -37,7 +37,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(Killer)
 	{
-		Killer->ModifyExp(Vitality->GetLevelV() * 5.f);
+		Killer->ModifyExp(Vitality->GetLevelA() * 5.f);
 	}
 
 	Vitality->SetExp(0);

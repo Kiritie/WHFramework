@@ -105,7 +105,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetLevelV(SaveData.Level);
+		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
@@ -210,7 +210,7 @@ UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 	return AbilitySystem;
 }
 
-bool AAbilityActorBase::SetLevelV(int32 InLevel)
+bool AAbilityActorBase::SetLevelA(int32 InLevel)
 {
 	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, ActorData.MaxLevel != -1 ? ActorData.MaxLevel : InLevel);
@@ -226,7 +226,6 @@ bool AAbilityActorBase::SetLevelV(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-
 		return true;
 	}
 	return false;

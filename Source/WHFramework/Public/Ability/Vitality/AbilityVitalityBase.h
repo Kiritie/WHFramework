@@ -7,7 +7,6 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
@@ -124,9 +123,9 @@ public:
 	virtual bool IsDying() const override;
 
 public:
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 	
 	virtual float GetRadius() const override { return Super::GetRadius(); }
 

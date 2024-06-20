@@ -36,7 +36,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	if(Killer)
 	{
-		Killer->ModifyExp(Pawn->GetLevelV() * 5.f);
+		Killer->ModifyExp(Pawn->GetLevelA() * 5.f);
 	}
 
 	Pawn->SetExp(0);

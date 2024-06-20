@@ -86,6 +86,7 @@ namespace GameplayTags
 	////////////////////////////////////////////////////
 	// State_Character
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Active, "State.Character.Active", "Character Active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Moving, "State.Character.Moving", "Character Moving");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Falling, "State.Character.Falling", "Character Falling");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Walking, "State.Character.Walking", "Character Walking");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Jumping, "State.Character.Jumping", "Character Jumping");
