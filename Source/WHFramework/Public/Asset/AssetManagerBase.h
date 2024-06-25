@@ -27,8 +27,6 @@ protected:
 	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetMap;
 
 public:
-	virtual void RegisterPrimaryAssetType(FPrimaryAssetType InPrimaryAssetType);
-	
 	virtual TSharedPtr<FStreamableHandle> LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority) override;
 	
 	virtual UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, bool bEnsured = true);

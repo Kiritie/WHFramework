@@ -195,12 +195,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// PrimaryAsset
 public:
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void RegisterPrimaryAssetType(FPrimaryAssetType InPrimaryAssetType)
-	{
-		UAssetManagerBase::Get().RegisterPrimaryAssetType(InPrimaryAssetType);
-	}
-
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InParams", DeterminesOutputType = "InPrimaryAssetClass", DisplayName = "LoadPrimaryAsset"), Category = "AssetModuleStatics")
 	static UPrimaryAssetBase* LoadPrimaryAsset(const FPrimaryAssetId& InPrimaryAssetId, TSubclassOf<UPrimaryAssetBase> InPrimaryAssetClass = nullptr, bool bEnsured = true)
 	{

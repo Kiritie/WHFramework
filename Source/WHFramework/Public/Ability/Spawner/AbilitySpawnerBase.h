@@ -48,9 +48,6 @@ protected:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Spawner")
-	FName SpawnerName;
-	
-	UPROPERTY(EditAnywhere, Category = "Spawner")
 	bool bAutoSpawn;
 	
 	UPROPERTY(EditAnywhere, Category = "Spawner")
@@ -66,9 +63,6 @@ public:
 #if WITH_EDITORONLY_DATA
 	UArrowComponent* GetArrowComponent() const { return ArrowComponent; }
 #endif
-	
-	UFUNCTION(BlueprintPure)
-	virtual FName GetSpawnerName() const { return SpawnerName; }
 
 	UFUNCTION(BlueprintPure)
 	virtual FAbilityItem GetAbilityItem() const { return AbilityItem; }

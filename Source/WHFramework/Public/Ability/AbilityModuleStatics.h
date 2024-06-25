@@ -69,17 +69,5 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
-	static AAbilityActorBase* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Vitality
-	static AAbilityVitalityBase* SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Pawn
-	static AAbilityPawnBase* SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Character
-	static AAbilityCharacterBase* SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AActor* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

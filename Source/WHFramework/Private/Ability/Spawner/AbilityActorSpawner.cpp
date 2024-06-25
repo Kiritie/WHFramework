@@ -56,6 +56,16 @@ AAbilityActorSpawner::AAbilityActorSpawner()
 #endif
 }
 
+void AAbilityActorSpawner::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	const auto& ActorData = AbilityItem.GetData<UAbilityActorDataBase>(false);
+	
+	GetCapsuleComponent()->SetCapsuleRadius(ActorData.Radius);
+	GetCapsuleComponent()->SetCapsuleHalfHeight(ActorData.HalfHeight);
+}
+
 AActor* AAbilityActorSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
 	const auto& ActorData = InAbilityItem.GetData<UAbilityActorDataBase>();
@@ -68,9 +78,7 @@ AActor* AAbilityActorSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbi
 	SaveData.SpawnRotation = GetActorRotation();
 	SaveData.InventoryData = ActorData.InventoryData;
 
-	AAbilityActorBase* Actor = UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
-
-	return Actor;
+	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
 }
 
 void AAbilityActorSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

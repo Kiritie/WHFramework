@@ -56,22 +56,7 @@ AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FSaveData* InSaveD
 	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer);
 }
 
-AAbilityActorBase* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
-}
-
-AAbilityCharacterBase* UAbilityModuleStatics::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityCharacter(InSaveData, InContainer);
-}
-
-AAbilityPawnBase* UAbilityModuleStatics::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityPawn(InSaveData, InContainer);
-}
-
-AAbilityVitalityBase* UAbilityModuleStatics::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityVitality(InSaveData, InContainer);
 }

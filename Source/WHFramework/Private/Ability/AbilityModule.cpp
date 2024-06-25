@@ -62,10 +62,6 @@ void UAbilityModule::OnDestroy()
 void UAbilityModule::OnInitialize()
 {
 	Super::OnInitialize();
-	
-	DON_WITHINDEX(UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")), i,
-		if(i > 0) UAssetModuleStatics::RegisterPrimaryAssetType(*UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), i));
-	);
 
 	UAssetModuleStatics::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
 }
@@ -201,64 +197,17 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 	return PickUp;
 }
 
-AAbilityActorBase* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AAbilityActorBase* Actor = UObjectPoolModuleStatics::SpawnObject<AAbilityActorBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityActorDataBase>().Class))
 	{
-		Actor->LoadSaveData(InSaveData);
+		Cast<ISaveDataInterface>(Actor)->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Actor);
 		}
 		return Actor;
-	}
-	return nullptr;
-}
-
-AAbilityVitalityBase* UAbilityModule::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
-	if(AAbilityVitalityBase* Vitality = UObjectPoolModuleStatics::SpawnObject<AAbilityVitalityBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityVitalityDataBase>().Class))
-	{
-		Vitality->LoadSaveData(InSaveData);
-		if(InContainer)
-		{
-			InContainer->AddSceneActor(Vitality);
-		}
-		return Vitality;
-	}
-	return nullptr;
-}
-
-AAbilityPawnBase* UAbilityModule::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
-	if(AAbilityPawnBase* Pawn = UObjectPoolModuleStatics::SpawnObject<AAbilityPawnBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityPawnDataBase>().Class))
-	{
-		Pawn->LoadSaveData(InSaveData);
-		Pawn->SpawnDefaultController();
-		if(InContainer)
-		{
-			InContainer->AddSceneActor(Pawn);
-		}
-		return Pawn;
-	}
-	return nullptr;
-}
-
-AAbilityCharacterBase* UAbilityModule::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	auto& SaveData = InSaveData->CastRef<FCharacterSaveData>();
-	if(AAbilityCharacterBase* Character = UObjectPoolModuleStatics::SpawnObject<AAbilityCharacterBase>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityCharacterDataBase>().Class))
-	{
-		Character->LoadSaveData(InSaveData);
-		Character->SpawnDefaultController();
-		if(InContainer)
-		{
-			InContainer->AddSceneActor(Character);
-		}
-		return Character;
 	}
 	return nullptr;
 }

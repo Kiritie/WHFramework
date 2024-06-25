@@ -8,6 +8,7 @@
 
 #include "AbilityModule.generated.h"
 
+class IAbilityActorInterface;
 class AAbilityItemBase;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
@@ -66,20 +67,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
 public:
-	virtual AAbilityActorBase* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Vitality
-public:
-	virtual AAbilityVitalityBase* SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Pawn
-public:
-	virtual AAbilityPawnBase* SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Character
-public:
-	virtual AAbilityCharacterBase* SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AActor* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

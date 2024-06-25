@@ -35,6 +35,8 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(FName("StimuliSource"));
 	StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
 	StimuliSource->RegisterForSense(UAISense_Damage::StaticClass());

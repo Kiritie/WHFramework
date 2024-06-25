@@ -4,6 +4,7 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/ArrowComponent.h"
@@ -63,15 +64,13 @@ AActor* AAbilityCharacterSpawner::SpawnImpl_Implementation(const FAbilityItem& I
 	auto SaveData = FCharacterSaveData();
 	SaveData.AssetID = CharacterData.GetPrimaryAssetId();
 	SaveData.Name = *CharacterData.Name.ToString();
-	SaveData.RaceID = NAME_None;
+	SaveData.RaceID = CharacterData.RaceID;
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 	SaveData.InventoryData = CharacterData.InventoryData;
 
-	AAbilityCharacterBase* Character = UAbilityModuleStatics::SpawnAbilityCharacter(&SaveData);
-
-	return Character;
+	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
 }
 
 void AAbilityCharacterSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

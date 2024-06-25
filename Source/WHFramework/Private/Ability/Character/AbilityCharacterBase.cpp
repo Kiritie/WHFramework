@@ -32,6 +32,8 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance ifyou don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	AutoPossessAI = EAutoPossessAI::Disabled;
+	
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
@@ -65,8 +67,6 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 
 	MovementRate = 1;
 	RotationRate = 1;
-
-	AutoPossessAI = EAutoPossessAI::Disabled;
 }
 
 void AAbilityCharacterBase::OnInitialize_Implementation()
@@ -116,6 +116,8 @@ void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArra
 	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
+
+	SpawnDefaultController();
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)

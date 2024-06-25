@@ -12,7 +12,7 @@
 
 AAbilityPawnSpawner::AAbilityPawnSpawner()
 {
-	GetCapsuleComponent()->InitCapsuleSize(50, 50.0f);
+	GetCapsuleComponent()->InitCapsuleSize(50.f, 50.0f);
 
 #if WITH_EDITORONLY_DATA
 	if (!IsRunningCommandlet())
@@ -63,15 +63,13 @@ AActor* AAbilityPawnSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbil
 	auto SaveData = FPawnSaveData();
 	SaveData.AssetID = PawnData.GetPrimaryAssetId();
 	SaveData.Name = *PawnData.Name.ToString();
-	SaveData.RaceID = NAME_None;
+	SaveData.RaceID = PawnData.RaceID;
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnLocation = GetActorLocation();
 	SaveData.SpawnRotation = GetActorRotation();
 	SaveData.InventoryData = PawnData.InventoryData;
 
-	AAbilityPawnBase* Pawn = UAbilityModuleStatics::SpawnAbilityPawn(&SaveData);
-
-	return Pawn;
+	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
 }
 
 void AAbilityPawnSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

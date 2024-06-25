@@ -22,6 +22,8 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	AutoPossessAI = EAutoPossessAI::Disabled;
+
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
@@ -47,20 +49,13 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 
 void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
-	USceneModuleStatics::AddSceneActor(this);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	InitializeAbilitySystem();
 
 	FSM->SwitchDefaultState();
+
+	SpawnDefaultController();
 }
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
