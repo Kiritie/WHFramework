@@ -10,6 +10,7 @@
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Scene/SceneModuleStatics.h"
 
 AAbilityPickUpBase::AAbilityPickUpBase()
 {
@@ -33,7 +34,7 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	FallingComponent->TraceChannel = UAbilityModuleStatics::GetPickUpTraceChannel();
+	FallingComponent->TraceChannel = USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel();
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

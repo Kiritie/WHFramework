@@ -5,6 +5,7 @@
 #include "Debug/Widget/SDebugPanelWidget.h"
 #include "Gameplay/WHGameState.h"
 #include "Gameplay/WHPlayerController.h"
+#include "Main/MainModule.h"
 #include "Widget/WidgetModuleStatics.h"
 
 AWHGameMode::AWHGameMode()
@@ -18,22 +19,31 @@ AWHGameMode::AWHGameMode()
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-	
+
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 {
-	
+	if(AMainModule* MainModule = AMainModule::GetPtr())
+	{
+		MainModule->Execute_OnPreparatory(MainModule, InPhase);
+	}
 }
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
-	
+	if(AMainModule* MainModule = AMainModule::GetPtr())
+	{
+		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
+	}
 }
 
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
-	
+	if(AMainModule* MainModule = AMainModule::GetPtr())
+	{
+		MainModule->Execute_OnTermination(MainModule, InPhase);
+	}
 }
 
 bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor)

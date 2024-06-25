@@ -228,7 +228,7 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosi
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
 		IgnoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, RayStart, RayEnd, UCommonStatics::GetGameTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, RayStart, RayEnd, UEngineTypes::ConvertToTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }

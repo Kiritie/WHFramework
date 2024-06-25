@@ -75,6 +75,26 @@ UWorldWeather* USceneModuleStatics::GetWorldWeather(TSubclassOf<UWorldWeather> I
 	return USceneModule::Get().GetWorldWeather(InClass);
 }
 
+bool USceneModuleStatics::HasTraceMapping(const FName& InName, bool bEnsured)
+{
+	return USceneModule::Get().HasTraceMapping(InName, bEnsured);
+}
+
+FTraceMapping USceneModuleStatics::GetTraceMapping(const FName& InName, bool bEnsured)
+{
+	return USceneModule::Get().GetTraceMapping(InName, bEnsured);
+}
+
+void USceneModuleStatics::AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel)
+{
+	USceneModule::Get().AddTraceMapping(InName, InTraceChannel);
+}
+
+void USceneModuleStatics::RemoveTraceMapping(const FName& InName)
+{
+	USceneModule::Get().RemoveTraceMapping(InName);
+}
+
 void USceneModuleStatics::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	USceneModule::Get().AsyncLoadLevel(InLevelPath, OnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);

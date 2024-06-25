@@ -70,6 +70,20 @@ public:
 	static UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Traces
+	UFUNCTION(BlueprintPure)
+	static bool HasTraceMapping(const FName& InName, bool bEnsured = true);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static FTraceMapping GetTraceMapping(const FName& InName, bool bEnsured = true);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void RemoveTraceMapping(const FName& InName);
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Level
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncLoadLevelFinished"), Category = "SceneModuleStatics")
 	static void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);

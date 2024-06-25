@@ -135,24 +135,6 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
-void AMainModule::BeginPlay()
-{
-	Super::BeginPlay();
-
-	Execute_OnPreparatory(this, EPhase::Primary);
-	Execute_OnPreparatory(this, EPhase::Lesser);
-	Execute_OnPreparatory(this, EPhase::Final);
-}
-
-void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	Execute_OnTermination(this, EPhase::Primary);
-	Execute_OnTermination(this, EPhase::Lesser);
-	Execute_OnTermination(this, EPhase::Final);
-}
-
 void AMainModule::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

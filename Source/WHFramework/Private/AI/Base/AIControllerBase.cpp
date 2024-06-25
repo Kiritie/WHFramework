@@ -144,24 +144,27 @@ void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 
 	UBehaviorTree* BehaviorTree = OwnerAgent->GetBehaviorTreeAsset();
 	
-	if(!BehaviorTree || SourceBehaviorTree == BehaviorTree) return;
-	
-	SourceBehaviorTree = BehaviorTree;
-	CurrentBehaviorTree = DuplicateObject<UBehaviorTree>(SourceBehaviorTree, this);
+	if(!BehaviorTree) return;
 
-	if(SourceBlackboard != CurrentBehaviorTree->BlackboardAsset)
+	if(SourceBehaviorTree != BehaviorTree)
 	{
-		SourceBlackboard = Cast<UAIBlackboardBase>(CurrentBehaviorTree->BlackboardAsset);
-		CurrentBlackboard = DuplicateObject<UAIBlackboardBase>(SourceBlackboard, this);
+		SourceBehaviorTree = BehaviorTree;
+		CurrentBehaviorTree = DuplicateObject<UBehaviorTree>(SourceBehaviorTree, this);
 
-		UBlackboardComponent* BlackboardComp;
-		if(UseBlackboard(CurrentBlackboard, BlackboardComp))
+		if(SourceBlackboard != CurrentBehaviorTree->BlackboardAsset)
 		{
-			CurrentBlackboard->Initialize(BlackboardComp);
-		}
-	}
-	CurrentBehaviorTree->BlackboardAsset = CurrentBlackboard;
+			SourceBlackboard = Cast<UAIBlackboardBase>(CurrentBehaviorTree->BlackboardAsset);
+			CurrentBlackboard = DuplicateObject<UAIBlackboardBase>(SourceBlackboard, this);
 
+			UBlackboardComponent* BlackboardComp;
+			if(UseBlackboard(CurrentBlackboard, BlackboardComp))
+			{
+				CurrentBlackboard->Initialize(BlackboardComp);
+			}
+		}
+		CurrentBehaviorTree->BlackboardAsset = CurrentBlackboard;
+	}
+	
 	if(bAutoRun)
 	{
 		RunBehaviorTree(CurrentBehaviorTree);

@@ -6,6 +6,7 @@
 #include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
+#include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Raw/AbilityRawDataBase.h"
@@ -18,6 +19,10 @@
 #include "Ability/PickUp/AbilityPickUpRaw.h"
 #include "Ability/PickUp/AbilityPickUpSkill.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Ability/Item/Equip/AbilityEquipBase.h"
+#include "Ability/Item/Prop/AbilityPropBase.h"
+#include "Ability/Item/Raw/AbilityRawBase.h"
+#include "Ability/Item/Skill/AbilitySkillBase.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Asset/AssetModuleStatics.h"
@@ -90,9 +95,53 @@ void UAbilityModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-ECollisionChannel UAbilityModule::GetPickUpTraceChannel() const
+AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	return ECC_MAX;
+	AAbilityItemBase* Item = nullptr;
+	switch (InItem.GetType())
+	{
+		case EAbilityItemType::Prop:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(nullptr, nullptr, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
+			break;
+		}
+		case EAbilityItemType::Equip:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(nullptr, nullptr, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
+			break;
+		}
+		case EAbilityItemType::Skill:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilitySkillBase>(nullptr, nullptr, false, InItem.GetData<UAbilitySkillDataBase>().SkillClass);
+			break;
+		}
+		case EAbilityItemType::Raw:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(nullptr, nullptr, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
+			break;
+		}
+		default: break;
+	}
+
+	if(Item)
+	{
+		Item->SetActorLocationAndRotation(InLocation, InRotation);
+		if(InContainer)
+		{
+			InContainer->AddSceneActor(Item);
+		}
+	}
+	return Item;
+}
+
+AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
+{
+	AAbilityItemBase* Item = SpawnAbilityItem(InItem);
+	if(Item)
+	{
+		Item->Initialize(InOwnerActor, InItem);
+	}
+	return Item;
 }
 
 AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)

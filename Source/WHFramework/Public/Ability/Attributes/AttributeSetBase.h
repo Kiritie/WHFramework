@@ -32,6 +32,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	float GetAttributeValue(FGameplayAttribute InAttribute);
 
+	UFUNCTION(BlueprintPure)
+	float GetAttributeBaseValue(FGameplayAttribute InAttribute);
+
 	UFUNCTION(BlueprintCallable)
 	void SetAttributeValue(FGameplayAttribute InAttribute, float InValue);
 

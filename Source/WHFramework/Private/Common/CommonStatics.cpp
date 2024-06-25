@@ -113,11 +113,6 @@ void UCommonStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference,
 	UKismetSystemLibrary::QuitGame(GetWorldContext(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
 
-ETraceTypeQuery UCommonStatics::GetGameTraceType(ECollisionChannel InTraceChannel)
-{
-	return UEngineTypes::ConvertToTraceType(InTraceChannel);
-}
-
 bool UCommonStatics::IsInScreenViewport(const FVector& InWorldLocation)
 {
 	const UWHLocalPlayer* LP = GetLocalPlayer();

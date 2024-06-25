@@ -79,7 +79,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(true);
+	Character->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -95,7 +95,7 @@ void UAbilityCharacterState_Death::DeathStart()
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
+	Character->GetInteractionComponent()->SetInteractable(false);
 }
 
 void UAbilityCharacterState_Death::DeathEnd()

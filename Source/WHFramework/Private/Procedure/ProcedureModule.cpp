@@ -136,21 +136,35 @@ void UProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
 
 void UProcedureModule::SwitchProcedureByIndex(int32 InIndex)
 {
-	if(HasProcedureByIndex(InIndex))
+	if(InIndex != -1)
 	{
-		SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InIndex));
+		if(HasProcedureByIndex(InIndex))
+		{
+			SwitchProcedure(GetProcedureByIndex<UProcedureBase>(InIndex));
+		}
+		else
+		{
+			WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InIndex), EDM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		}
 	}
 	else
 	{
-		WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定索引的流程: %d"), InIndex), EDM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		SwitchProcedure(nullptr);
 	}
 }
 
 void UProcedureModule::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	if(HasProcedureByClass<UProcedureBase>(InClass))
+	if(InClass)
 	{
-		SwitchProcedure(GetProcedureByClass<UProcedureBase>(InClass));
+		if(HasProcedureByClass<UProcedureBase>(InClass))
+		{
+			SwitchProcedure(GetProcedureByClass<UProcedureBase>(InClass));
+		}
+		else
+		{
+			WHDebug(FString::Printf(TEXT("切换流程失败，不存在指定类型的流程: %s"), *InClass->GetName()), EDM_All, EDC_Procedure, EDV_Warning, FColor::Red, 5.f);
+		}
 	}
 	else
 	{

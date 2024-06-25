@@ -7,7 +7,6 @@
 #include "Character/Base/CharacterBase.h"
 #include "BehaviorTree/BehaviorTree.h"
 
-
 UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bNotifyTick = true;
@@ -65,4 +64,9 @@ EBTNodeResult::Type UAITaskBase::ExecuteTask(UBehaviorTreeComponent& OwnerComp, 
 void UAITaskBase::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
 	
+}
+
+APawn* UAITaskBase::GetAgent(TSubclassOf<APawn> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
 }

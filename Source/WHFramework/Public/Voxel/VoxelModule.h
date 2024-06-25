@@ -185,10 +185,6 @@ public:
 	virtual FIndex NumberToVoxelIndex(int32 InNumber) const;
 
 public:
-	virtual ECollisionChannel GetChunkTraceChannel() const;
-	
-	virtual ECollisionChannel GetVoxelTraceChannel() const;
-
 	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
 
 	virtual bool VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);

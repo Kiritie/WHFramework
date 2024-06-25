@@ -41,6 +41,11 @@ class UAbilityInventorySlot;
 	{ \
 		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
 		return _AttributeSet->Get##PropertyName(); \
+	}\
+	FORCEINLINE float GetBase##PropertyName() const \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		return _AttributeSet->GetBase##PropertyName(); \
 	}
 
 #define ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \

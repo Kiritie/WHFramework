@@ -475,6 +475,38 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 	}
 }
 
+bool USceneModule::HasTraceMapping(const FName& InName, bool bEnsured) const
+{
+	if(TraceMappings.Contains(InName)) return true;
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No trace mapping, trace name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
+	return false;
+}
+
+FTraceMapping USceneModule::GetTraceMapping(const FName& InName, bool bEnsured) const
+{
+	if(HasTraceMapping(InName, bEnsured))
+	{
+		return TraceMappings[InName];
+	}
+	return FTraceMapping();
+}
+
+void USceneModule::AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel)
+{
+	if(!TraceMappings.Contains(InName))
+	{
+		TraceMappings.Add(InName, InTraceChannel);
+	}
+}
+
+void USceneModule::RemoveTraceMapping(const FName& InName)
+{
+	if(TraceMappings.Contains(InName))
+	{
+		TraceMappings.Remove(InName);
+	}
+}
+
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(FGuid(InID))) return true;

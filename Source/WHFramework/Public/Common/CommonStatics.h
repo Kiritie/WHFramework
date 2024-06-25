@@ -88,11 +88,6 @@ public:
 	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Trace
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static ETraceTypeQuery GetGameTraceType(ECollisionChannel InTraceChannel);
-
-	//////////////////////////////////////////////////////////////////////////
 	// Viewport
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool IsInScreenViewport(const FVector& InWorldLocation);

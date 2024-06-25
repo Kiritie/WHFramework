@@ -8,6 +8,7 @@
 #include "Math/MathStatics.h"
 #include "AbilityModuleStatics.generated.h"
 
+class AAbilityItemBase;
 class AAbilityActorBase;
 class UAbilitySystemComponentBase;
 class UGameplayAbility;
@@ -53,12 +54,16 @@ public:
 		}
 		return OutDatas.Num() > 0;
 	}
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Item
+	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, FRotator InRotation = FRotator::ZeroRotator, ISceneContainerInterface* InContainer = nullptr);
+
+	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor);
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
-	static ECollisionChannel GetPickUpTraceChannel();
-
-	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, ISceneContainerInterface* InContainer = nullptr);
 
 	static AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 

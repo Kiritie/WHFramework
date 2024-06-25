@@ -44,6 +44,11 @@ float UAttributeSetBase::GetAttributeValue(FGameplayAttribute InAttribute)
 	return GetAttributeData(InAttribute).GetCurrentValue();
 }
 
+float UAttributeSetBase::GetAttributeBaseValue(FGameplayAttribute InAttribute)
+{
+	return GetAttributeData(InAttribute).GetBaseValue();
+}
+
 void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();

@@ -8,6 +8,7 @@
 
 #include "AbilityModule.generated.h"
 
+class AAbilityItemBase;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPickUpBase;
@@ -49,11 +50,16 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	// Item
+public:
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, FRotator InRotation = FRotator::ZeroRotator, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor);
+
+	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	virtual ECollisionChannel GetPickUpTraceChannel() const;
-
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, ISceneContainerInterface* InContainer = nullptr);
 
 	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 

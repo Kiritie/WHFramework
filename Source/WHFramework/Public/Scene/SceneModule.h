@@ -169,6 +169,25 @@ protected:
 	void OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// Traces
+protected:
+	UPROPERTY(EditAnywhere, Category = "Traces")
+	TMap<FName, FTraceMapping> TraceMappings;
+
+public:
+	UFUNCTION(BlueprintPure)
+	virtual bool HasTraceMapping(const FName& InName, bool bEnsured = true) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual FTraceMapping GetTraceMapping(const FName& InName, bool bEnsured = true) const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void RemoveTraceMapping(const FName& InName);
+
+	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor
 protected:
 	UPROPERTY(EditAnywhere, Category = "SceneActor")

@@ -9,6 +9,35 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath)
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
 
 /**
+ *
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTraceMapping
+{
+	GENERATED_BODY()
+
+public:
+	FTraceMapping()
+	{
+		TraceChannel = ECC_GameTraceChannel1;
+	}
+
+	FTraceMapping(ECollisionChannel InTraceChannel)
+	{
+		TraceChannel = InTraceChannel;
+	}
+
+protected:
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<ECollisionChannel> TraceChannel;
+
+public:
+	ECollisionChannel GetTraceChannel() const;
+	
+	ETraceTypeQuery GetTraceType() const;
+};
+
+/**
 * 世界小地图模式
 */
 UENUM(BlueprintType)

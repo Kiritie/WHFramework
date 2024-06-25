@@ -36,9 +36,14 @@ bool UAbilityModuleStatics::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> 
 	return false;
 }
 
-ECollisionChannel UAbilityModuleStatics::GetPickUpTraceChannel()
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	return UAbilityModule::Get().GetPickUpTraceChannel();
+	return UAbilityModule::Get().SpawnAbilityItem(InItem, InLocation, InRotation, InContainer);
+}
+
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
+{
+	return UAbilityModule::Get().SpawnAbilityItem(InItem, InOwnerActor);
 }
 
 AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
