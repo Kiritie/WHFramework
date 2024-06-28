@@ -182,7 +182,11 @@ public:
 		const FName WidgetName = T::WidgetName;
 		if(!AllEditorWidgets.Contains(WidgetName) || bForce)
 		{
-			AllEditorWidgets.Add(WidgetName, InWidget);
+			if(TSharedPtr<T> OldWidget = GetEditorWidget<T>())
+			{
+				OldWidget->Destroy();
+			}
+			AllEditorWidgets.Emplace(WidgetName, InWidget);
 			InWidget->_WidgetName = WidgetName;
 			if(InParent)
 			{
@@ -190,20 +194,26 @@ public:
 			}
 			if(bAutoOpen)
 			{
-				InWidget->Open(true);
+				InWidget->Open(nullptr, true);
 			}
 		}
 		return InWidget;
 	}
-	
+		
 	template<class T>
-	bool OpenEditorWidget(bool bInstant = false, FName InName = T::WidgetName)
+	bool OpenEditorWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
+	{
+		return OpenEditorWidget<T>(InParams ? *InParams : TArray<FParameter>(), bInstant, InName);
+	}
+
+	template<class T>
+	bool OpenEditorWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<T> EditorWidget = GetEditorWidget<T>(InName))
 		{
 			if(EditorWidget->GetWidgetState() != EEditorWidgetState::Opened)
 			{
-				EditorWidget->OnOpen(bInstant);
+				EditorWidget->OnOpen(InParams, bInstant);
 			}
 			return true;
 		}

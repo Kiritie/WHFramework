@@ -12,32 +12,41 @@ void SEditorTabLabel::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SHorizontalBox)
-
-		+SHorizontalBox::Slot()
-		.HAlign(HAlign_Left)
-		.VAlign(VAlign_Center)
-		.Padding(FMargin(0.f, 0.f, 4.f, 0.f))
-		.AutoWidth()
-		[
-			SNew(SBox)
-			.WidthOverride(InArgs._IconWidth)
-			.HeightOverride(InArgs._IconHeight)
-			[
-				SNew(SImage)
-				.Image(InArgs._Icon)
-				.Visibility_Lambda([InArgs]() { return InArgs._Icon.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
-			]
-		]
 		
 		+SHorizontalBox::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Center)
-		.AutoWidth()
+		.FillWidth(1.f)
 		[
-			SNew(STextBlock)
-			.Text(InArgs._Label)
-			.Font(InArgs._LabelFont)
-			.ColorAndOpacity(InArgs._LabelColor)
+			SNew(SHorizontalBox)
+			.Clipping(EWidgetClipping::ClipToBoundsAlways)
+
+			+SHorizontalBox::Slot()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			.Padding(FMargin(0.f, 0.f, 4.f, 0.f))
+			.AutoWidth()
+			[
+				SNew(SBox)
+				.WidthOverride(InArgs._IconWidth)
+				.HeightOverride(InArgs._IconHeight)
+				[
+					SNew(SImage)
+					.Image(InArgs._Icon)
+					.Visibility_Lambda([InArgs]() { return InArgs._Icon.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+				]
+			]
+			
+			+SHorizontalBox::Slot()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			.AutoWidth()
+			[
+				SNew(STextBlock)
+				.Text(InArgs._Label)
+				.Font(InArgs._LabelFont)
+				.ColorAndOpacity(InArgs._LabelColor)
+			]
 		]
 		
 		+SHorizontalBox::Slot()

@@ -215,6 +215,11 @@ public:
 		*this = MakePointer(InValue);
 	}
 
+	FParameter(const void* InValue)
+	{
+		*this = MakePointer(InValue);
+	}
+
 	friend bool operator==(const FParameter& A, const FParameter& B)
 	{
 		switch (A.ParameterType)
@@ -473,6 +478,8 @@ public:
 
 	void SetPointerValue(void* InValue) { PointerValue = InValue; }
 
+	void SetPointerValue(const void* InValue) { PointerValue = const_cast<void*>(InValue); }
+
 public:
 	static FParameter MakeInteger(int32 InValue, const FText& InDescription = FText::GetEmpty())
 	{
@@ -662,6 +669,15 @@ public:
 		Parameter.ParameterType = EParameterType::Delegate;
 		Parameter.Description = InDescription;
 		Parameter.SetDelegateValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakePointer(const void* InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Pointer;
+		Parameter.Description = InDescription;
+		Parameter.SetPointerValue(InValue);
 		return Parameter;
 	}
 

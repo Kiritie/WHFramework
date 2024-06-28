@@ -16,9 +16,16 @@ class AAbilityEquipBase;
 class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlot;
 
+#define GAMEPLAYATTRIBUTE_VALUE_GETTERBASE(PropertyName) \
+	FORCEINLINE float GetBase##PropertyName() const \
+	{ \
+		return PropertyName.GetBaseValue(); \
+	}
+
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_GETTERBASE(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 

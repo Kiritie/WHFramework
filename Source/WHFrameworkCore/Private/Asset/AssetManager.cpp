@@ -81,6 +81,18 @@ bool FAssetManager::ContainsAssetByCondition(const TFunction<bool(FUniqueAssetDa
 	return false;
 }
 
+bool FAssetManager::ContainsAssetsByType(FUniqueType InAssetType) const
+{
+	for (auto& Iter : AssetMap)
+	{
+		if (Iter.Value->GetType().IsA(InAssetType))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 FUniqueAssetData* FAssetManager::LoadAssetByID(const FUniqueAssetID& InAssetID, bool bEnsured)
 {
 	FUniqueAssetData* LoadedAsset = nullptr;

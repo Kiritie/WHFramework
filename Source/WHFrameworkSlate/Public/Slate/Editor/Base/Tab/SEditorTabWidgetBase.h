@@ -32,7 +32,7 @@ class WHFRAMEWORKSLATE_API SEditorTabWidgetBase : public SEditorWidgetBase
 	static const FName WidgetName;
 
 protected:
-	virtual void OnOpen(bool bInstant) override;
+	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 	
 	virtual void OnClose(bool bInstant) override;
 

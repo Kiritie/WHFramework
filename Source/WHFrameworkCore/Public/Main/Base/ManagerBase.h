@@ -21,6 +21,10 @@ public:
 	*/
 	virtual void OnInitialize();
 	/**
+	* 当准备
+	*/
+	virtual void OnPreparatory();
+	/**
 	* 当重置
 	*/
 	virtual void OnReset();

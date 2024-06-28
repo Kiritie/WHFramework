@@ -28,9 +28,9 @@ public:
 
 	virtual void OnInitialize() override;
 
-	virtual void OnOpen(bool bInstant = false) override;
+	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
-	virtual void OnClose(bool bInstant = false) override;
+	virtual void OnClose(bool bInstant) override;
 
 	virtual void OnSave() override;
 	
@@ -57,7 +57,9 @@ protected:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 public:
-	virtual void Open(bool bInstant = false) override;
+	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false);
+	
+	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false);
 
 	virtual void Close(bool bInstant = false) override;
 

@@ -84,6 +84,14 @@ public:
 		return false;
 	}
 
+	virtual bool ContainsAssetsByType(FUniqueType InAssetType) const;
+	
+	template<class T>
+	bool ContainsAssetsByType(FUniqueType InAssetType = T::Type)
+	{
+		return ContainsAssetsByType(InAssetType);
+	}
+
 	virtual FUniqueAssetData* LoadAssetByID(const FUniqueAssetID& InAssetID, bool bEnsured = true);
 
 	template<class T>

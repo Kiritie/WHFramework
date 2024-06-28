@@ -57,7 +57,7 @@ public:
 	SEditorTabGroup();
 
 public:
-	void SetActivedTabIndex(int32 InIndex, ESelectInfo::Type InSelectInfo);
+	void SetActivedTabIndex(int32 InIndex, ESelectInfo::Type InSelectInfo = ESelectInfo::Type::Direct);
 
 private:
 	TSharedPtr<SHorizontalBox> HBox_Tabs;

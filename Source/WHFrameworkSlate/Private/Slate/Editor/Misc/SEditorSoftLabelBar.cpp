@@ -32,9 +32,11 @@ void SEditorSoftLabelBar::Construct(const FArguments& InArgs)
 		[
 			SNew(SButton)
 			.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.Tab.Default"))
-			.OnClicked_Lambda([this, InArgs, i]()
+			.ContentPadding(FMargin(0.f))
+			.Visibility_Lambda([this, i](){ return SortLabels[i].bSortable ? EVisibility::Visible : EVisibility::HitTestInvisible; })
+			.OnClicked_Lambda([this, i]()
 			{
-				if(!SortLabels[i].Label.IsEmpty())
+				if(!SortLabels[i].Label.Get().IsEmpty())
 				{
 					if(SortLabelIndex != i)
 					{
@@ -64,7 +66,7 @@ void SEditorSoftLabelBar::Construct(const FArguments& InArgs)
 					SNew(STextBlock)
 					.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
 					.Text(SortLabels[i].Label)
-					.ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f))
+					// .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f))
 				]
 
 				+SHorizontalBox::Slot()
@@ -74,7 +76,7 @@ void SEditorSoftLabelBar::Construct(const FArguments& InArgs)
 				.AutoWidth()
 				[
 					SNew(SImage)
-					.Visibility_Lambda([this, InArgs, i](){ return !SortLabels[i].Label.IsEmpty() && SortLabelIndex == i ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+					.Visibility_Lambda([this, i](){ return !SortLabels[i].Label.Get().IsEmpty() && SortLabelIndex == i ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 					.Image_Lambda([this](){ return SortLabelAscending ? FWHFrameworkSlateStyle::Get().GetBrush("Icons.Arrow_Up") :  FWHFrameworkSlateStyle::Get().GetBrush("Icons.Arrow_Down"); })
 				]
 			]

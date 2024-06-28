@@ -54,6 +54,24 @@ public:
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 
 	//////////////////////////////////////////////////////////////////////////
+	// String
+	static bool SortString(const FString& InStr1, const FString& InStr2)
+	{
+		int32 Num1 = 0;
+		int32 Num2 = 0;
+		for(int32 k = 0; k < (InStr1.Len() < InStr2.Len() ? InStr1.Len() : InStr2.Len()); k++)
+		{
+			Num1 = InStr1.GetCharArray()[k];
+			Num2 = InStr2.GetCharArray()[k];
+			if(Num1 != Num2)
+			{
+				break;
+			}
+		}
+		return Num1 >= Num2;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
 	// Array
 	template<class T>
 	static void SortStringElementArray(TArray<T>& InArray, const TFunction<FString(const T&)>& InElementFunc, bool bAscending = true)
@@ -64,18 +82,7 @@ public:
 			{
 				const FString Str1 = InElementFunc(InArray[i]);
 				const FString Str2 = InElementFunc(InArray[j]);
-				int32 Num1 = 0;
-				int32 Num2 = 0;
-				for(int32 k = 0; k < (Str1.Len() < Str2.Len() ? Str1.Len() : Str2.Len()); k++)
-				{
-					Num1 = Str1.GetCharArray()[k];
-					Num2 = Str2.GetCharArray()[k];
-					if(Num1 != Num2)
-					{
-						break;
-					}
-				}
-				if(bAscending ? Num1 > Num2 : Num1 < Num2)
+				if(bAscending ? SortString(Str1, Str2) : !SortString(Str1, Str2))
 				{
 					InArray.Swap(i, j);
 				}

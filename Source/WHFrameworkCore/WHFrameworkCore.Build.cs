@@ -32,7 +32,8 @@ public class WHFrameworkCore : ModuleRules
 				"zlib",
 				"ImageWrapper",
 				"Engine",
-				"GameplayTags"
+				"GameplayTags",
+				"EngineSettings"
 			}
 		);
 		

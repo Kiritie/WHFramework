@@ -31,6 +31,13 @@ void FInputManager::OnInitialize()
 	AddInputManager(this);
 }
 
+void FInputManager::OnPreparatory()
+{
+	FManagerBase::OnPreparatory();
+
+	UpdateInputMode();
+}
+
 void FInputManager::OnReset()
 {
 	FManagerBase::OnReset();

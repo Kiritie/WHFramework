@@ -4,6 +4,7 @@
 #include "HAL/PlatformFilemanager.h"
 #include "Misc/Paths.h"
 #include "Async/Async.h"
+#include "Debug/DebugTypes.h"
 #include "Main/MainManager.h"
 #if PLATFORM_WINDOWS
 #include <windows.h>
@@ -26,18 +27,17 @@ FZipManager::~FZipManager()
 
 bool FZipManager::Pack(const FString& InZipFile, const FString& InOriginDirectory, const FString& InIgnoreFile)
 {
-    TRACE_CPUPROFILER_EVENT_SCOPE_TEXT("MW_UMWZip_Pack")
     static IPlatformFile& pf = FPlatformFileManager::Get().GetPlatformFile();
     if (pf.FileExists(*InZipFile))
     {
-        UE_LOG(LogTemp, Error, TEXT("mwzip pack failed! zip path already exist! %s"), *InZipFile)
+        WHLog(FString::Printf(TEXT("zip pack failed! zip path already exist! %s"), *InZipFile), EDC_Zip, EDV_Error);
         return false;
     }
     int err;
     zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_CREATE, &err);
     if (!Archive)
     {
-        UE_LOG(LogTemp, Error, TEXT("mwzip pack failed! zip_open failed(%d): %s"), err, *InZipFile)
+        WHLog(FString::Printf(TEXT("zip pack failed! zip_open failed(%d): %s"), err, *InZipFile), EDC_Zip, EDV_Error);
         return false;
     }
     const FString d = InOriginDirectory / FString();
@@ -63,7 +63,7 @@ bool FZipManager::Pack(const FString& InZipFile, const FString& InOriginDirector
     err = zip_close(Archive);
     if (err != 0)
     {
-        UE_LOG(LogTemp, Error, TEXT("mwzip pack warning! zip_close failed(%d): %s"), err, *InZipFile)
+        WHLog(FString::Printf(TEXT("zip pack warning! zip_close failed(%d): %s"), err, *InZipFile), EDC_Zip, EDV_Error);
         //return false; //暂时不处理关闭问题
     }
     return r;
@@ -71,11 +71,11 @@ bool FZipManager::Pack(const FString& InZipFile, const FString& InOriginDirector
 
 bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirectory)
 {
-    TRACE_CPUPROFILER_EVENT_SCOPE_TEXT("MW_UMWZip_Unpack")
+    TRACE_CPUPROFILER_EVENT_SCOPE_TEXT("MW_Uzip_Unpack")
     static IPlatformFile& pf = FPlatformFileManager::Get().GetPlatformFile();
     if(!pf.FileExists(*InZipFile))
     {
-        UE_LOG(LogTemp, Error, TEXT("mwzip unpack failed! zipfile(%s) not exist!"), *InZipFile)
+        WHLog(FString::Printf(TEXT("zip unpack failed! zipfile(%s) not exist!"), *InZipFile), EDC_Zip, EDV_Error);
         return false;
     }
     if (!pf.DirectoryExists(*InDestDirectory))
@@ -127,14 +127,14 @@ bool FZipManager::Pack(const FString& InZipFile, const TArray<FString>& InOrigin
     static IFileManager& fm = IFileManager::Get();
     if(fm.FileExists(*InZipFile))
     {
-        UE_LOG(LogTemp, Error, TEXT("zip create failed: zip path already exist! %s"), *InZipFile)
+        WHLog(FString::Printf(TEXT("zip create failed: zip path already exist! %s"), *InZipFile), EDC_Zip, EDV_Error);
         return false;
     }
     int Err;
     zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_CREATE, &Err);
     if (!Archive)
     {
-        UE_LOG(LogTemp, Error, TEXT("zip open failed(%d): %s"), Err, *InZipFile)
+        WHLog(FString::Printf(TEXT("zip open failed(%d): %s"), Err, *InZipFile), EDC_Zip, EDV_Error);
         return false;
     }
     for(FString p : InOriginFiles)
@@ -156,7 +156,7 @@ bool FZipManager::Pack(const FString& InZipFile, const TArray<FString>& InOrigin
         if (zip_add(Archive, TCHAR_TO_UTF8(*z), Source) == -1)
         {
             zip_source_free(Source);
-            UE_LOG(LogTemp, Error, TEXT("zip add entry failed: source_file:%s zip_file:%s"), *p, *z)
+            WHLog(FString::Printf(TEXT("zip add entry failed: source_file:%s zip_file:%s"), *p, *z), EDC_Zip, EDV_Error);
             return false;
         }
     }
@@ -168,7 +168,7 @@ bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString
     static IFileManager& fm = IFileManager::Get();
     if (!fm.DirectoryExists(*InDirectory))
     {
-        UE_LOG(LogTemp, Error, TEXT("zip Add failed, directory not exist: %s"), *InDirectory);
+        WHLog(FString::Printf(TEXT("zip Add failed, directory not exist: %s"), *InDirectory), EDC_Zip, EDV_Error);
         return false;
     }
     TArray<FString> files;
@@ -197,7 +197,7 @@ bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString
             {
                 zip_source_free(Source);
                 zip_close(InArchive);
-                UE_LOG(LogTemp, Error, TEXT("zip add failed: source_file:%s zip_file:%s"), *p, *z)
+                WHLog(FString::Printf(TEXT("zip add failed: source_file:%s zip_file:%s"), *p, *z), EDC_Zip, EDV_Error);
                 return false;
             }
         }
@@ -212,7 +212,7 @@ bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirector
     zip* z = zip_open(TCHAR_TO_UTF8(*InZipFile), 0, &err);
     if (!z)
     {
-        UE_LOG(LogTemp, Error, TEXT("mwzip unpack failed! open zip(%s) err(%d)"),*InZipFile, err)
+        WHLog(FString::Printf(TEXT("zip unpack failed! open zip(%s) err(%d)"),*InZipFile, err), EDC_Zip, EDV_Error);
         return false;
     }
     const int num = zip_get_num_files(z);
@@ -232,13 +232,13 @@ bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirector
         zip_file* f = zip_fopen_index(z, i, ZIP_FL_UNCHANGED);
         if (!f)
         {
-            UE_LOG(LogTemp, Error, TEXT("mwzip unpack failed! zip file open(%hs) failed!"), n)
+            WHLog(FString::Printf(TEXT("zip unpack failed! zip file open(%hs) failed!"), n), EDC_Zip, EDV_Error);
             continue;
         }
         TUniquePtr<FArchive> w(IFileManager::Get().CreateFileWriter(*d, FILEWRITE_None));
         if(!w.IsValid())
         {
-            UE_LOG(LogTemp, Error, TEXT("mwzip unpack failed! createfilewriter(%s) failed!"), *d)
+            WHLog(FString::Printf(TEXT("zip unpack failed! createfilewriter(%s) failed!"), *d), EDC_Zip, EDV_Error);
             continue;
         }
         zip_int64_t l = zip_fread(f, b, ZIP_BUFFER_MAX);
@@ -249,7 +249,7 @@ bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirector
         }
         if (l < 0)
         {
-            UE_LOG(LogTemp, Error, TEXT("mwzip unpack failed! zip file read(%hs) failed!"), n)
+            WHLog(FString::Printf(TEXT("zip unpack failed! zip file read(%hs) failed!"), n), EDC_Zip, EDV_Error);
         }
         w->Close();
         zip_fclose(f);

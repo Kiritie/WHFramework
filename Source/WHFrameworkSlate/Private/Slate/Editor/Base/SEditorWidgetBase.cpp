@@ -49,19 +49,23 @@ void SEditorWidgetBase::OnInitialize()
 	SlatePrepass();
 
 	OnBindCommands(WidgetCommands);
-	
-	if(WidgetType == EEditorWidgetType::Main)
+
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaSeconds)
 	{
-		if(GetOwnerWindow().IsValid())
+		if(WidgetType == EEditorWidgetType::Main)
 		{
-			OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowActivated);
-			OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowDeactivated);
-			OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
+			if(GetOwnerWindow().IsValid())
+			{
+				OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowActivated);
+				OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowDeactivated);
+				OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
+			}
 		}
-	}
+		return false;
+	}));
 }
 
-void SEditorWidgetBase::OnOpen(bool bInstant)
+void SEditorWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
 	WidgetState = EEditorWidgetState::Opening;
 	SetVisibility(EVisibility::SelfHitTestInvisible);
@@ -207,9 +211,14 @@ FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
 }
 
-void SEditorWidgetBase::Open(bool bInstant)
+void SEditorWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
 {
-	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(bInstant, GetWidgetName());
+	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(InParams, bInstant, GetWidgetName());
+}
+
+void SEditorWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
+{
+	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(InParams, bInstant, GetWidgetName());
 }
 
 void SEditorWidgetBase::Close(bool bInstant)
@@ -225,7 +234,7 @@ void SEditorWidgetBase::Toggle(bool bInstant)
 	}
 	else
 	{
-		Open(bInstant);
+		Open(nullptr, bInstant);
 	}
 }
 

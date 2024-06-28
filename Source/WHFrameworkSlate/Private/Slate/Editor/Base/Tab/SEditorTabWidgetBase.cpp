@@ -91,9 +91,9 @@ void SEditorTabWidgetBase::Construct(const FArguments& InArgs, const TSharedPtr<
 	];
 }
 
-void SEditorTabWidgetBase::OnOpen(bool bInstant)
+void SEditorTabWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	SEditorWidgetBase::OnOpen(bInstant);
+	SEditorWidgetBase::OnOpen(InParams, bInstant);
 }
 
 void SEditorTabWidgetBase::OnClose(bool bInstant)

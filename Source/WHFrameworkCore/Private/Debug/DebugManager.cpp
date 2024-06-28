@@ -56,6 +56,7 @@ void FDebugManager::LogMessage(const FString& InMessage, EDebugCategory InCatego
 		LOG_CASE(Voxel, InVerbosity)
 		LOG_CASE(WebRequest, InVerbosity)
 		LOG_CASE(Widget, InVerbosity)
+		LOG_CASE(Zip, InVerbosity)
 		default: break;
 	}
 }

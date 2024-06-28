@@ -23,6 +23,10 @@ void FManagerBase::OnInitialize()
 	
 }
 
+void FManagerBase::OnPreparatory()
+{
+}
+
 void FManagerBase::OnReset()
 {
 }

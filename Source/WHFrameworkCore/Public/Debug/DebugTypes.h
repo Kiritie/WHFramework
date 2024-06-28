@@ -39,6 +39,7 @@ enum EDebugCategory : int
 	EDC_Voxel UMETA(DisplayName = "Voxel"),
 	EDC_WebRequest UMETA(DisplayName = "WebRequest"),
 	EDC_Widget UMETA(DisplayName = "Widget"),
+	EDC_Zip UMETA(DisplayName = "Zip"),
 	EDC_Custom1 UMETA(DisplayName = "Custom1"),
 	EDC_Custom2 UMETA(DisplayName = "Custom2"),
 	EDC_Custom3 UMETA(DisplayName = "Custom3"),
@@ -138,6 +139,8 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Voxel, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);
 // UI
 DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
+// Zip
+DEFINE_LOG_CATEGORY_STATIC(WH_Zip, Log, All);
 
 // 断言实现
 #define WH_ENSUREEDITOR_IMPL(Capture, Always, InExpression, InFormat) \

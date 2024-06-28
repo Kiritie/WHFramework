@@ -38,7 +38,7 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 {
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
-	HttpRequest->SetURL(GetServerURL() + InUrl);
+	HttpRequest->SetURL(InUrl.StartsWith(TEXT("/")) ? (GetServerURL() + InUrl) : InUrl);
 
 	FString ContentType;
 	switch(InContent.ContentType)
