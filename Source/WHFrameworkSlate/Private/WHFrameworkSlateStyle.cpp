@@ -110,6 +110,8 @@ void FWHFrameworkSlateStyle::FStyle::Initialize()
 	const FTableRowStyle& NormalTableRowStyle = FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("TableView.Row");
 	
 	const FEditableTextBoxStyle& NormalEditableTextBoxStyle = FCoreStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
+	
+	const FComboButtonStyle& NormalComboButtonStyle = FCoreStyle::Get().GetWidgetStyle<FComboButtonStyle>("ComboButton");
 
 	// Icons
 	{
@@ -256,6 +258,23 @@ void FWHFrameworkSlateStyle::FStyle::Initialize()
 			.SetBackgroundColor(FLinearColor(0.6f, 0.6f, 0.6f, 0.1f))
 			.SetForegroundColor(FSlateColor::UseForeground())
 			.SetPadding(FMargin(10.f, 8.f))
+		);
+	}
+	
+	// ComboBoxes
+	{
+		FSlateBrush _TempBrush = FSlateBrush(NormalComboButtonStyle.ButtonStyle.Normal);
+		_TempBrush.TintColor = FLinearColor(_TempBrush.TintColor.GetSpecifiedColor().R, _TempBrush.TintColor.GetSpecifiedColor().G, _TempBrush.TintColor.GetSpecifiedColor().B, 0.1f);
+		Set("ComboBoxes.SettingItem", FComboBoxStyle()
+			.SetContentPadding(FMargin(10.f, 8.f))
+			.SetMenuRowPadding(FMargin(10.0f, 5.f))
+			.SetComboButtonStyle(
+				FComboButtonStyle(NormalComboButtonStyle)
+				.SetButtonStyle(
+					FButtonStyle(NormalComboButtonStyle.ButtonStyle)
+					.SetNormal(_TempBrush)
+				)
+			)
 		);
 	}
 

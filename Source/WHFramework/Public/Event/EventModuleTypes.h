@@ -10,8 +10,6 @@ class UEventHandleBase;
 
 DECLARE_DELEGATE_FourParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>, bool);
 
-DECLARE_DELEGATE_TwoParams(FEventExecuteDelegate, UObject* InSender, UEventHandleBase* InEventHandle);
-
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEventExecuteDynamicDelegate, UObject*, InSender, UEventHandleBase*, InEventHandle);
 
 UENUM(BlueprintType)

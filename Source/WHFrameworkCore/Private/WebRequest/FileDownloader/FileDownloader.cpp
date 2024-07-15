@@ -6,27 +6,30 @@
 #include "Debug/DebugTypes.h"
 #include "HAL/PlatformFileManager.h"
 #include "Interfaces/IHttpResponse.h"
-#include "WebRequest/FileDownloader/FileDownloadManager.h"
+#include "WebRequest/WebRequestManager.h"
 
-FFileDownloader::FFileDownloader()
+const FUniqueType FFileDownloader::Type = FUniqueType(&IFileDownloaderInterface::Type);
+
+FFileDownloader::FFileDownloader(FUniqueType InType, const FWebFileURL& InURL): IFileDownloaderInterface(InType)
 {
-	FileType = EDownloadFileType::Resource;
-	DownloadResult = EDownloadToStorageResult::None;
+	FileURL = InURL;
+}
+
+FFileDownloader::FFileDownloader(const FWebFileURL& InURL): IFileDownloaderInterface(Type)
+{
+	FileURL = InURL;
 }
 
 FFileDownloader::~FFileDownloader()
 {
 }
 
-TSharedPtr<FFileDownloader> FFileDownloader::Create()
+void FFileDownloader::DownloadFile(const FString& SavePath, float Timeout, const FString& ContentType, bool bForceByPayload)
 {
-	const auto Downloader = MakeShared<FFileDownloader>();
-	FFileDownloadManager::Get().AddDownloader(Downloader);
-	return Downloader;
-}
+	if(DownloadResult == EDownloadToStorageResult::Cancelled) return;
 
-void FFileDownloader::DownloadFile(const FString& URL, const FString& SavePath, float Timeout, const FString& ContentType, bool bForceByPayload)
-{
+	FString URL = (GetFileURL().FileURL.StartsWith(TEXT("/")) ? FWebRequestManager::Get().GetServerURL() : TEXT("")) + GetFileURL().FileURL;
+
 	if (URL.IsEmpty())
 	{
 		WHLog(FString::Printf(TEXT("You have not provided an URL to download the file")), EDC_WebRequest, EDV_Error);
@@ -53,7 +56,16 @@ void FFileDownloader::DownloadFile(const FString& URL, const FString& SavePath, 
 
 	auto OnResult = [this](FFileDownloaderResult&& Result) mutable
 	{
+		HttpRequestPtr.Reset();
+		
 		OnComplete_Internal(Result.Result, MoveTemp(Result.Data));
+
+		OnComplete.Broadcast(DownloadResult = (Result.Result == EDownloadToMemoryResult::SucceededByPayload ? EDownloadToStorageResult::SucceededByPayload : EDownloadToStorageResult::Success), FileSavePath);
+
+		if(bAutoDestroy)
+		{
+			DestroyDownload();
+		}
 	};
 
 	if (bForceByPayload)
@@ -62,8 +74,44 @@ void FFileDownloader::DownloadFile(const FString& URL, const FString& SavePath, 
 	}
 	else
 	{
-		DownloadFile(URL, Timeout, ContentType, TNumericLimits<TArray<uint8>::SizeType>::Max()).Next(OnResult);
+		DownloadFile(URL, Timeout, ContentType, (int64)TNumericLimits<TArray<uint8>::SizeType>::Max()).Next(OnResult);
 	}
+}
+
+void FFileDownloader::CancelDownload()
+{
+	if(DownloadResult != EDownloadToStorageResult::None) return;
+	
+	OnComplete.Broadcast(DownloadResult = EDownloadToStorageResult::Cancelled, FileSavePath);
+	if (HttpRequestPtr.IsValid())
+	{
+		const TSharedPtr<IHttpRequest> HttpRequest = HttpRequestPtr.Pin();
+
+		HttpRequest->CancelRequest();
+		
+		HttpRequestPtr.Reset();
+	}
+
+	if(bAutoDestroy)
+	{
+		DestroyDownload();
+	}
+}
+
+void FFileDownloader::DestroyDownload()
+{
+	if(DownloadResult == EDownloadToStorageResult::None) return;
+	
+	if (HttpRequestPtr.IsValid())
+	{
+		const TSharedPtr<IHttpRequest> HttpRequest = HttpRequestPtr.Pin();
+
+		HttpRequest->CancelRequest();
+	}
+
+	OnDestroy_Internal();
+
+	OnDestroy.Broadcast();
 }
 
 void FFileDownloader::OnComplete_Internal(EDownloadToMemoryResult Result, TArray64<uint8> DownloadedContent)
@@ -137,12 +185,13 @@ void FFileDownloader::OnComplete_Internal(EDownloadToMemoryResult Result, TArray
 	}
 
 	delete FileHandle;
-	OnComplete.Broadcast(DownloadResult = (Result == EDownloadToMemoryResult::SucceededByPayload ? EDownloadToStorageResult::SucceededByPayload : EDownloadToStorageResult::Success), FileSavePath);
 }
 
 void FFileDownloader::OnDestroy_Internal()
 {
-	FFileDownloadManager::Get().RemoveDownloader(AsShared());
+	WHLog(FString::Printf(TEXT("Download destroyed")), EDC_WebRequest, EDV_Warning);
+
+	FWebRequestManager::Get().RemoveDownloader(SharedThis(this));
 }
 
 TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL, float Timeout, const FString& ContentType, int64 MaxChunkSize)
@@ -154,7 +203,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 	}
 
 	TSharedPtr<TPromise<FFileDownloaderResult>> PromisePtr = MakeShared<TPromise<FFileDownloaderResult>>();
-	TWeakPtr<FFileDownloader> WeakThisPtr = AsShared();
+	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 	GetContentSize(URL, Timeout).Next([WeakThisPtr, PromisePtr, URL, Timeout, ContentType, MaxChunkSize](int64 ContentSize) mutable
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
@@ -317,7 +366,7 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 	}
 
 	TSharedPtr<TPromise<EDownloadToMemoryResult>> PromisePtr = MakeShared<TPromise<EDownloadToMemoryResult>>();
-	TWeakPtr<FFileDownloader> WeakThisPtr = AsShared();
+	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 	GetContentSize(URL, Timeout).Next([WeakThisPtr, PromisePtr, URL, Timeout, ContentType, MaxChunkSize, OnChunkDownloaded, ChunkRange](int64 ContentSize) mutable
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
@@ -402,7 +451,8 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 			{
 				const float Progress = ContentSize <= 0 ? 0.0f : static_cast<float>(BytesReceived + ChunkRange.X) / ContentSize;
 				WHLog(FString::Printf(TEXT("Downloaded %lld bytes of file chunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *URL, ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
-				SharedThis->OnProgress.Broadcast(BytesSent, BytesReceived + ChunkRange.X, ContentSize);
+				SharedThis->OnProgress_Internal(BytesSent, BytesReceived + ChunkRange.X, ContentSize);
+				SharedThis->OnProgress.Broadcast(URL, BytesSent, BytesReceived + ChunkRange.X, ContentSize);
 			}
 		};
 
@@ -473,22 +523,14 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 		return MakeFulfilledPromise<FFileDownloaderResult>(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()}).GetFuture();
 	}
 
-	TWeakPtr<FFileDownloader> WeakThisPtr = AsShared();
+	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
-	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#else
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#endif
 
 	HttpRequestRef->SetVerb("GET");
 	HttpRequestRef->SetURL(URL);
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
 	HttpRequestRef->SetTimeout(Timeout);
-#else
-	WHLog(FString::Printf(TEXT("The Timeout feature is only supported in engine version 4.26 or later. Please update your engine to use this feature"));
-#endif
 
 	if (!ContentType.IsEmpty())
 	{
@@ -572,24 +614,16 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 		return MakeFulfilledPromise<FFileDownloaderResult>(FFileDownloaderResult{EDownloadToMemoryResult::Cancelled, TArray64<uint8>()}).GetFuture();
 	}
 
-	TWeakPtr<FFileDownloader> WeakThisPtr = AsShared();
+	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
-	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#else
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#endif
 
 	HttpRequestRef->SetVerb("GET");
 	HttpRequestRef->SetURL(URL);
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
 	HttpRequestRef->SetTimeout(Timeout);
-#else
-	WHLog(FString::Printf(TEXT("The Timeout feature is only supported in engine version 4.26 or later. Please update your engine to use this feature"));
-#endif
 
-	HttpRequestRef->OnRequestProgress().BindLambda([WeakThisPtr](FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived)
+	HttpRequestRef->OnRequestProgress().BindLambda([WeakThisPtr, URL](FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived)
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (SharedThis.IsValid())
@@ -597,7 +631,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 			const int64 ContentLength = Request->GetContentLength();
 			const float Progress = ContentLength <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentLength;
 			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file chunk from %s by payload. Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), static_cast<int64>(Request->GetContentLength()), Progress), EDC_WebRequest, EDV_Log);
-			SharedThis->OnProgress.Broadcast(BytesSent, BytesReceived, ContentLength);
+			SharedThis->OnProgress.Broadcast(URL, BytesSent, BytesReceived, ContentLength);
 		}
 	});
 
@@ -651,20 +685,12 @@ TFuture<int64> FFileDownloader::GetContentSize(const FString& URL, float Timeout
 {
 	TSharedPtr<TPromise<int64>> PromisePtr = MakeShared<TPromise<int64>>();
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
-	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#else
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
-#endif
 
 	HttpRequestRef->SetVerb("HEAD");
 	HttpRequestRef->SetURL(URL);
 
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
 	HttpRequestRef->SetTimeout(Timeout);
-#else
-	WHLog(FString::Printf(TEXT("The Timeout feature is only supported in engine version 4.26 or later. Please update your engine to use this feature"));
-#endif
 
 	HttpRequestRef->OnProcessRequestComplete().BindLambda([PromisePtr, URL](const FHttpRequestPtr& Request, const FHttpResponsePtr& Response, const bool bSucceeded)
 	{
@@ -697,27 +723,7 @@ TFuture<int64> FFileDownloader::GetContentSize(const FString& URL, float Timeout
 	return PromisePtr->GetFuture();
 }
 
-void FFileDownloader::CancelDownload()
+void FFileDownloader::OnProgress_Internal(int64 BytesSent, int64 BytesReceived, int64 FullSize)
 {
-	OnComplete.Broadcast(DownloadResult = EDownloadToStorageResult::Cancelled, FileSavePath);
-	if (HttpRequestPtr.IsValid())
-	{
-#if UE_VERSION_NEWER_THAN(4, 26, 0)
-		const TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = HttpRequestPtr.Pin();
-#else
-		const TSharedPtr<IHttpRequest> HttpRequest = HttpRequestPtr.Pin();
-#endif
-
-		HttpRequest->CancelRequest();
-	}
-	WHLog(FString::Printf(TEXT("Download canceled")), EDC_WebRequest, EDV_Warning);
-
-	DestroyDownload();
-}
-
-void FFileDownloader::DestroyDownload()
-{
-	OnDestroy_Internal();
-
-	OnDestroy.Broadcast();
+	IFileDownloaderInterface::OnProgress_Internal(BytesSent, BytesReceived, FullSize);
 }

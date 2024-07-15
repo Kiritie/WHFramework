@@ -5,7 +5,7 @@
 #include "Input/InputManager.h"
 #include "Main/MainManager.h"
 
-FUniqueType FSlateWidgetManager::Type = FUniqueType();
+FUniqueType FSlateWidgetManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FSlateWidgetManager)
 

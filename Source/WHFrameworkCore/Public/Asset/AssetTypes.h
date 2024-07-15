@@ -274,3 +274,35 @@ public:
 
 	virtual const FSlateBrush* GetDisplayIcon() const { return GetAssetData() ? GetAssetData()->GetDisplayIcon() : nullptr; }
 };
+
+class FSimpleDirectoryVisitor : public IPlatformFile::FDirectoryVisitor
+{
+public:
+	virtual bool Visit( const TCHAR* FilenameOrDirectory, bool bIsDirectory ) override
+	{
+		if (bIsDirectory)
+		{
+			Directories.Add(FilenameOrDirectory);
+		}
+		return true;
+	}
+
+public:
+	TArray<FString> Directories;
+};
+
+class FSimpleFileVisitor : public IPlatformFile::FDirectoryVisitor
+{
+public:
+	virtual bool Visit( const TCHAR* FilenameOrDirectory, bool bIsDirectory ) override
+	{
+		if (!bIsDirectory)
+		{
+			Files.Add(FilenameOrDirectory);
+		}
+		return true;
+	}
+
+public:
+	TArray<FString> Files;
+};

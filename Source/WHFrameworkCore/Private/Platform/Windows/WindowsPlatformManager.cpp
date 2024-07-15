@@ -6,6 +6,7 @@
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"
 #include "Platform/Windows/WindowsMessageHelpers.h"
+#include "WHFrameworkCoreStatics.h"
 #if PLATFORM_WINDOWS
 #include <activation.h>
 #include <shellapi.h>
@@ -183,6 +184,17 @@ void FWindowsPlatformManager::OnInitialize()
 	{
 		Application->AddMessageHandler(Handler);
 	}
+
+	bool bAutoRun = false;
+	if(FParse::Bool(FCommandLine::Get(), TEXT("SetAppAutoRun"), bAutoRun))
+	{
+		SetAppAutoRun(bAutoRun);
+	}
+
+	// if(FParse::Param(FCommandLine::Get(), TEXT("AutoExit")))
+	// {
+	// 	FGenericPlatformMisc::RequestExit(false);
+	// }
 }
 
 void FWindowsPlatformManager::OnTermination()
@@ -236,7 +248,7 @@ DWORD FWindowsPlatformManager::GetProcessIDByName(string pName)
 	return dProcessID;
 }
 
-BOOL CALLBACK lpEnumFunc(HWND hwnd, LPARAM lParam)
+bool CALLBACK lpEnumFunc(HWND hwnd, LPARAM lParam)
 {
 	FHWndsArg *pArg = (LPHWndsArg)lParam;
 	DWORD  processId;
@@ -310,4 +322,136 @@ bool FWindowsPlatformManager::DeleteLinkFile(LPCOLESTR szDestLnkPath)
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	
 	return PlatformFile.DeleteFile(szDestLnkPath);
-}	
+}
+
+void FWindowsPlatformManager::SetAppAutoRun(bool bAutoRun)
+{
+	if(!IsAdministrator())
+	{
+		const FString Param = FString::Printf(TEXT("-SetAppAutoRun %s -AutoExit"), *FCoreStatics::BoolToString(bAutoRun));
+		ExecElevatedProcess(FPlatformProcess::ExecutablePath(), *Param);
+		return;
+	}
+
+	if(bAutoRun)
+	{
+		TCHAR szFilePath[MAX_PATH];
+		memset(szFilePath, 0, MAX_PATH);
+		if (GetModuleFileName(NULL, szFilePath, MAX_PATH))
+		{
+			HKEY hKey;
+			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS)
+			{
+				RegSetValueEx(hKey, _T("AutoRun"), 0, REG_SZ, (LPBYTE)szFilePath, (lstrlen(szFilePath) + 1)*sizeof(TCHAR));
+			}
+			RegCloseKey(hKey);
+		}
+	}
+	else
+	{
+		HKEY hKey;
+        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS)
+        {
+        	RegDeleteValue(hKey, _T("AutoRun"));
+        }
+        RegCloseKey(hKey);
+	}
+}
+
+bool IsRunAsAdministrator()
+{
+	BOOL fIsRunAsAdmin = false;
+	DWORD dwError = ERROR_SUCCESS;
+	PSID pAdministratorsGroup = NULL;
+
+	SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+	if (!AllocateAndInitializeSid(
+		&NtAuthority,
+		2,
+		SECURITY_BUILTIN_DOMAIN_RID,
+		DOMAIN_ALIAS_RID_ADMINS,
+		0, 0, 0, 0, 0, 0,
+		&pAdministratorsGroup))
+	{
+		dwError = GetLastError();
+		goto Cleanup;
+	}
+
+	if (!CheckTokenMembership(NULL, pAdministratorsGroup, &fIsRunAsAdmin))
+	{
+		dwError = GetLastError();
+		goto Cleanup;
+	}
+
+	Cleanup:
+
+		if (pAdministratorsGroup)
+		{
+			FreeSid(pAdministratorsGroup);
+			pAdministratorsGroup = NULL;
+		}
+
+	if (ERROR_SUCCESS != dwError)
+	{
+		throw dwError;
+	}
+
+	return fIsRunAsAdmin;
+}
+
+void ElevateNow()
+{
+	if(IsRunAsAdministrator()) return;
+
+	WCHAR szFilePath[MAX_PATH];
+	memset(szFilePath, 0, MAX_PATH);
+	if (GetModuleFileName(NULL, szFilePath, MAX_PATH))
+	{
+		SHELLEXECUTEINFO sei = { sizeof(sei) };
+
+		sei.lpVerb = _T("runas");
+		sei.lpFile = szFilePath;
+		sei.hwnd = (HWND)GEngine->GameViewport->GetWindow()->GetNativeWindow()->GetOSWindowHandle();
+		sei.cbSize = sizeof(sei);
+		sei.fMask = SEE_MASK_NO_CONSOLE;
+		sei.nShow = SW_SHOWDEFAULT;
+
+		if (!ShellExecuteEx(&sei))
+		{
+			DWORD dwError = GetLastError();
+			if (dwError == ERROR_CANCELLED)
+				//Annoys you to Elevate it LOL
+					CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ElevateNow, 0, 0, 0);
+		}
+	}
+}
+
+bool FWindowsPlatformManager::IsAdministrator()
+{
+	return IsRunAsAdministrator();
+}
+
+void FWindowsPlatformManager::AsAdministrator()
+{
+	ElevateNow();
+}
+
+bool FWindowsPlatformManager::ExecElevatedProcess(const TCHAR* URL, const TCHAR* Params)
+{
+	SHELLEXECUTEINFO ShellExecuteInfo;
+	ZeroMemory(&ShellExecuteInfo, sizeof(ShellExecuteInfo));
+	ShellExecuteInfo.cbSize = sizeof(ShellExecuteInfo);
+	ShellExecuteInfo.fMask = SEE_MASK_UNICODE | SEE_MASK_NOCLOSEPROCESS;
+	ShellExecuteInfo.lpFile = URL;
+	ShellExecuteInfo.lpVerb = TEXT("runas");
+	ShellExecuteInfo.nShow = SW_SHOW;
+	ShellExecuteInfo.lpParameters = Params;
+
+	bool bSuccess = false;
+	if (ShellExecuteEx(&ShellExecuteInfo))
+	{
+		verify(::CloseHandle(ShellExecuteInfo.hProcess));
+		bSuccess = true;
+	}
+	return bSuccess;
+}

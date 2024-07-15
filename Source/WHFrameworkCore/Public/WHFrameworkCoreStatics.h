@@ -70,6 +70,10 @@ public:
 		}
 		return Num1 >= Num2;
 	}
+	
+	static FString BoolToString(bool InBool);
+
+	static bool StringToBool(const FString& InString);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Array

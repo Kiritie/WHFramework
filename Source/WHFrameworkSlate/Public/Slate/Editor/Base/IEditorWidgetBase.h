@@ -4,6 +4,7 @@
 
 #include "UObject/Interface.h"
 #include "WHFrameworkSlateTypes.h"
+#include "Parameter/ParameterTypes.h"
 #include "Widgets/SCompoundWidget.h"
 
 /**

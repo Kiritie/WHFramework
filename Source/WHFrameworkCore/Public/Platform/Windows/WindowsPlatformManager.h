@@ -63,6 +63,14 @@ public:
 
 	virtual bool DeleteLinkFile(LPCOLESTR szDestLnkPath);
 
+	virtual void SetAppAutoRun(bool bAutoRun);
+
+	virtual bool IsAdministrator();
+	
+	virtual void AsAdministrator();
+
+	virtual bool ExecElevatedProcess(const TCHAR* URL, const TCHAR* Params);
+
 protected:
 	FWindowsApplication* GetApplication() const
 	{

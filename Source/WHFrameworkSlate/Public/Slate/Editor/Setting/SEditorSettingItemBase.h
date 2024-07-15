@@ -27,7 +27,7 @@ public:
 	FParameter ItemValue;
 };
 
-DECLARE_DELEGATE_TwoParams(FOnEditorSettingItemValueChanged, FName/* ItemName*/, FParameter/* InValue*/);
+DECLARE_DELEGATE_TwoParams(FOnEditorSettingItemValueChanged, const FName&/* ItemName*/, const FParameter&/* InValue*/);
 
 template <typename InWidgetType>
 struct TEditorSettingItemBaseNamedArgs : public TSlateBaseNamedArgs<InWidgetType>

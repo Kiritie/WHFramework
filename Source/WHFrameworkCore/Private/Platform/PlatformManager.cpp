@@ -4,7 +4,7 @@
 
 #include "Main/MainManager.h"
 
-const FUniqueType FPlatformManager::Type = FUniqueType();
+const FUniqueType FPlatformManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FPlatformManager)
 

@@ -51,13 +51,28 @@ void FEnumParameterValueCustomization::CustomizeChildren(TSharedRef<IPropertyHan
 			})
 		);
 
+	EnumNamesHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FEnumParameterValue, EnumNames));
+	EnumNamesHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FEnumParameterValueCustomization::OnEnumTypeChanged, true));
+	ChildBuilder.AddProperty(EnumNamesHandle.ToSharedRef())
+		.Visibility(
+			TAttribute<EVisibility>::Create([this]()
+			{
+				UObject* EnumTypeValue = nullptr;
+				if (EnumTypeHandle->GetValue(EnumTypeValue) != FPropertyAccess::Success)
+				{
+					return EVisibility::Collapsed;
+				}
+				return EnumTypeValue ? EVisibility::Collapsed : EVisibility::Visible;
+			})
+		);
+
 	EnumValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FEnumParameterValue, EnumValue));
 
 	ChildBuilder.AddProperty(EnumValueHandle.ToSharedRef())
 		.Visibility(
 			TAttribute<EVisibility>::Create([this]()
 			{
-				return CachedEnumType ? EVisibility::Visible : EVisibility::Collapsed;
+				return EnumPropValues.Num() > 0 ? EVisibility::Visible : EVisibility::Collapsed;
 			})
 		)
 		.CustomWidget()
@@ -81,20 +96,6 @@ void FEnumParameterValueCustomization::CustomizeChildren(TSharedRef<IPropertyHan
 	OnEnumTypeChanged();
 }
 
-void FEnumParameterValueCustomization::RefreshEnumPropertyValues()
-{
-	EnumPropValues.Reset();
-
-	if (CachedEnumType)
-	{
-		for (int32 i = 0; i < CachedEnumType->NumEnums() - 1; i++)
-		{
-			FString DisplayedName = CachedEnumType->GetDisplayNameTextByIndex(i).ToString();
-			EnumPropValues.Add(DisplayedName);
-		}
-	}
-}
-
 void FEnumParameterValueCustomization::PreChange(const UUserDefinedEnum* Changed, FEnumEditorUtils::EEnumEditorChangeInfo ChangedType)
 {
 	// Implementing interface pure virtual method but nothing to do here
@@ -102,17 +103,12 @@ void FEnumParameterValueCustomization::PreChange(const UUserDefinedEnum* Changed
 
 void FEnumParameterValueCustomization::PostChange(const UUserDefinedEnum* Changed, FEnumEditorUtils::EEnumEditorChangeInfo ChangedType)
 {
-	if (Changed != nullptr && CachedEnumType == Changed)
-	{
-		RefreshEnumPropertyValues();
-	}
+	OnEnumTypeChanged(false);
 }
 
 void FEnumParameterValueCustomization::OnEnumTypeChanged(bool bPropertyChanged)
 {
-	CachedEnumType = nullptr;
-
-	UEnum* SelectedEnumType = nullptr;
+	EnumPropValues.Empty();
 
 	UObject* EnumTypeValue;
 	EnumTypeHandle->GetValue(EnumTypeValue);
@@ -120,10 +116,15 @@ void FEnumParameterValueCustomization::OnEnumTypeChanged(bool bPropertyChanged)
 	FString EnumNameValue;
 	EnumNameHandle->GetValue(EnumNameValue);
 
+	TArray<FString> EnumNamesValue;
+	EnumNameHandle->GetValue(EnumNameValue);
+
 	if(bPropertyChanged)
 	{
 		EnumValueHandle->SetValue(0);
 	}
+
+	UEnum* SelectedEnumType = nullptr;
 
 	if (EnumTypeValue)
 	{
@@ -136,8 +137,15 @@ void FEnumParameterValueCustomization::OnEnumTypeChanged(bool bPropertyChanged)
 
 	if (SelectedEnumType)
 	{
-		CachedEnumType = SelectedEnumType;
-		RefreshEnumPropertyValues();
+		for (int32 i = 0; i < SelectedEnumType->NumEnums() - 1; i++)
+		{
+			FString DisplayedName = SelectedEnumType->GetDisplayNameTextByIndex(i).ToString();
+			EnumPropValues.Add(DisplayedName);
+		}
+	}
+	else if(EnumNamesValue.Num() > 0)
+	{
+		EnumPropValues = EnumNamesValue;
 	}
 }
 
@@ -159,7 +167,7 @@ FText FEnumParameterValueCustomization::GetCurrentEnumValueDesc() const
 	FPropertyAccess::Result Result = FPropertyAccess::Fail;
 	uint8 EnumIndex = INDEX_NONE;
 
-	if (CachedEnumType)
+	if (EnumPropValues.Num() > 0)
 	{	
 		Result = EnumValueHandle->GetValue(EnumIndex);
 	}
@@ -171,7 +179,7 @@ FText FEnumParameterValueCustomization::GetCurrentEnumValueDesc() const
 
 void FEnumParameterValueCustomization::OnEnumValueComboChange(uint8 Index)
 {
-	if (CachedEnumType)
+	if (EnumPropValues.Num() > 0)
 	{
 		EnumValueHandle->SetValue(Index);
 	}

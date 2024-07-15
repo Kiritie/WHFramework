@@ -4,7 +4,7 @@
 
 #include "Main/MainManager.h"
 
-FUniqueType FApplicationManager::Type = FUniqueType();
+FUniqueType FApplicationManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FApplicationManager)
 

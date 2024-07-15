@@ -32,11 +32,11 @@ FUniqueAssetID FUniqueAssetID::EmptyUniqueID = FUniqueID(0);
 
 //////////////////////////////////////////////////////////////////////////
 // FUniqueAssetData
-const FUniqueType FUniqueAssetData::Type = FUniqueType();
+const FUniqueType FUniqueAssetData::Type = FUniqueType(&FUniqueClass::Type);
 
 //////////////////////////////////////////////////////////////////////////
 // FUniqueAssetItem
-const FUniqueType FUniqueAssetItem::Type = FUniqueType();
+const FUniqueType FUniqueAssetItem::Type = FUniqueType(&FUniqueAssetItem::Type);
 
 FUniqueAssetData* FUniqueAssetItem::GetAssetData() const
 {

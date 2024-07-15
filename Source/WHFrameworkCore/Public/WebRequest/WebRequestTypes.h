@@ -5,6 +5,23 @@
 #include "Parameter/ParameterTypes.h"
 #include "WebRequestTypes.generated.h"
 
+const int32 BytesOfMB = 1024 * 1024;
+
+/**
+ * A struct that contains the result of downloading a file
+ */
+using FFileDownloaderResult = struct{ EDownloadToMemoryResult Result; TArray64<uint8> Data; };
+
+DECLARE_MULTICAST_DELEGATE_FourParams(FOnFileDownloadProgress, FString FileUrl, int64/* BytesSent*/, int64/* BytesReceived*/, int64/* FullSize*/);
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnFileDownloadComplete, EDownloadToStorageResult/* Result*/, const FString&/* SavePath*/);
+
+DECLARE_MULTICAST_DELEGATE(FOnFileDownloadDestroy)
+
+DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithText, const FString&/*, Text*/);
+
+DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithJson, const TSharedPtr<FJsonObject>&/*, JsonObject*/);
+
 UENUM(BlueprintType)
 enum class EWebRequestMethod : uint8
 {
@@ -19,6 +36,74 @@ enum class EWebContentType : uint8
 	Text,
 	Json,
 	Data
+};
+
+UENUM()
+enum class EDownloadToMemoryResult : uint8
+{
+	Success,
+	/** Downloaded successfully, but there was no Content-Length header in the response and thus downloaded by payload */
+	SucceededByPayload,
+	Cancelled,
+	DownloadFailed,
+	InvalidURL
+};
+
+UENUM()
+enum class EDownloadToStorageResult : uint8
+{
+	None,
+	Success,
+	/** Downloaded successfully, but there was no Content-Length header in the response and thus downloaded by payload */
+	SucceededByPayload,
+	Cancelled,
+	DownloadFailed,
+	SaveFailed,
+	DirectoryCreationFailed,
+	InvalidURL,
+	InvalidSavePath
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORKCORE_API FWebFileURL
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	FWebFileURL()
+	{
+		FileURL = TEXT("");
+		FilePath = TEXT("");
+		MD5Hash = TEXT("");
+	}
+
+	FWebFileURL(const FString& InFileURL) : FWebFileURL()
+	{
+		FileURL = InFileURL;
+	}
+
+	FWebFileURL(const FString& InFileURL, const FString& InFilePath) : FWebFileURL()
+	{
+		FileURL = InFileURL;
+		FilePath = InFilePath;
+	}
+
+	FWebFileURL(const FString& InFileURL, const FString& InFilePath, const FString& InMD5Hash) : FWebFileURL()
+	{
+		FileURL = InFileURL;
+		FilePath = InFilePath;
+		MD5Hash = InMD5Hash;
+	}
+
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString FileURL;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString FilePath;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString MD5Hash;
 };
 
 USTRUCT(BlueprintType)
@@ -154,7 +239,3 @@ public:
 		return TEXT("");
 	}
 };
-
-DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithText, const FString&/*, Text*/);
-
-DECLARE_DELEGATE_OneParam(FOnWebRequestComplete_WithJson, const TSharedPtr<FJsonObject>&/*, JsonObject*/);

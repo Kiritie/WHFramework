@@ -8,7 +8,7 @@
 #include "Parameter/ParameterManager.h"
 #include "Scene/SceneManager.h"
 #include "WebRequest/WebRequestManager.h"
-#include "WebRequest/FileDownloader/FileDownloadManager.h"
+#include "WebRequest/WebRequestManager.h"
 #include "Zip/ZipManager.h"
 #include "Platform/Windows/WindowsPlatformManager.h"
 
@@ -22,7 +22,7 @@ void FWHFrameworkCoreModule::StartupModule()
 #endif
 	FSceneManager::Register();
 	FWebRequestManager::Register();
-	FFileDownloadManager::Register();
+	FWebRequestManager::Register();
 	FZipManager::Register();
 }
 
@@ -36,7 +36,7 @@ void FWHFrameworkCoreModule::ShutdownModule()
 #endif
 	FSceneManager::UnRegister();
 	FWebRequestManager::UnRegister();
-	FFileDownloadManager::UnRegister();
+	FWebRequestManager::UnRegister();
 	FZipManager::UnRegister();
 }
 

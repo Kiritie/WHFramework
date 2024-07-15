@@ -7,7 +7,7 @@
 
 // Add default functionality here for any IParameterManager functions that are not pure virtual.
 
-const FUniqueType FParameterManager::Type = FUniqueType();
+const FUniqueType FParameterManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FParameterManager)
 

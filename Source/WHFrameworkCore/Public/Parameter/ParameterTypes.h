@@ -44,17 +44,37 @@ public:
 	{
 		EnumType = nullptr;
 		EnumName = TEXT("");
+		EnumNames = TArray<FString>();
 		EnumValue = 0;
+	}
+
+	FEnumParameterValue(UEnum* const InEnumType, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumType = InEnumType;
+		EnumValue = FMath::Clamp(InEnumValue, 0, EnumType->NumEnums() - 1);
+	}
+
+	FEnumParameterValue(const FString& InEnumName, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumType = LoadObject<UEnum>(nullptr, *InEnumName);
+		EnumName = InEnumName;
+		EnumValue = FMath::Clamp(InEnumValue, 0, EnumType->NumEnums() - 1);
+	}
+	
+	FEnumParameterValue(const TArray<FString>& InEnumNames, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumNames = InEnumNames;
+		EnumValue = FMath::Clamp(InEnumValue, 0, EnumNames.Num() - 1);
 	}
 
 	friend bool operator==(const FEnumParameterValue& A, const FEnumParameterValue& B)
 	{
-		return A.EnumType == B.EnumType && A.EnumName == B.EnumName && A.EnumValue == B.EnumValue;
+		return A.EnumType == B.EnumType && A.EnumName == B.EnumName && A.EnumNames == B.EnumNames && A.EnumValue == B.EnumValue;
 	}
 
 	friend bool operator!=(const FEnumParameterValue& A, const FEnumParameterValue& B)
 	{
-		return A.EnumType != B.EnumType || A.EnumName != B.EnumName || A.EnumValue != B.EnumValue;
+		return A.EnumType != B.EnumType || A.EnumName != B.EnumName && A.EnumNames == B.EnumNames || A.EnumValue != B.EnumValue;
 	}
 
 public:
@@ -63,6 +83,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString EnumName;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FString> EnumNames;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	uint8 EnumValue;
@@ -102,7 +125,7 @@ public:
 		ObjectPtrValue = nullptr;
 		PointerValue = nullptr;
 	}
-	
+
 	FParameter(int32 InValue)
 	{
 		*this = MakeInteger(InValue);
@@ -121,6 +144,11 @@ public:
 	FParameter(uint8 InValue)
 	{
 		*this = MakeByte(InValue);
+	}
+
+	FParameter(const FEnumParameterValue& InValue)
+	{
+		*this = MakeEnum(InValue);
 	}
 
 	FParameter(const FString& InValue)
@@ -790,7 +818,7 @@ public:
 
 	FParameterMap(const TMap<FString, FString>& InMap)
 	{
-		Map = InMap; 
+		Map = InMap;
 	}
 
 protected:

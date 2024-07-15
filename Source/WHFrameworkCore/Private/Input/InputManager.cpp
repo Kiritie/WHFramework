@@ -6,7 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainManager.h"
 
-const FUniqueType FInputManager::Type = FUniqueType();
+const FUniqueType FInputManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FInputManager)
 

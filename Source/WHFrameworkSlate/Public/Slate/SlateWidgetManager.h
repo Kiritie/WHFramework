@@ -177,25 +177,22 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<IEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false, bool bForce = true)
+	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<IEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false)
 	{
 		const FName WidgetName = T::WidgetName;
-		if(!AllEditorWidgets.Contains(WidgetName) || bForce)
+		if(AllEditorWidgets.Contains(WidgetName))
 		{
-			if(TSharedPtr<T> OldWidget = GetEditorWidget<T>())
-			{
-				OldWidget->Destroy();
-			}
-			AllEditorWidgets.Emplace(WidgetName, InWidget);
-			InWidget->_WidgetName = WidgetName;
-			if(InParent)
-			{
-				InParent->AddChild(InWidget);
-			}
-			if(bAutoOpen)
-			{
-				InWidget->Open(nullptr, true);
-			}
+			AllEditorWidgets[WidgetName]->Destroy();
+		}
+		AllEditorWidgets.Emplace(WidgetName, InWidget);
+		InWidget->_WidgetName = WidgetName;
+		if(InParent)
+		{
+			InParent->AddChild(InWidget);
+		}
+		if(bAutoOpen)
+		{
+			InWidget->Open(nullptr, true);
 		}
 		return InWidget;
 	}

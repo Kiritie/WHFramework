@@ -33,7 +33,7 @@ public class WHFrameworkSlate : ModuleRules
 				"zlib",
 				"ImageWrapper",
 				"Engine",
-				"GameplayTags", "DesktopPlatform"
+				"GameplayTags"
 			}
 		);
 		

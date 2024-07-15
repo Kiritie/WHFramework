@@ -7,6 +7,10 @@
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 
+class IFileDownloaderInterface;
+class FFileDownloaderCollection;
+class FFileDownloader;
+
 class WHFRAMEWORKCORE_API FWebRequestManager : public FManagerBase
 {
 	GENERATED_MANAGER(FWebRequestManager)
@@ -20,14 +24,29 @@ public:
 	static const FUniqueType Type;
 
 public:
-	bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
+	virtual void OnInitialize() override;
+	
+	virtual void OnPreparatory() override;
 
-	bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete);
+	virtual void OnRefresh(float DeltaSeconds) override;
 
-	bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete);
+public:
+	virtual void ConnectServer(); 
+
+public:
+	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
+
+	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete);
+
+	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete);
+
+public:
+	virtual void AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader);
+
+	virtual void RemoveDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader);
 
 protected:
-	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
+	virtual void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
 
 protected:
 	bool bLocalMode;
@@ -35,7 +54,11 @@ protected:
 	FString ServerURL;
 
 	int32 ServerPort;
-	
+
+	bool bConnected;
+
+	TArray<TSharedPtr<IFileDownloaderInterface>> Downloaders;
+
 public:
 	bool IsLocalMode() const { return bLocalMode; }
 
@@ -43,9 +66,27 @@ public:
 
 	FString GetServerURL() const;
 	
-	void SetServerURL(const FString& InServerURL) { this->ServerURL = InServerURL; }
+	void SetServerURL(const FString& InServerURL) { ServerURL = InServerURL; }
 
 	int32 GetServerPort() const { return ServerPort; }
 
-	void SetServerPort(int32 InServerPort) { this->ServerPort = InServerPort; }
+	void SetServerPort(int32 InServerPort) { ServerPort = InServerPort; }
+
+	bool IsConnected() const { return bConnected; }
+
+	TArray<TSharedPtr<IFileDownloaderInterface>> GetAllDownloader() { return Downloaders; }
+	
+	template<class T>
+	TArray<TSharedPtr<T>> GetAllDownloader()
+	{
+		TArray<TSharedPtr<T>> ReturnValues;
+		for(auto& Iter : TArray(Downloaders))
+		{
+			if(Iter && Iter->IsA<T>())
+			{
+				ReturnValues.Add(StaticCastSharedPtr<T>(Iter));
+			}
+		}
+		return ReturnValues;
+	}
 };

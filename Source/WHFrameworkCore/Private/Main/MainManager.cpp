@@ -3,7 +3,7 @@
 
 #include "Main/MainManager.h"
 
-const FUniqueType FMainManager::Type = FUniqueType();
+const FUniqueType FMainManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MAIN_MANAGER(FMainManager)
 

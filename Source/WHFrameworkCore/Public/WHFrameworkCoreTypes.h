@@ -94,6 +94,41 @@ InstanceClass* InstanceClass::GetPtr() \
 	return Instance; \
 }
 
+#define GET_STRING_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \
+	FString SettingValue = DefaultValue; \
+	bool bSuccess = GConfig->GetString(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
+	OutValue = SettingValue; \
+	return bSuccess;
+	
+#define GET_BOOL_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \
+	bool SettingValue = DefaultValue; \
+	bool bSuccess = GConfig->GetBool(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
+	OutValue = SettingValue; \
+	return bSuccess;
+	
+#define GET_INT_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \
+	int32 SettingValue = DefaultValue; \
+	bool bSuccess = GConfig->GetInt(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
+	OutValue = SettingValue; \
+	return bSuccess;
+	
+#define GET_ENUM_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue, ValueOptions) \
+	int32 SettingValue = DefaultValue; \
+	bool bSuccess = GConfig->GetInt(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
+	OutValue = FEnumParameterValue(ValueOptions, SettingValue); \
+	return bSuccess;
+#define SET_STRING_CONFIG(IniFilename, IniSection, IniKey, InValue) \
+	GConfig->SetString(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+
+#define SET_BOOL_CONFIG(IniFilename, IniSection, IniKey, InValue) \
+	GConfig->SetBool(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+
+#define SET_INT_CONFIG(IniFilename, IniSection, IniKey, InValue) \
+	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+
+#define SET_ENUM_CONFIG(IniFilename, IniSection, IniKey, InValue) \
+	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+
 /*
  * FUniqueType
  */
@@ -111,7 +146,7 @@ public:
 
 	bool operator==(const FUniqueType& Other) const
 	{
-		return ID == Other.ID || (ParentType != nullptr && *ParentType == Other);
+		return ID == Other.ID || (ParentType && *ParentType == Other);
 	}
 
 	bool IsA(const FUniqueType& Other) const

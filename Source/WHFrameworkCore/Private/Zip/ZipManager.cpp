@@ -13,7 +13,7 @@
 #define ZIP_THREAD_MAX 10
 #define ZIP_BUFFER_MAX 1024
 
-const FUniqueType FZipManager::Type = FUniqueType();
+const FUniqueType FZipManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FZipManager)
 

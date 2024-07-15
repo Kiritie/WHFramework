@@ -8,8 +8,9 @@
 #include "Main/MainManager.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "WebRequest/FileDownloader/FileDownloaderInterface.h"
 
-const FUniqueType FWebRequestManager::Type = FUniqueType();
+const FUniqueType FWebRequestManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FWebRequestManager)
 
@@ -19,6 +20,8 @@ FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 	bLocalMode = false;
 	ServerURL = TEXT("");
 	ServerPort = 0;
+	bConnected = false;
+	Downloaders = TArray<TSharedPtr<IFileDownloaderInterface>>();
 }
 
 FWebRequestManager::~FWebRequestManager()
@@ -32,6 +35,36 @@ FString FWebRequestManager::GetServerURL() const
 	const FString BeginURL = !bLocalMode ? ServerURL.Mid(0, MidIndex) : TEXT("http://127.0.0.1");
 	const FString EndURL = ServerURL.Mid(MidIndex, ServerURL.Len() - MidIndex);
 	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
+}
+
+void FWebRequestManager::OnInitialize()
+{
+	FManagerBase::OnInitialize();
+}
+
+void FWebRequestManager::OnPreparatory()
+{
+	FManagerBase::OnPreparatory();
+
+	ConnectServer();
+}
+
+void FWebRequestManager::OnRefresh(float DeltaSeconds)
+{
+	FManagerBase::OnRefresh(DeltaSeconds);
+
+	for(auto& Iter : TArray(Downloaders))
+	{
+		Iter->RefreshDownload(DeltaSeconds);
+	}
+}
+
+void FWebRequestManager::ConnectServer()
+{
+	SendWebRequest(GetServerURL(), EWebRequestMethod::Get, {}, {}, [this](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+	{
+		bConnected = bSuccess;
+	});
 }
 
 bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
@@ -119,6 +152,26 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 		}
 		OnComplete.Execute(Json);
 	});
+}
+
+void FWebRequestManager::AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader)
+{
+	if(!Downloader) return;;
+	
+	if(!Downloaders.Contains(Downloader))
+	{
+		Downloaders.Add(Downloader);
+	}
+}
+
+void FWebRequestManager::RemoveDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader)
+{
+	if(!Downloader) return;;
+
+	if(Downloaders.Contains(Downloader))
+	{
+		Downloaders.Remove(Downloader);
+	}
 }
 
 void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)

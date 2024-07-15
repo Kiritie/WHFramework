@@ -107,6 +107,8 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AWHActor::Tick(float DeltaSeconds)
 {
+	Super::Tick(DeltaSeconds);
+	
 	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);

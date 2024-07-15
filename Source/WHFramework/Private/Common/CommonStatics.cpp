@@ -203,12 +203,12 @@ bool UCommonStatics::RegexMatch(const FString& InSourceStr, const FString& InPat
 
 FString UCommonStatics::BoolToString(bool InBool)
 {
-	return InBool ? TEXT("true") : TEXT("false");
+	return FCoreStatics::BoolToString(InBool);
 }
 
 bool UCommonStatics::StringToBool(const FString& InString)
 {
-	return InString == TEXT("true");
+	return FCoreStatics::StringToBool(InString);
 }
 
 TArray<FString> UCommonStatics::NotNumberSymbols = TArray<FString>{ TEXT("."), TEXT(","), TEXT(" ") };

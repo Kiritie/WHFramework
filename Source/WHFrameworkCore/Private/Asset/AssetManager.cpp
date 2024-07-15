@@ -6,7 +6,7 @@
 #include "Debug/DebugTypes.h"
 #include "Main/MainManager.h"
 
-FUniqueType FAssetManager::Type = FUniqueType();
+FUniqueType FAssetManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FAssetManager)
 

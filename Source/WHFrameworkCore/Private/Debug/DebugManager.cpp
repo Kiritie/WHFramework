@@ -6,7 +6,7 @@
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"
 
-const FUniqueType FDebugManager::Type = FUniqueType();
+const FUniqueType FDebugManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FDebugManager)
 
