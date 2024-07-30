@@ -37,6 +37,11 @@ FString FWebRequestManager::GetServerURL() const
 	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
 }
 
+void FWebRequestManager::SetServerURL(const FString& InServerURL)
+{
+	ServerURL = InServerURL.StartsWith(TEXT("http")) ? InServerURL : (TEXT("http://") + InServerURL);
+}
+
 void FWebRequestManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
@@ -61,6 +66,8 @@ void FWebRequestManager::OnRefresh(float DeltaSeconds)
 
 void FWebRequestManager::ConnectServer()
 {
+	CancelWebRequest(GetServerURL());
+	
 	SendWebRequest(GetServerURL(), EWebRequestMethod::Get, {}, {}, [this](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 	{
 		bConnected = bSuccess;
@@ -72,6 +79,8 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
 	HttpRequest->SetURL(InUrl.StartsWith(TEXT("/")) ? (GetServerURL() + InUrl) : InUrl);
+
+	WebRequestMap.Emplace(HttpRequest->GetURL(), HttpRequest.ToSharedPtr());
 
 	FString ContentType;
 	switch(InContent.ContentType)
@@ -154,6 +163,29 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 	});
 }
 
+bool FWebRequestManager::CancelWebRequest(const FString& InUrl)
+{
+	if(WebRequestMap.Contains(InUrl))
+	{
+		if(TSharedPtr<IHttpRequest> WebRequest = WebRequestMap[InUrl])
+		{
+			WebRequestMap.Remove(InUrl);
+			WebRequest->CancelRequest();
+		}
+		return true;
+	}
+	return false;
+}
+
+TSharedPtr<IHttpRequest> FWebRequestManager::GetWebRequest(const FString& InUrl) const
+{
+	if(WebRequestMap.Contains(InUrl))
+	{
+		return WebRequestMap[InUrl];
+	}
+	return nullptr;
+}
+
 void FWebRequestManager::AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader)
 {
 	if(!Downloader) return;;
@@ -176,6 +208,14 @@ void FWebRequestManager::RemoveDownloader(const TSharedPtr<IFileDownloaderInterf
 
 void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
 {
+	if(!WebRequestMap.Contains(HttpRequest->GetURL()))
+	{
+		WHLog(FString::Printf(TEXT("The web request has be canceled: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
+		return;
+	}
+
+	WebRequestMap.Remove(HttpRequest->GetURL());
+
 	if(!HttpResponse.IsValid())
 	{
 		WHLog(FString::Printf(TEXT("Unable to process web request: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
@@ -204,7 +244,6 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 		WHLog(TEXT("Web request successed"), EDC_WebRequest);
 		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
 		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest);
-
 		OnComplete(HttpRequest, HttpResponse, true);
 	}
 	else
@@ -212,7 +251,6 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 		WHLog(FString::Printf(TEXT("Web response returned error code: %d"), HttpResponse->GetResponseCode()), EDC_WebRequest, EDV_Error);
 		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Error);
 		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest, EDV_Error);
-
 		OnComplete(HttpRequest, HttpResponse, false);
 	}
 }

@@ -1,13 +1,13 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Asset/Modifier/Material/AssetModifier_RemoveMaterialUserData.h"
+#include "Asset/Modifier/Material/AssetModifier_RemoveAssetUserData.h"
 
-UAssetModifier_RemoveMaterialUserData::UAssetModifier_RemoveMaterialUserData()
+UAssetModifier_RemoveAssetUserData::UAssetModifier_RemoveAssetUserData()
 {
 	UserDataClass = nullptr;
 }
 
-bool UAssetModifier_RemoveMaterialUserData::CanModify_Implementation(const FAssetData& InAssetData) const
+bool UAssetModifier_RemoveAssetUserData::CanModify_Implementation(const FAssetData& InAssetData) const
 {
 	if(UMaterialInterface* MaterialInterface = Cast<UMaterialInterface>(InAssetData.GetAsset()))
 	{
@@ -19,7 +19,7 @@ bool UAssetModifier_RemoveMaterialUserData::CanModify_Implementation(const FAsse
 	return false;
 }
 
-void UAssetModifier_RemoveMaterialUserData::DoModify_Implementation(const FAssetData& InAssetData)
+void UAssetModifier_RemoveAssetUserData::DoModify_Implementation(const FAssetData& InAssetData)
 {
 	if(UMaterialInterface* MaterialInterface = Cast<UMaterialInterface>(InAssetData.GetAsset()))
 	{

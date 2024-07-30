@@ -40,6 +40,10 @@ public:
 
 	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete);
 
+	virtual bool CancelWebRequest(const FString& InUrl);
+
+	virtual TSharedPtr<IHttpRequest> GetWebRequest(const FString& InUrl) const;
+
 public:
 	virtual void AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader);
 
@@ -57,6 +61,8 @@ protected:
 
 	bool bConnected;
 
+	TMap<FString, TSharedPtr<IHttpRequest>> WebRequestMap;
+
 	TArray<TSharedPtr<IFileDownloaderInterface>> Downloaders;
 
 public:
@@ -66,7 +72,7 @@ public:
 
 	FString GetServerURL() const;
 	
-	void SetServerURL(const FString& InServerURL) { ServerURL = InServerURL; }
+	void SetServerURL(const FString& InServerURL);
 
 	int32 GetServerPort() const { return ServerPort; }
 

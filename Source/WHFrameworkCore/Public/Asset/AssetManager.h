@@ -104,6 +104,24 @@ public:
 		return nullptr;
 	}
 
+	virtual FUniqueAssetData* LoadAssetByCondition(const TFunction<bool(FUniqueAssetData*)>& InCondition);
+
+	template<class T>
+	T* LoadAssetByCondition(const TFunction<bool(T*)>& InCondition)
+	{
+		for(auto& Iter : AssetMap)
+		{
+			if(T* LoadedAsset = Iter.Value->CastTo<T>())
+			{
+				if(InCondition(LoadedAsset))
+				{
+					return LoadedAsset;
+				}
+			}
+		}
+		return nullptr;
+	}
+
 	virtual TArray<FUniqueAssetData*> LoadAssetsByType(FUniqueType InAssetType);
 
 	template<class T>

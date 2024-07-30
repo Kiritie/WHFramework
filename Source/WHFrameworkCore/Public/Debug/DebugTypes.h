@@ -29,6 +29,7 @@ enum EDebugCategory : int
 	EDC_Network UMETA(DisplayName = "Network"),
 	EDC_ObjectPool UMETA(DisplayName = "ObjectPool"),
 	EDC_Parameter UMETA(DisplayName = "Parameter"),
+	EDC_Platform UMETA(DisplayName = "Platform"),
 	EDC_Pawn UMETA(DisplayName = "Pawn"),
 	EDC_Procedure UMETA(DisplayName = "Procedure"),
 	EDC_ReferencePool UMETA(DisplayName = "ReferencePool"),
@@ -119,6 +120,8 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Network, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_ObjectPool, Log, All);
 // 参数
 DEFINE_LOG_CATEGORY_STATIC(WH_Parameter, Log, All);
+// 平台
+DEFINE_LOG_CATEGORY_STATIC(WH_Platform, Log, All);
 // Pawn
 DEFINE_LOG_CATEGORY_STATIC(WH_Pawn, Log, All);
 // 流程

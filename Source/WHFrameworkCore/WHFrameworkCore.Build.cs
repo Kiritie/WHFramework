@@ -72,6 +72,11 @@ public class WHFrameworkCore : ModuleRules
 		{
 			PublicAdditionalLibraries.Add(Path.Combine(externalLib, "Zip", "Linux", "libzip.a"));
 		}
+		
+		if (Target.IsInPlatformGroup(UnrealPlatformGroup.Linux))
+		{
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "SDL2");
+		}
 	}
 	
 	void AddRuntimeDependencies(string[] DllNames, string LibraryPath, bool DelayLoad)

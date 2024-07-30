@@ -44,7 +44,7 @@ public:
 	virtual void DestroyDownload();
 
 protected:
-	virtual void OnProgress_Internal(int64 BytesSent, int64 BytesReceived, int64 FullSize);
+	virtual void OnProgress_Internal(FString CurrentFileUrl, int64 CurrentFileIndex, int64 TotalFileNum, int64 BytesSent, int64 BytesReceived, int64 FullSize);
 
 public:
 	FOnFileDownloadProgress OnProgress;
@@ -52,6 +52,8 @@ public:
 	FOnFileDownloadComplete OnComplete;
 
 	FOnFileDownloadDestroy OnDestroy;
+
+	bool bAsyncSave;
 
 	bool bAutoDestroy;
 	

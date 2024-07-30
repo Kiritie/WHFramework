@@ -1,7 +1,7 @@
 ﻿#include "Slate/Editor/Setting/SEditorPathSettingItem.h"
 
-#include "DesktopPlatformModule.h"
 #include "WHFrameworkSlateStyle.h"
+#include "Platform/PlatformManager.h"
 #include "Slate/Editor/Misc/SEditorSplitLine.h"
 
 SEditorPathSettingItem::SEditorPathSettingItem()
@@ -76,13 +76,13 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 						.ButtonStyle(&FWHFrameworkSlateStyle::Get().GetWidgetStyle<FButtonStyle>("Buttons.SelectPath"))
 						.OnClicked_Lambda([this, InArgs]()
 						{
-							IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+							IPlatformManager* PlatformManager = FPlatformManager::GetPtr();
 							
 							TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
 							void* ParentWindowHandle = (ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid()) ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
 
 							FString Path;
-							if(DesktopPlatform->OpenDirectoryDialog(ParentWindowHandle, GetSettingValue().GetStringValue(), GetSettingValue().GetStringValue(), Path))
+							if(PlatformManager->OpenDirectoryDialog(ParentWindowHandle, GetSettingValue().GetStringValue(), GetSettingValue().GetStringValue(), Path))
 							{
 								SetSettingValue(Path + (!Path.EndsWith(TEXT("/")) ? TEXT("/") : TEXT("")) + InArgs._AdditionPath);
 							}
