@@ -4,9 +4,10 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
 #include "Ability/AbilityModule.h"
-#include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Common/Components/FallingMovementComponent.h"
+#include "Common/Components/FollowingMovementComponent.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -26,6 +27,8 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	RotatingComponent->RotationRate = FRotator(0.f, 180.f, 0.f);
 
 	FallingComponent = CreateDefaultSubobject<UFallingMovementComponent>(TEXT("FallingComponent"));
+	
+	FollowingComponent = CreateDefaultSubobject<UFollowingMovementComponent>(TEXT("FollowingComponent"));
 
 	Item = FAbilityItem::Empty;
 }
@@ -34,7 +37,7 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	FallingComponent->TraceChannel = USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel();
+	FallingComponent->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -46,6 +49,8 @@ void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	Item = FAbilityItem::Empty;
+
+	FollowingComponent->SetFollowingTarget(nullptr);
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -81,6 +86,14 @@ void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AAc
 
 	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(OtherActor))
 	{
-		OnPickUp(Picker);
+		if(OtherComp->IsA<UInteractionComponent>())
+		{
+			FallingComponent->SetActive(false);
+			FollowingComponent->SetFollowingTarget(OtherActor);
+		}
+		else
+		{
+			OnPickUp(Picker);
+		}
 	}
 }

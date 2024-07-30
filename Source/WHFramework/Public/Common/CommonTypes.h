@@ -85,6 +85,9 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 	return nullptr;
 }
 
+#define GET_FUNCTION_NAME_THISCLASS(FunctionName) \
+	((void)sizeof(&ThisClass::FunctionName), FName(TEXT(#FunctionName)))
+
 //////////////////////////////////////////////////////////////////////////
 // Tags
 namespace GameplayTags

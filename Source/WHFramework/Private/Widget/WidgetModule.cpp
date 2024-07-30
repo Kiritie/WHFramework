@@ -68,9 +68,9 @@ void UWidgetModule::OnInitialize()
 
 	FInputManager::Get().AddInputManager(this);
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, FName("OnOpenUserWidget"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, FName("OnCloseUserWidget"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetWorldWidgetVisible>(this, FName("OnSetWorldWidgetVisible"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, GET_FUNCTION_NAME_THISCLASS(OnOpenUserWidget));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, GET_FUNCTION_NAME_THISCLASS(OnCloseUserWidget));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetWorldWidgetVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetWorldWidgetVisible));
 
 	for(auto& Iter : UserWidgetClasses)
 	{

@@ -10,7 +10,7 @@ UInteractionComponent::UInteractionComponent(const FObjectInitializer& ObjectIni
 	PrimaryComponentTick.bCanEverTick = false;
 	
 	UPrimitiveComponent::SetCollisionProfileName(TEXT("Interaction"));
-	InitBoxExtent(FVector(100, 100, 50));
+	InitBoxExtent(FVector(100.f, 100.f, 100.f));
 	OnComponentBeginOverlap.AddDynamic(this, &UInteractionComponent::OnBeginOverlap);
 	OnComponentEndOverlap.AddDynamic(this, &UInteractionComponent::OnEndOverlap);
 }

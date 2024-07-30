@@ -51,7 +51,7 @@ void UProcedureModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, FName("OnSwitchProcedure"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, GET_FUNCTION_NAME_THISCLASS(OnSwitchProcedure));
 
 	if(DefaultAsset)
 	{

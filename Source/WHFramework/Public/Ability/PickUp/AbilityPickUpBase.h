@@ -9,6 +9,7 @@
 
 #include "AbilityPickUpBase.generated.h"
 
+class UFollowingMovementComponent;
 class IAbilityPickerInterface;
 class AVoxelChunk;
 class UBoxComponent;
@@ -61,6 +62,9 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFallingMovementComponent* FallingComponent;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UFollowingMovementComponent* FollowingComponent;
 
 public:
 	FAbilityItem& GetItem() { return Item; }

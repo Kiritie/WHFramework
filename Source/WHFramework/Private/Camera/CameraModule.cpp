@@ -260,9 +260,9 @@ void UCameraModule::OnInitialize()
 		CameraMap.Emplace(Iter->GetCameraName(), Iter);
 	}
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, FName("OnSetCameraView"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_ResetCameraView>(this, FName("OnResetCameraView"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchCameraPoint>(this, FName("OnSwitchCameraPoint"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, GET_FUNCTION_NAME_THISCLASS(OnSetCameraView));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_ResetCameraView>(this, GET_FUNCTION_NAME_THISCLASS(OnResetCameraView));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchCameraPoint>(this, GET_FUNCTION_NAME_THISCLASS(OnSwitchCameraPoint));
 }
 
 void UCameraModule::OnPreparatory(EPhase InPhase)

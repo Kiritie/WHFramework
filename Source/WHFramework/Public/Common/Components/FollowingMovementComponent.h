@@ -5,10 +5,10 @@
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
 #include "GameFramework/MovementComponent.h"
-#include "FallingMovementComponent.generated.h"
+#include "FollowingMovementComponent.generated.h"
 
 UCLASS(ClassGroup=Movement, meta=(BlueprintSpawnableComponent), HideCategories=(Velocity))
-class WHFRAMEWORK_API UFallingMovementComponent : public UMovementComponent
+class WHFRAMEWORK_API UFollowingMovementComponent : public UMovementComponent
 {
 	GENERATED_UCLASS_BODY()
 
@@ -17,20 +17,23 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float FallingSpeed;
+	float FollowingSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float AcceleratedSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TEnumAsByte<ECollisionChannel> TraceChannel;
+	AActor* FollowingTarget;
+
+private:
+	float CurrentFollowingSpeed;
 
 public:
 	UFUNCTION(BlueprintPure)
-	float GetFallingSpeed() const { return FallingSpeed; }
+	float GetFollowingSpeed() const { return FollowingSpeed; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetFallingSpeed(float InFallingSpeed) { FallingSpeed = InFallingSpeed; }
+	void SetFollowingSpeed(float InFollowingSpeed) { FollowingSpeed = InFollowingSpeed; }
 
 	UFUNCTION(BlueprintPure)
 	float GetAcceleratedSpeed() const { return AcceleratedSpeed; }
@@ -39,8 +42,11 @@ public:
 	void SetAcceleratedSpeed(float InAcceleratedSpeed) { AcceleratedSpeed = InAcceleratedSpeed; }
 
 	UFUNCTION(BlueprintPure)
-	TEnumAsByte<ECollisionChannel> GetTraceChannel() const { return TraceChannel; }
+	AActor* GetFollowingTarget() const { return FollowingTarget; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetTraceChannel(const TEnumAsByte<ECollisionChannel>& InTraceChannel) { TraceChannel = InTraceChannel; }
+	void SetFollowingTarget(AActor* InFollowingTarget);
 };
+
+
+

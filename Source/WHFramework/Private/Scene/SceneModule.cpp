@@ -146,8 +146,8 @@ void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, FName("OnSetDataLayerRuntimeState"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, FName("OnSetDataLayerOwnerPlayer"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerRuntimeState));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerOwnerPlayer));
 
 	if(WorldTimer)
 	{
