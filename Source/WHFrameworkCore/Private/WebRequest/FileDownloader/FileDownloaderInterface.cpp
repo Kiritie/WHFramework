@@ -7,6 +7,7 @@ const FUniqueType IFileDownloaderInterface::Type = FUniqueType(&FUniqueClass::Ty
 
 IFileDownloaderInterface::IFileDownloaderInterface(FUniqueType InType) : FUniqueClass(InType)
 {
+	bAsyncSave = false;
 	bAutoDestroy = false;
 	FileBytesSent = 0;
 	FileBytesReceived = 0;
@@ -32,7 +33,7 @@ void IFileDownloaderInterface::DestroyDownload()
 {
 }
 
-void IFileDownloaderInterface::OnProgress_Internal(int64 BytesSent, int64 BytesReceived, int64 FullSize)
+void IFileDownloaderInterface::OnProgress_Internal(FString CurrentFileUrl, int64 CurrentFileIndex, int64 TotalFileNum, int64 BytesSent, int64 BytesReceived, int64 FullSize)
 {
 	FileBytesSent = BytesSent;
 	FileBytesReceived = BytesReceived;

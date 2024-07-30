@@ -12,7 +12,7 @@ const int32 BytesOfMB = 1024 * 1024;
  */
 using FFileDownloaderResult = struct{ EDownloadToMemoryResult Result; TArray64<uint8> Data; };
 
-DECLARE_MULTICAST_DELEGATE_FourParams(FOnFileDownloadProgress, FString FileUrl, int64/* BytesSent*/, int64/* BytesReceived*/, int64/* FullSize*/);
+DECLARE_MULTICAST_DELEGATE_SixParams(FOnFileDownloadProgress, FString/* CurrentFileUrl*/, int64/* CurrentFileIndex*/, int64/* TotalFileNum*/, int64/* BytesSent*/, int64/* BytesReceived*/, int64/* FullSize*/);
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnFileDownloadComplete, EDownloadToStorageResult/* Result*/, const FString&/* SavePath*/);
 

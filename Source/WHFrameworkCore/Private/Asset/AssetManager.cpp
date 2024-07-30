@@ -106,6 +106,18 @@ FUniqueAssetData* FAssetManager::LoadAssetByID(const FUniqueAssetID& InAssetID, 
 	return LoadedAsset;
 }
 
+FUniqueAssetData* FAssetManager::LoadAssetByCondition(const TFunction<bool(FUniqueAssetData*)>& InCondition)
+{
+	for (auto& Iter : AssetMap)
+	{
+		if (InCondition(Iter.Value))
+		{
+			return Iter.Value;
+		}
+	}
+	return nullptr;
+}
+
 TArray<FUniqueAssetData*> FAssetManager::LoadAssetsByType(FUniqueType InAssetType)
 {
 	TArray<FUniqueAssetData*> LoadedAssets;

@@ -22,7 +22,6 @@ FFileDownloaderCollection::FFileDownloaderCollection(const TArray<FWebFileURL>& 
 
 FFileDownloaderCollection::~FFileDownloaderCollection()
 {
-	
 }
 
 void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Timeout, const FString& ContentType, bool bForceByPayload)
@@ -31,6 +30,12 @@ void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Tim
 	
 	TArray<FWebFileURL> URLs = GetFileURLs();
 	
+	if (Downloaders.Num() > 0)
+	{
+		WHLog(TEXT("The downloader collection has started"), EDC_WebRequest, EDV_Warning);
+		return;
+	}
+
 	if (URLs.IsEmpty())
 	{
 		WHLog(FString::Printf(TEXT("You have not provided an URL to download the file")), EDC_WebRequest, EDV_Error);
@@ -69,7 +74,7 @@ void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Tim
 		if(FileManager.FileExists(*_FilePath))
 		{
 			const FMD5Hash FileHash = FMD5Hash::HashFile(*_FilePath);
-			const FString HashValue = LexToString(FileHash);
+			const FString HashValue = LexToString(FileHash).Replace(TEXT("-"), TEXT(""));
 			if(HashValue.Equals(Iter.MD5Hash))
 			{
 				bNeedDownload = false;
@@ -83,6 +88,7 @@ void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Tim
 			DownloadFilePaths.Add(_FilePath);
 
 			TSharedPtr<FFileDownloader> AssetDownloader = CreateDownloader<FFileDownloader>(Iter);
+			// AssetDownloader->bAsyncSave = true;
 
 			AddDownloader(AssetDownloader);
 		}
@@ -100,52 +106,55 @@ void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Tim
 		}
 	}
 
+	TWeakPtr<FFileDownloaderCollection> _WeakThis(SharedThis(this));
+
 	for(int32 i = 0; i < Downloaders.Num(); i++)
 	{
-		TWeakPtr<FFileDownloaderCollection> _WeakThis(SharedThis(this));
-		
-		Downloaders[i]->OnProgress.AddLambda([_WeakThis, i](FString FileUrl, int64 BytesSent, int64 BytesReceived, int64 FullSize)
+		Downloaders[i]->OnProgress.AddLambda([_WeakThis, i](FString CurrentFileUrl, int64 CurrentFileIndex, int64 TotalFileNum, int64 BytesSent, int64 BytesReceived, int64 FullSize)
 		{
 			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(!ThisPtr.IsValid()) return;
-
-			ThisPtr->OnProgress_Internal(0, i + 1, ThisPtr->Downloaders.Num());
-			ThisPtr->OnProgress.Broadcast(FileUrl, 0, i + 1, ThisPtr->Downloaders.Num());
+			if(ThisPtr.IsValid())
+			{
+				ThisPtr->OnProgress_Internal(CurrentFileUrl, i, ThisPtr->Downloaders.Num(), BytesSent, BytesReceived, FullSize);
+				ThisPtr->OnProgress.Broadcast(CurrentFileUrl, i, ThisPtr->Downloaders.Num(), BytesSent, BytesReceived, FullSize);
+			}
 		});
 
 		Downloaders[i]->OnDestroy.AddLambda([_WeakThis, i]()
 		{
 			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(!ThisPtr.IsValid()) return;
-
-			ThisPtr->RemoveDownloader(ThisPtr->Downloaders[i]);
-
-			if(ThisPtr->Downloaders.IsEmpty())
+			if(ThisPtr.IsValid())
 			{
-				ThisPtr->OnDestroy_Internal();
+				ThisPtr->RemoveDownloader(ThisPtr->Downloaders[i]);
 
-				ThisPtr->OnDestroy.Broadcast();
+				if(ThisPtr->Downloaders.IsEmpty())
+				{
+					ThisPtr->OnDestroy_Internal();
+
+					ThisPtr->OnDestroy.Broadcast();
+				}
 			}
 		});
 		
 		Downloaders[i]->OnComplete.AddLambda([_WeakThis, i, Timeout, ContentType, bForceByPayload, DownloadFilePaths](EDownloadToStorageResult Result, const FString& SavePath)
 		{
 			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(!ThisPtr.IsValid()) return;
-
-			if(i < ThisPtr->Downloaders.Num() - 1 && Result != EDownloadToStorageResult::Cancelled)
+			if(ThisPtr.IsValid())
 			{
-				ThisPtr->Downloaders[i + 1]->DownloadFile(DownloadFilePaths[i + 1], Timeout, ContentType, bForceByPayload);
-			}
-			else
-			{
-				ThisPtr->OnComplete_Internal(Result);
-
-				if(ThisPtr->bAutoDestroy)
+				if(i == ThisPtr->Downloaders.Num() - 1 || Result == EDownloadToStorageResult::Cancelled)
 				{
-					ThisPtr->OnDestroy_Internal();
+					ThisPtr->OnComplete_Internal(Result);
 
-					ThisPtr->OnDestroy.Broadcast();
+					if(ThisPtr->bAutoDestroy)
+					{
+						ThisPtr->OnDestroy_Internal();
+
+						ThisPtr->OnDestroy.Broadcast();
+					}
+				}
+				else if(Result == EDownloadToStorageResult::Success || Result == EDownloadToStorageResult::SucceededByPayload)
+				{
+					ThisPtr->Downloaders[i + 1]->DownloadFile(DownloadFilePaths[i + 1], Timeout, ContentType, bForceByPayload);
 				}
 			}
 		});

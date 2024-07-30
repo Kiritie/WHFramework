@@ -46,6 +46,7 @@ void FDebugManager::LogMessage(const FString& InMessage, EDebugCategory InCatego
 		LOG_CASE(Network, InVerbosity)
 		LOG_CASE(ObjectPool, InVerbosity)
 		LOG_CASE(Parameter, InVerbosity)
+		LOG_CASE(Platform, InVerbosity)
 		LOG_CASE(Pawn, InVerbosity)
 		LOG_CASE(Procedure, InVerbosity)
 		LOG_CASE(ReferencePool, InVerbosity)

@@ -51,20 +51,20 @@ public:
 	FEnumParameterValue(UEnum* const InEnumType, const uint8 InEnumValue) : FEnumParameterValue()
 	{
 		EnumType = InEnumType;
-		EnumValue = FMath::Clamp(InEnumValue, 0, EnumType->NumEnums() - 1);
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumType->NumEnums() - 1, 0));
 	}
 
 	FEnumParameterValue(const FString& InEnumName, const uint8 InEnumValue) : FEnumParameterValue()
 	{
 		EnumType = LoadObject<UEnum>(nullptr, *InEnumName);
 		EnumName = InEnumName;
-		EnumValue = FMath::Clamp(InEnumValue, 0, EnumType->NumEnums() - 1);
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumType->NumEnums() - 1, 0));
 	}
 	
 	FEnumParameterValue(const TArray<FString>& InEnumNames, const uint8 InEnumValue) : FEnumParameterValue()
 	{
 		EnumNames = InEnumNames;
-		EnumValue = FMath::Clamp(InEnumValue, 0, EnumNames.Num() - 1);
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumNames.Num() - 1, 0));
 	}
 
 	friend bool operator==(const FEnumParameterValue& A, const FEnumParameterValue& B)

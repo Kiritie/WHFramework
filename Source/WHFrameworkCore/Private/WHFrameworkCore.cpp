@@ -8,9 +8,14 @@
 #include "Parameter/ParameterManager.h"
 #include "Scene/SceneManager.h"
 #include "WebRequest/WebRequestManager.h"
-#include "WebRequest/WebRequestManager.h"
 #include "Zip/ZipManager.h"
+#if PLATFORM_WINDOWS
 #include "Platform/Windows/WindowsPlatformManager.h"
+#elif PLATFORM_MAC
+#include "Platform/Mac/MacPlatformManager.h"
+#elif PLATFORM_LINUX
+#include "Platform/Linux/LinuxPlatformManager.h"
+#endif
 
 void FWHFrameworkCoreModule::StartupModule()
 {
@@ -19,6 +24,10 @@ void FWHFrameworkCoreModule::StartupModule()
 	FParameterManager::Register();
 #if PLATFORM_WINDOWS
 	FWindowsPlatformManager::Register();
+#elif PLATFORM_MAC
+	FMacPlatformManager::Register();
+#elif PLATFORM_LINUX
+	FLinuxPlatformManager::Register();
 #endif
 	FSceneManager::Register();
 	FWebRequestManager::Register();
@@ -33,6 +42,10 @@ void FWHFrameworkCoreModule::ShutdownModule()
 	FParameterManager::UnRegister();
 #if PLATFORM_WINDOWS
 	FWindowsPlatformManager::UnRegister();
+#elif PLATFORM_MAC
+	FMacPlatformManager::UnRegister();
+#elif PLATFORM_LINUX
+	FLinuxPlatformManager::UnRegister();
 #endif
 	FSceneManager::UnRegister();
 	FWebRequestManager::UnRegister();

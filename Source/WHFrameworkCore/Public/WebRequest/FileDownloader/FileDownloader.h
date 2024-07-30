@@ -93,8 +93,10 @@ protected:
 	 */
 	virtual TFuture<int64> GetContentSize(const FString& URL, float Timeout);
 
+	virtual void DeleteFileHandle();
+
 protected:
-	virtual void OnProgress_Internal(int64 BytesSent, int64 BytesReceived, int64 FullSize) override;
+	virtual void OnProgress_Internal(FString CurrentFileUrl, int64 CurrentFileIndex, int64 TotalFileNum, int64 BytesSent, int64 BytesReceived, int64 FullSize) override;
 	
 	virtual void OnComplete_Internal(EDownloadToMemoryResult Result, TArray64<uint8> DownloadedContent);
 
@@ -104,6 +106,8 @@ public:
 	TWeakPtr<IHttpRequest> HttpRequestPtr;
 	
 	FWebFileURL FileURL;
+
+	IFileHandle* FileHandle;
 
 public:
 	virtual FWebFileURL GetFileURL() const { return FileURL; }

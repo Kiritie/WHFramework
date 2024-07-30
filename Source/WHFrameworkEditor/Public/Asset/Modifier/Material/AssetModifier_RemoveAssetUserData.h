@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Asset/Modifier/AssetModifierBase.h"
-#include "AssetModifier_AddMaterialUserData.generated.h"
+#include "AssetModifier_RemoveAssetUserData.generated.h"
 
 /**
  * 
  */
 UCLASS(Abstract)
-class WHFRAMEWORKEDITOR_API UAssetModifier_AddMaterialUserData : public UAssetModifierBase
+class WHFRAMEWORKEDITOR_API UAssetModifier_RemoveAssetUserData : public UAssetModifierBase
 {
 	GENERATED_BODY()
 
 public:
-	UAssetModifier_AddMaterialUserData();
+	UAssetModifier_RemoveAssetUserData();
 
 public:
 	virtual bool CanModify_Implementation(const FAssetData& InAssetData) const override;

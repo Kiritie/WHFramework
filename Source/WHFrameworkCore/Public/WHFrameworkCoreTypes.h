@@ -117,17 +117,22 @@ InstanceClass* InstanceClass::GetPtr() \
 	bool bSuccess = GConfig->GetInt(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
 	OutValue = FEnumParameterValue(ValueOptions, SettingValue); \
 	return bSuccess;
+
 #define SET_STRING_CONFIG(IniFilename, IniSection, IniKey, InValue) \
-	GConfig->SetString(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+	GConfig->SetString(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename); \
+	GConfig->Flush(false, IniFilename)
 
 #define SET_BOOL_CONFIG(IniFilename, IniSection, IniKey, InValue) \
-	GConfig->SetBool(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+	GConfig->SetBool(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename); \
+	GConfig->Flush(false, IniFilename)
 
 #define SET_INT_CONFIG(IniFilename, IniSection, IniKey, InValue) \
-	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename); \
+	GConfig->Flush(false, IniFilename)
 
 #define SET_ENUM_CONFIG(IniFilename, IniSection, IniKey, InValue) \
-	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename);
+	GConfig->SetInt(TEXT(#IniSection), TEXT(#IniKey), InValue, IniFilename); \
+	GConfig->Flush(false, IniFilename)
 
 /*
  * FUniqueType
