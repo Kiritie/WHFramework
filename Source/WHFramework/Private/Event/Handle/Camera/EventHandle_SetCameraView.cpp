@@ -23,7 +23,7 @@ void UEventHandle_SetCameraView::Parse_Implementation(const TArray<FParameter>& 
 	CameraViewData.FromParams(InParams);
 	if(InParams.IsValidIndex(InParams.Num() - 1))
 	{
-		bCacheData = InParams[InParams.Num() - 1].GetBooleanValue();
+		bCacheData = InParams[InParams.Num() - 1];
 	}
 }
 

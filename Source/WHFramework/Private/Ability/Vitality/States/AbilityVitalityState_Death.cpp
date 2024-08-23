@@ -28,7 +28,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(InParams.IsValidIndex(0))
 	{
-		Killer = InParams[0].GetObjectValue<IAbilityVitalityInterface>();
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();

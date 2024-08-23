@@ -26,17 +26,17 @@ void UEventHandle_CloseUserWidget::Parse_Implementation(const TArray<FParameter>
 	{
 		if(InParams[0].GetParameterType() == EParameterType::Class)
 		{
-			WidgetClass = InParams[0].GetClassValue();
+			WidgetClass = InParams[0];
 			WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
 		}
 		else
 		{
-			WidgetName = InParams[0].GetNameValue();
+			WidgetName = InParams[0];
 		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bInstant = InParams[1].GetBooleanValue();
+		bInstant = InParams[1];
 	}
 }
 

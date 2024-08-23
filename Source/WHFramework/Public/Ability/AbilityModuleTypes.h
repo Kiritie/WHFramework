@@ -34,6 +34,7 @@ class UAbilityInventorySlot;
 	ATTRIBUTE_VALUE_GETTER(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_MODIFY(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_MULTIPLE(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName)
 
 #define ATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -67,6 +68,13 @@ class UAbilityInventorySlot;
 	{ \
 		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
 		_AttributeSet->ModifyAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InDeltaValue); \
+	}
+
+#define ATTRIBUTE_VALUE_MULTIPLE(ClassName, PropertyName) \
+	FORCEINLINE void Multiple##PropertyName(float InMultipleValue) \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		_AttributeSet->MultipleAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InMultipleValue); \
 	}
 
 #define ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName) \
@@ -389,7 +397,9 @@ enum class EDamageType : uint8
 	// 物理伤害
 	Physics,
 	// 魔法伤害
-	Magic
+	Magic,
+	// 掉落伤害
+	Fall
 };
 
 /**

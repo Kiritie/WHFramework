@@ -39,17 +39,17 @@ void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
 	{
-		SetActorLocation(InParams[0].GetVectorValue());
+		SetActorLocation(InParams[0]);
 	}
 
 	if(InParams.IsValidIndex(1) && InParams[1].GetParameterType() == EParameterType::Rotator)
 	{
-		SetActorRotation(InParams[1].GetRotatorValue());
+		SetActorRotation(InParams[1]);
 	}
 
 	if(InParams.IsValidIndex(2) && InParams[2].GetParameterType() == EParameterType::Vector)
 	{
-		SetActorScale3D(InParams[2].GetVectorValue());
+		SetActorScale3D(InParams[2]);
 	}
 
 	Execute_SetActorVisible(this, true);

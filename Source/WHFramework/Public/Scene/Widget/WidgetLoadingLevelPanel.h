@@ -14,7 +14,7 @@ class WHFRAMEWORK_API UWidgetLoadingLevelPanel : public UUserWidgetBase
 	GENERATED_BODY()
 	
 public:
-	UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer);
+	UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;

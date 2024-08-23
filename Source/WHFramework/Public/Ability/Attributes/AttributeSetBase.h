@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue);
 
+	UFUNCTION(BlueprintCallable)
+	void MultipleAttributeValue(FGameplayAttribute InAttribute, float InMultipleValue);
+
 	UFUNCTION(BlueprintPure)
 	TArray<FGameplayAttribute> GetAllAttributes() const;
 

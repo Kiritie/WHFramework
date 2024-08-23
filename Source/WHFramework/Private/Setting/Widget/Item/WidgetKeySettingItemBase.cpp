@@ -65,7 +65,7 @@ void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)
 void UWidgetKeySettingItemBase::OnKeySelected(FKey InKey, UWidgetPressAnyKeyPanelBase* InPressAnyKeyPanel)
 {
 	InPressAnyKeyPanel->OnKeySelected.RemoveAll(this);
-	Keys[InPressAnyKeyPanel->GetWidgetParams()[0].GetIntegerValue()] = InKey;
+	Keys[InPressAnyKeyPanel->GetWidgetParams()[0]] = InKey;
 	if(OnValuesChanged.IsBound())
 	{
 		OnValuesChanged.Broadcast(this, GetValues());

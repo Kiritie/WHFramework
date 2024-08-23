@@ -21,7 +21,7 @@ void SEditorIntegerSettingItem::Construct(const FArguments& InArgs)
 			.Style(FWHFrameworkSlateStyle::Get(), "EditableTextBoxes.SettingItem")
 			.Text_Lambda([this]()
 			{
-				return FText::FromString(FString::FromInt(GetSettingValue().GetIntegerValue()));
+				return FText::FromString(FString::FromInt(GetSettingValue()));
 			})
 			.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type IntegerCommitType)
 			{

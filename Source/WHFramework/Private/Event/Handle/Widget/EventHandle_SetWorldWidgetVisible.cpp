@@ -21,11 +21,11 @@ void UEventHandle_SetWorldWidgetVisible::Parse_Implementation(const TArray<FPara
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WidgetClass = InParams[0].GetClassValue();
+		WidgetClass = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bVisible = InParams[1].GetBooleanValue();
+		bVisible = InParams[1];
 	}
 }
 

@@ -74,6 +74,11 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 			UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), EDamageType::Magic, HitResult, SourceTags);
 			SetMagicDamage(0.f);
 		}
+		else if(Data.EvaluatedData.Attribute.GetName().StartsWith("Fall"))
+		{
+			UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandle).HandleDamage(SourceActor, TargetActor, GetFallDamage(), EDamageType::Fall, HitResult, SourceTags);
+			SetFallDamage(0.f);
+		}
 	}
 }
 
@@ -119,3 +124,7 @@ void UVitalityAttributeSetBase::OnRep_MagicDamage(const FGameplayAttributeData& 
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MagicDamage, OldMagicDamage);
 }
 
+void UVitalityAttributeSetBase::OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, FallDamage, OldFallDamage);
+}

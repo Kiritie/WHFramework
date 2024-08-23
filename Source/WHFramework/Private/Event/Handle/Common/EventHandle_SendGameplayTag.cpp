@@ -17,7 +17,7 @@ void UEventHandle_SendGameplayTag::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Tag = InParams[0].GetTagValue();
+		Tag = InParams[0];
 	}
 }
 

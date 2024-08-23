@@ -27,7 +27,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	if(InParams.IsValidIndex(0))
 	{
-		Killer = InParams[0].GetObjectValue<IAbilityVitalityInterface>();
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();

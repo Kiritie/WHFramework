@@ -248,6 +248,54 @@ public:
 		*this = MakePointer(InValue);
 	}
 
+	FORCEINLINE operator int32() const { return IntegerValue; }
+	
+	FORCEINLINE operator float() const { return FloatValue; }
+	
+	FORCEINLINE operator uint8() const { return ByteValue; }
+	
+	FORCEINLINE operator FEnumParameterValue() const { return EnumValue; }
+	
+	FORCEINLINE operator FString() const { return StringValue; }
+	
+	FORCEINLINE operator FName() const { return NameValue; }
+	
+	FORCEINLINE operator FText() const { return TextValue; }
+	
+	FORCEINLINE operator bool() const { return BooleanValue; }
+	
+	FORCEINLINE operator FVector() const { return VectorValue; }
+	
+	FORCEINLINE operator FRotator() const { return RotatorValue; }
+	
+	FORCEINLINE operator FColor() const { return ColorValue; }
+	
+	FORCEINLINE operator FKey() const { return KeyValue; }
+	
+	FORCEINLINE operator FGameplayTag() const { return TagValue; }
+	
+	FORCEINLINE operator FGameplayTagContainer() const { return TagsValue; }
+	
+	FORCEINLINE operator UClass*() const { return ClassValue; }
+	
+	template<class T>
+	FORCEINLINE operator TSubclassOf<T>() const { return GetClassValue<T>(); }
+
+	template<class T>
+	FORCEINLINE operator TSoftClassPtr<T>() const { return GetClassPtrValue<T>(); }
+	
+	FORCEINLINE operator UObject*() const { return ObjectValue; }
+	
+	template<class T>
+	FORCEINLINE operator T*() const { return GetObjectValue<T>(); }
+
+	template<class T>
+	FORCEINLINE operator TSoftObjectPtr<T>() const { return GetObjectPtrValue<T>(); }
+
+	FORCEINLINE operator FSimpleDynamicDelegate() const { return DelegateValue; }
+	
+	FORCEINLINE operator void*() const { return PointerValue; }
+
 	friend bool operator==(const FParameter& A, const FParameter& B)
 	{
 		switch (A.ParameterType)
@@ -465,6 +513,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	UClass* GetClassValue() const { return ClassValue; }
+	
+	template<class T>
+	TSubclassOf<T> GetClassValue() const { return ClassValue; }
 
 	void SetClassValue(UClass* InValue) { ClassValue = InValue; }
 

@@ -32,7 +32,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 
 	if(InParams.IsValidIndex(0))
 	{
-		Killer = InParams[0].GetObjectValue<IAbilityVitalityInterface>();
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();

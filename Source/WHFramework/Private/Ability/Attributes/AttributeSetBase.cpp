@@ -85,6 +85,24 @@ void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, flo
 	}
 }
 
+void UAttributeSetBase::MultipleAttributeValue(FGameplayAttribute InAttribute, float InMultipleValue)
+{
+	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	IAbilityActorInterface* AbilityActor = Cast<IAbilityActorInterface>(AbilityComp->GetAvatarActor());
+	
+	FOnAttributeChangeData OnAttributeChangeData;
+	OnAttributeChangeData.Attribute = InAttribute;
+	OnAttributeChangeData.OldValue = GetAttributeValue(InAttribute);
+	
+	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Multiplicitive, InMultipleValue);
+	OnAttributeChangeData.NewValue = GetAttributeValue(InAttribute);
+
+	if(OnAttributeChangeData.NewValue != OnAttributeChangeData.OldValue)
+	{
+		//AbilityActor->OnAttributeChange(OnAttributeChangeData);
+	}
+}
+
 TArray<FGameplayAttribute> UAttributeSetBase::GetAllAttributes() const
 {
 	TArray<FGameplayAttribute> AllAttributes;

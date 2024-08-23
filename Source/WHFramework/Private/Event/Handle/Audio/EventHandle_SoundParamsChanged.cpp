@@ -20,7 +20,7 @@ void UEventHandle_SoundParamsChanged::Parse_Implementation(const TArray<FParamet
 {
 	if(InParams.IsValidIndex(0))
 	{
-		SoundClass = InParams[0].GetObjectValue<USoundClass>();
+		SoundClass = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{

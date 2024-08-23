@@ -98,10 +98,7 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	if(InTarget == this)
-	{
-		Death(this);
-	}
+	
 }
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)

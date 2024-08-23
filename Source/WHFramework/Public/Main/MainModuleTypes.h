@@ -39,7 +39,7 @@ protected: \
 	static ModuleClass* Instance; \
 	static ModuleClass* InstanceEditor; \
 public: \
-	static bool IsExist(bool bInEditor = false); \
+	static bool IsValid(bool bInEditor = false); \
 	static ModuleClass& Get(bool bInEditor = false); \
 	static ModuleClass* GetPtr(bool bInEditor = false); \
 
@@ -97,7 +97,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 #define IMPLEMENTATION_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
-bool ModuleClass::IsExist(bool bInEditor) \
+bool ModuleClass::IsValid(bool bInEditor) \
 { \
 	return UMainModuleStatics::IsExistModuleByClass(ModuleClass::StaticClass(), bInEditor); \
 } \

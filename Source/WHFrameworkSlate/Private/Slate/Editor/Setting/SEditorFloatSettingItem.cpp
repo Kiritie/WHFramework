@@ -21,7 +21,7 @@ void SEditorFloatSettingItem::Construct(const FArguments& InArgs)
 			.Style(FWHFrameworkSlateStyle::Get(), "EditableTextBoxes.SettingItem")
 			.Text_Lambda([this]()
 			{
-				return UKismetTextLibrary::Conv_DoubleToText(GetSettingValue().GetFloatValue(), ERoundingMode::HalfToEven, false, false, 1, 324, 0, 2);
+				return UKismetTextLibrary::Conv_DoubleToText(GetSettingValue(), ERoundingMode::HalfToEven, false, false, 1, 324, 0, 2);
 			})
 			.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type FloatCommitType)
 			{

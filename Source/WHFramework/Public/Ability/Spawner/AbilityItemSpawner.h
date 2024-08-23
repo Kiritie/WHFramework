@@ -3,16 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilityActorSpawner.h"
+#include "AbilitySpawnerBase.h"
 #include "AbilityItemSpawner.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API AAbilityItemSpawner : public AAbilityActorSpawner
+class WHFRAMEWORK_API AAbilityItemSpawner : public AAbilitySpawnerBase
 {
 	GENERATED_BODY()
 
 public:
 	AAbilityItemSpawner();
+
+protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
 	virtual AActor* SpawnImpl_Implementation(const FAbilityItem& InAbilityItem) override;

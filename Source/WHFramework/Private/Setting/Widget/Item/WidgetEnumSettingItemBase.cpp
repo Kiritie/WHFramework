@@ -25,7 +25,7 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		EnumMaxNum = InParams[2].GetIntegerValue();
+		EnumMaxNum = InParams[2];
 	}
 	
 	if(!EnumName.IsEmpty())
@@ -67,6 +67,6 @@ FParameter UWidgetEnumSettingItemBase::GetValue() const
 
 void UWidgetEnumSettingItemBase::SetValue(const FParameter& InValue)
 {
-	ComboBox_Value->SetSelectedIndex(InValue.GetIntegerValue());
+	ComboBox_Value->SetSelectedIndex(InValue);
 	Super::SetValue(InValue);
 }

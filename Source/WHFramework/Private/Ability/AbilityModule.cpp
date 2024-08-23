@@ -3,16 +3,14 @@
 
 #include "Ability/AbilityModule.h"
 
+#include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Raw/AbilityRawDataBase.h"
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
-#include "Ability/Pawn/AbilityPawnBase.h"
-#include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Ability/PickUp/AbilityPickUpEquip.h"
 #include "Ability/PickUp/AbilityPickUpProp.h"
@@ -23,14 +21,13 @@
 #include "Ability/Item/Prop/AbilityPropBase.h"
 #include "Ability/Item/Raw/AbilityRawBase.h"
 #include "Ability/Item/Skill/AbilitySkillBase.h"
-#include "Ability/Vitality/AbilityVitalityBase.h"
-#include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
-		
+#include "Voxel/VoxelModule.h"
+
 IMPLEMENTATION_MODULE(UAbilityModule)
 
 // Sets default values
@@ -160,7 +157,7 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 	{
 		case EAbilityItemType::Voxel:
 		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpVoxel>();
+			if(UVoxelModule::IsValid()) PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpVoxel>();
 			break;
 		}
 		case EAbilityItemType::Prop:

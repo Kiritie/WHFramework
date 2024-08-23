@@ -43,6 +43,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_MagicDamage, Category = "Damage")
 	FGameplayAttributeData MagicDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FallDamage, Category = "Damage")
+	FGameplayAttributeData FallDamage;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 			
 	UPROPERTY(VisibleAnywhere, Category = "Damage")
 	TSubclassOf<UDamageHandle> DamageHandle;
@@ -72,4 +76,7 @@ public:
 
 	UFUNCTION()
 	virtual void OnRep_MagicDamage(const FGameplayAttributeData& OldMagicDamage);
+
+	UFUNCTION()
+	virtual void OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage);
 };

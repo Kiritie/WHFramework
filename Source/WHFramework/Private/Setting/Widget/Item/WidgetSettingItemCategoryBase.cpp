@@ -13,7 +13,7 @@ void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(UObject* InOwner, co
 {
 	if(InParams.IsValidIndex(0))
 	{
-		SetCategory(InParams[0].GetTextValue());
+		SetCategory(InParams[0]);
 	}
 }
 

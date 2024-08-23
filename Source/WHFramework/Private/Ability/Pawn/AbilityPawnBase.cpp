@@ -166,10 +166,7 @@ void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	if(InTarget == this)
-	{
-		Death(this);
-	}
+	
 }
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
