@@ -25,6 +25,12 @@ void UEventHandleBase::OnEditorRefresh()
 }
 #endif
 
+
+bool UEventHandleBase::OnExecute_Implementation()
+{
+	return false;
+}
+
 bool UEventHandleBase::Filter_Implementation(UObject* InOwner, const FName InFuncName) const
 {
 	return true;

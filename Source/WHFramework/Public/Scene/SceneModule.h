@@ -10,6 +10,8 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_PlayLevelSequence;
+class UEventHandle_SetActorVisible;
 class UEventHandle_SetDataLayerOwnerPlayer;
 class ATargetPoint;
 class AMiniMapCapture;
@@ -162,6 +164,12 @@ protected:
 	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
 	
 protected:
+	UFUNCTION()
+	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
+	
+	UFUNCTION()
+	void OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle);
+	
 	UFUNCTION()
 	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
 	

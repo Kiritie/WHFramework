@@ -57,7 +57,7 @@ void FMainManager::OnWorldAdded(UWorld* InWorld)
 	{
 		if(!GWorldContext)
 		{
-			GWorldContext = GWorld;
+			GWorldContext = InWorld;
 		}
 		OnPreparatory();
 	}

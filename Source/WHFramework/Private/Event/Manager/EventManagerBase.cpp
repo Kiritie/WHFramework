@@ -50,6 +50,19 @@ void UEventManagerBase::OnHandleEvent(UObject* InSender, UEventHandleBase* InEve
 	K2_OnHandleEvent(InSender, InEventHandle);
 }
 
+bool UEventManagerBase::GetEventInfoByTag(const FGameplayTag& InTag, FEventInfo& OutMenuInfo) const
+{
+	for(auto& Iter : EventInfos)
+	{
+		if(Iter.Tag == InTag)
+		{
+			OutMenuInfo = Iter;
+			return true;
+		}
+	}
+	return false;
+}
+
 void UEventManagerBase::OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle)
 {
 	K2_OnGameInited(InSender, InEventHandle);

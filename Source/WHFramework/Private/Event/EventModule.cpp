@@ -245,7 +245,7 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			}
 		}
 
-		if(bRecovery)
+		if(bRecovery && !EventHandle->OnExecute())
 		{
 			UObjectPoolModuleStatics::DespawnObject(EventHandle);
 		}

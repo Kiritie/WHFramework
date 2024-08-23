@@ -48,7 +48,10 @@ public class WHFramework : ModuleRules
 				"ImageWrapper",
 				"ImageWriteQueue",
 				"ProceduralMeshComponent",
-				"DeveloperSettings"
+				"DeveloperSettings",
+				"LevelSequence",
+				"MovieScene",
+				"CinematicCamera"
 			});
 	}
 }
