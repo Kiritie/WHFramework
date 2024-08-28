@@ -12,7 +12,8 @@ UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 	Health(50.f),
 	MaxHealth(50.f),
 	PhysicsDamage(0.f),
-	MagicDamage(0.f)
+	MagicDamage(0.f),
+	FallDamage(0.f)
 {
 	DamageHandle = UDamageHandle::StaticClass();
 }
@@ -92,6 +93,7 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxExp, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MagicDamage, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, FallDamage, COND_None, REPNOTIFY_Always);
 }
 
 void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHealth)

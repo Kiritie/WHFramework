@@ -109,10 +109,8 @@ void UFSMComponent::OnTermination()
 
 bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	if(!bInitialized || (InState && !HasState(InState)) || CurrentState != TargetState) return false;
+	if(!bInitialized || InState == CurrentState || (InState && !HasState(InState)) || CurrentState != TargetState) return false;
 	
-	if(InState == CurrentState) return true;
-
 	UFiniteStateBase* LastState = CurrentState;
 
 	if(!LastState || LastState->OnLeaveValidate(InState))

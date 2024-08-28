@@ -154,6 +154,11 @@ FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForInputID(int3
 	return FGameplayAbilitySpec();
 }
 
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForItem(FAbilityItem Item)
+{
+	return FindAbilitySpecForHandle(Item.AbilityHandle);
+}
+
 FGameplayAbilitySpecHandle UAbilitySystemComponentBase::FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject)
 {
 	ABILITYLIST_SCOPE_LOCK();

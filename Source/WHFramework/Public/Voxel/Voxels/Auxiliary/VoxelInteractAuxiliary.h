@@ -26,8 +26,6 @@ protected:
 public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual bool DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;

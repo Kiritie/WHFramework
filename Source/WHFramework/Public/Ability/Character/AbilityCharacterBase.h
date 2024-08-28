@@ -280,6 +280,8 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 
 	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 

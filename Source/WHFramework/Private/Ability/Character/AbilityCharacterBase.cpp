@@ -90,7 +90,7 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(IsActive())
 	{
-		if(GetMoveVelocity().Size() > 0.2f)
+		if(GetMoveVelocity(true).Size() > 0.2f)
 		{
 			if(!IsMoving())
 			{

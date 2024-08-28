@@ -17,11 +17,12 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
-	BoxComponent->SetupAttachment(RootComponent);
-	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
-	BoxComponent->SetBoxExtent(FVector(10.f));
-	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(FName("InteractionComponent"));
+	InteractionComponent->SetupAttachment(RootComponent);
+	InteractionComponent->SetCollisionProfileName(TEXT("PickUp"));
+	InteractionComponent->SetBoxExtent(FVector(10.f));
+	InteractionComponent->SetInteractable(true);
+	InteractionComponent->AddInteractAction(EInteractAction::PickUp);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
 	RotatingComponent->RotationRate = FRotator(0.f, 180.f, 0.f);
@@ -80,6 +81,45 @@ void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 	}
 }
 
+bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
+{
+	switch (InInteractAction)
+	{
+		case EInteractAction::PickUp:
+		{
+			return true;
+		}
+		default: break;
+	}
+	return false;
+}
+
+void AAbilityPickUpBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityPickUpBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+{
+	if(!bPassivity) return;
+	
+	switch (InInteractAction)
+	{
+		case EInteractAction::PickUp:
+		{
+			if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+			{
+				OnPickUp(Picker);
+			}
+			break;
+		}
+		default: break;
+	}
+}
+
 void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
@@ -96,4 +136,9 @@ void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AAc
 			OnPickUp(Picker);
 		}
 	}
+}
+
+UInteractionComponent* AAbilityPickUpBase::GetInteractionComponent() const
+{
+	return InteractionComponent;
 }

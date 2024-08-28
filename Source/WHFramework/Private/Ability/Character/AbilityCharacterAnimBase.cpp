@@ -25,8 +25,8 @@ void UAbilityCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 
 	bFalling = Character->IsFalling();
 
-	VerticalSpeed = Character->GetMoveVelocity(false).Z;
-	HorizontalSpeed = Character->GetMoveVelocity().Size();
+	VerticalSpeed = Character->GetMoveVelocity().Z;
+	HorizontalSpeed = Character->GetMoveVelocity(true).Size();
 
-	MoveDirection = FMath::FindDeltaAngleDegrees(Character->GetMoveDirection().ToOrientationRotator().Yaw, Character->GetActorRotation().Yaw);
+	MoveDirection = FMath::FindDeltaAngleDegrees(Character->GetMoveDirection(true).ToOrientationRotator().Yaw, Character->GetActorRotation().Yaw);
 }

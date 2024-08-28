@@ -61,18 +61,6 @@ protected:
 protected:
 	UFUNCTION(BlueprintNativeEvent)
 	void TurnPlayer(const FInputActionValue& InValue);
-	
-	UFUNCTION(BlueprintNativeEvent)
-	void MoveHPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION(BlueprintNativeEvent)
-	void ActionHPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION(BlueprintNativeEvent)
-	void MoveVPlayer(const FInputActionValue& InValue);
-
-	UFUNCTION(BlueprintNativeEvent)
-	void ActionVPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
 	void MoveForwardPlayer(const FInputActionValue& InValue);

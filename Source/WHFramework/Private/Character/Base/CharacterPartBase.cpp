@@ -37,7 +37,7 @@ void UCharacterPartBase::UpdateVoxelOverlap()
 	if(AVoxelChunk* Chunk = Cast<AVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
 	{
 		const FVoxelItem& StayingVoxel = Chunk->GetVoxelItem(Chunk->LocationToIndex(GetComponentLocation()), true);
-		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection(false));
+		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection());
 		if(StayingVoxel != OverlappingVoxel)
 		{
 			if(StayingVoxel.IsValid())

@@ -174,6 +174,8 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

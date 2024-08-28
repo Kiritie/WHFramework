@@ -8,6 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
 
+class UAbilityBase;
 class AAbilityCharacterBase;
 
 /**

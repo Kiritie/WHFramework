@@ -36,7 +36,7 @@ public:
 	virtual void AddInteractAction(EInteractAction InInteractAction);
 		
 	virtual void RemoveInteractAction(EInteractAction InInteractAction);
-		
+	
 	virtual void ClearInteractActions();
 
 protected:

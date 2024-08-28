@@ -268,7 +268,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI
-protected: 
+protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAIPerceptionStimuliSourceComponent* StimuliSource;
 
@@ -282,10 +282,10 @@ public:
 	/// Stats
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FVector GetMoveVelocity(bool bIgnoreZ = true) const;
+	virtual FVector GetMoveVelocity(bool bIgnoreZ = false) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector GetMoveDirection(bool bIgnoreZ = true) const;
+	virtual FVector GetMoveDirection(bool bIgnoreZ = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

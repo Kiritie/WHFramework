@@ -13,6 +13,8 @@
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
 	StateName = FName("Death");
+
+	Killer = nullptr;
 	bDeathStarted = false;
 }
 
@@ -49,7 +51,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}
 
-	Character->SetExp(0);
+	Character->SetExp(0.f);
 	Character->SetHealth(0.f);
 }
 

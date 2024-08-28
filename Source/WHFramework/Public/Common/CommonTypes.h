@@ -55,7 +55,9 @@ enum class EInteractAction : uint8
 	Dialogue = 3 UMETA(DisplayName="对话"),
 	// 交易
 	Transaction = 4 UMETA(DisplayName="交易"),
-	
+	// 拾取
+	PickUp = 5 UMETA(DisplayName="拾取"),
+
 	Custom1 = 10,
 	Custom2 = 11,
 	Custom3 = 12,

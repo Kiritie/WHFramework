@@ -34,7 +34,7 @@ bool IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface*
 
 	if(InInteractionAgent)
 	{
-		if(!InteractingAgent && !InInteractionAgent->InteractingAgent || bForce)
+		if((!InteractingAgent && !InInteractionAgent->InteractingAgent) || bForce)
 		{
 			const auto LastInteractingAgent = InteractingAgent;
 			InteractingAgent = InInteractionAgent;
@@ -46,7 +46,7 @@ bool IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface*
 	}
 	else
 	{
-		if(InteractingAgent && InteractingAgent->InteractingAgent == this || bForce)
+		if((InteractingAgent && InteractingAgent->InteractingAgent == this) || bForce)
 		{
 			const auto LastInteractingAgent = InteractingAgent;
 			InteractingAgent = nullptr;

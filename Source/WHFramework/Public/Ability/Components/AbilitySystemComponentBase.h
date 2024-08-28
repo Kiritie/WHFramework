@@ -98,6 +98,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForInputID(int32 InputID);
+			
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
+	virtual FGameplayAbilitySpec FindAbilitySpecForItem(FAbilityItem Item);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);

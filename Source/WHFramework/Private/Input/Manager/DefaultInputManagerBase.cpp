@@ -132,34 +132,6 @@ void UDefaultInputManagerBase::TurnPlayer_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::MoveHPlayer_Implementation(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(UCommonStatics::GetPlayerController()->GetPawn() && UCommonStatics::GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveH(UCommonStatics::GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UDefaultInputManagerBase::ActionHPlayer_Implementation(const FInputActionValue& InValue)
-{
-}
-
-void UDefaultInputManagerBase::MoveVPlayer_Implementation(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(UCommonStatics::GetPlayerController()->GetPawn() && UCommonStatics::GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveV(UCommonStatics::GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UDefaultInputManagerBase::ActionVPlayer_Implementation(const FInputActionValue& InValue)
-{
-}
-
 void UDefaultInputManagerBase::MoveForwardPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;

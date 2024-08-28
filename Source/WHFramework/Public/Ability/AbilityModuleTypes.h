@@ -506,7 +506,7 @@ public:
 		ID = InVoxelItem.ID;
 		Count = InCount == -1 ? InVoxelItem.Count : InCount;
 		Level = InVoxelItem.Level;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		AbilityHandle = InVoxelItem.AbilityHandle;
 	}
 
 	virtual ~FAbilityItem() override = default;
