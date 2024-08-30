@@ -63,7 +63,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	int32 Level;
 
-protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	float MovementRate;
 
@@ -146,6 +145,8 @@ public:
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+
+	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -269,6 +270,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
 		
+public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
@@ -282,6 +284,10 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 
@@ -293,6 +299,10 @@ public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
 	virtual void OnRep_Controller() override;

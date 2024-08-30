@@ -78,19 +78,19 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots);
+	virtual void AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots, bool bAddition = true);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemByRange(FAbilityItem& InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
+	virtual void AddItemByRange(FAbilityItem& InItem, int32 InStartIndex = 0, int32 InEndIndex = -1, bool bAddition = true);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType);
+	virtual void AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType, bool bAddition = true);
 		
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes);
+	virtual void AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes, bool bAddition = true);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddItemByQueryInfo(FItemQueryInfo& InQueryInfo);
+	virtual void AddItemByQueryInfo(FItemQueryInfo& InQueryInfo, bool bAddition = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots);

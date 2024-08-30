@@ -157,7 +157,12 @@ FText UCommonStatics::GetEnumValueDisplayName(const FString& InEnumName, int32 I
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
-		return Enum->GetDisplayNameTextByValue(InEnumValue);
+		FText DisplayName;
+		if(FText::FindText(TEXT("UObjectDisplayNames"), Enum->GetNameByValue(InEnumValue).ToString().Replace(TEXT("::"), TEXT(".")), DisplayName))
+		{
+			return DisplayName;
+		}
+		return FText::FromString(Enum->GetAuthoredNameStringByValue(InEnumValue));
 	}
 	return FText::GetEmpty();
 }
@@ -167,21 +172,6 @@ int32 UCommonStatics::GetEnumValueByAuthoredName(const FString& InEnumName, cons
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByAuthoredName(InEnumName, InEnumAuthoredName))
 	{
 		return Enum->GetValueByNameString(InEnumAuthoredName);
-	}
-	return -1;
-}
-
-int32 UCommonStatics::GetEnumValueByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName)
-{
-	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByDisplayName(InEnumName, InEnumDisplayName))
-	{
-		for(int32 i = 0; i < Enum->NumEnums() - 1; i++)
-		{
-			if(Enum->GetDisplayNameTextByIndex(i).ToString().Equals(InEnumDisplayName))
-			{
-				return Enum->GetValueByIndex(i);
-			}
-		}
 	}
 	return -1;
 }

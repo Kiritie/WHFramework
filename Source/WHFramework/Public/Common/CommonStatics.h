@@ -133,14 +133,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static int32 GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
 
-	/*
-	 * 通过获取枚举值显示名称获取枚举值
-	 * @param InEnumName 枚举名称
-	 * @param InDisplayName 枚举值显示名称
-	 */
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static int32 GetEnumValueByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize
 	/*

@@ -16,7 +16,10 @@ class AAbilityEquipBase;
 class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlot;
 
-#define GAMEPLAYATTRIBUTE_VALUE_GETTERBASE(PropertyName) \
+#define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
+	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)); \
+
+#define GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
 	FORCEINLINE float GetBase##PropertyName() const \
 	{ \
 		return PropertyName.GetBaseValue(); \
@@ -25,7 +28,7 @@ class UAbilityInventorySlot;
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_GETTERBASE(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
@@ -231,6 +234,34 @@ public:
 	UDamageHandle() {}
 
 	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+};
+
+/**
+ * 伤害处理类
+ */
+UCLASS(Blueprintable)
+class WHFRAMEWORK_API URecoveryHandle : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	URecoveryHandle() {}
+
+	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+};
+
+/**
+ * 伤害处理类
+ */
+UCLASS(Blueprintable)
+class WHFRAMEWORK_API UInterruptHandle : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	UInterruptHandle() {}
+
+	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**

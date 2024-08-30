@@ -251,36 +251,42 @@ FItemQueryInfo UAbilityInventoryBase::QueryItemBySplitTypes(EItemQueryType InQue
 	return QueryInfo;
 }
 
-void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots)
+void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots, bool bAddition)
 {
-	for (int i = 0; i < InSlots.Num(); i++)
+	auto tmpItem = InItem;
+	for(int i = 0; i < InSlots.Num(); i++)
 	{
 		InSlots[i]->AddItem(InItem);
 		if (InItem.Count <= 0) break;
 	}
+	tmpItem.Count -= InItem.Count;
+	if(auto Agent = GetOwnerAgent())
+	{
+		if(bAddition) Agent->OnAdditionItem(tmpItem);
+	}
 }
 
-void UAbilityInventoryBase::AddItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex)
+void UAbilityInventoryBase::AddItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex, bool bAddition)
 {
 	const auto QueryInfo = QueryItemByRange(EItemQueryType::Add, InItem, InStartIndex, InEndIndex);
-	AddItemBySlots(InItem, QueryInfo.Slots);
+	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
 }
 
-void UAbilityInventoryBase::AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType)
+void UAbilityInventoryBase::AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType, bool bAddition)
 {
 	const auto QueryInfo = QueryItemBySplitType(EItemQueryType::Add, InItem, InSplitType);
-	AddItemBySlots(InItem, QueryInfo.Slots);
+	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
 }
 
-void UAbilityInventoryBase::AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes)
+void UAbilityInventoryBase::AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes, bool bAddition)
 {
 	const auto QueryInfo = QueryItemBySplitTypes(EItemQueryType::Add, InItem, InSplitTypes);
-	AddItemBySlots(InItem, QueryInfo.Slots);
+	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
 }
 
-void UAbilityInventoryBase::AddItemByQueryInfo(FItemQueryInfo& InQueryInfo)
+void UAbilityInventoryBase::AddItemByQueryInfo(FItemQueryInfo& InQueryInfo, bool bAddition)
 {
-	AddItemBySlots(InQueryInfo.Item, InQueryInfo.Slots);
+	AddItemBySlots(InQueryInfo.Item, InQueryInfo.Slots, bAddition);
 }
 
 void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots)

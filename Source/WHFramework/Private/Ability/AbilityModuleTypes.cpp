@@ -36,8 +36,6 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 
 void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
-	AAbilityCharacterBase* SourceCharacter = Cast<AAbilityCharacterBase>(SourceActor);
-	
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
 	if (DamageValue > 0.f)
@@ -45,6 +43,32 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
 			TargetVitality->HandleDamage(DamageType, DamageValue, false, false, HitResult, SourceTags, SourceActor);
+		}
+	}
+}
+
+void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+{
+	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
+
+	if (RecoveryValue > 0.f)
+	{
+		if (TargetVitality && !TargetVitality->IsDead())
+		{
+			TargetVitality->HandleRecovery(RecoveryValue, HitResult, SourceTags, SourceActor);
+		}
+	}
+}
+
+void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+{
+	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
+
+	if (InterruptDuration > 0.f)
+	{
+		if (TargetVitality && !TargetVitality->IsDead())
+		{
+			TargetVitality->HandleInterrupt(InterruptDuration, HitResult, SourceTags, SourceActor);
 		}
 	}
 }

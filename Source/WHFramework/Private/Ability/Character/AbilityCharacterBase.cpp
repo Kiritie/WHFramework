@@ -375,6 +375,11 @@ void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IIntera
 	
 }
 
+void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -562,13 +567,6 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == GetHealthAttribute())
-	{
-		if(DeltaValue > 0.f)
-		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-		}
-	}
 	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
 	{
 		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
@@ -588,12 +586,23 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-
 	if(GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityCharacterBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityCharacterBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
 }
 
 bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const

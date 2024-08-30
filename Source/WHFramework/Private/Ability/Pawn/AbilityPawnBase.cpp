@@ -192,6 +192,11 @@ void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteraction
 	
 }
 
+void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AAbilityPawnBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -328,24 +333,27 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 			SetExp(0.f);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == GetHealthAttribute())
-	{
-		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
-		if(DeltaValue > 0.f)
-		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-		}
-	}
 }
 
 void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
 }

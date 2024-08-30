@@ -59,7 +59,7 @@ void AWHPlayerController::BeginPlay()
 	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::None);
+		Execute_OnPreparatory(this, EPhase::All);
 	}
 }
 
@@ -69,7 +69,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::None);
+		Execute_OnTermination(this, EPhase::All);
 	}
 }
 

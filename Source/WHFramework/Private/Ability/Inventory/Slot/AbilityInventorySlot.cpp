@@ -115,9 +115,9 @@ void UAbilityInventorySlot::OnItemChanged(FAbilityItem& InOldItem)
 	}
 	if(IsSelected())
 	{
-		if(const auto InventoryAgent = Inventory->GetOwnerAgent())
+		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
-			InventoryAgent->OnSelectItem(GetItem());
+			Agent->OnSelectItem(GetItem());
 		}
 	}
 }
@@ -211,23 +211,23 @@ void UAbilityInventorySlot::MoveItem(int32 InCount /*= -1*/)
 		{
 			case ESlotSplitType::Default:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			case ESlotSplitType::Shortcut:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			case ESlotSplitType::Auxiliary:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut}, false);
 				break;
 			}
 			case ESlotSplitType::Equip:
 			case ESlotSplitType::Skill:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary});
+				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			default: break;
@@ -260,13 +260,13 @@ void UAbilityInventorySlot::UseItem(int32 InCount /*= -1*/)
 		}
 		case EAbilityItemType::Equip:
 		{
-			Inventory->AddItemBySplitType(Item, ESlotSplitType::Equip); 
+			Inventory->AddItemBySplitType(Item, ESlotSplitType::Equip, false); 
 			Refresh();
 			break;
 		}
 		case EAbilityItemType::Skill:
 		{
-			Inventory->AddItemBySplitType(Item, ESlotSplitType::Skill);
+			Inventory->AddItemBySplitType(Item, ESlotSplitType::Skill, false);
 			Refresh();
 			break;
 		}

@@ -22,7 +22,6 @@ public:
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
 
 protected:
-	/** 当MaxAttribute发生改变时按比例设置Attribute */
 	virtual void AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty);
 
 public:

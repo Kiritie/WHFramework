@@ -155,6 +155,10 @@ void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractio
 	
 }
 
+void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)
+{
+}
+
 void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
