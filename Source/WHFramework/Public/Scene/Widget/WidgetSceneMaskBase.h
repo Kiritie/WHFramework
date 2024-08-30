@@ -3,18 +3,18 @@
 #pragma once
 #include "Widget/Screen/UserWidgetBase.h"
 
-#include "WidgetUIMaskBase.generated.h"
+#include "WidgetSceneMaskBase.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetUIMaskBase : public UUserWidgetBase
+class WHFRAMEWORK_API UWidgetSceneMaskBase : public UUserWidgetBase
 {
 	GENERATED_BODY()
 	
 public:
-	UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer);
+	UWidgetSceneMaskBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
 	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
@@ -24,4 +24,12 @@ public:
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
+
+protected:
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+protected:
+	FSimpleDynamicDelegate OnMaskClosed;
 };

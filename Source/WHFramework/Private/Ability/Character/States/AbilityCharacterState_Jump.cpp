@@ -3,7 +3,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Scene/SceneModuleStatics.h"
@@ -11,7 +10,6 @@
 UAbilityCharacterState_Jump::UAbilityCharacterState_Jump()
 {
 	StateName = FName("Jump");
-	
 }
 
 void UAbilityCharacterState_Jump::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -32,6 +30,8 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 	
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
 
+	Character->Jump();
+
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
@@ -40,8 +40,6 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 			Character->GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
 		}
 	}
-
-	Character->Jump();
 }
 
 void UAbilityCharacterState_Jump::OnRefresh(float DeltaSeconds)

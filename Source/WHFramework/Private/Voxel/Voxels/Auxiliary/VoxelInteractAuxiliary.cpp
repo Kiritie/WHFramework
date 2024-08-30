@@ -37,7 +37,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			Interaction->AddInteractAction(Iter);
 		}
 		Interaction->SetInteractable(VoxelItem.Owner != nullptr);
-		Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * FVector(1.f, 1.f, 0.5f));
+		Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * FVector(1.5f, 1.5f, 1.f));
 	}
 }
 

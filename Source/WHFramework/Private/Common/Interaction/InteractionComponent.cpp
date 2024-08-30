@@ -40,9 +40,9 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 	}
 }
 
-void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
+bool UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return;
+	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
 	
 	GetInteractionAgent()->GetOverlappingAgents().Add(InInteractionAgent);
 	if(!GetInteractionAgent()->GetInteractingAgent())
@@ -50,11 +50,12 @@ void UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteracti
 		GetInteractionAgent()->SetInteractingAgent(InInteractionAgent);
 	}
 	InInteractionAgent->GetInteractionComponent()->OnAgentEnter(GetInteractionAgent());
+	return true;
 }
 
-void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
+bool UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(!GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return;
+	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || !GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
 
 	GetInteractionAgent()->GetOverlappingAgents().Remove(InInteractionAgent);
 	if(GetInteractionAgent()->GetInteractingAgent() == InInteractionAgent)
@@ -66,22 +67,27 @@ void UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteracti
 	{
 		GetInteractionAgent()->SetInteractingAgent(GetInteractionAgent()->GetOverlappingAgents()[0]);
 	}
+	return true;
 }
 
-void UInteractionComponent::AddInteractAction(EInteractAction InInteractAction)
+bool UInteractionComponent::AddInteractAction(EInteractAction InInteractAction)
 {
 	if(!InteractActions.Contains(InInteractAction))
 	{
 		InteractActions.Add(InInteractAction);
+		return true;
 	}
+	return false;
 }
 
-void UInteractionComponent::RemoveInteractAction(EInteractAction InInteractAction)
+bool UInteractionComponent::RemoveInteractAction(EInteractAction InInteractAction)
 {
 	if(InteractActions.Contains(InInteractAction))
 	{
 		InteractActions.Remove(InInteractAction);
+		return true;
 	}
+	return false;
 }
 
 void UInteractionComponent::ClearInteractActions()

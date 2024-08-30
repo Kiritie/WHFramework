@@ -8,9 +8,50 @@
 
 // Add default functionality here for any IInteractionInterface functions that are not pure virtual.
 
+bool IInteractionAgentInterface::IsInteractable(IInteractionAgentInterface* InInteractionAgent)
+{
+	switch(GetInteractAgentType())
+	{
+		case EInteractAgentType::Static:
+		{
+			switch(InInteractionAgent->GetInteractAgentType())
+			{
+				case EInteractAgentType::Vitality:
+				{
+					return true;
+				}
+				default: break;
+			}
+			break;
+		}
+		case EInteractAgentType::Vitality:
+		{
+			switch(InInteractionAgent->GetInteractAgentType())
+			{
+				case EInteractAgentType::Static:
+				case EInteractAgentType::Vitality:
+				{
+					return true;
+				}
+				default: break;
+			}
+			break;
+		}
+		default: break;
+	}
+	return false;
+}
+
 bool IInteractionAgentInterface::IsOverlapping(IInteractionAgentInterface* InInteractionAgent)
 {
 	return OverlappingAgents.Contains(InInteractionAgent);
+}
+
+bool IInteractionAgentInterface::EnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+	if(!InInteractionAgent) return false;
+	
+	return GetInteractionComponent()->OnAgentEnter(InInteractionAgent);
 }
 
 bool IInteractionAgentInterface::DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
@@ -26,6 +67,15 @@ bool IInteractionAgentInterface::DoInteract(EInteractAction InInteractAction, II
 		return true;
 	}
 	return false;
+}
+
+bool IInteractionAgentInterface::LeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+	if(!InInteractionAgent) InInteractionAgent = InteractingAgent;
+
+	if(!InInteractionAgent) return false;
+	
+	return GetInteractionComponent()->OnAgentLeave(InInteractionAgent);
 }
 
 bool IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent, bool bForce)

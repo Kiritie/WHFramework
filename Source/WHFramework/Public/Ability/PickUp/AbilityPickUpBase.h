@@ -10,6 +10,7 @@
 
 #include "AbilityPickUpBase.generated.h"
 
+class UBoxComponent;
 class UFollowingMovementComponent;
 class IAbilityPickerInterface;
 class AVoxelChunk;
@@ -63,6 +64,9 @@ protected:
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* InteractionComponent;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -83,7 +87,9 @@ public:
 
 	virtual UMeshComponent* GetMeshComponent() const { return nullptr; }
 
-	URotatingMovementComponent* GetRotatingComponent() const { return RotatingComponent; }
+	virtual UBoxComponent* GetBoxComponent() const { return BoxComponent; }
+
+	virtual URotatingMovementComponent* GetRotatingComponent() const { return RotatingComponent; }
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
@@ -95,6 +101,8 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
+
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

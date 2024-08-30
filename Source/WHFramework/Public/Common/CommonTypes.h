@@ -70,6 +70,20 @@ enum class EInteractAction : uint8
 	Custom10 = 19
 };
 
+/**
+ * 交互对象类型
+ */
+UENUM(BlueprintType)
+enum class EInteractAgentType : uint8
+{
+	// 无
+	None = 0 UMETA(DisplayName="无"),
+	// 静态的
+	Static = 1 UMETA(DisplayName="静态的"),
+	// 有生命的
+	Vitality = 2 UMETA(DisplayName="有生命的")
+};
+
 //////////////////////////////////////////////////////////////////////////
 // Functions
 extern WHFRAMEWORK_API const UObject* GetWorldContext(bool bInEditor = false);

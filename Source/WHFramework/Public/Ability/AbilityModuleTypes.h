@@ -13,7 +13,7 @@ class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
-class UWidgetAbilityInventorySlotBase;
+class UWidgetInventorySlotBase;
 class UAbilityInventorySlot;
 
 #define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
@@ -730,11 +730,11 @@ struct WHFRAMEWORK_API FWidgetInventorySlots
 public:
 	FORCEINLINE FWidgetInventorySlots()
 	{
-		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
+		Slots = TArray<UWidgetInventorySlotBase*>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UWidgetAbilityInventorySlotBase*> Slots;
+	TArray<UWidgetInventorySlotBase*> Slots;
 };
 
 USTRUCT(BlueprintType)

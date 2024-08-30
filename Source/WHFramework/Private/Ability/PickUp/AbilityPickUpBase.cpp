@@ -17,10 +17,14 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
+	BoxComponent->SetupAttachment(RootComponent);
+	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
+	BoxComponent->SetBoxExtent(FVector(10.f));
+
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(FName("InteractionComponent"));
 	InteractionComponent->SetupAttachment(RootComponent);
-	InteractionComponent->SetCollisionProfileName(TEXT("PickUp"));
-	InteractionComponent->SetBoxExtent(FVector(10.f));
+	InteractionComponent->SetBoxExtent(FVector(50.f));
 	InteractionComponent->SetInteractable(true);
 	InteractionComponent->AddInteractAction(EInteractAction::PickUp);
 

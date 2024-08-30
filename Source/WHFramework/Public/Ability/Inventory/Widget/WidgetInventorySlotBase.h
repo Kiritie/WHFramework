@@ -4,7 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Widget/Screen/SubWidgetBase.h"
-#include "WidgetAbilityInventorySlotBase.generated.h"
+#include "WidgetInventorySlotBase.generated.h"
 
 class UAbilityInventorySlot;
 class UAbilityInventoryBase;
@@ -13,12 +13,12 @@ class UAbilityInventoryBase;
  * UI物品槽
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetAbilityInventorySlotBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetInventorySlotBase : public USubWidgetBase
 {
 	GENERATED_BODY()
 
 public:
-	UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer);
+	UWidgetInventorySlotBase(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
