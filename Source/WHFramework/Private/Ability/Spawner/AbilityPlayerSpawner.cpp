@@ -9,8 +9,6 @@
 
 AAbilityPlayerSpawner::AAbilityPlayerSpawner()
 {
-	GetCapsuleComponent()->InitCapsuleSize(40.0f, 92.0f);
-
 #if WITH_EDITORONLY_DATA
 	if (!IsRunningCommandlet())
 	{

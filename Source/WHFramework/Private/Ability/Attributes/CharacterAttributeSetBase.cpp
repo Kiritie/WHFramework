@@ -6,10 +6,9 @@
 #include "Net/UnrealNetwork.h"
 
 UCharacterAttributeSetBase::UCharacterAttributeSetBase()
-:	
-	MoveSpeed(350.f),
-	RotationSpeed(360.f),
-	JumpForce(420.f)
+	: MoveSpeed(350.f)
+	, RotationSpeed(720.f)
+	, JumpForce(420.f)
 {
 }
 

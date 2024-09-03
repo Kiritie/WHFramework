@@ -80,6 +80,11 @@ void AAbilityCharacterBase::OnInitialize_Implementation()
 void AAbilityCharacterBase::OnPreparatory_Implementation(EPhase InPhase)
 {
 	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		RefreshAttributes();
+	}
 }
 
 void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -113,18 +118,16 @@ void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArra
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
 
-	InitializeAbilitySystem();
-
-	FSM->SwitchDefaultState();
+	InitializeAbilities();
 
 	SpawnDefaultController();
+
+	FSM->SwitchDefaultState();
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-
-	FSM->SwitchState(nullptr);
 
 	SetMotionRate(1, 1);
 	
@@ -543,6 +546,7 @@ float AAbilityCharacterBase::GetHalfHeight() const
 float AAbilityCharacterBase::GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/)
 {
 	if(!InTargetCharacter || !InTargetCharacter->IsValidLowLevel()) return -1;
+
 	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetCharacter->GetActorLocation().X, InTargetCharacter->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetCharacter->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : InTargetCharacter->GetRadius());
 }
 

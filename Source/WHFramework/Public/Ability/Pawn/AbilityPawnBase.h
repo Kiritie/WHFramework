@@ -39,6 +39,17 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnIn
 public:
 	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 	

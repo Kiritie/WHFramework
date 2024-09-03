@@ -46,7 +46,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
 	}
 
-	if(Killer)
+	if(Killer && Killer != Character)
 	{
 		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}

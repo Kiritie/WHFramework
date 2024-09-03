@@ -220,11 +220,6 @@ void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& I
 	WidgetParams = InParams;
 
 	K2_OnInitialize(InOwner, InParams);
-
-	for(auto& Iter : ChildWidgets)
-	{
-		Iter->OnInitialize(InOwner, InParams);
-	}
 }
 
 void UUserWidgetBase::OnReset(bool bForce)
@@ -440,11 +435,16 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams,
 
 void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	if(bForce || !InOwner || OwnerObject != InOwner)
+	if(!InOwner || OwnerObject != InOwner || bForce)
 	{
 		OwnerObject = InOwner;
 
 		OnInitialize(InOwner, InParams);
+		
+		for(auto& Iter : ChildWidgets)
+		{
+			Iter->Init(InOwner, InParams, bForce);
+		}
 	}
 }
 

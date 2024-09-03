@@ -14,9 +14,7 @@ AAbilityPickUpSpawner::AAbilityPickUpSpawner()
 
 AActor* AAbilityPickUpSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	AAbilityPickUpBase* Item = UAbilityModuleStatics::SpawnAbilityPickUp(InAbilityItem, GetActorLocation());
-
-	return Item;
+	return UAbilityModuleStatics::SpawnAbilityPickUp(InAbilityItem, GetActorLocation());
 }
 
 void AAbilityPickUpSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

@@ -185,6 +185,22 @@ TArray<AActor*> FSceneEditorManager::GetSelectedActorsInCurrentWorld() const
 	return ReturnValues;
 }
 
+FVector FSceneEditorManager::GetActiveViewportViewLocation() const
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::Get().GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	const TSharedPtr<IAssetViewport> Viewport = LevelEditorModule.GetFirstActiveViewport();
+
+	return Viewport->GetAssetViewportClient().GetViewLocation();
+}
+
+FRotator FSceneEditorManager::GetActiveViewportViewRotation() const
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::Get().GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	const TSharedPtr<IAssetViewport> Viewport = LevelEditorModule.GetFirstActiveViewport();
+
+	return Viewport->GetAssetViewportClient().GetViewRotation();
+}
+
 SConstraintCanvas::FSlot* FSceneEditorManager::AddWidgetToViewport(const TSharedPtr<IAssetViewport>& InViewport, const TSharedRef<SWidget>& InWidget)
 {
 	SConstraintCanvas::FSlot* Slot = nullptr;

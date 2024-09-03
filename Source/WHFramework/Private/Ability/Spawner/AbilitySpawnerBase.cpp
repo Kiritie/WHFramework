@@ -3,14 +3,14 @@
 #include "Ability/Spawner/AbilitySpawnerBase.h"
 
 #include "Ability/AbilityModuleNetworkComponent.h"
+#include "Ability/Spawner/Widget/WidgetAbilitySpawnerInfo.h"
 #include "Components/ArrowComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/TextRenderComponent.h"
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
-#include "Engine/Font.h"
+#include "Widget/World/WorldWidgetComponent.h"
 
 AAbilitySpawnerBase::AAbilitySpawnerBase()
 {
@@ -30,11 +30,15 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	ArrowComponent->bTreatAsASprite = true;
 	ArrowComponent->bIsScreenSizeScaled = true;
 
-	TextComponent = CreateEditorOnlyDefaultSubobject<UTextRenderComponent>(TEXT("Text"));
-	TextComponent->SetupAttachment(GetCapsuleComponent());
+	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(TEXT("Widget"));
+	WidgetComponent->SetupAttachment(GetCapsuleComponent());
+	WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
 	
-	static ConstructorHelpers::FObjectFinder<UFont> RobotoFontObj(TEXT("/Engine/EngineFonts/Roboto"));
-	TextComponent->SetFont(RobotoFontObj.Object);
+	static ConstructorHelpers::FClassFinder<UWidgetAbilitySpawnerInfo> SpawnerInfoClassFinder(TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Ability/Blueprints/Widget/WBP_SpawnerInfo_Base.WBP_SpawnerInfo_Base_C'"));
+	if(SpawnerInfoClassFinder.Succeeded())
+	{
+		WidgetComponent->SetWorldWidgetClass(SpawnerInfoClassFinder.Class);
+	}
 #endif
 
 	ActorID = FGuid::NewGuid();
@@ -49,6 +53,8 @@ void AAbilitySpawnerBase::OnInitialize_Implementation()
 
 void AAbilitySpawnerBase::OnPreparatory_Implementation(EPhase InPhase)
 {
+	WidgetComponent->SetVisibility(false);
+
 	if(bAutoSpawn)
 	{
 		Spawn();
@@ -66,6 +72,18 @@ void AAbilitySpawnerBase::OnTermination_Implementation(EPhase InPhase)
 	{
 		Destroy();
 	}
+}
+
+void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+#if WITH_EDITORONLY_DATA
+	if(UWidgetAbilitySpawnerInfo* SpawnerInfo = Cast<UWidgetAbilitySpawnerInfo>(WidgetComponent->GetWorldWidget()))
+	{
+		SpawnerInfo->InitAbilityItem(AbilityItem);
+	}
+#endif
 }
 
 void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

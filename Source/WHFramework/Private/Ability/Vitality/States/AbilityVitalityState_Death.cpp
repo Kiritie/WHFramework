@@ -35,7 +35,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
-	if(Killer)
+	if(Killer && Killer != Vitality)
 	{
 		Killer->ModifyExp(Vitality->GetLevelA() * 5.f);
 	}

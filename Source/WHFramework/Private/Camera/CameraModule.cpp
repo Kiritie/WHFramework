@@ -27,6 +27,7 @@
 #include "Math/MathStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/CameraSaveGame.h"
+#include "Scene/SceneManager.h"
 #include "Scene/SceneModuleStatics.h"
 
 IMPLEMENTATION_MODULE(UCameraModule)

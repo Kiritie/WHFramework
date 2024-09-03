@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilityItemSpawner.h"
+#include "AbilitySpawnerBase.h"
 #include "AbilityActorSpawner.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorSpawner : public AAbilityItemSpawner
+class WHFRAMEWORK_API AAbilityActorSpawner : public AAbilitySpawnerBase
 {
 	GENERATED_BODY()
 

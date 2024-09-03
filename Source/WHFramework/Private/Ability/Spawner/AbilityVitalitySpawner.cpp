@@ -10,7 +10,6 @@
 
 AAbilityVitalitySpawner::AAbilityVitalitySpawner()
 {
-	GetCapsuleComponent()->InitCapsuleSize(50.0f, 50.0f);
 }
 
 AActor* AAbilityVitalitySpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)

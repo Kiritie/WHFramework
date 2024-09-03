@@ -19,10 +19,11 @@ class WHFRAMEWORK_API IAbilityActorInterface : public IAbilitySystemInterface
 	GENERATED_BODY()
 
 public:
-	virtual void InitializeAbilitySystem(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
+	virtual void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
 
 	virtual void RefreshAttributes();
 
+protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) = 0;
 	
 public:
@@ -35,4 +36,7 @@ public:
 	virtual float GetHalfHeight() const = 0;
 
 	virtual UAttributeSetBase* GetAttributeSet() const = 0;
+
+private:
+	bool bAbilityInitialized = false;
 };

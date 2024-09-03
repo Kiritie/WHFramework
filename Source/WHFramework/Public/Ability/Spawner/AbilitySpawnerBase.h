@@ -7,7 +7,7 @@
 #include "Engine/NavigationObjectBase.h"
 
 #include "AbilitySpawnerBase.generated.h"
-class UTextRenderComponent;
+class UWorldWidgetComponent;
 class UArrowComponent;
 class UCapsuleComponent;
 /**
@@ -34,6 +34,9 @@ public:
 
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
+protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -97,7 +100,7 @@ protected:
 	UArrowComponent* ArrowComponent;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UTextRenderComponent* TextComponent;
+	UWorldWidgetComponent* WidgetComponent;
 #endif
 
 protected:
@@ -117,7 +120,7 @@ public:
 #if WITH_EDITORONLY_DATA
 	UArrowComponent* GetArrowComponent() const { return ArrowComponent; }
 	
-	UTextRenderComponent* GetTextComponent() const { return TextComponent; }
+	UWorldWidgetComponent* GetWidgetComponent() const { return WidgetComponent; }
 #endif
 
 	UFUNCTION(BlueprintPure)

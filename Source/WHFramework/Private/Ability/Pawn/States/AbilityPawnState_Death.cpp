@@ -34,7 +34,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
-	if(Killer)
+	if(Killer && Killer != Pawn)
 	{
 		Killer->ModifyExp(Pawn->GetLevelA() * 5.f);
 	}

@@ -12,8 +12,6 @@
 
 AAbilityPawnSpawner::AAbilityPawnSpawner()
 {
-	GetCapsuleComponent()->InitCapsuleSize(50.f, 50.0f);
-
 #if WITH_EDITORONLY_DATA
 	if (!IsRunningCommandlet())
 	{

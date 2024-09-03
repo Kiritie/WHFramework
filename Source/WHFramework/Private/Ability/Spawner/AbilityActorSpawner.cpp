@@ -12,8 +12,6 @@
 
 AAbilityActorSpawner::AAbilityActorSpawner()
 {
-	GetCapsuleComponent()->InitCapsuleSize(40.0f, 40.0f);
-
 #if WITH_EDITORONLY_DATA
 	if (!IsRunningCommandlet())
 	{

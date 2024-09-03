@@ -15,9 +15,6 @@ public:
 	AAbilityItemSpawner();
 
 protected:
-	virtual void OnConstruction(const FTransform& Transform) override;
-
-protected:
 	virtual AActor* SpawnImpl_Implementation(const FAbilityItem& InAbilityItem) override;
 
 	virtual void DestroyImpl_Implementation(AActor* InAbilityActor) override;

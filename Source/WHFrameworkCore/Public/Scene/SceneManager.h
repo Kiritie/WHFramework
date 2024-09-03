@@ -38,6 +38,10 @@ public:
 	// Viewport
 public:
 #if WITH_EDITOR
+	virtual FVector GetActiveViewportViewLocation() const { return FVector::ZeroVector; }
+	
+	virtual FRotator GetActiveViewportViewRotation() const { return FRotator::ZeroRotator; }
+	
 	virtual SConstraintCanvas::FSlot* AddWidgetToActiveViewport(const TSharedRef<SWidget>& InWidget) { return nullptr; }
 
 	virtual TArray<SConstraintCanvas::FSlot*> AddWidgetToAllViewport(const TSharedRef<SWidget>& InWidget) { return TArray<SConstraintCanvas::FSlot*>(); }

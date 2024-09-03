@@ -8,7 +8,6 @@
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Death.h"
 #include "Ability/Pawn/States/AbilityPawnState_Default.h"
-#include "Asset/AssetModuleStatics.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonStatics.h"
@@ -47,21 +46,44 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Level = 0;
 }
 
+void AAbilityPawnBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		RefreshAttributes();
+	}
+}
+
+void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+}
+
+void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
+{
+	Super::OnTermination_Implementation(InPhase);
+}
+
 void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
 
-	InitializeAbilitySystem();
-
-	FSM->SwitchDefaultState();
+	InitializeAbilities();
 
 	SpawnDefaultController();
+
+	FSM->SwitchDefaultState();
 }
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
 {
-	FSM->SwitchState(nullptr);
-
 	RaceID = NAME_None;
 	Level = 0;
 

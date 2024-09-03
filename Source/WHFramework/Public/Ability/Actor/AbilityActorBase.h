@@ -33,6 +33,17 @@ class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorI
 public:
 	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 

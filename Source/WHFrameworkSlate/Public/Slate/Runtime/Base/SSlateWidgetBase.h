@@ -64,7 +64,7 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce = false) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams = nullptr, bool bForce = false) override;
 
 	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
 	
