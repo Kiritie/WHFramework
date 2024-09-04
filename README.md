@@ -12,6 +12,6 @@ Change PlayerControllerClass to WHPlayerController;
 Change LocalPlayerClass to WHLocalPlayer;  
 Change AssetManagerClass to AssetManagerBase;  
 Change InputComponentClass to InputComponentBase;  
-Change InputUserSettingsClass to InputUserSettingsBase.
+Change UserSettingsClass(Enhanced Input) to InputUserSettingsBase.
 
 Start using it now...
