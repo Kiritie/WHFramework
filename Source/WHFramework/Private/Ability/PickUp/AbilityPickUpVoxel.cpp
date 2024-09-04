@@ -3,6 +3,7 @@
 
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 
+#include "Common/Interaction/InteractionComponent.h"
 #include "Components/BoxComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"

@@ -2,7 +2,8 @@
 
 
 #include "AI/Base/AIBlackboardBase.h"
-#include "AI/Base/AIAgentInterface.h"
+
+#include "AI/Base/AIControllerBase.h"
 #include "Math/MathTypes.h"
 
 void UAIBlackboardBase::PostLoad()
@@ -11,23 +12,40 @@ void UAIBlackboardBase::PostLoad()
 
 	// BLACKBOARD_VALUE_GENERATE_BOOL(IsLostTarget);
 	// BLACKBOARD_VALUE_GENERATE_VECTOR(TargetLocation);
-	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetCharacter, APawn);
+	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetAgent, APawn);
 }
 
-void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent, IAIAgentInterface* InAgent)
+void UAIBlackboardBase::OnInitialize()
 {
-	Component = InComponent;
-	Agent = InAgent;
+	Reset();
 }
 
-void UAIBlackboardBase::Refresh()
+void UAIBlackboardBase::OnReset()
 {
-	OnRefresh();
+	ResetIsLostTarget();
+	ResetTargetLocation();
+	ResetTargetAgent();
 }
 
 void UAIBlackboardBase::OnRefresh()
 {
 	
+}
+
+void UAIBlackboardBase::OnValueReset(FName InValueName)
+{
+	if(InValueName.IsEqual(NAME_IsLostTarget))
+	{
+		SetIsLostTarget(false);
+	}
+	else if(InValueName.IsEqual(NAME_TargetLocation))
+	{
+		SetTargetLocation(EMPTY_Vector);
+	}
+	else if(InValueName.IsEqual(NAME_TargetAgent))
+	{
+		SetTargetAgent(nullptr);
+	}
 }
 
 void UAIBlackboardBase::OnValuePreChange(FName InValueName)
@@ -39,7 +57,7 @@ void UAIBlackboardBase::OnValueChanged(FName InValueName)
 {
 	OnBlackboardValueChanged.Broadcast(InValueName);
 
-	if(InValueName.IsEqual(FName("IsLostTarget")))
+	if(InValueName.IsEqual(NAME_IsLostTarget))
 	{
 		if(GetIsLostTarget())
 		{
@@ -49,16 +67,39 @@ void UAIBlackboardBase::OnValueChanged(FName InValueName)
 			}
 			else
 			{
-				SetIsLostTarget(false);
+				ResetIsLostTarget();
 			}
 		}
 		else
 		{
-			SetTargetLocation(EMPTY_Vector);
+			ResetTargetLocation();
 		}
 	}
-	else if(InValueName.IsEqual(FName("TargetCharacter")))
+}
+
+void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent)
+{
+	Component = InComponent;
+	Controller = Cast<AAIControllerBase>(Component->GetOwner());
+	if (Controller)
 	{
-		SetIsLostTarget(false);
+		Agent = Cast<IAIAgentInterface>(Controller->GetPawn());
 	}
+
+	OnInitialize();
+}
+
+void UAIBlackboardBase::Reset()
+{
+	OnReset();
+}
+
+void UAIBlackboardBase::ResetValue(FName InValueName)
+{
+	OnValueReset(InValueName);
+}
+
+void UAIBlackboardBase::Refresh()
+{
+	OnRefresh();
 }

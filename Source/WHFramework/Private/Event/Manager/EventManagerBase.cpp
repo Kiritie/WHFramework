@@ -22,12 +22,12 @@ void UEventManagerBase::OnInitialize()
 
 	for(const auto Iter : EventHandleClasses)
 	{
-		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, FName("OnHandleEvent"));
+		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, GET_FUNCTION_NAME_THISCLASS(OnHandleEvent));
 	}
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameInited>(this, FName("OnGameInited"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameStarted>(this, FName("OnGameStarted"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, FName("OnGameExited"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameInited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameInited));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameStarted>(this, GET_FUNCTION_NAME_THISCLASS(OnGameStarted));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameExited));
 }
 
 void UEventManagerBase::OnPreparatory(EPhase InPhase)
@@ -48,6 +48,19 @@ void UEventManagerBase::OnTermination(EPhase InPhase)
 void UEventManagerBase::OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle)
 {
 	K2_OnHandleEvent(InSender, InEventHandle);
+}
+
+bool UEventManagerBase::GetEventInfoByTag(const FGameplayTag& InTag, FEventInfo& OutMenuInfo) const
+{
+	for(auto& Iter : EventInfos)
+	{
+		if(Iter.Tag == InTag)
+		{
+			OutMenuInfo = Iter;
+			return true;
+		}
+	}
+	return false;
 }
 
 void UEventManagerBase::OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle)

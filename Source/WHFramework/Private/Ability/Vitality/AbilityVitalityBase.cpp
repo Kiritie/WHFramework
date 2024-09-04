@@ -9,7 +9,6 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Default.h"
 #include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -79,7 +78,7 @@ void AAbilityVitalityBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityVitalityBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 }
 
@@ -92,18 +91,14 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
 	{
-		FSM->GetStateByClass<UAbilityVitalityState_Death>()->Killer = InKiller;
 		InKiller->Kill(this);
 	}
-	FSM->SwitchStateByClass<UAbilityVitalityState_Death>();
+	FSM->SwitchStateByClass<UAbilityVitalityState_Death>({ InKiller });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	if(InTarget == this)
-	{
-		Death(this);
-	}
+	
 }
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
@@ -195,7 +190,7 @@ bool AAbilityVitalityBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
-bool AAbilityVitalityBase::SetLevelV(int32 InLevel)
+bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
 {
 	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
@@ -229,20 +224,12 @@ UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= GetAttributeSet<UVitalityAttributeSetBase>()->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
-			SetLevelV(GetLevelV() + 1);
+			SetLevelA(GetLevelA() + 1);
 			SetExp(0.f);
-		}
-	}
-	else if(InAttributeChangeData.Attribute == GetAttributeSet<UVitalityAttributeSetBase>()->GetHealthAttribute())
-	{
-		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
-		if(DeltaValue > 0.f)
-		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -251,10 +238,21 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityVitalityBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityVitalityBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
 }

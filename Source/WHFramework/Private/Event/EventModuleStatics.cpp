@@ -11,11 +11,6 @@ void UEventModuleStatics::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, 
 	UEventModule::Get().SubscribeEvent(InClass, InOwner, InFuncName);
 }
 
-void UEventModuleStatics::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
-{
-	UEventModule::Get().SubscribeEvent(InClass, InDelegate);
-}
-
 void UEventModuleStatics::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	UEventModule::Get().SubscribeEventByDelegate(InClass, InDelegate);
@@ -24,11 +19,6 @@ void UEventModuleStatics::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase>
 void UEventModuleStatics::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
 {
 	UEventModule::Get().UnsubscribeEvent(InClass, InOwner, InFuncName);
-}
-
-void UEventModuleStatics::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
-{
-	UEventModule::Get().UnsubscribeEvent(InClass, InDelegate);
 }
 
 void UEventModuleStatics::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)

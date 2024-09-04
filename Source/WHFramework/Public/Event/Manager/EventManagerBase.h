@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include "Common/CommonTypes.h"
 #include "Common/Base/WHObject.h"
+#include "Event/EventModuleTypes.h"
 
 #include "EventManagerBase.generated.h"
 
@@ -66,12 +68,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Event")
 	TArray<TSubclassOf<UEventHandleBase>> EventHandleClasses;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (TitleProperty = "Tag"), Category = "Event")
+	TArray<FEventInfo> EventInfos;
+
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetEventManagerName() const { return EventManagerName; }
 
 	UFUNCTION(BlueprintPure)
 	TArray<TSubclassOf<UEventHandleBase>> GetEventHandleClasses() const { return EventHandleClasses; }
+
+	UFUNCTION(BlueprintPure)
+	bool GetEventInfoByTag(const FGameplayTag& InTag, FEventInfo& OutMenuInfo) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Events

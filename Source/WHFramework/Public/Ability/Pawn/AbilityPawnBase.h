@@ -39,6 +39,17 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnIn
 public:
 	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
 protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 	
@@ -52,7 +63,7 @@ protected:
 	
 	virtual void ResetData();
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
 	virtual bool HasArchive() const override { return true; }
@@ -72,6 +83,8 @@ public:
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+
+	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -138,6 +151,8 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Vitality; }
+
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	
 	virtual UAbilityInventoryBase* GetInventory() const override;
@@ -150,7 +165,7 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetable_Implementation() const override;
+	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
@@ -172,10 +187,10 @@ public:
 	virtual void SetRaceID(FName InRaceID) override { RaceID = InRaceID; }
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
@@ -197,9 +212,19 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

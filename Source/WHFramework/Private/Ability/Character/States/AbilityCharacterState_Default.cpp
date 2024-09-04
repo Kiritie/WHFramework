@@ -3,7 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Default.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "FSM/Components/FSMComponent.h"
 
 UAbilityCharacterState_Default::UAbilityCharacterState_Default()
@@ -11,39 +11,41 @@ UAbilityCharacterState_Default::UAbilityCharacterState_Default()
 	StateName = FName("Default");
 }
 
-void UAbilityCharacterState_Default::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterState_Default::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Default::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterState_Default::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityCharacterState_Default::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+
+	Character->GetInteractionComponent()->SetInteractable(false);
 
 	Character->Execute_SetActorVisible(Character, true);
 	Character->ResetData();
 	Character->SetMotionRate(1, 1);
 }
 
-void UAbilityCharacterState_Default::OnRefresh()
+void UAbilityCharacterState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 
 	TrySwitchToWalk();
 }
 
-void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterState_Default::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

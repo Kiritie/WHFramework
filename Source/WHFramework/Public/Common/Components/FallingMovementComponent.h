@@ -15,16 +15,32 @@ class WHFRAMEWORK_API UFallingMovementComponent : public UMovementComponent
 public:
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float FallingSpeed;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float AcceleratedSpeed;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TEnumAsByte<ECollisionChannel> TraceChannel;
+
+public:
+	UFUNCTION(BlueprintPure)
+	float GetFallingSpeed() const { return FallingSpeed; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetFallingSpeed(float InFallingSpeed) { FallingSpeed = InFallingSpeed; }
+
+	UFUNCTION(BlueprintPure)
+	float GetAcceleratedSpeed() const { return AcceleratedSpeed; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetAcceleratedSpeed(float InAcceleratedSpeed) { AcceleratedSpeed = InAcceleratedSpeed; }
+
+	UFUNCTION(BlueprintPure)
+	TEnumAsByte<ECollisionChannel> GetTraceChannel() const { return TraceChannel; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetTraceChannel(const TEnumAsByte<ECollisionChannel>& InTraceChannel) { TraceChannel = InTraceChannel; }
 };
-
-
-

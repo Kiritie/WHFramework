@@ -119,7 +119,7 @@ void UWidgetVideoSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSettin
 
 	if(InSettingItem == SettingItem_GlobalVideoQuality)
 	{
-		if(InValue != (int32)EVideoQuality::Custom)
+		if(InValue.GetIntegerValue() != (int32)EVideoQuality::Custom)
 		{
 			SettingItem_ViewDistanceQuality->SetValue(InValue);
 			SettingItem_ShadowQuality->SetValue(InValue);

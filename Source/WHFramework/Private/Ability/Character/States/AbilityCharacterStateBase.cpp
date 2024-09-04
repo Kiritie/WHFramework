@@ -7,29 +7,29 @@ UAbilityCharacterStateBase::UAbilityCharacterStateBase()
 	StateName = FName("AbilityCharacterStateBase");
 }
 
-void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterStateBase::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 }
 
-void UAbilityCharacterStateBase::OnRefresh()
+void UAbilityCharacterStateBase::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityCharacterStateBase::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterStateBase::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 }
 
 void UAbilityCharacterStateBase::OnTermination()

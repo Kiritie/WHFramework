@@ -19,6 +19,35 @@ class WHFRAMEWORK_API UWorldWidgetComponent : public UWidgetComponent
 public:	
 	UWorldWidgetComponent();
 
+public:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	virtual void SetWidget(UUserWidget* InWidget) override;
+
+	virtual void RefreshParams();
+
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* InProperty) const override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+public:
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
+
+	UFUNCTION(BlueprintCallable)
+	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldWidget(UUserWidget* InWidget);
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh = false);
+
 protected:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
@@ -48,34 +77,6 @@ protected:
 
 private:	
 	FTransform InitTransform;
-
-public:
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
-	virtual void SetWidget(UUserWidget* InWidget) override;
-
-#if WITH_EDITOR
-	virtual bool CanEditChange(const FProperty* InProperty) const override;
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-	virtual void RefreshParams();
-#endif
-
-public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
-
-	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
-
-	UFUNCTION(BlueprintCallable)
-	void SetWorldWidget(UUserWidget* InWidget);
-
-	UFUNCTION(BlueprintCallable)
-	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh = false);
 
 public:
 	UFUNCTION(BlueprintCallable)

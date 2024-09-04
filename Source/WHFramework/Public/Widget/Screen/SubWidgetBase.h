@@ -49,11 +49,16 @@ public:
 	virtual void OnDestroy(bool bRecovery) override;
 
 public:
+	virtual void Init(const TArray<FParameter>* InParams);
+	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	virtual void Init(const TArray<FParameter>& InParams);
+	
 	UFUNCTION(BlueprintCallable)
-	void Refresh() override;
+	virtual void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(bool bRecovery = false) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

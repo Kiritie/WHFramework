@@ -44,17 +44,37 @@ public:
 	{
 		EnumType = nullptr;
 		EnumName = TEXT("");
+		EnumNames = TArray<FString>();
 		EnumValue = 0;
+	}
+
+	FEnumParameterValue(UEnum* const InEnumType, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumType = InEnumType;
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumType->NumEnums() - 1, 0));
+	}
+
+	FEnumParameterValue(const FString& InEnumName, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumType = LoadObject<UEnum>(nullptr, *InEnumName);
+		EnumName = InEnumName;
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumType->NumEnums() - 1, 0));
+	}
+	
+	FEnumParameterValue(const TArray<FString>& InEnumNames, const uint8 InEnumValue) : FEnumParameterValue()
+	{
+		EnumNames = InEnumNames;
+		EnumValue = FMath::Clamp(InEnumValue, 0, FMath::Max(EnumNames.Num() - 1, 0));
 	}
 
 	friend bool operator==(const FEnumParameterValue& A, const FEnumParameterValue& B)
 	{
-		return A.EnumType == B.EnumType && A.EnumName == B.EnumName && A.EnumValue == B.EnumValue;
+		return A.EnumType == B.EnumType && A.EnumName == B.EnumName && A.EnumNames == B.EnumNames && A.EnumValue == B.EnumValue;
 	}
 
 	friend bool operator!=(const FEnumParameterValue& A, const FEnumParameterValue& B)
 	{
-		return A.EnumType != B.EnumType || A.EnumName != B.EnumName || A.EnumValue != B.EnumValue;
+		return A.EnumType != B.EnumType || A.EnumName != B.EnumName && A.EnumNames == B.EnumNames || A.EnumValue != B.EnumValue;
 	}
 
 public:
@@ -63,6 +83,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString EnumName;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FString> EnumNames;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	uint8 EnumValue;
@@ -102,7 +125,7 @@ public:
 		ObjectPtrValue = nullptr;
 		PointerValue = nullptr;
 	}
-	
+
 	FParameter(int32 InValue)
 	{
 		*this = MakeInteger(InValue);
@@ -121,6 +144,11 @@ public:
 	FParameter(uint8 InValue)
 	{
 		*this = MakeByte(InValue);
+	}
+
+	FParameter(const FEnumParameterValue& InValue)
+	{
+		*this = MakeEnum(InValue);
 	}
 
 	FParameter(const FString& InValue)
@@ -214,6 +242,59 @@ public:
 	{
 		*this = MakePointer(InValue);
 	}
+
+	FParameter(const void* InValue)
+	{
+		*this = MakePointer(InValue);
+	}
+
+	FORCEINLINE operator int32() const { return IntegerValue; }
+	
+	FORCEINLINE operator float() const { return FloatValue; }
+	
+	FORCEINLINE operator uint8() const { return ByteValue; }
+	
+	FORCEINLINE operator FEnumParameterValue() const { return EnumValue; }
+	
+	FORCEINLINE operator FString() const { return StringValue; }
+	
+	FORCEINLINE operator FName() const { return NameValue; }
+	
+	FORCEINLINE operator FText() const { return TextValue; }
+	
+	FORCEINLINE operator bool() const { return BooleanValue; }
+	
+	FORCEINLINE operator FVector() const { return VectorValue; }
+	
+	FORCEINLINE operator FRotator() const { return RotatorValue; }
+	
+	FORCEINLINE operator FColor() const { return ColorValue; }
+	
+	FORCEINLINE operator FKey() const { return KeyValue; }
+	
+	FORCEINLINE operator FGameplayTag() const { return TagValue; }
+	
+	FORCEINLINE operator FGameplayTagContainer() const { return TagsValue; }
+	
+	FORCEINLINE operator UClass*() const { return ClassValue; }
+	
+	template<class T>
+	FORCEINLINE operator TSubclassOf<T>() const { return GetClassValue<T>(); }
+
+	template<class T>
+	FORCEINLINE operator TSoftClassPtr<T>() const { return GetClassPtrValue<T>(); }
+	
+	FORCEINLINE operator UObject*() const { return ObjectValue; }
+	
+	template<class T>
+	FORCEINLINE operator T*() const { return GetObjectValue<T>(); }
+
+	template<class T>
+	FORCEINLINE operator TSoftObjectPtr<T>() const { return GetObjectPtrValue<T>(); }
+
+	FORCEINLINE operator FSimpleDynamicDelegate() const { return DelegateValue; }
+	
+	FORCEINLINE operator void*() const { return PointerValue; }
 
 	friend bool operator==(const FParameter& A, const FParameter& B)
 	{
@@ -339,6 +420,14 @@ protected:
 
 public:
 	//////////////////////////////////////////////////////////////////////////
+	void SetParameterValue(const FParameter& InParameter)
+	{
+		const FText _Description = Description;
+		*this = InParameter;
+		Description = _Description;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
 	EParameterType GetParameterType() const { return ParameterType; }
 
 	void SetParameterType(EParameterType InParameterType) { ParameterType = InParameterType; }
@@ -424,6 +513,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	UClass* GetClassValue() const { return ClassValue; }
+	
+	template<class T>
+	TSubclassOf<T> GetClassValue() const { return ClassValue; }
 
 	void SetClassValue(UClass* InValue) { ClassValue = InValue; }
 
@@ -464,6 +556,8 @@ public:
 	T& GetPointerValueRef() const { return *GetPointerValue<T>(); }
 
 	void SetPointerValue(void* InValue) { PointerValue = InValue; }
+
+	void SetPointerValue(const void* InValue) { PointerValue = const_cast<void*>(InValue); }
 
 public:
 	static FParameter MakeInteger(int32 InValue, const FText& InDescription = FText::GetEmpty())
@@ -657,6 +751,15 @@ public:
 		return Parameter;
 	}
 
+	static FParameter MakePointer(const void* InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Pointer;
+		Parameter.Description = InDescription;
+		Parameter.SetPointerValue(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakePointer(void* InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
@@ -677,14 +780,15 @@ public:
 	{
 		Name = NAME_None;
 		bRegistered = false;
-		DisplayName = FText::GetEmpty();
 		Category = FText::GetEmpty();
 		Parameter = FParameter();
 	}
 
-	FParameterSet(FName InName, const FParameter& InParameter) : FParameterSet()
+	FParameterSet(FName InName, const FParameter& InParameter, const FText& InCategory = FText::GetEmpty(), bool bInRegistered = false)
 	{
 		Name = InName;
+		bRegistered = bInRegistered;
+		Category = InCategory;
 		Parameter = InParameter;
 	}
 
@@ -694,9 +798,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bRegistered;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "bRegistered"))
-	FText DisplayName;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "bRegistered"))
 	FText Category;
@@ -768,7 +869,7 @@ public:
 
 	FParameterMap(const TMap<FString, FString>& InMap)
 	{
-		Map = InMap; 
+		Map = InMap;
 	}
 
 protected:
@@ -844,7 +945,7 @@ public:
 	FString ToJsonString() const
 	{
 		FString JsonString;
-		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR> >::Create(&JsonString);
+		const TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
 		JsonWriter->WriteObjectStart();
 		for (auto& Iter : Map)
 		{

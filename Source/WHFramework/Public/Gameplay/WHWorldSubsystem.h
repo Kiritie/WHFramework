@@ -21,8 +21,6 @@ public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
 public:
-	virtual void Tick(float DeltaTime) override;
-
 	virtual TStatId GetStatId() const override { return TStatId(); }
 
 public:

@@ -6,7 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainManager.h"
 
-const FUniqueType FInputManager::Type = FUniqueType();
+const FUniqueType FInputManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FInputManager)
 
@@ -15,7 +15,7 @@ FInputManager::FInputManager() : FManagerBase(Type)
 {
 	NativeInputMode = EInputMode::GameOnly;
 	
-	GlobalInputMode = EInputMode::GameOnly;
+	GlobalInputMode = EInputMode::None;
 
 	InputManagers = TArray<IInputManagerInterface*>();
 }
@@ -29,6 +29,13 @@ void FInputManager::OnInitialize()
 	FManagerBase::OnInitialize();
 
 	AddInputManager(this);
+}
+
+void FInputManager::OnPreparatory()
+{
+	FManagerBase::OnPreparatory();
+
+	UpdateInputMode();
 }
 
 void FInputManager::OnReset()

@@ -3,8 +3,10 @@
 
 #include "FSM/Components/FSMComponent.h"
 
+#include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "FSM/FSMModuleStatics.h"
+#include "FSM/Base/FSMAgentInterface.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 // ParamSets default values
@@ -48,7 +50,7 @@ void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	OnRefresh();
+	OnRefresh(DeltaTime);
 }
 
 void UFSMComponent::OnInitialize()
@@ -79,11 +81,11 @@ void UFSMComponent::OnInitialize()
 	}
 }
 
-void UFSMComponent::OnRefresh()
+void UFSMComponent::OnRefresh(float DeltaSeconds)
 {
 	if(CurrentState)
 	{
-		CurrentState->OnRefresh();
+		CurrentState->OnRefresh(DeltaSeconds);
 	}
 }
 
@@ -105,48 +107,46 @@ void UFSMComponent::OnTermination()
 	CurrentState = nullptr;
 }
 
-bool UFSMComponent::SwitchState(UFiniteStateBase* InState)
+bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	if(!bInitialized || InState && !HasState(InState)) return false;
+	if(!bInitialized || InState == CurrentState || (InState && !HasState(InState)) || CurrentState != TargetState) return false;
 	
-	if(InState == CurrentState) return true;
-
 	UFiniteStateBase* LastState = CurrentState;
 
 	if(!LastState || LastState->OnLeaveValidate(InState))
 	{
-		if(!InState || InState->OnEnterValidate(LastState))
+		if(!InState || InState->OnEnterValidate(LastState, InParams))
 		{
+			TargetState = InState;
 			if(LastState)
 			{
 				LastState->OnLeave(InState);
-				CurrentState = nullptr;
 			}
+			CurrentState = TargetState;
 			if(InState)
 			{
-				CurrentState = InState;
-				InState->OnEnter(LastState);
-			}
-			else
-			{
-				CurrentState = nullptr;
+				InState->OnEnter(LastState, InParams);
 			}
 		}
 	}
 	if(CurrentState != LastState)
 	{
-		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState);
-		OnStateChanged.Broadcast(CurrentState);
+		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState, LastState);
+		OnStateChanged.Broadcast(CurrentState, LastState);
+		if(!CurrentState)
+		{
+			RefreshState();
+		}
 		return true;
 	}
 	return false;
 }
 
-bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
+bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex, const TArray<FParameter>& InParams)
 {
 	if(HasStateByIndex(InStateIndex))
 	{
-		return SwitchState(GetStateByIndex<UFiniteStateBase>(InStateIndex));
+		return SwitchState(GetStateByIndex<UFiniteStateBase>(InStateIndex), InParams);
 	}
 	else if(bInitialized)
 	{
@@ -158,11 +158,27 @@ bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex)
 	return false;
 }
 
-bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass)
+bool UFSMComponent::SwitchStateByName(const FName InStateName, const TArray<FParameter>& InParams)
+{
+	if(HasStateByName(InStateName))
+	{
+		return SwitchState(GetStateByName<UFiniteStateBase>(InStateName), InParams);
+	}
+	else if(bInitialized)
+	{
+		if(bShowDebugMessage)
+		{
+			WHLog(FString::Printf(TEXT("%s=>切换状态失败，不存在指定名称的状态: %s"), *GetAgent()->GetActorNameOrLabel(), *InStateName.ToString()), EDC_FSM, EDV_Warning);
+		}
+	}
+	return false;
+}
+
+bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClass, const TArray<FParameter>& InParams)
 {
 	if(HasStateByClass<UFiniteStateBase>(InStateClass))
 	{
-		return SwitchState(GetStateByClass<UFiniteStateBase>(InStateClass));
+		return SwitchState(GetStateByClass<UFiniteStateBase>(InStateClass), InParams);
 	}
 	else if(bInitialized)
 	{
@@ -174,40 +190,45 @@ bool UFSMComponent::SwitchStateByClass(TSubclassOf<UFiniteStateBase> InStateClas
 	return false;
 }
 
-bool UFSMComponent::SwitchDefaultState()
+bool UFSMComponent::SwitchDefaultState(const TArray<FParameter>& InParams)
 {
 	if(DefaultState)
 	{
-		return SwitchStateByClass(DefaultState);
+		return SwitchStateByClass(DefaultState, InParams);
 	}
 	return false;
 }
 
-bool UFSMComponent::SwitchFinalState()
+bool UFSMComponent::SwitchFinalState(const TArray<FParameter>& InParams)
 {
 	if(FinalState)
 	{
-		return SwitchStateByClass(FinalState);
+		return SwitchStateByClass(FinalState, InParams);
 	}
 	return false;
 }
 
-bool UFSMComponent::SwitchLastState()
+bool UFSMComponent::SwitchLastState(const TArray<FParameter>& InParams)
 {
 	if(CurrentState && CurrentState->GetStateIndex() > 0)
 	{
-		return SwitchStateByIndex(CurrentState->GetStateIndex() - 1);
+		return SwitchStateByIndex(CurrentState->GetStateIndex() - 1, InParams);
 	}
 	return false;
 }
 
-bool UFSMComponent::SwitchNextState()
+bool UFSMComponent::SwitchNextState(const TArray<FParameter>& InParams)
 {
 	if(CurrentState && CurrentState->GetStateIndex() < StateMap.Num() - 1)
 	{
-		return SwitchStateByIndex(CurrentState->GetStateIndex() + 1);
+		return SwitchStateByIndex(CurrentState->GetStateIndex() + 1, InParams);
 	}
 	return false;
+}
+
+void UFSMComponent::RefreshState()
+{
+	GetAgent<IFSMAgentInterface>()->OnFiniteStateRefresh(CurrentState);
 }
 
 bool UFSMComponent::TerminateState(UFiniteStateBase* InState)
@@ -249,17 +270,47 @@ bool UFSMComponent::HasStateByIndex(int32 InStateIndex) const
 
 UFiniteStateBase* UFSMComponent::GetStateByIndex(int32 InStateIndex, TSubclassOf<UFiniteStateBase> InStateClass) const
 {
-	return GetStateByIndex<UFiniteStateBase>(InStateIndex);
+	if(HasStateByIndex(InStateIndex))
+	{
+		return GetDeterminesOutputObject(GetStates()[InStateIndex], InStateClass);
+	}
+	return nullptr;
+}
+
+bool UFSMComponent::HasStateByName(const FName InStateName) const
+{
+	if(InStateName.IsNone()) return false;
+
+	return StateMap.Contains(InStateName);
+}
+
+UFiniteStateBase* UFSMComponent::GetStateByName(const FName InStateName, TSubclassOf<UFiniteStateBase> InStateClass) const
+{
+	if(InStateName.IsNone()) return nullptr;
+
+	if(HasStateByName(InStateName))
+	{
+		return GetDeterminesOutputObject(StateMap[InStateName], InStateClass);
+	}
+	return nullptr;
 }
 
 bool UFSMComponent::HasStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const
 {
-	return HasStateByClass<UFiniteStateBase>(InStateClass);
+	if(!InStateClass) return false;
+
+	const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
+	return StateMap.Contains(StateName);
 }
 
 UFiniteStateBase* UFSMComponent::GetStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const
 {
-	return GetStateByClass<UFiniteStateBase>(InStateClass);
+	if(HasStateByClass(InStateClass))
+	{
+		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
+		return GetDeterminesOutputObject(StateMap[StateName], InStateClass);
+	}
+	return nullptr;
 }
 
 bool UFSMComponent::IsCurrentState(UFiniteStateBase* InState) const

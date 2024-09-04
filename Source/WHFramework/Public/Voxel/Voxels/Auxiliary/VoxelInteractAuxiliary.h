@@ -7,6 +7,7 @@
 #include "VoxelInteractAuxiliary.generated.h"
 
 class UVoxel;
+class UInteractionComponent;
 
 /**
  */
@@ -26,8 +27,6 @@ protected:
 public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual bool DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
@@ -36,7 +35,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class UInteractionComponent* Interaction;
+	UInteractionComponent* Interaction;
 
 public:
 	template<class T>
@@ -45,10 +44,12 @@ public:
 		return Cast<T>(GetInteractingAgent());
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InAgentClass"))
-	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InAgentClass) const { return Cast<AActor>(GetInteractingAgent()); }
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return Cast<AActor>(GetInteractingAgent()); }
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
+
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
 	
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

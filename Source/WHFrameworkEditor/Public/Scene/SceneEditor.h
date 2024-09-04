@@ -84,6 +84,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Viewport
 public:
+	virtual FVector GetActiveViewportViewLocation() const override;
+
+	virtual FRotator GetActiveViewportViewRotation() const override;
+	
 	virtual SConstraintCanvas::FSlot* AddWidgetToViewport(const TSharedPtr<IAssetViewport>& InViewport, const TSharedRef<SWidget>& InWidget);
 	
 	virtual SConstraintCanvas::FSlot* AddWidgetToActiveViewport(const TSharedRef<SWidget>& InWidget) override;

@@ -55,7 +55,9 @@ enum class EInteractAction : uint8
 	Dialogue = 3 UMETA(DisplayName="对话"),
 	// 交易
 	Transaction = 4 UMETA(DisplayName="交易"),
-	
+	// 拾取
+	PickUp = 5 UMETA(DisplayName="拾取"),
+
 	Custom1 = 10,
 	Custom2 = 11,
 	Custom3 = 12,
@@ -66,6 +68,20 @@ enum class EInteractAction : uint8
 	Custom8 = 17,
 	Custom9 = 18,
 	Custom10 = 19
+};
+
+/**
+ * 交互对象类型
+ */
+UENUM(BlueprintType)
+enum class EInteractAgentType : uint8
+{
+	// 无
+	None = 0 UMETA(DisplayName="无"),
+	// 静态的
+	Static = 1 UMETA(DisplayName="静态的"),
+	// 有生命的
+	Vitality = 2 UMETA(DisplayName="有生命的")
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -84,6 +100,9 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 	}
 	return nullptr;
 }
+
+#define GET_FUNCTION_NAME_THISCLASS(FunctionName) \
+	((void)sizeof(&ThisClass::FunctionName), FName(TEXT(#FunctionName)))
 
 //////////////////////////////////////////////////////////////////////////
 // Tags
@@ -127,6 +146,7 @@ namespace GameplayTags
 	////////////////////////////////////////////////////
 	// State_Character
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Active);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Moving);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Falling);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Walking);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Jumping);

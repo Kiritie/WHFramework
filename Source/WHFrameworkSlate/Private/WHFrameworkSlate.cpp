@@ -10,12 +10,14 @@ void FWHFrameworkSlateModule::StartupModule()
 {
 	FSlateWidgetManager::Register();
 
-	FWHFrameworkSlateStyle::ResetToDefault();
+	FWHFrameworkSlateStyle::Initialize();
 }
 
 void FWHFrameworkSlateModule::ShutdownModule()
 {
 	FSlateWidgetManager::UnRegister();
+
+	FWHFrameworkSlateStyle::Shutdown();
 }
 
 IMPLEMENT_MODULE(FWHFrameworkSlateModule, WHFrameworkSlate)

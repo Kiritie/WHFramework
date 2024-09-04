@@ -17,11 +17,3 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		MainModule->Execute_OnInitialize(MainModule);
 	}
 }
-
-void UWHWorldSubsystem::Tick(float DeltaTime)
-{
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnRefresh(MainModule, DeltaTime);
-	}
-}

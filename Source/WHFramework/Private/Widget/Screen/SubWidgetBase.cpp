@@ -54,6 +54,16 @@ void USubWidgetBase::OnDestroy(bool bRecovery)
 	K2_OnDestroy(bRecovery);
 }
 
+void USubWidgetBase::Init(const TArray<FParameter>* InParams)
+{
+	Init(InParams ? *InParams : TArray<FParameter>());
+}
+
+void USubWidgetBase::Init(const TArray<FParameter>& InParams)
+{
+	OnInitialize(InParams);
+}
+
 void USubWidgetBase::Refresh()
 {
 	OnRefresh();

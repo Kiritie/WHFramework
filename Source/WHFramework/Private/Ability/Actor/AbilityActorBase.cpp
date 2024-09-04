@@ -40,6 +40,31 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	Level = 0;
 }
 
+void AAbilityActorBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void AAbilityActorBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		RefreshAttributes();
+	}
+}
+
+void AAbilityActorBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+}
+
+void AAbilityActorBase::OnTermination_Implementation(EPhase InPhase)
+{
+	Super::OnTermination_Implementation(InPhase);
+}
+
 void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
@@ -53,7 +78,7 @@ void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FP
 
 	Super::OnSpawn_Implementation(InOwner, InParams);
 
-	InitializeAbilitySystem();
+	InitializeAbilities();
 }
 
 void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
@@ -105,7 +130,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetLevelV(SaveData.Level);
+		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
@@ -153,6 +178,10 @@ void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractio
 void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
 	
+}
+
+void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)
+{
 }
 
 void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
@@ -210,7 +239,7 @@ UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 	return AbilitySystem;
 }
 
-bool AAbilityActorBase::SetLevelV(int32 InLevel)
+bool AAbilityActorBase::SetLevelA(int32 InLevel)
 {
 	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, ActorData.MaxLevel != -1 ? ActorData.MaxLevel : InLevel);
@@ -226,7 +255,6 @@ bool AAbilityActorBase::SetLevelV(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-
 		return true;
 	}
 	return false;

@@ -9,33 +9,33 @@ UAbilityVitalityState_Default::UAbilityVitalityState_Default()
 	StateName = FName("Default");
 }
 
-void UAbilityVitalityState_Default::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityVitalityState_Default::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityVitalityState_Default::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityVitalityState_Default::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->ResetData();
 }
 
-void UAbilityVitalityState_Default::OnRefresh()
+void UAbilityVitalityState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityVitalityState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityVitalityState_Default::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 }
 
 void UAbilityVitalityState_Default::OnTermination()

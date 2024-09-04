@@ -24,6 +24,8 @@ class WHFRAMEWORK_API IAbilityInventoryAgentInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	virtual void OnAdditionItem(const FAbilityItem& InItem) = 0;
+	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) = 0;
 		
 	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) = 0;

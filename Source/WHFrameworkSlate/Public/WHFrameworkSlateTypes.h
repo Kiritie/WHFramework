@@ -173,7 +173,9 @@ enum class EEditorWidgetType : uint8
 enum class EEditorWidgetState : uint8
 {
 	None,
+	Opening,
 	Opened,
+	Closing,
 	Closed
 };
 

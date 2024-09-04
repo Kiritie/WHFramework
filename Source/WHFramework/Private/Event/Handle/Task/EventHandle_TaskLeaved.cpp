@@ -5,7 +5,7 @@
 
 UEventHandle_TaskLeaved::UEventHandle_TaskLeaved()
 {
-
+	Task = nullptr;
 }
 
 void UEventHandle_TaskLeaved::OnDespawn_Implementation(bool bRecovery)
@@ -17,6 +17,6 @@ void UEventHandle_TaskLeaved::Parse_Implementation(const TArray<FParameter>& InP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Task = InParams[0].GetObjectValue<UTaskBase>();
+		Task = InParams[0];
 	}
 }

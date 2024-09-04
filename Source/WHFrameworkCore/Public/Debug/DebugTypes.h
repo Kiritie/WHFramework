@@ -29,6 +29,7 @@ enum EDebugCategory : int
 	EDC_Network UMETA(DisplayName = "Network"),
 	EDC_ObjectPool UMETA(DisplayName = "ObjectPool"),
 	EDC_Parameter UMETA(DisplayName = "Parameter"),
+	EDC_Platform UMETA(DisplayName = "Platform"),
 	EDC_Pawn UMETA(DisplayName = "Pawn"),
 	EDC_Procedure UMETA(DisplayName = "Procedure"),
 	EDC_ReferencePool UMETA(DisplayName = "ReferencePool"),
@@ -39,6 +40,7 @@ enum EDebugCategory : int
 	EDC_Voxel UMETA(DisplayName = "Voxel"),
 	EDC_WebRequest UMETA(DisplayName = "WebRequest"),
 	EDC_Widget UMETA(DisplayName = "Widget"),
+	EDC_Zip UMETA(DisplayName = "Zip"),
 	EDC_Custom1 UMETA(DisplayName = "Custom1"),
 	EDC_Custom2 UMETA(DisplayName = "Custom2"),
 	EDC_Custom3 UMETA(DisplayName = "Custom3"),
@@ -118,6 +120,8 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Network, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_ObjectPool, Log, All);
 // 参数
 DEFINE_LOG_CATEGORY_STATIC(WH_Parameter, Log, All);
+// 平台
+DEFINE_LOG_CATEGORY_STATIC(WH_Platform, Log, All);
 // Pawn
 DEFINE_LOG_CATEGORY_STATIC(WH_Pawn, Log, All);
 // 流程
@@ -138,22 +142,47 @@ DEFINE_LOG_CATEGORY_STATIC(WH_Voxel, Log, All);
 DEFINE_LOG_CATEGORY_STATIC(WH_WebRequest, Log, All);
 // UI
 DEFINE_LOG_CATEGORY_STATIC(WH_Widget, Log, All);
+// Zip
+DEFINE_LOG_CATEGORY_STATIC(WH_Zip, Log, All);
 
 // 断言实现
-#define WH_ENSUREEDITOR_IMPL(Capture, Always, InExpression, InFormat) \
-(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
-{ \
-static bool bExecuted = false; \
-return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
-}) && [] () { PLATFORM_BREAK(); return false; } ()))
+#if WITH_EDITOR
+	#define WH_ENSUREEDITOR_IMPL(Capture, Always, InExpression, InFormat) \
+	(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
+	{ \
+		static bool bExecuted = false; \
+		return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
+	}) && [] () { PLATFORM_BREAK(); return false; } ()))
 
-#define WH_ENSUREEDITORMSGF_IMPL(Capture, Always, InExpression, InFormat, Message, Category, Verbosity) \
-(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
-{ \
-static bool bExecuted = false; \
-WHLog(Message, Category, Verbosity); \
-return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
-}) && [] () { PLATFORM_BREAK(); return false; } ()))
+	#define WH_ENSUREEDITORMSGF_IMPL(Capture, Always, InExpression, InFormat, Message, Category, Verbosity) \
+	(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
+	{ \
+		static bool bExecuted = false; \
+		if ((!bExecuted)) \
+		{ \
+			WHLog(Message, Category, Verbosity); \
+		} \
+		return CheckVerifyImpl(bExecuted, Always, __FILE__, __LINE__, PLATFORM_RETURN_ADDRESS(), #InExpression, InFormat); \
+	}) && [] () { PLATFORM_BREAK(); return false; } ()))
+#else
+	#define WH_ENSUREEDITOR_IMPL(Capture, Always, InExpression, InFormat) \
+	(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
+	{ \
+		static bool bExecuted = false; \
+		return false; \
+	}) && [] () { PLATFORM_BREAK(); return false; } ()))
+
+	#define WH_ENSUREEDITORMSGF_IMPL(Capture, Always, InExpression, InFormat, Message, Category, Verbosity) \
+	(LIKELY(!!(InExpression)) || (DispatchCheckVerify<bool>([&] () UE_DEBUG_SECTION \
+	{ \
+		static bool bExecuted = false; \
+		if ((!bExecuted)) \
+		{ \
+			WHLog(Message, Category, Verbosity); \
+		} \
+		return false; \
+	}) && [] () { PLATFORM_BREAK(); return false; } ()))
+#endif
 
 #define LOG_CASE(Category, Verbosity) \
 case EDC_##Category: \

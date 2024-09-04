@@ -10,7 +10,7 @@ class IInteractionAgentInterface;
 /**
  * 
  */
-UCLASS()
+UCLASS(ClassGroup="Collision", editinlinenew, meta=(DisplayName="Interaction", BlueprintSpawnableComponent))
 class WHFRAMEWORK_API UInteractionComponent : public UBoxComponent
 {
 	GENERATED_BODY()
@@ -28,15 +28,16 @@ protected:
 	UFUNCTION()
 	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	virtual void OnAgentEnter(IInteractionAgentInterface* InInteractionAgent);
+public:
+	virtual bool OnAgentEnter(IInteractionAgentInterface* InInteractionAgent);
 
-	virtual void OnAgentLeave(IInteractionAgentInterface* InInteractionAgent);
+	virtual bool OnAgentLeave(IInteractionAgentInterface* InInteractionAgent);
 
 public:
-	virtual void AddInteractAction(EInteractAction InInteractAction);
+	virtual bool AddInteractAction(EInteractAction InInteractAction);
 		
-	virtual void RemoveInteractAction(EInteractAction InInteractAction);
-		
+	virtual bool RemoveInteractAction(EInteractAction InInteractAction);
+	
 	virtual void ClearInteractActions();
 
 protected:

@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
-#include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
@@ -12,27 +11,32 @@ UAbilityPawnState_Death::UAbilityPawnState_Death()
 	StateName = FName("Death");
 }
 
-void UAbilityPawnState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityPawnState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityPawnState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityPawnState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
-	if(Killer)
+	if(Killer && Killer != Pawn)
 	{
-		Killer->ModifyExp(Pawn->GetLevelV() * 5.f);
+		Killer->ModifyExp(Pawn->GetLevelA() * 5.f);
 	}
 
 	Pawn->SetExp(0);
@@ -41,14 +45,14 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 	DeathStart();
 }
 
-void UAbilityPawnState_Death::OnRefresh()
+void UAbilityPawnState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	Killer = nullptr;
 

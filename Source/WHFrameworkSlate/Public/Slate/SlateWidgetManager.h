@@ -2,7 +2,7 @@
 
 #pragma once
 #include "WHFrameworkSlateTypes.h"
-#include "Editor/Base/SEditorWidgetBase.h"
+#include "Editor/Base/IEditorWidgetBase.h"
 #include "Runtime/Base/SSlateWidgetBase.h"
 #include "Input/InputManagerInterface.h"
 #include "Main/MainTypes.h"
@@ -157,7 +157,7 @@ public:
 	////////////////////////////////////////////////////
 	// EditorWidget
 protected:
-	TMap<FName, TSharedPtr<SEditorWidgetBase>> AllEditorWidgets;
+	TMap<FName, TSharedPtr<IEditorWidgetBase>> AllEditorWidgets;
 
 public:
 	template<class T>
@@ -177,34 +177,40 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<SEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false, bool bForce = true)
+	TSharedPtr<T> CreateEditorWidget(const TSharedPtr<T>& InWidget, const TSharedPtr<IEditorWidgetBase>& InParent = nullptr, bool bAutoOpen = false)
 	{
 		const FName WidgetName = T::WidgetName;
-		if(!AllEditorWidgets.Contains(WidgetName) || bForce)
+		if(AllEditorWidgets.Contains(WidgetName))
 		{
-			AllEditorWidgets.Add(WidgetName, InWidget);
-			InWidget->_WidgetName = WidgetName;
-			if(InParent)
-			{
-				InParent->AddChild(InWidget);
-			}
-			InWidget->SetVisibility(EVisibility::Collapsed);
-			if(bAutoOpen)
-			{
-				InWidget->Open();
-			}
+			AllEditorWidgets[WidgetName]->Destroy();
+		}
+		AllEditorWidgets.Emplace(WidgetName, InWidget);
+		InWidget->_WidgetName = WidgetName;
+		if(InParent)
+		{
+			InParent->AddChild(InWidget);
+		}
+		if(bAutoOpen)
+		{
+			InWidget->Open(nullptr, true);
 		}
 		return InWidget;
 	}
-	
+		
 	template<class T>
-	bool OpenEditorWidget(bool bInstant = false, FName InName = T::WidgetName)
+	bool OpenEditorWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
+	{
+		return OpenEditorWidget<T>(InParams ? *InParams : TArray<FParameter>(), bInstant, InName);
+	}
+
+	template<class T>
+	bool OpenEditorWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<T> EditorWidget = GetEditorWidget<T>(InName))
 		{
 			if(EditorWidget->GetWidgetState() != EEditorWidgetState::Opened)
 			{
-				EditorWidget->OnOpen(bInstant);
+				EditorWidget->OnOpen(InParams, bInstant);
 			}
 			return true;
 		}

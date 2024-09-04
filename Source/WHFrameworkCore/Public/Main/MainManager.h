@@ -5,7 +5,7 @@
 #include "MainTypes.h"
 #include "Base/ManagerBase.h"
 
-class WHFRAMEWORKCORE_API FMainManager : public FManagerBase
+class WHFRAMEWORKCORE_API FMainManager : public FManagerBase, public FTickableGameObject
 {
 	GENERATED_MAIN_MANAGER(FMainManager)
 	
@@ -22,9 +22,23 @@ public:
 public:
 	virtual void OnInitialize() override;
 
+	virtual void OnPreparatory() override;
+
 	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual void OnTermination() override;
+
+protected:
+	virtual void OnWorldAdded(UWorld* InWorld);
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
+	virtual TStatId GetStatId() const override;
+	
+	virtual bool IsTickableInEditor() const override { return true; }
+
+	virtual bool IsTickable() const override { return true; }
 
 protected:
 	/// 管理器列表

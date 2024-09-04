@@ -50,7 +50,7 @@ void USaveGameModule::OnInitialize()
 {
 	Super::OnInitialize();
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, FName("OnGameExited"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameExited));
 }
 
 void USaveGameModule::OnPreparatory(EPhase InPhase)

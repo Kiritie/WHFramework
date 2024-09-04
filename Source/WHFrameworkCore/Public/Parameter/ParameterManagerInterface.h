@@ -6,7 +6,6 @@
 #include "UObject/Interface.h"
 #include "ParameterManagerInterface.generated.h"
 
-class ATargetPoint;
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UParameterManagerInterface : public UInterface

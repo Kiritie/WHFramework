@@ -6,7 +6,7 @@
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"
 
-const FUniqueType FSceneManager::Type = FUniqueType();
+const FUniqueType FSceneManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FSceneManager)
 

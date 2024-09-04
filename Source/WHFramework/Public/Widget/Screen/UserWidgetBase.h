@@ -101,7 +101,7 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce = false) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams = nullptr, bool bForce = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;

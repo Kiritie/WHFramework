@@ -34,6 +34,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent)
+	bool OnExecute();
+
+public:
+	UFUNCTION(BlueprintNativeEvent)
 	bool Filter(UObject* InOwner, const FName InFuncName) const;
 
 	UFUNCTION(BlueprintNativeEvent)

@@ -14,7 +14,7 @@ void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 
 	if(InParams.IsValidIndex(0))
 	{
-		SetTitle(InParams[0].GetTextValue());
+		SetTitle(InParams[0]);
 	}
 }
 

@@ -954,7 +954,7 @@ bool AVoxelChunk::AddSceneActor(AActor* InActor)
 			}
 			Execute_SetContainer(InActor, this);
 		}
-		InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+		// InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 		return true;
 	}
 	return false;
@@ -967,7 +967,7 @@ bool AVoxelChunk::RemoveSceneActor(AActor* InActor)
 	if(SceneActorMap.Contains(Execute_GetActorID(InActor)))
 	{
 		SceneActorMap.Remove(Execute_GetActorID(InActor));
-		InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		// InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		if(Execute_GetContainer(InActor) == this)
 		{
 			Execute_SetContainer(InActor, nullptr);

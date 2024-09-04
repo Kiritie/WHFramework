@@ -43,9 +43,9 @@ void UAbilityInventoryEquipSlot::OnItemPreChange(FAbilityItem& InNewItem)
 
 	if(IsEmpty()) return;
 
-	if(const auto InventoryAgent = GetInventory()->GetOwnerAgent())
+	if(const auto Agent = GetInventory()->GetOwnerAgent())
 	{
-		InventoryAgent->OnDischargeItem(Item);
+		Agent->OnDischargeItem(Item);
 	}
 }
 
@@ -57,8 +57,8 @@ void UAbilityInventoryEquipSlot::OnItemChanged(FAbilityItem& InOldItem)
 	
 	if(IsEmpty()) return;
 
-	if(const auto InventoryAgent = GetInventory()->GetOwnerAgent())
+	if(const auto Agent = GetInventory()->GetOwnerAgent())
 	{
-		InventoryAgent->OnAssembleItem(Item);
+		Agent->OnAssembleItem(Item);
 	}
 }

@@ -9,33 +9,33 @@ UAbilityPawnState_Default::UAbilityPawnState_Default()
 	StateName = FName("Default");
 }
 
-void UAbilityPawnState_Default::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityPawnState_Default::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityPawnState_Default::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityPawnState_Default::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityPawnState_Default::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityPawnState_Default::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
 	Pawn->ResetData();
 }
 
-void UAbilityPawnState_Default::OnRefresh()
+void UAbilityPawnState_Default::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityPawnState_Default::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityPawnState_Default::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 }
 
 void UAbilityPawnState_Default::OnTermination()

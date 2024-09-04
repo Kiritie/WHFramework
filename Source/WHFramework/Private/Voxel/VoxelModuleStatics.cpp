@@ -127,16 +127,6 @@ EVoxelType UVoxelModuleStatics::GetRandomVoxelType(FIndex InIndex)
 	return UVoxelModule::Get().GetRandomVoxelType(InIndex);
 }
 
-ECollisionChannel UVoxelModuleStatics::GetChunkTraceChannel()
-{
-	return UVoxelModule::Get().GetChunkTraceChannel();
-}
-
-ECollisionChannel UVoxelModuleStatics::GetVoxelTraceChannel()
-{
-	return UVoxelModule::Get().GetVoxelTraceChannel();
-}
-
 bool UVoxelModuleStatics::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	return UVoxelModule::Get().VoxelRaycastSinge(InRayStart, InRayEnd, InIgnoreActors, OutHitResult);

@@ -13,12 +13,22 @@ class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilitySkillBase;
 class AAbilityEquipBase;
-class UWidgetAbilityInventorySlotBase;
+class UWidgetInventorySlotBase;
 class UAbilityInventorySlot;
+
+#define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
+	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)); \
+
+#define GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
+	FORCEINLINE float GetBase##PropertyName() const \
+	{ \
+		return PropertyName.GetBaseValue(); \
+	}
 
 #define GAMEPLAYATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
@@ -27,6 +37,7 @@ class UAbilityInventorySlot;
 	ATTRIBUTE_VALUE_GETTER(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_MODIFY(ClassName, PropertyName) \
+	ATTRIBUTE_VALUE_MULTIPLE(ClassName, PropertyName) \
 	ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName)
 
 #define ATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -41,6 +52,11 @@ class UAbilityInventorySlot;
 	{ \
 		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
 		return _AttributeSet->Get##PropertyName(); \
+	}\
+	FORCEINLINE float GetBase##PropertyName() const \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		return _AttributeSet->GetBase##PropertyName(); \
 	}
 
 #define ATTRIBUTE_VALUE_SETTER(ClassName, PropertyName) \
@@ -57,6 +73,13 @@ class UAbilityInventorySlot;
 		_AttributeSet->ModifyAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InDeltaValue); \
 	}
 
+#define ATTRIBUTE_VALUE_MULTIPLE(ClassName, PropertyName) \
+	FORCEINLINE void Multiple##PropertyName(float InMultipleValue) \
+	{ \
+		ClassName* _AttributeSet = Cast<ClassName>(GetAttributeSet()); \
+		_AttributeSet->MultipleAttributeValue(_AttributeSet->Get##PropertyName##Attribute(), InMultipleValue); \
+	}
+
 #define ATTRIBUTE_VALUE_INITTER(ClassName, PropertyName) \
 	FORCEINLINE void Init##PropertyName(float InValue) \
 	{ \
@@ -64,8 +87,8 @@ class UAbilityInventorySlot;
 		_AttributeSet->Init##PropertyName(InValue); \
 	}
 
-#define ATTRIBUTE_DELTAVALUE_CLAMP(PropertyName, DeltaValue) \
-	DeltaValue > 0.f ? FMath::Min(DeltaValue, GetMax##PropertyName() - Get##PropertyName()) : FMath::Max(DeltaValue, -Get##PropertyName())
+#define ATTRIBUTE_DELTAVALUE_CLAMP(UserObject, PropertyName, DeltaValue) \
+	DeltaValue > 0.f ? FMath::Min(DeltaValue, UserObject->GetMax##PropertyName() - UserObject->Get##PropertyName()) : FMath::Max(DeltaValue, -UserObject->Get##PropertyName())
 
 USTRUCT()
 struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContext
@@ -211,6 +234,34 @@ public:
 	UDamageHandle() {}
 
 	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+};
+
+/**
+ * 伤害处理类
+ */
+UCLASS(Blueprintable)
+class WHFRAMEWORK_API URecoveryHandle : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	URecoveryHandle() {}
+
+	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+};
+
+/**
+ * 伤害处理类
+ */
+UCLASS(Blueprintable)
+class WHFRAMEWORK_API UInterruptHandle : public UWHObject
+{
+	GENERATED_BODY()
+
+public:
+	UInterruptHandle() {}
+
+	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -377,7 +428,9 @@ enum class EDamageType : uint8
 	// 物理伤害
 	Physics,
 	// 魔法伤害
-	Magic
+	Magic,
+	// 掉落伤害
+	Fall
 };
 
 /**
@@ -484,7 +537,7 @@ public:
 		ID = InVoxelItem.ID;
 		Count = InCount == -1 ? InVoxelItem.Count : InCount;
 		Level = InVoxelItem.Level;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		AbilityHandle = InVoxelItem.AbilityHandle;
 	}
 
 	virtual ~FAbilityItem() override = default;
@@ -577,7 +630,7 @@ public:
 		Items = TArray<FAbilityItem>();
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "ID"))
 	TArray<FAbilityItem> Items;
 };
 
@@ -677,11 +730,11 @@ struct WHFRAMEWORK_API FWidgetInventorySlots
 public:
 	FORCEINLINE FWidgetInventorySlots()
 	{
-		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
+		Slots = TArray<UWidgetInventorySlotBase*>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UWidgetAbilityInventorySlotBase*> Slots;
+	TArray<UWidgetInventorySlotBase*> Slots;
 };
 
 USTRUCT(BlueprintType)

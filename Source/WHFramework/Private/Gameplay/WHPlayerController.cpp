@@ -59,7 +59,7 @@ void AWHPlayerController::BeginPlay()
 	if(Execute_IsDefaultLifecycle(this))
 	{
 		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::None);
+		Execute_OnPreparatory(this, EPhase::All);
 	}
 }
 
@@ -69,7 +69,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::None);
+		Execute_OnTermination(this, EPhase::All);
 	}
 }
 
@@ -224,11 +224,11 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosi
 	if(DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
 	{
 		const FVector RayStart = PlayerCameraManager->GetCameraLocation();
-		const FVector RayEnd = RayStart + RayDirection * InRayDistance;
+		const FVector RayEnd = RayStart + RayDirection * (InRayDistance + UCameraModuleStatics::GetCameraDistance(true));
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
 		IgnoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, RayStart, RayEnd, UCommonStatics::GetGameTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(this, RayStart, RayEnd, UEngineTypes::ConvertToTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }
@@ -260,7 +260,20 @@ void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
 
 	if(PlayerPawn != InPlayerPawn)
 	{
+		if(PlayerPawn)
+		{
+			PlayerPawn->OnDestroyed.RemoveAll(this);
+		}
 		PlayerPawn = InPlayerPawn;
+		if(PlayerPawn)
+		{
+			PlayerPawn->OnDestroyed.AddDynamic(this, &AWHPlayerController::OnPlayerDestroyed);
+		}
 		OnPlayerPawnChanged.Broadcast(PlayerPawn);
 	}
+}
+
+void AWHPlayerController::OnPlayerDestroyed(AActor* InPlayerActor)
+{
+	SetPlayerPawn(nullptr);
 }

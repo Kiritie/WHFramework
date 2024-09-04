@@ -110,7 +110,7 @@ FParameter UParameterModuleStatics::MakeClassParameter(UClass* InValue, const FT
 	return FParameter::MakeClass(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue, const FText InDescription)
+FParameter UParameterModuleStatics::MakeClassPtrParameter(const TSoftClassPtr<UObject> InValue, const FText InDescription)
 {
 	return FParameter::MakeClassPtr(InValue, InDescription);
 }
@@ -120,7 +120,12 @@ FParameter UParameterModuleStatics::MakeObjectParameter(UObject* InValue, const 
 	return FParameter::MakeObject(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue, const FText InDescription)
+FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject> InValue, const FText InDescription)
+{
+	return FParameter::MakeObjectPtr(InValue, InDescription);
+}
+
+FParameter UParameterModuleStatics::MakeActorPtrParameter(const TSoftObjectPtr<AActor> InValue, const FText InDescription)
 {
 	return FParameter::MakeObjectPtr(InValue, InDescription);
 }

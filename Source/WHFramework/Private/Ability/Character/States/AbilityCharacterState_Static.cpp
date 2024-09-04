@@ -14,19 +14,19 @@ UAbilityCharacterState_Static::UAbilityCharacterState_Static()
 	StateName = FName("Static");
 }
 
-void UAbilityCharacterState_Static::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterState_Static::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Static::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterState_Static::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -34,17 +34,17 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastFiniteState)
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
+	Character->GetInteractionComponent()->SetInteractable(false);
 }
 
-void UAbilityCharacterState_Static::OnRefresh()
+void UAbilityCharacterState_Static::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -52,7 +52,7 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(true);
+	Character->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityCharacterState_Static::OnTermination()

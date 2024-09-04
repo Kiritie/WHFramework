@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "NativeGameplayTags.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "EventModuleTypes.generated.h"
@@ -9,8 +10,6 @@
 class UEventHandleBase;
 
 DECLARE_DELEGATE_FourParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>, bool);
-
-DECLARE_DELEGATE_TwoParams(FEventExecuteDelegate, UObject* InSender, UEventHandleBase* InEventHandle);
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEventExecuteDynamicDelegate, UObject*, InSender, UEventHandleBase*, InEventHandle);
 
@@ -81,4 +80,29 @@ public:
 
 	UPROPERTY()
 	TArray<UEventHandleBase*> Handles;
+};
+
+USTRUCT(Blueprintable)
+struct FEventInfo
+{
+	GENERATED_BODY()
+
+public:
+	FEventInfo()
+	{
+		Tag = FGameplayTag();
+		Events = TArray<UEventHandleBase*>();
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Event"))
+	FGameplayTag Tag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
+	TArray<UEventHandleBase*> Events;
+};
+
+namespace GameplayTags
+{
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(EventTag_EventRoot);
 };

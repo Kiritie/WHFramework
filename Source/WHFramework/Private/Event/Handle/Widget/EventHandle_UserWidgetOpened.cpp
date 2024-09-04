@@ -17,6 +17,6 @@ void UEventHandle_UserWidgetOpened::Parse_Implementation(const TArray<FParameter
 {
 	if(InParams.IsValidIndex(0))
 	{
-		UserWidget = InParams[0].GetObjectValue<UUserWidgetBase>();
+		UserWidget = InParams[0];
 	}
 }

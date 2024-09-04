@@ -7,7 +7,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName STaskStatusWidget::WidgetName = FName("TaskStatusWidget");
+const FName STaskStatusWidget::WidgetName = FName("TaskStatusWidget");
 
 STaskStatusWidget::STaskStatusWidget()
 {

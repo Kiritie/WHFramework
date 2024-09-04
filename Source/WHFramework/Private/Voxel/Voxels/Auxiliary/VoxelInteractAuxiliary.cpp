@@ -64,11 +64,6 @@ bool AVoxelInteractAuxiliary::CanInteract(EInteractAction InInteractAction, IInt
 	return false;
 }
 
-bool AVoxelInteractAuxiliary::DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	return IInteractionAgentInterface::DoInteract(InInteractAction, InInteractionAgent);
-}
-
 void AVoxelInteractAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }

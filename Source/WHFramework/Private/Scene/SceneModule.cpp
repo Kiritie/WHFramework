@@ -12,12 +12,16 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
+#include "Event/Handle/Scene/EventHandle_PlayLevelSequence.h"
+#include "Event/Handle/Scene/EventHandle_SetActorVisible.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerOwnerPlayer.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Runtime/LevelSequence/Public/LevelSequenceActor.h"
+#include "Runtime/LevelSequence/Public/LevelSequencePlayer.h"
 #include "SaveGame/Module/SceneSaveGame.h"
 #include "Scene/Object/WorldTimer.h"
 #include "Scene/Object/WorldWeather.h"
@@ -146,8 +150,10 @@ void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, FName("OnSetDataLayerRuntimeState"));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, FName("OnSetDataLayerOwnerPlayer"));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetActorVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetActorVisible));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_PlayLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnPlayLevelSequence));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerRuntimeState));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerOwnerPlayer));
 
 	if(WorldTimer)
 	{
@@ -458,6 +464,44 @@ UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
 	return GetDeterminesOutputObject(WorldWeather, InClass);
 }
 
+void USceneModule::OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle)
+{
+	if(AActor* Actor = InEventHandle->ActorPath.LoadSynchronous())
+	{
+		Actor->GetRootComponent()->SetVisibility(InEventHandle->bVisible, true);
+	}
+}
+
+void USceneModule::OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle)
+{
+	if(ALevelSequenceActor* Actor = InEventHandle->LevelSequence.LoadSynchronous())
+	{
+		FTimerHandle TimerHandle;
+		auto PlaySequence = [Actor, InEventHandle]()
+		{
+			if(!InEventHandle->bReverse)
+			{
+				Actor->SequencePlayer->Play();
+			}
+			else
+			{
+				Actor->SequencePlayer->PlayReverse();
+			}
+		};
+		if(InEventHandle->Delay > 0.f)
+		{
+			GetWorld()->GetTimerManager().SetTimer(TimerHandle, [PlaySequence]()
+			{
+				PlaySequence();
+			}, InEventHandle->Delay, false);
+		}
+		else
+		{
+			PlaySequence();
+		}
+	}
+}
+
 void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle)
 {
 	UDataLayerManager::GetDataLayerManager(this)->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
@@ -472,6 +516,38 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 	else if(DataLayerPlayerMappings.Contains(InEventHandle->DataLayer))
 	{
 		DataLayerPlayerMappings.Remove(InEventHandle->DataLayer);
+	}
+}
+
+bool USceneModule::HasTraceMapping(const FName& InName, bool bEnsured) const
+{
+	if(TraceMappings.Contains(InName)) return true;
+	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No trace mapping, trace name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
+	return false;
+}
+
+FTraceMapping USceneModule::GetTraceMapping(const FName& InName, bool bEnsured) const
+{
+	if(HasTraceMapping(InName, bEnsured))
+	{
+		return TraceMappings[InName];
+	}
+	return FTraceMapping();
+}
+
+void USceneModule::AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel)
+{
+	if(!TraceMappings.Contains(InName))
+	{
+		TraceMappings.Add(InName, InTraceChannel);
+	}
+}
+
+void USceneModule::RemoveTraceMapping(const FName& InName)
+{
+	if(TraceMappings.Contains(InName))
+	{
+		TraceMappings.Remove(InName);
 	}
 }
 
@@ -695,6 +771,7 @@ void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 			else if(Result == EAsyncLoadingResult::Succeeded)
 			{
 				WHLog(TEXT("Load level successed!"));
+				LoadedLevels.Add(InLevelPath, LoadedPackage);
 				if(InFinishDelayTime > 0.f)
 				{
 					FTimerHandle TimerHandle;
@@ -706,14 +783,11 @@ void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFini
 				{
 					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
 				}
-				LoadedLevels.Add(InLevelPath, LoadedPackage);
 			}
 		}), 0, PKG_ContainsMap);
 	}
 	else
 	{
-		FLatentActionInfo LatentActionInfo;
-		UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
 		OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
 	}
 }
@@ -771,7 +845,10 @@ void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoa
 	}
 	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true);
+	FLatentActionInfo LatentActionInfo;
+	UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
+
+	// UGameplayStatics::OpenLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true);
 
 	//UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
 }

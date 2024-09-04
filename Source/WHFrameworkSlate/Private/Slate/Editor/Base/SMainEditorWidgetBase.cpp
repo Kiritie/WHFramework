@@ -7,7 +7,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SMainEditorWidgetBase::WidgetName = FName("MainEditorWidgetBase");
+const FName SMainEditorWidgetBase::WidgetName = FName("MainEditorWidgetBase");
 
 SMainEditorWidgetBase::SMainEditorWidgetBase()
 {

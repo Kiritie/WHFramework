@@ -30,7 +30,7 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 
 	for (const auto& Iter : UParameterModule::Get().GetAllParameter())
 	{
-		if (Iter.Name != NAME_None && Iter.bRegistered && !Iter.DisplayName.IsEmpty())
+		if (Iter.Name != NAME_None && Iter.bRegistered && !Iter.Parameter.GetDescription().IsEmpty())
 		{
 			UWidgetSettingItemBase* SettingItem = nullptr;
 			switch (Iter.Parameter.GetParameterType())
@@ -41,17 +41,17 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 				case EParameterType::Name:
 				case EParameterType::Text:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.DisplayName }, false, USettingModule::Get().GetTextSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, false, USettingModule::Get().GetTextSettingItemClass());
 					break;
 				}
 				case EParameterType::Boolean:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.DisplayName }, false, USettingModule::Get().GetBoolSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, false, USettingModule::Get().GetBoolSettingItemClass());
 					break;
 				}
 				case EParameterType::Key:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.DisplayName, 1, true }, false, USettingModule::Get().GetKeySettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, false, USettingModule::Get().GetKeySettingItemClass());
 					break;
 				}
 				default: break;

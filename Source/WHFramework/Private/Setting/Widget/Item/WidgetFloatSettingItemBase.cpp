@@ -29,22 +29,22 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const
 
 	if(InParams.IsValidIndex(1))
 	{
-		MinValue = InParams[1].GetFloatValue();
+		MinValue = InParams[1];
 	}
 
 	if(InParams.IsValidIndex(2))
 	{
-		MaxValue = InParams[2].GetFloatValue();
+		MaxValue = InParams[2];
 	}
 
 	if(InParams.IsValidIndex(3))
 	{
-		DecimalNum = InParams[3].GetIntegerValue();
+		DecimalNum = InParams[3];
 	}
 
 	if(InParams.IsValidIndex(4))
 	{
-		ScaleFactor = InParams[4].GetFloatValue();
+		ScaleFactor = InParams[4];
 	}
 
 	if(Txt_MinValue)

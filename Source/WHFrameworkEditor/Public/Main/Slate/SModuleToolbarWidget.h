@@ -19,8 +19,7 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-public:
-	static FName WidgetName;
+	static const FName WidgetName;
 
 public:
 	virtual void OnCreate() override;
@@ -37,4 +36,6 @@ private:
 	void OnDefaultsToggled();
 
 	void OnEditingToggled();
+	
+	void OnDeleteClicked();
 };

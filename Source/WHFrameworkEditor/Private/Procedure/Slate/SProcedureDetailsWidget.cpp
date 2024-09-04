@@ -9,7 +9,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SProcedureDetailsWidget::WidgetName = FName("SModuleToolbarWidget");
+const FName SProcedureDetailsWidget::WidgetName = FName("SModuleToolbarWidget");
 
 SProcedureDetailsWidget::SProcedureDetailsWidget()
 {

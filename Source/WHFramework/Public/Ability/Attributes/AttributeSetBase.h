@@ -22,7 +22,6 @@ public:
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
 
 protected:
-	/** 当MaxAttribute发生改变时按比例设置Attribute */
 	virtual void AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty);
 
 public:
@@ -32,11 +31,17 @@ public:
 	UFUNCTION(BlueprintPure)
 	float GetAttributeValue(FGameplayAttribute InAttribute);
 
+	UFUNCTION(BlueprintPure)
+	float GetAttributeBaseValue(FGameplayAttribute InAttribute);
+
 	UFUNCTION(BlueprintCallable)
 	void SetAttributeValue(FGameplayAttribute InAttribute, float InValue);
 
 	UFUNCTION(BlueprintCallable)
 	void ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue);
+
+	UFUNCTION(BlueprintCallable)
+	void MultipleAttributeValue(FGameplayAttribute InAttribute, float InMultipleValue);
 
 	UFUNCTION(BlueprintPure)
 	TArray<FGameplayAttribute> GetAllAttributes() const;

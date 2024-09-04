@@ -15,23 +15,29 @@ public:
 	{
 		Label = FText::GetEmpty();
 		Fill = 1.f;
+		bSortable = true;
 	}
 	
-	FEditorSortLabel(const FText& Label, const float Fill)
+	FEditorSortLabel(const TAttribute<FText>& Label, const float Fill, bool bSortable = true)
 		: Label(Label),
-		  Fill(Fill)
+		  Fill(Fill),
+		  bSortable(bSortable)
 	{
 	}
 
 public:
-	FText Label;
+	TAttribute<FText> Label;
 	float Fill;
+	bool bSortable;
 };
 
 class WHFRAMEWORKSLATE_API SEditorSoftLabelBar : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SEditorSoftLabelBar) {}
+	SLATE_BEGIN_ARGS(SEditorSoftLabelBar)
+		: _SortLabelIndex(0)
+		, _SortLabelAscending(false)
+	{}
 
 		SLATE_ARGUMENT(FMargin, Padding)
 
@@ -50,6 +56,9 @@ public:
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
 
+public:
+	float GetSortLabelFill(int32 InIndex) const;
+
 private:
 	TSharedPtr<SHorizontalBox> HBox_Labels;
 
@@ -57,9 +66,13 @@ private:
 	
 	bool SortLabelAscending;
 
+	TArray<FEditorSortLabel> SortLabels;
+
 	FOnSortLabelIndexAndAscendingChanged OnSortLabelIndexAndAscendingChanged;
 
 public:
+	TArray<FEditorSortLabel> GetSortLabels() const { return SortLabels; }
+	
 	int32 GetSortLabelIndex() const { return SortLabelIndex; }
 
 	bool IsSortLabelAscending() const { return SortLabelAscending; }

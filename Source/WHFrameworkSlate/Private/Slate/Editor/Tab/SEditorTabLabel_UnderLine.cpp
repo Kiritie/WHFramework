@@ -16,7 +16,7 @@ void SEditorTabLabel_UnderLine::Construct(const FArguments& InArgs)
 		+SVerticalBox::Slot()
 		.HAlign(HAlign_Fill)
 		.VAlign(VAlign_Fill)
-		.Padding(FMargin(0.f, 0.f, 0.f, 15.f))
+		.Padding(InArgs._LabelPadding)
 		.AutoHeight()
 		[
 			SNew(SHorizontalBox)
@@ -24,7 +24,7 @@ void SEditorTabLabel_UnderLine::Construct(const FArguments& InArgs)
 			+SHorizontalBox::Slot()
 			.HAlign(HAlign_Left)
 			.VAlign(VAlign_Center)
-			.Padding(FMargin(0.f, 0.f, 5.f, 0.f))
+			.Padding(FMargin(0.f, 0.f, 4.f, 0.f))
 			.AutoWidth()
 			[
 				SNew(SBox)
@@ -43,9 +43,9 @@ void SEditorTabLabel_UnderLine::Construct(const FArguments& InArgs)
 			.AutoWidth()
 			[
 				SNew(STextBlock)
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 				.Text(InArgs._Label)
-				.ColorAndOpacity(InArgs._Color)
+				.Font(InArgs._LabelFont)
+				.ColorAndOpacity(InArgs._LabelColor)
 			]
 		]
 
@@ -56,7 +56,7 @@ void SEditorTabLabel_UnderLine::Construct(const FArguments& InArgs)
 		[
 			SNew(SEditorSplitLine)
 			.Height(2.f)
-			.Color(FSlateColor(FLinearColor(0.f, 0.4f, 0.95f)))
+			.Color(FSlateColor(FLinearColor(0.f, 0.3f, 0.85f)))
 			.Visibility_Lambda([InArgs](){ return InArgs._bActived.Get() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 		]
 	];

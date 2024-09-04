@@ -48,6 +48,11 @@ FSaveData* AVoxelContainerAuxiliary::ToData()
 	return &SaveData;
 }
 
+void AVoxelContainerAuxiliary::OnAdditionItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AVoxelContainerAuxiliary::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 

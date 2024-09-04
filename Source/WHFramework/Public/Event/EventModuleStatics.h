@@ -33,8 +33,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
 	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
-	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
-
 	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics", meta = (DisplayName = "Subscribe Event"))
 	static void SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
 
@@ -52,8 +50,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
 	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
-
-	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
 
 	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics", meta = (DisplayName = "Unsubscribe Event"))
 	static void UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);

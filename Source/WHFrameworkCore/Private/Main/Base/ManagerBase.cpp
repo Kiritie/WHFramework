@@ -3,7 +3,7 @@
 
 #include "Main/Base/ManagerBase.h"
 
-const FUniqueType FManagerBase::Type = FUniqueType();
+const FUniqueType FManagerBase::Type = FUniqueType(&FUniqueClass::Type);
 
 // Sets default values
 FManagerBase::FManagerBase() : FUniqueClass(Type)
@@ -21,6 +21,10 @@ FManagerBase::~FManagerBase()
 void FManagerBase::OnInitialize()
 {
 	
+}
+
+void FManagerBase::OnPreparatory()
+{
 }
 
 void FManagerBase::OnReset()

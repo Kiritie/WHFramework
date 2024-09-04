@@ -8,6 +8,8 @@
 
 #include "AbilityModule.generated.h"
 
+class IAbilityActorInterface;
+class AAbilityItemBase;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPickUpBase;
@@ -49,31 +51,21 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	// Item
+public:
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, FRotator InRotation = FRotator::ZeroRotator, ISceneContainerInterface* InContainer = nullptr);
+
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor);
+
+	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	virtual ECollisionChannel GetPickUpTraceChannel() const;
-
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, ISceneContainerInterface* InContainer = nullptr);
 
 	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
 public:
-	virtual AAbilityActorBase* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Vitality
-public:
-	virtual AAbilityVitalityBase* SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Pawn
-public:
-	virtual AAbilityPawnBase* SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Character
-public:
-	virtual AAbilityCharacterBase* SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AActor* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

@@ -22,6 +22,8 @@ public:
 public:
 	virtual void OnInitialize() override;
 
+	virtual void OnPreparatory() override;
+
 	virtual void OnReset() override;
 
 	virtual void OnRefresh(float DeltaSeconds) override;

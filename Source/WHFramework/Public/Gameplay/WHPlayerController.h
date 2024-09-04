@@ -137,6 +137,9 @@ public:
 
 protected:
 	virtual void SetPlayerPawn(APawn* InPlayerPawn);
+	
+	UFUNCTION()
+	virtual void OnPlayerDestroyed(AActor* InPlayerActor);
 
 public:
 	template<class T>

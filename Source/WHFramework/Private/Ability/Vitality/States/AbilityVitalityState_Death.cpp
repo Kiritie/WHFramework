@@ -12,27 +12,32 @@ UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 	StateName = FName("Death");
 }
 
-void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityVitalityState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityVitalityState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 
-	if(Killer)
+	if(Killer && Killer != Vitality)
 	{
-		Killer->ModifyExp(Vitality->GetLevelV() * 5.f);
+		Killer->ModifyExp(Vitality->GetLevelA() * 5.f);
 	}
 
 	Vitality->SetExp(0);
@@ -41,14 +46,14 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 	DeathStart();
 }
 
-void UAbilityVitalityState_Death::OnRefresh()
+void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 }
 
-void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	Killer = nullptr;
 

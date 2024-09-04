@@ -89,18 +89,25 @@ public:
 	static FParameter MakeClassParameter(UClass* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject>& InValue, const FText InDescription = FText::GetEmpty());
+	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject> InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeObjectParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject>& InValue, const FText InDescription = FText::GetEmpty());
+	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject> InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeActorPtrParameter(const TSoftObjectPtr<AActor> InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeDelegateParameter(const FSimpleDynamicDelegate& InValue, const FText InDescription = FText::GetEmpty());
 
 public:
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetParameterValue(UPARAM(ref) FParameter& InParameter, const FParameter& InValue) { InParameter.SetParameterValue(InValue); }
+
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static EParameterType GetParameterType(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetParameterType(); }

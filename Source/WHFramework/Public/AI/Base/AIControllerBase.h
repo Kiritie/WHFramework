@@ -40,10 +40,16 @@ protected:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UBehaviorTree* BehaviorTreeAsset;
+	UBehaviorTree* SourceBehaviorTree;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UAIBlackboardBase* BlackboardAsset;
+	UBehaviorTree* CurrentBehaviorTree;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UAIBlackboardBase* SourceBlackboard;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UAIBlackboardBase* CurrentBlackboard;
 
 protected:
 	virtual void BeginPlay() override;
@@ -60,22 +66,22 @@ protected:
 public:
 	virtual void Tick(float DeltaSeconds) override;
 	
-	virtual void InitBehaviorTree(UBehaviorTree* InBehaviorTreeAsset);
+	virtual void InitBehaviorTree(bool bAutoRun = false);
 
 	virtual bool RunBehaviorTree(UBehaviorTree* BTAsset) override;
 
 	virtual void StopBehaviorTree();
 
 public:
-	UBehaviorTree* GetBehaviorTree() const { return BehaviorTreeAsset; }
+	UBehaviorTree* GetBehaviorTree() const { return CurrentBehaviorTree; }
 
 	template<class T>
 	T* GetBlackboard() const
 	{
-		return  Cast<T>(BlackboardAsset);
+		return  Cast<T>(CurrentBlackboard);
 	}
 
-	UAIBlackboardBase* GetBlackboard() const { return BlackboardAsset; }
+	UAIBlackboardBase* GetBlackboard() const { return CurrentBlackboard; }
 
 	UBehaviorTreeComponent* GetBehaviorTreeComponent() const;
 

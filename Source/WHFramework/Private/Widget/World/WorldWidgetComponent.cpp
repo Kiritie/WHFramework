@@ -3,8 +3,8 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
-#include "Camera/CameraModuleStatics.h"
 #include "Common/CommonStatics.h"
+#include "Scene/SceneManager.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWorldWidgetComponent::UWorldWidgetComponent()
@@ -53,7 +53,7 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UCommonStatics::IsPlaying())
+	if(UCommonStatics::IsPlaying() && EndPlayReason == EEndPlayReason::Type::Destroyed)
 	{
 		DestroyWorldWidget();
 	}
@@ -63,11 +63,9 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if(!UCommonStatics::IsPlaying()) return;
-	
 	if(bOrientCamera)
 	{
-		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
+		SetWorldRotation(FSceneManager::Get().GetActiveViewportViewRotation());
 		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
 	}
 	else
@@ -76,13 +74,16 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		SetRelativeScale3D(InitTransform.GetScale3D());
 	}
 
-	if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
+	if(UCommonStatics::IsPlaying())
 	{
-		WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
-		
-		if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+		if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 		{
-			WorldWidget->OnRefresh();
+			WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
+		
+			if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+			{
+				WorldWidget->OnRefresh();
+			}
 		}
 	}
 }
@@ -106,6 +107,19 @@ void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
 	{
 		WorldWidget->OnDestroy(false);
 		WorldWidget = nullptr;
+	}
+}
+
+void UWorldWidgetComponent::RefreshParams()
+{
+	if(!WorldWidgetClass) return;
+
+	if(const UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
+	{
+		Space = DefaultObject->GetWidgetSpace();
+		DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
+		Pivot = DefaultObject->GetWidgetAlignment();
+		WidgetParams = DefaultObject->GetWidgetParams();
 	}
 }
 
@@ -176,24 +190,11 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 			{
 				WidgetClass = nullptr;
 			}
+			// SetWorldWidgetClass(WidgetClass, true);
 		}
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-}
-
-void UWorldWidgetComponent::RefreshParams()
-{
-	if(WorldWidgetClass)
-	{
-		if(const UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
-		{
-			Space = DefaultObject->GetWidgetSpace();
-			DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
-			Pivot = DefaultObject->GetWidgetAlignment();
-			WidgetParams = DefaultObject->GetWidgetParams();
-		}
-	}
 }
 #endif
 
@@ -259,31 +260,30 @@ void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 
 void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh)
 {
+	if(WorldWidgetClass == InClass) return;
+
+	WorldWidgetClass = InClass;
+
+	RefreshParams();
+	
 	switch(Space)
 	{
 		case EWidgetSpace::World:
 		{
-			if(WidgetClass != InClass)
+			WidgetClass = InClass;
+			if(bRefresh)
 			{
-				WidgetClass = InClass;
-				if(WorldWidgetClass != InClass)
+				if(FSlateApplication::IsInitialized())
 				{
-					WorldWidgetClass = InClass;
-				}
-				if(bRefresh)
-				{
-					if(FSlateApplication::IsInitialized())
+					if(HasBegunPlay() && !GetWorld()->bIsTearingDown)
 					{
-						if(HasBegunPlay() && !GetWorld()->bIsTearingDown)
+						if(WidgetClass)
 						{
-							if(WidgetClass)
-							{
-								SetWidget(CreateWidget(GetWorld(), WidgetClass));
-							}
-							else
-							{
-								SetWidget(nullptr);
-							}
+							SetWidget(CreateWidget(GetWorld(), WidgetClass));
+						}
+						else
+						{
+							SetWidget(nullptr);
 						}
 					}
 				}
@@ -292,19 +292,15 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass
 		}
 		case EWidgetSpace::Screen:
 		{
-			if(WorldWidgetClass != InClass)
+			if(bRefresh)
 			{
-				WorldWidgetClass = InClass;
-				if(bRefresh)
+				if(WorldWidgetClass)
 				{
-					if(WorldWidgetClass)
-					{
-						CreateWorldWidget(WidgetParams);
-					}
-					else
-					{
-						DestroyWorldWidget();
-					}
+					CreateWorldWidget(WidgetParams);
+				}
+				else
+				{
+					DestroyWorldWidget();
 				}
 			}
 			break;

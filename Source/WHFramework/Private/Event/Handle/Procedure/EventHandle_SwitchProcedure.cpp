@@ -19,7 +19,7 @@ void UEventHandle_SwitchProcedure::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ProcedureClass = InParams[0].GetClassValue();
+		ProcedureClass = InParams[0];
 	}
 }
 

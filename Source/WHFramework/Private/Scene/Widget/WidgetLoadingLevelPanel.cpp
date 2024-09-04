@@ -9,7 +9,7 @@
 #include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 #include "Scene/SceneModuleStatics.h"
 
-UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& objectInitializer) :Super(objectInitializer)
+UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer) :Super(ObjectInitializer)
 {
 	WidgetName = FName("LoadingLevelPanel");
 	WidgetType = EWidgetType::Temporary;
@@ -34,7 +34,7 @@ void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool b
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		LoadProgress = InParams[1].GetFloatValue();
+		LoadProgress = InParams[1];
 		CurrentProgress = LoadProgress;
 	}
 }

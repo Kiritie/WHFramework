@@ -7,7 +7,6 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
@@ -46,7 +45,7 @@ protected:
 	
 	virtual void ResetData() override;
 
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InFiniteState) override;
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
 	virtual void Serialize(FArchive& Ar) override;
@@ -124,9 +123,9 @@ public:
 	virtual bool IsDying() const override;
 
 public:
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 	
 	virtual float GetRadius() const override { return Super::GetRadius(); }
 
@@ -175,9 +174,19 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
 	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

@@ -18,8 +18,8 @@ void UAbilityInventoryAuxiliarySlot::OnItemChanged(FAbilityItem& InOldItem)
 {
 	Super::OnItemChanged(InOldItem);
 
-	if(auto InventoryAgent = Inventory->GetOwnerAgent())
+	if(auto Agent = Inventory->GetOwnerAgent())
 	{
-		InventoryAgent->OnAuxiliaryItem(GetItem());
+		Agent->OnAuxiliaryItem(GetItem());
 	}
 }

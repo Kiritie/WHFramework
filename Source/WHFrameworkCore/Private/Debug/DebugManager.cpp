@@ -6,7 +6,7 @@
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"
 
-const FUniqueType FDebugManager::Type = FUniqueType();
+const FUniqueType FDebugManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FDebugManager)
 
@@ -46,6 +46,7 @@ void FDebugManager::LogMessage(const FString& InMessage, EDebugCategory InCatego
 		LOG_CASE(Network, InVerbosity)
 		LOG_CASE(ObjectPool, InVerbosity)
 		LOG_CASE(Parameter, InVerbosity)
+		LOG_CASE(Platform, InVerbosity)
 		LOG_CASE(Pawn, InVerbosity)
 		LOG_CASE(Procedure, InVerbosity)
 		LOG_CASE(ReferencePool, InVerbosity)
@@ -56,6 +57,7 @@ void FDebugManager::LogMessage(const FString& InMessage, EDebugCategory InCatego
 		LOG_CASE(Voxel, InVerbosity)
 		LOG_CASE(WebRequest, InVerbosity)
 		LOG_CASE(Widget, InVerbosity)
+		LOG_CASE(Zip, InVerbosity)
 		default: break;
 	}
 }

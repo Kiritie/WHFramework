@@ -95,7 +95,7 @@ void UAnimationModule::ExecuteWithDelay(float Duration, TFunction<void()> OnFini
 	LatentInfo.UUID = 0;
 	LatentInfo.Linkage = 0;
 	LatentInfo.CallbackTarget = this;
-	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_CHECKED(UAnimationModule, OnExecuteWithDelayFinish);
+	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnExecuteWithDelayFinish);
 	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FDelayAction(Duration, LatentInfo));
 }
 
@@ -107,7 +107,7 @@ void UAnimationModule::ExecuteWithTransition(float Duration, TFunction<void()> O
 	LatentInfo.UUID = 0;
 	LatentInfo.Linkage = 0;
 	LatentInfo.CallbackTarget = this;
-	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_CHECKED(UAnimationModule, OnExecuteWithTransitionFinish);
+	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnExecuteWithTransitionFinish);
 	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FTransitionAction(Duration / 2.f, LatentInfo));
 
 	UWidgetModuleStatics::OpenUserWidget<UWidgetTransitionMaskBase>({ Duration });

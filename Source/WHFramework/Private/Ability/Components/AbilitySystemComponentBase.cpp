@@ -154,6 +154,11 @@ FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForInputID(int3
 	return FGameplayAbilitySpec();
 }
 
+FGameplayAbilitySpec UAbilitySystemComponentBase::FindAbilitySpecForItem(FAbilityItem Item)
+{
+	return FindAbilitySpecForHandle(Item.AbilityHandle);
+}
+
 FGameplayAbilitySpecHandle UAbilitySystemComponentBase::FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject)
 {
 	ABILITYLIST_SCOPE_LOCK();
@@ -1039,7 +1044,7 @@ int32 UAbilitySystemComponentBase::GetDefaultAbilityLevel() const
 	AAbilityCharacterBase* OwnerCharacter = Cast<AAbilityCharacterBase>(GetOwnerActor());
 	if (OwnerCharacter)
 	{
-		return OwnerCharacter->GetLevelV();
+		return OwnerCharacter->GetLevelA();
 	}
 	return 1;
 }

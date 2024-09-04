@@ -122,7 +122,7 @@ public:
 		Z = InZ;
 	}
 
-	FORCEINLINE FIndex(FVector InVector)
+	FORCEINLINE FIndex(const FVector& InVector)
 	{
 		X = FMath::CeilToInt(InVector.X);
 		Y = FMath::CeilToInt(InVector.Y);

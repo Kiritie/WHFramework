@@ -631,16 +631,25 @@ public:
 	void SetInitCameraDistance(float InInitCameraDistance) { InitCameraDistance = InInitCameraDistance; }
 	
 	UFUNCTION(BlueprintPure)
+	FVector GetRealCameraLocation();
+	
+	UFUNCTION(BlueprintPure)
 	FVector GetCurrentCameraLocation(bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	FVector GetTargetCameraLocation() const { return TargetCameraLocation; }
-	
+
+	UFUNCTION(BlueprintPure)
+	FVector GetRealCameraOffset() const;
+
 	UFUNCTION(BlueprintPure)
 	FVector GetCurrentCameraOffset(bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	FVector GetTargetCameraOffset() const { return TargetCameraOffset; }
+
+	UFUNCTION(BlueprintPure)
+	FRotator GetRealCameraRotation();
 
 	UFUNCTION(BlueprintPure)
 	FRotator GetCurrentCameraRotation(bool bRefresh = false);
@@ -649,10 +658,16 @@ public:
 	FRotator GetTargetCameraRotation() const { return TargetCameraRotation; }
 
 	UFUNCTION(BlueprintPure)
+	float GetRealCameraDistance() const;
+
+	UFUNCTION(BlueprintPure)
 	float GetCurrentCameraDistance(bool bRefresh = false) const;
 
 	UFUNCTION(BlueprintPure)
 	float GetTargetCameraDistance() const { return TargetCameraDistance; }
+
+	UFUNCTION(BlueprintPure)
+	float GetRealCameraFov() const;
 
 	UFUNCTION(BlueprintPure)
 	float GetCurrentCameraFov(bool bRefresh = false) const;

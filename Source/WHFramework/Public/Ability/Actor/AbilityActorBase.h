@@ -33,6 +33,17 @@ class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorI
 public:
 	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation(EPhase InPhase) override;
+
 public:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
@@ -58,6 +69,8 @@ public:
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+
+	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -135,6 +148,8 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+
 	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
 	
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
@@ -145,10 +160,10 @@ public:
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelV() const override { return Level; }
+	virtual int32 GetLevelA() const override { return Level; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual bool SetLevelV(int32 InLevel) override;
+	virtual bool SetLevelA(int32 InLevel) override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const override;

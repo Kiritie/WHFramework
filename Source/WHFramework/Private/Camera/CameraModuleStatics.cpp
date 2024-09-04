@@ -5,7 +5,6 @@
 
 #include "Camera/CameraModule.h"
 #include "Camera/Actor/CameraActorBase.h"
-#include "Camera/Manager/CameraManagerBase.h"
 
 ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass)
 {
@@ -22,29 +21,29 @@ void UCameraModuleStatics::SetDefaultCameraPoint(ACameraPointBase* InCameraPoint
 	UCameraModule::Get().SetDefaultCameraPoint(InCameraPoint);
 }
 
-FVector UCameraModuleStatics::GetCameraLocation(bool bReal, bool bRefresh)
+FVector UCameraModuleStatics::GetCameraLocation(bool bReally, bool bRefresh)
 {
-	return bReal ? UCameraModule::Get().GetCurrentCameraManager()->GetCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation(bRefresh);
+	return bReally ? UCameraModule::Get().GetRealCameraLocation() : UCameraModule::Get().GetCurrentCameraLocation(bRefresh);
 }
 
-FRotator UCameraModuleStatics::GetCameraRotation(bool bRefresh)
+FRotator UCameraModuleStatics::GetCameraRotation(bool bReally, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraRotation(bRefresh);
+	return bReally ? UCameraModule::Get().GetRealCameraRotation() : UCameraModule::Get().GetCurrentCameraRotation(bRefresh);
 }
 
-float UCameraModuleStatics::GetCameraDistance(bool bRefresh)
+float UCameraModuleStatics::GetCameraDistance(bool bReally, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraDistance(bRefresh);
+	return bReally ? UCameraModule::Get().GetRealCameraDistance() : UCameraModule::Get().GetCurrentCameraDistance(bRefresh);
 }
 
-FVector UCameraModuleStatics::GetCameraOffset(bool bRefresh)
+FVector UCameraModuleStatics::GetCameraOffset(bool bReally, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
+	return bReally ? UCameraModule::Get().GetRealCameraOffset() : UCameraModule::Get().GetCurrentCameraOffset(bRefresh);
 }
 
-float UCameraModuleStatics::GetCameraFov(bool bRefresh)
+float UCameraModuleStatics::GetCameraFov(bool bReally, bool bRefresh)
 {
-	return UCameraModule::Get().GetCurrentCameraFov(bRefresh);
+	return bReally ? UCameraModule::Get().GetRealCameraFov() : UCameraModule::Get().GetCurrentCameraFov(bRefresh);
 }
 
 ACameraActorBase* UCameraModuleStatics::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass)

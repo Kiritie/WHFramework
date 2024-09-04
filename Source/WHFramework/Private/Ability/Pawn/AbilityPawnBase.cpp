@@ -8,7 +8,6 @@
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Death.h"
 #include "Ability/Pawn/States/AbilityPawnState_Default.h"
-#include "Asset/AssetModuleStatics.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonStatics.h"
@@ -21,6 +20,8 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	AutoPossessAI = EAutoPossessAI::Disabled;
 
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
@@ -45,28 +46,44 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Level = 0;
 }
 
+void AAbilityPawnBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		RefreshAttributes();
+	}
+}
+
+void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+}
+
+void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
+{
+	Super::OnTermination_Implementation(InPhase);
+}
+
 void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
-	}
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
-	USceneModuleStatics::AddSceneActor(this);
+	InitializeAbilities();
 
-	InitializeAbilitySystem();
+	SpawnDefaultController();
 
 	FSM->SwitchDefaultState();
 }
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
 {
-	FSM->SwitchState(nullptr);
-
 	RaceID = NAME_None;
 	Level = 0;
 
@@ -86,7 +103,7 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
-		SetLevelV(SaveData.Level);
+		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
 
@@ -121,7 +138,7 @@ void AAbilityPawnBase::ResetData()
 	SetHealth(GetMaxHealth());
 }
 
-void AAbilityPawnBase::OnFiniteStateChanged(UFiniteStateBase* InFiniteState)
+void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 }
 
@@ -164,18 +181,14 @@ void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	if(InKiller)
 	{
-		FSM->GetStateByClass<UAbilityPawnState_Death>()->Killer = InKiller;
 		InKiller->Kill(this);
 	}
-	FSM->SwitchStateByClass<UAbilityPawnState_Death>();
+	FSM->SwitchStateByClass<UAbilityPawnState_Death>({ InKiller });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	if(InTarget == this)
-	{
-		Death(this);
-	}
+	
 }
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
@@ -197,6 +210,11 @@ void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteraction
 }
 
 void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+{
+	
+}
+
+void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
 {
 	
 }
@@ -255,7 +273,7 @@ bool AAbilityPawnBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
 }
 
-bool AAbilityPawnBase::SetLevelV(int32 InLevel)
+bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 {
 	const auto& VitalityData = GetPawnData<UAbilityPawnDataBase>();
 	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
@@ -322,27 +340,19 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityPawnBase::IsTargetable_Implementation() const
+bool AAbilityPawnBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
 }
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == AttributeSet->GetExpAttribute())
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= AttributeSet->GetMaxExp())
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
-			SetLevelV(GetLevelV() + 1);
+			SetLevelA(GetLevelA() + 1);
 			SetExp(0.f);
-		}
-	}
-	else if(InAttributeChangeData.Attribute == AttributeSet->GetHealthAttribute())
-	{
-		const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
-		if(DeltaValue > 0.f)
-		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(DeltaValue), FColor::Green, DeltaValue < GetMaxHealth() ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -351,10 +361,21 @@ void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDam
 {
 	ModifyHealth(-LocalDamageDone);
 
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-
 	if (GetHealth() <= 0.f)
 	{
 		Death(Cast<IAbilityVitalityInterface>(SourceActor));
 	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
 }

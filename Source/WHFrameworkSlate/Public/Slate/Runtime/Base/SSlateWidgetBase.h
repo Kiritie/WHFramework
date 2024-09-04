@@ -23,10 +23,9 @@ public:
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs);
 	
-public:
-	static FName WidgetName;
+	static const FName WidgetName;
 
-	static FName ParentName;
+	static const FName ParentName;
 
 protected:
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -65,7 +64,7 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce = false) override;
+	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams = nullptr, bool bForce = false) override;
 
 	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
 	

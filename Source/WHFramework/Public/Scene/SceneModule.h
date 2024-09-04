@@ -10,6 +10,8 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_PlayLevelSequence;
+class UEventHandle_SetActorVisible;
 class UEventHandle_SetDataLayerOwnerPlayer;
 class ATargetPoint;
 class AMiniMapCapture;
@@ -163,10 +165,35 @@ protected:
 	
 protected:
 	UFUNCTION()
+	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
+	
+	UFUNCTION()
+	void OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle);
+	
+	UFUNCTION()
 	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
 	
 	UFUNCTION()
 	void OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Traces
+protected:
+	UPROPERTY(EditAnywhere, Category = "Traces")
+	TMap<FName, FTraceMapping> TraceMappings;
+
+public:
+	UFUNCTION(BlueprintPure)
+	virtual bool HasTraceMapping(const FName& InName, bool bEnsured = true) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual FTraceMapping GetTraceMapping(const FName& InName, bool bEnsured = true) const;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void RemoveTraceMapping(const FName& InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor

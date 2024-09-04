@@ -16,7 +16,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SProcedureListWidget::WidgetName = FName("ProcedureListWidget");
+const FName SProcedureListWidget::WidgetName = FName("ProcedureListWidget");
 
 SProcedureListWidget::SProcedureListWidget()
 {

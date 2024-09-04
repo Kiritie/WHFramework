@@ -22,6 +22,8 @@ public:
 
 	void Construct(const FArguments& InArgs, const TSharedRef<SDockTab>& InNomadTab);
 
+	static const FName WidgetName;
+
 public:
 	virtual void OnCreate() override;
 
@@ -50,6 +52,8 @@ private:
 	FText GetPickedClassName() const;
 
 protected:
+	TSharedPtr<SWidget> OnGetAssetContextMenu(const TArray<FAssetData>& _SelectedAssets) const;
+
 	void OnAssetSelected(const FAssetData& AssetData);
 
 	void OnAssetDoubleClicked(const FAssetData& AssetData);

@@ -8,7 +8,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SModuleToolbarWidget::WidgetName = FName("ModuleToolbarWidget");
+const FName SModuleToolbarWidget::WidgetName = FName("ModuleToolbarWidget");
 
 SModuleToolbarWidget::SModuleToolbarWidget()
 {
@@ -33,6 +33,14 @@ void SModuleToolbarWidget::OnDefaultsToggled()
 void SModuleToolbarWidget::OnEditingToggled()
 {
 	GetParentWidgetN<SModuleEditorWidget>()->ListWidget->ToggleEditing();
+}
+
+void SModuleToolbarWidget::OnDeleteClicked()
+{
+	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to delete main module?"))) == EAppReturnType::Yes)
+	{
+		GetParentWidgetN<SModuleEditorWidget>()->DeleteMainModule();
+	}
 }
 
 void SModuleToolbarWidget::OnCreate()
@@ -94,6 +102,20 @@ void SModuleToolbarWidget::OnCreate()
 			FText::FromString(TEXT("Toggle Editing")),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
 			EUserInterfaceActionType::ToggleButton
+		);
+		ToolBarBuilder_List.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnDeleteClicked),
+				FCanExecuteAction::CreateLambda([]() -> bool
+				{
+					return !UCommonStatics::IsPlaying();
+				})
+			),
+			NAME_None,
+			FText::FromString(TEXT("Delete")),
+			FText::FromString(TEXT("Delete mian module")),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Delete"),
+			EUserInterfaceActionType::Button
 		);
 	}
 	ToolBarBuilder_List.EndSection();

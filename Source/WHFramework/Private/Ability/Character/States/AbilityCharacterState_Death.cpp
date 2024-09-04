@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -14,22 +13,29 @@
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
 	StateName = FName("Death");
+
+	Killer = nullptr;
 	bDeathStarted = false;
 }
 
-void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex)
+void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
-	Super::OnInitialize(InFSMComponent, InStateIndex);
+	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Death::OnEnterValidate(UFiniteStateBase* InLastFiniteState)
+bool UAbilityCharacterState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastFiniteState);
+	return Super::OnEnterValidate(InLastState, InParams);
 }
 
-void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
+void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	Super::OnEnter(InLastFiniteState);
+	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -40,18 +46,18 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastFiniteState)
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
 	}
 
-	if(Killer)
+	if(Killer && Killer != Character)
 	{
-		Killer->ModifyExp(Character->GetLevelV() * 10.f);
+		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}
 
-	Character->SetExp(0);
+	Character->SetExp(0.f);
 	Character->SetHealth(0.f);
 }
 
-void UAbilityCharacterState_Death::OnRefresh()
+void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
 {
-	Super::OnRefresh();
+	Super::OnRefresh(DeltaSeconds);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -61,9 +67,9 @@ void UAbilityCharacterState_Death::OnRefresh()
 	}
 }
 
-void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
+void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextFiniteState);
+	Super::OnLeave(InNextState);
 
 	Killer = nullptr;
 	bDeathStarted = false;
@@ -75,7 +81,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextFiniteState)
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(true);
+	Character->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -91,7 +97,7 @@ void UAbilityCharacterState_Death::DeathStart()
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetGenerateOverlapEvents(false);
+	Character->GetInteractionComponent()->SetInteractable(false);
 }
 
 void UAbilityCharacterState_Death::DeathEnd()

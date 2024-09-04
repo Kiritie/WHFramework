@@ -5,7 +5,7 @@
 #include "Input/InputManager.h"
 #include "Main/MainManager.h"
 
-FUniqueType FSlateWidgetManager::Type = FUniqueType();
+FUniqueType FSlateWidgetManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FSlateWidgetManager)
 
@@ -15,7 +15,7 @@ FSlateWidgetManager::FSlateWidgetManager() : FManagerBase(Type)
 	AllSlateWidgets = TMap<FName, TSharedPtr<SSlateWidgetBase>>();
 	TemporarySlateWidget = nullptr;
 
-	AllEditorWidgets = TMap<FName, TSharedPtr<SEditorWidgetBase>>();
+	AllEditorWidgets = TMap<FName, TSharedPtr<IEditorWidgetBase>>();
 }
 
 FSlateWidgetManager::~FSlateWidgetManager()

@@ -52,7 +52,7 @@ bool UVoxelPlant::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractA
 {
 	switch (InInteractAction)
 	{
-		case EInputInteractAction::Action1:
+		case EInputInteractAction::Primary:
 		{
 			return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
 		}

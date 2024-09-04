@@ -5,7 +5,7 @@
 
 UEventHandle_ProcedureLeaved::UEventHandle_ProcedureLeaved()
 {
-
+	Procedure = nullptr;
 }
 
 void UEventHandle_ProcedureLeaved::OnDespawn_Implementation(bool bRecovery)
@@ -17,6 +17,6 @@ void UEventHandle_ProcedureLeaved::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Procedure = InParams[0].GetObjectValue<UProcedureBase>();
+		Procedure = InParams[0];
 	}
 }

@@ -30,10 +30,10 @@ public class WHFrameworkCore : ModuleRules
 				"SlateCore",
 				"InputCore",
 				"zlib",
-				"DesktopPlatform",
 				"ImageWrapper",
 				"Engine",
-				"GameplayTags"
+				"GameplayTags",
+				"EngineSettings"
 			}
 		);
 		
@@ -71,6 +71,11 @@ public class WHFrameworkCore : ModuleRules
 		else if (Target.Platform == UnrealTargetPlatform.Linux)
 		{
 			PublicAdditionalLibraries.Add(Path.Combine(externalLib, "Zip", "Linux", "libzip.a"));
+		}
+		
+		if (Target.IsInPlatformGroup(UnrealPlatformGroup.Linux))
+		{
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "SDL2");
 		}
 	}
 	

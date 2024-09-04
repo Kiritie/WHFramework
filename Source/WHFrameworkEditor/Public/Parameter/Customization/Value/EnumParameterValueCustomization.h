@@ -26,8 +26,6 @@ public:
 protected:
 	void OnEnumTypeChanged(bool bPropertyChanged = false);
 
-	void RefreshEnumPropertyValues();
-
 	void OnEnumValueComboChange(uint8 Index);
 	TSharedRef<SWidget> OnGetEnumValueContent() const;
 	FText GetCurrentEnumValueDesc() const;
@@ -35,11 +33,10 @@ protected:
 private:
 	TSharedPtr<IPropertyHandle> EnumTypeHandle;
 	TSharedPtr<IPropertyHandle> EnumNameHandle;
+	TSharedPtr<IPropertyHandle> EnumNamesHandle;
 	TSharedPtr<IPropertyHandle> EnumValueHandle;
 
 	TSharedPtr<IPropertyHandle> NotifyObserverProperty;
-	
-	UEnum* CachedEnumType;
 	
 	TArray<FString> EnumPropValues;
 };

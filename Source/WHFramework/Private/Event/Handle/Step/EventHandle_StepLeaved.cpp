@@ -5,7 +5,7 @@
 
 UEventHandle_StepLeaved::UEventHandle_StepLeaved()
 {
-
+	Step = nullptr;
 }
 
 void UEventHandle_StepLeaved::OnDespawn_Implementation(bool bRecovery)
@@ -17,6 +17,6 @@ void UEventHandle_StepLeaved::Parse_Implementation(const TArray<FParameter>& InP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Step = InParams[0].GetObjectValue<UStepBase>();
+		Step = InParams[0];
 	}
 }

@@ -21,10 +21,10 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
+const FName SModuleEditorWidget::WidgetName = FName("ModuleEditorWidget");
+
 SModuleEditorWidget::SModuleEditorWidget()
 {
-	WidgetName = FName("ModuleEditorWidget");
-
 	DefaultLayoutName = FName("ModuleEditor_Layout");
 
 	MainModule = nullptr;
@@ -146,13 +146,13 @@ void SModuleEditorWidget::RegisterMenuBar(FMenuBarBuilder& InMenuBarBuilder)
 
 void SModuleEditorWidget::RegisterTabSpawners()
 {
-	SAssignNewEdN(ListWidget, SModuleListWidget, SharedThis(this), false);
+	SAssignNewEdN(ListWidget, SModuleListWidget, SharedThis(this), true);
 
-	SAssignNewEdN(DetailsWidget, SModuleDetailsWidget, SharedThis(this), false);
+	SAssignNewEdN(DetailsWidget, SModuleDetailsWidget, SharedThis(this), true);
 
-	SAssignNewEdN(StatusWidget, SModuleStatusWidget, SharedThis(this), false);
+	SAssignNewEdN(StatusWidget, SModuleStatusWidget, SharedThis(this), true);
 
-	SAssignNewEdN(ToolbarWidget, SModuleToolbarWidget, SharedThis(this), false);
+	SAssignNewEdN(ToolbarWidget, SModuleToolbarWidget, SharedThis(this), true);
 
 	RegisterTabSpawner("Toolbar", FOnSpawnTab::CreateSP(this, &SModuleEditorWidget::SpawnToolbarWidgetTab))
 		.SetDisplayName(LOCTEXT("ToolbarTab", "Toolbar"))
@@ -402,12 +402,7 @@ FReply SModuleEditorWidget::OnCreateMainModuleButtonClicked()
 	
 	if(bPressedOk && PickedClass)
 	{
-		if(UEditorActorSubsystem* EditorActorSubsystem = GEditor->GetEditorSubsystem<UEditorActorSubsystem>())
-		{
-			EditorActorSubsystem->SpawnActorFromClass(PickedClass, FVector::ZeroVector, FRotator::ZeroRotator);
-
-			Rebuild();
-		}
+		CreateMainModule(PickedClass);
 	}
 	
 	return FReply::Handled();
@@ -425,6 +420,32 @@ void SModuleEditorWidget::SetIsPreview(bool bIsPreview)
 		bPreview = bIsPreview;
 		Refresh();
 		SetRenderOpacity(bPreview ? 0.8f : 1.f);
+	}
+}
+
+void SModuleEditorWidget::CreateMainModule(TSubclassOf<AMainModule> InClass)
+{
+	if(MainModule || !InClass) return;
+	
+	if(UEditorActorSubsystem* EditorActorSubsystem = GEditor->GetEditorSubsystem<UEditorActorSubsystem>())
+	{
+		MainModule = Cast<AMainModule>(EditorActorSubsystem->SpawnActorFromClass(InClass, FVector::ZeroVector, FRotator::ZeroRotator));
+		MainModule->OnGenerate();
+
+		Rebuild();
+	}
+}
+
+void SModuleEditorWidget::DeleteMainModule()
+{
+	if(!MainModule) return;
+
+	if(UEditorActorSubsystem* EditorActorSubsystem = GEditor->GetEditorSubsystem<UEditorActorSubsystem>())
+	{
+		MainModule->OnDestroy();
+		EditorActorSubsystem->DestroyActor(MainModule);
+
+		Rebuild();
 	}
 }
 

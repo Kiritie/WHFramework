@@ -17,6 +17,6 @@ void UEventHandle_StepStarted::Parse_Implementation(const TArray<FParameter>& In
 {
 	if(InParams.IsValidIndex(0))
 	{
-		RootStepIndex = InParams[0].GetIntegerValue();
+		RootStepIndex = InParams[0];
 	}
 }

@@ -66,8 +66,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
 
-	void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
-
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Subscribe Event"))
 	void SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
 
@@ -85,8 +83,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
-
-	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate);
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Unsubscribe Event"))
 	void UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);

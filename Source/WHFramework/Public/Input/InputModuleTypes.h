@@ -14,9 +14,9 @@ class UPlayerMappableKeyProfileBase;
 UENUM(BlueprintType)
 enum class EInputInteractAction : uint8
 {
-	Action1,
-	Action2,
-	Action3
+	Primary,
+	Secondary,
+	Third
 };
 
 USTRUCT(BlueprintType)
@@ -129,7 +129,7 @@ public:
 		Event = EInputEvent::IE_MAX;
 	}
 
-	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, const FInputActionHandlerWithKeySignature& InDelegate)
+	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, const FInputActionHandlerDynamicSignature& InDelegate)
 		: Key(InKey),
 		  Event(InEvent),
 		  Delegate(InDelegate)
@@ -143,10 +143,8 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TEnumAsByte<EInputEvent> Event;
 
-	FInputActionHandlerWithKeySignature Delegate;
-
 	UPROPERTY(BlueprintReadWrite)
-	FInputActionHandlerDynamicSignature DynamicDelegate;
+	FInputActionHandlerDynamicSignature Delegate;
 };
 
 USTRUCT(BlueprintType)

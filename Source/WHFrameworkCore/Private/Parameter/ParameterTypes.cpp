@@ -26,7 +26,7 @@ void FParameters::SetParameter(FName InName, const FParameter& InParameter)
 		{
 			if(Sets[i].Name == InName)
 			{
-				Sets[i].Parameter = InParameter;
+				Sets[i].Parameter.SetParameterValue(InParameter);
 				break;
 			}
 		}

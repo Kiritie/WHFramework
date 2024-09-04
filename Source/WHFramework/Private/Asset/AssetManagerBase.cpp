@@ -24,14 +24,6 @@ void UAssetManagerBase::StartInitialLoading()
 	Super::StartInitialLoading();
 }
 
-void UAssetManagerBase::RegisterPrimaryAssetType(FPrimaryAssetType InPrimaryAssetType)
-{
-	if(!PrimaryAssetMap.Contains(InPrimaryAssetType))
-	{
-		PrimaryAssetMap.Add(InPrimaryAssetType);
-	}
-}
-
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
 {
 	return Super::LoadPrimaryAsset(AssetToLoad, LoadBundles, DelegateToCall, Priority);
@@ -41,20 +33,22 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 {
 	UPrimaryAssetBase* LoadedAsset = nullptr;
 
-	if(InPrimaryAssetId.IsValid() && PrimaryAssetMap.Contains(InPrimaryAssetId.PrimaryAssetType))
+	if(InPrimaryAssetId.IsValid())
 	{
-		if(!PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Contains(InPrimaryAssetId))
+		FPrimaryAssets& PrimaryAssets = PrimaryAssetMap.FindOrAdd(InPrimaryAssetId.PrimaryAssetType);
+
+		if(!PrimaryAssets.Assets.Contains(InPrimaryAssetId))
 		{
 			const FSoftObjectPath AssetPath = GetPrimaryAssetPath(InPrimaryAssetId);
 			LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
 			if(LoadedAsset)
 			{
-				PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets.Add(InPrimaryAssetId, LoadedAsset);
+				PrimaryAssets.Assets.Add(InPrimaryAssetId, LoadedAsset);
 			}
 		}
 		else
 		{
-			LoadedAsset = PrimaryAssetMap[InPrimaryAssetId.PrimaryAssetType].Assets[InPrimaryAssetId];
+			LoadedAsset = PrimaryAssets.Assets[InPrimaryAssetId];
 		}
 	}
 
@@ -71,17 +65,14 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 {
 	TArray<UPrimaryAssetBase*> LoadedAssets;
 
-	if(PrimaryAssetMap.Contains(InPrimaryAssetType))
+	TArray<FPrimaryAssetId> AssetIds;
+	GetPrimaryAssetIdList(InPrimaryAssetType, AssetIds);
+
+	for(auto& Iter : AssetIds)
 	{
-		TArray<FPrimaryAssetId> AssetIds;
-		GetPrimaryAssetIdList(InPrimaryAssetType, AssetIds);
-	
-		for(auto& Iter : AssetIds)
+		if(UPrimaryAssetBase* Asset = LoadPrimaryAsset(Iter, bEnsured))
 		{
-			if(UPrimaryAssetBase* Asset = LoadPrimaryAsset(Iter, bEnsured))
-			{
-				LoadedAssets.Add(Asset);
-			}
+			LoadedAssets.Add(Asset);
 		}
 	}
 	

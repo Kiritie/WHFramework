@@ -371,7 +371,7 @@ void UInputModule::ApplyKeyMappings()
 	for(auto& Iter : KeyMappings)
 	{
 		FInputKeyBinding KB(FInputChord(Iter.Value.Key, false, false, false, false), Iter.Value.Event);
-		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.DynamicDelegate.GetUObject(), Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.TryGetBoundFunctionName() : Iter.Value.DynamicDelegate.GetFunctionName());
+		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.Delegate.GetUObject(), Iter.Value.Delegate.GetFunctionName());
 		GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
 	}
 }

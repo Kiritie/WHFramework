@@ -17,7 +17,7 @@ void UEventHandle_CameraPointChanged::Parse_Implementation(const TArray<FParamet
 {
 	if(InParams.IsValidIndex(0))
 	{
-		CameraPoint = InParams[0].GetObjectValue<ACameraPointBase>();
+		CameraPoint = InParams[0];
 	}
 }
 

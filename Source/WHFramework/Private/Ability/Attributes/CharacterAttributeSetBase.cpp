@@ -6,15 +6,16 @@
 #include "Net/UnrealNetwork.h"
 
 UCharacterAttributeSetBase::UCharacterAttributeSetBase()
-:	
-	MoveSpeed(350.f),
-	RotationSpeed(360.f),
-	JumpForce(420.f)
+	: MoveSpeed(350.f)
+	, RotationSpeed(720.f)
+	, JumpForce(420.f)
 {
 }
 
-void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
+void UCharacterAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
+	Super::PreAttributeBaseChange(Attribute, NewValue);
+
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
 	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
 	
@@ -31,9 +32,27 @@ void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
 	}
-	else
+}
+
+void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
+{
+	Super::PreAttributeChange(Attribute, NewValue);
+
+	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
+	
+	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
+	if (Attribute == GetMoveSpeedAttribute())
 	{
-		Super::PreAttributeChange(Attribute, NewValue);
+		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
+	}
+	else if (Attribute == GetRotationSpeedAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
+	}
+	else if (Attribute == GetJumpForceAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
 	}
 }
 

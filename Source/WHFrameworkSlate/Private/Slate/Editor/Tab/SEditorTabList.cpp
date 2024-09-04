@@ -1,6 +1,6 @@
 ﻿#include "Slate/Editor/Tab/SEditorTabList.h"
 
-#include "Slate/Editor/Tab/SEditorTabWidgetBase.h"
+#include "Slate/Editor/Base/Tab/SEditorTabWidgetBase.h"
 
 SEditorTabList::SEditorTabList(): bKeepOneActivated(false)
 {

@@ -1,5 +1,6 @@
 #include "Asset/AssetModuleTypes.h"
 
+#include "Ability/Item/AbilityItemDataBase.h"
 #include "Asset/AssetModuleStatics.h"
 
 FAbilityItem FAbilityItem::Empty = FAbilityItem();

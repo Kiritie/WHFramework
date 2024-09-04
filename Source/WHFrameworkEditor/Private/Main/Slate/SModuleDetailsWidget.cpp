@@ -10,7 +10,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SModuleDetailsWidget::WidgetName = FName("ModuleDetailsWidget");
+const FName SModuleDetailsWidget::WidgetName = FName("ModuleDetailsWidget");
 
 SModuleDetailsWidget::SModuleDetailsWidget()
 {

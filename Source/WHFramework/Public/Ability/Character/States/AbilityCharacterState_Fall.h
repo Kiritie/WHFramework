@@ -20,17 +20,17 @@ public:
 	UAbilityCharacterState_Fall();
 
 public:
-	virtual void OnInitialize(UFSMComponent* InFSMComponent, int32 InStateIndex) override;
+	virtual void OnInitialize(UFSMComponent* InFSM, int32 InStateIndex) override;
 
-	virtual bool OnEnterValidate(UFiniteStateBase* InLastFiniteState) override;
+	virtual bool OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
 
-	virtual void OnEnter(UFiniteStateBase* InLastFiniteState) override;
+	virtual void OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
 	
-	virtual void OnRefresh() override;
+	virtual void OnRefresh(float DeltaSeconds) override;
 
-	virtual bool OnLeaveValidate(UFiniteStateBase* InNextFiniteState) override;
+	virtual bool OnLeaveValidate(UFiniteStateBase* InNextState) override;
 
-	virtual void OnLeave(UFiniteStateBase* InNextFiniteState) override;
+	virtual void OnLeave(UFiniteStateBase* InNextState) override;
 
 	virtual void OnTermination() override;
 };

@@ -8,7 +8,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SModuleStatusWidget::WidgetName = FName("ModuleStatusWidget");
+const FName SModuleStatusWidget::WidgetName = FName("ModuleStatusWidget");
 
 SModuleStatusWidget::SModuleStatusWidget()
 {

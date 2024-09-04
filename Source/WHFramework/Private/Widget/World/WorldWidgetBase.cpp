@@ -401,11 +401,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 
 EWidgetSpace UWorldWidgetBase::GetWidgetSpace() const
 {
-	if(WidgetComponent)
-	{
-		return WidgetComponent->GetWidgetSpace();
-	}
-	return EWidgetSpace::Screen;
+	return WidgetSpace;
 }
 
 UPanelWidget* UWorldWidgetBase::GetRootPanelWidget() const

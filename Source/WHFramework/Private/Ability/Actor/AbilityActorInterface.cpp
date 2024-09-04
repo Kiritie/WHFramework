@@ -6,8 +6,10 @@
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 
-void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActor* InAvatarActor)
+void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
 {
+	if(bAbilityInitialized) return;
+
 	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
 	UAttributeSetBase* AttributeSet = GetAttributeSet();
 
@@ -16,12 +18,13 @@ void IAbilityActorInterface::InitializeAbilitySystem(AActor* InOwnerActor, AActo
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor, InOwnerActor);
 	}
-	RefreshAttributes();
 
 	for(auto& Iter : AttributeSet->GetAllAttributes())
 	{
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
 	}
+
+	bAbilityInitialized = true;
 }
 
 void IAbilityActorInterface::RefreshAttributes()

@@ -36,9 +36,14 @@ bool UAbilityModuleStatics::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> 
 	return false;
 }
 
-ECollisionChannel UAbilityModuleStatics::GetPickUpTraceChannel()
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	return UAbilityModule::Get().GetPickUpTraceChannel();
+	return UAbilityModule::Get().SpawnAbilityItem(InItem, InLocation, InRotation, InContainer);
+}
+
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
+{
+	return UAbilityModule::Get().SpawnAbilityItem(InItem, InOwnerActor);
 }
 
 AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
@@ -51,22 +56,7 @@ AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FSaveData* InSaveD
 	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer);
 }
 
-AAbilityActorBase* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
-}
-
-AAbilityCharacterBase* UAbilityModuleStatics::SpawnAbilityCharacter(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityCharacter(InSaveData, InContainer);
-}
-
-AAbilityPawnBase* UAbilityModuleStatics::SpawnAbilityPawn(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityPawn(InSaveData, InContainer);
-}
-
-AAbilityVitalityBase* UAbilityModuleStatics::SpawnAbilityVitality(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
-{
-	return UAbilityModule::Get().SpawnAbilityVitality(InSaveData, InContainer);
 }

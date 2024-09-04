@@ -4,27 +4,36 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
 #include "Ability/AbilityModule.h"
-#include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Common/Components/FallingMovementComponent.h"
+#include "Common/Components/FollowingMovementComponent.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Scene/SceneModuleStatics.h"
 
 AAbilityPickUpBase::AAbilityPickUpBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComponent"));
+	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
 	BoxComponent->SetBoxExtent(FVector(10.f));
-	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
+
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(FName("InteractionComponent"));
+	InteractionComponent->SetupAttachment(RootComponent);
+	InteractionComponent->SetBoxExtent(FVector(50.f));
+	InteractionComponent->SetInteractable(true);
+	InteractionComponent->AddInteractAction(EInteractAction::PickUp);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
 	RotatingComponent->RotationRate = FRotator(0.f, 180.f, 0.f);
 
 	FallingComponent = CreateDefaultSubobject<UFallingMovementComponent>(TEXT("FallingComponent"));
+	
+	FollowingComponent = CreateDefaultSubobject<UFollowingMovementComponent>(TEXT("FollowingComponent"));
 
 	Item = FAbilityItem::Empty;
 }
@@ -33,7 +42,7 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	FallingComponent->TraceChannel = UAbilityModuleStatics::GetPickUpTraceChannel();
+	FallingComponent->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -45,6 +54,8 @@ void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	Item = FAbilityItem::Empty;
+
+	FollowingComponent->SetFollowingTarget(nullptr);
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -74,12 +85,64 @@ void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 	}
 }
 
+bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
+{
+	switch (InInteractAction)
+	{
+		case EInteractAction::PickUp:
+		{
+			return true;
+		}
+		default: break;
+	}
+	return false;
+}
+
+void AAbilityPickUpBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityPickUpBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
+{
+}
+
+void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+{
+	if(!bPassivity) return;
+	
+	switch (InInteractAction)
+	{
+		case EInteractAction::PickUp:
+		{
+			if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+			{
+				OnPickUp(Picker);
+			}
+			break;
+		}
+		default: break;
+	}
+}
+
 void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
 
 	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(OtherActor))
 	{
-		OnPickUp(Picker);
+		if(OtherComp->IsA<UInteractionComponent>())
+		{
+			FallingComponent->SetActive(false);
+			FollowingComponent->SetFollowingTarget(OtherActor);
+		}
+		else
+		{
+			OnPickUp(Picker);
+		}
 	}
+}
+
+UInteractionComponent* AAbilityPickUpBase::GetInteractionComponent() const
+{
+	return InteractionComponent;
 }

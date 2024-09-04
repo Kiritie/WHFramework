@@ -37,6 +37,14 @@ void AMainModule::OnGenerate()
 
 void AMainModule::OnDestroy()
 {
+	for(int32 i = 0; i < Modules.Num(); i++)
+	{
+		if(Modules[i])
+		{
+			Modules[i]->OnDestroy();
+		}
+	}
+	Modules.Empty();
 }
 #endif
 
@@ -125,24 +133,6 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 
 		ModuleMap.Empty();
 	}
-}
-
-void AMainModule::BeginPlay()
-{
-	Super::BeginPlay();
-
-	Execute_OnPreparatory(this, EPhase::Primary);
-	Execute_OnPreparatory(this, EPhase::Lesser);
-	Execute_OnPreparatory(this, EPhase::Final);
-}
-
-void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	Execute_OnTermination(this, EPhase::Primary);
-	Execute_OnTermination(this, EPhase::Lesser);
-	Execute_OnTermination(this, EPhase::Final);
 }
 
 void AMainModule::Tick(float DeltaSeconds)

@@ -23,7 +23,7 @@ void UEventHandle_SetDataLayerRuntimeState::Parse_Implementation(const TArray<FP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		DataLayer = InParams[0].GetObjectValue<UDataLayerAsset>();
+		DataLayer = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
@@ -31,7 +31,7 @@ void UEventHandle_SetDataLayerRuntimeState::Parse_Implementation(const TArray<FP
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		bRecursive = InParams[2].GetBooleanValue();
+		bRecursive = InParams[2];
 	}
 }
 

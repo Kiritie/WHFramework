@@ -31,8 +31,11 @@ void UDefaultInputManagerBase::OnBindAction(UInputComponentBase* InInputComponen
 	InInputComponent->BindInputAction(GameplayTags::InputTag_ZoomCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::ZoomCamera);
 	
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveForwardPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveForwardPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionForwardPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveRightPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveRightPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionRightPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveUpPlayer);
+	InInputComponent->BindInputAction(GameplayTags::InputTag_MoveUpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionUpPlayer);
 	InInputComponent->BindInputAction(GameplayTags::InputTag_JumpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::JumpPlayer, false);
 
 	InInputComponent->BindInputAction(GameplayTags::InputTag_SystemOperation, ETriggerEvent::Started, this, &UDefaultInputManagerBase::SystemOperation);
@@ -129,26 +132,6 @@ void UDefaultInputManagerBase::TurnPlayer_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::MoveHPlayer_Implementation(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(UCommonStatics::GetPlayerController()->GetPawn() && UCommonStatics::GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveH(UCommonStatics::GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
-void UDefaultInputManagerBase::MoveVPlayer_Implementation(const FInputActionValue& InValue)
-{
-	if(InValue.Get<float>() == 0.f) return;
-
-	if(UCommonStatics::GetPlayerController()->GetPawn() && UCommonStatics::GetPlayerController()->GetPawn()->Implements<UWHPlayerInterface>())
-	{
-		IWHPlayerInterface::Execute_MoveV(UCommonStatics::GetPlayerController()->GetPawn(), InValue.Get<float>());
-	}
-}
-
 void UDefaultInputManagerBase::MoveForwardPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
@@ -161,6 +144,10 @@ void UDefaultInputManagerBase::MoveForwardPlayer_Implementation(const FInputActi
 	{
 		MoveForwardCamera(InValue);
 	}
+}
+
+void UDefaultInputManagerBase::ActionForwardPlayer_Implementation(const FInputActionValue& InValue)
+{
 }
 
 void UDefaultInputManagerBase::MoveRightPlayer_Implementation(const FInputActionValue& InValue)
@@ -177,6 +164,10 @@ void UDefaultInputManagerBase::MoveRightPlayer_Implementation(const FInputAction
 	}
 }
 
+void UDefaultInputManagerBase::ActionRightPlayer_Implementation(const FInputActionValue& InValue)
+{
+}
+
 void UDefaultInputManagerBase::MoveUpPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
@@ -189,6 +180,10 @@ void UDefaultInputManagerBase::MoveUpPlayer_Implementation(const FInputActionVal
 	{
 		MoveUpCamera(InValue);
 	}
+}
+
+void UDefaultInputManagerBase::ActionUpPlayer_Implementation(const FInputActionValue& InValue)
+{
 }
 
 void UDefaultInputManagerBase::JumpPlayer_Implementation()

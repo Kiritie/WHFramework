@@ -7,7 +7,7 @@
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
-FName SStepStatusWidget::WidgetName = FName("StepStatusWidget");
+const FName SStepStatusWidget::WidgetName = FName("StepStatusWidget");
 
 SStepStatusWidget::SStepStatusWidget()
 {

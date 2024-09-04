@@ -132,11 +132,6 @@ void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject
 	}
 }
 
-void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
-{
-	SubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
-}
-
 void UEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
 {
 	SubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
@@ -164,11 +159,6 @@ void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObje
 	{
 		Mapping.Delegate.Unbind();
 	}
-}
-
-void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDelegate& InDelegate)
-{
-	UnsubscribeEvent(InClass, InDelegate.GetUObject(), InDelegate.TryGetBoundFunctionName());
 }
 
 void UEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
@@ -255,7 +245,7 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			}
 		}
 
-		if(bRecovery)
+		if(bRecovery && !EventHandle->OnExecute())
 		{
 			UObjectPoolModuleStatics::DespawnObject(EventHandle);
 		}

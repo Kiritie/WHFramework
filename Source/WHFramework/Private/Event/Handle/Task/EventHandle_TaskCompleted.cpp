@@ -17,6 +17,6 @@ void UEventHandle_TaskCompleted::Parse_Implementation(const TArray<FParameter>& 
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Task = InParams[0].GetObjectValue<UTaskBase>();
+		Task = InParams[0];
 	}
 }
