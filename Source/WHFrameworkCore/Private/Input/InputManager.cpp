@@ -3,7 +3,9 @@
 
 #include "Input/InputManager.h"
 
+#if WITH_ENGINE
 #include "Kismet/GameplayStatics.h"
+#endif
 #include "Main/MainManager.h"
 
 const FUniqueType FInputManager::Type = FUniqueType(&FManagerBase::Type);
@@ -75,6 +77,7 @@ void FInputManager::RemoveInputManager(IInputManagerInterface* InInputManager)
 
 void FInputManager::UpdateInputMode()
 {
+#if WITH_ENGINE
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GWorldContext, 0);
 
 	if(!PlayerController) return;
@@ -134,4 +137,5 @@ void FInputManager::UpdateInputMode()
 		}
 		// UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
 	}
+#endif
 }

@@ -3,7 +3,9 @@
 
 #include "Slate/Runtime/Base/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
+#if WITH_ENGINE
 #include "Engine/World.h"
+#endif
 #include "Input/InputManager.h"
 #include "Slate/SlateWidgetManager.h"
 
@@ -180,7 +182,9 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	if(!GetParentWidget())
 	{
+#if WITH_ENGINE
 		GWorld->GetGameViewport()->AddViewportWidgetContent(SharedThis(this), WidgetZOrder);
+#endif
 	}
 
 	switch(WidgetOpenType)
@@ -248,10 +252,12 @@ void SSlateWidgetBase::OnRefresh()
 
 void SSlateWidgetBase::OnDestroy(bool bRecovery)
 {
+#if WITH_ENGINE
 	if(GWorld->GetGameViewport())
 	{
 		GWorld->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
 	}
+#endif
 
 	if(ParentWidget)
 	{
@@ -356,7 +362,9 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 			{
 				GetLastTemporary()->Open();
 			}
+#if WITH_ENGINE
 			GWorld->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
+#endif
 		}
 		default: break;
 	}

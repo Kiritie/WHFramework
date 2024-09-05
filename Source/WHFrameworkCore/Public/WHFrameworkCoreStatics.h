@@ -106,6 +106,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Texture
+#if WITH_ENGINE
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static UTexture2D* LoadTextureFromFile(const FString& InFilePath);
 
@@ -114,4 +115,5 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize, UTexture2D* InTemplate = nullptr);
+#endif
 };

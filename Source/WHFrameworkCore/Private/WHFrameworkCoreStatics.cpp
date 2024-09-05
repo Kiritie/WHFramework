@@ -1,9 +1,11 @@
 ﻿#include "WHFrameworkCoreStatics.h"
 
 #include "IImageWrapperModule.h"
-#include "ImageUtils.h"
 #include "WHFrameworkCoreTypes.h"
+#if WITH_ENGINE
+#include "ImageUtils.h"
 #include "Engine/Texture.h"
+#endif
 
 void FCoreStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
@@ -116,6 +118,7 @@ bool FCoreStatics::StringToBool(const FString& InString)
 	return InString == TEXT("true");
 }
 
+#if WITH_ENGINE
 UTexture2D* FCoreStatics::LoadTextureFromFile(const FString& InFilePath)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -324,3 +327,4 @@ UTexture2D* FCoreStatics::CompositeTextures(const TArray<UTexture2D*>& InTexture
 	}
 	return nullptr;
 }
+#endif

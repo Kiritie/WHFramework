@@ -1,7 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-using System;
-using System.IO;
 using UnrealBuildTool;
 
 public class WHFrameworkSlate : ModuleRules
@@ -32,11 +30,16 @@ public class WHFrameworkSlate : ModuleRules
 				"InputCore",
 				"zlib",
 				"ImageWrapper",
-				"Engine",
+				// "Engine",
 				"GameplayTags"
 			}
 		);
 		
+		if (Target.bCompileAgainstEngine)
+		{
+			PrivateDependencyModuleNames.Add("Engine");
+		}
+
 		const string ResourcesDir = "$(PluginDir)/Resources/Slate/...";
 		RuntimeDependencies.Add(ResourcesDir, StagedFileType.NonUFS);
 	}

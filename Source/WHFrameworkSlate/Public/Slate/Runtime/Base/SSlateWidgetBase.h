@@ -2,7 +2,6 @@
 
 #pragma once
 
-
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"
 

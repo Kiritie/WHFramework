@@ -2,8 +2,11 @@
 
 
 #include "Input/InputTypes.h"
+#if WITH_ENGINE
 #include "Widgets/SViewport.h"
+#endif
 
+#if WITH_ENGINE
 void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewportClient& GameViewportClient) const
 {
 	const TSharedPtr<SViewport> ViewportWidget = GameViewportClient.GetGameViewportWidget();
@@ -18,3 +21,4 @@ void FInputModeNone::ApplyInputMode(class FReply& SlateOperations, UGameViewport
 		GameViewportClient.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
 	}
 }
+#endif
