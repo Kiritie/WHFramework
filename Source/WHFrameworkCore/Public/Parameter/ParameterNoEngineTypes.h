@@ -45,6 +45,3 @@ public:
 		return false;
 	}
 };
-
-typedef FGameplayTagN FGameplayTag;
-typedef FGameplayTagContainerN FGameplayTagContainer;

@@ -13,6 +13,8 @@ ULookingComponent::ULookingComponent()
 
 	LookingMaxDistance = 12000.f;
 	LookingRotationSpeed = 360.f;
+	LookingTarget = nullptr;
+	OwnerActor = nullptr;
 }
 
 // Called when the game starts
@@ -69,7 +71,7 @@ bool ULookingComponent::CanLookAtTarget()
 
 bool ULookingComponent::DoLookAtTarget(AActor* InTargetActor)
 {
-	if (!CanLookAtTarget()) return true;
+	if (!CanLookAtTarget() || !InTargetActor) return true;
 
 	const FVector TargetDirection = InTargetActor->GetActorLocation() - OwnerActor->GetActorLocation();
 	const FRotator CurrentRotation = OwnerActor->GetActorRotation();

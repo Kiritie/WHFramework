@@ -7,6 +7,8 @@
 #include "GameplayTagContainer.h"
 #else 
 #include "ParameterNoEngineTypes.h"
+using FGameplayTag = FGameplayTagN;
+using FGameplayTagContainer = FGameplayTagContainerN;
 #endif
 #include "WHFrameworkCoreTypes.h"
 
