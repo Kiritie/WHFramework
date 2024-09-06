@@ -13,7 +13,9 @@ IMPLEMENTATION_MANAGER(FAssetManager)
 FAssetManager::FAssetManager() : FManagerBase(Type)
 {
 	AssetMap = TMap<FUniqueAssetID, FUniqueAssetData*>();
+#if WITH_ENGINE
 	TextureMap = TMap<FString, UTexture2D*>();
+#endif
 }
 
 void FAssetManager::OnInitialize()
@@ -144,6 +146,7 @@ TArray<FUniqueAssetData*> FAssetManager::LoadAssetsByCondition(const TFunction<b
 	return LoadedAssets;
 }
 
+#if WITH_ENGINE
 UTexture2D* FAssetManager::LoadTextureByPath(const FString& InTexturePath, bool bEnsured)
 {
 	UTexture2D* Texture;
@@ -164,6 +167,7 @@ UTexture2D* FAssetManager::LoadTextureByPath(const FString& InTexturePath, bool 
 	ensureEditorMsgf(!bEnsured || Texture, FString::Printf(TEXT("Failed to load texture for path %s!"), *InTexturePath), EDC_Asset, EDV_Error);
 	return Texture;
 }
+#endif
 
 void FAssetManager::ReleaseRuntimeData()
 {
