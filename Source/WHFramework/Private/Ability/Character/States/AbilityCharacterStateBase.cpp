@@ -12,9 +12,9 @@ void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStat
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterStateBase::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)

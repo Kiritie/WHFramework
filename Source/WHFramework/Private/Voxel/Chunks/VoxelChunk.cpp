@@ -78,7 +78,6 @@ FSaveData* AVoxelChunk::ToData()
 	SaveData = FVoxelChunkSaveData();
 
 	SaveData.Index = Index;
-	SaveData.bBuilded = bBuilded;
 	SaveData.bGenerated = bGenerated;
 
 	for(auto& Iter : VoxelMap)
@@ -92,6 +91,7 @@ FSaveData* AVoxelChunk::ToData()
 			SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
 		}
 	}
+	
 	if(!bChanged && UVoxelModule::Get().GetWorldData().IsExistChunkData(Index))
 	{
 		SaveData.VoxelDatas = UVoxelModule::Get().GetWorldData().GetChunkData(Index)->VoxelDatas;
@@ -954,7 +954,6 @@ bool AVoxelChunk::AddSceneActor(AActor* InActor)
 			}
 			Execute_SetContainer(InActor, this);
 		}
-		// InActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 		return true;
 	}
 	return false;
@@ -967,7 +966,6 @@ bool AVoxelChunk::RemoveSceneActor(AActor* InActor)
 	if(SceneActorMap.Contains(Execute_GetActorID(InActor)))
 	{
 		SceneActorMap.Remove(Execute_GetActorID(InActor));
-		// InActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		if(Execute_GetContainer(InActor) == this)
 		{
 			Execute_SetContainer(InActor, nullptr);
@@ -980,7 +978,7 @@ bool AVoxelChunk::RemoveSceneActor(AActor* InActor)
 void AVoxelChunk::GenerateSceneActors()
 {
 	auto& WorldData = UVoxelModule::Get().GetWorldData();
-	if(WorldData.IsGenerateChunkData(Index))
+	if(WorldData.IsChunkGenerated(Index))
 	{
 		LoadSceneActors(WorldData.GetChunkData(Index));
 	}

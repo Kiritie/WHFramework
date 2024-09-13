@@ -14,9 +14,9 @@ void UAbilityVitalityState_Default::OnInitialize(UFSMComponent* InFSM, int32 InS
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityVitalityState_Default::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityVitalityState_Default::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityVitalityState_Default::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)

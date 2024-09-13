@@ -1,12 +1,14 @@
 #include "Voxel/Datas/VoxelData.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()
 {
 	Type = FName("Voxel");
 	MaxCount = 64;
+	PickUpClass = AAbilityPickUpVoxel::StaticClass();
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
@@ -67,7 +69,7 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 {
 	if(Sounds.Contains(InSoundType))
 	{
-		Sounds[InSoundType];
+		return Sounds[InSoundType];
 	}
 	return nullptr;
 }
@@ -85,6 +87,11 @@ bool UVoxelData::IsEmpty() const
 bool UVoxelData::IsUnknown() const
 {
 	return VoxelType == EVoxelType::Unknown;
+}
+
+bool UVoxelData::IsMainPart() const
+{
+	return bMainPart;
 }
 
 bool UVoxelData::IsCustom() const

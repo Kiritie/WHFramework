@@ -27,6 +27,9 @@ public:
 	virtual void OnDestroy(bool bRecovery) override;
 
 protected:
+	virtual void NativePreConstruct() override;
+
+protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UHorizontalBox* Box_KeyIcon;
 
@@ -36,7 +39,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UCommonTextBlockN* Txt_KeyCode;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UCommonTextBlockN* Txt_DisplayName;
+
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KeyMapping")
+	FText KeyDisplayName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KeyMapping")
 	FString KeyMappingName;
 };

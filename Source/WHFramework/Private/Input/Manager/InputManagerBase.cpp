@@ -19,6 +19,10 @@ void UInputManagerBase::OnInitialize()
 	FInputManager::Get().AddInputManager(this);
 }
 
+void UInputManagerBase::OnReset()
+{
+}
+
 void UInputManagerBase::OnRefresh(float DeltaSeconds)
 {
 	K2_OnRefresh(DeltaSeconds);

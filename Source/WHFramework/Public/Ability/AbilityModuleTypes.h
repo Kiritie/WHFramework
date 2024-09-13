@@ -5,6 +5,7 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Common/CommonStatics.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -763,8 +764,15 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void AddItem(const FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes)
+	virtual void AddItem(const FAbilityItem& InItem, TArray<ESlotSplitType> InSplitTypes, bool bUnique = true)
 	{
+		if(InSplitTypes.IsEmpty())
+		{
+			for(int32 i = 1; i < UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.ESlotSplitType")); i++)
+			{
+				InSplitTypes.Add((ESlotSplitType)i);
+			}
+		}
 		for(const auto& Iter : InSplitTypes)
 		{
 			if(SplitItems.Contains(Iter))
@@ -772,6 +780,7 @@ public:
 				FAbilityItems& tmpItems = SplitItems[Iter];
 				for(int32 i = 0; i < tmpItems.Items.Num(); i++)
 				{
+					if(bUnique && tmpItems.Items[i].EqualType(InItem)) return;
 					if(!tmpItems.Items[i].IsValid())
 					{
 						tmpItems.Items[i] = InItem;

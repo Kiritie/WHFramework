@@ -33,6 +33,7 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(TEXT("Widget"));
 	WidgetComponent->SetupAttachment(GetCapsuleComponent());
 	WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+	WidgetComponent->SetOrientCamera(true);
 	
 	static ConstructorHelpers::FClassFinder<UWidgetAbilitySpawnerInfo> SpawnerInfoClassFinder(TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Ability/Blueprints/Widget/WBP_SpawnerInfo_Base.WBP_SpawnerInfo_Base_C'"));
 	if(SpawnerInfoClassFinder.Succeeded())
@@ -53,7 +54,9 @@ void AAbilitySpawnerBase::OnInitialize_Implementation()
 
 void AAbilitySpawnerBase::OnPreparatory_Implementation(EPhase InPhase)
 {
+#if WITH_EDITORONLY_DATA
 	WidgetComponent->SetVisibility(false);
+#endif
 
 	if(bAutoSpawn)
 	{

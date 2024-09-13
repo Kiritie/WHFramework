@@ -15,6 +15,7 @@ UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectI
 	Box_KeyIcon = nullptr;
 	Border_KeyCode = nullptr;
 	Txt_KeyCode = nullptr;
+	Txt_DisplayName = nullptr;
 }
 
 void UWidgetKeyTipsItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -74,6 +75,7 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 		}
 	)
 	KeyCode.RemoveFromEnd(TEXT("."));
+	KeyCode.RemoveFromEnd(TEXT("/"));
 
 	if(Box_KeyIcon->GetChildrenCount() > 1)
 	{
@@ -91,4 +93,15 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 void UWidgetKeyTipsItemBase::OnDestroy(bool bRecovery)
 {
 	Super::OnDestroy(bRecovery);
+}
+
+void UWidgetKeyTipsItemBase::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	if(Txt_DisplayName)
+	{
+		Txt_DisplayName->SetText(KeyDisplayName);
+		Txt_DisplayName->SetVisibility(KeyDisplayName.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
 }

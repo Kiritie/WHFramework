@@ -534,9 +534,6 @@ public:
 	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool bBuilded;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bGenerated;
 
 	FORCEINLINE FVoxelChunkSaveData()
@@ -545,7 +542,6 @@ public:
 		VoxelDatas = TEXT("");
 		PickUpDatas = TArray<FPickUpSaveData>();
 		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
-		bBuilded = false;
 		bGenerated = false;
 	}
 
@@ -561,11 +557,6 @@ public:
 		{
 			Iter.MakeSaved();
 		}
-	}
-
-	bool HasVoxelData() const
-	{
-		return !VoxelDatas.IsEmpty();
 	}
 };
 
@@ -708,24 +699,6 @@ public:
 	
 public:
 	virtual bool IsExistChunkData(FIndex InChunkIndex) const { return false; }
-	
-	virtual bool IsBuildChunkData(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return ChunkData->bBuilded;
-		}
-		return false;
-	}
-	
-	virtual bool IsGenerateChunkData(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return ChunkData->bGenerated;
-		}
-		return false;
-	}
 
 	template<class T>
 	T* GetChunkData(FIndex InChunkIndex)
@@ -736,6 +709,24 @@ public:
 	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) { return nullptr; }
 
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
+	
+	virtual bool IsChunkGenerated(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return ChunkData->bGenerated;
+		}
+		return false;
+	}
+	
+	virtual bool IsChunkHasVoxelData(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return !ChunkData->VoxelDatas.IsEmpty();
+		}
+		return false;
+	}
 };
 
 USTRUCT(BlueprintType)

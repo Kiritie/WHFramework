@@ -4,7 +4,8 @@
 
 #include "AbilityEquipDataBase.generated.h"
 
-class AAbilityPickUpEquip;
+class AAbilityEquipBase;
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityEquipDataBase : public UAbilityItemDataBase
 {
@@ -16,7 +17,4 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityEquipBase> EquipClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPickUpEquip> EquipPickUpClass;
 };

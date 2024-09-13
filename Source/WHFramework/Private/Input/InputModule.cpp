@@ -164,6 +164,11 @@ void UInputModule::OnReset()
 {
 	Super::OnReset();
 
+	for(auto Iter : InputManagerRefs)
+	{
+		Iter.Value->OnReset();
+	}
+
 	TouchPressedCount = 0;
 }
 

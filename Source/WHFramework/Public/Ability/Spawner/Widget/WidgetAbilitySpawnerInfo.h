@@ -8,7 +8,7 @@
 #include "WidgetAbilitySpawnerInfo.generated.h"
 
 /**
- * ������Ѫ��
+ * 
  */
 UCLASS()
 class WHFRAMEWORK_API UWidgetAbilitySpawnerInfo : public UWorldWidgetBase

@@ -147,16 +147,19 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
-	for(auto Iter : SaveData.TaskItemMap)
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		if(GetTaskMap().Contains(Iter.Key))
+		for(auto Iter : SaveData.TaskItemMap)
 		{
-			GetTaskMap()[Iter.Key]->LoadSaveData(&Iter.Value);
+			if(GetTaskMap().Contains(Iter.Key))
+			{
+				GetTaskMap()[Iter.Key]->LoadSaveData(&Iter.Value);
+			}
 		}
-	}
-	if(!CurrentTask)
-	{
-		EnterTask(GetFirstTask());
+		if(!CurrentTask)
+		{
+			EnterTask(GetFirstTask());
+		}
 	}
 }
 

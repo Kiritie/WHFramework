@@ -18,7 +18,4 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	UAnimMontage* AnimMontage;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	bool bAutoEndAbility;
 };

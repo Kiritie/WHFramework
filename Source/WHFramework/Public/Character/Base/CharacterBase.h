@@ -276,6 +276,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
 	
+	virtual AAIControllerBase* GetAIController() const override;
+
 	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
 
 	//////////////////////////////////////////////////////////////////////////

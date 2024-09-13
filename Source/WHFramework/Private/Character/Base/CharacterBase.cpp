@@ -4,6 +4,7 @@
 #include "Character/Base/CharacterBase.h"
 
 #include "AIController.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Asset/AssetModuleStatics.h"
@@ -487,6 +488,11 @@ UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const
 {
 	return nullptr;
+}
+
+AAIControllerBase* ACharacterBase::GetAIController() const
+{
+	return GetController<AAIControllerBase>();
 }
 
 FVector ACharacterBase::GetMoveVelocity(bool bIgnoreZ) const

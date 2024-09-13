@@ -33,9 +33,9 @@ public:
 
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
 	
-	virtual void ClearHitTargets();
+	virtual void ClearHitTargets() override;
 
-	virtual void SetHitAble(bool bValue);
+	virtual void SetHitAble(bool bValue) override;
 
 public:
 	UFUNCTION(BlueprintPure)

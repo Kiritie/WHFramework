@@ -51,3 +51,8 @@ void UAIServiceBase::OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* N
 {
 	Super::OnCeaseRelevant(OwnerComp, NodeMemory);
 }
+
+APawn* UAIServiceBase::GetAgent(TSubclassOf<APawn> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
+}

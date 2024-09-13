@@ -19,9 +19,9 @@ void UAbilityCharacterState_Static::OnInitialize(UFSMComponent* InFSM, int32 InS
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Static::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Static::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)

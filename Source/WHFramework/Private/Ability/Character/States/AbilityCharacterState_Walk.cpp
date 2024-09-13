@@ -17,9 +17,9 @@ void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InSta
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Walk::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Walk::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -43,9 +43,9 @@ void UAbilityCharacterState_Walk::OnRefresh(float DeltaSeconds)
 	Super::OnRefresh(DeltaSeconds);
 }
 
-bool UAbilityCharacterState_Walk::OnLeaveValidate(UFiniteStateBase* InNextState)
+bool UAbilityCharacterState_Walk::OnPreLeave(UFiniteStateBase* InNextState)
 {
-	return Super::OnLeaveValidate(InNextState);
+	return Super::OnPreLeave(InNextState);
 }
 
 void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextState)

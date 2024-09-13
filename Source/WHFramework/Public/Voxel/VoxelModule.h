@@ -142,7 +142,14 @@ public:
 
 	virtual void DestroyChunk(FIndex InIndex);
 
+public:
+	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
+
+	virtual void DestroyChunkQueues();
+
 protected:
+	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
+
 	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 	
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
@@ -150,7 +157,6 @@ protected:
 public:
 	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
 
-public:
 	virtual AVoxelChunk* FindChunkByIndex(FIndex InIndex) const;
 
 	virtual AVoxelChunk* FindChunkByLocation(FVector InLocation) const;
@@ -196,14 +202,6 @@ public:
 	virtual bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
 
 	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
-
-public:
-	void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
-
-	void DestroyChunkQueues();
-
-protected:
-	bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")

@@ -17,9 +17,9 @@ void UAbilityCharacterState_Jump::OnInitialize(UFSMComponent* InFSM, int32 InSta
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Jump::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Jump::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -30,8 +30,6 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 	
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
 
-	Character->Jump();
-
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
@@ -40,6 +38,8 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 			Character->GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
 		}
 	}
+
+	Character->Jump();
 }
 
 void UAbilityCharacterState_Jump::OnRefresh(float DeltaSeconds)

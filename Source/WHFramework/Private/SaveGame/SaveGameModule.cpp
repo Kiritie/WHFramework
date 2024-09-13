@@ -272,7 +272,7 @@ USaveGameBase* USaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> I
 
 USaveGameBase* USaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	return USaveGameModuleStatics::HasSaveGame(InClass, InIndex) ? USaveGameModuleStatics::LoadSaveGame(InClass, InIndex, EPhase::Primary) : USaveGameModuleStatics::CreateSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModuleStatics::HasSaveGame(InClass, InIndex) ? USaveGameModuleStatics::LoadSaveGame(InClass, InIndex, InPhase) : USaveGameModuleStatics::CreateSaveGame(InClass, InIndex, InPhase);
 }
 
 bool USaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
@@ -349,7 +349,7 @@ USaveGameBase* USaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	{
 		if(PHASEC(InPhase, EPhase::Primary))
 		{
-			UnloadSaveGame(InClass, -1, InPhase);
+			UnloadSaveGame(InClass, -1, EPhase::Primary);
 		}
 		SaveGame->bLoaded = true;
 		if(PHASEC(InPhase, EPhase::All))

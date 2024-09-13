@@ -12,9 +12,9 @@ void UAbilityPawnStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateInde
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityPawnStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityPawnStateBase::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityPawnStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)

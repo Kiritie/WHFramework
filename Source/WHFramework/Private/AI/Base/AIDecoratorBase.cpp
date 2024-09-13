@@ -45,3 +45,8 @@ void UAIDecoratorBase::OnNodeProcessed(FBehaviorTreeSearchData& SearchData, EBTN
 {
 	Super::OnNodeProcessed(SearchData, NodeResult);
 }
+
+APawn* UAIDecoratorBase::GetAgent(TSubclassOf<APawn> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
+}

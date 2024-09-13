@@ -63,5 +63,7 @@ public:
 
 	bool IsUnknown() const;
 
+	bool IsMainPart() const;
+
 	bool IsCustom() const;
 };

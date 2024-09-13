@@ -5,6 +5,8 @@
 
 #include "AbilityItemDataBase.generated.h"
 
+class AAbilityPickUpBase;
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityItemDataBase : public UPrimaryAssetBase
 {
@@ -37,6 +39,9 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<class UItemAbilityBase> AbilityClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AAbilityPickUpBase> PickUpClass;
 	
 	UPROPERTY(Transient)
 	UMaterialInterface* IconSourceMat;

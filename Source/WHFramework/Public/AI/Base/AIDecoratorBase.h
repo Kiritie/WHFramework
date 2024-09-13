@@ -53,5 +53,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const;
 };

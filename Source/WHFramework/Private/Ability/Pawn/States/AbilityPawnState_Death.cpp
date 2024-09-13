@@ -16,9 +16,9 @@ void UAbilityPawnState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIn
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityPawnState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityPawnState_Death::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)

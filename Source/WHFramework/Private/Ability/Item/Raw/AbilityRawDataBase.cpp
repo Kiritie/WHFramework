@@ -5,5 +5,5 @@ UAbilityRawDataBase::UAbilityRawDataBase()
 	Type = FName("Raw");
 	MaxCount = 10;
 	RawClass = nullptr;
-	RawPickUpClass = nullptr;
+	PickUpClass = nullptr;
 }

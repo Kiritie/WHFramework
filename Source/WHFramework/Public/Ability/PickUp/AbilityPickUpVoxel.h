@@ -17,15 +17,15 @@ class WHFRAMEWORK_API AAbilityPickUpVoxel : public AAbilityPickUpBase
 public:
 	AAbilityPickUpVoxel();
 
-protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* MeshComponent;
-
 public:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
+
+protected:
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UVoxelMeshComponent* MeshComponent;
 
 public:
 	virtual UMeshComponent* GetMeshComponent() const override;

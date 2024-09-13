@@ -73,6 +73,8 @@ public:
 	virtual void StopBehaviorTree();
 
 public:
+	bool IsRunningBehaviorTree() const;
+
 	UBehaviorTree* GetBehaviorTree() const { return CurrentBehaviorTree; }
 
 	template<class T>
@@ -84,6 +86,4 @@ public:
 	UAIBlackboardBase* GetBlackboard() const { return CurrentBlackboard; }
 
 	UBehaviorTreeComponent* GetBehaviorTreeComponent() const;
-
-	bool IsRunningBehaviorTree() const;
 };

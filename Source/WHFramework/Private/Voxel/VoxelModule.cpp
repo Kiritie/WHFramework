@@ -46,23 +46,25 @@ UVoxelModule::UVoxelModule()
 
 	ModuleDependencies = { FName("AbilityModule"), FName("AudioModule"), FName("SceneModule") };
 
+	VoxelCapture = nullptr;
+	
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
 	WorldBasicData = FVoxelWorldBasicSaveData();
 
-	WorldData = UVoxelModule::NewWorldData();
+	WorldData = nullptr;
 
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
 	ChunkSpawnDistance = 2;
 	ChunkQueues = {
-		{EVoxelWorldState::Spawn, TArray{FVoxelChunkQueue(false, 100)}},
-		{EVoxelWorldState::Destroy, TArray{FVoxelChunkQueue(false, 1)}},
-		{EVoxelWorldState::Generate, TArray{FVoxelChunkQueue(false, 1)}},
-		{EVoxelWorldState::MapLoad, TArray{FVoxelChunkQueue(true, 100)}},
-		{EVoxelWorldState::MapBuild, TArray{FVoxelChunkQueue(true, 100), FVoxelChunkQueue(false, 100)}},
-		{EVoxelWorldState::MeshBuild, TArray{FVoxelChunkQueue(true, 100)}},
+		{ EVoxelWorldState::Spawn, TArray{ FVoxelChunkQueue(false, 100) } },
+		{ EVoxelWorldState::Destroy, TArray{ FVoxelChunkQueue(false, 10) } },
+		{ EVoxelWorldState::Generate, TArray{ FVoxelChunkQueue(false, 1) } },
+		{ EVoxelWorldState::MapLoad, TArray{ FVoxelChunkQueue(true, 100) } },
+		{ EVoxelWorldState::MapBuild, TArray{ FVoxelChunkQueue(true, 100), FVoxelChunkQueue(false, 100) } },
+		{ EVoxelWorldState::MeshBuild, TArray{ FVoxelChunkQueue(true, 100) } },
 	};
 
 	ChunkSpawnBatch = 0;
@@ -231,22 +233,19 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 
 void UVoxelModule::Load_Implementation()
 {
-	if(bAutoGenerate)
+	if(bModuleAutoSave)
 	{
-		Super::Load_Implementation();
-		if(!bModuleAutoSave)
-		{
-			LoadSaveData(NewWorldData());
-		}
+		USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0, bAutoGenerate ? EPhase::All : EPhase::Primary);
+	}
+	else if(!WorldData)
+	{
+		LoadSaveData(NewWorldData(), bAutoGenerate ? EPhase::All : EPhase::Primary);
 	}
 }
 
 void UVoxelModule::Save_Implementation()
 {
-	if(bAutoGenerate)
-	{
-		Super::Save_Implementation();
-	}
+	Super::Save_Implementation();
 }
 
 FString UVoxelModule::GetModuleDebugMessage()
@@ -300,8 +299,6 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SetWorldMode(EVoxelWorldMode::Preview);
-
 		WorldData = NewWorldData(InSaveData);
 
 		WorldData->RenderDatas = WorldBasicData.RenderDatas;
@@ -317,7 +314,8 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		
 		int32 ItemIndex = 0;
 		ITER_ARRAY(UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
-			if(Item->IsUnknown() || !Item->bMainPart) continue;
+			if(Item->IsUnknown() || !Item->IsMainPart()) continue;
+			
 			AVoxelEntityPreview* VoxelEntity;
 			if(PreviewVoxels.IsValidIndex(ItemIndex))
 			{
@@ -341,6 +339,10 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			ItemIndex++;
 		)
 	}
+	if(PHASEC(InPhase, EPhase::Lesser))
+	{
+		SetWorldMode(EVoxelWorldMode::Preview);
+	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SetWorldMode(EVoxelWorldMode::Default);
@@ -350,12 +352,14 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			Iter.Value->Generate(EPhase::Final);
 		}
 	}
-
-	if(SaveData.SceneData.WeatherData.WeatherSeed == 0)
+	if(PHASEC(InPhase, EPhase::All))
 	{
-		SaveData.SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
+		if(SaveData.SceneData.WeatherData.WeatherSeed == 0)
+		{
+			SaveData.SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
+		}
+		USceneModule::Get().LoadSaveData(&SaveData.SceneData, InPhase);
 	}
-	USceneModule::Get().LoadSaveData(&SaveData.SceneData, InPhase);
 }
 
 FSaveData* UVoxelModule::ToData()
@@ -389,6 +393,7 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		{
 			UObjectPoolModuleStatics::DespawnObject(Iter.Value);
 		}
+		
 		ChunkMap.Empty();
 
 		ChunkSpawnBatch = 0;
@@ -411,8 +416,13 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 
 void UVoxelModule::GenerateWorld()
 {
+	// Destroy chunk
+	if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
+	{
+		SetWorldState(EVoxelWorldState::Destroy);
+	}
 	// Spawn chunk
-	if(UpdateChunkQueue(EVoxelWorldState::Spawn, [this](FIndex Index, int32 Stage){ SpawnChunk(Index); }))
+	else if(UpdateChunkQueue(EVoxelWorldState::Spawn, [this](FIndex Index, int32 Stage){ SpawnChunk(Index); }))
 	{
 		SetWorldState(EVoxelWorldState::Spawn);
 	}
@@ -435,11 +445,6 @@ void UVoxelModule::GenerateWorld()
 	else if(UpdateChunkQueue(EVoxelWorldState::Generate, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
 	{
 		SetWorldState(EVoxelWorldState::Generate);
-	}
-	// Destroy chunk
-	if(UpdateChunkQueue(EVoxelWorldState::Destroy, [this](FIndex Index, int32 Stage){ DestroyChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Destroy);
 	}
 }
 
@@ -483,13 +488,9 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		{
 			if(IsOnTheWorld(InIndex, false))
 			{
-				if(WorldData->IsExistChunkData(InIndex) && WorldData->GetChunkData(InIndex)->HasVoxelData())
+				if(WorldData->IsChunkHasVoxelData(InIndex))
 				{
 					AddToChunkQueue(EVoxelWorldState::MapLoad, InIndex);
-					if(!WorldData->IsBuildChunkData(InIndex))
-					{
-						AddToChunkQueue(EVoxelWorldState::MapBuild, InIndex);
-					}
 				}
 				else
 				{
@@ -546,6 +547,108 @@ void UVoxelModule::DestroyChunk(FIndex InIndex)
 		UObjectPoolModuleStatics::DespawnObject(Chunk);
 		ChunkMap.Remove(InIndex);
 	}
+}
+
+void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
+{
+	if(bForce) DestroyChunkQueues();
+	FIndex GenerateIndex = FIndex::ZeroIndex;
+	FVector GenerateOffset = FVector::ZeroVector;
+	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonStatics::GetPlayerController()->GetViewTarget());
+	if(bFromAgent && VoxelAgent)
+	{
+		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f, 0.f);
+		GenerateIndex = LocationToChunkIndex(AgentLocation);
+		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector()).GetAbs();
+	}
+	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f) || WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f)))
+	{
+		TArray<FIndex> DestroyQueue;
+		ChunkMap.GenerateKeyArray(DestroyQueue);
+		const FVector SpawnRange = FVector(WorldData->GetWorldSize().X * 0.5f, WorldData->GetWorldSize().Y * 0.5f, WorldData->GetWorldSize().Z);
+		for(int32 x = GenerateIndex.X - SpawnRange.X; x < GenerateIndex.X + SpawnRange.X; x++)
+		{
+			for(int32 y = GenerateIndex.Y - SpawnRange.Y; y < GenerateIndex.Y + SpawnRange.Y; y++)
+			{
+				for(int32 z = 0; z < SpawnRange.Z; z++)
+				{
+					const FIndex Index = FIndex(x, y, z);
+					if(DestroyQueue.Contains(Index))
+					{
+						DestroyQueue.Remove(Index);
+					}
+					AddToChunkQueue(EVoxelWorldState::Spawn, Index);
+				}
+			}
+		}
+		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroy, Item););
+		ChunkGenerateIndex = GenerateIndex;
+		ChunkSpawnBatch++;
+	}
+}
+
+void UVoxelModule::DestroyChunkQueues()
+{
+	ITER_MAP(ChunkQueues, Item1,
+		ITER_ARRAY(Item1.Value.Queues, Item2,
+			Item2.Queue.Empty();
+			ITER_ARRAY(Item2.Tasks, Item3,
+				Item3->EnsureCompletion();
+				delete Item3;
+			)
+			Item2.Tasks.Empty();
+		)
+	)
+}
+
+bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc)
+{
+	ITER_ARRAY_WITHINDEX(ChunkQueues[InState].Queues, i, Item,
+		if(Item.bAsync)
+		{
+			if(Item.Tasks.Num() == 0 && Item.Queue.Num() > 0)
+			{
+				DON_WITHINDEX(FMath::CeilToInt((float)Item.Queue.Num() / Item.Speed), j,
+					TArray<FIndex> tmpQueue;
+					DON_WITHINDEX(FMath::Min(Item.Speed, Item.Queue.Num() - j * Item.Speed), k,
+						tmpQueue.Add(Item.Queue[j * Item.Speed + k]);
+					)
+					const auto Task = new FAsyncTask<AsyncTask_ChunkQueue>(tmpQueue, InFunc, i);
+					Item.Tasks.Add(Task);
+					Task->StartBackgroundTask();
+				)
+			}
+			else if(Item.Tasks.Num() > 0)
+			{
+				const auto tmpTasks = Item.Tasks;
+				ITER_ARRAY(tmpTasks, Task,
+					if(Task->IsDone())
+					{
+						ITER_ARRAY(Task->GetTask().GetChunkQueue(), Index,
+							Item.Queue.Remove(Index);
+						)
+						Item.Tasks.Remove(Task);
+						delete Task;
+					}
+				)
+			}
+			if(Item.Queue.Num() > 0 || Item.Tasks.Num() > 0)
+			{
+				return true;
+			}
+		}
+		else
+		{
+			const int32 tmpNum = FMath::Min(Item.Speed, Item.Queue.Num());
+			DON_WITHINDEX(tmpNum, j, InFunc(Item.Queue[j], i); )
+			Item.Queue.RemoveAt(0, tmpNum);
+			if(Item.Queue.Num() > 0)
+			{
+				return true;
+			}
+		}
+	)
+	return false;
 }
 
 void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
@@ -831,108 +934,6 @@ bool UVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, f
 			}
 		}
 	}
-	return false;
-}
-
-void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
-{
-	if(bForce) DestroyChunkQueues();
-	FIndex GenerateIndex = FIndex::ZeroIndex;
-	FVector GenerateOffset = FVector::ZeroVector;
-	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonStatics::GetPlayerController()->GetViewTarget());
-	if(bFromAgent && VoxelAgent)
-	{
-		const FVector AgentLocation = FVector(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f, 0.f);
-		GenerateIndex = LocationToChunkIndex(AgentLocation);
-		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector()).GetAbs();
-	}
-	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f) || WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f)))
-	{
-		TArray<FIndex> DestroyQueue;
-		ChunkMap.GenerateKeyArray(DestroyQueue);
-		const FVector SpawnRange = FVector(WorldData->GetWorldSize().X * 0.5f, WorldData->GetWorldSize().Y * 0.5f, WorldData->GetWorldSize().Z);
-		for(int32 x = GenerateIndex.X - SpawnRange.X; x < GenerateIndex.X + SpawnRange.X; x++)
-		{
-			for(int32 y = GenerateIndex.Y - SpawnRange.Y; y < GenerateIndex.Y + SpawnRange.Y; y++)
-			{
-				for(int32 z = 0; z < SpawnRange.Z; z++)
-				{
-					const FIndex Index = FIndex(x, y, z);
-					if(DestroyQueue.Contains(Index))
-					{
-						DestroyQueue.Remove(Index);
-					}
-					AddToChunkQueue(EVoxelWorldState::Spawn, Index);
-				}
-			}
-		}
-		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroy, Item););
-		ChunkGenerateIndex = GenerateIndex;
-		ChunkSpawnBatch++;
-	}
-}
-
-void UVoxelModule::DestroyChunkQueues()
-{
-	ITER_MAP(ChunkQueues, Item1,
-		ITER_ARRAY(Item1.Value.Queues, Item2,
-			Item2.Queue.Empty();
-			ITER_ARRAY(Item2.Tasks, Item3,
-				Item3->EnsureCompletion();
-				delete Item3;
-			)
-			Item2.Tasks.Empty();
-		)
-	)
-}
-
-bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc)
-{
-	ITER_ARRAY_WITHINDEX(ChunkQueues[InState].Queues, i, Item,
-		if(Item.bAsync)
-		{
-			if(Item.Tasks.Num() == 0 && Item.Queue.Num() > 0)
-			{
-				DON_WITHINDEX(FMath::CeilToInt((float)Item.Queue.Num() / Item.Speed), j,
-					TArray<FIndex> tmpQueue;
-					DON_WITHINDEX(FMath::Min(Item.Speed, Item.Queue.Num() - j * Item.Speed), k,
-						tmpQueue.Add(Item.Queue[j * Item.Speed + k]);
-					)
-					const auto Task = new FAsyncTask<AsyncTask_ChunkQueue>(tmpQueue, InFunc, i);
-					Item.Tasks.Add(Task);
-					Task->StartBackgroundTask();
-				)
-			}
-			else if(Item.Tasks.Num() > 0)
-			{
-				const auto tmpTasks = Item.Tasks;
-				ITER_ARRAY(tmpTasks, Task,
-					if(Task->IsDone())
-					{
-						ITER_ARRAY(Task->GetTask().GetChunkQueue(), Index,
-							Item.Queue.Remove(Index);
-						)
-						Item.Tasks.Remove(Task);
-						delete Task;
-					}
-				)
-			}
-			if(Item.Queue.Num() > 0 || Item.Tasks.Num() > 0)
-			{
-				return true;
-			}
-		}
-		else
-		{
-			const int32 tmpNum = FMath::Min(Item.Speed, Item.Queue.Num());
-			DON_WITHINDEX(tmpNum, j, InFunc(Item.Queue[j], i); )
-			Item.Queue.RemoveAt(0, tmpNum);
-			if(Item.Queue.Num() > 0)
-			{
-				return true;
-			}
-		}
-	)
 	return false;
 }
 

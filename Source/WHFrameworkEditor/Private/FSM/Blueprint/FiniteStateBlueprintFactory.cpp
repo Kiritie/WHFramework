@@ -21,10 +21,10 @@ UFiniteStateBlueprintFactory::UFiniteStateBlueprintFactory(const FObjectInitiali
 	DefaultEventGraph = FName("Finite State Graph");
 
 	DefaultEventNodes.Add(FName("K2_OnInitialize"));
-	DefaultEventNodes.Add(FName("K2_OnEnterValidate"));
+	DefaultEventNodes.Add(FName("K2_OnPreEnter"));
 	DefaultEventNodes.Add(FName("K2_OnEnter"));
 	DefaultEventNodes.Add(FName("K2_OnRefresh"));
-	DefaultEventNodes.Add(FName("K2_OnLeaveValidate"));
+	DefaultEventNodes.Add(FName("K2_OnPreLeave"));
 	DefaultEventNodes.Add(FName("K2_OnLeave"));
 	DefaultEventNodes.Add(FName("K2_OnTermination"));
 }

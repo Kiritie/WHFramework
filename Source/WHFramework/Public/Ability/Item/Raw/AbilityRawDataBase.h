@@ -4,8 +4,8 @@
 
 #include "AbilityRawDataBase.generated.h"
 
-class AAbilityPickUpRaw;
 class AAbilityRawBase;
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityRawDataBase : public UAbilityItemDataBase
 {
@@ -17,7 +17,4 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityRawBase> RawClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPickUpRaw> RawPickUpClass;
 };

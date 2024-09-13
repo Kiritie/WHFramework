@@ -57,6 +57,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	float StartRotatingThreshold = 0.85f;
 
+	// 旋转平滑速度
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
+	float RotatingSmoothnessSpeed = 9.f;
+
 	// Target LockOn Widget指示器是否应该自动绘制和附加
 	//
 	// 当设置为false时，这允许您手动绘制小部件，以进一步控制您希望它出现的位置

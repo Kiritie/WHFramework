@@ -113,9 +113,9 @@ bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParamet
 	
 	UFiniteStateBase* LastState = CurrentState;
 
-	if(!LastState || LastState->OnLeaveValidate(InState))
+	if(!LastState || LastState->OnPreLeave(InState))
 	{
-		if(!InState || InState->OnEnterValidate(LastState, InParams))
+		if(!InState || InState->OnPreEnter(LastState, InParams))
 		{
 			TargetState = InState;
 			if(LastState)

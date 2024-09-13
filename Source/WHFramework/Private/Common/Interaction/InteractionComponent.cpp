@@ -42,7 +42,7 @@ void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponen
 
 bool UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
 {
-	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
+	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || GetInteractionAgent()->GetInteractableActions(InInteractionAgent).IsEmpty() || GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
 	
 	GetInteractionAgent()->GetOverlappingAgents().Add(InInteractionAgent);
 	if(!GetInteractionAgent()->GetInteractingAgent())

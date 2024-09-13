@@ -3,6 +3,7 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
+#include "Camera/CameraModuleStatics.h"
 #include "Common/CommonStatics.h"
 #include "Scene/SceneManager.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -18,7 +19,7 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 #endif
 
 	bAutoCreate = true;
-	bOrientCamera = true;
+	bOrientCamera = false;
 	bBindToSelf = true;
 	WidgetParams = TArray<FParameter>();
 	WidgetPoints = TMap<FName, USceneComponent*>();
@@ -65,7 +66,11 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	if(bOrientCamera)
 	{
-		SetWorldRotation(FSceneManager::Get().GetActiveViewportViewRotation());
+#if WITH_EDITOR
+		SetWorldRotation(GIsPlaying ? UCameraModuleStatics::GetCameraRotation(true) : FSceneManager::Get().GetActiveViewportViewRotation());
+#else
+		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
+#endif
 		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
 	}
 	else

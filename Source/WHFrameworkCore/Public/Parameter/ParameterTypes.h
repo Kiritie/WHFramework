@@ -3,13 +3,7 @@
 #pragma once
 
 #include "Json.h"
-#if WITH_ENGINE
 #include "GameplayTagContainer.h"
-#else 
-#include "ParameterNoEngineTypes.h"
-using FGameplayTag = FGameplayTagN;
-using FGameplayTagContainer = FGameplayTagContainerN;
-#endif
 #include "WHFrameworkCoreTypes.h"
 
 #include "ParameterTypes.generated.h"

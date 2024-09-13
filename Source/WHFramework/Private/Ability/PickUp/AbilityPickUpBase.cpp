@@ -20,12 +20,13 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
-	BoxComponent->SetBoxExtent(FVector(10.f));
+	BoxComponent->SetBoxExtent(FVector(15.f));
+	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnOverlap);
 
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(FName("InteractionComponent"));
 	InteractionComponent->SetupAttachment(RootComponent);
 	InteractionComponent->SetBoxExtent(FVector(50.f));
-	InteractionComponent->SetInteractable(true);
+	InteractionComponent->SetInteractable(false);
 	InteractionComponent->AddInteractAction(EInteractAction::PickUp);
 
 	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
@@ -48,14 +49,18 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	InteractionComponent->SetInteractable(true);
 }
 
 void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+
 	Item = FAbilityItem::Empty;
 
 	FollowingComponent->SetFollowingTarget(nullptr);
+	InteractionComponent->SetInteractable(false);
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -91,7 +96,7 @@ bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteract
 	{
 		case EInteractAction::PickUp:
 		{
-			return true;
+			return Item.IsValid();
 		}
 		default: break;
 	}
@@ -124,20 +129,28 @@ void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteracti
 	}
 }
 
+FBox AAbilityPickUpBase::GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const
+{
+	return BoxComponent->Bounds.GetBox();
+}
+
 void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
 
 	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(OtherActor))
 	{
-		if(OtherComp->IsA<UInteractionComponent>())
+		if(Picker->IsAutoPickUp())
 		{
-			FallingComponent->SetActive(false);
-			FollowingComponent->SetFollowingTarget(OtherActor);
-		}
-		else
-		{
-			OnPickUp(Picker);
+			if(OtherComp->IsA<UInteractionComponent>())
+			{
+				FallingComponent->SetActive(false);
+				FollowingComponent->SetFollowingTarget(OtherActor);
+			}
+			else
+			{
+				OnPickUp(Picker);
+			}
 		}
 	}
 }

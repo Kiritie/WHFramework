@@ -8,6 +8,8 @@ UWidgetUIMaskBase::UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer
 	WidgetType = EWidgetType::Permanent;
 	bWidgetPenetrable = false;
 	WidgetInputMode = EInputMode::UIOnly;
+
+	SetIsFocusable(true);
 }
 
 void UWidgetUIMaskBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)

@@ -103,3 +103,8 @@ void UAIBlackboardBase::Refresh()
 {
 	OnRefresh();
 }
+
+APawn* UAIBlackboardBase::GetAgent(TSubclassOf<APawn> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
+}

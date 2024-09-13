@@ -5,24 +5,17 @@
 
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
-#include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Raw/AbilityRawDataBase.h"
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
-#include "Ability/PickUp/AbilityPickUpEquip.h"
-#include "Ability/PickUp/AbilityPickUpProp.h"
-#include "Ability/PickUp/AbilityPickUpRaw.h"
-#include "Ability/PickUp/AbilityPickUpSkill.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Item/Equip/AbilityEquipBase.h"
 #include "Ability/Item/Prop/AbilityPropBase.h"
 #include "Ability/Item/Raw/AbilityRawBase.h"
 #include "Ability/Item/Skill/AbilitySkillBase.h"
 #include "Asset/AssetModuleStatics.h"
-#include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -151,37 +144,10 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
+
+	const auto& ItemData = SaveData.Item.GetData<UAbilityItemDataBase>();
 	
-	AAbilityPickUpBase* PickUp = nullptr;
-	switch (SaveData.Item.GetType())
-	{
-		case EAbilityItemType::Voxel:
-		{
-			if(UVoxelModule::IsValid()) PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpVoxel>();
-			break;
-		}
-		case EAbilityItemType::Prop:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpProp>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Equip:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpEquip>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Skill:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpSkill>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Raw:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpRaw>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
-			break;
-		}
-		default: break;
-	}
+	AAbilityPickUpBase* PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpBase>(nullptr, nullptr, false, ItemData.PickUpClass);
 
 	if(PickUp)
 	{

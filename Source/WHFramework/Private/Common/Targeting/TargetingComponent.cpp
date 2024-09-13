@@ -542,7 +542,7 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 		}
 	}
 
-	return FMath::RInterpTo(ControlRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), 9.0f);
+	return RotatingSmoothnessSpeed > 0.f ? FMath::RInterpTo(ControlRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), RotatingSmoothnessSpeed) : TargetRotation;
 }
 
 void UTargetingComponent::SetControlRotationOnTarget(AActor* TargetActor) const

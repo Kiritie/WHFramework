@@ -380,6 +380,11 @@ UBehaviorTree* APawnBase::GetBehaviorTreeAsset() const
 	return nullptr;
 }
 
+AAIControllerBase* APawnBase::GetAIController() const
+{
+	return GetController<AAIControllerBase>();
+}
+
 FVector APawnBase::GetMoveVelocity(bool bIgnoreZ) const
 {
 	FVector Velocity = GetMovementComponent()->Velocity;

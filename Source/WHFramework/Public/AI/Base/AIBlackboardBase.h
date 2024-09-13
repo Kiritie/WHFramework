@@ -22,8 +22,6 @@ class WHFRAMEWORK_API UAIBlackboardBase : public UBlackboardData
 protected:
 	virtual void PostLoad() override;
 
-	
-
 protected:
 	virtual void OnInitialize();
 	
@@ -86,5 +84,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const;
 };
