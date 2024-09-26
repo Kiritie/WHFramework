@@ -91,4 +91,9 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Falling, "State.Character.Falling", "Character Falling");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Walking, "State.Character.Walking", "Character Walking");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(StateTag_Character_Jumping, "State.Character.Jumping", "Character Jumping");
+
+	////////////////////////////////////////////////////
+	// Event_Hit
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(EventTag_Hit_Attack, "Event.Hit.Attack", "Hit Attack");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(EventTag_Hit_Skill, "Event.Hit.Skill", "Hit Skill");
 }

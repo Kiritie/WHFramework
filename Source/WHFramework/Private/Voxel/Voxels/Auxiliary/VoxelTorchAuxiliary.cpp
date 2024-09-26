@@ -11,15 +11,15 @@
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 {
-	LightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("LightComponent"));
-	LightComponent->SetupAttachment(RootComponent);
-	LightComponent->SetLightColor(FLinearColor(1.f, 0.8f, 0, 1.f));
-	LightComponent->SetIntensity(10000.f);
-	LightComponent->SetAttenuationRadius(1500.f);
-	LightComponent->SetCastShadows(true);
+	PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
+	PointLight->SetupAttachment(RootComponent);
+	PointLight->SetLightColor(FLinearColor(1.f, 0.8f, 0, 1.f));
+	PointLight->SetIntensity(10000.f);
+	PointLight->SetAttenuationRadius(1500.f);
+	PointLight->SetCastShadows(true);
 
-	EffectComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("EffectComponent"));
-	EffectComponent->SetupAttachment(LightComponent);
+	ParticleSystem = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("ParticleSystem"));
+	ParticleSystem->SetupAttachment(PointLight);
 }
 
 void AVoxelTorchAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -31,17 +31,17 @@ void AVoxelTorchAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(VoxelItem.IsValid())
 		{
 			const auto& VoxelData = VoxelItem.GetVoxelData<UVoxelTorchData>();
-			EffectComponent->SetTemplate(VoxelData.EffectAsset);
-			EffectComponent->SetRelativeScale3D(VoxelData.EffectScale);
-			EffectComponent->SetRelativeLocation(VoxelData.EffectOffset * UVoxelModule::Get().GetWorldData().BlockSize);
+			ParticleSystem->SetTemplate(VoxelData.EffectAsset);
+			ParticleSystem->SetRelativeScale3D(VoxelData.EffectScale);
+			ParticleSystem->SetRelativeLocation(VoxelData.EffectOffset * UVoxelModule::Get().GetWorldData().BlockSize);
 		
-			LightComponent->SetRelativeLocation(FVector::UpVector * VoxelItem.GetVoxelData().GetRange().Z * 0.5f * UVoxelModule::Get().GetWorldData().BlockSize);
+			PointLight->SetRelativeLocation(FVector::UpVector * VoxelItem.GetVoxelData().GetRange().Z * 0.5f * UVoxelModule::Get().GetWorldData().BlockSize);
 		}
 	}
 }
 
 void AVoxelTorchAuxiliary::SetLightVisible(bool bInVisible)
 {
-	LightComponent->SetVisibility(bInVisible);
-	EffectComponent->SetVisibility(bInVisible);
+	PointLight->SetVisibility(bInVisible);
+	ParticleSystem->SetVisibility(bInVisible);
 }

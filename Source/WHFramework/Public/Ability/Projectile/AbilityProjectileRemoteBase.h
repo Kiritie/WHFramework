@@ -2,34 +2,30 @@
 
 #pragma once
 
-#include "Ability/Item/Skill/AbilitySkillBase.h"
-#include "AbilitySkillRemoteBase.generated.h"
+#include "Ability/Projectile/AbilityProjectileBase.h"
+#include "AbilityProjectileRemoteBase.generated.h"
 
 class AAbilityCharacterBase;
 class USphereComponent;
-class UStaticMeshComponent;
 class UProjectileMovementComponent;
 
 /**
  * 远程技能基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilitySkillRemoteBase : public AAbilitySkillBase
+class WHFRAMEWORK_API AAbilityProjectileRemoteBase : public AAbilityProjectileBase
 {
 	GENERATED_BODY()
 	
 public:	
-	AAbilitySkillRemoteBase();
+	AAbilityProjectileRemoteBase();
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	USphereComponent* SphereComponent;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* MeshComponent;
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UProjectileMovementComponent* MovementComponent;
+	UProjectileMovementComponent* ProjectileMovement;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -47,21 +43,18 @@ protected:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty) override;
+	virtual void Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle) override;
 		
 public:
 	virtual bool CanHitTarget(AActor* InTarget) const override;
 
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
 	
-	virtual void ClearHitTargets();
+	virtual void ClearHitTargets() override;
 
-	virtual void SetHitAble(bool bValue);
+	virtual void SetHitAble(bool bValue) override;
 
 public:
 	UFUNCTION(BlueprintPure)
 	USphereComponent* GetSphereComponent() const { return SphereComponent; }
-
-	UFUNCTION(BlueprintPure)
-	UStaticMeshComponent* GetMeshComponent() const { return MeshComponent; }
 };

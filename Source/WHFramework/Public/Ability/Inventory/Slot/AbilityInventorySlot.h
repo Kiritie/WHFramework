@@ -22,16 +22,16 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Properties
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FAbilityItem Item;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	UAbilityInventoryBase* Inventory;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	EAbilityItemType LimitType;
 		
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Default")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	ESlotSplitType SplitType;
 	
 public:

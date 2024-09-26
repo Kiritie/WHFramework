@@ -16,10 +16,6 @@ class WHFRAMEWORK_API AAbilityPropBase : public AAbilityItemBase
 public:	
 	AAbilityPropBase();
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* MeshComponent;
-
 public:
 	virtual void Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty) override;
 };

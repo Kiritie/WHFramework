@@ -12,7 +12,6 @@
 #include "Event/Handle/Widget/EventHandle_UserWidgetOpened.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetStateChanged.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Input/InputModuleStatics.h"
 #include "Widget/Animator/WidgetAnimatorBase.h"

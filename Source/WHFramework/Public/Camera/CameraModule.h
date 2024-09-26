@@ -362,10 +362,10 @@ public:
 	virtual void StopDoCameraLocation();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraOffset(FVector InOffset, bool bInstant = false);
+	virtual void SetCameraOffset(FVector InOffset = FVector(-1.f), bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void DoCameraOffset(FVector InOffset = FVector(-1.f), float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraOffset();

@@ -24,13 +24,6 @@ public:
 	AAbilityItemBase();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	AActor* OwnerActor;
-
-protected:
 	virtual int32 GetLimit_Implementation() const override { return 1000; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
@@ -40,6 +33,13 @@ protected:
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void Initialize(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty);
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	AActor* OwnerActor;
 
 public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }

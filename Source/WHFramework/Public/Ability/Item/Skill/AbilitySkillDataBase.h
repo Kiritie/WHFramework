@@ -1,14 +1,14 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/Item/AbilityPriceItemDataBase.h"
 
 #include "AbilitySkillDataBase.generated.h"
 
-class AAbilitySkillBase;
+class AAbilityProjectileBase;
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilitySkillDataBase : public UAbilityItemDataBase
+class WHFRAMEWORK_API UAbilitySkillDataBase : public UAbilityPriceItemDataBase
 {
 	GENERATED_BODY()
 
@@ -23,5 +23,5 @@ public:
 	ESkillMode SkillMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilitySkillBase> SkillClass;
+	TSubclassOf<AAbilityProjectileBase> ProjectileClass;
 };

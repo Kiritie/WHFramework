@@ -15,6 +15,7 @@ class AAbilityCharacterBase;
 class AAbilityPickUpBase;
 class AAbilityActorBase;
 class AAbilityPawnBase;
+class AAbilityProjectileBase;
 
 UCLASS()
 class WHFRAMEWORK_API UAbilityModule : public UModuleBase
@@ -53,16 +54,21 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Item
 public:
-	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, FRotator InRotation = FRotator::ZeroRotator, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);
 
-	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor);
+	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
 	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Projectile
+public:
+	virtual AAbilityProjectileBase* SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor = nullptr, const FGameplayAbilitySpecHandle& InAbilityHandle = FGameplayAbilitySpecHandle());
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor

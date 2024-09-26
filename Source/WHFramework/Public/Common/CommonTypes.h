@@ -80,8 +80,8 @@ enum class EInteractAgentType : uint8
 	None = 0 UMETA(DisplayName="无"),
 	// 静态的
 	Static = 1 UMETA(DisplayName="静态的"),
-	// 有生命的
-	Vitality = 2 UMETA(DisplayName="有生命的")
+	// 可移动的
+	Movable = 2 UMETA(DisplayName="可移动的")
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -151,4 +151,9 @@ namespace GameplayTags
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Falling);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Walking);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(StateTag_Character_Jumping);
+
+	////////////////////////////////////////////////////
+	// Event_Hit
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(EventTag_Hit_Attack);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(EventTag_Hit_Skill);
 };

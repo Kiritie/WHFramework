@@ -237,6 +237,13 @@ public:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	ULookingComponent* Looking;
+
+public:
+	UFUNCTION()
+	virtual void OnTargetLookAtOn(AActor* InTargetActor);
+	
+	UFUNCTION()
+	virtual void OnTargetLookAtOff(AActor* InTargetActor);
 	
 public:
 	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;

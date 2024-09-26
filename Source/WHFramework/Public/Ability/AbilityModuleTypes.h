@@ -12,7 +12,7 @@
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
-class AAbilitySkillBase;
+class AAbilityProjectileBase;
 class AAbilityEquipBase;
 class UWidgetInventorySlotBase;
 class UAbilityInventorySlot;
@@ -470,6 +470,8 @@ enum class EAbilityItemType : uint8
 {
 	// 无
 	None UMETA(DisplayName="无"),
+	// 货币
+	Coin UMETA(DisplayName="货币"),
 	// 体素
 	Voxel UMETA(DisplayName="体素"),
 	// 材料

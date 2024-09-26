@@ -55,10 +55,10 @@ protected:
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
 
 protected:
-	virtual FBox GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const override;
-
 	UFUNCTION()
-	virtual void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	virtual FBox GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -69,16 +69,16 @@ protected:
 	UBoxComponent* BoxComponent;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UInteractionComponent* InteractionComponent;
+	UInteractionComponent* Interaction;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	URotatingMovementComponent* RotatingComponent;
+	URotatingMovementComponent* RotatingMovement;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UFallingMovementComponent* FallingComponent;
+	UFallingMovementComponent* FallingMovement;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UFollowingMovementComponent* FollowingComponent;
+	UFollowingMovementComponent* FollowingMovement;
 
 public:
 	FAbilityItem& GetItem() { return Item; }
@@ -91,7 +91,7 @@ public:
 
 	virtual UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 
-	virtual URotatingMovementComponent* GetRotatingComponent() const { return RotatingComponent; }
+	virtual URotatingMovementComponent* GetRotatingComponent() const { return RotatingMovement; }
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 

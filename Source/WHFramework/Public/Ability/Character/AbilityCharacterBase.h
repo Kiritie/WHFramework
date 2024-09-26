@@ -23,7 +23,7 @@ class UVoxel;
 class AController;
 class UAbilityBase;
 class UAbilitySystemComponentBase;
-class AAbilitySkillBase;
+class AAbilityProjectileBase;
 class UAbilityCharacterInventoryBase;
 
 /**
@@ -197,7 +197,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Vitality; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Movable; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	

@@ -39,7 +39,7 @@ void UAbilityCharacterAttackPointBase::OnHitTarget(AActor* InTarget, const FHitR
 	FGameplayEventData EventData;
 	EventData.Instigator = GetOwnerCharacter();
 	EventData.Target = InTarget;
-	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwnerCharacter(), FGameplayTag::RequestGameplayTag("Event.Hit.Attack"), EventData);
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwnerCharacter(), GameplayTags::EventTag_Hit_Attack, EventData);
 }
 
 void UAbilityCharacterAttackPointBase::ClearHitTargets()

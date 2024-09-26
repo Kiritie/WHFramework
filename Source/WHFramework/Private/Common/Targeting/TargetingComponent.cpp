@@ -337,9 +337,9 @@ void UTargetingComponent::TargetLockOn(AActor* TargetToLockOn)
 		}
 	}
 
-	if (OnTargetLockedOn.IsBound())
+	if (OnTargetLockOn.IsBound())
 	{
-		OnTargetLockedOn.Broadcast(TargetToLockOn);
+		OnTargetLockOn.Broadcast(TargetToLockOn);
 	}
 }
 
@@ -367,9 +367,9 @@ void UTargetingComponent::TargetLockOff()
 			OwnerPlayerController->ResetIgnoreLookInput();
 		}
 
-		if (OnTargetLockedOff.IsBound())
+		if (OnTargetLockOff.IsBound())
 		{
-			OnTargetLockedOff.Broadcast(LockedOnTargetActor);
+			OnTargetLockOff.Broadcast(LockedOnTargetActor);
 		}
 	}
 
@@ -515,7 +515,7 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 	const FRotator ControlRotation = OwnerPlayerController->GetControlRotation();
 
 	const FVector CharacterLocation = OwnerActor->GetActorLocation();
-	const FVector OtherActorLocation = OtherActor->GetActorLocation();
+	const FVector OtherActorLocation = OtherActor->GetActorLocation() + OtherActor->GetActorRotation().RotateVector(LocationOffset);
 
 	// Find look at rotation
 	const FRotator LookRotation = FRotationMatrix::MakeFromX(OtherActorLocation - CharacterLocation).Rotator();

@@ -16,7 +16,7 @@ bool IInteractionAgentInterface::IsInteractable(IInteractionAgentInterface* InIn
 		{
 			switch(InInteractionAgent->GetInteractAgentType())
 			{
-				case EInteractAgentType::Vitality:
+				case EInteractAgentType::Movable:
 				{
 					return true;
 				}
@@ -24,12 +24,12 @@ bool IInteractionAgentInterface::IsInteractable(IInteractionAgentInterface* InIn
 			}
 			break;
 		}
-		case EInteractAgentType::Vitality:
+		case EInteractAgentType::Movable:
 		{
 			switch(InInteractionAgent->GetInteractAgentType())
 			{
 				case EInteractAgentType::Static:
-				case EInteractAgentType::Vitality:
+				case EInteractAgentType::Movable:
 				{
 					return true;
 				}

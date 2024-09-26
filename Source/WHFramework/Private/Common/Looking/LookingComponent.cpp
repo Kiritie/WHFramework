@@ -4,7 +4,6 @@
 
 #include "Common/Looking/LookingAgentInterface.h"
 #include "Engine/World.h"
-#include "GameFramework/PlayerController.h"
 
 // Sets default values for this component's properties
 ULookingComponent::ULookingComponent()
@@ -47,6 +46,10 @@ void ULookingComponent::TargetLookingOn(AActor* InTargetActor)
 
 void ULookingComponent::TargetLookingOff()
 {
+	if(OnTargetLookAtOff.IsBound())
+	{
+		OnTargetLookAtOff.Execute(LookingTarget);
+	}
 	LookingTarget = nullptr;
 }
 
@@ -60,11 +63,11 @@ bool ULookingComponent::TargetIsLookAtAble(AActor* InTargetActor) const
 	return true;
 }
 
-bool ULookingComponent::CanLookAtTarget()
+bool ULookingComponent::CanLookAtTarget() const
 {
-	if (OnCanLockAtTarget.IsBound())
+	if (OnCanLookAtTarget.IsBound())
 	{
-		return OnCanLockAtTarget.Execute();
+		return OnCanLookAtTarget.Execute();
 	}
 	return true;
 }
@@ -73,13 +76,23 @@ bool ULookingComponent::DoLookAtTarget(AActor* InTargetActor)
 {
 	if (!CanLookAtTarget() || !InTargetActor) return true;
 
-	const FVector TargetDirection = InTargetActor->GetActorLocation() - OwnerActor->GetActorLocation();
+	if(OnTargetLookAtOn.IsBound())
+	{
+		OnTargetLookAtOn.Execute(LookingTarget);
+	}
+
 	const FRotator CurrentRotation = OwnerActor->GetActorRotation();
-	const FRotator TargetRotation = FRotator(CurrentRotation.Pitch, TargetDirection.ToOrientationRotator().Yaw, CurrentRotation.Roll);
+	const FRotator TargetRotation = FRotator(CurrentRotation.Pitch, GetLookingRotation(InTargetActor).Yaw, CurrentRotation.Roll);
 	if(!CurrentRotation.Equals(TargetRotation))
 	{
 		OwnerActor->SetActorRotation(FMath::RInterpConstantTo(CurrentRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), LookingRotationSpeed));
 		return false;
 	}
 	return true;
+}
+
+FRotator ULookingComponent::GetLookingRotation(AActor* InTargetActor) const
+{
+	const FVector TargetDirection = InTargetActor->GetActorLocation() - OwnerActor->GetActorLocation();
+	return TargetDirection.ToOrientationRotator();
 }

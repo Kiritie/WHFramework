@@ -29,9 +29,6 @@ public:
 	UObject* Icon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Price;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxCount;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

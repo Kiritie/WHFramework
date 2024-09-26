@@ -13,6 +13,10 @@
 // Sets default values
 AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 {
+	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
+	BoxComponent->SetupAttachment(RootComponent);
+	BoxComponent->SetCollisionProfileName(TEXT("VoxelAuxiliary"));
+
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
@@ -37,7 +41,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			Interaction->AddInteractAction(Iter);
 		}
 		Interaction->SetInteractable(VoxelItem.Owner != nullptr);
-		Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * FVector(1.f, 1.f, 0.5f));
+		BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 	}
 }
 
@@ -74,21 +78,22 @@ void AVoxelInteractAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInte
 
 void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
 {
-	if(!bPassivity) return;
-	
-	switch ((EVoxelInteractAction)InInteractAction)
+	if(bPassivity)
 	{
-		case EVoxelInteractAction::Open:
+		switch ((EVoxelInteractAction)InInteractAction)
 		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
-			break;
+			case EVoxelInteractAction::Open:
+			{
+				GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
+				break;
+			}
+			case EVoxelInteractAction::Close:
+			{
+				GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
+				break;
+			}
+			default: break;
 		}
-		case EVoxelInteractAction::Close:
-		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
-			break;
-		}
-		default: break;
 	}
 }
 

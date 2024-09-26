@@ -1,15 +1,15 @@
 #pragma once
 
 #include "UObject/Interface.h"
-#include "AbilityAttackerInterface.generated.h"
+#include "AbilityHitterInterface.generated.h"
 
 UINTERFACE()
-class WHFRAMEWORK_API UAbilityAttackerInterface : public UInterface
+class WHFRAMEWORK_API UAbilityHitterInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class WHFRAMEWORK_API IAbilityAttackerInterface
+class WHFRAMEWORK_API IAbilityHitterInterface
 {
 	GENERATED_BODY()
 

@@ -110,10 +110,10 @@ public:
 	static void StopDoCameraLocation();
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SetCameraOffset(FVector InOffset, bool bInstant = false);
+	static void SetCameraOffset(FVector InOffset = FVector(-1.f), bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	static void DoCameraOffset(FVector InOffset = FVector(-1.f), float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void StopDoCameraOffset();
@@ -150,6 +150,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void StopDoCameraTransform();
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetCameraFov(float InFov = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void DoCameraFov(float InFov = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void StopDoCameraFov();
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void AddCameraMovementInput(FVector InDirection, float InValue);

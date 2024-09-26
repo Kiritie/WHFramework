@@ -9,12 +9,11 @@
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Raw/AbilityRawDataBase.h"
-#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Ability/Item/Equip/AbilityEquipBase.h"
 #include "Ability/Item/Prop/AbilityPropBase.h"
 #include "Ability/Item/Raw/AbilityRawBase.h"
-#include "Ability/Item/Skill/AbilitySkillBase.h"
+#include "Ability/Projectile/AbilityProjectileBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -83,32 +82,7 @@ void UAbilityModule::OnTermination(EPhase InPhase)
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	AAbilityItemBase* Item = nullptr;
-	switch (InItem.GetType())
-	{
-		case EAbilityItemType::Prop:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(nullptr, nullptr, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
-			break;
-		}
-		case EAbilityItemType::Equip:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(nullptr, nullptr, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
-			break;
-		}
-		case EAbilityItemType::Skill:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilitySkillBase>(nullptr, nullptr, false, InItem.GetData<UAbilitySkillDataBase>().SkillClass);
-			break;
-		}
-		case EAbilityItemType::Raw:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(nullptr, nullptr, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
-			break;
-		}
-		default: break;
-	}
-
+	AAbilityItemBase* Item = SpawnAbilityItem(InItem);
 	if(Item)
 	{
 		Item->SetActorLocationAndRotation(InLocation, InRotation);
@@ -122,7 +96,27 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector 
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
 {
-	AAbilityItemBase* Item = SpawnAbilityItem(InItem);
+	AAbilityItemBase* Item = nullptr;
+	switch (InItem.GetType())
+	{
+		case EAbilityItemType::Prop:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(nullptr, nullptr, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
+			break;
+		}
+		case EAbilityItemType::Equip:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(nullptr, nullptr, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
+			break;
+		}
+		case EAbilityItemType::Raw:
+		{
+			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(nullptr, nullptr, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
+			break;
+		}
+		default: break;
+	}
+
 	if(Item)
 	{
 		Item->Initialize(InOwnerActor, InItem);
@@ -158,6 +152,18 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 		}
 	}
 	return PickUp;
+}
+
+AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
+{
+	if(!InClass) return nullptr;
+	
+	if(AAbilityProjectileBase* Projectile = UObjectPoolModuleStatics::SpawnObject<AAbilityProjectileBase>(nullptr, nullptr, false, InClass))
+	{
+		Projectile->Initialize(InOwnerActor, InAbilityHandle);
+		return Projectile;
+	}
+	return nullptr;
 }
 
 AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)

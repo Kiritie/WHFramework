@@ -11,7 +11,6 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();
 	Icon = nullptr;
-	Price = 0;
 	MaxCount = -1;
 	MaxLevel = -1;
 	AbilityClass = nullptr;

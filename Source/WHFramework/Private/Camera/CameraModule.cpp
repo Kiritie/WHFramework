@@ -813,6 +813,8 @@ void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant)
 {
 	if(!CurrentCamera) return;
 
+	InOffset = InOffset != FVector(-1.f) ? InOffset : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewOffset : InitCameraOffset);
+
 	TargetCameraOffset = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InOffset, CameraMoveRange.Min, CameraMoveRange.Max) : InOffset;
 	if(bInstant)
 	{
@@ -824,7 +826,11 @@ void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant)
 
 void UCameraModule::DoCameraOffset(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce)
 {
-	if(!CurrentCamera || ((CameraDoOffsetOffset != EMPTY_Vector || CurrentCameraOffset == InOffset) && !bForce)) return;
+	if(!CurrentCamera) return;
+
+	InOffset = InOffset != FVector(-1.f) ? InOffset : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewOffset : InitCameraOffset);
+
+	if((CameraDoOffsetOffset != EMPTY_Vector || CurrentCameraOffset == InOffset) && !bForce) return;
 
 	TargetCameraOffset = InOffset;
 	if(InDuration > 0.f)

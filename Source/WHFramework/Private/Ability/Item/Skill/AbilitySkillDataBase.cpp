@@ -6,5 +6,5 @@ UAbilitySkillDataBase::UAbilitySkillDataBase()
 	MaxCount = 1;
 	SkillType = ESkillType::None;
 	SkillMode = ESkillMode::None;
-	SkillClass = nullptr;
+	ProjectileClass = nullptr;
 }

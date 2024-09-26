@@ -6,6 +6,7 @@
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "VoxelInteractAuxiliary.generated.h"
 
+class UBoxComponent;
 class UVoxel;
 class UInteractionComponent;
 
@@ -34,7 +35,10 @@ public:
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 
 public:

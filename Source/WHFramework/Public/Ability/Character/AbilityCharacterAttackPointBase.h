@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Components/BoxComponent.h"
-#include "Ability/Interfaces/AbilityAttackerInterface.h"
+#include "Ability/Interfaces/AbilityHitterInterface.h"
 
 #include "AbilityCharacterAttackPointBase.generated.h"
 
@@ -13,7 +13,7 @@ class AAbilityCharacterBase;
  * 角色攻击点组件
  */
 UCLASS()
-class WHFRAMEWORK_API UAbilityCharacterAttackPointBase : public UBoxComponent, public IAbilityAttackerInterface
+class WHFRAMEWORK_API UAbilityCharacterAttackPointBase : public UBoxComponent, public IAbilityHitterInterface
 {
 	GENERATED_BODY()
 	

@@ -56,6 +56,11 @@ AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FSaveData* InSaveD
 	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer);
 }
 
+AAbilityProjectileBase* UAbilityModuleStatics::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
+{
+	return UAbilityModule::Get().SpawnAbilityProjectile(InClass, InOwnerActor, InAbilityHandle);
+}
+
 AActor* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);

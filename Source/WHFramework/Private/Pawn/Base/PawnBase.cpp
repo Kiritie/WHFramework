@@ -4,6 +4,7 @@
 #include "Pawn/Base/PawnBase.h"
 
 #include "AIController.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Asset/AssetModuleStatics.h"

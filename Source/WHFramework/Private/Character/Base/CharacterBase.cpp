@@ -56,7 +56,9 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 
 	Looking = CreateDefaultSubobject<ULookingComponent>(FName("Looking"));
 	Looking->LookingMaxDistance = 1500.f;
-	Looking->OnCanLockAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
+	Looking->OnCanLookAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
+	Looking->OnTargetLookAtOn.BindDynamic(this, &ACharacterBase::OnTargetLookAtOn);
+	Looking->OnTargetLookAtOff.BindDynamic(this, &ACharacterBase::OnTargetLookAtOff);
 
 	Name = NAME_None;
 	Anim = nullptr;
@@ -468,6 +470,16 @@ void ACharacterBase::StopAIMove(bool bMulticast)
 void ACharacterBase::MultiStopAIMove_Implementation()
 {
 	StopAIMove(false);
+}
+
+void ACharacterBase::OnTargetLookAtOn(AActor* InTargetActor)
+{
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+}
+
+void ACharacterBase::OnTargetLookAtOff(AActor* InTargetActor)
+{
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
 bool ACharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
