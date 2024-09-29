@@ -309,7 +309,7 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 	{
 		FVector2D ScreenPos;
 		const FVector Location = InMapping.GetLocation();
-		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false))
+		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false) && Location != FVector(-1.f))
 		{
 			CanvasPanelSlot->SetPosition(ScreenPos);
 		}
@@ -353,11 +353,12 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	if(bRefresh)
 	{
 		bool bVisible = false;
-		FWorldWidgetMapping Mapping;
-		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(false, GetClass()))
+		if(UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(false, GetClass()))
 		{
+			FWorldWidgetMapping Mapping;
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
-			const FVector Location = Mapping.GetLocation();
+			
+			const FVector Location = GetWidgetMapping(this, Mapping) ? Mapping.GetLocation() : (OwnerActor ? OwnerActor->GetActorLocation() : FVector(-1.f));
 			const float Distance = FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true));
 			switch(WidgetVisibility)
 			{
@@ -373,7 +374,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 				}
 				case EWorldWidgetVisibility::ScreenOnly:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location);
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f);
 					break;
 				}
 				case EWorldWidgetVisibility::DistanceOnly:
@@ -388,7 +389,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 				}
 				case EWorldWidgetVisibility::ScreenAndDistance:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
 					break;
 				}
 				default: break;

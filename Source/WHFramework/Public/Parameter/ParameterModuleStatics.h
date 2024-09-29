@@ -86,6 +86,9 @@ public:
 	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeBrushParameter(const FSlateBrush& InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeClassParameter(UClass* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -93,6 +96,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeObjectParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeObjectInstParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject> InValue, const FText InDescription = FText::GetEmpty());
@@ -222,6 +228,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FSlateBrush GetBrushValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetBrushValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetBrushValue(UPARAM(ref) FParameter& InParameter, const FSlateBrush& InValue) { InParameter.SetBrushValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static UClass* GetClassValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetClassValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
@@ -240,6 +253,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetObjectValue(UPARAM(ref) FParameter& InParameter, UObject* InValue) { InParameter.SetObjectValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ParameterModuleStatics")
+	static UObject* GetObjectInstValue(UPARAM(ref) const FParameter& InParameter, TSubclassOf<UObject> InClass = nullptr) { return GetDeterminesOutputObject(InParameter.GetObjectInstValue(), InClass); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetObjectInstValue(UPARAM(ref) FParameter& InParameter, UObject* InValue) { InParameter.SetObjectInstValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

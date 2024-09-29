@@ -11,7 +11,7 @@
 
 void FParameterCustomization::CustomizeHeader(TSharedRef<class IPropertyHandle> InStructPropertyHandle, class FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& StructCustomizationUtils)
 {
-	TSharedPtr<IPropertyHandle> ParameterDescriptionHandle = InStructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FParameter, Description)).ToSharedRef();
+	TSharedPtr<IPropertyHandle> ParameterDescriptionHandle = InStructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FParameter, Description));
 
 	FText ParameterDescription;
 	ParameterDescriptionHandle->GetValue(ParameterDescription);
@@ -32,92 +32,53 @@ void FParameterCustomization::CustomizeHeader(TSharedRef<class IPropertyHandle> 
 void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InStructPropertyHandle, IDetailChildrenBuilder& ChildBuilder, IPropertyTypeCustomizationUtils& StructCustomizationUtils)
 {
 	TMap<FName, TSharedPtr<IPropertyHandle>> PropertyHandles;
+	
 	uint32 NumChildren;
 	InStructPropertyHandle->GetNumChildren(NumChildren);
-
 	for (uint32 ChildIndex = 0; ChildIndex < NumChildren; ++ChildIndex)
 	{
-		TSharedRef<IPropertyHandle> ChildHandle = InStructPropertyHandle->GetChildHandle(ChildIndex).ToSharedRef();
+		TSharedPtr<IPropertyHandle> ChildHandle = InStructPropertyHandle->GetChildHandle(ChildIndex);
 		const FName PropertyName = ChildHandle->GetProperty()->GetFName();
 		PropertyHandles.Add(PropertyName, ChildHandle);
 	}
-	
-	auto ShowParameterValue = [this] (EParameterType ParameterType)
-	{
-		return TAttribute<EVisibility>::Create([this, ParameterType]()
-		{
-			uint8 ParameterTypeValue = 0;
-			if (ParameterTypeHandle->GetValue(ParameterTypeValue) != FPropertyAccess::Success)
-			{
-				return EVisibility::Collapsed;
-			}
-			return static_cast<EParameterType>(ParameterTypeValue) == ParameterType ? EVisibility::Visible : EVisibility::Collapsed;
-		});
-	};
 
-	ParameterTypeHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ParameterType)).ToSharedRef();
+	ParameterTypeHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ParameterType));
 	ParameterTypeHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FParameterCustomization::OnParameterTypeChanged));
 	ChildBuilder.AddProperty(ParameterTypeHandle.ToSharedRef());
 
-	DescriptionHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, Description)).ToSharedRef();
+	DescriptionHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, Description));
 	ChildBuilder.AddProperty(DescriptionHandle.ToSharedRef());
+	
+#define ADD_PARAM_PROPERTY(ParamType) \
+	ParamType##ValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ParamType##Value)); \
+	ChildBuilder.AddProperty(ParamType##ValueHandle.ToSharedRef()).Visibility(TAttribute<EVisibility>::Create([this]() \
+		{ \
+			uint8 ParamTypeValue = 0; \
+			return ParameterTypeHandle->GetValue(ParamTypeValue) == FPropertyAccess::Success && (EParameterType)ParamTypeValue == EParameterType::ParamType ? EVisibility::Visible : EVisibility::Collapsed; \
+		}) \
+	);
 
-	IntegerValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, IntegerValue)).ToSharedRef();
-	ChildBuilder.AddProperty(IntegerValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Integer));
-
-	FloatValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, FloatValue)).ToSharedRef();
-	ChildBuilder.AddProperty(FloatValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Float));
-
-	ByteValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ByteValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ByteValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Byte));
-
-	EnumValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, EnumValue)).ToSharedRef();
-	ChildBuilder.AddProperty(EnumValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Enum));
-
-	StringValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, StringValue)).ToSharedRef();
-	ChildBuilder.AddProperty(StringValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::String));
-
-	NameValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, NameValue)).ToSharedRef();
-	ChildBuilder.AddProperty(NameValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Name));
-
-	TextValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, TextValue)).ToSharedRef();
-	ChildBuilder.AddProperty(TextValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Text));
-
-	BooleanValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, BooleanValue)).ToSharedRef();
-	ChildBuilder.AddProperty(BooleanValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Boolean));
-
-	VectorValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, VectorValue)).ToSharedRef();
-	ChildBuilder.AddProperty(VectorValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Vector));
-
-	RotatorValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, RotatorValue)).ToSharedRef();
-	ChildBuilder.AddProperty(RotatorValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Rotator));
-
-	ColorValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ColorValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ColorValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Color));
-
-	KeyValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, KeyValue)).ToSharedRef();
-	ChildBuilder.AddProperty(KeyValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Key));
-
-	TagValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, TagValue)).ToSharedRef();
-	ChildBuilder.AddProperty(TagValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Tag));
-
-	TagsValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, TagsValue)).ToSharedRef();
-	ChildBuilder.AddProperty(TagsValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Tags));
-
-	ClassValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ClassValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ClassValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Class));
-
-	ClassPtrValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ClassPtrValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ClassPtrValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::ClassPtr));
-
-	ObjectValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ObjectValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ObjectValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Object));
-
-	ObjectPtrValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ObjectPtrValue)).ToSharedRef();
-	ChildBuilder.AddProperty(ObjectPtrValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::ObjectPtr));
-
-	DelegateValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, DelegateValue)).ToSharedRef();
-	ChildBuilder.AddProperty(DelegateValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Delegate));
+	ADD_PARAM_PROPERTY(Integer)
+	ADD_PARAM_PROPERTY(Float)
+	ADD_PARAM_PROPERTY(Byte)
+	ADD_PARAM_PROPERTY(Enum)
+	ADD_PARAM_PROPERTY(String)
+	ADD_PARAM_PROPERTY(Name)
+	ADD_PARAM_PROPERTY(Text)
+	ADD_PARAM_PROPERTY(Boolean)
+	ADD_PARAM_PROPERTY(Vector)
+	ADD_PARAM_PROPERTY(Rotator)
+	ADD_PARAM_PROPERTY(Color)
+	ADD_PARAM_PROPERTY(Key)
+	ADD_PARAM_PROPERTY(Tag)
+	ADD_PARAM_PROPERTY(Tags)
+	ADD_PARAM_PROPERTY(Brush)
+	ADD_PARAM_PROPERTY(Class)
+	ADD_PARAM_PROPERTY(ClassPtr)
+	ADD_PARAM_PROPERTY(Object)
+	ADD_PARAM_PROPERTY(ObjectInst)
+	ADD_PARAM_PROPERTY(ObjectPtr)
+	ADD_PARAM_PROPERTY(Delegate)
 }
 
 void FParameterCustomization::OnParameterTypeChanged()

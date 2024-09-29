@@ -75,42 +75,42 @@ UWorldWeather* USceneModuleStatics::GetWorldWeather(TSubclassOf<UWorldWeather> I
 	return USceneModule::Get().GetWorldWeather(InClass);
 }
 
-bool USceneModuleStatics::HasTraceMapping(const FName& InName, bool bEnsured)
+bool USceneModuleStatics::HasTraceMapping(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().HasTraceMapping(InName, bEnsured);
 }
 
-FTraceMapping USceneModuleStatics::GetTraceMapping(const FName& InName, bool bEnsured)
+FTraceMapping USceneModuleStatics::GetTraceMapping(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().GetTraceMapping(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel)
+void USceneModuleStatics::AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel)
 {
 	USceneModule::Get().AddTraceMapping(InName, InTraceChannel);
 }
 
-void USceneModuleStatics::RemoveTraceMapping(const FName& InName)
+void USceneModuleStatics::RemoveTraceMapping(const FName InName)
 {
 	USceneModule::Get().RemoveTraceMapping(InName);
 }
 
-void USceneModuleStatics::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	USceneModule::Get().AsyncLoadLevel(InLevelPath, OnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
 }
 
-void USceneModuleStatics::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	USceneModule::Get().AsyncUnloadLevel(InLevelPath, InOnAsyncUnloadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
 }
 
-float USceneModuleStatics::GetAsyncLoadLevelProgress(FName InLevelPath)
+float USceneModuleStatics::GetAsyncLoadLevelProgress(const FName InLevelPath)
 {
 	return USceneModule::Get().GetAsyncLoadLevelProgress(InLevelPath);
 }
 
-float USceneModuleStatics::GetAsyncUnloadLevelProgress(FName InLevelPath)
+float USceneModuleStatics::GetAsyncUnloadLevelProgress(const FName InLevelPath)
 {
 	return USceneModule::Get().GetAsyncUnloadLevelProgress(InLevelPath);
 }
@@ -135,42 +135,42 @@ bool USceneModuleStatics::RemoveSceneActor(AActor* InActor)
 	return USceneModule::Get().RemoveSceneActor(InActor);
 }
 
-bool USceneModuleStatics::HasTargetPointByName(FName InName, bool bEnsured)
+bool USceneModuleStatics::HasTargetPointByName(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().HasTargetPointByName(InName, bEnsured);
 }
 
-ATargetPoint* USceneModuleStatics::GetTargetPointByName(FName InName, bool bEnsured)
+ATargetPoint* USceneModuleStatics::GetTargetPointByName(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().GetTargetPointByName(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
+void USceneModuleStatics::AddTargetPointByName(const FName InName, ATargetPoint* InPoint)
 {
 	USceneModule::Get().AddTargetPointByName(InName, InPoint);
 }
 
-void USceneModuleStatics::RemoveTargetPointByName(FName InName)
+void USceneModuleStatics::RemoveTargetPointByName(const FName InName)
 {
 	USceneModule::Get().RemoveTargetPointByName(InName);
 }
 
-bool USceneModuleStatics::HasScenePointByName(FName InName, bool bEnsured)
+bool USceneModuleStatics::HasScenePointByName(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().HasScenePointByName(InName, bEnsured);
 }
 
-USceneComponent* USceneModuleStatics::GetScenePointByName(FName InName, bool bEnsured)
+USceneComponent* USceneModuleStatics::GetScenePointByName(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().GetScenePointByName(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddScenePointByName(FName InName, USceneComponent* InSceneComp)
+void USceneModuleStatics::AddScenePointByName(const FName InName, USceneComponent* InSceneComp)
 {
 	USceneModule::Get().AddScenePointByName(InName, InSceneComp);
 }
 
-void USceneModuleStatics::RemoveScenePointByName(FName InName)
+void USceneModuleStatics::RemoveScenePointByName(const FName InName)
 {
 	USceneModule::Get().RemoveScenePointByName(InName);
 }
@@ -185,7 +185,7 @@ bool USceneModuleStatics::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase
 	return USceneModule::Get().HasPhysicsVolumeByClass(InClass, bEnsured);
 }
 
-bool USceneModuleStatics::HasPhysicsVolumeByName(FName InName, bool bEnsured)
+bool USceneModuleStatics::HasPhysicsVolumeByName(const FName InName, bool bEnsured)
 {
 	return USceneModule::Get().HasPhysicsVolumeByName(InName, bEnsured);
 }
@@ -195,7 +195,7 @@ APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByClass(TSubclassOf<APh
 	return USceneModule::Get().GetPhysicsVolumeByClass(InClass, bEnsured);
 }
 
-APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByName(const FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
 	return USceneModule::Get().GetPhysicsVolumeByName(InName, InClass, bEnsured);
 }
@@ -205,7 +205,7 @@ void USceneModuleStatics::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 	USceneModule::Get().AddPhysicsVolume(InPhysicsVolume);
 }
 
-void USceneModuleStatics::AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume)
+void USceneModuleStatics::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
 	USceneModule::Get().AddPhysicsVolumeByName(InName, InPhysicsVolume);
 }
@@ -215,7 +215,7 @@ void USceneModuleStatics::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolum
 	USceneModule::Get().RemovePhysicsVolume(InPhysicsVolume);
 }
 
-void USceneModuleStatics::RemovePhysicsVolumeByName(FName InName)
+void USceneModuleStatics::RemovePhysicsVolumeByName(const FName InName)
 {
 	USceneModule::Get().RemovePhysicsVolumeByName(InName);
 }

@@ -105,6 +105,11 @@ FParameter UParameterModuleStatics::MakeTagsParameter(const FGameplayTagContaine
 	return FParameter::MakeTags(InValue, InDescription);
 }
 
+FParameter UParameterModuleStatics::MakeBrushParameter(const FSlateBrush& InValue, const FText InDescription)
+{
+	return FParameter::MakeBrush(InValue, InDescription);
+}
+
 FParameter UParameterModuleStatics::MakeClassParameter(UClass* InValue, const FText InDescription)
 {
 	return FParameter::MakeClass(InValue, InDescription);
@@ -118,6 +123,11 @@ FParameter UParameterModuleStatics::MakeClassPtrParameter(const TSoftClassPtr<UO
 FParameter UParameterModuleStatics::MakeObjectParameter(UObject* InValue, const FText InDescription)
 {
 	return FParameter::MakeObject(InValue, InDescription);
+}
+
+FParameter UParameterModuleStatics::MakeObjectInstParameter(UObject* InValue, const FText InDescription)
+{
+	return FParameter::MakeObjectInst(InValue, InDescription);
 }
 
 FParameter UParameterModuleStatics::MakeObjectPtrParameter(const TSoftObjectPtr<UObject> InValue, const FText InDescription)

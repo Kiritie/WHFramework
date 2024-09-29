@@ -32,7 +32,10 @@ void UCommonVisualAttachmentN::SynchronizeProperties()
 {
 	Super::SynchronizeProperties();
 
-	MyAttachmentBox->SetContentAnchor(ContentAnchor);
+	if(MyAttachmentBox)
+	{
+		MyAttachmentBox->SetContentAnchor(ContentAnchor);
+	}
 }
 
 FVector2D UCommonVisualAttachmentN::GetContentAnchor() const

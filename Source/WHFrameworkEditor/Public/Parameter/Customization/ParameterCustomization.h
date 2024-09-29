@@ -54,11 +54,15 @@ private:
 
 	TSharedPtr<IPropertyHandle> TagsValueHandle;
 
+	TSharedPtr<IPropertyHandle> BrushValueHandle;
+
 	TSharedPtr<IPropertyHandle> ClassValueHandle;
 
 	TSharedPtr<IPropertyHandle> ClassPtrValueHandle;
 
 	TSharedPtr<IPropertyHandle> ObjectValueHandle;
+
+	TSharedPtr<IPropertyHandle> ObjectInstValueHandle;
 
 	TSharedPtr<IPropertyHandle> ObjectPtrValueHandle;
 
