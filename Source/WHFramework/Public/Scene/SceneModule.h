@@ -10,6 +10,8 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_AsyncUnloadLevel;
+class UEventHandle_AsyncLoadLevel;
 class UEventHandle_PlayLevelSequence;
 class UEventHandle_SetActorVisible;
 class UEventHandle_SetDataLayerOwnerPlayer;
@@ -164,6 +166,12 @@ protected:
 	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
 	
 protected:
+	UFUNCTION()
+	void OnAsyncLoadLevel(UObject* InSender, UEventHandle_AsyncLoadLevel* InEventHandle);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevel(UObject* InSender, UEventHandle_AsyncUnloadLevel* InEventHandle);
+
 	UFUNCTION()
 	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
 	

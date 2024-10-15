@@ -10,7 +10,9 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
+#include "Event/Handle/Scene/EventHandle_AsyncLoadLevel.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
+#include "Event/Handle/Scene/EventHandle_AsyncUnloadLevel.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_PlayLevelSequence.h"
 #include "Event/Handle/Scene/EventHandle_SetActorVisible.h"
@@ -148,6 +150,8 @@ void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevel>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevel));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevel>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevel));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetActorVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetActorVisible));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_PlayLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnPlayLevelSequence));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerRuntimeState));
@@ -460,6 +464,18 @@ UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
 UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass) const
 {
 	return GetDeterminesOutputObject(WorldWeather, InClass);
+}
+
+void USceneModule::OnAsyncLoadLevel(UObject* InSender, UEventHandle_AsyncLoadLevel* InEventHandle)
+{
+	FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
+	AsyncLoadLevel(InEventHandle->LevelPath, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+}
+
+void USceneModule::OnAsyncUnloadLevel(UObject* InSender, UEventHandle_AsyncUnloadLevel* InEventHandle)
+{
+	FOnAsyncUnloadLevelFinished OnAsyncUnloadLevelFinished;
+	AsyncUnloadLevel(InEventHandle->LevelPath, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
 }
 
 void USceneModule::OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle)
