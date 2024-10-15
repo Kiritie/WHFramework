@@ -453,6 +453,8 @@ void UCommonButton::OnDespawn_Implementation(bool bRecovery)
 		SetSelectedInternal(false, false, false);
 	}
 
+	HoldReset();
+
 	RemoveFromParent();
 }
 

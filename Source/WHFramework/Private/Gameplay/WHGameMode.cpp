@@ -32,18 +32,12 @@ void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
-	}
+	
 }
 
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnTermination(MainModule, InPhase);
-	}
+	
 }
 
 bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor)

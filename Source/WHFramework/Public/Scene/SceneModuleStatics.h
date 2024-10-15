@@ -72,30 +72,30 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Traces
 	UFUNCTION(BlueprintPure)
-	static bool HasTraceMapping(const FName& InName, bool bEnsured = true);
+	static bool HasTraceMapping(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static FTraceMapping GetTraceMapping(const FName& InName, bool bEnsured = true);
+	static FTraceMapping GetTraceMapping(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel);
+	static void AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void RemoveTraceMapping(const FName& InName);
+	static void RemoveTraceMapping(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncLoadLevelFinished"), Category = "SceneModuleStatics")
-	static void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	static void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncUnloadLevelFinished"), Category = "SceneModuleStatics")
-	static void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	static void AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static float GetAsyncLoadLevelProgress(FName InLevelPath);
+	static float GetAsyncLoadLevelProgress(const FName InLevelPath);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static float GetAsyncUnloadLevelProgress(FName InLevelPath);
+	static float GetAsyncUnloadLevelProgress(const FName InLevelPath);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Actor
@@ -120,30 +120,30 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Target Point
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static bool HasTargetPointByName(FName InName, bool bEnsured = true);
+	static bool HasTargetPointByName(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static class ATargetPoint* GetTargetPointByName(FName InName, bool bEnsured = true);
+	static class ATargetPoint* GetTargetPointByName(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void AddTargetPointByName(FName InName, class ATargetPoint* InPoint);
+	static void AddTargetPointByName(const FName InName, class ATargetPoint* InPoint);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void RemoveTargetPointByName(FName InName);
+	static void RemoveTargetPointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Point
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static bool HasScenePointByName(FName InName, bool bEnsured = true);
+	static bool HasScenePointByName(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static USceneComponent* GetScenePointByName(FName InName, bool bEnsured = true);
+	static USceneComponent* GetScenePointByName(const FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void AddScenePointByName(FName InName, USceneComponent* InSceneComp);
+	static void AddScenePointByName(const FName InName, USceneComponent* InSceneComp);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void RemoveScenePointByName(FName InName);
+	static void RemoveScenePointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Physics Volume
@@ -154,25 +154,25 @@ public:
 	static bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
 	
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true);
+	static bool HasPhysicsVolumeByName(const FName InName, bool bEnsured = true);
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleStatics")
 	static APhysicsVolumeBase* GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass), Category = "SceneModuleStatics")
-	static APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true);
+	static APhysicsVolumeBase* GetPhysicsVolumeByName(const FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 	
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
+	static void AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void RemovePhysicsVolumeByName(FName InName);
+	static void RemovePhysicsVolumeByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// World Text

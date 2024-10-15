@@ -5,5 +5,5 @@
 
 FVector FWorldWidgetMapping::GetLocation() const
 {
-	return SceneComp ? (SocketName.IsNone() ? SceneComp->GetComponentLocation() : SceneComp->GetSocketLocation(SocketName)) + Location : Location;
+	return SceneComp ? (SceneComp->IsVisible() ? (SocketName.IsNone() ? SceneComp->GetComponentLocation() : SceneComp->GetSocketLocation(SocketName)) + Location : FVector(-1.f)) : Location;
 }

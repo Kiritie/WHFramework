@@ -46,6 +46,8 @@ protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return false; }
 
 public:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual UWorld* GetTickableGameObjectWorld() const override { return GetWorld(); }

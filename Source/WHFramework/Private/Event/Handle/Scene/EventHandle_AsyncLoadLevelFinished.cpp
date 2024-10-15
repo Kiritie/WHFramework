@@ -16,6 +16,6 @@ void UEventHandle_AsyncLoadLevelFinished::Parse_Implementation(const TArray<FPar
 {
 	if(InParams.IsValidIndex(0))
 	{
-		LevelPath = *InParams[0].GetStringValue();
+		LevelPath = InParams[0];
 	}
 }

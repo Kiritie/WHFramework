@@ -16,7 +16,8 @@ UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& Obj
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	WidgetInputMode = EInputMode::None;
 	
-	LoadingLevelPath = NAME_None;
+	LevelPath = NAME_None;
+	bUnloading = false;
 	LoadProgress = 0.f;
 	CurrentProgress = 0.f;
 }
@@ -30,12 +31,11 @@ void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool b
 
 	if(InParams.IsValidIndex(0))
 	{
-		LoadingLevelPath = *InParams[0].GetStringValue();
+		LevelPath = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		LoadProgress = InParams[1];
-		CurrentProgress = LoadProgress;
+		bUnloading = InParams[1];
 	}
 }
 
@@ -48,9 +48,9 @@ void UWidgetLoadingLevelPanel::OnRefresh()
 {
 	Super::OnRefresh();
 
-	if(!LoadingLevelPath.IsNone())
+	if(!LevelPath.IsNone())
 	{
-		const float Progress = USceneModuleStatics::GetAsyncLoadLevelProgress(LoadingLevelPath) * 0.5f;
+		const float Progress = bUnloading ? USceneModuleStatics::GetAsyncUnloadLevelProgress(LevelPath) : (USceneModuleStatics::GetAsyncLoadLevelProgress(LevelPath) * 0.5f);
 		if(Progress > LoadProgress)
 		{
 			LoadProgress = Progress;
@@ -72,6 +72,11 @@ void UWidgetLoadingLevelPanel::OnRefresh()
 		}
 		WHLog(FString::Printf(TEXT("Load level progress: %f"), CurrentProgress));
 	}
+}
+
+float UWidgetLoadingLevelPanel::GetLoadProgress(bool bSmoothness) const
+{
+	return bSmoothness ? CurrentProgress : LoadProgress;
 }
 
 void UWidgetLoadingLevelPanel::SetLoadProgress(float InLoadProgress, bool bSmoothness)

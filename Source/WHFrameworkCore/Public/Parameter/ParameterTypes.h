@@ -26,10 +26,12 @@ enum class EParameterType : uint8
 	Key,
 	Tag,
 	Tags,
+	Brush,
 	AssetID,
 	Class,
 	ClassPtr,
 	Object,
+	ObjectInst,
 	ObjectPtr,
 	Delegate,
 	Pointer UMETA(Hidden)
@@ -79,16 +81,16 @@ public:
 	}
 
 public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UEnum* EnumType;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString EnumName;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FString> EnumNames;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 EnumValue;
 };
 
@@ -98,7 +100,6 @@ struct WHFRAMEWORKCORE_API FParameter
 #if WITH_EDITOR
 	friend class FParameterCustomization;
 #endif
-	
 	GENERATED_USTRUCT_BODY()
 
 public:
@@ -120,10 +121,12 @@ public:
 		KeyValue = FKey();
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
+		BrushValue = FSlateBrush();
 		AssetIDValue = FPrimaryAssetId();
 		ClassValue = nullptr;
 		ClassPtrValue = nullptr;
 		ObjectValue = nullptr;
+		ObjectInstValue = nullptr;
 		ObjectPtrValue = nullptr;
 		PointerValue = nullptr;
 	}
@@ -213,6 +216,12 @@ public:
 		*this = MakeTags(InValue);
 	}
 		
+	FParameter(const FSlateBrush& InValue)
+	{
+		*this = MakeBrush(InValue);
+	}
+
+		
 	FParameter(const FPrimaryAssetId& InValue)
 	{
 		*this = MakeAssetID(InValue);
@@ -283,6 +292,9 @@ public:
 	
 	FORCEINLINE operator FGameplayTagContainer() const { return TagsValue; }
 		
+	FORCEINLINE operator FSlateBrush() const { return BrushValue; }
+
+		
 	FORCEINLINE operator FPrimaryAssetId() const { return AssetIDValue; }
 
 	FORCEINLINE operator UClass*() const { return ClassValue; }
@@ -322,10 +334,12 @@ public:
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
 			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
+			case EParameterType::Brush: return A.BrushValue == B.BrushValue;
 			case EParameterType::AssetID: return A.AssetIDValue == B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue == B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue == B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue == B.ObjectValue;
+			case EParameterType::ObjectInst: return A.ObjectInstValue == B.ObjectInstValue;
 			case EParameterType::ObjectPtr: return A.ObjectPtrValue == B.ObjectPtrValue;
 			case EParameterType::Delegate: return A.DelegateValue == B.DelegateValue;
 			case EParameterType::Pointer: return A.PointerValue == B.PointerValue;
@@ -351,10 +365,12 @@ public:
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
 			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
+			case EParameterType::Brush: return A.BrushValue != B.BrushValue;
 			case EParameterType::AssetID: return A.AssetIDValue != B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue != B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue != B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue != B.ObjectValue;
+			case EParameterType::ObjectInst: return A.ObjectInstValue != B.ObjectInstValue;
 			case EParameterType::ObjectPtr: return A.ObjectPtrValue != B.ObjectPtrValue;
 			case EParameterType::Delegate: return A.DelegateValue != B.DelegateValue;
 			case EParameterType::Pointer: return A.PointerValue != B.PointerValue;
@@ -364,70 +380,76 @@ public:
 	}
 
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EParameterType ParameterType;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Description;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 IntegerValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float FloatValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 ByteValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FEnumParameterValue EnumValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString StringValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName NameValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (MultiLine))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (MultiLine))
 	FText TextValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool BooleanValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector VectorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FRotator RotatorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FColor ColorValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKey KeyValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTag TagValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTagContainer TagsValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FSlateBrush BrushValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetIDValue;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UClass* ClassValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftClassPtr<UObject> ClassPtrValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UObject* ObjectValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
+	UObject* ObjectInstValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UObject> ObjectPtrValue;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSimpleDynamicDelegate DelegateValue;
 
 	void* PointerValue;
@@ -526,6 +548,11 @@ public:
 	void SetTagsValue(const FGameplayTagContainer& InTagsValue) { TagsValue = InTagsValue; }
 
 	//////////////////////////////////////////////////////////////////////////
+	FSlateBrush GetBrushValue() const { return BrushValue; }
+
+	void SetBrushValue(const FSlateBrush& InBrushValue) { BrushValue = InBrushValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	FPrimaryAssetId GetAssetIDValue() const { return AssetIDValue; }
 
 	void SetAssetIDValue(const FPrimaryAssetId& InAssetIDValue) { AssetIDValue = InAssetIDValue; }
@@ -552,6 +579,14 @@ public:
 	T* GetObjectValue() const { return Cast<T>(ObjectValue); }
 
 	void SetObjectValue(UObject* InValue) { ObjectValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	UObject* GetObjectInstValue() const { return ObjectInstValue; }
+
+	template<class T>
+	T* GetObjectInstValue() const { return Cast<T>(ObjectInstValue); }
+
+	void SetObjectInstValue(UObject* InValue) { ObjectInstValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	template<class T = UObject>
@@ -723,6 +758,15 @@ public:
 		return Parameter;
 	}
 
+	static FParameter MakeBrush(const FSlateBrush& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Brush;
+		Parameter.Description = InDescription;
+		Parameter.SetBrushValue(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakeAssetID(const FPrimaryAssetId& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
@@ -757,6 +801,15 @@ public:
 		Parameter.ParameterType = EParameterType::Object;
 		Parameter.Description = InDescription;
 		Parameter.SetObjectValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeObjectInst(UObject* InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::ObjectInst;
+		Parameter.Description = InDescription;
+		Parameter.SetObjectInstValue(InValue);
 		return Parameter;
 	}
 
@@ -821,16 +874,16 @@ public:
 	}
 
 public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRegistered;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (EditConditionHides, EditCondition = "bRegistered"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bRegistered"))
 	FText Category;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FParameter Parameter;
 };
 
@@ -840,7 +893,7 @@ struct WHFRAMEWORKCORE_API FParameters
 	GENERATED_USTRUCT_BODY()
 
 public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (TitleProperty = "Name"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "Name"))
 	TArray<FParameterSet> Sets;
 
 public:
@@ -901,7 +954,7 @@ public:
 	}
 
 protected:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<FString, FString> Map;
 
 public:

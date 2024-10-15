@@ -66,8 +66,6 @@ USceneModule::USceneModule()
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
 
-	LoadedLevels = TMap<FName, TSoftObjectPtr<UWorld>>();
-
 	SceneActors = TArray<AActor*>();
 	SceneActorMap = TMap<FGuid, AActor*>();
 
@@ -519,14 +517,14 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 	}
 }
 
-bool USceneModule::HasTraceMapping(const FName& InName, bool bEnsured) const
+bool USceneModule::HasTraceMapping(const FName InName, bool bEnsured) const
 {
 	if(TraceMappings.Contains(InName)) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No trace mapping, trace name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
-FTraceMapping USceneModule::GetTraceMapping(const FName& InName, bool bEnsured) const
+FTraceMapping USceneModule::GetTraceMapping(const FName InName, bool bEnsured) const
 {
 	if(HasTraceMapping(InName, bEnsured))
 	{
@@ -535,7 +533,7 @@ FTraceMapping USceneModule::GetTraceMapping(const FName& InName, bool bEnsured) 
 	return FTraceMapping();
 }
 
-void USceneModule::AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel)
+void USceneModule::AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel)
 {
 	if(!TraceMappings.Contains(InName))
 	{
@@ -543,7 +541,7 @@ void USceneModule::AddTraceMapping(const FName& InName, ECollisionChannel InTrac
 	}
 }
 
-void USceneModule::RemoveTraceMapping(const FName& InName)
+void USceneModule::RemoveTraceMapping(const FName InName)
 {
 	if(TraceMappings.Contains(InName))
 	{
@@ -591,14 +589,14 @@ bool USceneModule::RemoveSceneActor(AActor* InActor)
 	return false;
 }
 
-bool USceneModule::HasTargetPointByName(FName InName, bool bEnsured) const
+bool USceneModule::HasTargetPointByName(const FName InName, bool bEnsured) const
 {
 	if(TargetPoints.Contains(InName)) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No TargetPoint, TargetPoint name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
-ATargetPoint* USceneModule::GetTargetPointByName(FName InName, bool bEnsured) const
+ATargetPoint* USceneModule::GetTargetPointByName(const FName InName, bool bEnsured) const
 {
 	if(HasTargetPointByName(InName, bEnsured))
 	{
@@ -607,7 +605,7 @@ ATargetPoint* USceneModule::GetTargetPointByName(FName InName, bool bEnsured) co
 	return nullptr;
 }
 
-void USceneModule::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
+void USceneModule::AddTargetPointByName(const FName InName, ATargetPoint* InPoint)
 {
 	if(!TargetPoints.Contains(InName))
 	{
@@ -619,7 +617,7 @@ void USceneModule::AddTargetPointByName(FName InName, ATargetPoint* InPoint)
 	}
 }
 
-void USceneModule::RemoveTargetPointByName(FName InName)
+void USceneModule::RemoveTargetPointByName(const FName InName)
 {
 	if(TargetPoints.Contains(InName))
 	{
@@ -627,14 +625,14 @@ void USceneModule::RemoveTargetPointByName(FName InName)
 	}
 }
 
-bool USceneModule::HasScenePointByName(FName InName, bool bEnsured) const
+bool USceneModule::HasScenePointByName(const FName InName, bool bEnsured) const
 {
 	if(ScenePoints.Contains(InName)) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No ScenePoint, ScenePoint name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
 	return false;
 }
 
-USceneComponent* USceneModule::GetScenePointByName(FName InName, bool bEnsured) const
+USceneComponent* USceneModule::GetScenePointByName(const FName InName, bool bEnsured) const
 {
 	if(HasScenePointByName(InName, bEnsured))
 	{
@@ -643,7 +641,7 @@ USceneComponent* USceneModule::GetScenePointByName(FName InName, bool bEnsured) 
 	return nullptr;
 }
 
-void USceneModule::AddScenePointByName(FName InName, USceneComponent* InSceneComp)
+void USceneModule::AddScenePointByName(const FName InName, USceneComponent* InSceneComp)
 {
 	if(!ScenePoints.Contains(InName))
 	{
@@ -651,7 +649,7 @@ void USceneModule::AddScenePointByName(FName InName, USceneComponent* InSceneCom
 	}
 }
 
-void USceneModule::RemoveScenePointByName(FName InName)
+void USceneModule::RemoveScenePointByName(const FName InName)
 {
 	if(ScenePoints.Contains(InName))
 	{
@@ -670,7 +668,7 @@ bool USceneModule::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InCla
 	return false;
 }
 
-bool USceneModule::HasPhysicsVolumeByName(FName InName, bool bEnsured) const
+bool USceneModule::HasPhysicsVolumeByName(const FName InName, bool bEnsured) const
 {
 	if(PhysicsVolumes.Contains(InName)) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No PhysicsVolume, PhysicsVolume name: %s"), *InName.ToString()), EDC_Scene, EDV_Error);
@@ -688,7 +686,7 @@ APhysicsVolumeBase* USceneModule::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVo
 	return nullptr;
 }
 
-APhysicsVolumeBase* USceneModule::GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
+APhysicsVolumeBase* USceneModule::GetPhysicsVolumeByName(const FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured) const
 {
 	if(HasPhysicsVolumeByName(InName, bEnsured))
 	{
@@ -704,7 +702,7 @@ void USceneModule::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 	AddPhysicsVolumeByName(InPhysicsVolume->GetVolumeName(), InPhysicsVolume);
 }
 
-void USceneModule::AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume)
+void USceneModule::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
 	if(!InPhysicsVolume) return;
 	
@@ -721,7 +719,7 @@ void USceneModule::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 	RemovePhysicsVolumeByName(InPhysicsVolume->GetVolumeName());
 }
 
-void USceneModule::RemovePhysicsVolumeByName(FName InName)
+void USceneModule::RemovePhysicsVolumeByName(const FName InName)
 {
 	if(PhysicsVolumes.Contains(InName))
 	{
@@ -752,116 +750,103 @@ void USceneModule::SetOutlineColor(const FLinearColor& InColor)
 	}
 }
 
-void USceneModule::AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModule::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
+	WHLog(TEXT("Start load level: %s") + InLevelPath.ToString(), EDC_Scene);
+
 	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	if(!LoadedLevels.Contains(InLevelPath))
+
+	if(bCreateLoadingWidget)
 	{
-		if(bCreateLoadingWidget)
+		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>({ InLevelPath, false });
+	}
+	
+	LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, InLevelPath, InOnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget](const FName PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
+		if(Result == EAsyncLoadingResult::Failed)
 		{
-			TArray<FParameter> Parameters { InLevelPath.ToString(), false };
-			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
+			WHLog(TEXT("Load level failed!"));
 		}
-		WHLog(TEXT("Start load level: %s") + LoadPackagePath, EDC_Scene);
-		LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, LoadPackagePath, InLevelPath, InOnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget](const FName& PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-			if(Result == EAsyncLoadingResult::Failed)
+		else if(Result == EAsyncLoadingResult::Succeeded)
+		{
+			WHLog(TEXT("Load level successed!"));
+			if(InFinishDelayTime > 0.f)
 			{
-				WHLog(TEXT("Load level failed!"));
+				FTimerHandle TimerHandle;
+				GetWorld()->GetTimerManager().SetTimer(TimerHandle, FTimerDelegate::CreateUObject(this, &USceneModule::OnAsyncLoadLevelFinished, InLevelPath, InOnAsyncLoadLevelFinished, bCreateLoadingWidget), InFinishDelayTime, false);
 			}
-			else if(Result == EAsyncLoadingResult::Succeeded)
+			else
 			{
-				WHLog(TEXT("Load level successed!"));
-				LoadedLevels.Add(InLevelPath, LoadedPackage);
-				if(InFinishDelayTime > 0.f)
-				{
-					FTimerHandle TimerHandle;
-					FTimerDelegate TimerDelegate;
-					TimerDelegate.BindUObject(this, &USceneModule::OnAsyncLoadLevelFinished, InLevelPath, InOnAsyncLoadLevelFinished);
-					GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
-				}
-				else
-				{
-					OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
-				}
+				OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished, bCreateLoadingWidget);
 			}
-		}), 0, PKG_ContainsMap);
+		}
+	}), 0, PKG_ContainsMap);
+}
+
+void USceneModule::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	WHLog(TEXT("Start unload level: ") + InLevelPath.ToString());
+
+	if(bCreateLoadingWidget)
+	{
+		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>({ InLevelPath, true });
+	}
+	
+	FLatentActionInfo LatentActionInfo;
+	UGameplayStatics::UnloadStreamLevel(this, InLevelPath, LatentActionInfo, false);
+	
+	if(InFinishDelayTime > 0.f)
+	{
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, FTimerDelegate::CreateUObject(this, &USceneModule::OnAsyncUnloadLevelFinished, InLevelPath, InOnAsyncUnloadLevelFinished, bCreateLoadingWidget), InFinishDelayTime, false);
 	}
 	else
 	{
-		OnAsyncLoadLevelFinished(InLevelPath, InOnAsyncLoadLevelFinished);
+		OnAsyncUnloadLevelFinished(InLevelPath, InOnAsyncUnloadLevelFinished, bCreateLoadingWidget);
 	}
 }
 
-void USceneModule::AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
-{
-	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	if(LoadedLevels.Contains(InLevelPath))
-	{
-		FLatentActionInfo LatentActionInfo;
-		UGameplayStatics::UnloadStreamLevel(this, *LoadPackagePath, LatentActionInfo, false);
-		if(bCreateLoadingWidget)
-		{
-			TArray<FParameter> Parameters { InLevelPath.ToString(), true };
-			UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(&Parameters);
-		}
-		WHLog(TEXT("Start unload level: ") + LoadPackagePath);
-		if(InFinishDelayTime > 0.f)
-		{
-			FTimerHandle TimerHandle;
-			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &USceneModule::OnAsyncUnloadLevelFinished, InLevelPath, InOnAsyncUnloadLevelFinished);
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, InFinishDelayTime, false);
-		}
-		else
-		{
-			OnAsyncUnloadLevelFinished(InLevelPath, InOnAsyncUnloadLevelFinished);
-		}
-		if(bCreateLoadingWidget && UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>())
-		{
-			UWidgetModuleStatics::GetUserWidget<UWidgetLoadingLevelPanel>()->SetLoadProgress(1.f);
-		}
-		LoadedLevels.Remove(InLevelPath);
-	}
-}
-
-float USceneModule::GetAsyncLoadLevelProgress(FName InLevelPath) const
+float USceneModule::GetAsyncLoadLevelProgress(const FName InLevelPath) const
 {
 	const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
 	return GetAsyncLoadPercentage(*LoadPackagePath) / 100.f;
 }
 
-float USceneModule::GetAsyncUnloadLevelProgress(FName InLevelPath) const
+float USceneModule::GetAsyncUnloadLevelProgress(const FName InLevelPath) const
 {
 	return 1.f;
 }
 
-void USceneModule::OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished)
+void USceneModule::OnAsyncLoadLevelFinished(const FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished, bool bDestroyLoadingWidget)
 {
+	FLatentActionInfo LatentActionInfo;
+	UGameplayStatics::LoadStreamLevel(this, InLevelPath, true, false, LatentActionInfo);
+
 	WHLog(TEXT("Load level Succeeded!"));
+
+	if(bDestroyLoadingWidget)
+	{
+		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+	}
 
 	if(InOnAsyncLoadLevelFinished.IsBound())
 	{
 		InOnAsyncLoadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
-
-	FLatentActionInfo LatentActionInfo;
-	UGameplayStatics::LoadStreamLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true, false, LatentActionInfo);
-
-	// UGameplayStatics::OpenLevelBySoftObjectPtr(this, LoadedLevels[InLevelPath], true);
-
-	//UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InLevelPath }, EEventNetType::Multicast);
 }
 
-void USceneModule::OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished)
+void USceneModule::OnAsyncUnloadLevelFinished(const FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished, bool bDestroyLoadingWidget)
 {
 	WHLog(TEXT("Unload level Succeeded!"));
 
-	UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+	if(bDestroyLoadingWidget)
+	{
+		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
+	}
 	
 	if(InOnAsyncUnloadLevelFinished.IsBound())
 	{
 		InOnAsyncUnloadLevelFinished.Execute(InLevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InLevelPath.ToString() }, EEventNetType::Multicast);
+	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InLevelPath }, EEventNetType::Multicast);
 }
