@@ -7,7 +7,7 @@
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
-#include "Ability/Character/States/AbilityCharacterState_Default.h"
+#include "Ability/Character/States/AbilityCharacterState_Spawn.h"
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
 #include "Ability/Character/States/AbilityCharacterState_Static.h"
@@ -51,9 +51,12 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Character");
-	FSM->DefaultState = UAbilityCharacterState_Default::StaticClass();
+	
+	FSM->DefaultState = UAbilityCharacterState_Spawn::StaticClass();
+	FSM->FinalState = UAbilityCharacterState_Death::StaticClass();
+	
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Default::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
@@ -309,16 +312,12 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	if(InKiller)
-	{
-		InKiller->Kill(this);
-	}
-	FSM->SwitchStateByClass<UAbilityCharacterState_Death>({ InKiller });
+	FSM->SwitchFinalState({ InKiller });
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	
+	InTarget->Death(this);
 }
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
@@ -350,6 +349,19 @@ void AAbilityCharacterBase::UnJump()
 	}
 }
 
+void AAbilityCharacterBase::Static()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Static>();
+}
+
+void AAbilityCharacterBase::UnStatic()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Static>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
 bool AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(InPickUp)
@@ -373,7 +385,7 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 {
 }
 
-void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	
 }
@@ -388,17 +400,7 @@ void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassi
 
 }
 
-void AAbilityCharacterBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AAbilityCharacterBase::OnAssembleItem(const FAbilityItem& InItem)
-{
-
-}
-
-void AAbilityCharacterBase::OnDischargeItem(const FAbilityItem& InItem)
+void AAbilityCharacterBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 
 }
@@ -592,7 +594,14 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float Loc
 
 	if(GetHealth() <= 0.f)
 	{
-		Death(Cast<IAbilityVitalityInterface>(SourceActor));
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
 	}
 
 	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));

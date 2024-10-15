@@ -21,8 +21,6 @@ UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectI
 	WidgetInputMode = EInputMode::UIOnly;
 	WidgetCreateType = EWidgetCreateType::AutoCreate;
 	WidgetCloseType = EWidgetCloseType::Remove;
-
-	bWidgetPenetrable = true;
 }
 
 void UWidgetSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)

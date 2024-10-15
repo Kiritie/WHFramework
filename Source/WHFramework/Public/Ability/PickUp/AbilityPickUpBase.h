@@ -33,7 +33,7 @@ public:
 	virtual void OnInitialize_Implementation() override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 	
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -52,7 +52,7 @@ protected:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 protected:
 	UFUNCTION()

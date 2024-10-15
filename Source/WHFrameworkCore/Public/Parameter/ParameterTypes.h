@@ -26,6 +26,7 @@ enum class EParameterType : uint8
 	Key,
 	Tag,
 	Tags,
+	AssetID,
 	Class,
 	ClassPtr,
 	Object,
@@ -119,6 +120,7 @@ public:
 		KeyValue = FKey();
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
+		AssetIDValue = FPrimaryAssetId();
 		ClassValue = nullptr;
 		ClassPtrValue = nullptr;
 		ObjectValue = nullptr;
@@ -210,6 +212,11 @@ public:
 	{
 		*this = MakeTags(InValue);
 	}
+		
+	FParameter(const FPrimaryAssetId& InValue)
+	{
+		*this = MakeAssetID(InValue);
+	}
 
 	FParameter(UClass* InValue)
 	{
@@ -275,7 +282,9 @@ public:
 	FORCEINLINE operator FGameplayTag() const { return TagValue; }
 	
 	FORCEINLINE operator FGameplayTagContainer() const { return TagsValue; }
-	
+		
+	FORCEINLINE operator FPrimaryAssetId() const { return AssetIDValue; }
+
 	FORCEINLINE operator UClass*() const { return ClassValue; }
 	
 	template<class T>
@@ -313,6 +322,7 @@ public:
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
 			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
+			case EParameterType::AssetID: return A.AssetIDValue == B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue == B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue == B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue == B.ObjectValue;
@@ -341,6 +351,7 @@ public:
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
 			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
+			case EParameterType::AssetID: return A.AssetIDValue != B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue != B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue != B.ClassPtrValue;
 			case EParameterType::Object: return A.ObjectValue != B.ObjectValue;
@@ -400,6 +411,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FGameplayTagContainer TagsValue;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FPrimaryAssetId AssetIDValue;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UClass* ClassValue;
@@ -509,7 +523,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	FGameplayTagContainer GetTagsValue() const { return TagsValue; }
 
-	void SetTagsValue(const FGameplayTagContainer& InTagValue) { TagsValue = InTagValue; }
+	void SetTagsValue(const FGameplayTagContainer& InTagsValue) { TagsValue = InTagsValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FPrimaryAssetId GetAssetIDValue() const { return AssetIDValue; }
+
+	void SetAssetIDValue(const FPrimaryAssetId& InAssetIDValue) { AssetIDValue = InAssetIDValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	UClass* GetClassValue() const { return ClassValue; }
@@ -701,6 +720,15 @@ public:
 		Parameter.ParameterType = EParameterType::Tags;
 		Parameter.Description = InDescription;
 		Parameter.SetTagsValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeAssetID(const FPrimaryAssetId& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::AssetID;
+		Parameter.Description = InDescription;
+		Parameter.SetAssetIDValue(InValue);
 		return Parameter;
 	}
 

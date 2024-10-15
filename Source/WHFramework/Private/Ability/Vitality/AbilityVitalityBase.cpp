@@ -6,7 +6,7 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
-#include "Ability/Vitality/States/AbilityVitalityState_Default.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
 #include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
@@ -20,8 +20,11 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 {
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
-	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
-	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
+	
+	FSM->DefaultState = UAbilityVitalityState_Spawn::StaticClass();
+	FSM->FinalState = UAbilityVitalityState_Death::StaticClass();
+
+	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
 
 	// stats
@@ -89,16 +92,12 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	if(InKiller)
-	{
-		InKiller->Kill(this);
-	}
-	FSM->SwitchStateByClass<UAbilityVitalityState_Death>({ InKiller });
+	FSM->SwitchFinalState({ InKiller });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	
+	InTarget->Death(this);
 }
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
@@ -121,9 +120,9 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 	Super::OnLeaveInteract(InInteractionAgent);
 }
 
-void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	Super::OnInteract(InInteractAction, InInteractionAgent, bPassivity);
+	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
 }
 
 void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
@@ -131,19 +130,9 @@ void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassiv
 	Super::OnActiveItem(InItem, bPassive, bSuccess);
 }
 
-void AAbilityVitalityBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
+void AAbilityVitalityBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
-	Super::OnCancelItem(InItem, bPassive);
-}
-
-void AAbilityVitalityBase::OnAssembleItem(const FAbilityItem& InItem)
-{
-	Super::OnAssembleItem(InItem);
-}
-
-void AAbilityVitalityBase::OnDischargeItem(const FAbilityItem& InItem)
-{
-	Super::OnDischargeItem(InItem);
+	Super::OnDeactiveItem(InItem, bPassive);
 }
 
 void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
@@ -240,7 +229,14 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float Loca
 
 	if (GetHealth() <= 0.f)
 	{
-		Death(Cast<IAbilityVitalityInterface>(SourceActor));
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
 	}
 
 	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));

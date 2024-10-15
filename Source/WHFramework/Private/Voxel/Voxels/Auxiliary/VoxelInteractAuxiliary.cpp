@@ -76,9 +76,9 @@ void AVoxelInteractAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInte
 {
 }
 
-void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	if(bPassivity)
+	if(bPassive)
 	{
 		switch ((EVoxelInteractAction)InInteractAction)
 		{

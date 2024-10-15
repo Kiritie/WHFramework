@@ -2,7 +2,7 @@
 
 #include "Ability/Character/AbilityCharacterInventoryBase.h"
 
-#include "Ability/Inventory/Slot/AbilityInventorySkillSlot.h"
+#include "Ability/Inventory/Slot/AbilityInventorySkillSlotBase.h"
 
 UAbilityCharacterInventoryBase::UAbilityCharacterInventoryBase()
 {
@@ -22,19 +22,4 @@ FSaveData* UAbilityCharacterInventoryBase::ToData()
 void UAbilityCharacterInventoryBase::UnloadData(EPhase InPhase)
 {
 	Super::UnloadData(InPhase);
-}
-
-FItemQueryInfo UAbilityCharacterInventoryBase::QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
-{
-	return Super::QueryItemByRange(InActionType, InItem, InStartIndex, InEndIndex);
-}
-
-void UAbilityCharacterInventoryBase::DiscardAllItem()
-{
-	Super::DiscardAllItem();
-}
-
-void UAbilityCharacterInventoryBase::ClearAllItem()
-{
-	Super::ClearAllItem();
 }

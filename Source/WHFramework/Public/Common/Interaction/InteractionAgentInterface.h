@@ -41,7 +41,7 @@ protected:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) = 0;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) = 0;
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)

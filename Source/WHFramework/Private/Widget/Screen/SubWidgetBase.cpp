@@ -13,13 +13,14 @@ USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Su
 
 void USubWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-
+	Super::OnSpawn_Implementation(InOwner, InParams);
 }
 
 void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
+	Super::OnDespawn_Implementation(bRecovery);
+	
 	OwnerWidget = nullptr;
-	RemoveFromParent();
 }
 
 void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
@@ -75,6 +76,11 @@ void USubWidgetBase::Destroy(bool bRecovery)
 	{
 		OwnerWidget->DestroySubWidget(this, bRecovery);
 	}
+}
+
+UUserWidgetBase* USubWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass) const
+{
+	return GetDeterminesOutputObject(OwnerWidget, InClass);
 }
 
 TArray<UWidget*> USubWidgetBase::GetAllPoolWidgets() const

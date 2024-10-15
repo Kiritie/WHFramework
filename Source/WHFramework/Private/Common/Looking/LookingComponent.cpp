@@ -93,6 +93,7 @@ bool ULookingComponent::DoLookAtTarget(AActor* InTargetActor)
 
 FRotator ULookingComponent::GetLookingRotation(AActor* InTargetActor) const
 {
+	if(!InTargetActor) InTargetActor = LookingTarget;
 	const FVector TargetDirection = InTargetActor->GetActorLocation() - OwnerActor->GetActorLocation();
 	return TargetDirection.ToOrientationRotator();
 }

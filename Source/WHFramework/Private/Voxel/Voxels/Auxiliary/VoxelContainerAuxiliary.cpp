@@ -58,17 +58,7 @@ void AVoxelContainerAuxiliary::OnActiveItem(const FAbilityItem& InItem, bool bPa
 
 }
 
-void AVoxelContainerAuxiliary::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AVoxelContainerAuxiliary::OnAssembleItem(const FAbilityItem& InItem)
-{
-
-}
-
-void AVoxelContainerAuxiliary::OnDischargeItem(const FAbilityItem& InItem)
+void AVoxelContainerAuxiliary::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 
 }

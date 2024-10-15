@@ -11,4 +11,8 @@ class WHFRAMEWORK_API UAbilityCoinDataBase : public UAbilityItemDataBase
 
 public:
 	UAbilityCoinDataBase();
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 Unit;
 };

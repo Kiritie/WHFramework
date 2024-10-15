@@ -4,7 +4,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Common/Base/WHObject.h"
-#include "AbilityInventorySlot.generated.h"
+#include "AbilityInventorySlotBase.generated.h"
 
 class UAbilityInventoryBase;
 
@@ -12,12 +12,12 @@ class UAbilityInventoryBase;
  * 物品槽
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityInventorySlot : public UWHObject
+class WHFRAMEWORK_API UAbilityInventorySlotBase : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityInventorySlot();
+	UAbilityInventorySlotBase();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Properties
@@ -33,7 +33,10 @@ protected:
 		
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	ESlotSplitType SplitType;
-	
+			
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	int32 SlotIndex;
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotRefresh OnInventorySlotRefresh;
@@ -83,7 +86,7 @@ public:
 	virtual void Refresh();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Replace(UAbilityInventorySlot* InSlot);
+	virtual void Replace(UAbilityInventorySlotBase* InSlot);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetItem(FAbilityItem& InItem, bool bRefresh = true);

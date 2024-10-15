@@ -5,6 +5,7 @@
 
 #include "AbilityItemDataBase.generated.h"
 
+class UItemAbilityBase;
 class AAbilityPickUpBase;
 
 UCLASS(BlueprintType)
@@ -35,7 +36,7 @@ public:
 	int32 MaxLevel;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSubclassOf<class UItemAbilityBase> AbilityClass;
+	TSubclassOf<UItemAbilityBase> AbilityClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityPickUpBase> PickUpClass;

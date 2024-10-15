@@ -3,7 +3,8 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlot.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
@@ -121,6 +122,51 @@ FAbilityItems FInventorySlots::GetItems()
 		Items.Items.Add(Iter->GetItem());
 	}
 	return Items;
+}
+
+void FInventorySaveData::CopyAllItem(FInventorySaveData SaveData)
+{
+	SplitItems = SaveData.SplitItems;
+}
+
+void FInventorySaveData::AddItem(FAbilityItem InItem)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.AddItemByRange(InItem, 0, -1, false);
+
+	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::RemoveItem(FAbilityItem InItem)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.RemoveItemByRange(InItem, 0, -1);
+
+	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::ClearItem(FAbilityItem InItem)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.ClearItem(InItem);
+
+	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::ClearAllItem()
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.ClearAllItem();
+
+	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
 UAbilityItemDataBase& FActorSaveData::GetItemData() const

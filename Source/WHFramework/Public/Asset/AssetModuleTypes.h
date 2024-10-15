@@ -89,11 +89,6 @@ public:
 		LoadedClass = nullptr;
 	}
 
-	FStaticClass(UClass* InBaseClass) : FStaticClass()
-	{
-		BaseClass = InBaseClass;
-	}
-
 	FStaticClass(UClass* InBaseClass, const FString& InClassName) : FStaticClass()
 	{
 		BaseClass = InBaseClass;
@@ -145,11 +140,6 @@ public:
 		BaseClass = nullptr;
 		ObjectName = TEXT("");
 		LoadedObject = nullptr;
-	}
-
-	FStaticObject(UClass* InBaseClass) : FStaticObject()
-	{
-		BaseClass = InBaseClass;
 	}
 
 	FStaticObject(UClass* InBaseClass, const FString& InObjectName) : FStaticObject()

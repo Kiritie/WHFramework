@@ -21,18 +21,3 @@ void UAbilityPawnInventoryBase::UnloadData(EPhase InPhase)
 {
 	Super::UnloadData(InPhase);
 }
-
-void UAbilityPawnInventoryBase::DiscardAllItem()
-{
-	Super::DiscardAllItem();
-}
-
-void UAbilityPawnInventoryBase::ClearAllItem()
-{
-	Super::ClearAllItem();
-}
-
-FItemQueryInfo UAbilityPawnInventoryBase::QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
-{
-	return Super::QueryItemByRange(InActionType, InItem, InStartIndex, InEndIndex);
-}

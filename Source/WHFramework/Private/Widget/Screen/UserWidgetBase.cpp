@@ -26,7 +26,6 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ParentSlot = NAME_None;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
@@ -51,107 +50,17 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
-FReply UUserWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UUserWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
-{
-	
-}
-
 void UUserWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }
 
 void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
+{
+	
+}
+
+void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
 	
 }
@@ -216,6 +125,8 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	OwnerObject = InOwner;
+
 	WidgetParams = InParams;
 
 	K2_OnInitialize(InOwner, InParams);
@@ -436,8 +347,6 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams,
 {
 	if(!InOwner || OwnerObject != InOwner || bForce)
 	{
-		OwnerObject = InOwner;
-
 		OnInitialize(InOwner, InParams);
 		
 		for(auto& Iter : ChildWidgets)

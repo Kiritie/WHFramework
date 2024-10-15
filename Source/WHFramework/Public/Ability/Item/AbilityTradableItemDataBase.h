@@ -2,22 +2,20 @@
 
 #include "AbilityItemDataBase.h"
 
-#include "AbilityPriceItemDataBase.generated.h"
-
-class AAbilityPickUpBase;
+#include "AbilityTradableItemDataBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityPriceItemDataBase : public UAbilityItemDataBase
+class WHFRAMEWORK_API UAbilityTradableItemDataBase : public UAbilityItemDataBase
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityPriceItemDataBase();
+	UAbilityTradableItemDataBase();
 
 public:
 	virtual void ResetData_Implementation() override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Price;
+	TArray<FAbilityItem> Prices;
 };

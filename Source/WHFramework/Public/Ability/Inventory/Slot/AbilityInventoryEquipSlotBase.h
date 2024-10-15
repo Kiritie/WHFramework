@@ -2,19 +2,19 @@
 
 #pragma once
 
-#include "AbilityInventorySlot.h"
-#include "AbilityInventoryEquipSlot.generated.h"
+#include "AbilityInventorySlotBase.h"
+#include "AbilityInventoryEquipSlotBase.generated.h"
 
 /**
  * װ����
  */
 UCLASS()
-class WHFRAMEWORK_API UAbilityInventoryEquipSlot : public UAbilityInventorySlot
+class WHFRAMEWORK_API UAbilityInventoryEquipSlotBase : public UAbilityInventorySlotBase
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityInventoryEquipSlot();
+	UAbilityInventoryEquipSlotBase();
 
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;

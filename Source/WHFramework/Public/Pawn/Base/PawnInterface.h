@@ -36,4 +36,8 @@ public:
 	virtual void SetNameP(FName InName) = 0;
 
 	virtual AController* GetDefaultController() const = 0;
+
+	virtual bool IsUseControllerRotation() const = 0;
+
+	virtual void SetUseControllerRotation(bool bValue) = 0;
 };

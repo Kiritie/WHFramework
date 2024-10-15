@@ -121,8 +121,6 @@ protected:
 
 	int32 WidgetZOrder;
 
-	bool bWidgetPenetrable;
-
 	FAnchors WidgetAnchors;
 
 	bool bWidgetAutoSize;
@@ -144,6 +142,8 @@ protected:
 	EInputMode WidgetInputMode;
 
 	EScreenWidgetState WidgetState;
+
+	bool bConsumePointerInput;
 
 	UObject* OwnerObject;
 	
@@ -171,8 +171,6 @@ public:
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
-
-	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
 
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 

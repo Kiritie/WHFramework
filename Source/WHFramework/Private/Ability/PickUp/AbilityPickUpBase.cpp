@@ -124,9 +124,9 @@ void AAbilityPickUpBase::OnLeaveInteract(IInteractionAgentInterface* InInteracti
 {
 }
 
-void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	if(bPassivity)
+	if(bPassive)
 	{
 		switch (InInteractAction)
 		{

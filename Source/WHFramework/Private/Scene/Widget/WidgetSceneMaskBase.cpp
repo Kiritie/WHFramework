@@ -7,7 +7,6 @@ UWidgetSceneMaskBase::UWidgetSceneMaskBase(const FObjectInitializer& ObjectIniti
 	WidgetName = FName("SceneMask");
 	WidgetType = EWidgetType::Permanent;
 	WidgetZOrder = -1;
-	bWidgetPenetrable = false;
 	WidgetInputMode = EInputMode::UIOnly;
 	SetIsFocusable(true);
 }

@@ -54,6 +54,8 @@ private:
 
 	TSharedPtr<IPropertyHandle> TagsValueHandle;
 
+	TSharedPtr<IPropertyHandle> AssetIDValueHandle;
+
 	TSharedPtr<IPropertyHandle> ClassValueHandle;
 
 	TSharedPtr<IPropertyHandle> ClassPtrValueHandle;

@@ -22,11 +22,4 @@ protected:
 	virtual FSaveData* ToData() override;
 
 	virtual void UnloadData(EPhase InPhase) override;
-
-public:
-	virtual void DiscardAllItem() override;
-
-	virtual void ClearAllItem() override;
-
-	virtual FItemQueryInfo QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1) override;
 };

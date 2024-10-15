@@ -4,24 +4,24 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Widget/Screen/SubWidgetBase.h"
-#include "WidgetInventorySlotBase.generated.h"
+#include "WidgetAbilityInventorySlotBase.generated.h"
 
-class UAbilityInventorySlot;
+class UAbilityInventorySlotBase;
 class UAbilityInventoryBase;
 
 /**
  * UI物品槽
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetInventorySlotBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityInventorySlotBase : public USubWidgetBase
 {
 	GENERATED_BODY()
 
 public:
-	UWidgetInventorySlotBase(const FObjectInitializer& ObjectInitializer);
+	UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -84,11 +84,19 @@ public:
 	void DiscardItem(int InCount = -1);
 	
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true), Category = "Style")
+	TSubclassOf<UCommonButtonStyle> MatchStyle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true), Category = "Style")
+	TSubclassOf<UCommonButtonStyle> MismatchStyle;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FText KeyCode;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UAbilityInventorySlot* OwnerSlot;
+	UAbilityInventorySlotBase* OwnerSlot;
+
+	TSubclassOf<UCommonButtonStyle> DefaultStyle;
 
 	FTimerHandle CooldownTimerHandle;
 
@@ -98,16 +106,16 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsCooldowning() const;
+	
 	FText GetKeyCode() const { return KeyCode; }
 	
 	void SetKeyCode(const FText& InKeyCode) { this->KeyCode = InKeyCode; }
-
 
 	UFUNCTION(BlueprintPure)
 	FAbilityItem& GetItem() const;
 
 	UFUNCTION(BlueprintPure)
-	UAbilityInventorySlot* GetOwnerSlot() const { return OwnerSlot; }
+	UAbilityInventorySlotBase* GetOwnerSlot() const { return OwnerSlot; }
 
 	UFUNCTION(BlueprintPure)
 	UAbilityInventoryBase* GetInventory() const;

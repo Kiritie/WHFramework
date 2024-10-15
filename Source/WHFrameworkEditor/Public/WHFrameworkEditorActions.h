@@ -18,6 +18,8 @@ public:
 
 	// TCommands<> interface
 	virtual void RegisterCommands() override;
+
+	static void MapActions(TSharedRef<FUICommandList>& ToolkitCommands);
 };
 
 //////////////////////////////////////////////////////////////////////////

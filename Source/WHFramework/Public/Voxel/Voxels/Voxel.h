@@ -26,7 +26,7 @@ public:
 	UVoxel();
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Object
+	// Reference
 public:
 	virtual void OnReset_Implementation() override;
 

@@ -7,7 +7,7 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Death.h"
-#include "Ability/Pawn/States/AbilityPawnState_Default.h"
+#include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonStatics.h"
@@ -37,8 +37,11 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
-	FSM->DefaultState = UAbilityPawnState_Default::StaticClass();
-	FSM->States.Add(UAbilityPawnState_Default::StaticClass());
+	
+	FSM->DefaultState = UAbilityPawnState_Spawn::StaticClass();
+	FSM->FinalState = UAbilityPawnState_Death::StaticClass();
+	
+	FSM->States.Add(UAbilityPawnState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityPawnState_Death::StaticClass());
 
 	// stats
@@ -179,16 +182,12 @@ void AAbilityPawnBase::Serialize(FArchive& Ar)
 
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	if(InKiller)
-	{
-		InKiller->Kill(this);
-	}
-	FSM->SwitchStateByClass<UAbilityPawnState_Death>({ InKiller });
+	FSM->SwitchFinalState({ InKiller });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	
+	InTarget->Death(this);
 }
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
@@ -209,7 +208,7 @@ void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteraction
 {
 }
 
-void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	
 }
@@ -224,17 +223,7 @@ void AAbilityPawnBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, b
 
 }
 
-void AAbilityPawnBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AAbilityPawnBase::OnAssembleItem(const FAbilityItem& InItem)
-{
-
-}
-
-void AAbilityPawnBase::OnDischargeItem(const FAbilityItem& InItem)
+void AAbilityPawnBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 
 }
@@ -363,7 +352,14 @@ void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDam
 
 	if (GetHealth() <= 0.f)
 	{
-		Death(Cast<IAbilityVitalityInterface>(SourceActor));
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
 	}
 
 	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));

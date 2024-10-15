@@ -12,13 +12,10 @@
 // Sets default values
 AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
-
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
 	SphereComponent->SetupAttachment(RootComponent);
 	SphereComponent->SetCollisionProfileName(TEXT("Projectile"));
-	SphereComponent->SetSphereRadius(50);
+	SphereComponent->SetSphereRadius(50.f);
 	SphereComponent->SetGenerateOverlapEvents(false);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityProjectileRemoteBase::OnBeginOverlap);
 
@@ -28,8 +25,8 @@ AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 	ProjectileMovement->BounceVelocityStopSimulatingThreshold = false;
 	ProjectileMovement->Velocity = FVector::ZeroVector;
 
-	DurationTime = 10;
-	InitialVelocity = FVector(3000, 0, 0);
+	MaxDurationTime = 10.f;
+	InitialVelocity = 3000.f;
 }
 
 void AAbilityProjectileRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -55,8 +52,13 @@ void AAbilityProjectileRemoteBase::OnDespawn_Implementation(bool bRecovery)
 void AAbilityProjectileRemoteBase::Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
 {
 	Super::Initialize_Implementation(InOwnerActor, InAbilityHandle);
+}
 
-	ProjectileMovement->Velocity = GetActorRotation().RotateVector(InitialVelocity);
+void AAbilityProjectileRemoteBase::Launch_Implementation(FVector InDirection)
+{
+	Super::Launch_Implementation(InDirection);
+
+	ProjectileMovement->Velocity = GetActorRotation().RotateVector(FVector(InitialVelocity, 0.f, 0.f));
 }
 
 bool AAbilityProjectileRemoteBase::CanHitTarget(AActor* InTarget) const

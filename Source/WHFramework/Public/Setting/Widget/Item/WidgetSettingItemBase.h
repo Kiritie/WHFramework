@@ -22,7 +22,7 @@ public:
 	UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 

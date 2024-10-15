@@ -49,7 +49,7 @@ public:
 	bool DoLookAtTarget(AActor* InTargetActor);
 
 	UFUNCTION(BlueprintPure)
-	FRotator GetLookingRotation(AActor* InTargetActor) const;
+	FRotator GetLookingRotation(AActor* InTargetActor = nullptr) const;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Looking")

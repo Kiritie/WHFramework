@@ -9,5 +9,5 @@ UWidgetWorldText::UWidgetWorldText(const FObjectInitializer& ObjectInitializer) 
 	WidgetInputMode = EInputMode::None;
 
 	WidgetVisibility = EWorldWidgetVisibility::DistanceOnly;
-	WidgetShowDistance = 1500.f;
+	WidgetShowDistance = 10000.f;
 }

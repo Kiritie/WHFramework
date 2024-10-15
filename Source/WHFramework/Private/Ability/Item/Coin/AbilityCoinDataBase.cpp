@@ -4,5 +4,6 @@ UAbilityCoinDataBase::UAbilityCoinDataBase()
 {
 	Type = FName("Coin");
 	MaxCount = 999;
-	PickUpClass = nullptr;
+
+	Unit = 1;
 }

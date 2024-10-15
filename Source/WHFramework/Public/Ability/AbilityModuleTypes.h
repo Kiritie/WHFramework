@@ -5,17 +5,17 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
-#include "Common/CommonStatics.h"
 
 #include "AbilityModuleTypes.generated.h"
 
+class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
 class AAbilityProjectileBase;
 class AAbilityEquipBase;
-class UWidgetInventorySlotBase;
-class UAbilityInventorySlot;
+class UWidgetAbilityInventorySlotBase;
+class UAbilityInventorySlotBase;
 
 #define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
 	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)); \
@@ -553,6 +553,14 @@ public:
 
 	UAbilityItemDataBase& GetData(bool bEnsured = true) const;
 	
+	template<class T>
+	bool IsDataType() const
+	{
+		return IsDataType(T::StaticClass());
+	}
+
+	bool IsDataType(TSubclassOf<UAbilityItemDataBase> InType) const;
+
 	EAbilityItemType GetType() const;
 
 	FORCEINLINE virtual bool IsValid() const override
@@ -639,7 +647,7 @@ public:
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryRefresh);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlot*, InInventorySlot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlotBase*, InInventorySlot);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotRefresh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
@@ -665,10 +673,10 @@ public:
 	FORCEINLINE FItemQueryInfo()
 	{
 		Item = FAbilityItem();
-		Slots = TArray<UAbilityInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlotBase*>();
 	}
 
-	FORCEINLINE FItemQueryInfo(FAbilityItem InItem, TArray<UAbilityInventorySlot*> InSlots)
+	FORCEINLINE FItemQueryInfo(FAbilityItem InItem, TArray<UAbilityInventorySlotBase*> InSlots)
 	{
 		Item = InItem;
 		Slots = InSlots;
@@ -678,7 +686,7 @@ public:
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TArray<UAbilityInventorySlot*> Slots;
+	TArray<UAbilityInventorySlotBase*> Slots;
 
 public:
 	FORCEINLINE bool IsValid() const
@@ -715,11 +723,11 @@ struct WHFRAMEWORK_API FInventorySlots
 public:
 	FORCEINLINE FInventorySlots()
 	{
-		Slots = TArray<UAbilityInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlotBase*>();
 	}
 	
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UAbilityInventorySlot*> Slots;
+	TArray<UAbilityInventorySlotBase*> Slots;
 
 public:
 	FAbilityItems GetItems();
@@ -733,11 +741,11 @@ struct WHFRAMEWORK_API FWidgetInventorySlots
 public:
 	FORCEINLINE FWidgetInventorySlots()
 	{
-		Slots = TArray<UWidgetInventorySlotBase*>();
+		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UWidgetInventorySlotBase*> Slots;
+	TArray<UWidgetAbilityInventorySlotBase*> Slots;
 };
 
 USTRUCT(BlueprintType)
@@ -748,9 +756,13 @@ struct WHFRAMEWORK_API FInventorySaveData : public FSaveData
 public:
 	FORCEINLINE FInventorySaveData()
 	{
+		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndex = -1;
 	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UAbilityInventoryBase> InventoryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
@@ -766,43 +778,15 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void AddItem(const FAbilityItem& InItem, TArray<ESlotSplitType> InSplitTypes, bool bUnique = true)
-	{
-		if(InSplitTypes.IsEmpty())
-		{
-			for(int32 i = 1; i < UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.ESlotSplitType")); i++)
-			{
-				InSplitTypes.Add((ESlotSplitType)i);
-			}
-		}
-		for(const auto& Iter : InSplitTypes)
-		{
-			if(SplitItems.Contains(Iter))
-			{
-				FAbilityItems& tmpItems = SplitItems[Iter];
-				for(int32 i = 0; i < tmpItems.Items.Num(); i++)
-				{
-					if(bUnique && tmpItems.Items[i].EqualType(InItem)) return;
-					if(!tmpItems.Items[i].IsValid())
-					{
-						tmpItems.Items[i] = InItem;
-						return;
-					}
-				}
-			}
-		}
-	}
+	virtual void CopyAllItem(FInventorySaveData SaveData);
 
-	virtual void ClearAllItem()
-	{
-		for(auto& Iter1 : SplitItems)
-		{
-			for(auto& Iter2 : Iter1.Value.Items)
-			{
-				Iter2 = FAbilityItem::Empty;
-			}
-		}
-	}
+	virtual void AddItem(FAbilityItem InItem);
+
+	virtual void RemoveItem(FAbilityItem InItem);
+
+	virtual void ClearItem(FAbilityItem InItem);
+
+	virtual void ClearAllItem();
 };
 
 /**

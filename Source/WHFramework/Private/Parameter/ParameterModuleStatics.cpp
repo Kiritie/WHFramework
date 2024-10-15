@@ -105,6 +105,11 @@ FParameter UParameterModuleStatics::MakeTagsParameter(const FGameplayTagContaine
 	return FParameter::MakeTags(InValue, InDescription);
 }
 
+FParameter UParameterModuleStatics::MakeAssetIDParameter(const FPrimaryAssetId& InValue, const FText InDescription)
+{
+	return FParameter::MakeAssetID(InValue, InDescription);
+}
+
 FParameter UParameterModuleStatics::MakeClassParameter(UClass* InValue, const FText InDescription)
 {
 	return FParameter::MakeClass(InValue, InDescription);

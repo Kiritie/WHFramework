@@ -8,7 +8,6 @@ UVoxelData::UVoxelData()
 {
 	Type = FName("Voxel");
 	MaxCount = 64;
-	Price = 1;
 	PickUpClass = AAbilityPickUpVoxel::StaticClass();
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();

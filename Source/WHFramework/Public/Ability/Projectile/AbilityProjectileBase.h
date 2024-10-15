@@ -18,17 +18,30 @@ class WHFRAMEWORK_API AAbilityProjectileBase : public AWHActor, public IAbilityH
 public:	
 	AAbilityProjectileBase();
 
+public:
+	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+	virtual bool IsDefaultLifecycle_Implementation() const override {  return true;}
 	
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void Initialize(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle);
 	
+	UFUNCTION(BlueprintNativeEvent)
+	void Launch(FVector InDirection = FVector::ZeroVector);
+		
+	UFUNCTION(BlueprintNativeEvent)
+	void Destroy();
+
 public:
 	virtual bool CanHitTarget(AActor* InTarget) const override;
 
@@ -51,22 +64,28 @@ protected:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FName SocketName;
+	FName OriginSocketName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float DurationTime;
+	FName FinalSocketName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float MaxDurationTime;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FGameplayTag HitEventTag;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TMap<FGameplayTag, FGameplayEffectContainer> EffectContainerMap;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	int32 Level;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY()
 	AActor* OwnerActor;
+
+	UPROPERTY()
+	int32 AbilityLevel;
+
+	UPROPERTY()
+	FGameplayAbilityActorInfo AbilityActorInfo;
+
+	UPROPERTY()
+	TMap<FGameplayTag, FGameplayEffectContainer> EffectContainerMap;
 
 	UPROPERTY()
 	TArray<AActor*> HitTargets;

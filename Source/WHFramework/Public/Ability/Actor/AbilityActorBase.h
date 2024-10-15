@@ -45,7 +45,7 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -68,17 +68,13 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
-	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
-
-	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 

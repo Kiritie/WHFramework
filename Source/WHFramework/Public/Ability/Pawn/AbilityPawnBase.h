@@ -34,7 +34,7 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnIn
 	GENERATED_BODY()
 
 	friend class UAbilityPawnState_Death;
-	friend class UAbilityPawnState_Default;
+	friend class UAbilityPawnState_Spawn;
 
 public:
 	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
@@ -51,7 +51,7 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 	
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -70,11 +70,11 @@ public:
 
 	virtual void Serialize(FArchive& Ar) override;
 
-	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
+	virtual void Death(IAbilityVitalityInterface* InKiller) override;
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
-	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
+	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
 	
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -82,17 +82,13 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
-	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
-
-	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 

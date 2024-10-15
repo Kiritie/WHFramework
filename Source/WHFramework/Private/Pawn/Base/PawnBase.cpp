@@ -267,6 +267,16 @@ void APawnBase::SetActorVisible_Implementation(bool bInVisible)
 	}
 }
 
+bool APawnBase::IsUseControllerRotation() const
+{
+	return bUseControllerRotationYaw;
+}
+
+void APawnBase::SetUseControllerRotation(bool bValue)
+{
+	bUseControllerRotationYaw = bValue;
+}
+
 bool APawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);

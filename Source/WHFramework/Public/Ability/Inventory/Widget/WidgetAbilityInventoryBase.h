@@ -5,7 +5,7 @@
 #include "Widget/Screen/UserWidgetBase.h"
 #include "Ability/AbilityModuleTypes.h"
 
-#include "WidgetInventoryBase.generated.h"
+#include "WidgetAbilityInventoryBase.generated.h"
 
 class UWidgetInventoryBaseSlotBase;
 
@@ -13,12 +13,12 @@ class UWidgetInventoryBaseSlotBase;
  * ��Ʒ������
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetInventoryBase : public UUserWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityInventoryBase : public UUserWidgetBase
 {
 	GENERATED_BODY()
 
 public:
-	UWidgetInventoryBase(const FObjectInitializer& ObjectInitializer);
+	UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
@@ -34,5 +34,5 @@ public:
 	UAbilityInventoryBase* GetInventory() const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<UWidgetInventorySlotBase*> GetSplitUISlots(ESlotSplitType InSplitType) const;
+	TArray<UWidgetAbilityInventorySlotBase*> GetSplitUISlots(ESlotSplitType InSplitType) const;
 };

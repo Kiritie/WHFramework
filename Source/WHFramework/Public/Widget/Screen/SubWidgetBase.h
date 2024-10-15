@@ -2,18 +2,17 @@
 
 #pragma once
 
-#include "UserWidgetBase.h"
-#include "Blueprint/UserWidget.h"
-#include "Common/CommonTypes.h"
-#include "ObjectPool/ObjectPoolInterface.h"
+#include "Slate/Runtime/Interfaces/BaseWidgetInterface.h"
+#include "Widget/Common/CommonButton.h"
 
 #include "SubWidgetBase.generated.h"
 
+class UUserWidgetBase;
 /**
  * 
  */
 UCLASS(BlueprintType, meta = (DisableNativeTick))
-class WHFRAMEWORK_API USubWidgetBase : public UUserWidget, public IBaseWidgetInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API USubWidgetBase : public UCommonButton, public IBaseWidgetInterface
 {
 	GENERATED_BODY()
 	
@@ -21,7 +20,7 @@ public:
 	USubWidgetBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -75,7 +74,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass = nullptr) const { return GetDeterminesOutputObject(OwnerWidget, InClass); }
+	UUserWidgetBase* GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }

@@ -175,7 +175,7 @@ void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractio
 {
 }
 
-void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	
 }
@@ -189,17 +189,7 @@ void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, 
 
 }
 
-void AAbilityActorBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AAbilityActorBase::OnAssembleItem(const FAbilityItem& InItem)
-{
-
-}
-
-void AAbilityActorBase::OnDischargeItem(const FAbilityItem& InItem)
+void AAbilityActorBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 
 }

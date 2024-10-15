@@ -23,7 +23,6 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
-	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
@@ -42,109 +41,6 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetMapping>();
 }
 
-FReply UWorldWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
-		if(IsWidgetInEditor())
-		{
-#if WITH_EDITOR
-			if(AActor* OwnerActor = GetOwnerObject<AActor>())
-			{
-				FSceneManager::Get().SelectActorsInCurrentWorld({ OwnerActor }, !InMouseEvent.IsControlDown());
-			}
-#endif
-		}
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
-{
-}
-
 void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
@@ -157,6 +53,10 @@ void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	WidgetIndex = 0;
 	WidgetComponent = nullptr;
 	BindWidgetMap.Empty();
+}
+
+void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
+{
 }
 
 void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)

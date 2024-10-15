@@ -104,6 +104,9 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 	TagsValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, TagsValue)).ToSharedRef();
 	ChildBuilder.AddProperty(TagsValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Tags));
 
+	AssetIDValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, AssetIDValue)).ToSharedRef();
+	ChildBuilder.AddProperty(AssetIDValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::AssetID));
+
 	ClassValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ClassValue)).ToSharedRef();
 	ChildBuilder.AddProperty(ClassValueHandle.ToSharedRef()).Visibility(ShowParameterValue(EParameterType::Class));
 

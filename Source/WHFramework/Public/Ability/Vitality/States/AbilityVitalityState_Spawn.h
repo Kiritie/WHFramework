@@ -2,21 +2,22 @@
 
 #pragma once
 
-#include "AbilityPawnStateBase.h"
-#include "AbilityPawnState_Default.generated.h"
+#include "AbilityVitalityStateBase.h"
+#include "UObject/Object.h"
+#include "AbilityVitalityState_Spawn.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAbilityPawnState_Default : public UAbilityPawnStateBase
+class WHFRAMEWORK_API UAbilityVitalityState_Spawn : public UAbilityVitalityStateBase
 {
 	GENERATED_BODY()
 
-	friend class AAbilityPawnBase;
+	friend class AAbilityVitalityBase;
 
 public:
-	UAbilityPawnState_Default();
+	UAbilityVitalityState_Spawn();
 
 public:
 	virtual void OnInitialize(UFSMComponent* InFSM, int32 InStateIndex) override;

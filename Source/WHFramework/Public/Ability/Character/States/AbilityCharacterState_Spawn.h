@@ -4,20 +4,20 @@
 
 #include "AbilityCharacterStateBase.h"
 #include "UObject/Object.h"
-#include "AbilityCharacterState_Default.generated.h"
+#include "AbilityCharacterState_Spawn.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UAbilityCharacterState_Default : public UAbilityCharacterStateBase
+class WHFRAMEWORK_API UAbilityCharacterState_Spawn : public UAbilityCharacterStateBase
 {
 	GENERATED_BODY()
 
 	friend class AAbilityCharacterBase;
 
 public:
-	UAbilityCharacterState_Default();
+	UAbilityCharacterState_Spawn();
 
 public:
 	virtual void OnInitialize(UFSMComponent* InFSM, int32 InStateIndex) override;

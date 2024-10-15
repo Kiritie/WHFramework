@@ -290,6 +290,17 @@ void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
 	}
 }
 
+bool ACharacterBase::IsUseControllerRotation() const
+{
+	return bUseControllerRotationYaw;
+}
+
+void ACharacterBase::SetUseControllerRotation(bool bValue)
+{
+	bUseControllerRotationYaw = bValue;
+	GetCharacterMovement()->bOrientRotationToMovement = !bValue;
+}
+
 bool ACharacterBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
 {
 	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);

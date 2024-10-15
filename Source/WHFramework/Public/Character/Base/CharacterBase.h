@@ -71,7 +71,7 @@ protected:
 public:
 	virtual void Tick(float DeltaSeconds) override;
 	
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -165,6 +165,10 @@ protected:
 public:
 	virtual AController* GetDefaultController() const override { return DefaultController; }
 
+	virtual bool IsUseControllerRotation() const override;
+
+	virtual void SetUseControllerRotation(bool bValue) override;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Voxel
 protected:

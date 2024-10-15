@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Blueprint/UserWidget.h"
+#include "CommonUserWidget.h"
 #include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
@@ -15,7 +15,7 @@ class UWidgetAnimatorBase;
  * 
  */
 UCLASS(BlueprintType, meta = (DisableNativeTick))
-class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API UUserWidgetBase : public UCommonUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
 {
 	friend class UWidgetModule;
 	
@@ -24,24 +24,12 @@ class WHFRAMEWORK_API UUserWidgetBase : public UUserWidget, public IScreenWidget
 public:
 	UUserWidgetBase(const FObjectInitializer& ObjectInitializer);
 
-protected:
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	
-	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	
-	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	
-	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+public:
+	virtual int32 GetLimit_Implementation() const override { return 0; }
 
-	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	
-	virtual FReply NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
-	
-	virtual FReply NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
-	
-	virtual FReply NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
-	
-	virtual FReply NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent) override;
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -51,13 +39,6 @@ public:
 	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
-
-public:
-	virtual int32 GetLimit_Implementation() const override { return 0; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnCreate")
@@ -217,9 +198,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	bool bWidgetPenetrable;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
 	FAnchors WidgetAnchors;
 
@@ -331,9 +309,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
-
-	UFUNCTION(BlueprintPure)
-	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }

@@ -1,0 +1,54 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
+
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+
+UAbilityInventoryEquipSlotBase::UAbilityInventoryEquipSlotBase()
+{
+}
+
+void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
+{
+	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
+}
+
+void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InOwner, InParams);
+}
+
+void UAbilityInventoryEquipSlotBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Super::OnDespawn_Implementation(bRecovery);
+}
+
+bool UAbilityInventoryEquipSlotBase::CheckSlot(FAbilityItem& InItem) const
+{
+	return Super::CheckSlot(InItem);
+}
+
+void UAbilityInventoryEquipSlotBase::Refresh()
+{
+	Super::Refresh();
+}
+
+void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
+{
+	Super::OnItemPreChange(InNewItem);
+
+	if(IsEmpty()) return;
+
+	CancelItem(true);
+}
+
+void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
+{
+	Super::OnItemChanged(InOldItem);
+
+	if(IsEmpty()) return;
+
+	ActiveItem(true);
+}

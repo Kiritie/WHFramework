@@ -59,9 +59,9 @@ void FEditorModuleBase::UnRegisterCustomization(FPropertyEditorModule& PropertyE
 
 void FEditorModuleBase::AddWindowMenu(const TSharedPtr<const FUICommandInfo>& Command, const TSharedPtr<const FUICommandList>& Commands)
 {
-	UToolMenu* oolMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window.WHFramework");
+	UToolMenu* ToolMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window.WHFramework");
 	{
-		FToolMenuSection& Section = oolMenu->FindOrAddSection("WHFramework");
+		FToolMenuSection& Section = ToolMenu->FindOrAddSection("WHFramework");
 		{
 			Section.AddMenuEntryWithCommandList(Command, Commands);
 		}

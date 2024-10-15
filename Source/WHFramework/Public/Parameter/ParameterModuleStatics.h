@@ -86,6 +86,9 @@ public:
 	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeAssetIDParameter(const FPrimaryAssetId& InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FParameter MakeClassParameter(UClass* InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
@@ -219,6 +222,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetTagsValue(UPARAM(ref) FParameter& InParameter, const FGameplayTagContainer& InValue) { InParameter.SetTagsValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FPrimaryAssetId GetAssetIDValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetAssetIDValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetAssetIDValue(UPARAM(ref) FParameter& InParameter, const FPrimaryAssetId& InValue) { InParameter.SetAssetIDValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

@@ -5,5 +5,5 @@
 
 AAbilityProjectileMeleeBase::AAbilityProjectileMeleeBase()
 {
-	DurationTime = 10;
+	MaxDurationTime = 10;
 }

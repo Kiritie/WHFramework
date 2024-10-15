@@ -2,28 +2,22 @@
 
 #pragma once
 
-#include "AbilityInventorySlot.h"
-#include "AbilityInventorySkillSlot.generated.h"
+#include "AbilityInventorySlotBase.h"
+#include "AbilityInventoryAuxiliarySlotSlot.generated.h"
 
 /**
  * ���ܲ�
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityInventorySkillSlot : public UAbilityInventorySlot
+class WHFRAMEWORK_API UAbilityInventoryAuxiliarySlotSlot : public UAbilityInventorySlotBase
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityInventorySkillSlot();
+	UAbilityInventoryAuxiliarySlotSlot();
 
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
-	virtual void OnItemPreChange(FAbilityItem& InNewItem) override;
-
 	virtual void OnItemChanged(FAbilityItem& InOldItem) override;
-	
-	virtual bool ActiveItem(bool bPassive = false) override;
-	
-	virtual void CancelItem(bool bPassive = false) override;
 };

@@ -35,7 +35,7 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 	GENERATED_BODY()
 
 	friend class UAbilityCharacterState_Death;
-	friend class UAbilityCharacterState_Default;
+	friend class UAbilityCharacterState_Spawn;
 	friend class UAbilityCharacterState_Fall;
 	friend class UAbilityCharacterState_Jump;
 	friend class UAbilityCharacterState_Static;
@@ -103,7 +103,7 @@ protected:
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -124,16 +124,22 @@ protected:
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
 public:
-	virtual void Death(IAbilityVitalityInterface* InKiller = nullptr) override;
+	virtual void Death(IAbilityVitalityInterface* InKiller) override;
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
-	virtual void Revive(IAbilityVitalityInterface* InRescuer = nullptr) override;
+	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
 
 	virtual void Jump() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnJump();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Static();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnStatic();
 
 public:
 	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) override;
@@ -144,17 +150,13 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
-	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
-
-	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 

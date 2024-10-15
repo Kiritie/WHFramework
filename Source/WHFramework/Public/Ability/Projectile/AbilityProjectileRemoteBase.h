@@ -29,14 +29,14 @@ protected:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector InitialVelocity;
+	float InitialVelocity;
 	
 protected:
 	UFUNCTION()
 	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
@@ -44,6 +44,8 @@ protected:
 
 public:
 	virtual void Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle) override;
+
+	virtual void Launch_Implementation(FVector InDirection) override;
 		
 public:
 	virtual bool CanHitTarget(AActor* InTarget) const override;

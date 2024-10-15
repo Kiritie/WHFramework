@@ -4,6 +4,7 @@
 
 #include "AssetToolsModule.h"
 #include "ISettingsModule.h"
+#include "LevelEditor.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "ToolMenus.h"
 #include "UnrealEdGlobals.h"
@@ -167,6 +168,13 @@ void FWHFrameworkEditorModule::RegisterMenus()
 	FSceneEditorModule::Get().RegisterMenus(PluginCommands);
 	FStepEditorModule::Get().RegisterMenus(PluginCommands);
 	FTaskEditorModule::Get().RegisterMenus(PluginCommands);
+
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+	LevelEditorModule.GetGlobalLevelEditorActions()->Append(PluginCommands.ToSharedRef());
+
+	TSharedRef<FUICommandList> LevelEditorActions = LevelEditorModule.GetGlobalLevelEditorActions();
+
+	FWHFrameworkEditorCommands::MapActions(LevelEditorActions);
 }
 
 void FWHFrameworkEditorModule::UnRegisterMenus()

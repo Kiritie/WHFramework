@@ -34,8 +34,6 @@ public:
 
 	virtual FAnchors GetWidgetAnchors() const = 0;
 
-	virtual bool IsWidgetPenetrable() const = 0;
-
 	virtual bool IsWidgetAutoSize() const = 0;
 
 	virtual FVector2D GetWidgetDrawSize() const = 0;
