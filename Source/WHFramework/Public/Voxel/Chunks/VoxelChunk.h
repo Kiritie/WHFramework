@@ -61,8 +61,6 @@ public:
 
 	virtual void Generate(EPhase InPhase);
 
-	virtual void UnGenerate(EPhase InPhase);
-
 	virtual void CreateMesh();
 
 	virtual void BuildMap(int32 InStage);

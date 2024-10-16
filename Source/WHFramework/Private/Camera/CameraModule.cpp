@@ -1189,17 +1189,17 @@ void UCameraModule::OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCa
 
 bool UCameraModule::IsControllingMove()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraPanMove).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
 }
 
 bool UCameraModule::IsControllingRotate()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraRotate).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
 }
 
 bool UCameraModule::IsControllingZoom()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
 }
 
 bool UCameraModule::IsTrackingTarget()

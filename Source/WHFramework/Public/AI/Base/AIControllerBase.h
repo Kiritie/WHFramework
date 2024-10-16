@@ -70,6 +70,8 @@ public:
 
 	virtual bool RunBehaviorTree(UBehaviorTree* BTAsset) override;
 
+	virtual bool RunBehaviorTree();
+
 	virtual void StopBehaviorTree();
 
 public:

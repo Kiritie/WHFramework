@@ -138,7 +138,7 @@ void AVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParamet
 
 void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
-	if(UVoxelModuleStatics::GetWorldMode() == EVoxelWorldMode::Default)
+	// if(UVoxelModuleStatics::GetWorldMode() == EVoxelWorldMode::Default)
 	{
 		UVoxelModule::Get().GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
 	}
@@ -220,24 +220,6 @@ void AVoxelChunk::Generate(EPhase InPhase)
 		{
 			bBuilded = true;
 			bGenerated = true;
-		}
-	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(bGenerated)
-		{
-			GenerateSceneActors();
-		}
-	}
-}
-
-void AVoxelChunk::UnGenerate(EPhase InPhase)
-{
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(bGenerated)
-		{
-			DestroySceneActors();
 		}
 	}
 }

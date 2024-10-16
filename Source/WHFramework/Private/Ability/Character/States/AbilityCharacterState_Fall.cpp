@@ -26,7 +26,7 @@ void UAbilityCharacterState_Fall::OnEnter(UFiniteStateBase* InLastState, const T
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Falling);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Falling);
 }
 
 void UAbilityCharacterState_Fall::OnRefresh(float DeltaSeconds)
@@ -45,7 +45,7 @@ void UAbilityCharacterState_Fall::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Falling);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Character_Falling);
 }
 
 void UAbilityCharacterState_Fall::OnTermination()

@@ -26,7 +26,7 @@ class UAbilityPawnInventoryBase;
 class UAbilityPawnDataBase;
 
 /**
- * Ability Vitality基类
+ * Ability Pawn基类
  */
 UCLASS()
 class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface, public ITargetingAgentInterface
@@ -75,6 +75,10 @@ public:
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
+
+	virtual void Static() override;
+
+	virtual void UnStatic() override;
 	
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -128,6 +132,8 @@ public:
 
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
+	virtual UShapeComponent* GetCollisionComponent() const override;
+
 	template<class T>
 	T* GetAbilitySystemComponent() const
 	{
@@ -162,6 +168,9 @@ public:
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
 	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsActive(bool bNeedNotDead = false) const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
@@ -169,6 +178,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDying() const override;
 
+	UFUNCTION(BlueprintPure)
+	virtual bool IsMoving() const override;
+	
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameV() const override { return Name; }

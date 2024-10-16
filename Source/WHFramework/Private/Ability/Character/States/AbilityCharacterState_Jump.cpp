@@ -28,7 +28,7 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 	
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Jumping);
 
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
@@ -53,7 +53,7 @@ void UAbilityCharacterState_Jump::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Character_Jumping);
 
 	Character->StopJumping();
 }

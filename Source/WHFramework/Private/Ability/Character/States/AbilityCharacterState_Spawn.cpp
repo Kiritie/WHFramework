@@ -3,8 +3,11 @@
 #include "Ability/Character/States/AbilityCharacterState_Spawn.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "FSM/Components/FSMComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Spawn::UAbilityCharacterState_Spawn()
 {
@@ -27,13 +30,15 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Active);
 
+	Character->GetCharacterMovement()->SetActive(false);
+	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
 
 	Character->Execute_SetActorVisible(Character, true);
 	Character->ResetData();
-	Character->SetMotionRate(1, 1);
+	Character->SetMotionRate(1.f, 1.f);
 }
 
 void UAbilityCharacterState_Spawn::OnRefresh(float DeltaSeconds)
@@ -49,7 +54,16 @@ void UAbilityCharacterState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Pawn_Active);
+
+	Character->GetCharacterMovement()->SetActive(true);
+	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Character->GetInteractionComponent()->SetInteractable(true);
+
+	if(!Character->IsPlayer())
+	{
+		Character->GetController<AAIControllerBase>()->RunBehaviorTree();
+	}
 }
 
 void UAbilityCharacterState_Spawn::OnTermination()

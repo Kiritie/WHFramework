@@ -31,8 +31,8 @@ AAIControllerBase::AAIControllerBase()
 	PerceptionComponent->ConfigureSense(*SightSenseConfig);
 	PerceptionComponent->SetDominantSense(*SightSenseConfig->GetSenseImplementation());
 
-	const auto damageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
-	PerceptionComponent->ConfigureSense(*damageSenseConfig);
+	const auto DamageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
+	PerceptionComponent->ConfigureSense(*DamageSenseConfig);
 }
 
 void AAIControllerBase::OnInitialize_Implementation()
@@ -142,13 +142,13 @@ void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 	
 	if(!OwnerAgent) return;
 
-	UBehaviorTree* BehaviorTree = OwnerAgent->GetBehaviorTreeAsset();
+	UBehaviorTree* BehaviorTreeAsset = OwnerAgent->GetBehaviorTreeAsset();
 	
-	if(!BehaviorTree) return;
+	if(!BehaviorTreeAsset) return;
 
-	if(SourceBehaviorTree != BehaviorTree)
+	if(SourceBehaviorTree != BehaviorTreeAsset)
 	{
-		SourceBehaviorTree = BehaviorTree;
+		SourceBehaviorTree = BehaviorTreeAsset;
 		CurrentBehaviorTree = DuplicateObject<UBehaviorTree>(SourceBehaviorTree, this);
 
 		if(SourceBlackboard != CurrentBehaviorTree->BlackboardAsset)
@@ -156,10 +156,10 @@ void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 			SourceBlackboard = Cast<UAIBlackboardBase>(CurrentBehaviorTree->BlackboardAsset);
 			CurrentBlackboard = DuplicateObject<UAIBlackboardBase>(SourceBlackboard, this);
 
-			UBlackboardComponent* BlackboardComp;
-			if(UseBlackboard(CurrentBlackboard, BlackboardComp))
+			UBlackboardComponent* BlackboardComponent;
+			if(UseBlackboard(CurrentBlackboard, BlackboardComponent))
 			{
-				CurrentBlackboard->Initialize(BlackboardComp);
+				CurrentBlackboard->Initialize(BlackboardComponent);
 			}
 		}
 		CurrentBehaviorTree->BlackboardAsset = CurrentBlackboard;
@@ -167,13 +167,22 @@ void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 	
 	if(bAutoRun)
 	{
-		RunBehaviorTree(CurrentBehaviorTree);
+		RunBehaviorTree();
 	}
 }
 
 bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 {
-	return Super::RunBehaviorTree(BTAsset);
+	if(!IsRunningBehaviorTree())
+	{
+		return Super::RunBehaviorTree(BTAsset);
+	}
+	return true;
+}
+
+bool AAIControllerBase::RunBehaviorTree()
+{
+	return RunBehaviorTree(CurrentBehaviorTree);
 }
 
 void AAIControllerBase::StopBehaviorTree()

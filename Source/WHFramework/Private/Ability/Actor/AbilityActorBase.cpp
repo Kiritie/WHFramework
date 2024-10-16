@@ -224,6 +224,11 @@ UAttributeSetBase* AAbilityActorBase::GetAttributeSet() const
 	return AttributeSet;
 }
 
+UShapeComponent* AAbilityActorBase::GetCollisionComponent() const
+{
+	return BoxComponent;
+}
+
 UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystem;

@@ -4,6 +4,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
+#include "AI/Base/AIControllerBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
@@ -32,7 +33,12 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+
+	if(!Pawn->IsPlayer())
+	{
+		Pawn->GetController<AAIControllerBase>()->StopBehaviorTree();
+	}
 
 	if(Killer && Killer != Pawn)
 	{
@@ -58,8 +64,8 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 }
 
 void UAbilityPawnState_Death::OnTermination()
@@ -76,9 +82,9 @@ void UAbilityPawnState_Death::DeathEnd()
 {
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 	
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	UObjectPoolModuleStatics::DespawnObject(Pawn);
 }

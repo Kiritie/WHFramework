@@ -125,6 +125,8 @@ public:
 
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
+	virtual UShapeComponent* GetCollisionComponent() const override;
+
 	template<class T>
 	T* GetAbilitySystemComponent() const
 	{

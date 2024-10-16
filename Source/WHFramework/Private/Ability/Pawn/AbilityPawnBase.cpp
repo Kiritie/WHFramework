@@ -15,6 +15,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Pawn/AbilityPawnInventoryBase.h"
+#include "Ability/Pawn/States/AbilityPawnState_Static.h"
 
 AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
@@ -43,6 +44,7 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	
 	FSM->States.Add(UAbilityPawnState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityPawnState_Death::StaticClass());
+	FSM->States.Add(UAbilityPawnState_Static::StaticClass());
 
 	// stats
 	RaceID = NAME_None;
@@ -67,6 +69,23 @@ void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
 void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(IsDead()) return;
+
+	if(IsActive())
+	{
+		if(GetMoveVelocity(true).Size() > 0.2f)
+		{
+			if(!IsMoving())
+			{
+				AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Pawn_Moving);
+			}
+		}
+		else if(IsMoving())
+		{
+			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Moving);
+		}
+	}
 }
 
 void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
@@ -195,6 +214,19 @@ void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 	FSM->SwitchDefaultState();
 }
 
+void AAbilityPawnBase::Static()
+{
+	FSM->SwitchStateByClass<UAbilityPawnState_Static>();
+}
+
+void AAbilityPawnBase::UnStatic()
+{
+	if(FSM->IsCurrentStateClass<UAbilityPawnState_Static>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
 bool AAbilityPawnBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
 	return false;
@@ -254,12 +286,17 @@ void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityPawnBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
+}
+
+bool AAbilityPawnBase::IsMoving() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Moving);
 }
 
 bool AAbilityPawnBase::SetLevelA(int32 InLevel)
@@ -304,6 +341,11 @@ UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const
 	return AttributeSet;
 }
 
+UShapeComponent* AAbilityPawnBase::GetCollisionComponent() const
+{
+	return BoxComponent;
+}
+
 UAbilitySystemComponent* AAbilityPawnBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystem;
@@ -332,6 +374,11 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 bool AAbilityPawnBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 {
 	return !IsDead();
+}
+
+bool AAbilityPawnBase::IsActive(bool bNeedNotDead) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Active) && (!bNeedNotDead || !IsDead());
 }
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)

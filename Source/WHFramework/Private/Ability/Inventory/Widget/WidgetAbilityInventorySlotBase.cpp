@@ -34,7 +34,6 @@ void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 
 	SetStyle(DefaultStyle);
 
-	KeyCode = FText::GetEmpty();
 	OwnerSlot = nullptr;
 	StopCooldown();
 }

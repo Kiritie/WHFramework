@@ -7,6 +7,7 @@
 
 class UAttributeSetBase;
 class UAbilityBase;
+class UShapeComponent;
 
 UINTERFACE()
 class WHFRAMEWORK_API UAbilityActorInterface : public UAbilitySystemInterface
@@ -36,6 +37,8 @@ public:
 	virtual float GetHalfHeight() const = 0;
 
 	virtual UAttributeSetBase* GetAttributeSet() const = 0;
+
+	virtual UShapeComponent* GetCollisionComponent() const = 0;
 
 private:
 	bool bAbilityInitialized = false;

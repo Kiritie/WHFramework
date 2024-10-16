@@ -3,6 +3,7 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
+#include "Common/Interaction/InteractionComponent.h"
 
 UAbilityVitalityState_Spawn::UAbilityVitalityState_Spawn()
 {
@@ -26,6 +27,9 @@ void UAbilityVitalityState_Spawn::OnEnter(UFiniteStateBase* InLastState, const T
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->ResetData();
+
+	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Vitality->GetInteractionComponent()->SetInteractable(false);
 }
 
 void UAbilityVitalityState_Spawn::OnRefresh(float DeltaSeconds)
@@ -36,6 +40,11 @@ void UAbilityVitalityState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityVitalityState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
+
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+	
+	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Vitality->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityVitalityState_Spawn::OnTermination()

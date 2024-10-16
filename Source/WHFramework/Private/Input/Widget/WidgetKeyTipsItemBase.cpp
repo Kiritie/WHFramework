@@ -18,17 +18,26 @@ UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectI
 	Txt_DisplayName = nullptr;
 }
 
-void UWidgetKeyTipsItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetKeyTipsItemBase::NativePreConstruct()
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::NativePreConstruct();
+
+	SetKeyDisplayName(KeyDisplayName);
 }
 
-void UWidgetKeyTipsItemBase::OnInitialize(const TArray<FParameter>& InParams)
+void UWidgetKeyTipsItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnInitialize(InParams);
+	IObjectPoolInterface::OnSpawn_Implementation(InOwner, InParams);
+
+	RefreshData();
 }
 
-void UWidgetKeyTipsItemBase::OnRefresh()
+void UWidgetKeyTipsItemBase::OnDespawn_Implementation(bool bRecovery)
+{
+	IObjectPoolInterface::OnDespawn_Implementation(bRecovery);
+}
+
+void UWidgetKeyTipsItemBase::RefreshData_Implementation()
 {
 	FString KeyCode;
 
@@ -86,22 +95,32 @@ void UWidgetKeyTipsItemBase::OnRefresh()
 
 	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	Border_KeyCode->SetVisibility(!KeyCode.IsEmpty() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-
-	Super::OnRefresh();
 }
 
-void UWidgetKeyTipsItemBase::OnDestroy(bool bRecovery)
+FText UWidgetKeyTipsItemBase::GetKeyDisplayName() const
 {
-	Super::OnDestroy(bRecovery);
+	return KeyDisplayName;
 }
 
-void UWidgetKeyTipsItemBase::NativePreConstruct()
+void UWidgetKeyTipsItemBase::SetKeyDisplayName(const FText InKeyDisplayName)
 {
-	Super::NativePreConstruct();
+	KeyDisplayName = InKeyDisplayName;
 
 	if(Txt_DisplayName)
 	{
 		Txt_DisplayName->SetText(KeyDisplayName);
 		Txt_DisplayName->SetVisibility(KeyDisplayName.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
+}
+
+FString UWidgetKeyTipsItemBase::GetKeyMappingName() const
+{
+	return KeyMappingName;
+}
+
+void UWidgetKeyTipsItemBase::SetKeyMappingName(const FString& InKeyMappingName)
+{
+	KeyMappingName = InKeyMappingName;
+
+	RefreshData();
 }

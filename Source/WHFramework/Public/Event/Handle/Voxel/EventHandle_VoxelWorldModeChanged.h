@@ -7,23 +7,23 @@
 #include "Parameter/ParameterModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
 
-#include "EventHandle_WorldStateChanged.generated.h"
+#include "EventHandle_VoxelWorldModeChanged.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_WorldStateChanged : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_VoxelWorldModeChanged : public UEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_WorldStateChanged();
+	UEventHandle_VoxelWorldModeChanged();
 	
 public:
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	EVoxelWorldState WorldState;
+	EVoxelWorldMode WorldMode;
 };

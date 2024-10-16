@@ -28,7 +28,7 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const T
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Walking);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Walking);
 	
 	Character->GetInteractionComponent()->SetInteractable(true);
 
@@ -54,7 +54,7 @@ void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Walking);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Character_Walking);
 }
 
 void UAbilityCharacterState_Walk::OnTermination()

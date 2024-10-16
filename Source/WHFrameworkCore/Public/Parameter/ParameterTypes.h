@@ -254,6 +254,11 @@ public:
 		*this = MakeObjectPtr(InValue);
 	}
 
+	FParameter(const FSimpleDynamicDelegate& InValue)
+	{
+		*this = MakeDelegate(InValue);
+	}
+
 	FParameter(void* InValue)
 	{
 		*this = MakePointer(InValue);

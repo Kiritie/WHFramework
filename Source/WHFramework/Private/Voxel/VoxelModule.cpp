@@ -7,8 +7,8 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_WorldModeChanged.h"
-#include "Event/Handle/Voxel/EventHandle_WorldStateChanged.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelWorldModeChanged.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelWorldStateChanged.h"
 #include "Main/MainModuleStatics.h"
 #include "Math/MathStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -273,12 +273,12 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_WorldModeChanged::StaticClass(), this, {&WorldMode});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, {&WorldMode});
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_WorldStateChanged::StaticClass(), this, {&WorldState});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, {&WorldState});
 }
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
@@ -346,11 +346,11 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SetWorldMode(EVoxelWorldMode::Default);
-
-		for(auto& Iter : ChunkMap)
-		{
-			Iter.Value->Generate(EPhase::Final);
-		}
+		//
+		// for(auto& Iter : ChunkMap)
+		// {
+		// 	Iter.Value->Generate(EPhase::Final);
+		// }
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -406,11 +406,6 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
 		SetWorldMode(EVoxelWorldMode::Preview);
-
-		for(auto& Iter : ChunkMap)
-		{
-			Iter.Value->UnGenerate(EPhase::Final);
-		}
 	}
 }
 
@@ -523,20 +518,7 @@ void UVoxelModule:: GenerateChunk(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = FindChunkByIndex(InIndex))
 	{
-		switch(WorldMode)
-		{
-			case EVoxelWorldMode::Default:
-			{
-				Chunk->Generate(EPhase::Primary);
-				break;
-			}
-			case EVoxelWorldMode::Preview:
-			{
-				Chunk->Generate(EPhase::Lesser);
-				break;
-			}
-			default: break;
-		}
+		Chunk->Generate(EPhase::Primary);
 	}
 }
 

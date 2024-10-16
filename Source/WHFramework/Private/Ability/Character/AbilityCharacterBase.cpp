@@ -102,12 +102,12 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 		{
 			if(!IsMoving())
 			{
-				AbilitySystem->AddLooseGameplayTag(GameplayTags::StateTag_Character_Moving);
+				AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Pawn_Moving);
 			}
 		}
 		else if(IsMoving())
 		{
-			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Moving);
+			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Moving);
 		}
 	}
 }
@@ -439,6 +439,11 @@ UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
 	return AttributeSet;
 }
 
+UShapeComponent* AAbilityCharacterBase::GetCollisionComponent() const
+{
+	return GetCapsuleComponent();
+}
+
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
 {
 	return Interaction;
@@ -461,37 +466,37 @@ bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 
 bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Active) && (!bNeedNotDead || !IsDead());
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Active) && (!bNeedNotDead || !IsDead());
 }
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityCharacterBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
 }
 
 bool AAbilityCharacterBase::IsMoving() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Moving);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Moving);
 }
 
 bool AAbilityCharacterBase::IsFalling(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Falling) : GetCharacterMovement()->IsFalling();
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Falling) : GetCharacterMovement()->IsFalling();
 }
 
 bool AAbilityCharacterBase::IsWalking(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Walking) : GetCharacterMovement()->IsWalking();
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Walking) : GetCharacterMovement()->IsWalking();
 }
 
 bool AAbilityCharacterBase::IsJumping() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Character_Jumping);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Jumping);
 }
 
 void AAbilityCharacterBase::SetNameV(FName InName)

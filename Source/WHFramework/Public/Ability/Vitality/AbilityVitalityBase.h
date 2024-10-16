@@ -150,6 +150,8 @@ public:
 
 	virtual UAttributeSetBase* GetAttributeSet() const override { return Super::GetAttributeSet(); }
 
+	virtual UShapeComponent* GetCollisionComponent() const override { return Super::GetCollisionComponent(); }
+
 	template<class T>
 	T* GetAbilitySystemComponent() const
 	{

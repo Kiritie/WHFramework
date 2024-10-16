@@ -136,10 +136,10 @@ public:
 	virtual void UnJump();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Static();
+	virtual void Static() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void UnStatic();
+	virtual void UnStatic() override;
 
 public:
 	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) override;
@@ -188,6 +188,8 @@ public:
 
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
+	virtual UShapeComponent* GetCollisionComponent() const override;
+
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
 	template<class T>
@@ -220,7 +222,7 @@ public:
 	virtual bool CanLookAtTarget() override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsActive(bool bNeedNotDead = false) const;
+	virtual bool IsActive(bool bNeedNotDead = false) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
@@ -229,7 +231,7 @@ public:
 	virtual bool IsDying() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsMoving() const;
+	virtual bool IsMoving() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsFalling(bool bReally = false) const;

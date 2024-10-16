@@ -5,6 +5,8 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
+#include "Common/Interaction/InteractionComponent.h"
+#include "Components/BoxComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityVitalityState_Death::UAbilityVitalityState_Death()
@@ -33,7 +35,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
 	if(Killer && Killer != Vitality)
 	{
@@ -59,8 +61,8 @@ void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 }
 
 void UAbilityVitalityState_Death::OnTermination()
@@ -70,6 +72,11 @@ void UAbilityVitalityState_Death::OnTermination()
 
 void UAbilityVitalityState_Death::DeathStart()
 {
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+
+	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Vitality->GetInteractionComponent()->SetInteractable(false);
+
 	DeathEnd();
 }
 
@@ -77,9 +84,6 @@ void UAbilityVitalityState_Death::DeathEnd()
 {
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 	
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
-	
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
-
-	UObjectPoolModuleStatics::DespawnObject(Vitality);
+	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 }

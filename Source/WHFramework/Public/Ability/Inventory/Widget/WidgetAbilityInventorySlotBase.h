@@ -90,9 +90,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true), Category = "Style")
 	TSubclassOf<UCommonButtonStyle> MismatchStyle;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	FText KeyCode;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilityInventorySlotBase* OwnerSlot;
 
@@ -106,10 +103,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsCooldowning() const;
-	
-	FText GetKeyCode() const { return KeyCode; }
-	
-	void SetKeyCode(const FText& InKeyCode) { this->KeyCode = InKeyCode; }
 
 	UFUNCTION(BlueprintPure)
 	FAbilityItem& GetItem() const;

@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -30,11 +31,16 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Active);
 
 	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
+
+	if(!Character->IsPlayer())
+	{
+		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
+	}
 }
 
 void UAbilityCharacterState_Static::OnRefresh(float DeltaSeconds)
@@ -48,11 +54,16 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Pawn_Active);
 
 	Character->GetCharacterMovement()->SetActive(true);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Character->GetInteractionComponent()->SetInteractable(true);
+
+	if(!Character->IsPlayer())
+	{
+		Character->GetController<AAIControllerBase>()->RunBehaviorTree();
+	}
 }
 
 void UAbilityCharacterState_Static::OnTermination()
