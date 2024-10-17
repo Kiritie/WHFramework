@@ -94,7 +94,7 @@ void UModuleBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 void UModuleBase::UnloadData(EPhase InPhase)
 {
-	ISaveDataInterface::UnloadData(InPhase);
+	ISaveDataAgentInterface::UnloadData(InPhase);
 }
 
 FSaveData* UModuleBase::ToData()

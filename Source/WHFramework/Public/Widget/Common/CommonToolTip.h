@@ -19,7 +19,7 @@ public:
 	UCommonToolTip(const FObjectInitializer& ObjectInitializer);
 	
 	//////////////////////////////////////////////////////////////////////////
-	/// Object
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 

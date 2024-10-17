@@ -4,7 +4,6 @@
 
 #include "Common/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "VoxelEntity.generated.h"
 
@@ -16,7 +15,7 @@ class UVoxelMeshComponent;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelEntity : public AWHActor, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelEntity : public AWHActor
 {
 	GENERATED_BODY()
 
@@ -24,6 +23,8 @@ public:
 	// Sets default values for this actor's properties
 	AVoxelEntity();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 

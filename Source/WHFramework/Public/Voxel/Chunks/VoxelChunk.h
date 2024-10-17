@@ -4,7 +4,6 @@
 
 #include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
@@ -21,7 +20,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface
 {
 	GENERATED_BODY()
 
@@ -30,6 +29,15 @@ class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInter
 public:	
 	// Sets default values for this actor's properties
 	AVoxelChunk();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
@@ -44,15 +52,6 @@ protected:
 
 	UFUNCTION()
 	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
-public:
-	virtual int32 GetLimit_Implementation() const override { return 5000; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
@@ -135,6 +134,8 @@ protected:
 	TMap<FGuid, AActor*> SceneActorMap;
 
 public:
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
+	
 	virtual bool HasSceneActor(const FString& InID, bool bEnsured) const override;
 
 	template<class T>

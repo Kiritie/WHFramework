@@ -5,6 +5,7 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Scene/SceneModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -641,6 +642,12 @@ public:
 		Items = TArray<FAbilityItem>();
 	}
 
+	FAbilityItems(int32 InNum)
+	{
+		Items = TArray<FAbilityItem>();
+		Items.SetNum(InNum);
+	}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "ID"))
 	TArray<FAbilityItem> Items;
 };
@@ -758,7 +765,7 @@ public:
 	{
 		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
-		SelectedIndex = -1;
+		SelectedIndexs = TMap<ESlotSplitType, int32>();
 	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -768,7 +775,7 @@ public:
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	int32 SelectedIndex;
+	TMap<ESlotSplitType, int32> SelectedIndexs;
 
 public:
 	virtual bool IsValid() const override
@@ -924,26 +931,20 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FActorSaveData : public FSaveData
+struct WHFRAMEWORK_API FActorSaveData : public FSceneActorSaveData
 {
 	GENERATED_BODY()
 
 public:
 	FORCEINLINE FActorSaveData()
 	{
-		ActorID = FGuid();
 		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
-		SpawnLocation = FVector::ZeroVector;
-		SpawnRotation = FRotator::ZeroRotator;
 	}
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FGuid ActorID;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetID;
 
@@ -955,12 +956,6 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FInventorySaveData InventoryData;
-
-	UPROPERTY()
-	FVector SpawnLocation;
-	
-	UPROPERTY()
-	FRotator SpawnRotation;
 
 public:
 	virtual void MakeSaved() override

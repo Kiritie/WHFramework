@@ -29,14 +29,6 @@ AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 	InitialVelocity = 3000.f;
 }
 
-void AAbilityProjectileRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if(CanHitTarget(OtherActor))
-	{
-		OnHitTarget(OtherActor, SweepResult);
-	}
-}
-
 void AAbilityProjectileRemoteBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
@@ -47,6 +39,14 @@ void AAbilityProjectileRemoteBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 
 	ProjectileMovement->Velocity = FVector::ZeroVector;
+}
+
+void AAbilityProjectileRemoteBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(CanHitTarget(OtherActor))
+	{
+		OnHitTarget(OtherActor, SweepResult);
+	}
 }
 
 void AAbilityProjectileRemoteBase::Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)

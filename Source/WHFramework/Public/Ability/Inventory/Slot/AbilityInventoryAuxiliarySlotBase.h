@@ -3,18 +3,18 @@
 #pragma once
 
 #include "AbilityInventorySlotBase.h"
-#include "AbilityInventoryAuxiliarySlotSlot.generated.h"
+#include "AbilityInventoryAuxiliarySlotBase.generated.h"
 
 /**
  * ���ܲ�
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityInventoryAuxiliarySlotSlot : public UAbilityInventorySlotBase
+class WHFRAMEWORK_API UAbilityInventoryAuxiliarySlotBase : public UAbilityInventorySlotBase
 {
 	GENERATED_BODY()
 
 public:
-	UAbilityInventoryAuxiliarySlotSlot();
+	UAbilityInventoryAuxiliarySlotBase();
 
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;

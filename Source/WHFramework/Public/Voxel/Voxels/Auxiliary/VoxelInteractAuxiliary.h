@@ -53,7 +53,7 @@ public:
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 	
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

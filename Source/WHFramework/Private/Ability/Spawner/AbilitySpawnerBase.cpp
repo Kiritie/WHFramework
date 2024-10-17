@@ -47,6 +47,26 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	Container = nullptr;
 }
 
+void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	USceneModuleStatics::AddSceneActor(this);
+}
+
+void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	
+	USceneModuleStatics::RemoveSceneActor(this);
+	if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
+	Container = nullptr;
+}
+
 void AAbilitySpawnerBase::OnInitialize_Implementation()
 {
 	Execute_SetActorVisible(this, bVisible);
@@ -87,26 +107,6 @@ void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
 		SpawnerInfo->InitAbilityItem(AbilityItem);
 	}
 #endif
-}
-
-void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	USceneModuleStatics::AddSceneActor(this);
-}
-
-void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Execute_SetActorVisible(this, false);
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	
-	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
-	{
-		Container->RemoveSceneActor(this);
-	}
-
-	Container = nullptr;
 }
 
 void AAbilitySpawnerBase::SetActorVisible_Implementation(bool bInVisible)

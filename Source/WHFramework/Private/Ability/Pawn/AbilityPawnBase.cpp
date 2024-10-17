@@ -51,6 +51,25 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Level = 0;
 }
 
+void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	InitializeAbilities();
+
+	SpawnDefaultController();
+
+	FSM->SwitchDefaultState();
+}
+
+void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
+{
+	RaceID = NAME_None;
+	Level = 0;
+
+	Inventory->UnloadSaveData();
+}
+
 void AAbilityPawnBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
@@ -93,33 +112,13 @@ void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnSpawn_Implementation(InOwner, InParams);
-
-	InitializeAbilities();
-
-	SpawnDefaultController();
-
-	FSM->SwitchDefaultState();
-}
-
-void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
-{
-	RaceID = NAME_None;
-	Level = 0;
-
-	Inventory->UnloadSaveData();
-}
-
 void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
+		SetActorTransform(SaveData.SpawnTransform);
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -149,8 +148,7 @@ FSaveData* AAbilityPawnBase::ToData()
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
-	SaveData.SpawnLocation = GetActorLocation();
-	SaveData.SpawnRotation = GetActorRotation();
+	SaveData.SpawnTransform = GetActorTransform();
 
 	return &SaveData;
 }
@@ -250,6 +248,11 @@ void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
 	
 }
 
+void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AAbilityPawnBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -267,15 +270,18 @@ void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
-void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
+void AAbilityPawnBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
 {
-	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+	if(InSplitType == ESlotSplitType::Shortcut)
 	{
-		SetGenerateVoxelID(InItem.ID);
-	}
-	else
-	{
-		SetGenerateVoxelID(FPrimaryAssetId());
+		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+		{
+			SetGenerateVoxelID(InItem.ID);
+		}
+		else
+		{
+			SetGenerateVoxelID(FPrimaryAssetId());
+		}
 	}
 }
 

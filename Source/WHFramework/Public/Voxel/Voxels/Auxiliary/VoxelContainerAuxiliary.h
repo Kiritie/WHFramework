@@ -28,6 +28,8 @@ protected:
 
 public:
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
+
+	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
 	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -35,7 +37,7 @@ public:
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 

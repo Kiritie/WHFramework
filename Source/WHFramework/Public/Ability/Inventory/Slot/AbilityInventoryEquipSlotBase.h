@@ -16,12 +16,17 @@ class WHFRAMEWORK_API UAbilityInventoryEquipSlotBase : public UAbilityInventoryS
 public:
 	UAbilityInventoryEquipSlotBase();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
-	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
+		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+public:
+	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
 	virtual bool CheckSlot(FAbilityItem& InItem) const override;
 	

@@ -53,6 +53,44 @@ AVoxelChunk::AVoxelChunk()
 	ITER_DIRECTION(Iter, Neighbors.Add(Iter); )
 }
 
+void AVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	
+}
+
+void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
+{
+	// if(UVoxelModuleStatics::GetWorldMode() == EVoxelWorldMode::Default)
+	{
+		UVoxelModule::Get().GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
+	}
+
+	for(auto& Iter : VoxelMap)
+	{
+		DestroyAuxiliary(Iter.Value);
+	}
+	
+	DestroySceneActors();
+
+	BreakNeighbors();
+
+	Index = FIndex::ZeroIndex;
+	Batch = -1;
+	bBuilded = false;
+	bGenerated = false;
+	bChanged = false;
+
+	SolidMesh->ClearData();
+	SemiMesh->ClearData();
+	TransMesh->ClearData();
+
+	VoxelMap.Empty();
+
+	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+
+	Execute_SetActorVisible(this, false);
+}
+
 void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
@@ -129,54 +167,6 @@ void AVoxelChunk::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 
 void AVoxelChunk::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-}
-
-void AVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	
-}
-
-void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
-{
-	// if(UVoxelModuleStatics::GetWorldMode() == EVoxelWorldMode::Default)
-	{
-		UVoxelModule::Get().GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
-	}
-
-	for(auto& Iter : VoxelMap)
-	{
-		DestroyAuxiliary(Iter.Value);
-	}
-	
-	DestroySceneActors();
-
-	BreakNeighbors();
-
-	Index = FIndex::ZeroIndex;
-	Batch = -1;
-	bBuilded = false;
-	bGenerated = false;
-	bChanged = false;
-
-	SolidMesh->ClearData();
-	SemiMesh->ClearData();
-	TransMesh->ClearData();
-
-	VoxelMap.Empty();
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-
-	Execute_SetActorVisible(this, false);
-}
-
-void AVoxelChunk::SetActorVisible_Implementation(bool bInVisible)
-{
-	bVisible = bInVisible;
-	GetRootComponent()->SetVisibility(bInVisible, true);
-
-	SolidMesh->SetCollisionEnabled(bInVisible);
-	SemiMesh->SetCollisionEnabled(bInVisible);
-	TransMesh->SetCollisionEnabled(bInVisible);
 }
 
 void AVoxelChunk::Initialize(FIndex InIndex, int32 InBatch)
@@ -903,6 +893,16 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 		}
 	}
 	return bSuccess;
+}
+
+void AVoxelChunk::SetActorVisible_Implementation(bool bInVisible)
+{
+	bVisible = bInVisible;
+	GetRootComponent()->SetVisibility(bInVisible, true);
+
+	SolidMesh->SetCollisionEnabled(bInVisible);
+	SemiMesh->SetCollisionEnabled(bInVisible);
+	TransMesh->SetCollisionEnabled(bInVisible);
 }
 
 bool AVoxelChunk::HasSceneActor(const FString& InID, bool bEnsured) const

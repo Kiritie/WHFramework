@@ -17,6 +17,15 @@ class WHFRAMEWORK_API AAbilityProjectileBase : public AWHActor, public IAbilityH
 	
 public:	
 	AAbilityProjectileBase();
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
@@ -24,12 +33,6 @@ public:
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	virtual bool IsDefaultLifecycle_Implementation() const override {  return true;}
 	
 public:

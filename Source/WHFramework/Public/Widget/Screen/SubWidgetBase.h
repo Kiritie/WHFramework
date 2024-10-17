@@ -19,11 +19,13 @@ class WHFRAMEWORK_API USubWidgetBase : public UCommonButton, public IBaseWidgetI
 public:
 	USubWidgetBase(const FObjectInitializer& ObjectInitializer);
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
+		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:

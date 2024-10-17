@@ -12,6 +12,7 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "CharacterBase.generated.h"
@@ -23,12 +24,21 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(meta=(ShortTooltip="A character is a type of Pawn that includes the ability to walk around."))
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface, public ILookingAgentInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISaveDataAgentInterface, public IPrimaryEntityInterface, public IWHActorInterface, public ILookingAgentInterface
 {
 	GENERATED_BODY()
 	
 public:
 	ACharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -44,6 +54,23 @@ public:
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
+	//////////////////////////////////////////////////////////////////////////
+	/// SaveData
+public:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+	
+	virtual void SpawnDefaultController() override;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Character
 public:
@@ -62,22 +89,6 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
-
-protected:
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-public:
-	virtual void Tick(float DeltaSeconds) override;
-	
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	virtual void SpawnDefaultController() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name

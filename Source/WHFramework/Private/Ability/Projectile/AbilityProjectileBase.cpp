@@ -26,21 +26,6 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 	HitTargets = TArray<AActor*>();
 }
 
-void AAbilityProjectileBase::OnPreparatory_Implementation(EPhase InPhase)
-{
-	Super::OnPreparatory_Implementation(InPhase);
-}
-
-void AAbilityProjectileBase::OnRefresh_Implementation(float DeltaSeconds)
-{
-	Super::OnRefresh_Implementation(DeltaSeconds);
-
-	if(UMeshComponent* MeshComponent = Cast<UMeshComponent>(RootComponent->GetAttachParent()))
-	{
-		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
-	}
-}
-
 void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
@@ -59,6 +44,21 @@ void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
 	AbilityLevel = 0;
 	AbilityActorInfo = FGameplayAbilityActorInfo();
 	EffectContainerMap.Empty();
+}
+
+void AAbilityProjectileBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	Super::OnPreparatory_Implementation(InPhase);
+}
+
+void AAbilityProjectileBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(UMeshComponent* MeshComponent = Cast<UMeshComponent>(RootComponent->GetAttachParent()))
+	{
+		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
+	}
 }
 
 void AAbilityProjectileBase::Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)

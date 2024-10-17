@@ -3,15 +3,15 @@
 #include "Common/CommonTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
-#include "SaveDataInterface.generated.h"
+#include "SaveDataAgentInterface.generated.h"
 
 UINTERFACE()
-class WHFRAMEWORK_API USaveDataInterface : public UInterface
+class WHFRAMEWORK_API USaveDataAgentInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class WHFRAMEWORK_API ISaveDataInterface
+class WHFRAMEWORK_API ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 

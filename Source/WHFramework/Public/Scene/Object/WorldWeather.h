@@ -4,7 +4,7 @@
 
 #include "Common/Base/WHObject.h"
 #include "Components/ActorComponent.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "WorldWeather.generated.h"
 
 class ASkyLight;
@@ -14,7 +14,7 @@ class ADirectionalLight;
  * �����������
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
-class WHFRAMEWORK_API UWorldWeather : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UWorldWeather : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 

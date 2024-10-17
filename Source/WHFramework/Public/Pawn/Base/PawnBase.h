@@ -10,6 +10,7 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "PawnBase.generated.h"
@@ -20,12 +21,21 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(meta=(ShortTooltip="A Pawn is an actor that can be 'possessed' and receive input from a controller."))
-class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
+class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISaveDataAgentInterface, public IPrimaryEntityInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
 public:
 	APawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -40,6 +50,23 @@ public:
 
 protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// SaveData
+public:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
+	virtual void SpawnDefaultController() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Pawn
@@ -59,22 +86,6 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
-
-protected:
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-public:
-	virtual void Tick(float DeltaSeconds) override;
-	
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	virtual void SpawnDefaultController() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Components

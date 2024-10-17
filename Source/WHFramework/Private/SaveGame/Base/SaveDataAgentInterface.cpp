@@ -1,10 +1,10 @@
 #pragma once
 
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "Common/CommonStatics.h"
 
-void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
+void ISaveDataAgentInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 {
 	if (PHASEC(InPhase, EPhase::Final) && HasArchive())
 	{
@@ -13,7 +13,7 @@ void ISaveDataInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
 	LoadData(InSaveData, InPhase);
 }
 
-FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)
+FSaveData* ISaveDataAgentInterface::GetSaveData(bool bRefresh)
 {
 	FSaveData* SaveData = !bRefresh ? GetData() : ToData();
 	if (HasArchive())
@@ -23,7 +23,7 @@ FSaveData* ISaveDataInterface::GetSaveData(bool bRefresh)
 	return SaveData;
 }
 
-void ISaveDataInterface::UnloadSaveData(EPhase InPhase)
+void ISaveDataAgentInterface::UnloadSaveData(EPhase InPhase)
 {
 	UnloadData(InPhase);
 	if (PHASEC(InPhase, EPhase::Final) && HasArchive())

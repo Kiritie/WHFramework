@@ -120,7 +120,7 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem)
 	{
 		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
-			Agent->OnSelectItem(GetItem());
+			Agent->OnSelectItem(SplitType, GetItem());
 		}
 	}
 }
@@ -345,7 +345,7 @@ bool UAbilityInventorySlotBase::IsEmpty() const
 
 bool UAbilityInventorySlotBase::IsSelected() const
 {
-	return GetInventory()->GetSelectedSlot() == this;
+	return GetInventory()->GetSelectedSlot(SplitType) == this;
 }
 
 bool UAbilityInventorySlotBase::IsMatched(bool bForce) const
@@ -353,11 +353,6 @@ bool UAbilityInventorySlotBase::IsMatched(bool bForce) const
 	if(IsEmpty()) return false;
 
 	return IsMatch(Item, bForce);
-}
-
-int32 UAbilityInventorySlotBase::GetSplitIndex(ESlotSplitType InSplitType)
-{
-	return GetInventory()->GetSlotsBySplitType(InSplitType).Find(this);
 }
 
 int32 UAbilityInventorySlotBase::GetRemainVolume(FAbilityItem InItem) const

@@ -52,97 +52,6 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void APawnBase::OnInitialize_Implementation()
-{
-	Execute_SetActorVisible(this, bVisible);
-}
-
-void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
-{
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
-}
-
-void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
-{
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
-	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
-	{
-		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
-		{
-			Chunk->AddSceneActor(this);
-		}
-		else if(Container)
-		{
-			Container->RemoveSceneActor(this);
-		}
-	}
-}
-
-void APawnBase::OnTermination_Implementation(EPhase InPhase)
-{
-	IWHActorInterface::OnTermination_Implementation(InPhase);
-}
-
-void APawnBase::OnSwitch_Implementation()
-{
-	
-}
-
-void APawnBase::OnUnSwitch_Implementation()
-{
-	
-}
-
-void APawnBase::Switch_Implementation()
-{
-	UPawnModuleStatics::SwitchPawn(this);
-}
-
-void APawnBase::UnSwitch_Implementation()
-{
-	if(IsCurrent())
-	{
-		UPawnModuleStatics::SwitchPawn(nullptr);
-	}
-}
-
-bool APawnBase::IsCurrent_Implementation() const
-{
-	return UPawnModuleStatics::GetCurrentPawn() == this;
-}
-
-void APawnBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::All);
-	}
-}
-
-void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnTermination(this, EPhase::All);
-	}
-}
-
-void APawnBase::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnRefresh(this, DeltaSeconds);
-	}
-}
-
 void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
@@ -177,11 +86,117 @@ void APawnBase::OnDespawn_Implementation(bool bRecovery)
 	SetGenerateVoxelID(FPrimaryAssetId());
 }
 
+void APawnBase::OnInitialize_Implementation()
+{
+	Execute_SetActorVisible(this, bVisible);
+}
+
+void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+}
+
+void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
+
+	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
+	{
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		{
+			Chunk->AddSceneActor(this);
+		}
+		else if(Container)
+		{
+			Container->RemoveSceneActor(this);
+		}
+	}
+}
+
+void APawnBase::OnTermination_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnTermination_Implementation(InPhase);
+}
+
+void APawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* APawnBase::ToData()
+{
+	return nullptr;
+}
+
+void APawnBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::All);
+	}
+}
+
+void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this, EPhase::All);
+	}
+}
+
+void APawnBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}
+
 void APawnBase::SpawnDefaultController()
 {
 	Super::SpawnDefaultController();
 
 	DefaultController = Controller;
+}
+
+void APawnBase::OnSwitch_Implementation()
+{
+	
+}
+
+void APawnBase::OnUnSwitch_Implementation()
+{
+	
+}
+
+void APawnBase::Switch_Implementation()
+{
+	UPawnModuleStatics::SwitchPawn(this);
+}
+
+void APawnBase::UnSwitch_Implementation()
+{
+	if(IsCurrent())
+	{
+		UPawnModuleStatics::SwitchPawn(nullptr);
+	}
+}
+
+bool APawnBase::IsCurrent_Implementation() const
+{
+	return UPawnModuleStatics::GetCurrentPawn() == this;
 }
 
 void APawnBase::Turn_Implementation(float InValue)

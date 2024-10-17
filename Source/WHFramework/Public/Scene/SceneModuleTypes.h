@@ -114,6 +114,26 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneActorSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FSceneActorSaveData()
+	{
+		ActorID = FGuid();
+		SpawnTransform = FTransform::Identity;
+	}
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGuid ActorID;
+
+	UPROPERTY()
+	FTransform SpawnTransform;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -124,6 +144,7 @@ public:
 		MiniMapRange = 512.f;
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
+		ActorSaveDatas = TArray<FSceneActorSaveData>();
 	}
 
 public:
@@ -135,6 +156,9 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FWorldWeatherSaveData WeatherData;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSceneActorSaveData> ActorSaveDatas;
 
 public:
 	virtual void MakeSaved() override
@@ -143,5 +167,10 @@ public:
 
 		TimerData.MakeSaved();
 		WeatherData.MakeSaved();
+
+		for(auto& Iter : ActorSaveDatas)
+		{
+			Iter.MakeSaved();
+		}
 	}
 };

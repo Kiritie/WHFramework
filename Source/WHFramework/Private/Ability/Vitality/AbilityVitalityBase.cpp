@@ -130,6 +130,11 @@ void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassiv
 	Super::OnActiveItem(InItem, bPassive, bSuccess);
 }
 
+void AAbilityVitalityBase::OnRemoveItem(const FAbilityItem& InItem)
+{
+	Super::OnRemoveItem(InItem);
+}
+
 void AAbilityVitalityBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 	Super::OnDeactiveItem(InItem, bPassive);
@@ -140,17 +145,20 @@ void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPla
 	Super::OnDiscardItem(InItem, bInPlace);
 }
 
-void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
+void AAbilityVitalityBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
 {
-	Super::OnSelectItem(InItem);
-	
-	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+	Super::OnSelectItem(InSplitType, InItem);
+
+	if(InSplitType == ESlotSplitType::Shortcut)
 	{
-		SetGenerateVoxelID(InItem.ID);
-	}
-	else
-	{
-		SetGenerateVoxelID(FPrimaryAssetId());
+		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+		{
+			SetGenerateVoxelID(InItem.ID);
+		}
+		else
+		{
+			SetGenerateVoxelID(FPrimaryAssetId());
+		}
 	}
 }
 

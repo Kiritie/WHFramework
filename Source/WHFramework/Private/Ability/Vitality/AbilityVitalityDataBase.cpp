@@ -13,5 +13,5 @@ UAbilityVitalityDataBase::UAbilityVitalityDataBase()
 
 	InventoryData = FInventorySaveData();
 	InventoryData.InventoryClass = UAbilityVitalityInventoryBase::StaticClass();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
+	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
 }

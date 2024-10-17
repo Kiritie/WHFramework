@@ -71,99 +71,6 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void ACharacterBase::OnInitialize_Implementation()
-{
-	Execute_SetActorVisible(this, bVisible);
-
-	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
-}
-
-void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
-{
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
-}
-
-void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
-{
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
-	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
-	{
-		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
-		{
-			Chunk->AddSceneActor(this);
-		}
-		else if(Container)
-		{
-			Container->RemoveSceneActor(this);
-		}
-	}
-}
-
-void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
-{
-	IWHActorInterface::OnTermination_Implementation(InPhase);
-}
-
-void ACharacterBase::OnSwitch_Implementation()
-{
-	
-}
-
-void ACharacterBase::OnUnSwitch_Implementation()
-{
-	
-}
-
-void ACharacterBase::Switch_Implementation()
-{
-	UCharacterModuleStatics::SwitchCharacter(this);
-}
-
-void ACharacterBase::UnSwitch_Implementation()
-{
-	if(IsCurrent())
-	{
-		UCharacterModuleStatics::SwitchCharacter(nullptr);
-	}
-}
-
-bool ACharacterBase::IsCurrent_Implementation() const
-{
-	return UCharacterModuleStatics::GetCurrentCharacter() == this;
-}
-
-void ACharacterBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::All);
-	}
-}
-
-void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnTermination(this, EPhase::All);
-	}
-}
-
-void ACharacterBase::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnRefresh(this, DeltaSeconds);
-	}
-}
-
 void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
@@ -198,11 +105,119 @@ void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
 	SetGenerateVoxelID(FPrimaryAssetId());
 }
 
+void ACharacterBase::OnInitialize_Implementation()
+{
+	Execute_SetActorVisible(this, bVisible);
+
+	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
+}
+
+void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+}
+
+void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
+
+	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
+	{
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		{
+			Chunk->AddSceneActor(this);
+		}
+		else if(Container)
+		{
+			Container->RemoveSceneActor(this);
+		}
+	}
+}
+
+void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
+{
+	IWHActorInterface::OnTermination_Implementation(InPhase);
+}
+
+void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* ACharacterBase::ToData()
+{
+	return nullptr;
+}
+
+void ACharacterBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnInitialize(this);
+		Execute_OnPreparatory(this, EPhase::All);
+	}
+}
+
+void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this, EPhase::All);
+	}
+}
+
+void ACharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}
+
 void ACharacterBase::SpawnDefaultController()
 {
 	Super::SpawnDefaultController();
 
 	DefaultController = Controller;
+}
+
+void ACharacterBase::OnSwitch_Implementation()
+{
+	
+}
+
+void ACharacterBase::OnUnSwitch_Implementation()
+{
+	
+}
+
+void ACharacterBase::Switch_Implementation()
+{
+	UCharacterModuleStatics::SwitchCharacter(this);
+}
+
+void ACharacterBase::UnSwitch_Implementation()
+{
+	if(IsCurrent())
+	{
+		UCharacterModuleStatics::SwitchCharacter(nullptr);
+	}
+}
+
+bool ACharacterBase::IsCurrent_Implementation() const
+{
+	return UCharacterModuleStatics::GetCurrentCharacter() == this;
 }
 
 void ACharacterBase::Turn_Implementation(float InValue)

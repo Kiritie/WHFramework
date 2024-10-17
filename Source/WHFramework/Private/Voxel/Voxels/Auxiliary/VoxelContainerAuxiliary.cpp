@@ -53,6 +53,11 @@ void AVoxelContainerAuxiliary::OnAdditionItem(const FAbilityItem& InItem)
 	
 }
 
+void AVoxelContainerAuxiliary::OnRemoveItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AVoxelContainerAuxiliary::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -70,7 +75,7 @@ void AVoxelContainerAuxiliary::OnDiscardItem(const FAbilityItem& InItem, bool bI
 	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
-void AVoxelContainerAuxiliary::OnSelectItem(const FAbilityItem& InItem)
+void AVoxelContainerAuxiliary::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
 {
 	
 }

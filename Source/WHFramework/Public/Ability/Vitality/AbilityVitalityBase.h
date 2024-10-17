@@ -32,13 +32,16 @@ class WHFRAMEWORK_API AAbilityVitalityBase : public AAbilityActorBase, public IA
 	friend class UAbilityVitalityState_Death;
 	friend class UAbilityVitalityState_Spawn;
 
-protected:
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
-	
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
@@ -65,12 +68,14 @@ public:
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
+
+	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
 		
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 

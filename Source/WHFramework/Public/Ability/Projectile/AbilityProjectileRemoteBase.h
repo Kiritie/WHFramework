@@ -19,28 +19,19 @@ class WHFRAMEWORK_API AAbilityProjectileRemoteBase : public AAbilityProjectileBa
 	
 public:	
 	AAbilityProjectileRemoteBase();
-
-protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	USphereComponent* SphereComponent;
 	
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UProjectileMovementComponent* ProjectileMovement;
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float InitialVelocity;
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 	
 protected:
 	UFUNCTION()
 	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-protected:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle) override;
@@ -55,6 +46,17 @@ public:
 	virtual void ClearHitTargets() override;
 
 	virtual void SetHitAble(bool bValue) override;
+
+protected:
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	USphereComponent* SphereComponent;
+	
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UProjectileMovementComponent* ProjectileMovement;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float InitialVelocity;
 
 public:
 	UFUNCTION(BlueprintPure)

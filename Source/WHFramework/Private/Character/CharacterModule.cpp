@@ -10,7 +10,9 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonStatics.h"
 #include "Net/UnrealNetwork.h"
-		
+#include "SaveGame/Module/CharacterSaveGame.h"
+#include "Scene/SceneModuleStatics.h"
+
 IMPLEMENTATION_MODULE(UCharacterModule)
 
 // Sets default values
@@ -19,6 +21,8 @@ UCharacterModule::UCharacterModule()
 	ModuleName = FName("CharacterModule");
 	ModuleDisplayName = FText::FromString(TEXT("Character Module"));
 
+	ModuleSaveGame = UCharacterSaveGame::StaticClass();
+	
 	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
 	Characters = TArray<ACharacterBase*>();
@@ -57,6 +61,8 @@ void UCharacterModule::OnInitialize()
 		if(Iter && !CharacterMap.Contains(Iter->GetNameC()))
 		{
 			CharacterMap.Add(Iter->GetNameC(), Iter);
+			
+			USceneModuleStatics::AddSceneActor(Iter);
 		}
 	}
 }
@@ -67,7 +73,7 @@ void UCharacterModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(DefaultCharacter)
+		if(!CurrentCharacter && DefaultCharacter)
 		{
 			SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
 		}
@@ -92,6 +98,29 @@ void UCharacterModule::OnUnPause()
 void UCharacterModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+}
+
+void UCharacterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FCharacterModuleSaveData>();
+
+	if(SaveData.IsSaved())
+	{
+		if(SaveData.CurrentCharacter)
+		{
+			SwitchCharacter(SaveData.CurrentCharacter, DefaultResetCamera, DefaultInstantSwitch);
+		}
+	}
+}
+
+FSaveData* UCharacterModule::ToData()
+{
+	static FCharacterModuleSaveData* SaveData;
+	SaveData = new FCharacterModuleSaveData();
+
+	SaveData->CurrentCharacter = CurrentCharacter;
+
+	return SaveData;
 }
 
 FString UCharacterModule::GetModuleDebugMessage()

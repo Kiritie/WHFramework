@@ -79,9 +79,9 @@ enum class EInteractAgentType : uint8
 	// 无
 	None = 0 UMETA(DisplayName="无"),
 	// 静态的
-	Static = 1 UMETA(DisplayName="静态的"),
+	Passivity = 1 UMETA(DisplayName="被动的"),
 	// 可移动的
-	Movable = 2 UMETA(DisplayName="可移动的")
+	Initiative = 2 UMETA(DisplayName="主动的")
 };
 
 //////////////////////////////////////////////////////////////////////////

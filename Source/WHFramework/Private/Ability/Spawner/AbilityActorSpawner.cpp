@@ -72,8 +72,7 @@ AActor* AAbilityActorSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbi
 	SaveData.AssetID = ActorData.GetPrimaryAssetId();
 	SaveData.Name = *ActorData.Name.ToString();
 	SaveData.Level = InAbilityItem.Level;
-	SaveData.SpawnLocation = GetActorLocation();
-	SaveData.SpawnRotation = GetActorRotation();
+	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.InventoryData = ActorData.InventoryData;
 
 	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);

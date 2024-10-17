@@ -20,44 +20,19 @@ public:
 	UAbilityInventorySlotBase();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Properties
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	UAbilityInventoryBase* Inventory;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	EAbilityItemType LimitType;
-		
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	ESlotSplitType SplitType;
-			
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	int32 SlotIndex;
-
+	/// ObjectPool
 public:
-	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotRefresh OnInventorySlotRefresh;
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
-	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotActivated OnInventorySlotActivated;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotCanceled OnInventorySlotCanceled;
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Initialize
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex);
 	
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	UFUNCTION(BlueprintCallable)
 	virtual void OnItemPreChange(FAbilityItem& InNewItem);
 		
@@ -118,8 +93,32 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void ClearItem();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Getter/Setter
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UAbilityInventoryBase* Inventory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	EAbilityItemType LimitType;
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	ESlotSplitType SplitType;
+			
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	int32 SlotIndex;
+
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnInventorySlotRefresh OnInventorySlotRefresh;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInventorySlotActivated OnInventorySlotActivated;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInventorySlotCanceled OnInventorySlotCanceled;
+
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsEmpty() const;
@@ -129,8 +128,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	bool IsMatched(bool bForce = false) const;
-
-	int32 GetSplitIndex(ESlotSplitType InSplitType = ESlotSplitType::None);
 
 	int32 GetRemainVolume(FAbilityItem InItem = FAbilityItem::Empty) const;
 
@@ -150,6 +147,9 @@ public:
 	
 	UFUNCTION(BlueprintPure)
 	ESlotSplitType GetSplitType() const { return SplitType; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetSlotIndex() const { return SlotIndex; }
 
 	UFUNCTION(BlueprintPure)
 	virtual FAbilityInfo GetAbilityInfo() const;

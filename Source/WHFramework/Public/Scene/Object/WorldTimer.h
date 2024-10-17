@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "WorldTimer.generated.h"
 
 class ASkyLight;
@@ -13,7 +13,7 @@ class ADirectionalLight;
  * ʱ��������
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
-class WHFRAMEWORK_API UWorldTimer : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UWorldTimer : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 

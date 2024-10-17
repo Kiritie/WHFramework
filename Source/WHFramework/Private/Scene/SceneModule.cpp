@@ -366,14 +366,23 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			MiniMapRange = SaveData.MiniMapRange;
 		}
+		
 		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
 			WorldTimer->LoadSaveData(&SaveData.TimerData);
 		}
-	
+		
 		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
 			WorldWeather->LoadSaveData(&SaveData.WeatherData);
+		}
+
+		for(auto& Iter : SaveData.ActorSaveDatas)
+		{
+			if(auto Agent = GetSceneActor<ISaveDataAgentInterface>(Iter.ActorID.ToString(), false))
+			{
+				Agent->LoadSaveData(&Iter);
+			}
 		}
 	}
 }
@@ -393,6 +402,17 @@ FSaveData* USceneModule::ToData()
 	if(WorldWeather && WorldWeather->IsAutoSave())
 	{
 		SaveData->WeatherData = WorldWeather->GetSaveDataRef<FWorldWeatherSaveData>(true);
+	}
+	
+	for(auto& Iter : SceneActorMap)
+	{
+		if(auto Agent = Cast<ISaveDataAgentInterface>(Iter.Value))
+		{
+			if(auto Data = Agent->GetSaveData<FSceneActorSaveData>(true))
+			{
+				SaveData->ActorSaveDatas.Add(*Data);
+			}
+		}
 	}
 
 	return SaveData;

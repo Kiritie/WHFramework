@@ -9,7 +9,6 @@
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "AbilityActorBase.generated.h"
 
@@ -26,12 +25,21 @@ class UAbilityActorDataBase;
  * Ability Actor基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface
 {
 	GENERATED_BODY()
 
 public:
 	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -45,12 +53,6 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;
@@ -72,13 +74,15 @@ public:
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
+	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
+
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
@@ -146,7 +150,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
 	

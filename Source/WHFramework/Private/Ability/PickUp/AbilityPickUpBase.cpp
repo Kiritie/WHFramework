@@ -39,18 +39,9 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	Item = FAbilityItem::Empty;
 }
 
-void AAbilityPickUpBase::OnInitialize_Implementation()
-{
-	Super::OnInitialize_Implementation();
-
-	FallingMovement->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
-}
-
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
-
-	Interaction->SetInteractable(true);
 }
 
 void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
@@ -60,7 +51,13 @@ void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 	Item = FAbilityItem::Empty;
 
 	FollowingMovement->SetFollowingTarget(nullptr);
-	Interaction->SetInteractable(false);
+}
+
+void AAbilityPickUpBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	FallingMovement->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)

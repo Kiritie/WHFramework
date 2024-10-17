@@ -18,7 +18,7 @@ public:
 	UWHObject();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Object
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 

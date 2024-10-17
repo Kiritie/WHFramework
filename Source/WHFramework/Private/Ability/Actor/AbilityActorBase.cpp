@@ -40,6 +40,27 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	Level = 0;
 }
 
+void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	if(InParams.IsValidIndex(0))
+	{
+		ActorID = InParams[0].GetPointerValueRef<FGuid>();
+	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+	}
+
+	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	InitializeAbilities();
+}
+
+void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Super::OnDespawn_Implementation(bRecovery);
+}
+
 void AAbilityActorBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
@@ -63,27 +84,6 @@ void AAbilityActorBase::OnRefresh_Implementation(float DeltaSeconds)
 void AAbilityActorBase::OnTermination_Implementation(EPhase InPhase)
 {
 	Super::OnTermination_Implementation(InPhase);
-}
-
-void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
-	Super::OnSpawn_Implementation(InOwner, InParams);
-
-	InitializeAbilities();
-}
-
-void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Super::OnDespawn_Implementation(bRecovery);
 }
 
 void AAbilityActorBase::Serialize(FArchive& Ar)
@@ -125,8 +125,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
+		SetActorTransform(SaveData.SpawnTransform);
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -152,8 +151,7 @@ FSaveData* AAbilityActorBase::ToData()
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
-	SaveData.SpawnLocation = GetActorLocation();
-	SaveData.SpawnRotation = GetActorRotation();
+	SaveData.SpawnTransform = GetActorTransform();
 
 	return &SaveData;
 }
@@ -184,6 +182,10 @@ void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)
 {
 }
 
+void AAbilityActorBase::OnRemoveItem(const FAbilityItem& InItem)
+{
+}
+
 void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -201,8 +203,9 @@ void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
-void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)
+void AAbilityActorBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
 {
+	
 }
 
 void AAbilityActorBase::OnAuxiliaryItem(const FAbilityItem& InItem)
@@ -212,6 +215,7 @@ void AAbilityActorBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
+	
 }
 
 UAbilityActorDataBase& AAbilityActorBase::GetActorData() const

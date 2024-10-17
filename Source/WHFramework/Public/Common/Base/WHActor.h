@@ -6,12 +6,13 @@
 #include "GameFramework/Actor.h"
 #include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "WHActor.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UWHActorInterface : public UInterface
+class UWHActorInterface : public USceneActorInterface
 {
 	GENERATED_BODY()
 };
@@ -19,7 +20,7 @@ class UWHActorInterface : public UInterface
 /**
  * 
  */
-class WHFRAMEWORK_API IWHActorInterface
+class WHFRAMEWORK_API IWHActorInterface : public ISceneActorInterface
 {
 	GENERATED_BODY()
 
@@ -58,12 +59,21 @@ protected:
  * 
  */
 UCLASS(meta=(ShortTooltip="An Actor is an object that can be placed or spawned in the world."), hidecategories = (Tick, Replication, Collision, Input, Cooking, Hidden, Hlod, Physics, LevelInstance))
-class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API AWHActor : public AActor, public IWHActorInterface, public IObjectPoolInterface, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	AWHActor(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -80,13 +90,11 @@ protected:
 	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
+	/// SaveData
 public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual FSaveData* ToData() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor

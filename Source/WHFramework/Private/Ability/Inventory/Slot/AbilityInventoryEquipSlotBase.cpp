@@ -4,15 +4,9 @@
 #include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Ability/Inventory/AbilityInventoryBase.h"
 
 UAbilityInventoryEquipSlotBase::UAbilityInventoryEquipSlotBase()
 {
-}
-
-void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
-{
-	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
 void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -23,6 +17,11 @@ void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(UObject* InOwner, co
 void UAbilityInventoryEquipSlotBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+}
+
+void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
+{
+	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
 bool UAbilityInventoryEquipSlotBase::CheckSlot(FAbilityItem& InItem) const

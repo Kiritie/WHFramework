@@ -15,26 +15,6 @@ AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
 	Container = nullptr;
 }
 
-void AWHActor::OnInitialize_Implementation()
-{
-	Execute_SetActorVisible(this, bVisible);
-}
-
-void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
-{
-	
-}
-
-void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
-{
-	
-}
-
-void AWHActor::OnTermination_Implementation(EPhase InPhase)
-{
-	
-}
-
 void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
@@ -70,6 +50,41 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 	}
 
 	Container = nullptr;
+}
+
+void AWHActor::OnInitialize_Implementation()
+{
+	Execute_SetActorVisible(this, bVisible);
+}
+
+void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
+{
+	
+}
+
+void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void AWHActor::OnTermination_Implementation(EPhase InPhase)
+{
+	
+}
+
+void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* AWHActor::ToData()
+{
+	return nullptr;
 }
 
 void AWHActor::SetActorVisible_Implementation(bool bInVisible)

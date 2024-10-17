@@ -171,7 +171,7 @@ AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainer
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
 	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityActorDataBase>().Class))
 	{
-		Cast<ISaveDataInterface>(Actor)->LoadSaveData(InSaveData);
+		Cast<ISaveDataAgentInterface>(Actor)->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Actor);

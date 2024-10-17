@@ -37,7 +37,7 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
 
-	if(!Character->IsPlayer())
+	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
 	}
@@ -60,7 +60,7 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Character->GetInteractionComponent()->SetInteractable(true);
 
-	if(!Character->IsPlayer())
+	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->RunBehaviorTree();
 	}

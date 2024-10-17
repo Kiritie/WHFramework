@@ -7,7 +7,7 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Common/Targeting/TargetingAgentInterface.h"
@@ -29,7 +29,7 @@ class UAbilityPawnDataBase;
  * Ability Pawn基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface, public ITargetingAgentInterface
+class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -38,6 +38,15 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnIn
 
 public:
 	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -51,12 +60,6 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-	
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
@@ -90,13 +93,15 @@ public:
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
+	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
+
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
+	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
@@ -153,7 +158,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Movable; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Initiative; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 	

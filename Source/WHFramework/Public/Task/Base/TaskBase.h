@@ -6,7 +6,7 @@
 #include "Task/TaskModuleTypes.h"
 #include "Common/CommonTypes.h"
 #include "Common/Base/WHObject.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "TaskBase.generated.h"
 
@@ -36,7 +36,7 @@ public:
  * 任务基类
  */
 UCLASS(Blueprintable, hidecategories = (Default))
-class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 

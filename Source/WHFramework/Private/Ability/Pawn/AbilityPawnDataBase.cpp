@@ -13,5 +13,5 @@ UAbilityPawnDataBase::UAbilityPawnDataBase()
 
 	InventoryData = FInventorySaveData();
 	InventoryData.InventoryClass = UAbilityPawnInventoryBase::StaticClass();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
+	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
 }

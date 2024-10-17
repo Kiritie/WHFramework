@@ -12,5 +12,5 @@ UVoxelContainerData::UVoxelContainerData()
 
 	InventoryData = FInventorySaveData();
 	InventoryData.InventoryClass = UAbilityInventoryBase::StaticClass();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(40);
+	InventoryData.SplitItems.Add(ESlotSplitType::Default, 40);
 }

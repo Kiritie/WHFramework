@@ -72,6 +72,29 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	RotationRate = 1;
 }
 
+void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	InitializeAbilities();
+
+	SpawnDefaultController();
+
+	FSM->SwitchDefaultState();
+}
+
+void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Super::OnDespawn_Implementation(bRecovery);
+
+	SetMotionRate(1, 1);
+	
+	RaceID = NAME_None;
+	Level = 0;
+
+	Inventory->UnloadSaveData();
+}
+
 void AAbilityCharacterBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
@@ -117,29 +140,6 @@ void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
-void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnSpawn_Implementation(InOwner, InParams);
-
-	InitializeAbilities();
-
-	SpawnDefaultController();
-
-	FSM->SwitchDefaultState();
-}
-
-void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Super::OnDespawn_Implementation(bRecovery);
-
-	SetMotionRate(1, 1);
-	
-	RaceID = NAME_None;
-	Level = 0;
-
-	Inventory->UnloadSaveData();
-}
-
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
@@ -183,8 +183,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SetActorLocation(SaveData.SpawnLocation);
-		SetActorRotation(SaveData.SpawnRotation);
+		SetActorTransform(SaveData.SpawnTransform);
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -214,8 +213,7 @@ FSaveData* AAbilityCharacterBase::ToData()
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
-	SaveData.SpawnLocation = GetActorLocation();
-	SaveData.SpawnRotation = GetActorRotation();
+	SaveData.SpawnTransform = GetActorTransform();
 	
 	SaveData.CameraRotation = UCameraModuleStatics::GetCameraRotation();
 	SaveData.CameraDistance = UCameraModuleStatics::GetCameraDistance();
@@ -395,6 +393,11 @@ void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
 	
 }
 
+void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
+{
+	
+}
+
 void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -412,15 +415,18 @@ void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPl
 	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
 }
 
-void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
+void AAbilityCharacterBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
 {
-	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+	if(InSplitType == ESlotSplitType::Shortcut)
 	{
-		SetGenerateVoxelID(InItem.ID);
-	}
-	else
-	{
-		SetGenerateVoxelID(FPrimaryAssetId());
+		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+		{
+			SetGenerateVoxelID(InItem.ID);
+		}
+		else
+		{
+			SetGenerateVoxelID(FPrimaryAssetId());
+		}
 	}
 }
 

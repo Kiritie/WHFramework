@@ -60,7 +60,7 @@ void UAbilityCharacterState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Character->GetInteractionComponent()->SetInteractable(true);
 
-	if(!Character->IsPlayer())
+	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->RunBehaviorTree();
 	}

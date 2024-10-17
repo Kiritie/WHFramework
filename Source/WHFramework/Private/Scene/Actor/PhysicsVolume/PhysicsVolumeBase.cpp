@@ -11,6 +11,15 @@ APhysicsVolumeBase::APhysicsVolumeBase()
 	VolumeName = NAME_None;
 }
 
+void APhysicsVolumeBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+}
+
+void APhysicsVolumeBase::OnDespawn_Implementation(bool bRecovery)
+{
+	VolumeName = NAME_None;
+}
+
 void APhysicsVolumeBase::OnInitialize_Implementation()
 {
 	
@@ -70,13 +79,4 @@ void APhysicsVolumeBase::Initialize(const FPhysicsVolumeData& InPhysicsVolumeDat
 	TerminalVelocity = InPhysicsVolumeData.TerminalVelocity;
 	bWaterVolume = InPhysicsVolumeData.bWaterVolume;
 	bPhysicsOnContact = InPhysicsVolumeData.bPhysicsOnContact;
-}
-
-void APhysicsVolumeBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-}
-
-void APhysicsVolumeBase::OnDespawn_Implementation(bool bRecovery)
-{
-	VolumeName = NAME_None;
 }

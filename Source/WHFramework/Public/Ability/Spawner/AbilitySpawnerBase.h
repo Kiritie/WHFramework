@@ -14,12 +14,21 @@ class UCapsuleComponent;
  * 
  */
 UCLASS(Abstract, Blueprintable, hidecategories = (Tick, Replication, Collision, Input, Cooking, Hidden, Hlod, Physics, LevelInstance))
-class WHFRAMEWORK_API AAbilitySpawnerBase : public ANavigationObjectBase, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API AAbilitySpawnerBase : public ANavigationObjectBase, public IWHActorInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
 public:
 	AAbilitySpawnerBase();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -37,15 +46,6 @@ protected:
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor

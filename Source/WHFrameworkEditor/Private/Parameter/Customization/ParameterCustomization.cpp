@@ -50,7 +50,7 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 
 #define ADD_PARAM_PROPERTY(ParamType) \
 	TSharedPtr<IPropertyHandle> ParamType##ValueHandle = PropertyHandles.FindChecked(GET_MEMBER_NAME_CHECKED(FParameter, ParamType##Value)); \
-	ParameterValueHandles.Add(EParameterType::##ParamType, ParamType##ValueHandle); \
+	ParameterValueHandles.Add(EParameterType::ParamType, ParamType##ValueHandle); \
 	ChildBuilder.AddProperty(ParamType##ValueHandle.ToSharedRef()).Visibility(TAttribute<EVisibility>::Create([this]() \
 		{ \
 			uint8 ParamTypeValue = 0; \
