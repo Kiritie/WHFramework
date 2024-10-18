@@ -72,6 +72,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
+	bool bSaveActorDatas;
+
 	UPROPERTY(EditAnywhere, Category = "World|Coordinate")
 	float SeaLevel;
 	

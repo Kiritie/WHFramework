@@ -111,13 +111,13 @@ protected:
 
 public:
 	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotRefresh OnInventorySlotRefresh;
+	FOnInventorySlotRefresh OnSlotRefresh;
 
 	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotActivated OnInventorySlotActivated;
+	FOnInventorySlotActivated OnSlotActivated;
 
 	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotCanceled OnInventorySlotCanceled;
+	FOnInventorySlottDeactived OnSlotDeactived;
 
 public:
 	UFUNCTION(BlueprintPure)

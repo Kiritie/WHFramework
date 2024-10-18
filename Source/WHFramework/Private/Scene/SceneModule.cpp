@@ -46,6 +46,8 @@ USceneModule::USceneModule()
 
 	ModuleSaveGame = USceneSaveGame::StaticClass();
 
+	bSaveActorDatas = false;
+
 	SeaLevel = 0.f;
 	Altitude = 0.f;
 
@@ -377,11 +379,14 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			WorldWeather->LoadSaveData(&SaveData.WeatherData);
 		}
 
-		for(auto& Iter : SaveData.ActorSaveDatas)
+		if(bSaveActorDatas)
 		{
-			if(auto Agent = GetSceneActor<ISaveDataAgentInterface>(Iter.ActorID.ToString(), false))
+			for(auto& Iter : SaveData.ActorSaveDatas)
 			{
-				Agent->LoadSaveData(&Iter);
+				if(auto Agent = GetSceneActor<ISaveDataAgentInterface>(Iter.ActorID.ToString(), false))
+				{
+					Agent->LoadSaveData(&Iter);
+				}
 			}
 		}
 	}
@@ -403,14 +408,17 @@ FSaveData* USceneModule::ToData()
 	{
 		SaveData->WeatherData = WorldWeather->GetSaveDataRef<FWorldWeatherSaveData>(true);
 	}
-	
-	for(auto& Iter : SceneActorMap)
+
+	if(bSaveActorDatas)
 	{
-		if(auto Agent = Cast<ISaveDataAgentInterface>(Iter.Value))
+		for(auto& Iter : SceneActorMap)
 		{
-			if(auto Data = Agent->GetSaveData<FSceneActorSaveData>(true))
+			if(auto Agent = Cast<ISaveDataAgentInterface>(Iter.Value))
 			{
-				SaveData->ActorSaveDatas.Add(*Data);
+				if(auto Data = Agent->GetSaveData<FSceneActorSaveData>(true))
+				{
+					SaveData->ActorSaveDatas.Add(*Data);
+				}
 			}
 		}
 	}

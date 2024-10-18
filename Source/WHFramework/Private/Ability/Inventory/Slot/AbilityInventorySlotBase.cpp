@@ -20,14 +20,6 @@ UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 	SlotIndex = 0;
 }
 
-void UAbilityInventorySlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
-{
-	Inventory = InInventory;
-	LimitType = InLimitType;
-	SplitType = InSplitType;
-	SlotIndex = InSlotIndex;
-}
-
 void UAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
@@ -40,6 +32,17 @@ void UAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 	LimitType = EAbilityItemType::None;
 	SplitType = ESlotSplitType::Default;
 	SlotIndex = 0;
+	OnSlotRefresh.Clear();
+	OnSlotActivated.Clear();
+	OnSlotDeactived.Clear();
+}
+
+void UAbilityInventorySlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)
+{
+	Inventory = InInventory;
+	LimitType = InLimitType;
+	SplitType = InSplitType;
+	SlotIndex = InSlotIndex;
 }
 
 bool UAbilityInventorySlotBase::CheckSlot(FAbilityItem& InItem) const
@@ -93,7 +96,7 @@ void UAbilityInventorySlotBase::Refresh()
 	{
 		SetItem(FAbilityItem::Empty, false);
 	}
-	OnInventorySlotRefresh.Broadcast();
+	OnSlotRefresh.Broadcast();
 	GetInventory()->OnRefresh.Broadcast();
 }
 
@@ -298,12 +301,12 @@ bool UAbilityInventorySlotBase::ActiveItem(bool bPassive /*= false*/)
 	{
 		if(Vitality->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
 		{
-			OnInventorySlotActivated.Broadcast();
+			OnSlotActivated.Broadcast();
 			for(auto Iter : GetInventory()->QueryItemByRange(EItemQueryType::Get, Item).Slots)
 			{
 				if(Iter != this)
 				{
-					Iter->OnInventorySlotActivated.Broadcast();
+					Iter->OnSlotActivated.Broadcast();
 				}
 			}
 			bSuccess = true;
@@ -323,7 +326,7 @@ void UAbilityInventorySlotBase::CancelItem(bool bPassive /*= false*/)
 	if(auto Vitality = GetInventory()->GetOwnerAgent<IAbilityVitalityInterface>())
 	{
 		Vitality->GetAbilitySystemComponent()->CancelAbilityHandle(Item.AbilityHandle);
-		OnInventorySlotCanceled.Broadcast();
+		OnSlotDeactived.Broadcast();
 	}
 	if(auto Agent = GetInventory()->GetOwnerAgent())
 	{

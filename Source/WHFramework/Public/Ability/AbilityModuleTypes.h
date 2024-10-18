@@ -658,7 +658,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityIn
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotRefresh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotCanceled);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlottDeactived);
 
 UENUM(BlueprintType)
 enum class ESlotSplitType : uint8

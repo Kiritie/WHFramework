@@ -26,43 +26,12 @@ public:
 	UAbilityInventoryBase();
 		
 	//////////////////////////////////////////////////////////////////////////
-	// Reference
+	// ReferencePool
 public:
 	virtual void OnReset_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Properties
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TMap<ESlotSplitType, FInventorySlots> SplitSlots;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TMap<ESlotSplitType, UAbilityInventorySlotBase*> SelectedSlots;
-				
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UAbilityInventoryBase* ConnectInventory;
-	
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<UAbilityInventoryShortcutSlotBase> ShortcutSlotClass;
-
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<UAbilityInventoryAuxiliarySlotBase> AuxiliarySlotClass;
-	
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<UAbilityInventoryEquipSlotBase> EquipSlotClass;
-
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<UAbilityInventorySkillSlotBase> SkillSlotClass;
-	
-public:
-	UPROPERTY(BlueprintAssignable)
-	FOnInventoryRefresh OnRefresh;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnInventorySlotSelected OnSlotSelected;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Data
+	/// SaveData
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -71,7 +40,7 @@ protected:
 	virtual void UnloadData(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Actions
+	/// AbilityInventory
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FItemQueryInfo QueryItemByRange(EItemQueryType InQueryType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1);
@@ -129,8 +98,35 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Setter/Getter
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TMap<ESlotSplitType, FInventorySlots> SplitSlots;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TMap<ESlotSplitType, UAbilityInventorySlotBase*> SelectedSlots;
+				
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UAbilityInventoryBase* ConnectInventory;
+	
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UAbilityInventoryShortcutSlotBase> ShortcutSlotClass;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UAbilityInventoryAuxiliarySlotBase> AuxiliarySlotClass;
+	
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UAbilityInventoryEquipSlotBase> EquipSlotClass;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UAbilityInventorySkillSlotBase> SkillSlotClass;
+	
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnInventoryRefresh OnRefresh;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInventorySlotSelected OnSlotSelected;
+
 public:
 	template<class T>
 	T* GetOwnerAgent() const

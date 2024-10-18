@@ -13,7 +13,7 @@
 // Sets default values
 AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 {
-	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
+	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("VoxelAuxiliary"));
 
@@ -26,7 +26,6 @@ void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
-	Interaction->SetInteractable(false);
 	Interaction->ClearInteractActions();
 }
 
@@ -40,7 +39,6 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			Interaction->AddInteractAction(Iter);
 		}
-		Interaction->SetInteractable(VoxelItem.Owner != nullptr);
 		BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 	}
 }

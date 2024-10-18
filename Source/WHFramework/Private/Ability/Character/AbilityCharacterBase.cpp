@@ -44,7 +44,6 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
-	Interaction->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	Interaction->SetInteractable(false);
 
 	Interaction->AddInteractAction(EInteractAction::Revive);

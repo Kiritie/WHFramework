@@ -17,7 +17,7 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
+	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
 	BoxComponent->SetBoxExtent(FVector(15.f));

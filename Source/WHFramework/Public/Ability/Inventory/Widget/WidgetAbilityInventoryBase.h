@@ -20,14 +20,14 @@ class WHFRAMEWORK_API UWidgetAbilityInventoryBase : public UUserWidgetBase
 public:
 	UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer);
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TMap<ESlotSplitType, FWidgetInventorySlots> UISlotDatas;
-
 public:
 	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
 	
 	virtual void OnRefresh() override;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TMap<ESlotSplitType, FWidgetInventorySlots> UISlotDatas;
 
 public:
 	UFUNCTION(BlueprintPure)
