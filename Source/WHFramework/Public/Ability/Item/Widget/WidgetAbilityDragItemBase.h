@@ -3,14 +3,14 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Blueprint/UserWidget.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 #include "WidgetAbilityDragItemBase.generated.h"
 
 /**
  * UI拖拽项
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetAbilityDragItemBase : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UWidgetAbilityDragItemBase : public UPoolWidgetBase
 {
 	GENERATED_BODY()
 	

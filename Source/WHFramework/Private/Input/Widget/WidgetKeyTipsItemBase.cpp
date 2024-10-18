@@ -27,14 +27,14 @@ void UWidgetKeyTipsItemBase::NativePreConstruct()
 
 void UWidgetKeyTipsItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	IObjectPoolInterface::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InOwner, InParams);
 
 	RefreshData();
 }
 
 void UWidgetKeyTipsItemBase::OnDespawn_Implementation(bool bRecovery)
 {
-	IObjectPoolInterface::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(bRecovery);
 }
 
 void UWidgetKeyTipsItemBase::RefreshData_Implementation()

@@ -14,6 +14,8 @@ UWidgetAbilityDragItemBase::UWidgetAbilityDragItemBase(const FObjectInitializer&
 
 void UWidgetAbilityDragItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	Super::OnSpawn_Implementation(InOwner, InParams);
+	
 	if(InParams.IsValidIndex(0))
 	{
 		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
@@ -22,5 +24,7 @@ void UWidgetAbilityDragItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 
 void UWidgetAbilityDragItemBase::OnDespawn_Implementation(bool bRecovery)
 {
+	Super::OnDespawn_Implementation(bRecovery);
+	
 	Item = FAbilityItem::Empty;
 }

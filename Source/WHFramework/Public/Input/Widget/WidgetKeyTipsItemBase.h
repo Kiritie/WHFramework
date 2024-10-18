@@ -1,8 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "ObjectPool/ObjectPoolInterface.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 
-#include "Widget/Screen/SubWidgetBase.h"
 #include "WidgetKeyTipsItemBase.generated.h"
 
 class UBorder;
@@ -10,7 +11,7 @@ class UHorizontalBox;
 class UCommonTextBlockN;
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetKeyTipsItemBase : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UWidgetKeyTipsItemBase : public UPoolWidgetBase
 {
 	GENERATED_BODY()
 

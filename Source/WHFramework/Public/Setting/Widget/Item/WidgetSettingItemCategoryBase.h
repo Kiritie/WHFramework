@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "Blueprint/UserWidget.h"
-#include "ObjectPool/ObjectPoolInterface.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 
 #include "WidgetSettingItemCategoryBase.generated.h"
 
@@ -11,7 +10,7 @@ class UTextBlock;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetSettingItemCategoryBase : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UWidgetSettingItemCategoryBase : public UPoolWidgetBase
 {
 	GENERATED_BODY()
 	

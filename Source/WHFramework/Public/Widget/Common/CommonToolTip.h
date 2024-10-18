@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Blueprint/UserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 
 #include "CommonToolTip.generated.h"
 
@@ -11,7 +11,7 @@ class UImage;
 class UCommonTextBlockN;
 
 UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common ToolTip", DisableNativeTick))
-class WHFRAMEWORK_API UCommonToolTip : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UCommonToolTip : public UPoolWidgetBase
 {
 	GENERATED_BODY()
 
@@ -30,9 +30,6 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
 	UCommonTextBlockN* Txt_Content;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UWidget* OwnerWidget;
 
 public:
 	UFUNCTION(BlueprintPure)
