@@ -81,7 +81,7 @@ public:
 	{
 		if(IsExistManager<T>())
 		{
-			return Get().ManagerMap[T::Type]->template CastTo<T>();
+			return Get().ManagerMap[T::Type]->template Cast<T>();
 		}
 		return nullptr;
 	}

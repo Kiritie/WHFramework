@@ -88,6 +88,8 @@ void APawnBase::OnDespawn_Implementation(bool bRecovery)
 
 void APawnBase::OnInitialize_Implementation()
 {
+	bWHActorInitialized = true;
+	
 	Execute_SetActorVisible(this, bVisible);
 }
 
@@ -124,13 +126,20 @@ void APawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
+		ActorID = SaveData.ActorID;
 		SetActorTransform(SaveData.SpawnTransform);
 	}
 }
 
 FSaveData* APawnBase::ToData()
 {
-	return nullptr;
+	static FSceneActorSaveData SaveData;
+	SaveData = FSceneActorSaveData();
+
+	SaveData.ActorID = ActorID;
+	SaveData.SpawnTransform = GetActorTransform();
+
+	return &SaveData;
 }
 
 void APawnBase::BeginPlay()
@@ -139,7 +148,10 @@ void APawnBase::BeginPlay()
 	
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!bWHActorInitialized)
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }

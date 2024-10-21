@@ -9,7 +9,7 @@ AWHGameState::AWHGameState()
 
 void AWHGameState::OnInitialize_Implementation()
 {
-	
+	bWHActorInitialized = true;
 }
 
 void AWHGameState::OnPreparatory_Implementation(EPhase InPhase)
@@ -33,7 +33,10 @@ void AWHGameState::BeginPlay()
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!bWHActorInitialized)
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }

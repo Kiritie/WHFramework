@@ -37,18 +37,16 @@ AAIControllerBase::AAIControllerBase()
 
 void AAIControllerBase::OnInitialize_Implementation()
 {
-	IWHActorInterface::OnInitialize_Implementation();
+	bWHActorInitialized = true;
 }
 
 void AAIControllerBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+	
 }
 
 void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-	
 	IAIAgentInterface* OwnerAgent = GetPawn<IAIAgentInterface>();
 
 	if(!OwnerAgent) return;
@@ -64,7 +62,7 @@ void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAIControllerBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation(InPhase);
+	
 }
 
 void AAIControllerBase::BeginPlay()
@@ -73,7 +71,10 @@ void AAIControllerBase::BeginPlay()
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!bWHActorInitialized)
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }

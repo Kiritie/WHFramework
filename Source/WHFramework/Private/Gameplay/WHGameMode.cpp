@@ -19,7 +19,7 @@ AWHGameMode::AWHGameMode()
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-
+	bWHActorInitialized = true;
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
@@ -53,11 +53,6 @@ bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObjec
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-	}
 }
 
 void AWHGameMode::InitGameState()

@@ -176,11 +176,70 @@ private:
 };
 
 /*
+ * FUniqueStruct
+ */
+struct WHFRAMEWORKCORE_API FUniqueStruct
+{
+public:
+	FUniqueStruct()
+		: StructType(FUniqueType())
+	{
+	}
+
+	FUniqueStruct(FUniqueType InType)
+		: StructType(InType)
+	{
+	}
+
+	virtual ~FUniqueStruct() {}
+
+	static const FUniqueType Type;
+
+public:
+	template <typename T>
+	T* Cast()
+	{
+		return StructType.IsA(T::Type) ? static_cast<T*>(this) : nullptr;
+	}
+	template <typename T>
+	const T* Cast() const
+	{
+		return StructType.IsA(T::Type) ? static_cast<const T*>(this) : nullptr;
+	}
+	template <typename T>
+	T& CastRef()
+	{
+		return StructType.IsA(T::Type) ? *static_cast<T*>(this) : *new T();
+	}
+	template <typename T>
+	const T& CastRef() const
+	{
+		return StructType.IsA(T::Type) ? *static_cast<const T*>(this) : *new T();
+	}
+	template <typename T>
+	bool IsA() const
+	{
+		return StructType.IsA(T::Type);
+	}
+
+protected:
+	FUniqueType StructType;
+
+public:
+	FUniqueType GetStructType() const { return StructType; }
+};
+
+/*
  * FUniqueClass
  */
 class WHFRAMEWORKCORE_API FUniqueClass
 {
 public:
+	FUniqueClass()
+		: ClassType(FUniqueType())
+	{
+	}
+
 	FUniqueClass(FUniqueType InType)
 		: ClassType(InType)
 	{
@@ -192,14 +251,24 @@ public:
 
 public:
 	template <typename T>
-	T* CastTo()
+	T* Cast()
 	{
-		return ClassType.IsA(T::Type) ? StaticCast<T*>(this) : nullptr;
+		return ClassType.IsA(T::Type) ? static_cast<T*>(this) : nullptr;
 	}
 	template <typename T>
-	const T* CastTo() const
+	const T* Cast() const
 	{
-		return ClassType.IsA(T::Type) ? StaticCast<const T*>(this) : nullptr;
+		return ClassType.IsA(T::Type) ? static_cast<const T*>(this) : nullptr;
+	}
+	template <typename T>
+	T& CastRef()
+	{
+		return ClassType.IsA(T::Type) ? *static_cast<T*>(this) : *new T();
+	}
+	template <typename T>
+	const T& CastRef() const
+	{
+		return ClassType.IsA(T::Type) ? *static_cast<const T*>(this) : *new T();
 	}
 	template <typename T>
 	bool IsA() const
@@ -211,7 +280,7 @@ protected:
 	FUniqueType ClassType;
 
 public:
-	FUniqueType GetType() const { return ClassType; }
+	FUniqueType GetClassType() const { return ClassType; }
 };
 
 /*

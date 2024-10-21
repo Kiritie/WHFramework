@@ -2,6 +2,7 @@
 
 #include "Gameplay/WHWorldSubsystem.h"
 
+#include "EngineUtils.h"
 #include "Main/MainModule.h"
 
 UWHWorldSubsystem::UWHWorldSubsystem()
@@ -12,8 +13,12 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 
-	if(AMainModule* MainModule = AMainModule::GetPtr())
+	for(TActorIterator<AActor> Iter(&InWorld); Iter; ++Iter)
 	{
-		MainModule->Execute_OnInitialize(MainModule);
+		AActor* Actor = *Iter;
+		if(Actor->Implements<UWHActorInterface>())
+		{
+			IWHActorInterface::Execute_OnInitialize(Actor);
+		}
 	}
 }

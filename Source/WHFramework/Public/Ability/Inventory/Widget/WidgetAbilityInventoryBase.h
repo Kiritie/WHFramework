@@ -26,8 +26,8 @@ public:
 	virtual void OnRefresh() override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TMap<ESlotSplitType, FWidgetInventorySlots> UISlotDatas;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<ESlotSplitType, FWidgetInventorySlotData> UISlotDatas;
 
 public:
 	UFUNCTION(BlueprintPure)

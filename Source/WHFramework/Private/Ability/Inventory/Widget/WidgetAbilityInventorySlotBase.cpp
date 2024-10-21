@@ -56,7 +56,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 		{
 			OwnerSlot->OnSlotRefresh.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnRefresh);
 			OwnerSlot->OnSlotActivated.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnActivated);
-			OwnerSlot->OnSlotDeactived.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnCanceled);
+			OwnerSlot->OnSlotDeactived.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactived);
 		}
 
 		OwnerSlot = InOwnerSlot;
@@ -65,7 +65,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 		{
 			OwnerSlot->OnSlotRefresh.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnRefresh);
 			OwnerSlot->OnSlotActivated.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnActivated);
-			OwnerSlot->OnSlotDeactived.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnCanceled);
+			OwnerSlot->OnSlotDeactived.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactived);
 		}
 	}
 	Super::OnInitialize(InParams);
@@ -193,7 +193,7 @@ void UWidgetAbilityInventorySlotBase::OnActivated_Implementation()
 	}
 }
 
-void UWidgetAbilityInventorySlotBase::OnCanceled_Implementation()
+void UWidgetAbilityInventorySlotBase::OnDeactived_Implementation()
 {
 	StopCooldown();
 }

@@ -497,21 +497,6 @@ struct WHFRAMEWORK_API FAbilityItem : public FSaveData
 	GENERATED_BODY()
 
 public:
-	static FAbilityItem Empty;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FPrimaryAssetId ID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Count;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Level;
-
-	FGameplayAbilitySpecHandle AbilityHandle;
-
-public:
 	FORCEINLINE FAbilityItem()
 	{
 		ID = FPrimaryAssetId();
@@ -519,15 +504,7 @@ public:
 		Level = 0;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
-				
-	FORCEINLINE FAbilityItem(const FSaveData& InSaveData) : FSaveData(InSaveData)
-	{
-		ID = FPrimaryAssetId();
-		Count = 0;
-		Level = 0;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-		
+	
 	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
 	{
 		ID = InID;
@@ -546,6 +523,21 @@ public:
 
 	virtual ~FAbilityItem() override = default;
 
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Count;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level;
+
+	FGameplayAbilitySpecHandle AbilityHandle;
+	
+	static FAbilityItem Empty;
+
+public:
 	template<class T>
 	T& GetData(bool bEnsured = true) const
 	{
@@ -741,17 +733,21 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetInventorySlots
+struct WHFRAMEWORK_API FWidgetInventorySlotData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FWidgetInventorySlots()
+	FORCEINLINE FWidgetInventorySlotData()
 	{
+		Class = nullptr;
 		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
 	}
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSubclassOf<UWidgetAbilityInventorySlotBase> Class;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<UWidgetAbilityInventorySlotBase*> Slots;
 };
 
@@ -768,6 +764,7 @@ public:
 		SelectedIndexs = TMap<ESlotSplitType, int32>();
 	}
 
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<UAbilityInventoryBase> InventoryClass;
 
@@ -917,17 +914,18 @@ struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Location;
-	
 	FORCEINLINE FPickUpSaveData()
 	{
 		Item = FAbilityItem::Empty;
 		Location = FVector::ZeroVector;
 	}
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Location;
 };
 
 USTRUCT(BlueprintType)

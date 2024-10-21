@@ -44,16 +44,24 @@ ACameraActorBase::ACameraActorBase()
 
 void ACameraActorBase::OnInitialize_Implementation()
 {
+	AWHActor::OnInitialize_Implementation();
+	
+	IDebuggerInterface::Register();
+
 	SetCameraCollisionMode(CameraCollisionMode);
 }
 
 void ACameraActorBase::OnPreparatory_Implementation(EPhase InPhase)
 {
+	AWHActor::OnPreparatory_Implementation(InPhase);
+	
 	LastCameraLocation = GetActorLocation();
 }
 
 void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 {
+	AWHActor::OnRefresh_Implementation(DeltaSeconds);
+
 	CameraVelocity = GetActorLocation() - LastCameraLocation;
 
 	if(!GetActorLocation().Equals(LastCameraLocation, 0.1f))
@@ -83,6 +91,8 @@ void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
 {
+	AWHActor::OnTermination_Implementation(InPhase);
+
 	IDebuggerInterface::UnRegister();
 }
 

@@ -53,7 +53,7 @@ public:
 		TArray<FUniqueAssetID> UnRegisterAssets;
 		for(auto& Iter : AssetMap)
 		{
-			if (Iter.Value->GetType().IsA(InAssetType))
+			if (Iter.Value->GetClassType().IsA(InAssetType))
 			{
 				UnRegisterAssets.Add(Iter.Key);
 			}
@@ -75,7 +75,7 @@ public:
 		{
 			if (Iter.Value->IsA<T>())
 			{
-				if (InCondition(Iter.Value->CastTo<T>()))
+				if (InCondition(Iter.Value->Cast<T>()))
 				{
 					return true;
 				}
@@ -99,7 +99,7 @@ public:
 	{
 		if(FUniqueAssetData* LoadedAsset = LoadAssetByID(InAssetID, bEnsured))
 		{
-			return LoadedAsset->CastTo<T>();
+			return LoadedAsset->Cast<T>();
 		}
 		return nullptr;
 	}
@@ -111,7 +111,7 @@ public:
 	{
 		for(auto& Iter : AssetMap)
 		{
-			if(T* LoadedAsset = Iter.Value->CastTo<T>())
+			if(T* LoadedAsset = Iter.Value->Cast<T>())
 			{
 				if(InCondition(LoadedAsset))
 				{
@@ -130,9 +130,9 @@ public:
 		TArray<T*> LoadedAssets;
 		for(auto& Iter : AssetMap)
 		{
-			if (Iter.Value->GetType().IsA(InAssetType))
+			if (Iter.Value->GetClassType().IsA(InAssetType))
 			{
-				if(T* LoadedAsset = Iter.Value->CastTo<T>())
+				if(T* LoadedAsset = Iter.Value->Cast<T>())
 				{
 					LoadedAssets.Add(LoadedAsset);
 				}
@@ -149,7 +149,7 @@ public:
 		TArray<T*> LoadedAssets;
 		for(auto& Iter : AssetMap)
 		{
-			if(T* LoadedAsset = Iter.Value->CastTo<T>())
+			if(T* LoadedAsset = Iter.Value->Cast<T>())
 			{
 				if(InCondition(LoadedAsset))
 				{

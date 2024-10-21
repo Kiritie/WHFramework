@@ -26,6 +26,9 @@ class WHFRAMEWORK_API IWHActorInterface : public ISceneActorInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	IWHActorInterface();
+
+public:
 	/**
 	* 当初始化
 	*/
@@ -53,6 +56,9 @@ protected:
 	*/
 	UFUNCTION(BlueprintNativeEvent)
 	bool IsDefaultLifecycle() const;
+
+protected:
+	bool bWHActorInitialized;
 };
 
 /**

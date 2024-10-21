@@ -37,11 +37,13 @@ public:
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;
 
-	virtual FSaveData* GetData() { return nullptr; }
-
 	virtual FSaveData* ToData() = 0;
 
 	virtual void UnloadData(EPhase InPhase) { }
+
+	virtual void ResetData() { }
+
+	virtual FSaveData* GetData() { return nullptr; }
 
 	virtual bool HasArchive() const { return false; }
 };

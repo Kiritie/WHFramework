@@ -22,7 +22,7 @@ void APhysicsVolumeBase::OnDespawn_Implementation(bool bRecovery)
 
 void APhysicsVolumeBase::OnInitialize_Implementation()
 {
-	
+	bWHActorInitialized = true;
 }
 
 void APhysicsVolumeBase::OnPreparatory_Implementation(EPhase InPhase)
@@ -46,7 +46,10 @@ void APhysicsVolumeBase::BeginPlay()
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!bWHActorInitialized)
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::Final);
 	}
 }

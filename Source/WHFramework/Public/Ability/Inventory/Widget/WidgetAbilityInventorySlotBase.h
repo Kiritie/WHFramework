@@ -60,7 +60,7 @@ public:
 	void OnActivated();
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnCanceled();
+	void OnDeactived();
 		
 protected:
 	UFUNCTION(BlueprintNativeEvent)

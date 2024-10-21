@@ -87,7 +87,7 @@ bool FAssetManager::ContainsAssetsByType(FUniqueType InAssetType) const
 {
 	for (auto& Iter : AssetMap)
 	{
-		if (Iter.Value->GetType().IsA(InAssetType))
+		if (Iter.Value->GetClassType().IsA(InAssetType))
 		{
 			return true;
 		}
@@ -125,7 +125,7 @@ TArray<FUniqueAssetData*> FAssetManager::LoadAssetsByType(FUniqueType InAssetTyp
 	TArray<FUniqueAssetData*> LoadedAssets;
 	for (auto& Iter : AssetMap)
 	{
-		if (Iter.Value->GetType().IsA(InAssetType))
+		if (Iter.Value->GetClassType().IsA(InAssetType))
 		{
 			LoadedAssets.Add(Iter.Value);
 		}

@@ -27,7 +27,7 @@ AWHPlayerController::AWHPlayerController()
 
 void AWHPlayerController::OnInitialize_Implementation()
 {
-	
+	bWHActorInitialized = true;
 }
 
 void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
@@ -58,7 +58,10 @@ void AWHPlayerController::BeginPlay()
 
 	if(Execute_IsDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!bWHActorInitialized)
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }

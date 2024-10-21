@@ -430,16 +430,6 @@ struct WHFRAMEWORK_API FVoxelHitResult
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Point;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Normal;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVoxelItem VoxelItem;
-
-public:
 	FVoxelHitResult()
 	{
 		VoxelItem = FVoxelItem();
@@ -450,6 +440,16 @@ public:
 	FVoxelHitResult(const FHitResult& InHitResult);
 	
 	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint = FVector::ZeroVector, FVector InNormal = FVector::ZeroVector);
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Point;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Normal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVoxelItem VoxelItem;
 
 public:
 	bool IsValid() const;
@@ -469,6 +469,26 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelRenderData
 {
 	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelRenderData()
+	{
+		Material = nullptr;
+		UnlitMaterial = nullptr;
+		PixelSize = 16;
+		TextureSize = FVector2D::ZeroVector;
+		CombineTexture = nullptr;
+		Textures = TArray<UTexture2D*>();
+		MaterialInst = nullptr;
+		UnlitMaterialInst = nullptr;
+	}
+
+	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	{
+		Material = InMaterial;
+		UnlitMaterial = InUnlitMaterial;
+		PixelSize = InBlockPixelSize;
+	}
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -494,31 +514,22 @@ public:
 
 	UPROPERTY(Transient)
 	UMaterialInstance* UnlitMaterialInst;
-
-	FORCEINLINE FVoxelRenderData()
-	{
-		Material = nullptr;
-		UnlitMaterial = nullptr;
-		PixelSize = 16;
-		TextureSize = FVector2D::ZeroVector;
-		CombineTexture = nullptr;
-		Textures = TArray<UTexture2D*>();
-		MaterialInst = nullptr;
-		UnlitMaterialInst = nullptr;
-	}
-
-	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
-	{
-		Material = InMaterial;
-		UnlitMaterial = InUnlitMaterial;
-		PixelSize = InBlockPixelSize;
-	}
 };
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelChunkSaveData()
+	{
+		Index = FIndex::ZeroIndex;
+		VoxelDatas = TEXT("");
+		PickUpDatas = TArray<FPickUpSaveData>();
+		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
+		bGenerated = false;
+	}
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
@@ -535,15 +546,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bGenerated;
-
-	FORCEINLINE FVoxelChunkSaveData()
-	{
-		Index = FIndex::ZeroIndex;
-		VoxelDatas = TEXT("");
-		PickUpDatas = TArray<FPickUpSaveData>();
-		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
-		bGenerated = false;
-	}
 
 public:
 	virtual void MakeSaved() override
