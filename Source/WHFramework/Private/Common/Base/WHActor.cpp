@@ -57,6 +57,8 @@ void AWHActor::OnInitialize_Implementation()
 	bInitialized = true;
 
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
@@ -71,7 +73,7 @@ void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
 
 void AWHActor::OnTermination_Implementation(EPhase InPhase)
 {
-	
+	USceneModuleStatics::RemoveSceneActor(this);
 }
 
 void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)

@@ -178,12 +178,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool TextIsNumber(const FText& InText);
 
-	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Number (Text)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
 	static int32 TextToNumber(const FText& InText, TMap<int32, FString>& OutSymbols);
 
-	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Text (Number)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
-				
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Name (Text)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
+	static FName TextToName(const FText& InText);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Tag
 	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")

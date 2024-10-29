@@ -290,7 +290,10 @@ bool USaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InI
 			{
 				SaveGame->OnRefresh();
 			}
-			SaveGame->GetSaveData()->MakeSaved();
+			if(SaveGame->GetSaveData())
+			{
+				SaveGame->GetSaveData()->MakeSaved();
+			}
 			SaveGame->OnSave();
 		}
 		return true;
@@ -341,7 +344,10 @@ USaveGameBase* USaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	if(!SaveGame)
 	{
 		SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSlotName(SaveName, InIndex), UserIndex));
-		SaveGame->GetSaveData()->MakeSaved();
+		if(SaveGame->GetSaveData())
+		{
+			SaveGame->GetSaveData()->MakeSaved();
+		}
 		FSaveGameInfo& SaveGameInfo = SaveGameInfos.FindOrAdd(SaveName, FSaveGameInfo(InClass));
 		SaveGameInfo.SaveGames.Add(SaveGame);
 	}

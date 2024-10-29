@@ -249,6 +249,11 @@ FText UCommonStatics::NumberToText(int32 InNumber, const TMap<int32, FString>& I
 	return FText::FromString(TextStr);
 }
 
+FName UCommonStatics::TextToName(const FText& InText)
+{
+	return *InText.ToString();
+}
+
 FGameplayTag UCommonStatics::NameToTag(const FName InName)
 {
 	return FGameplayTag::RequestGameplayTag(InName);

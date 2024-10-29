@@ -61,8 +61,6 @@ void UCharacterModule::OnInitialize()
 		if(Iter && !CharacterMap.Contains(Iter->GetNameC()))
 		{
 			CharacterMap.Add(Iter->GetNameC(), Iter);
-			
-			USceneModuleStatics::AddSceneActor(Iter);
 		}
 	}
 }

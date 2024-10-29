@@ -93,17 +93,17 @@ void APawnBase::OnInitialize_Implementation()
 	bInitialized = true;
 	
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+	
 }
 
 void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
 		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
@@ -119,7 +119,7 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void APawnBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation(InPhase);
+	USceneModuleStatics::RemoveSceneActor(this);
 }
 
 void APawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)

@@ -5,36 +5,36 @@
 #include "Event/Handle/InstancedEventHandleBase.h"
 #include "Parameter/ParameterModuleTypes.h"
 
-#include "EventHandle_AsyncLoadLevel.generated.h"
+#include "EventHandle_StopLevelSequence.generated.h"
+
+class ALevelSequenceActor;
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_AsyncLoadLevel : public UInstancedEventHandleBase
+class WHFRAMEWORK_API UEventHandle_StopLevelSequence : public UInstancedEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_AsyncLoadLevel();
-	
+	UEventHandle_StopLevelSequence();
+
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+public:
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
 	virtual TArray<FParameter> Pack_Implementation() override;
-
+	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSoftObjectPtr<UWorld> LevelObjectPtr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "!LevelObjectPtr.IsValid()"))
-	FName LevelPath;
+	TSoftObjectPtr<ALevelSequenceActor> LevelSequence;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float FinishDelayTime;
+	float Delay;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool bCreateLoadingWidget;
+	bool bKeepState;
 };

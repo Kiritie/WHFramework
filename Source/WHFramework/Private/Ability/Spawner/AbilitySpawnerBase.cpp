@@ -76,6 +76,8 @@ void AAbilitySpawnerBase::OnInitialize_Implementation()
 	bInitialized = true;
 	
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void AAbilitySpawnerBase::OnPreparatory_Implementation(EPhase InPhase)
@@ -97,6 +99,8 @@ void AAbilitySpawnerBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilitySpawnerBase::OnTermination_Implementation(EPhase InPhase)
 {
+	USceneModuleStatics::RemoveSceneActor(this);
+
 	Destroy();
 }
 
