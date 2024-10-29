@@ -88,9 +88,9 @@ void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 
 	SetMotionRate(1, 1);
 	
+	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
 	Level = 0;
-
 	Inventory->UnloadSaveData();
 }
 
@@ -191,11 +191,6 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetLevelA(SaveData.Level);
 	
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
-
-		if(!SaveData.IsSaved())
-		{
-			ResetData();
-		}
 	}
 }
 
@@ -517,7 +512,7 @@ void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 {
 	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
-	InLevel = FMath::Clamp(InLevel, 0, CharacterData.MaxLevel != -1 ? CharacterData.MaxLevel : InLevel);
+	InLevel = CharacterData.GetClampedLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -526,11 +521,11 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		auto EffectContext = AbilitySystem->MakeEffectContext();
 		EffectContext.AddSourceObject(this);
 		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(CharacterData.PEClass, InLevel, EffectContext);
-		if(SpecHandle.IsValid())
+		if (SpecHandle.IsValid())
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-
+		ResetData();
 		return true;
 	}
 	return false;

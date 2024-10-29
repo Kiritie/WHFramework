@@ -45,17 +45,18 @@ void UAbilityInventorySlotBase::OnInitialize(UAbilityInventoryBase* InInventory,
 	SlotIndex = InSlotIndex;
 }
 
-bool UAbilityInventorySlotBase::CheckSlot(FAbilityItem& InItem) const
+bool UAbilityInventorySlotBase::ContainsItem(FAbilityItem InItem) const
 {
-	return LimitType == EAbilityItemType::None || InItem.GetType() == LimitType;
+	return !IsEmpty() && Item.EqualType(InItem);
 }
 
-bool UAbilityInventorySlotBase::CanPutIn(FAbilityItem& InItem) const
+bool UAbilityInventorySlotBase::MatchItem(FAbilityItem InItem, bool bPutIn) const
 {
-	return (IsEmpty() && CheckSlot(InItem)) || (Item.EqualType(InItem) && GetRemainVolume(InItem) > 0);
+	return bPutIn ? (IsEmpty() && MatchItemLimit(InItem) || Item.EqualType(InItem) && GetRemainVolume(InItem) > 0) :
+		(!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
 }
 
-bool UAbilityInventorySlotBase::IsMatch(FAbilityItem InItem, bool bForce) const
+bool UAbilityInventorySlotBase::MatchItemSplit(FAbilityItem InItem, bool bForce) const
 {
 	if(!InItem.IsValid()) return false;
 
@@ -85,9 +86,9 @@ bool UAbilityInventorySlotBase::IsMatch(FAbilityItem InItem, bool bForce) const
 	return false;
 }
 
-bool UAbilityInventorySlotBase::Contains(FAbilityItem& InItem) const
+bool UAbilityInventorySlotBase::MatchItemLimit(FAbilityItem InItem) const
 {
-	return !IsEmpty() && Item.EqualType(InItem);
+	return LimitType == EAbilityItemType::None || InItem.GetType() == LimitType;
 }
 
 void UAbilityInventorySlotBase::Refresh()
@@ -130,13 +131,15 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem)
 
 void UAbilityInventorySlotBase::Replace(UAbilityInventorySlotBase* InSlot)
 {
-	auto tmpItem = GetItem();
+	auto _Item = GetItem();
 	SetItem(InSlot->GetItem());
-	InSlot->SetItem(tmpItem);
+	InSlot->SetItem(_Item);
 }
 
 void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 {
+	if(Item == InItem) return;
+	
 	OnItemPreChange(InItem);
 	FAbilityItem OldItem = Item;
 	Item = InItem;
@@ -150,7 +153,7 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 
 void UAbilityInventorySlotBase::AddItem(FAbilityItem& InItem)
 {
-	if (Contains(InItem))
+	if (ContainsItem(InItem))
 	{
 		const int32 tmpNum = InItem.Count - GetRemainVolume(InItem);
 		Item.Count = FMath::Clamp(Item.Count + InItem.Count, 0, GetMaxVolume(InItem));
@@ -167,7 +170,7 @@ void UAbilityInventorySlotBase::AddItem(FAbilityItem& InItem)
 
 void UAbilityInventorySlotBase::SubItem(FAbilityItem& InItem)
 {
-	if (Contains(InItem))
+	if (ContainsItem(InItem))
 	{
 		int32 tmpNum = InItem.Count - Item.Count;
 		Item.Count = FMath::Clamp(Item.Count - InItem.Count, 0, GetMaxVolume(InItem));
@@ -182,17 +185,17 @@ void UAbilityInventorySlotBase::SplitItem(int32 InCount /*= -1*/)
 
 	if(InCount == - 1) InCount = Item.Count;
 	const int32 tmpCount = Item.Count / InCount;
-	auto ItemQueryInfo = Inventory->QueryItemByRange(EItemQueryType::Add, Item);
+	auto ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Add, Item);
 	for (int32 i = 0; i < InCount; i++)
 	{
-		FAbilityItem tmpItem = FAbilityItem(Item, tmpCount);
-		Item.Count -= tmpItem.Count;
-		for (int32 j = 0; j < ItemQueryInfo.Slots.Num(); j++)
+		FAbilityItem _Item = FAbilityItem(Item, tmpCount);
+		Item.Count -= _Item.Count;
+		for (int32 j = 0; j < ItemQueryData.Slots.Num(); j++)
 		{
-			if (ItemQueryInfo.Slots[j]->IsEmpty() && ItemQueryInfo.Slots[j] != this)
+			if (ItemQueryData.Slots[j]->IsEmpty() && ItemQueryData.Slots[j] != this)
 			{
-				ItemQueryInfo.Slots[j]->SetItem(tmpItem);
-				ItemQueryInfo.Slots.RemoveAt(j);
+				ItemQueryData.Slots[j]->SetItem(_Item);
+				ItemQueryData.Slots.RemoveAt(j);
 				break;
 			}
 		}
@@ -205,11 +208,11 @@ void UAbilityInventorySlotBase::MoveItem(int32 InCount /*= -1*/)
 	if (IsEmpty()) return;
 
 	if (InCount == -1) InCount = Item.Count;
-	FAbilityItem tmpItem = FAbilityItem(Item, InCount);
+	FAbilityItem _Item = FAbilityItem(Item, InCount);
 
 	if(Inventory->GetConnectInventory())
 	{
-		Inventory->GetConnectInventory()->AddItemByRange(tmpItem);
+		Inventory->GetConnectInventory()->AddItemByRange(_Item);
 	}
 	else
 	{
@@ -217,31 +220,31 @@ void UAbilityInventorySlotBase::MoveItem(int32 InCount /*= -1*/)
 		{
 			case ESlotSplitType::Default:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			case ESlotSplitType::Shortcut:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			case ESlotSplitType::Auxiliary:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut}, false);
+				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut}, false);
 				break;
 			}
 			case ESlotSplitType::Equip:
 			case ESlotSplitType::Skill:
 			{
-				Inventory->AddItemBySplitTypes(tmpItem, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
 				break;
 			}
 			default: break;
 		}
 	}
 
-	tmpItem.Count = InCount - tmpItem.Count;
-	SubItem(tmpItem);
+	_Item.Count = InCount - _Item.Count;
+	SubItem(_Item);
 }
 
 void UAbilityInventorySlotBase::UseItem(int32 InCount /*= -1*/)
@@ -257,8 +260,8 @@ void UAbilityInventorySlotBase::UseItem(int32 InCount /*= -1*/)
 			DON(InCount,
 				if(ActiveItem())
 				{
-					auto tmpItem = FAbilityItem(Item, 1);
-					SubItem(tmpItem);
+					auto _Item = FAbilityItem(Item, 1);
+					SubItem(_Item);
 				}
 				else break;
 			)
@@ -286,9 +289,9 @@ void UAbilityInventorySlotBase::DiscardItem(int32 InCount /*= -1*/, bool bInPlac
 
 	if(auto Agent = GetInventory()->GetOwnerAgent())
 	{
-		FAbilityItem tmpItem = FAbilityItem(Item, InCount);
-		Agent->OnDiscardItem(tmpItem, bInPlace);
-		SubItem(tmpItem);
+		FAbilityItem _Item = FAbilityItem(Item, InCount);
+		Agent->OnDiscardItem(_Item, bInPlace);
+		SubItem(_Item);
 	}
 }
 
@@ -319,7 +322,7 @@ bool UAbilityInventorySlotBase::ActiveItem(bool bPassive /*= false*/)
     return bSuccess;
 }
 
-void UAbilityInventorySlotBase::CancelItem(bool bPassive /*= false*/)
+void UAbilityInventorySlotBase::DeactiveItem(bool bPassive /*= false*/)
 {
 	if(IsEmpty()) return;
 	
@@ -351,11 +354,25 @@ bool UAbilityInventorySlotBase::IsSelected() const
 	return GetInventory()->GetSelectedSlot(SplitType) == this;
 }
 
-bool UAbilityInventorySlotBase::IsMatched(bool bForce) const
+bool UAbilityInventorySlotBase::IsMatched() const
 {
 	if(IsEmpty()) return false;
 
-	return IsMatch(Item, bForce);
+	return MatchItem(Item);
+}
+
+bool UAbilityInventorySlotBase::IsLimitMatched() const
+{
+	if(IsEmpty()) return false;
+
+	return MatchItemLimit(Item);
+}
+
+bool UAbilityInventorySlotBase::IsSplitMatched(bool bForce) const
+{
+	if(IsEmpty()) return false;
+
+	return MatchItemSplit(Item, bForce);
 }
 
 int32 UAbilityInventorySlotBase::GetRemainVolume(FAbilityItem InItem) const

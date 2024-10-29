@@ -47,9 +47,6 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 	FSM->SwitchState(nullptr);
 
 	RaceID = NAME_None;
-	Level = 0;
-
-	Inventory->UnloadSaveData();
 }
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -190,7 +187,7 @@ bool AAbilityVitalityBase::IsDying() const
 bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
 {
 	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
-	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
+	InLevel = VitalityData.GetClampedLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -203,7 +200,7 @@ bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-
+		ResetData();
 		return true;
 	}
 	return false;

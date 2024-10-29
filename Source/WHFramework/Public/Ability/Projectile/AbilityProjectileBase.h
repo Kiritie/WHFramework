@@ -33,7 +33,7 @@ public:
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override {  return true;}
+	virtual bool IsUseDefaultLifecycle_Implementation() const override {  return true;}
 	
 public:
 	UFUNCTION(BlueprintNativeEvent)

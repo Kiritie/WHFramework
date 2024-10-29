@@ -28,7 +28,7 @@ public:
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
-	virtual bool CheckSlot(FAbilityItem& InItem) const override;
+	virtual bool MatchItemLimit(FAbilityItem InItem) const override;
 	
 	virtual void Refresh() override;
 

@@ -15,11 +15,7 @@ UCharacterAttributeSetBase::UCharacterAttributeSetBase()
 void UCharacterAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
-
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
 	
-	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
 	if (Attribute == GetMoveSpeedAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
@@ -37,11 +33,7 @@ void UCharacterAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute
 void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
-
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	AAbilityCharacterBase* TargetCharacter = Cast<AAbilityCharacterBase>(AbilityComp->GetAvatarActor());
 	
-	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
 	if (Attribute == GetMoveSpeedAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
@@ -54,6 +46,11 @@ void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
 	}
+}
+
+void UCharacterAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
 }
 
 void UCharacterAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data)

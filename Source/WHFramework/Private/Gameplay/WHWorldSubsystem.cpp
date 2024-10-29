@@ -13,10 +13,15 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 
+	if(AMainModule* MainModule = AMainModule::GetPtr())
+	{
+		MainModule->Execute_OnInitialize(MainModule);
+	}
+
 	for(TActorIterator<AActor> Iter(&InWorld); Iter; ++Iter)
 	{
 		AActor* Actor = *Iter;
-		if(Actor->Implements<UWHActorInterface>())
+		if(Actor->Implements<UWHActorInterface>() && !IWHActorInterface::Execute_IsInitialized(Actor))
 		{
 			IWHActorInterface::Execute_OnInitialize(Actor);
 		}

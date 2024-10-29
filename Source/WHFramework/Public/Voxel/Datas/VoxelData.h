@@ -14,9 +14,6 @@ public:
 	UVoxelData();
 
 public:
-	virtual void ResetData_Implementation() override;
-
-public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 

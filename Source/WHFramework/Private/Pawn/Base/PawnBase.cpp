@@ -45,6 +45,8 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	Name = NAME_None;
 	DefaultController = nullptr;
 
+	bInitialized = false;
+
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
@@ -88,7 +90,7 @@ void APawnBase::OnDespawn_Implementation(bool bRecovery)
 
 void APawnBase::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 	
 	Execute_SetActorVisible(this, bVisible);
 }
@@ -146,9 +148,9 @@ void APawnBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -160,7 +162,7 @@ void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -170,7 +172,7 @@ void APawnBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

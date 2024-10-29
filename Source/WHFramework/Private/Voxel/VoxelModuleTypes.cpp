@@ -117,9 +117,9 @@ bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
 {
-	FVoxelItem tmpItem = *this;
-	tmpItem.ID = InID;
-	return tmpItem;
+	FVoxelItem _Item = *this;
+	_Item.ID = InID;
+	return _Item;
 }
 
 FVoxelItem& FVoxelItem::GetMain() const

@@ -26,9 +26,6 @@ class WHFRAMEWORK_API IWHActorInterface : public ISceneActorInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	IWHActorInterface();
-
-public:
 	/**
 	* 当初始化
 	*/
@@ -52,13 +49,16 @@ public:
 
 protected:
 	/**
+	* 是否初始化完成
+	*/
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsInitialized() const;
+
+	/**
 	* 是否使用默认生命周期
 	*/
 	UFUNCTION(BlueprintNativeEvent)
-	bool IsDefaultLifecycle() const;
-
-protected:
-	bool bWHActorInitialized;
+	bool IsUseDefaultLifecycle() const;
 };
 
 /**
@@ -93,7 +93,13 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SaveData

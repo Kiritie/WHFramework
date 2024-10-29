@@ -64,6 +64,8 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	Anim = nullptr;
 	DefaultController = nullptr;
 
+	bInitialized = false;
+
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
@@ -107,7 +109,7 @@ void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
 
 void ACharacterBase::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 
 	Execute_SetActorVisible(this, bVisible);
 
@@ -167,9 +169,9 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -181,7 +183,7 @@ void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -191,7 +193,7 @@ void ACharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

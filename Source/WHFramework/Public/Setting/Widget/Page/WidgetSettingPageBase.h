@@ -69,7 +69,7 @@ protected:
 	virtual FSaveData* GetDefaultSaveData() const;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UVerticalBox* ContentBox;
 
 public:

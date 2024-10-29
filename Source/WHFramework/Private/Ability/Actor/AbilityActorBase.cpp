@@ -58,6 +58,10 @@ void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FP
 void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+
+	AssetID = FPrimaryAssetId();
+	Level = 0;
+	Inventory->UnloadSaveData();
 }
 
 void AAbilityActorBase::OnInitialize_Implementation()
@@ -131,11 +135,6 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
-
-		if(!SaveData.IsSaved())
-		{
-			ResetData();
-		}
 	}
 }
 
@@ -240,7 +239,7 @@ UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 bool AAbilityActorBase::SetLevelA(int32 InLevel)
 {
 	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
-	InLevel = FMath::Clamp(InLevel, 0, ActorData.MaxLevel != -1 ? ActorData.MaxLevel : InLevel);
+	InLevel = ActorData.GetClampedLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -253,6 +252,7 @@ bool AAbilityActorBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
+		ResetData();
 		return true;
 	}
 	return false;

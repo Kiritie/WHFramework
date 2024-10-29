@@ -119,7 +119,7 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
-	virtual void ResetData();
+	virtual void ResetData() override;
 
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
@@ -267,19 +267,19 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-		
-	UFUNCTION(BlueprintPure)
-	virtual float GetDefaultGravityScale() const { return DefaultGravityScale; }
-
-	UFUNCTION(BlueprintPure)
-	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-		
+				
+	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultGravityScale() const { return DefaultGravityScale; }
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
+
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	

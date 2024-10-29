@@ -142,6 +142,20 @@ public:
 	UFUNCTION(BlueprintPure)
 	TArray<USubWidgetBase*> GetAllSubWidgets() const;
 
+	template<class T>
+	TArray<T*> GetAllSubWidgets() const
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetAllSubWidgets())
+		{
+			if(T* SubWidget = Cast<T>(Iter))
+			{
+				ReturnValues.Add(SubWidget);
+			}
+		}
+		return ReturnValues;
+	}
+
 	UFUNCTION(BlueprintPure)
 	virtual TArray<UWidget*> GetAllPoolWidgets() const;
 

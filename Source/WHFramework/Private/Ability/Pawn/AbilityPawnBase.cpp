@@ -127,11 +127,6 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
-
-		if(!SaveData.IsSaved())
-		{
-			ResetData();
-		}
 	}
 }
 
@@ -307,8 +302,8 @@ bool AAbilityPawnBase::IsMoving() const
 
 bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 {
-	const auto& VitalityData = GetPawnData<UAbilityPawnDataBase>();
-	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
+	const auto& PawnData = GetPawnData<UAbilityPawnDataBase>();
+	InLevel = PawnData.GetClampedLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -316,12 +311,12 @@ bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 
 		auto EffectContext = AbilitySystem->MakeEffectContext();
 		EffectContext.AddSourceObject(this);
-		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(VitalityData.PEClass, InLevel, EffectContext);
+		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(PawnData.PEClass, InLevel, EffectContext);
 		if (SpecHandle.IsValid())
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-
+		ResetData();
 		return true;
 	}
 	return false;

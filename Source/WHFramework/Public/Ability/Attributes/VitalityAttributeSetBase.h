@@ -18,6 +18,18 @@ public:
 	UVitalityAttributeSetBase();
 
 public:
+	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
+
+	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+
+	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
+
+	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
+
+public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "VitalityAttributes")
 	FGameplayAttributeData Exp;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -63,15 +75,6 @@ protected:
 			
 	UPROPERTY(EditDefaultsOnly, Category = "VitalityHandles")
 	TSubclassOf<UInterruptHandle> InterruptHandleClass;
-
-public:
-	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
-	
-	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
-
-	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
 	UFUNCTION()

@@ -4,12 +4,12 @@
 
 AWHGameState::AWHGameState()
 {
-	
+	bInitialized = false;
 }
 
 void AWHGameState::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 }
 
 void AWHGameState::OnPreparatory_Implementation(EPhase InPhase)
@@ -31,9 +31,9 @@ void AWHGameState::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -45,7 +45,7 @@ void AWHGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -55,7 +55,7 @@ void AWHGameState::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

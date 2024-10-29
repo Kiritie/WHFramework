@@ -346,11 +346,6 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		SetWorldMode(EVoxelWorldMode::Default);
-		//
-		// for(auto& Iter : ChunkMap)
-		// {
-		// 	Iter.Value->Generate(EPhase::Final);
-		// }
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{

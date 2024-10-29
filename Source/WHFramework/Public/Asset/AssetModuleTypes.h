@@ -37,13 +37,14 @@ struct WHFRAMEWORK_API FDataTableRowBase : public FTableRowBase
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadOnly)
-	FName ID;
-
 	FDataTableRowBase()
 	{
 		ID = NAME_None;
 	}
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	FName ID;
 
 public:
 	virtual bool IsValid() const
@@ -102,11 +103,6 @@ public:
 	}
 
 public:
-	bool IsNeedLoad() const
-	{
-		return !ClassPath.IsNull();
-	}
-
 	FString GetClassName() const
 	{
 		return !ClassName.IsEmpty() ? ClassName : ClassPath.ToString();
@@ -155,11 +151,6 @@ public:
 	}
 
 public:
-	bool IsNeedLoad() const
-	{
-		return !ObjectPath.IsNull();
-	}
-
 	FString GetObjectName() const
 	{
 		return !ObjectName.IsEmpty() ? ObjectName : ObjectPath.GetLongPackageName();

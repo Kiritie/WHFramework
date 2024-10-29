@@ -28,7 +28,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 	
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonTextBlockN* Txt_Content;
 
 public:

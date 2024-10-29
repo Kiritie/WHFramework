@@ -18,6 +18,18 @@ public:
 	UCharacterAttributeSetBase();
 
 public:
+	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
+	
+	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+
+	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
+
+	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
+
+public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MoveSpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData MoveSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
@@ -29,15 +41,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_JumpForce, Category = "CharacterAttributes")
 	FGameplayAttributeData JumpForce;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
-
-public:
-	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
-	
-	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
-
-	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
 	UFUNCTION()

@@ -23,11 +23,13 @@ AWHPlayerController::AWHPlayerController()
 
 	InteractionRaycastMode = EInteractionRaycastMode::None;
 	InteractionDistance = 100000.f;
+
+	bInitialized = false;
 }
 
 void AWHPlayerController::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 }
 
 void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
@@ -56,9 +58,9 @@ void AWHPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -70,7 +72,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -101,7 +103,7 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

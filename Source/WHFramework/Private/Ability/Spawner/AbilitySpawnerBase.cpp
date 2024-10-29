@@ -42,9 +42,13 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	}
 #endif
 
+	bInitialized = false;
+
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
+
+	bAutoSpawn = false;
 }
 
 void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -69,7 +73,7 @@ void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
 
 void AAbilitySpawnerBase::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 	
 	Execute_SetActorVisible(this, bVisible);
 }
@@ -93,10 +97,7 @@ void AAbilitySpawnerBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilitySpawnerBase::OnTermination_Implementation(EPhase InPhase)
 {
-	if(bAutoDestroy)
-	{
-		Destroy();
-	}
+	Destroy();
 }
 
 void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
@@ -127,9 +128,9 @@ void AAbilitySpawnerBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -141,7 +142,7 @@ void AAbilitySpawnerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -151,7 +152,7 @@ void AAbilitySpawnerBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

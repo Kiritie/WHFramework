@@ -66,6 +66,7 @@ AActor* AAbilityCharacterSpawner::SpawnImpl_Implementation(const FAbilityItem& I
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.InventoryData = CharacterData.InventoryData;
+	SaveData.InventoryData.FillItems(InAbilityItem.Level);
 
 	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
 }

@@ -299,7 +299,6 @@ public:
 		
 	FORCEINLINE operator FSlateBrush() const { return BrushValue; }
 
-		
 	FORCEINLINE operator FPrimaryAssetId() const { return AssetIDValue; }
 
 	FORCEINLINE operator UClass*() const { return ClassValue; }
@@ -321,7 +320,9 @@ public:
 	FORCEINLINE operator FSimpleDynamicDelegate() const { return DelegateValue; }
 	
 	FORCEINLINE operator void*() const { return PointerValue; }
-
+	
+	FORCEINLINE operator const TArray<FParameter>() const { return { *this }; }
+	
 	friend bool operator==(const FParameter& A, const FParameter& B)
 	{
 		switch (A.ParameterType)

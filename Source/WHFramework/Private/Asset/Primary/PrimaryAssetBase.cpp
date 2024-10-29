@@ -5,7 +5,11 @@ UPrimaryAssetBase::UPrimaryAssetBase()
 	
 }
 
-void UPrimaryAssetBase::ResetData_Implementation()
+void UPrimaryAssetBase::OnInitialize_Implementation()
+{
+}
+
+void UPrimaryAssetBase::OnReset_Implementation()
 {
 }
 

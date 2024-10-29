@@ -61,7 +61,7 @@ public:
 
 	virtual FSaveData* ToData() override;
 
-	virtual void ResetData();
+	virtual void ResetData() override;
 
 public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;

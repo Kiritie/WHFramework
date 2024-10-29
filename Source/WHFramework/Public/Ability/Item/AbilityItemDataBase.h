@@ -17,7 +17,9 @@ public:
 	UAbilityItemDataBase();
 
 public:
-	virtual void ResetData_Implementation() override;
+	virtual void OnInitialize_Implementation() override;
+	
+	virtual void OnReset_Implementation() override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -25,7 +27,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FText Detail;
-		
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses = "/Script/Engine.Texture,/Script/Engine.MaterialInterface"))
 	UObject* Icon;
 
@@ -34,7 +36,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxLevel;
-		
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UItemAbilityBase> AbilityClass;
 
@@ -42,13 +44,18 @@ public:
 	TSubclassOf<AAbilityPickUpBase> PickUpClass;
 	
 	UPROPERTY(Transient)
-	UMaterialInterface* IconSourceMat;
+	UObject* IconBak;
 
-public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);
+	UPROPERTY(Transient)
+	UMaterialInterface* IconMat;
 
 public:
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
+
+	UFUNCTION(BlueprintPure)
+	int32 GetClampedLevel(int32 InLevel) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);
 };

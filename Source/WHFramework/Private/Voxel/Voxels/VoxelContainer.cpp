@@ -38,7 +38,7 @@ void UVoxelContainer::OnDestroy(IVoxelAgentInterface* InAgent)
 
 	if(GetAuxiliary<AVoxelContainerAuxiliary>())
 	{
-		GetAuxiliary<AVoxelContainerAuxiliary>()->GetInventory()->DiscardAllItem();
+		GetAuxiliary<AVoxelContainerAuxiliary>()->GetInventory()->DiscardItems();
 	}
 }
 

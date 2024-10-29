@@ -17,20 +17,24 @@ void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, 
 	Super::PreAttributeChange(Attribute, NewValue);
 }
 
+void UAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
+}
+
 void UAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
 }
 
-void UAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty)
+void UAttributeSetBase::AdjustAttributeForMaxChange(const FGameplayAttribute& Attribute, float OldMaxValue, float NewMaxValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	const float CurrentMaxValue = InMaxAttribute.GetCurrentValue();
-	if(!FMath::IsNearlyEqual(CurrentMaxValue, InNewMaxValue) && AbilityComp)
+	if(!FMath::IsNearlyEqual(OldMaxValue, NewMaxValue) && AbilityComp)
 	{
-		const float CurrentValue = InAffectedAttribute.GetCurrentValue();
-		float NewDelta = CurrentMaxValue > 0.f ? ((CurrentValue / CurrentMaxValue) * InNewMaxValue - CurrentValue) : InNewMaxValue;
-		ModifyAttributeValue(InAffectedAttributeProperty, NewDelta);
+		const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
+		float NewDelta = CurrentValue / OldMaxValue * NewMaxValue - CurrentValue;
+		ModifyAttributeValue(Attribute, NewDelta);
 	}
 }
 

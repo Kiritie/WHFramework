@@ -43,16 +43,16 @@ public:
 	/// Checks
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool CheckSlot(FAbilityItem& InItem) const;
+	virtual bool ContainsItem(FAbilityItem InItem) const;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool MatchItem(FAbilityItem InItem, bool bPutIn = false) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool CanPutIn(FAbilityItem& InItem) const;
-						
-	UFUNCTION(BlueprintPure)
-	virtual bool IsMatch(FAbilityItem InItem, bool bForce = false) const;
+	virtual bool MatchItemSplit(FAbilityItem InItem, bool bForce = false) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool Contains(FAbilityItem& InItem) const;
+	virtual bool MatchItemLimit(FAbilityItem InItem) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actions
@@ -88,7 +88,7 @@ public:
 	virtual bool ActiveItem(bool bPassive = false);
 		
 	UFUNCTION(BlueprintCallable)
-	virtual void CancelItem(bool bPassive = false);
+	virtual void DeactiveItem(bool bPassive = false);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void ClearItem();
@@ -127,7 +127,13 @@ public:
 	bool IsSelected() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsMatched(bool bForce = false) const;
+	bool IsMatched() const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsLimitMatched() const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsSplitMatched(bool bForce = false) const;
 
 	int32 GetRemainVolume(FAbilityItem InItem = FAbilityItem::Empty) const;
 

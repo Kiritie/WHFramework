@@ -24,13 +24,16 @@ bool UAbilityModuleStatics::GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> 
 	if (AbilityClass != nullptr)
 	{
 		UGameplayAbility* Ability = AbilityClass.GetDefaultObject();
-		if (Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
+		if (Ability->GetCostGameplayEffect() && Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
 		{
 			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
 			OutAbilityInfo.CostAttribute = ModifierInfo.Attribute;
 			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1, OutAbilityInfo.CostValue);
 		}
-		Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, OutAbilityInfo.CooldownDuration);
+		if (Ability->GetCooldownGameplayEffect())
+		{
+			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1, OutAbilityInfo.CooldownDuration);
+		}
 		return true;
 	}
 	return false;

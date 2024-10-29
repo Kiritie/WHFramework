@@ -14,7 +14,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void ResetData();
+	void OnInitialize();
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void OnReset();
 	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

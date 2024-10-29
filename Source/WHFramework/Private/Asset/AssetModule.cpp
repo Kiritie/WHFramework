@@ -60,26 +60,23 @@ void UAssetModule::OnInitialize()
 			DataTableMap.Add(Iter->RowStruct, Iter);
 		}
 	}
+
+	for(auto& Iter : StaticClasses)
+	{
+		FStaticClass& StaticClass = Iter.Value;
+		StaticClass.LoadedClass = LoadClass(StaticClass.BaseClass, StaticClass.GetClassName());
+	}
+		
+	for(auto& Iter : StaticObjects)
+	{
+		FStaticObject& StaticObject = Iter.Value;
+		StaticObject.LoadedObject = LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName());
+	}
 }
 
 void UAssetModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		for(auto& Iter : StaticClasses)
-		{
-			FStaticClass& StaticClass = Iter.Value;
-			StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
-		}
-		
-		for(auto& Iter : StaticObjects)
-		{
-			FStaticObject& StaticObject = Iter.Value;
-			StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
-		}
-	}
 }
 
 void UAssetModule::OnRefresh(float DeltaSeconds, bool bInEditor)

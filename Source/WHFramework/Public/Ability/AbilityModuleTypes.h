@@ -436,6 +436,26 @@ enum class EDamageType : uint8
 };
 
 /**
+* 装备稀有度
+*/
+UENUM(BlueprintType)
+enum class EEquipRarity : uint8
+{
+	// 普通
+	Normal,
+	// 中等
+	Medium,
+	// 高
+	High,
+	// 史诗
+	Epic,
+	// 传奇
+	Legendary,
+	// 神话
+	Mythic
+};
+
+/**
 * 技能类型
 */
 UENUM(BlueprintType)
@@ -483,10 +503,12 @@ enum class EAbilityItemType : uint8
 	Equip UMETA(DisplayName="装备"),
 	// 技能
 	Skill UMETA(DisplayName="技能"),
+	// 物体
+	Actor UMETA(DisplayName="物体"),
+	// 生命体
+	Vitality UMETA(DisplayName="生命体"),
 	// 对象
-	Actor UMETA(DisplayName="对象"),
-	// 生命
-	Vitality UMETA(DisplayName="生命"),
+	Pawn UMETA(DisplayName="对象"),
 	// 角色
 	Character UMETA(DisplayName="角色")
 };
@@ -664,18 +686,18 @@ enum class ESlotSplitType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FItemQueryInfo
+struct WHFRAMEWORK_API FItemQueryData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FItemQueryInfo()
+	FORCEINLINE FItemQueryData()
 	{
 		Item = FAbilityItem();
 		Slots = TArray<UAbilityInventorySlotBase*>();
 	}
 
-	FORCEINLINE FItemQueryInfo(FAbilityItem InItem, TArray<UAbilityInventorySlotBase*> InSlots)
+	FORCEINLINE FItemQueryData(FAbilityItem InItem, TArray<UAbilityInventorySlotBase*> InSlots)
 	{
 		Item = InItem;
 		Slots = InSlots;
@@ -693,7 +715,7 @@ public:
 		return Item.Count > 0;
 	}
 
-	FORCEINLINE friend FItemQueryInfo operator+(FItemQueryInfo& A, FItemQueryInfo& B)
+	FORCEINLINE friend FItemQueryData operator+(FItemQueryData& A, FItemQueryData& B)
 	{
 		A.Item += B.Item;
 		for(auto Iter : B.Slots)
@@ -703,7 +725,7 @@ public:
 		return A;
 	}
 
-	FORCEINLINE friend FItemQueryInfo operator+=(FItemQueryInfo& A, FItemQueryInfo B)
+	FORCEINLINE friend FItemQueryData operator+=(FItemQueryData& A, FItemQueryData B)
 	{
 		A.Item = B.Item;
 		for(auto Iter : B.Slots)
@@ -752,6 +774,40 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInventoryFillRule
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FInventoryFillRule()
+	{
+		ItemRate = 0.f;
+		ItemNum = 0;
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	float ItemRate;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	int32 ItemNum;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInventoryFillRules
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FInventoryFillRules()
+	{
+		Rules = TArray<FInventoryFillRule>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TArray<FInventoryFillRule> Rules;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInventorySaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -762,6 +818,7 @@ public:
 		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndexs = TMap<ESlotSplitType, int32>();
+		FillRules = TMap<EAbilityItemType, FInventoryFillRules>();
 	}
 
 public:
@@ -770,6 +827,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<EAbilityItemType, FInventoryFillRules> FillRules;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, int32> SelectedIndexs;
@@ -782,7 +842,9 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void CopyAllItem(FInventorySaveData SaveData);
+	virtual void FillItems(int32 InLevel);
+
+	virtual void CopyItems(FInventorySaveData SaveData);
 
 	virtual void AddItem(FAbilityItem InItem);
 
@@ -790,7 +852,7 @@ public:
 
 	virtual void ClearItem(FAbilityItem InItem);
 
-	virtual void ClearAllItem();
+	virtual void ClearItems();
 };
 
 /**
@@ -804,7 +866,9 @@ enum class EItemQueryType : uint8
 	// 添加
 	Add,
 	// 移除
-	Remove
+	Remove,
+	// 匹配
+	Match
 };
 
 USTRUCT(BlueprintType)

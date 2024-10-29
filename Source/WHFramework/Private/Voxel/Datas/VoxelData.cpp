@@ -8,6 +8,7 @@ UVoxelData::UVoxelData()
 {
 	Type = FName("Voxel");
 	MaxCount = 64;
+	MaxLevel = 0;
 	PickUpClass = AAbilityPickUpVoxel::StaticClass();
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
@@ -19,13 +20,6 @@ UVoxelData::UVoxelData()
 	MainData = nullptr;
 	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
-}
-
-void UVoxelData::ResetData_Implementation()
-{
-	Super::ResetData_Implementation();
-
-	Icon = nullptr;
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const

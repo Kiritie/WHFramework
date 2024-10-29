@@ -5,11 +5,6 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
-IWHActorInterface::IWHActorInterface()
-{
-	bWHActorInitialized = false;
-}
-
 AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
@@ -59,7 +54,7 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 
 void AWHActor::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 
 	Execute_SetActorVisible(this, bVisible);
 }
@@ -117,9 +112,9 @@ void AWHActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!bWHActorInitialized)
+		if(!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -131,7 +126,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -141,7 +136,7 @@ void AWHActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

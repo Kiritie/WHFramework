@@ -15,11 +15,13 @@ AWHGameMode::AWHGameMode()
 	DefaultPawnClass = nullptr;
 	PlayerControllerClass = AWHPlayerController::StaticClass();
 	GameStateClass = AWHGameState::StaticClass();
+
+	bInitialized = false;
 }
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-	bWHActorInitialized = true;
+	bInitialized = true;
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
@@ -90,7 +92,7 @@ void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnPreparatory(this, EPhase::Primary);
 		Execute_OnPreparatory(this, EPhase::Lesser);
@@ -102,7 +104,7 @@ void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::Primary);
 		Execute_OnTermination(this, EPhase::Lesser);
@@ -114,7 +116,7 @@ void AWHGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

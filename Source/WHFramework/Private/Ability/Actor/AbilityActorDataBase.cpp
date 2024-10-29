@@ -15,3 +15,13 @@ UAbilityActorDataBase::UAbilityActorDataBase()
 	InventoryData.InventoryClass = UAbilityInventoryBase::StaticClass();
 	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
 }
+
+void UAbilityActorDataBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void UAbilityActorDataBase::OnReset_Implementation()
+{
+	Super::OnReset_Implementation();
+}

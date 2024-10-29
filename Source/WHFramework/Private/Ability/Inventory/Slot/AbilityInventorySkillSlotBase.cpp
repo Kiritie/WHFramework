@@ -21,7 +21,7 @@ void UAbilityInventorySkillSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 	
 	if(Item.IsValid() && Item.GetData<UAbilitySkillDataBase>().SkillMode == ESkillMode::Passive)
 	{
-		CancelItem(true);
+		DeactiveItem(true);
 	}
 }
 
@@ -40,7 +40,7 @@ bool UAbilityInventorySkillSlotBase::ActiveItem(bool bPassive /*= false*/)
 	return Super::ActiveItem(bPassive);
 }
 
-void UAbilityInventorySkillSlotBase::CancelItem(bool bPassive /*= false*/)
+void UAbilityInventorySkillSlotBase::DeactiveItem(bool bPassive /*= false*/)
 {
-	return Super::CancelItem(bPassive);
+	return Super::DeactiveItem(bPassive);
 }

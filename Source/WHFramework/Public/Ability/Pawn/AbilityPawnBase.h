@@ -64,7 +64,7 @@ protected:
 
 	virtual FSaveData* ToData() override;
 	
-	virtual void ResetData();
+	virtual void ResetData() override;
 
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 

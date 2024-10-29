@@ -6,6 +6,7 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
+#include "Common/CommonStatics.h"
 
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
@@ -124,49 +125,90 @@ FAbilityItems FInventorySlots::GetItems()
 	return Items;
 }
 
-void FInventorySaveData::CopyAllItem(FInventorySaveData SaveData)
+void FInventorySaveData::FillItems(int32 InLevel)
+{
+	for(auto& Iter1 : FillRules)
+	{
+		if(Iter1.Key == EAbilityItemType::None) continue;
+
+		const FName ItemType = *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
+
+		auto ItemDatas = UAssetModuleStatics::LoadPrimaryAssets<UAbilityItemDataBase>(ItemType);
+
+		int32 ItemNum = 0;
+		const float FillRate = FMath::FRand();
+		for(auto& Iter2 : Iter1.Value.Rules)
+		{
+			if(FillRate <= Iter2.ItemRate)
+			{
+				ItemNum = Iter2.ItemNum;
+			}
+		}
+
+		if(Iter1.Key == EAbilityItemType::Coin)
+		{
+			if (ItemDatas.IsValidIndex(0))
+			{
+				AddItem(FAbilityItem(ItemDatas[0]->GetPrimaryAssetId(), ItemNum, ItemDatas[0]->GetClampedLevel(InLevel)));
+			}
+		}
+		else
+		{
+			for (int32 i = 0; i < ItemNum; i++)
+			{
+				if(ItemDatas.IsEmpty()) break;
+
+				const int32 tmpIndex = FMath::RandRange(0, ItemDatas.Num() - 1);
+				AddItem(FAbilityItem(ItemDatas[tmpIndex]->GetPrimaryAssetId(), 1, ItemDatas[tmpIndex]->GetClampedLevel(InLevel)));
+				ItemDatas.RemoveAt(tmpIndex);
+			}
+		}
+	}
+}
+
+void FInventorySaveData::CopyItems(FInventorySaveData SaveData)
 {
 	SplitItems = SaveData.SplitItems;
 }
 
 void FInventorySaveData::AddItem(FAbilityItem InItem)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.AddItemByRange(InItem, 0, -1, false);
 
-	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
 void FInventorySaveData::RemoveItem(FAbilityItem InItem)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.RemoveItemByRange(InItem, 0, -1);
 
-	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
 void FInventorySaveData::ClearItem(FAbilityItem InItem)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.ClearItem(InItem);
 
-	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
-void FInventorySaveData::ClearAllItem()
+void FInventorySaveData::ClearItems()
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(false, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
-	Inventory.ClearAllItem();
+	Inventory.ClearItems();
 
-	CopyAllItem(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
 UAbilityItemDataBase& FActorSaveData::GetItemData() const
