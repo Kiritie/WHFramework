@@ -16,6 +16,8 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 
 	WidgetZOrder = 10;
 
+	bWidgetAutoFocus = true;
+
 	SetIsFocusable(true);
 	
 	PageItemGroup = nullptr;

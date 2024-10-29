@@ -122,7 +122,7 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetNameV(SaveData.Name);
+		SetNameA(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
 		SetLevelA(SaveData.Level);
 
@@ -285,6 +285,48 @@ void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 }
 
+void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
+{
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
+	{
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
+		{
+			SetLevelA(GetLevelA() + 1);
+			SetExp(0.f);
+		}
+	}
+}
+
+void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(-LocalDamageDone);
+
+	if (GetHealth() <= 0.f)
+	{
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
+	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityPawnBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+}
+
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
@@ -303,7 +345,7 @@ bool AAbilityPawnBase::IsMoving() const
 bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 {
 	const auto& PawnData = GetPawnData<UAbilityPawnDataBase>();
-	InLevel = PawnData.GetClampedLevel(InLevel);
+	InLevel = PawnData.ClampLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -380,46 +422,4 @@ bool AAbilityPawnBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
 bool AAbilityPawnBase::IsActive(bool bNeedNotDead) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Active) && (!bNeedNotDead || !IsDead());
-}
-
-void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
-{
-	if(InAttributeChangeData.Attribute == GetExpAttribute())
-	{
-		if(InAttributeChangeData.NewValue >= GetMaxExp())
-		{
-			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
-		}
-	}
-}
-
-void AAbilityPawnBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(-LocalDamageDone);
-
-	if (GetHealth() <= 0.f)
-	{
-		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
-		{
-			SourceVitality->Kill(this);
-		}
-		else
-		{
-			Death(nullptr);
-		}
-	}
-
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityPawnBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(LocalRecoveryDone);
-	
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityPawnBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
 }

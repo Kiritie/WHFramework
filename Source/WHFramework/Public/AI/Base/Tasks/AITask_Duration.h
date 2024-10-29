@@ -11,7 +11,10 @@
 UCLASS()
 class WHFRAMEWORK_API UAITask_Duration : public UAITaskBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+	
+public:
+	UAITask_Duration(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "AbilitySystemComponent.h"
+#include "ActorAttributeSetBase.h"
 #include "Ability/AbilityModuleTypes.h"
-#include "Ability/Attributes/AttributeSetBase.h"
 
 #include "VitalityAttributeSetBase.generated.h"
 
@@ -10,7 +10,7 @@
  * 生命属性集
  */
 UCLASS()
-class WHFRAMEWORK_API UVitalityAttributeSetBase : public UAttributeSetBase
+class WHFRAMEWORK_API UVitalityAttributeSetBase : public UActorAttributeSetBase
 {
 	GENERATED_BODY()
 
@@ -30,14 +30,6 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "VitalityAttributes")
-	FGameplayAttributeData Exp;
-	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxExp, Category = "VitalityAttributes")
-	FGameplayAttributeData MaxExp;
-	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Health, Category = "VitalityAttributes")
 	FGameplayAttributeData Health;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
@@ -77,12 +69,6 @@ protected:
 	TSubclassOf<UInterruptHandle> InterruptHandleClass;
 
 public:
-	UFUNCTION()
-	virtual void OnRep_Exp(const FGameplayAttributeData& OldExp);
-
-	UFUNCTION()
-	virtual void OnRep_MaxExp(const FGameplayAttributeData& OldMaxExp);
-
 	UFUNCTION()
 	virtual void OnRep_Health(const FGameplayAttributeData& OldHealth);
 

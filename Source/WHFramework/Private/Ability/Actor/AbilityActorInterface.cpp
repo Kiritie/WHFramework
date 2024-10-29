@@ -8,7 +8,7 @@
 
 void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
 {
-	if(bAbilityInitialized) return;
+	if(bAbilitiesInitialized) return;
 
 	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
 	UAttributeSetBase* AttributeSet = GetAttributeSet();
@@ -24,7 +24,7 @@ void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* I
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
 	}
 
-	bAbilityInitialized = true;
+	bAbilitiesInitialized = true;
 }
 
 void IAbilityActorInterface::RefreshAttributes()

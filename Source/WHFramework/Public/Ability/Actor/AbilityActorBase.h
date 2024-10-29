@@ -3,8 +3,8 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "AbilitySystemInterface.h"
 #include "AbilityActorInterface.h"
+#include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Base/WHActor.h"
@@ -13,7 +13,6 @@
 #include "AbilityActorBase.generated.h"
 
 class UInteractionComponent;
-class UActorAttributeSetBase;
 class UActorAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
@@ -30,7 +29,7 @@ class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorI
 	GENERATED_BODY()
 
 public:
-	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	AAbilityActorBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -86,6 +85,9 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
+public:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
@@ -105,12 +107,17 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats")
 	FPrimaryAssetId AssetID;
-	
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	FName Name;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
 	int32 Level;
 
 public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
+	
+	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, MaxExp)
 
 public:
 	template<class T>
@@ -156,10 +163,15 @@ public:
 	
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 
-public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
 	
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
+		
+	UFUNCTION(BlueprintPure)
+	virtual FName GetNameA() const override { return Name; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetNameA(FName InName) override { Name = InName; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetLevelA() const override { return Level; }

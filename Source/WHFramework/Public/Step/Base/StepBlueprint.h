@@ -14,7 +14,10 @@
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UStepBlueprint : public UBlueprint
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UStepBlueprint(const FObjectInitializer& ObjectInitializer);
 
 #if WITH_EDITOR
 

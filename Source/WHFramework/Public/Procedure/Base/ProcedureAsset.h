@@ -13,8 +13,11 @@ class UProcedureBase;
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UProcedureAsset : public UAssetBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
+public:
+	UProcedureAsset(const FObjectInitializer& ObjectInitializer);
+	
 public:
 	virtual void Initialize(UAssetBase* InSource) override;
 

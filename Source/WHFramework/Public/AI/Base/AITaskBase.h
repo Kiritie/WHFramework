@@ -14,8 +14,11 @@ class IAIAgentInterface;
 UCLASS()
 class WHFRAMEWORK_API UAITaskBase : public UBTTaskNode
 {
-	GENERATED_UCLASS_BODY()
-	
+	GENERATED_BODY()
+		
+public:
+	UAITaskBase(const FObjectInitializer& ObjectInitializer);
+
 protected:
 	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
 

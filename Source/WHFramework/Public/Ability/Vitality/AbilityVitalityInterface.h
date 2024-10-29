@@ -23,8 +23,6 @@ public:
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) = 0;
 	
 	virtual void ModifyHealth(float InDeltaValue) = 0;
-	
-	virtual void ModifyExp(float InDeltaValue) = 0;
 
 public:
 	virtual bool IsDead(bool bCheckDying = true) const = 0;
@@ -32,10 +30,6 @@ public:
 	virtual bool IsDying() const = 0;
 	
 public:
-	virtual FName GetNameV() const = 0;
-
-	virtual void SetNameV(FName InName) = 0;
-		
 	virtual FName GetRaceID() const = 0;
 
 	virtual void SetRaceID(FName InRaceID) = 0;

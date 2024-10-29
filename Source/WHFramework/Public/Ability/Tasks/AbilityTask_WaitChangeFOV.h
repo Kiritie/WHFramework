@@ -13,8 +13,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FChangeFOVDelegate);
 UCLASS()
 class WHFRAMEWORK_API UAbilityTask_WaitChangeFOV : public UAbilityTask
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 	
+public:
+	UAbilityTask_WaitChangeFOV(const FObjectInitializer& ObjectInitializer);
+
+public:
 	UPROPERTY(BlueprintAssignable)
 	FChangeFOVDelegate OnTargetFOVReached;
 

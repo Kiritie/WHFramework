@@ -5,31 +5,32 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
+AWHActor::AWHActor()
+{
+	InitializeDefaults();
+}
+
 AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
+{
+	InitializeDefaults();
+}
+
+void AWHActor::InitializeDefaults()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 
 	ActorID = FGuid::NewGuid();
+
 	bVisible = true;
 	Container = nullptr;
 }
 
 void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
+	if(InParams.IsValidIndex(0))
 	{
-		SetActorLocation(InParams[0]);
-	}
-
-	if(InParams.IsValidIndex(1) && InParams[1].GetParameterType() == EParameterType::Rotator)
-	{
-		SetActorRotation(InParams[1]);
-	}
-
-	if(InParams.IsValidIndex(2) && InParams[2].GetParameterType() == EParameterType::Vector)
-	{
-		SetActorScale3D(InParams[2]);
+		ActorID = InParams[0].GetPointerValueRef<FGuid>();
 	}
 
 	Execute_SetActorVisible(this, true);

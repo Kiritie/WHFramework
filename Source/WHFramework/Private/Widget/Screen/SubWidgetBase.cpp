@@ -8,6 +8,8 @@
 
 USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bWidgetTickAble = false;
+
 	OwnerWidget = nullptr;
 }
 
@@ -21,6 +23,11 @@ void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 	
 	OwnerWidget = nullptr;
+}
+
+void USubWidgetBase::OnTick_Implementation(float DeltaSeconds)
+{
+	
 }
 
 void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)

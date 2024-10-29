@@ -377,14 +377,14 @@ bool UAbilityInventorySlotBase::IsSplitMatched(bool bForce) const
 
 int32 UAbilityInventorySlotBase::GetRemainVolume(FAbilityItem InItem) const
 {
-	const FAbilityItem TmpItem = InItem.IsValid() ? InItem : Item;
-	return GetMaxVolume(TmpItem) - Item.Count;
+	const FAbilityItem _Item = InItem.IsValid() ? InItem : Item;
+	return GetMaxVolume(_Item) - Item.Count;
 }
 
 int32 UAbilityInventorySlotBase::GetMaxVolume(FAbilityItem InItem) const
 {
-	const FAbilityItem TmpItem = InItem.IsValid() ? InItem : Item;
-	return TmpItem.IsValid() ? TmpItem.GetData().MaxCount : 0;
+	const FAbilityItem _Item = InItem.IsValid() ? InItem : Item;
+	return _Item.IsValid() ? _Item.GetData().MaxCount : 0;
 }
 
 FAbilityInfo UAbilityInventorySlotBase::GetAbilityInfo() const

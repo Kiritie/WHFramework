@@ -4,7 +4,7 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
-#include "Ability/Attributes/AttributeSetBase.h"
+#include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Asset/AssetModuleStatics.h"
@@ -27,7 +27,7 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(FName("AttributeSet"));
+	AttributeSet = CreateDefaultSubobject<UActorAttributeSetBase>(FName("AttributeSet"));
 		
 	Inventory = CreateDefaultSubobject<UAbilityInventoryBase>(FName("Inventory"));
 
@@ -36,15 +36,12 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 
 	// stats
 	AssetID = FPrimaryAssetId();
+	Name = NAME_None;
 	Level = 0;
 }
 
 void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
 	if(InParams.IsValidIndex(1))
 	{
 		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
@@ -60,6 +57,7 @@ void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 
 	AssetID = FPrimaryAssetId();
+	Name = NAME_None;
 	Level = 0;
 	Inventory->UnloadSaveData();
 }
@@ -124,6 +122,8 @@ void AAbilityActorBase::Serialize(FArchive& Ar)
 
 void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
+	Super::LoadData(InSaveData, InPhase);
+
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
@@ -132,6 +132,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
+		SetNameA(SaveData.Name);
 		SetLevelA(SaveData.Level);
 
 		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
@@ -140,11 +141,11 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityActorBase::ToData()
 {
-	static FVitalitySaveData SaveData;
-	SaveData = FVitalitySaveData();
+	static FActorSaveData SaveData;
+	SaveData = Super::ToData()->CastRef<FSceneActorSaveData>();
 
-	SaveData.ActorID = ActorID;
 	SaveData.AssetID = AssetID;
+	SaveData.Name = Name;
 	SaveData.Level = Level;
 
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
@@ -213,7 +214,14 @@ void AAbilityActorBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
+	{
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
+		{
+			SetLevelA(GetLevelA() + 1);
+			SetExp(0.f);
+		}
+	}
 }
 
 UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
@@ -239,7 +247,7 @@ UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 bool AAbilityActorBase::SetLevelA(int32 InLevel)
 {
 	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
-	InLevel = ActorData.GetClampedLevel(InLevel);
+	InLevel = ActorData.ClampLevel(InLevel);
 
 	if(Level != InLevel)
 	{

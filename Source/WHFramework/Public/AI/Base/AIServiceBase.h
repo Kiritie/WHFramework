@@ -14,7 +14,10 @@ class AAIControllerBase;
 UCLASS()
 class WHFRAMEWORK_API UAIServiceBase : public UBTService
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAIServiceBase(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	virtual bool InitService(UBehaviorTreeComponent& OwnerComp);

@@ -10,5 +10,8 @@
 UCLASS(MinimalAPI)
 class UStepGraph : public UEdGraph
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UStepGraph(const FObjectInitializer& ObjectInitializer);
 };

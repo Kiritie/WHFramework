@@ -12,7 +12,10 @@ class UProcedureAsset;
 UCLASS(abstract, MinimalAPI)
 class UAssetFactoryBase : public UFactory
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAssetFactoryBase(const FObjectInitializer& ObjectInitializer);
 
 public:
 	// UFactory interface

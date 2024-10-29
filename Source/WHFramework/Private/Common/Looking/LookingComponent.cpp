@@ -6,7 +6,8 @@
 #include "Engine/World.h"
 
 // Sets default values for this component's properties
-ULookingComponent::ULookingComponent()
+ULookingComponent::ULookingComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	PrimaryComponentTick.bCanEverTick = true;
 

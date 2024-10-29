@@ -7,9 +7,7 @@
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
-:	Exp(0.f),
-	MaxExp(50.f),
-	Health(50.f),
+:	Health(50.f),
 	MaxHealth(50.f),
 	PhysicsDamage(0.f),
 	MagicDamage(0.f),
@@ -108,8 +106,6 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Exp, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxExp, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
@@ -117,16 +113,6 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, FallDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Recovery, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Interrupt, COND_None, REPNOTIFY_Always);
-}
-
-void UVitalityAttributeSetBase::OnRep_Exp(const FGameplayAttributeData& OldExp)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, Exp, OldExp);
-}
-
-void UVitalityAttributeSetBase::OnRep_MaxExp(const FGameplayAttributeData& OldMaxExp)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxExp, OldMaxExp);
 }
 
 void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHealth)

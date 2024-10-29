@@ -23,6 +23,8 @@
 
 UAnimTextBlock::UAnimTextBlock(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bWidgetTickAble = true;
+	
 	Text = FText::GetEmpty();
 
 	AnimType = ETextAnimType::None;
@@ -62,13 +64,10 @@ void UAnimTextBlock::NativeConstruct()
 	SetText(Text);
 }
 
-bool UAnimTextBlock::IsTickAble_Implementation() const
-{
-	return true;
-}
-
 void UAnimTextBlock::OnTick_Implementation(float DeltaSeconds)
 {
+	Super::OnTick_Implementation(DeltaSeconds);
+	
 	switch(AnimType)
 	{
 		case ETextAnimType::LerpOnly:

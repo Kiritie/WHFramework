@@ -29,7 +29,7 @@ class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInter
 	GENERATED_BODY()
 	
 public:
-	ACharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	ACharacterBase(const FObjectInitializer& ObjectInitializer);
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -106,10 +106,6 @@ public:
 	virtual FName GetNameP() const override { return Name; }
 
 	virtual void SetNameP(FName InName) override { Name = InName; }
-
-	virtual FName GetNameC() const override { return Name; }
-
-	virtual void SetNameC(FName InName) override { Name = InName; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
@@ -211,21 +207,21 @@ protected:
 	FSingleSoundHandle SoundHandle;
 	
 public:
-	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
+	virtual void PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	
 	virtual void StopSound(bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
 public:
-	virtual void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void PlayMontage(UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlayMontage(class UAnimMontage* InMontage);
+	virtual void MultiPlayMontage(UAnimMontage* InMontage);
 	virtual void PlayMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
-	virtual void StopMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void StopMontage(UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiStopMontage(class UAnimMontage* InMontage);
+	virtual void MultiStopMontage(UAnimMontage* InMontage);
 	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////

@@ -41,7 +41,7 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbi
 	friend class UAbilityCharacterState_Walk;
 
 public:
-	AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -62,46 +62,6 @@ public:
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
-
-protected:
-	// stats
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	FName RaceID;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	int32 Level;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	float MovementRate;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	float RotationRate;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	AController* OwnerController;
-
-protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UAbilitySystemComponentBase* AbilitySystem;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCharacterAttributeSetBase* AttributeSet;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UInteractionComponent* Interaction;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilityCharacterInventoryBase* Inventory;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UFSMComponent* FSM;
-
-protected:
-	bool bASCInputBound;
-
-	float DefaultGravityScale;
-
-	float DefaultAirControl;
 
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -169,13 +129,86 @@ public:
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 public:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+protected:
+	// stats
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FName RaceID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	int32 Level;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	float MovementRate;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	float RotationRate;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	AController* OwnerController;
+
+protected:
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UAbilitySystemComponentBase* AbilitySystem;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UCharacterAttributeSetBase* AttributeSet;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UInteractionComponent* Interaction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UAbilityCharacterInventoryBase* Inventory;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UFSMComponent* FSM;
+
+protected:
+	bool bASCInputBound;
+
+	float DefaultGravityScale;
+
+	float DefaultAirControl;
+
+public:
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
+
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
+
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
+
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
+
+public:
 	UFUNCTION(BlueprintCallable)
 	float GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
 									
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetMotionRate(float InMovementRate, float InRotationRate);
 
-public:
 	template<class T>
 	T* GetAbilitySystemComponent() const
 	{
@@ -248,10 +281,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetNameV() const override { return Name; }
+	virtual FName GetNameA() const override { return Name; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNameV(FName InName) override;
+	virtual void SetNameA(FName InName) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FName GetRaceID() const override { return RaceID; }
@@ -279,40 +312,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
-
-public:
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
-
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
-
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
-
-	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
-
-public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
-	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 public:
 	virtual void OnRep_Controller() override;

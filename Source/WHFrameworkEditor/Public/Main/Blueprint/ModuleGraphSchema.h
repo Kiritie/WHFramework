@@ -10,8 +10,11 @@
 UCLASS(MinimalAPI)
 class UModuleGraphSchema : public UEdGraphSchema_K2
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
+public:
+	UModuleGraphSchema(const FObjectInitializer& ObjectInitializer);
+	
 public:
 	virtual bool ShouldAlwaysPurgeOnModification() const override { return true; }
 };

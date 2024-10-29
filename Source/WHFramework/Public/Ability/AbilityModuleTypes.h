@@ -1006,6 +1006,14 @@ public:
 		InventoryData = FInventorySaveData();
 	}
 
+	FORCEINLINE FActorSaveData(const FSceneActorSaveData& InSceneActorSaveData) : FSceneActorSaveData(InSceneActorSaveData)
+	{
+		AssetID = FPrimaryAssetId();
+		Name = NAME_None;
+		Level = 1;
+		InventoryData = FInventorySaveData();
+	}
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetID;

@@ -14,8 +14,11 @@ class UEdGraph;
 UCLASS(MinimalAPI)
 class UK2Node_FormatString : public UK2Node
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
+public:
+	UK2Node_FormatString(const FObjectInitializer& ObjectInitializer);
+	
 	//~ Begin UObject Interface
 		virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 	//~ End UObject Interface

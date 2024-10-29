@@ -149,7 +149,7 @@ void FInventorySaveData::FillItems(int32 InLevel)
 		{
 			if (ItemDatas.IsValidIndex(0))
 			{
-				AddItem(FAbilityItem(ItemDatas[0]->GetPrimaryAssetId(), ItemNum, ItemDatas[0]->GetClampedLevel(InLevel)));
+				AddItem(FAbilityItem(ItemDatas[0]->GetPrimaryAssetId(), ItemNum, ItemDatas[0]->ClampLevel(InLevel)));
 			}
 		}
 		else
@@ -159,7 +159,7 @@ void FInventorySaveData::FillItems(int32 InLevel)
 				if(ItemDatas.IsEmpty()) break;
 
 				const int32 tmpIndex = FMath::RandRange(0, ItemDatas.Num() - 1);
-				AddItem(FAbilityItem(ItemDatas[tmpIndex]->GetPrimaryAssetId(), 1, ItemDatas[tmpIndex]->GetClampedLevel(InLevel)));
+				AddItem(FAbilityItem(ItemDatas[tmpIndex]->GetPrimaryAssetId(), 1, ItemDatas[tmpIndex]->ClampLevel(InLevel)));
 				ItemDatas.RemoveAt(tmpIndex);
 			}
 		}

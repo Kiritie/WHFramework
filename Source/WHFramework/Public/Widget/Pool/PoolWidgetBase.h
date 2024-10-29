@@ -3,11 +3,12 @@
 #pragma once
 #include "Blueprint/UserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Slate/Runtime/Interfaces/BaseWidgetInterface.h"
 
 #include "PoolWidgetBase.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UPoolWidgetBase : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UPoolWidgetBase : public UUserWidget, public IBaseWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 
@@ -22,6 +23,33 @@ public:
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
+
+public:
+	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+
+	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
+public:
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+	void K2_OnRefresh();
+	UFUNCTION()
+	virtual void OnRefresh() override;
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
+	void K2_OnDestroy(bool bRecovery);
+	UFUNCTION()
+	virtual void OnDestroy(bool bRecovery) override;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void Refresh() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Destroy(bool bRecovery = false) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

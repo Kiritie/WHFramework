@@ -10,7 +10,10 @@
 UCLASS(ClassGroup=Movement, meta=(BlueprintSpawnableComponent), HideCategories=(Velocity))
 class WHFRAMEWORK_API UFollowingMovementComponent : public UMovementComponent
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+	
+public:
+	UFollowingMovementComponent(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;

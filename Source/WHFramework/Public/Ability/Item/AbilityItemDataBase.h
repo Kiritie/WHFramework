@@ -32,6 +32,9 @@ public:
 	UObject* Icon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UMaterialInterface* IconMat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxCount;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -42,19 +45,21 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityPickUpBase> PickUpClass;
-	
-	UPROPERTY(Transient)
-	UObject* IconBak;
 
+public:
+	UFUNCTION(BlueprintPure)
+	int32 ClampCount(int32 InCount) const;
+
+	UFUNCTION(BlueprintPure)
+	int32 ClampLevel(int32 InLevel) const;
+
+protected:
 	UPROPERTY(Transient)
-	UMaterialInterface* IconMat;
+	UObject* InitIcon;
 
 public:
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
-
-	UFUNCTION(BlueprintPure)
-	int32 GetClampedLevel(int32 InLevel) const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);

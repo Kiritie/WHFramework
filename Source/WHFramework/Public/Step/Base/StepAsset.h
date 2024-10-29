@@ -13,7 +13,10 @@ class UStepBase;
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UStepAsset : public UAssetBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UStepAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual void Initialize(UAssetBase* InSource) override;

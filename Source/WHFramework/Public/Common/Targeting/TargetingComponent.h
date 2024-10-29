@@ -23,7 +23,7 @@ class WHFRAMEWORK_API UTargetingComponent : public UActorComponent
 
 public:
 	// Sets default values for this component's properties
-	UTargetingComponent();
+	UTargetingComponent(const FObjectInitializer& ObjectInitializer);
 
 	// The minimum distance to enable target locked on.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")

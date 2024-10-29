@@ -10,5 +10,8 @@
 UCLASS(MinimalAPI)
 class UTaskGraph : public UEdGraph
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UTaskGraph(const FObjectInitializer& ObjectInitializer);
 };

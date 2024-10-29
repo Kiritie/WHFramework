@@ -3,9 +3,12 @@
 #include "Widget/Pool/PoolWidgetBase.h"
 
 #include "Common/CommonTypes.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bWidgetTickAble = false;
+
 	OwnerWidget = nullptr;
 }
 
@@ -19,6 +22,33 @@ void UPoolWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();
+}
+
+void UPoolWidgetBase::OnTick_Implementation(float DeltaSeconds)
+{
+	
+}
+
+void UPoolWidgetBase::OnRefresh()
+{
+	K2_OnRefresh();
+}
+
+void UPoolWidgetBase::OnDestroy(bool bRecovery)
+{
+	K2_OnDestroy(bRecovery);
+}
+
+void UPoolWidgetBase::Refresh()
+{
+	OnRefresh();
+}
+
+void UPoolWidgetBase::Destroy(bool bRecovery)
+{
+	OnDestroy(bRecovery);
+	
+	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 }
 
 UUserWidget* UPoolWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidget> InClass) const

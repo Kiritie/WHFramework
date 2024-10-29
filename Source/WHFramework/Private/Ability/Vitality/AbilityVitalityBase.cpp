@@ -11,7 +11,6 @@
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Datas/VoxelData.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
@@ -28,7 +27,6 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
 
 	// stats
-	Name = NAME_None;
 	RaceID = NAME_None;
 	GenerateVoxelID = FPrimaryAssetId();
 }
@@ -47,6 +45,7 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 	FSM->SwitchState(nullptr);
 
 	RaceID = NAME_None;
+	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -57,7 +56,6 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
 	}
 }
@@ -67,7 +65,6 @@ FSaveData* AAbilityVitalityBase::ToData()
 	static FVitalitySaveData SaveData;
 	SaveData = Super::ToData()->CastRef<FActorSaveData>();
 
-	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 
 	return &SaveData;
@@ -174,58 +171,9 @@ bool AAbilityVitalityBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResul
 	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
-bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
-{
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
-}
-
-bool AAbilityVitalityBase::IsDying() const
-{
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
-}
-
-bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
-{
-	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
-	InLevel = VitalityData.GetClampedLevel(InLevel);
-
-	if(Level != InLevel)
-	{
-		Level = InLevel;
-
-		auto EffectContext = AbilitySystem->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(VitalityData.PEClass, InLevel, EffectContext);
-		if (SpecHandle.IsValid())
-		{
-			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
-		}
-		ResetData();
-		return true;
-	}
-	return false;
-}
-
-FString AAbilityVitalityBase::GetHeadInfo() const
-{
-	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
-}
-
-UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
-{
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
-}
-
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == GetExpAttribute())
-	{
-		if(InAttributeChangeData.NewValue >= GetMaxExp())
-		{
-			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
-		}
-	}
+	Super::OnAttributeChange(InAttributeChangeData);
 }
 
 void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -256,4 +204,24 @@ void AAbilityVitalityBase::HandleRecovery(const float LocalRecoveryDone, FHitRes
 
 void AAbilityVitalityBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+}
+
+bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
+}
+
+bool AAbilityVitalityBase::IsDying() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
+}
+
+FString AAbilityVitalityBase::GetHeadInfo() const
+{
+	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
+}
+
+UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }

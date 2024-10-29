@@ -265,6 +265,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EInputMode WidgetInputMode;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	bool bWidgetAutoFocus;
+
 	UPROPERTY(Transient)
 	EScreenWidgetState WidgetState;
 

@@ -37,7 +37,7 @@ class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnIn
 	friend class UAbilityPawnState_Spawn;
 
 public:
-	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	AAbilityPawnBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -105,6 +105,15 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
+public:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
@@ -127,6 +136,25 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	int32 Level;
+
+public:
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
 	template<class T>
@@ -188,10 +216,10 @@ public:
 	
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetNameV() const override { return Name; }
+	virtual FName GetNameA() const override { return Name; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNameV(FName InName) override { Name = InName; }
+	virtual void SetNameA(FName InName) override { Name = InName; }
 	
 	UFUNCTION(BlueprintPure)
 	virtual FName GetRaceID() const override { return RaceID; }
@@ -213,31 +241,4 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-			
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
-
-public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
-	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

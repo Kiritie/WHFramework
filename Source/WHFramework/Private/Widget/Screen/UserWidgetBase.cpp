@@ -20,6 +20,7 @@
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
+
 	WidgetType = EWidgetType::Permanent;
 	WidgetName = NAME_None;
 	ParentName = NAME_None;
@@ -43,6 +44,8 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetState = EScreenWidgetState::None;
 	WidgetParams = TArray<FParameter>();
 	WidgetInputMode = EInputMode::None;
+	bWidgetAutoFocus = false;
+
 	OwnerObject = nullptr;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;
@@ -418,7 +421,7 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
 
-	if(IsFocusable())
+	if(bWidgetAutoFocus)
 	{
 		SetFocus();
 	}

@@ -15,7 +15,7 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	AbilityClass = nullptr;
 	PickUpClass = nullptr;
 
-	IconBak = nullptr;
+	InitIcon = nullptr;
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Ability/Materials/M_ItemIcon.M_ItemIcon'"));
 	if(IconSourceMatFinder.Succeeded())
@@ -28,24 +28,29 @@ void UAbilityItemDataBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	IconBak = Icon;
+	InitIcon = Icon;
 }
 
 void UAbilityItemDataBase::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 
-	Icon = IconBak;
+	Icon = InitIcon;
+}
+
+int32 UAbilityItemDataBase::ClampCount(int32 InCount) const
+{
+	return FMath::Clamp(InCount, 0, MaxCount != -1 ? MaxCount : InCount);
+}
+
+int32 UAbilityItemDataBase::ClampLevel(int32 InLevel) const
+{
+	return FMath::Clamp(InLevel, 0, MaxLevel != -1 ? MaxLevel : InLevel);
 }
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
 	return (EAbilityItemType)UCommonStatics::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
-}
-
-int32 UAbilityItemDataBase::GetClampedLevel(int32 InLevel) const
-{
-	return FMath::Clamp(InLevel, 0, MaxLevel != -1 ? MaxLevel : InLevel);
 }
 
 void UAbilityItemDataBase::SetIconByTexture_Implementation(UTexture* InTexture, FVector2D InSize, int32 InIndex)

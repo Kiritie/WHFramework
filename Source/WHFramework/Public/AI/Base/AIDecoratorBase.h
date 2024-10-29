@@ -13,7 +13,10 @@ class AAIControllerBase;
 UCLASS()
 class WHFRAMEWORK_API UAIDecoratorBase : public UBTDecorator
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAIDecoratorBase(const FObjectInitializer& ObjectInitializer);
 	
 protected:
 	virtual bool InitDecorator(UBehaviorTreeComponent& OwnerComp);

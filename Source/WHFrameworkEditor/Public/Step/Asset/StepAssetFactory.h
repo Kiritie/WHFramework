@@ -10,5 +10,8 @@
 UCLASS(hidecategories=Object, MinimalAPI)
 class UStepAssetFactory : public UAssetFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UStepAssetFactory(const FObjectInitializer& ObjectInitializer);
 };

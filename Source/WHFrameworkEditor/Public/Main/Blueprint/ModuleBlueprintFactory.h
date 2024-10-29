@@ -9,5 +9,8 @@
 UCLASS(HideCategories=Object, MinimalAPI)
 class UModuleBlueprintFactory : public UBlueprintFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UModuleBlueprintFactory(const FObjectInitializer& ObjectInitializer);
 };

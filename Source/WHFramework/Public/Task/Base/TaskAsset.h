@@ -13,7 +13,10 @@ class UTaskBase;
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UTaskAsset : public UAssetBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UTaskAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual void Initialize(UAssetBase* InSource) override;

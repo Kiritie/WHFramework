@@ -11,7 +11,10 @@
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UAssetBase : public UObject
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAssetBase(const FObjectInitializer& ObjectInitializer);
 
 public:
 	#if WITH_EDITORONLY_DATA

@@ -5,7 +5,6 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "AI/AIModuleTypes.h"
-#include "Common/CommonTypes.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "AIBlackboardBase.generated.h"
 

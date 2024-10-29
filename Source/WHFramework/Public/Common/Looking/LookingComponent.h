@@ -20,10 +20,9 @@ UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class WHFRAMEWORK_API ULookingComponent : public UActorComponent
 {
 	GENERATED_BODY()
-
+	
 public:
-	// Sets default values for this component's properties
-	ULookingComponent();
+	ULookingComponent(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	// Called when the game starts

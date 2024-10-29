@@ -14,7 +14,10 @@
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UModuleBlueprint : public UBlueprint
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UModuleBlueprint(const FObjectInitializer& ObjectInitializer);
 
 #if WITH_EDITOR
 

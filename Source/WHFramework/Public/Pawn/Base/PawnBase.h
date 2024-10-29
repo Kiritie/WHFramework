@@ -26,7 +26,7 @@ class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IW
 	GENERATED_BODY()
 	
 public:
-	APawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	APawnBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool

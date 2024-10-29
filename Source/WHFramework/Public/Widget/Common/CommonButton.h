@@ -136,7 +136,10 @@ private:
 UCLASS(Experimental)	// "Experimental" to hide it in the designer
 class WHFRAMEWORK_API UCommonButtonInternalN : public UCommonButtonInternalBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UCommonButtonInternalN(const FObjectInitializer& ObjectInitializer);
 
 public:
 	void SetButtonEnabled(bool bInIsButtonEnabled);

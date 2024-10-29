@@ -58,9 +58,9 @@ void UCharacterModule::OnInitialize()
 
 	for(auto Iter : Characters)
 	{
-		if(Iter && !CharacterMap.Contains(Iter->GetNameC()))
+		if(Iter && !CharacterMap.Contains(Iter->GetNameP()))
 		{
-			CharacterMap.Add(Iter->GetNameC(), Iter);
+			CharacterMap.Add(Iter->GetNameP(), Iter);
 		}
 	}
 }
@@ -123,7 +123,7 @@ FSaveData* UCharacterModule::ToData()
 
 FString UCharacterModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameC().ToString() : TEXT("None"));
+	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameP().ToString() : TEXT("None"));
 }
 
 void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
@@ -131,9 +131,9 @@ void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 	if(!Characters.Contains(InCharacter))
 	{
 		Characters.Add(InCharacter);
-		if(!CharacterMap.Contains(InCharacter->GetNameC()))
+		if(!CharacterMap.Contains(InCharacter->GetNameP()))
 		{
-			CharacterMap.Add(InCharacter->GetNameC(), InCharacter);
+			CharacterMap.Add(InCharacter->GetNameP(), InCharacter);
 		}
 	}
 }
@@ -143,9 +143,9 @@ void UCharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 	if(Characters.Contains(InCharacter))
 	{
 		Characters.Remove(InCharacter);
-		if(CharacterMap.Contains(InCharacter->GetNameC()))
+		if(CharacterMap.Contains(InCharacter->GetNameP()))
 		{
-			CharacterMap.Remove(InCharacter->GetNameC());
+			CharacterMap.Remove(InCharacter->GetNameP());
 		}
 	}
 }
@@ -199,7 +199,7 @@ bool UCharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) 
 {
 	if(!InClass) return false;
 	
-	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return HasCharacterByName(CharacterName);
 }
 
@@ -222,7 +222,7 @@ ACharacterBase* UCharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase
 {
 	if(!InClass) return nullptr;
 	
-	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return GetCharacterByName(CharacterName);
 }
 
@@ -230,7 +230,7 @@ ACharacterBase* UCharacterModule::GetCharacterByName(FName InName) const
 {
 	for (auto Iter : Characters)
 	{
-		if(Iter->GetNameC() == InName)
+		if(Iter->GetNameP() == InName)
 		{
 			return Iter;
 		}

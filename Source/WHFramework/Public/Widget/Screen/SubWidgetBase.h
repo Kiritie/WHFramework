@@ -28,6 +28,15 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+protected:
+	UPROPERTY(EditDefaultsOnly)
+	bool bWidgetTickAble;
+
+public:
+	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
+
+	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
 	void K2_OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);

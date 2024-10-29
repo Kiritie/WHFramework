@@ -24,10 +24,16 @@ public:
 
 	virtual void RefreshAttributes();
 
+	virtual void ModifyExp(float InDeltaValue) = 0;
+
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) = 0;
 	
 public:
+	virtual FName GetNameA() const = 0;
+
+	virtual void SetNameA(FName InName) = 0;
+
 	virtual int32 GetLevelA() const = 0;
 
 	virtual bool SetLevelA(int32 InLevel) = 0;
@@ -41,5 +47,5 @@ public:
 	virtual UShapeComponent* GetCollisionComponent() const = 0;
 
 private:
-	bool bAbilityInitialized = false;
+	bool bAbilitiesInitialized = false;
 };

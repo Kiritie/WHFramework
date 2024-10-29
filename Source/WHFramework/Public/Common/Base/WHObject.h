@@ -17,6 +17,8 @@ class WHFRAMEWORK_API UWHObject : public UObject, public IObjectPoolInterface
 public:
 	UWHObject();
 
+	UWHObject(const FObjectInitializer& ObjectInitializer);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:

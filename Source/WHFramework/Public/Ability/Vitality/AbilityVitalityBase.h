@@ -14,7 +14,6 @@
 
 class UFSMComponent;
 class UInteractionComponent;
-class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
@@ -27,10 +26,13 @@ class UAbilityVitalityInventoryBase;
 UCLASS()
 class WHFRAMEWORK_API AAbilityVitalityBase : public AAbilityActorBase, public IAbilityVitalityInterface, public IFSMAgentInterface, public IVoxelAgentInterface
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
 	friend class UAbilityVitalityState_Death;
 	friend class UAbilityVitalityState_Spawn;
+
+public:
+	AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -84,19 +86,43 @@ public:
 
 	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	
+	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
+	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FName Name;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FName RaceID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FPrimaryAssetId GenerateVoxelID;
+
+public:
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
 	template<class T>
@@ -124,19 +150,17 @@ public:
 	virtual bool IsDying() const override;
 
 public:
-	virtual int32 GetLevelA() const override { return Level; }
-
-	virtual bool SetLevelA(int32 InLevel) override;
+	virtual FName GetNameA() const override { return Super::GetNameA(); }
+	
+	virtual void SetNameA(FName InName) override { Super::SetNameA(InName); }
+	
+	virtual int32 GetLevelA() const override { return Super::GetLevelA(); }
+	
+	virtual bool SetLevelA(int32 InLevel) override { return Super::SetLevelA(InLevel); }
 	
 	virtual float GetRadius() const override { return Super::GetRadius(); }
 
 	virtual float GetHalfHeight() const override { return Super::GetRadius(); }
-	
-	UFUNCTION(BlueprintPure)
-	virtual FName GetNameV() const override { return Name; }
-
-	UFUNCTION(BlueprintCallable)
-	virtual void SetNameV(FName InName) override { Name = InName; }
 	
 	UFUNCTION(BlueprintPure)
 	virtual FName GetRaceID() const override { return RaceID; }
@@ -164,32 +188,4 @@ public:
 	}
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return Super::GetAbilitySystemComponent(); }
-
-public:
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
-
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
-
-public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
-	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
-
-	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 };

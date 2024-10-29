@@ -186,7 +186,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetNameV(SaveData.Name);
+		SetNameA(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
 		SetLevelA(SaveData.Level);
 	
@@ -429,6 +429,63 @@ void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 }
 
+void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
+{
+	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
+	
+	if(InAttributeChangeData.Attribute == GetExpAttribute())
+	{
+		if(InAttributeChangeData.NewValue >= GetMaxExp())
+		{
+			SetLevelA(GetLevelA() + 1);
+			SetExp(0.f);
+		}
+	}
+	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
+	{
+		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
+	}
+	else if(InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
+	{
+		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
+		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
+	}
+	else if(InAttributeChangeData.Attribute == GetJumpForceAttribute())
+	{
+		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
+	}
+}
+
+void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(-LocalDamageDone);
+
+	if(GetHealth() <= 0.f)
+	{
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
+	}
+
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityCharacterBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(LocalRecoveryDone);
+	
+	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+}
+
+void AAbilityCharacterBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+}
+
 UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystem;
@@ -499,7 +556,7 @@ bool AAbilityCharacterBase::IsJumping() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Jumping);
 }
 
-void AAbilityCharacterBase::SetNameV(FName InName)
+void AAbilityCharacterBase::SetNameA(FName InName)
 {
 	Name = InName;
 }
@@ -512,7 +569,7 @@ void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 {
 	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
-	InLevel = CharacterData.GetClampedLevel(InLevel);
+	InLevel = CharacterData.ClampLevel(InLevel);
 
 	if(Level != InLevel)
 	{
@@ -564,63 +621,6 @@ void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, f
 	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
 	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed() * RotationRate, 0);
 	Looking->LookingRotationSpeed = GetRotationSpeed() * RotationRate;
-}
-
-void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
-{
-	const float DeltaValue = InAttributeChangeData.NewValue - InAttributeChangeData.OldValue;
-	
-	if(InAttributeChangeData.Attribute == GetExpAttribute())
-	{
-		if(InAttributeChangeData.NewValue >= GetMaxExp())
-		{
-			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
-		}
-	}
-	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
-	{
-		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
-	}
-	else if(InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
-	{
-		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
-		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
-	}
-	else if(InAttributeChangeData.Attribute == GetJumpForceAttribute())
-	{
-		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
-	}
-}
-
-void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(-LocalDamageDone);
-
-	if(GetHealth() <= 0.f)
-	{
-		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
-		{
-			SourceVitality->Kill(this);
-		}
-		else
-		{
-			Death(nullptr);
-		}
-	}
-
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), IsPlayer() ? FColor::Red : FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityCharacterBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(LocalRecoveryDone);
-	
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityCharacterBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
 }
 
 bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const

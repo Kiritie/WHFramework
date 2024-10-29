@@ -9,6 +9,11 @@ UWHObject::UWHObject()
 	
 }
 
+UWHObject::UWHObject(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+}
+
 void UWHObject::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
