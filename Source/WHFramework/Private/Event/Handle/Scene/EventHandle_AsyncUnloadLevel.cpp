@@ -5,6 +5,7 @@
 
 UEventHandle_AsyncUnloadLevel::UEventHandle_AsyncUnloadLevel()
 {
+	LevelObjectPtr = nullptr;
 	LevelPath = NAME_None;
 	FinishDelayTime = 1.f;
 	bCreateLoadingWidget = false;
@@ -18,19 +19,23 @@ void UEventHandle_AsyncUnloadLevel::Parse_Implementation(const TArray<FParameter
 {
 	if(InParams.IsValidIndex(0))
 	{
-		LevelPath = InParams[0];
+		LevelObjectPtr = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		FinishDelayTime = InParams[1];
+		LevelPath = InParams[1];
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		bCreateLoadingWidget = InParams[2];
+		FinishDelayTime = InParams[2];
+	}
+	if(InParams.IsValidIndex(3))
+	{
+		bCreateLoadingWidget = InParams[3];
 	}
 }
 
 TArray<FParameter> UEventHandle_AsyncUnloadLevel::Pack_Implementation()
 {
-	return TArray<FParameter>{ LevelPath, FinishDelayTime, bCreateLoadingWidget };
+	return TArray<FParameter>{ LevelObjectPtr, LevelPath, FinishDelayTime, bCreateLoadingWidget };
 }

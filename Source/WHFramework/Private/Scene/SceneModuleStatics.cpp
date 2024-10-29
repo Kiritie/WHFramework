@@ -95,14 +95,24 @@ void USceneModuleStatics::RemoveTraceMapping(const FName InName)
 	USceneModule::Get().RemoveTraceMapping(InName);
 }
 
-void USceneModuleStatics::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& OnAsyncLoadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncLoadLevel(InLevelPath, OnAsyncLoadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
+	USceneModule::Get().AsyncLoadLevel(InLevelPath, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
 }
 
-void USceneModuleStatics::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncUnloadLevel(InLevelPath, InOnAsyncUnloadLevelFinished, InFinishDelayTime, bCreateLoadingWidget);
+	USceneModule::Get().AsyncLoadLevelByObjectPtr(InLevelObjectPtr, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
+}
+
+void USceneModuleStatics::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	USceneModule::Get().AsyncUnloadLevel(InLevelPath, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
+}
+
+void USceneModuleStatics::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+{
+	USceneModule::Get().AsyncUnloadLevelByObjectPtr(InLevelObjectPtr, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
 }
 
 float USceneModuleStatics::GetAsyncLoadLevelProgress(const FName InLevelPath)
@@ -110,9 +120,19 @@ float USceneModuleStatics::GetAsyncLoadLevelProgress(const FName InLevelPath)
 	return USceneModule::Get().GetAsyncLoadLevelProgress(InLevelPath);
 }
 
+float USceneModuleStatics::GetAsyncLoadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr)
+{
+	return USceneModule::Get().GetAsyncLoadLevelProgressByObjectPtr(InLevelObjectPtr);
+}
+
 float USceneModuleStatics::GetAsyncUnloadLevelProgress(const FName InLevelPath)
 {
 	return USceneModule::Get().GetAsyncUnloadLevelProgress(InLevelPath);
+}
+
+float USceneModuleStatics::GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr)
+{
+	return USceneModule::Get().GetAsyncUnloadLevelProgressByObjectPtr(InLevelObjectPtr);
 }
 
 bool USceneModuleStatics::HasSceneActor(const FString& InID, bool bEnsured)

@@ -10,6 +10,7 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_StopLevelSequence;
 class UEventHandle_AsyncUnloadLevel;
 class UEventHandle_AsyncLoadLevel;
 class UEventHandle_PlayLevelSequence;
@@ -180,7 +181,10 @@ protected:
 	
 	UFUNCTION()
 	void OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle);
-	
+		
+	UFUNCTION()
+	void OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevelSequence* InEventHandle);
+
 	UFUNCTION()
 	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
 	
@@ -334,22 +338,34 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncLoadLevelFinished"))
-	void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"))
+	void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncUnloadLevelFinished"))
-	void AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"))
+	void AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnUnloadFinished"))
+	void AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnUnloadFinished"))
+	void AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
 	UFUNCTION(BlueprintPure)
 	float GetAsyncLoadLevelProgress(const FName InLevelPath) const;
 
 	UFUNCTION(BlueprintPure)
+	float GetAsyncLoadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const;
+
+	UFUNCTION(BlueprintPure)
 	float GetAsyncUnloadLevelProgress(const FName InLevelPath) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const;
 
 protected:
 	UFUNCTION()
-	void OnAsyncLoadLevelFinished(const FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished, bool bDestroyLoadingWidget);
+	void OnAsyncLoadLevelFinished(const FName InLevelPath, const FOnAsyncLoadLevelFinished InOnLoadFinished, bool bDestroyLoadingWidget);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(const FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished, bool bDestroyLoadingWidget);
+	void OnAsyncUnloadLevelFinished(const FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnUnloadFinished, bool bDestroyLoadingWidget);
 };

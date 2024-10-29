@@ -27,6 +27,9 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UWorld> LevelObjectPtr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "!LevelObjectPtr.IsValid()"))
 	FName LevelPath;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

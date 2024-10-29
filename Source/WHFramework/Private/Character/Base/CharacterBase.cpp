@@ -111,18 +111,18 @@ void ACharacterBase::OnInitialize_Implementation()
 
 	Execute_SetActorVisible(this, bVisible);
 
+	USceneModuleStatics::AddSceneActor(this);
+
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
 void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+	
 }
 
 void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
 		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
@@ -138,7 +138,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation(InPhase);
+	USceneModuleStatics::RemoveSceneActor(this);
 }
 
 void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)

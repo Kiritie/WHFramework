@@ -7,6 +7,7 @@
 #include "Common/CommonStatics.h"
 #include "Scene/SceneManager.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "Widget/World/WorldWidgetActor.h"
 
 UWorldWidgetComponent::UWorldWidgetComponent()
 {
