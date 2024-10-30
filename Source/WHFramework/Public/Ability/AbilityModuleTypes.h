@@ -9,6 +9,7 @@
 
 #include "AbilityModuleTypes.generated.h"
 
+class UPawnActionAbilityBase;
 class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
@@ -317,110 +318,6 @@ public:
     void AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors);
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityInfo
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FGameplayAttribute CostAttribute;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float CostValue;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float CooldownDuration;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	float CooldownRemaining;
-
-public:
-	FORCEINLINE FAbilityInfo()
-	{
-		CostAttribute = FGameplayAttribute();
-		CostValue = 0.f;
-		CooldownDuration = -1.f;
-		CooldownRemaining = 0.f;
-	}
-
-	FORCEINLINE bool IsCooldownning() const
-	{
-		return CooldownRemaining > 0.f;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FCooldownInfo
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	float TotalTime;
-
-	UPROPERTY(BlueprintReadOnly)
-	float RemainTime;
-
-	UPROPERTY(BlueprintReadOnly)
-	bool bCooldowning;
-
-	FCooldownInfo()
-	{
-		TotalTime = 0.f;
-		RemainTime = 0.f;
-		bCooldowning = false;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityData : public FDataTableRowBase
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 AbilityLevel;
-
-	FGameplayAbilitySpecHandle AbilityHandle;
-
-public:
-	FAbilityData()
-	{
-		AbilityLevel = 1;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-
-	virtual bool IsValid() const override
-	{
-		return AbilityHandle.IsValid();
-	}
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemData : public FAbilityData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FPrimaryAssetId AbilityID;
-
-	FORCEINLINE FAbilityItemData()
-	{
-		AbilityID = FPrimaryAssetId();
-	}
-
-public:
-	template<class T>
-	T& GetItemData() const
-	{
-		return static_cast<T&>(GetItemData());
-	}
-
-	UAbilityItemDataBase& GetItemData() const;
-};
-
 /**
  * 伤害类型
  */
@@ -666,6 +563,113 @@ public:
 	TArray<FAbilityItem> Items;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level;
+	
+	FGameplayAbilitySpecHandle AbilityHandle;
+
+public:
+	FAbilityData()
+	{
+		ID = FPrimaryAssetId();
+		Level = 1;
+		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+
+	virtual bool IsValid() const override
+	{
+		return AbilityHandle.IsValid();
+	}
+
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+
+	UPrimaryAssetBase& GetData() const;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPawnAbilityActionData : public FAbilityData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UPawnActionAbilityBase> AbilityClass;
+
+	FORCEINLINE FPawnAbilityActionData()
+	{
+		AbilityClass = nullptr;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGameplayAttribute CostAttribute;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float CostValue;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float CooldownDuration;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float CooldownRemaining;
+
+public:
+	FORCEINLINE FAbilityInfo()
+	{
+		CostAttribute = FGameplayAttribute();
+		CostValue = 0.f;
+		CooldownDuration = -1.f;
+		CooldownRemaining = 0.f;
+	}
+
+	FORCEINLINE bool IsCooldownning() const
+	{
+		return CooldownRemaining > 0.f;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FCooldownInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	float TotalTime;
+
+	UPROPERTY(BlueprintReadOnly)
+	float RemainTime;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bCooldowning;
+
+	FCooldownInfo()
+	{
+		TotalTime = 0.f;
+		RemainTime = 0.f;
+		bCooldowning = false;
+	}
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryRefresh);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlotBase*, InInventorySlot);
@@ -844,7 +848,7 @@ public:
 	
 	virtual void FillItems(int32 InLevel);
 
-	virtual void CopyItems(FInventorySaveData SaveData);
+	virtual void CopyItems(const FInventorySaveData& InSaveData);
 
 	virtual void AddItem(FAbilityItem InItem);
 
@@ -1004,6 +1008,7 @@ public:
 		Name = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
+		BirthTransform = FTransform::Identity;
 	}
 
 	FORCEINLINE FActorSaveData(const FSceneActorSaveData& InSceneActorSaveData) : FSceneActorSaveData(InSceneActorSaveData)
@@ -1012,6 +1017,7 @@ public:
 		Name = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
+		BirthTransform = FTransform::Identity;
 	}
 
 public:
@@ -1023,9 +1029,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
-		
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FInventorySaveData InventoryData;
+
+	UPROPERTY()
+	FTransform BirthTransform;
 
 public:
 	virtual void MakeSaved() override
@@ -1036,12 +1045,12 @@ public:
 	}
 
 	template<class T>
-	T& GetItemData() const
+	T& GetData() const
 	{
-		return static_cast<T&>(GetItemData());
+		return static_cast<T&>(GetData());
 	}
 
-	UAbilityItemDataBase& GetItemData() const;
+	UPrimaryAssetBase& GetData() const;
 };
 
 USTRUCT(BlueprintType)
@@ -1073,11 +1082,17 @@ struct WHFRAMEWORK_API FPawnSaveData : public FVitalitySaveData
 public:
 	FORCEINLINE FPawnSaveData()
 	{
+		ActionAbilities = TMap<FGameplayTag, FPawnAbilityActionData>();
 	}
 
 	FORCEINLINE FPawnSaveData(const FVitalitySaveData& InVitalitySaveData) : FVitalitySaveData(InVitalitySaveData)
 	{
+		ActionAbilities = TMap<FGameplayTag, FPawnAbilityActionData>();
 	}
+
+public:
+	UPROPERTY()
+	TMap<FGameplayTag, FPawnAbilityActionData> ActionAbilities;
 };
 
 USTRUCT(BlueprintType)

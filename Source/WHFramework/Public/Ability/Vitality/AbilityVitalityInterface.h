@@ -21,14 +21,28 @@ public:
 	virtual void Kill(IAbilityVitalityInterface* InTarget) = 0;
 	
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) = 0;
-	
+
+	virtual void Static() = 0;
+
+	virtual void UnStatic() = 0;
+
+	virtual void Interrupt(float InDuration = -1.f) = 0;
+
+	virtual void UnInterrupt() = 0;
+
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 
 public:
+	virtual bool IsActive(bool bNeedNotDead = false) const = 0;
+
 	virtual bool IsDead(bool bCheckDying = true) const = 0;
 	
 	virtual bool IsDying() const = 0;
 	
+	virtual bool IsWalking(bool bReally = false) const = 0;
+	
+	virtual bool IsInterrupting() const = 0;
+
 public:
 	virtual FName GetRaceID() const = 0;
 

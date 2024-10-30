@@ -5,13 +5,14 @@
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Common/Looking/LookingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "FSM/Components/FSMComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Spawn::UAbilityCharacterState_Spawn()
 {
-	StateName = FName("Default");
+	StateName = FName("Spawn");
 }
 
 void UAbilityCharacterState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -30,7 +31,11 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->DoAction(GameplayTags::Ability_Pawn_Action_Spawn);
+
+	Character->LimitToAnim();
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -39,6 +44,8 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 	Character->Execute_SetActorVisible(Character, true);
 	Character->ResetData();
 	Character->SetMotionRate(1.f, 1.f);
+
+	Character->GetLooking()->TargetLookingOff();
 }
 
 void UAbilityCharacterState_Spawn::OnRefresh(float DeltaSeconds)
@@ -54,7 +61,9 @@ void UAbilityCharacterState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->FreeToAnim();
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);

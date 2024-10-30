@@ -12,6 +12,8 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Interrupt.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Static.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>("AttributeSet").
@@ -23,8 +25,10 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->DefaultState = UAbilityVitalityState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityVitalityState_Death::StaticClass();
 
-	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Interrupt::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Static::StaticClass());
 
 	// stats
 	RaceID = NAME_None;
@@ -97,6 +101,32 @@ void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
 	FSM->SwitchDefaultState();
+}
+
+void AAbilityVitalityBase::Static()
+{
+	FSM->SwitchStateByClass<UAbilityVitalityState_Static>();
+}
+
+void AAbilityVitalityBase::UnStatic()
+{
+	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Static>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityVitalityBase::Interrupt(float InDuration /*= -1*/)
+{
+	FSM->SwitchStateByClass<UAbilityVitalityState_Interrupt>({ InDuration });
+}
+
+void AAbilityVitalityBase::UnInterrupt()
+{
+	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Interrupt>())
+	{
+		FSM->SwitchState(nullptr);
+	}
 }
 
 bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
@@ -206,6 +236,11 @@ void AAbilityVitalityBase::HandleInterrupt(const float InterruptDuration, FHitRe
 {
 }
 
+bool AAbilityVitalityBase::IsActive(bool bNeedNotDead) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+}
+
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
@@ -214,6 +249,16 @@ bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 bool AAbilityVitalityBase::IsDying() const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
+}
+
+bool AAbilityVitalityBase::IsWalking(bool bReally) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Walking);
+}
+
+bool AAbilityVitalityBase::IsInterrupting() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Interrupting);
 }
 
 FString AAbilityVitalityBase::GetHeadInfo() const

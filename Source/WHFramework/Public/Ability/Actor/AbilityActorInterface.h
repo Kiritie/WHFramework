@@ -42,6 +42,10 @@ public:
 
 	virtual float GetHalfHeight() const = 0;
 
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const = 0;
+
+	virtual FTransform GetBirthTransform() const = 0;
+
 	virtual UAttributeSetBase* GetAttributeSet() const = 0;
 
 	virtual UShapeComponent* GetCollisionComponent() const = 0;

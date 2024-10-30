@@ -14,11 +14,16 @@ class WHFRAMEWORK_API IAbilityHitterInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool CanHitTarget(AActor* InTarget) const = 0;
+	virtual bool CanHitTarget(AActor* InTarget) const { return true; }
 
-	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) = 0;
-	
-	virtual void ClearHitTargets() = 0;
+	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) { }
+
+public:
+	virtual bool IsHitAble() const = 0;
 
 	virtual void SetHitAble(bool bValue) = 0;
+
+	virtual void ClearHitTargets() = 0;
+
+	virtual TArray<AActor*> GetHitTargets() const = 0;
 };

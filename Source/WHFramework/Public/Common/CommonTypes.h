@@ -141,19 +141,45 @@ namespace GameplayTags
 
 	////////////////////////////////////////////////////
 	// State_Vitality
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Vitality_Active);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Vitality_Dead);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Vitality_Dying);
-		
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Vitality_Walking);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Vitality_Interrupting);
+
 	////////////////////////////////////////////////////
 	// State_Pawn
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Pawn_Active);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Pawn_Moving);
 
 	////////////////////////////////////////////////////
 	// State_Character
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_FreeToAnim);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Animating);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Falling);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Walking);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Jumping);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Crouching);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Swimming);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Floating);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Climbing);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Flying);
+
+	////////////////////////////////////////////////////
+	// Ability_Pawn_Action
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Death);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Spawn);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Static);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Walk);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Interrupt);
+
+	////////////////////////////////////////////////////
+	// Ability_Character_Action
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Jump);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Fall);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Crouch);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Swim);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Float);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Climb);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Character_Action_Fly);
 
 	////////////////////////////////////////////////////
 	// Event_Hit

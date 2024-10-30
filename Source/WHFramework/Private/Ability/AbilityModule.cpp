@@ -169,7 +169,7 @@ AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf
 AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetData<UAbilityActorDataBase>().Class))
 	{
 		Cast<ISaveDataAgentInterface>(Actor)->LoadSaveData(InSaveData);
 		if(InContainer)

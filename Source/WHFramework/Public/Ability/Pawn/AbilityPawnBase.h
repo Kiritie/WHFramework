@@ -7,7 +7,6 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "FSM/Base/FSMAgentInterface.h"
-#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Common/Targeting/TargetingAgentInterface.h"
@@ -79,10 +78,28 @@ public:
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
 
+	UFUNCTION(BlueprintCallable)
 	virtual void Static() override;
 
+	UFUNCTION(BlueprintCallable)
 	virtual void UnStatic() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Interrupt(float InDuration = -1.f) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnInterrupt() override;
 	
+	UFUNCTION(BlueprintCallable)
+	virtual bool DoAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool StopAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
+
+public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
@@ -131,11 +148,22 @@ protected:
 	UFSMComponent* FSM;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	FName RaceID;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	int32 Level;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
+	FTransform BirthTransform;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
+	float MovementRate;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
+	float RotationRate;
+
+	TMap<FGameplayTag, FPawnAbilityActionData> ActionAbilities;
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -200,8 +228,6 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
-
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive(bool bNeedNotDead = false) const override;
 	
@@ -212,8 +238,16 @@ public:
 	virtual bool IsDying() const override;
 
 	UFUNCTION(BlueprintPure)
+	virtual bool IsWalking(bool bReally = false) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsInterrupting() const override;
+
+	UFUNCTION(BlueprintPure)
 	virtual bool IsMoving() const override;
 	
+	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
+
 public:
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameA() const override { return Name; }
@@ -241,4 +275,25 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
+
+	UFUNCTION(BlueprintPure)
+	virtual void GetMotionRate(float& OutMovementRate, float& OutRotationRate) override;
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetMotionRate(float InMovementRate, float InRotationRate) override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FPawnAbilityActionData GetActionAbility(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TMap<FGameplayTag, FPawnAbilityActionData>& GetActionAbilities() override { return ActionAbilities; }
 };

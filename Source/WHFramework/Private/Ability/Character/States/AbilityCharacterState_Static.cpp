@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -31,7 +30,11 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->DoAction(GameplayTags::Ability_Pawn_Action_Static);
+
+	Character->LimitToAnim();
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -54,7 +57,11 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->StopAction(GameplayTags::Ability_Pawn_Action_Static);
+
+	Character->FreeToAnim();
 
 	Character->GetCharacterMovement()->SetActive(true);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);

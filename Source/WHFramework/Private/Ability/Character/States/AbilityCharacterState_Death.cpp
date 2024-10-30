@@ -4,11 +4,12 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Components/CapsuleComponent.h"
+#include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Common/Looking/LookingComponent.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -53,6 +54,9 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 
 	Character->SetExp(0.f);
 	Character->SetHealth(0.f);
+
+	Character->GetLooking()->TargetLookingOff();
+	Character->LimitToAnim();
 }
 
 void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
@@ -78,6 +82,8 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+
+	Character->StopAction(GameplayTags::Ability_Pawn_Action_Death);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -94,6 +100,8 @@ void UAbilityCharacterState_Death::DeathStart()
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
+
+	Character->DoAction(GameplayTags::Ability_Pawn_Action_Death);
 }
 
 void UAbilityCharacterState_Death::DeathEnd()
@@ -102,4 +110,17 @@ void UAbilityCharacterState_Death::DeathEnd()
 	
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+
+	Character->StopAction(GameplayTags::Ability_Pawn_Action_Death);
+
+	Character->Inventory->DiscardItems();
+
+	if(!Character->IsPlayer())
+	{
+		UObjectPoolModuleStatics::DespawnObject(Character);
+	}
+	else
+	{
+		Character->Execute_SetActorVisible(Character, false);
+	}
 }

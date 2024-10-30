@@ -43,7 +43,7 @@ public:
 
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
 	
-	virtual void ClearHitTargets() override;
+	virtual bool IsHitAble() const override;
 
 	virtual void SetHitAble(bool bValue) override;
 

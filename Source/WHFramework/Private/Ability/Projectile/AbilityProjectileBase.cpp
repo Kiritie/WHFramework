@@ -124,14 +124,24 @@ void AAbilityProjectileBase::OnHitTarget(AActor* InTarget, const FHitResult& InH
 	ApplyEffectContainer(HitEventTag, EventData, -1);
 }
 
-void AAbilityProjectileBase::ClearHitTargets()
+bool AAbilityProjectileBase::IsHitAble() const
 {
-	HitTargets.Empty();
+	return true;
 }
 
 void AAbilityProjectileBase::SetHitAble(bool bValue)
 {
 
+}
+
+void AAbilityProjectileBase::ClearHitTargets()
+{
+	HitTargets.Empty();
+}
+
+TArray<AActor*> AAbilityProjectileBase::GetHitTargets() const
+{
+	return HitTargets;
 }
 
 FGameplayEffectContainerSpec AAbilityProjectileBase::MakeEffectContainerSpecFromContainer(const FGameplayEffectContainer& InContainer, const FGameplayEventData& EventData, int32 OverrideGameplayLevel)

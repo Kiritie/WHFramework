@@ -108,11 +108,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats")
 	FPrimaryAssetId AssetID;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
 	FName Name;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
 	int32 Level;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	FTransform BirthTransform;
 
 public:
 	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
@@ -184,4 +187,10 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
 };

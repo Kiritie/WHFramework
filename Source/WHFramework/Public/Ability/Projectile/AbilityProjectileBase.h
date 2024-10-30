@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Ability/Interfaces/AbilityHitterInterface.h"
+#include "Ability/Hitter/AbilityHitterInterface.h"
 #include "Common/Base/WHActor.h"
 #include "AbilityProjectileBase.generated.h"
 
@@ -49,10 +49,14 @@ public:
 	virtual bool CanHitTarget(AActor* InTarget) const override;
 
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
-	
-	virtual void ClearHitTargets() override;
+
+	virtual bool IsHitAble() const override;
 
 	virtual void SetHitAble(bool bValue) override;
+
+	virtual void ClearHitTargets() override;
+
+	virtual TArray<AActor*> GetHitTargets() const override;
 
 protected:
 	FGameplayEffectContainerSpec MakeEffectContainerSpecFromContainer(const FGameplayEffectContainer& InContainer, const FGameplayEventData& EventData, int32 OverrideGameplayLevel);

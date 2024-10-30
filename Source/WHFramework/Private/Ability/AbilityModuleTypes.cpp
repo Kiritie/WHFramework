@@ -75,11 +75,6 @@ void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor,
 	}
 }
 
-UAbilityItemDataBase& FAbilityItemData::GetItemData() const
-{
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
-}
-
 bool FGameplayEffectContainerSpec::HasValidTargets() const
 {
 	return TargetGameplayEffectSpecs.Num() > 0;
@@ -113,6 +108,11 @@ void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResul
 EAbilityItemType FAbilityItem::GetType() const
 {
 	return GetData().GetItemType();
+}
+
+UPrimaryAssetBase& FAbilityData::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);
 }
 
 FAbilityItems FInventorySlots::GetItems()
@@ -166,9 +166,9 @@ void FInventorySaveData::FillItems(int32 InLevel)
 	}
 }
 
-void FInventorySaveData::CopyItems(FInventorySaveData SaveData)
+void FInventorySaveData::CopyItems(const FInventorySaveData& InSaveData)
 {
-	SplitItems = SaveData.SplitItems;
+	SplitItems = InSaveData.SplitItems;
 }
 
 void FInventorySaveData::AddItem(FAbilityItem InItem)
@@ -186,7 +186,7 @@ void FInventorySaveData::RemoveItem(FAbilityItem InItem)
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
-	Inventory.RemoveItemByRange(InItem, 0, -1);
+	Inventory.RemoveItemByRange(InItem, 0, -1, false);
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
@@ -211,7 +211,7 @@ void FInventorySaveData::ClearItems()
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
-UAbilityItemDataBase& FActorSaveData::GetItemData() const
+UPrimaryAssetBase& FActorSaveData::GetData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
 }

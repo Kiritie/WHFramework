@@ -3,13 +3,15 @@
 #include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
 
 #include "Ability/Pawn/AbilityPawnBase.h"
+#include "Ability/Pawn/States/AbilityPawnState_Walk.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/ShapeComponent.h"
+#include "FSM/Components/FSMComponent.h"
 
 UAbilityPawnState_Spawn::UAbilityPawnState_Spawn()
 {
-	StateName = FName("Default");
+	StateName = FName("Spawn");
 }
 
 void UAbilityPawnState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -28,6 +30,10 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Spawn);
+
 	Pawn->ResetData();
 
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -37,6 +43,8 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 void UAbilityPawnState_Spawn::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+
+	TryLeave();
 }
 
 void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
@@ -44,6 +52,10 @@ void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 	Super::OnLeave(InNextState);
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
+
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	
+	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Spawn);
 
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Pawn->GetInteractionComponent()->SetInteractable(true);
@@ -57,4 +69,9 @@ void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 void UAbilityPawnState_Spawn::OnTermination()
 {
 	Super::OnTermination();
+}
+
+void UAbilityPawnState_Spawn::TryLeave()
+{
+	FSM->SwitchStateByClass<UAbilityPawnState_Walk>();
 }

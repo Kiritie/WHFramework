@@ -81,19 +81,45 @@ namespace GameplayTags
 
 	////////////////////////////////////////////////////
 	// State_Vitality
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Vitality_Active, "State.Vitality.Active", "Vitality Active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Vitality_Dead, "State.Vitality.Dead", "Vitality Dead");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Vitality_Dying, "State.Vitality.Dying", "Vitality Dying");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Vitality_Walking, "State.Vitality.Walking", "Vitality Walking");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Vitality_Interrupting, "State.Vitality.Interrupting", "Vitality Interrupting");
 
 	////////////////////////////////////////////////////
 	// State_Pawn
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Pawn_Active, "State.Pawn.Active", "Pawn Active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Pawn_Moving, "State.Pawn.Moving", "Pawn Moving");
 
 	////////////////////////////////////////////////////
 	// State_Character
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_FreeToAnim, "State.Character.FreeToAnim", "Character FreeToAnim");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Animating, "State.Character.Animating", "Character Animating");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Falling, "State.Character.Falling", "Character Falling");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Walking, "State.Character.Walking", "Character Walking");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Jumping, "State.Character.Jumping", "Character Jumping");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Crouching, "State.Character.Crouching", "Character Crouching");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Swimming, "State.Character.Swimming", "Character Swimming");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Floating, "State.Character.Floating", "Character Floating");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Climbing, "State.Character.Climbing", "Character Climbing");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Flying, "State.Character.Flying", "Character Flying");
+
+	////////////////////////////////////////////////////
+	// Ability_Pawn_Action
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Death, "Ability.Pawn.Action.Death", "Pawn Action Death");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Spawn, "Ability.Pawn.Action.Spawn", "Pawn Action Spawn");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Static, "Ability.Pawn.Action.Static", "Pawn Action Static");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Walk, "Ability.Pawn.Action.Walk", "Pawn Action Walk");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Interrupt, "Ability.Pawn.Action.Interrupt", "Pawn Action Interrupt");
+
+	////////////////////////////////////////////////////
+	// Ability_Character_Action
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Jump, "Ability.Character.Action.Jump", "Character Action Jump");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Fall, "Ability.Character.Action.Fall", "Character Action Fall");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Crouch, "Ability.Character.Action.Crouch", "Character Action Crouch");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Swim, "Ability.Character.Action.Swim", "Character Action Swim");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Float, "Ability.Character.Action.Float", "Character Action Float");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Climb, "Ability.Character.Action.Climb", "Character Action Climb");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Character_Action_Fly, "Ability.Character.Action.Fly", "Character Action Fly");
 
 	////////////////////////////////////////////////////
 	// Event_Hit

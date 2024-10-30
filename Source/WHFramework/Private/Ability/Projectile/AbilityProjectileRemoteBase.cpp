@@ -73,14 +73,12 @@ void AAbilityProjectileRemoteBase::OnHitTarget(AActor* InTarget, const FHitResul
 	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
-void AAbilityProjectileRemoteBase::ClearHitTargets()
+bool AAbilityProjectileRemoteBase::IsHitAble() const
 {
-	Super::ClearHitTargets();
+	return SphereComponent->GetGenerateOverlapEvents();
 }
 
 void AAbilityProjectileRemoteBase::SetHitAble(bool bValue)
 {
-	Super::SetHitAble(bValue);
-
 	SphereComponent->SetGenerateOverlapEvents(bValue);
 }

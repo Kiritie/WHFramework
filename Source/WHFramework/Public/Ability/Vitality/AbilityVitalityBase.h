@@ -61,6 +61,19 @@ public:
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
 	
+	UFUNCTION(BlueprintCallable)
+	virtual void Static() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnStatic() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Interrupt(float InDuration = -1.f) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnInterrupt() override;
+
+public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
@@ -144,10 +157,19 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
+	virtual bool IsActive(bool bNeedNotDead = false) const override;
+	
+	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDying() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWalking(bool bReally = false) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsInterrupting() const override;
 
 public:
 	virtual FName GetNameA() const override { return Super::GetNameA(); }
@@ -161,7 +183,11 @@ public:
 	virtual float GetRadius() const override { return Super::GetRadius(); }
 
 	virtual float GetHalfHeight() const override { return Super::GetRadius(); }
-	
+		
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override { return Super::GetDistance(InTargetActor, bIgnoreRadius, bIgnoreZAxis); }
+
+	virtual FTransform GetBirthTransform() const override { return Super::GetBirthTransform(); }
+
 	UFUNCTION(BlueprintPure)
 	virtual FName GetRaceID() const override { return RaceID; }
 

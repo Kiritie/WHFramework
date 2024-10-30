@@ -38,6 +38,8 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
 	Level = 0;
+
+	BirthTransform = FTransform::Identity;
 }
 
 void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -59,6 +61,9 @@ void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
 	Level = 0;
+
+	BirthTransform = FTransform::Identity;
+	
 	Inventory->UnloadSaveData();
 }
 
@@ -129,6 +134,10 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		SetActorTransform(SaveData.SpawnTransform);
+		if(!SaveData.IsSaved())
+		{
+			BirthTransform = SaveData.SpawnTransform;
+		}
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -151,6 +160,7 @@ FSaveData* AAbilityActorBase::ToData()
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
 	SaveData.SpawnTransform = GetActorTransform();
+	SaveData.BirthTransform = BirthTransform;
 
 	return &SaveData;
 }
@@ -274,4 +284,13 @@ float AAbilityActorBase::GetRadius() const
 float AAbilityActorBase::GetHalfHeight() const
 {
 	return BoxComponent->GetScaledBoxExtent().Z;
+}
+
+float AAbilityActorBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/) const
+{
+	if(!InTargetActor) return -1;
+
+	IAbilityActorInterface* TargetAbilityActor = Cast<IAbilityActorInterface>(InTargetActor);
+
+	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
 }

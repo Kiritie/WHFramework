@@ -98,12 +98,12 @@ void UInteractionComponent::ClearInteractActions()
 
 bool UInteractionComponent::IsInteractable() const
 {
-	return GetCollisionEnabled() == ECollisionEnabled::QueryOnly;
+	return GetGenerateOverlapEvents();
 }
 
 void UInteractionComponent::SetInteractable(bool bValue)
 {
-	SetCollisionEnabled(bValue ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	SetGenerateOverlapEvents(bValue);
 }
 
 IInteractionAgentInterface* UInteractionComponent::GetInteractionAgent() const

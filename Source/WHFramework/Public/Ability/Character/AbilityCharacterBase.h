@@ -8,7 +8,7 @@
 #include "Character/Base/CharacterBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Ability/Pawn/AbilityPawnInterface.h"
+#include "Ability/Character/AbilityCharacterInterface.h"
 #include "Common/Targeting/TargetingAgentInterface.h"
 
 #include "AbilityCharacterBase.generated.h"
@@ -29,7 +29,7 @@ class UAbilityCharacterInventoryBase;
  * Ability Character基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
+class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase, public IAbilityCharacterInterface, public IFSMAgentInterface, public IAbilityPickerInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -92,16 +92,65 @@ public:
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
 
-	virtual void Jump() override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void UnJump();
-
 	UFUNCTION(BlueprintCallable)
 	virtual void Static() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnStatic() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Interrupt(float InDuration = -1.f) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnInterrupt() override;
+		
+	UFUNCTION(BlueprintCallable)
+	virtual void FreeToAnim() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void LimitToAnim() override;
+
+	virtual void Jump() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnJump();
+
+	virtual void Crouch(bool bClientSimulation) override;
+
+	virtual void UnCrouch(bool bClientSimulation) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Swim() override;
+		
+	UFUNCTION(BlueprintCallable)
+	virtual void UnSwim() override;
+						
+	UFUNCTION(BlueprintCallable)
+	virtual void Float(float InWaterPosZ) override;
+						
+	UFUNCTION(BlueprintCallable)
+	virtual void UnFloat() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Climb() override;
+			
+	UFUNCTION(BlueprintCallable)
+	virtual void UnClimb() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Fly() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void UnFly() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool DoAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool StopAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
 	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) override;
@@ -146,13 +195,13 @@ protected:
 	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FTransform BirthTransform;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	float MovementRate;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	float RotationRate;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
-	AController* OwnerController;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -177,6 +226,8 @@ protected:
 
 	float DefaultAirControl;
 
+	TMap<FGameplayTag, FPawnAbilityActionData> ActionAbilities;
+
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
 	
@@ -199,16 +250,14 @@ public:
 	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 
 	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
+	
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, SwimSpeed)
+		
+	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, FlySpeed)
 
 	ATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
 
 public:
-	UFUNCTION(BlueprintCallable)
-	float GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius = true, bool bIgnoreZAxis = true);
-									
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetMotionRate(float InMovementRate, float InRotationRate);
-
 	template<class T>
 	T* GetAbilitySystemComponent() const
 	{
@@ -252,12 +301,6 @@ public:
 
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
-	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
-
-	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;
-
-	virtual bool CanLookAtTarget() override;
-
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive(bool bNeedNotDead = false) const override;
 
@@ -268,16 +311,46 @@ public:
 	virtual bool IsDying() const override;
 
 	UFUNCTION(BlueprintPure)
+	virtual bool IsWalking(bool bReally = false) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsInterrupting() const override;
+
+	UFUNCTION(BlueprintPure)
 	virtual bool IsMoving() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool IsFreeToAnim() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool IsAnimating() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsJumping() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsFalling(bool bReally = false) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsWalking(bool bReally = false) const;
+	virtual bool IsCrouching(bool bReally = false) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsJumping() const;
+	virtual bool IsSwimming(bool bReally = false) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsFloating() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsClimbing() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual bool IsFlying(bool bReally = false) const override;
+
+	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
+
+	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;
+
+	virtual bool CanLookAtTarget() override;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -306,12 +379,33 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-				
+	
 	UFUNCTION(BlueprintPure)
-	virtual float GetDefaultGravityScale() const { return DefaultGravityScale; }
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual float GetDefaultAirControl() const { return DefaultAirControl; }
+	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
+
+	UFUNCTION(BlueprintPure)
+	virtual void GetMotionRate(float& OutMovementRate, float& OutRotationRate) override;
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void SetMotionRate(float InMovementRate, float InRotationRate) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultGravityScale() const override { return DefaultGravityScale; }
+
+	UFUNCTION(BlueprintPure)
+	virtual float GetDefaultAirControl() const override { return DefaultAirControl; }
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FPawnAbilityActionData GetActionAbility(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TMap<FGameplayTag, FPawnAbilityActionData>& GetActionAbilities() override { return ActionAbilities; }
 
 public:
 	virtual void OnRep_Controller() override;

@@ -1,14 +1,13 @@
 #pragma once
-#include "Ability/Abilities/AbilityBase.h"
+#include "PawnAbilityBase.h"
 
 #include "CharacterAbilityBase.generated.h"
 
-class AAbilityCharacterBase;
 /**
  * 角色Ability基类
  */
 UCLASS()
-class WHFRAMEWORK_API UCharacterAbilityBase : public UAbilityBase
+class WHFRAMEWORK_API UCharacterAbilityBase : public UPawnAbilityBase
 {
 	GENERATED_BODY()
 

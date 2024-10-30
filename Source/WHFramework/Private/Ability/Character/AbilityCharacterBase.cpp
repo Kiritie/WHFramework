@@ -18,7 +18,14 @@
 #include "Common/CommonStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/Abilities/CharacterActionAbilityBase.h"
 #include "Ability/Character/AbilityCharacterInventoryBase.h"
+#include "Ability/Character/States/AbilityCharacterState_Climb.h"
+#include "Ability/Character/States/AbilityCharacterState_Crouch.h"
+#include "Ability/Character/States/AbilityCharacterState_Float.h"
+#include "Ability/Character/States/AbilityCharacterState_Fly.h"
+#include "Ability/Character/States/AbilityCharacterState_Interrupt.h"
+#include "Ability/Character/States/AbilityCharacterState_Swim.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Common/Looking/LookingComponent.h"
@@ -54,11 +61,17 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	FSM->DefaultState = UAbilityCharacterState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityCharacterState_Death::StaticClass();
 	
+	FSM->States.Add(UAbilityCharacterState_Climb::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Crouch::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Float::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Fly::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Interrupt::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
+	FSM->States.Add(UAbilityCharacterState_Swim::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
 
 	// stats
@@ -67,8 +80,12 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	RaceID = NAME_None;
 	Level = 0;
 
-	MovementRate = 1;
-	RotationRate = 1;
+	BirthTransform = FTransform::Identity;
+
+	MovementRate = 1.f;
+	RotationRate = 1.f;
+
+	ActionAbilities = TMap<FGameplayTag, FPawnAbilityActionData>();
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -91,6 +108,9 @@ void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
 	Level = 0;
+
+	BirthTransform = FTransform::Identity;
+	
 	Inventory->UnloadSaveData();
 }
 
@@ -183,6 +203,29 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		SetActorTransform(SaveData.SpawnTransform);
+		if(SaveData.IsSaved())
+		{
+			ActionAbilities = SaveData.ActionAbilities;
+
+			for(auto& Iter : ActionAbilities)
+			{
+				Iter.Value.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.Value.AbilityClass, Iter.Value.Level);
+			}
+		}
+		else
+		{
+			BirthTransform = SaveData.SpawnTransform;
+
+			const UAbilityCharacterDataBase& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
+			if(CharacterData.IsValid())
+			{
+				for(auto Iter : CharacterData.ActionAbilities)
+				{
+					Iter.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.AbilityClass, Iter.Level);
+					ActionAbilities.Add(Iter.AbilityClass->GetDefaultObject<UAbilityBase>()->AbilityTags.GetByIndex(0), Iter);
+				}
+			}
+		}
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -208,7 +251,10 @@ FSaveData* AAbilityCharacterBase::ToData()
 	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
 
 	SaveData.SpawnTransform = GetActorTransform();
-	
+	SaveData.BirthTransform = BirthTransform;
+
+	SaveData.ActionAbilities = ActionAbilities;
+
 	SaveData.CameraRotation = UCameraModuleStatics::GetCameraRotation();
 	SaveData.CameraDistance = UCameraModuleStatics::GetCameraDistance();
 
@@ -317,6 +363,48 @@ void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 	FSM->SwitchDefaultState();
 }
 
+void AAbilityCharacterBase::Static()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Static>();
+}
+
+void AAbilityCharacterBase::UnStatic()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Static>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityCharacterBase::Interrupt(float InDuration /*= -1*/)
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Interrupt>({ InDuration });
+}
+
+void AAbilityCharacterBase::UnInterrupt()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Interrupt>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityCharacterBase::FreeToAnim()
+{
+	if(!IsFreeToAnim())
+	{
+		AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
+	}
+}
+
+void AAbilityCharacterBase::LimitToAnim()
+{
+	if(IsFreeToAnim())
+	{
+		AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
+	}
+}
+
 void AAbilityCharacterBase::Jump()
 {
 	if(!FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
@@ -341,16 +429,147 @@ void AAbilityCharacterBase::UnJump()
 	}
 }
 
-void AAbilityCharacterBase::Static()
+void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Static>();
+	if(!FSM->IsCurrentStateClass<UAbilityCharacterState_Crouch>())
+	{
+		FSM->SwitchStateByClass<UAbilityCharacterState_Crouch>({ bClientSimulation });
+	}
+	else
+	{
+		Super::Crouch(bClientSimulation);
+	}
 }
 
-void AAbilityCharacterBase::UnStatic()
+void AAbilityCharacterBase::UnCrouch(bool bClientSimulation)
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Static>())
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Crouch>())
 	{
 		FSM->SwitchState(nullptr);
+	}
+	else
+	{
+		Super::UnCrouch(bClientSimulation);
+	}
+}
+
+void AAbilityCharacterBase::Swim()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Swim>();
+}
+
+void AAbilityCharacterBase::UnSwim()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Swim>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityCharacterBase::Float(float InWaterPosZ)
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Float>({ InWaterPosZ });
+}
+
+void AAbilityCharacterBase::UnFloat()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Float>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityCharacterBase::Climb()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Climb>();
+}
+
+void AAbilityCharacterBase::UnClimb()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Climb>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityCharacterBase::Fly()
+{
+	FSM->SwitchStateByClass<UAbilityCharacterState_Fly>();
+}
+
+void AAbilityCharacterBase::UnFly()
+{
+	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Fly>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
+{
+	if(!HasActionAbility(InActionTag)) return false;
+	
+	const FPawnAbilityActionData AbilityData = GetActionAbility(InActionTag);
+	const bool bSuccess = AbilitySystem->TryActivateAbility(AbilityData.AbilityHandle);
+	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
+	if(UCharacterActionAbilityBase* Ability = Cast<UCharacterActionAbilityBase>(Spec.GetPrimaryInstance()))
+	{
+		Ability->SetStopped(false);
+	}
+	return bSuccess;
+}
+
+bool AAbilityCharacterBase::StopAction(const FGameplayTag& InActionTag)
+{
+	if(!HasActionAbility(InActionTag)) return false;
+	
+	const FPawnAbilityActionData AbilityData = GetActionAbility(InActionTag);
+	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
+	if(UCharacterActionAbilityBase* Ability = Cast<UCharacterActionAbilityBase>(Spec.GetPrimaryInstance()))
+	{
+		Ability->SetStopped(true);
+	}
+	AbilitySystem->CancelAbilityHandle(AbilityData.AbilityHandle);
+	return true;
+}
+
+void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWasCancelled)
+{
+	if(InActionTag.MatchesTag(GameplayTags::Ability_Pawn_Action_Death))
+	{
+		FSM->GetCurrentState<UAbilityCharacterState_Death>()->DeathEnd();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Pawn_Action_Static))
+	{
+		UnStatic();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Pawn_Action_Interrupt))
+	{
+		UnInterrupt();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Jump))
+	{
+		UnJump();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Crouch))
+	{
+		UnCrouch(false);
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Swim))
+	{
+		UnSwim();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Float))
+	{
+		UnFloat();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Climb))
+	{
+		UnClimb();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Fly))
+	{
+		UnFly();
 	}
 }
 
@@ -523,7 +742,7 @@ bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 
 bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Active) && (!bNeedNotDead || !IsDead());
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
 }
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
@@ -536,9 +755,34 @@ bool AAbilityCharacterBase::IsDying() const
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
 }
 
+bool AAbilityCharacterBase::IsWalking(bool bReally) const
+{
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Walking) : GetCharacterMovement()->IsWalking();
+}
+
+bool AAbilityCharacterBase::IsInterrupting() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Interrupting);
+}
+
 bool AAbilityCharacterBase::IsMoving() const
 {
 	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Moving);
+}
+
+bool AAbilityCharacterBase::IsFreeToAnim() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_FreeToAnim);
+}
+
+bool AAbilityCharacterBase::IsAnimating() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Animating);
+}
+
+bool AAbilityCharacterBase::IsJumping() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Jumping);
 }
 
 bool AAbilityCharacterBase::IsFalling(bool bReally) const
@@ -546,14 +790,44 @@ bool AAbilityCharacterBase::IsFalling(bool bReally) const
 	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Falling) : GetCharacterMovement()->IsFalling();
 }
 
-bool AAbilityCharacterBase::IsWalking(bool bReally) const
+bool AAbilityCharacterBase::IsCrouching(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Walking) : GetCharacterMovement()->IsWalking();
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Crouching) : GetCharacterMovement()->IsCrouching();
 }
 
-bool AAbilityCharacterBase::IsJumping() const
+bool AAbilityCharacterBase::IsSwimming(bool bReally) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Jumping);
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Swimming) : GetCharacterMovement()->IsSwimming();
+}
+
+bool AAbilityCharacterBase::IsFloating() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Floating);
+}
+
+bool AAbilityCharacterBase::IsClimbing() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Climbing);
+}
+
+bool AAbilityCharacterBase::IsFlying(bool bReally) const
+{
+	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Flying) : GetCharacterMovement()->IsFlying();
+}
+
+bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
+{
+	return !IsDead();
+}
+
+bool AAbilityCharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
+{
+	return !IsDead();
+}
+
+bool AAbilityCharacterBase::CanLookAtTarget()
+{
+	return Super::CanLookAtTarget() && IsActive(true);
 }
 
 void AAbilityCharacterBase::SetNameA(FName InName)
@@ -607,35 +881,44 @@ float AAbilityCharacterBase::GetHalfHeight() const
 	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
-float AAbilityCharacterBase::GetDistance(AAbilityCharacterBase* InTargetCharacter, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/)
+float AAbilityCharacterBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/) const
 {
-	if(!InTargetCharacter || !InTargetCharacter->IsValidLowLevel()) return -1;
+	if(!InTargetActor) return -1;
 
-	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetCharacter->GetActorLocation().X, InTargetCharacter->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetCharacter->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : InTargetCharacter->GetRadius());
+	IAbilityActorInterface* TargetAbilityActor = Cast<IAbilityActorInterface>(InTargetActor);
+
+	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
 }
 
-void AAbilityCharacterBase::SetMotionRate_Implementation(float InMovementRate, float InRotationRate)
+void AAbilityCharacterBase::GetMotionRate(float& OutMovementRate, float& OutRotationRate)
+{
+	OutMovementRate = MovementRate;
+	OutRotationRate = RotationRate;
+}
+
+void AAbilityCharacterBase::SetMotionRate(float InMovementRate, float InRotationRate)
 {
 	MovementRate = InMovementRate;
 	RotationRate = InRotationRate;
+
 	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
 	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed() * RotationRate, 0);
+
 	Looking->LookingRotationSpeed = GetRotationSpeed() * RotationRate;
 }
 
-bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
+bool AAbilityCharacterBase::HasActionAbility(const FGameplayTag& InActionTag) const
 {
-	return !IsDead();
+	return ActionAbilities.Contains(InActionTag);
 }
 
-bool AAbilityCharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
+FPawnAbilityActionData AAbilityCharacterBase::GetActionAbility(const FGameplayTag& InActionTag)
 {
-	return !IsDead();
-}
-
-bool AAbilityCharacterBase::CanLookAtTarget()
-{
-	return Super::CanLookAtTarget() && IsActive(true);
+	if(HasActionAbility(InActionTag))
+	{
+		return ActionAbilities[InActionTag];
+	}
+	return FPawnAbilityActionData();
 }
 
 void AAbilityCharacterBase::OnRep_Controller()

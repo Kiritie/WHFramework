@@ -29,7 +29,9 @@ void UAbilityPawnState_Static::OnEnter(UFiniteStateBase* InLastState, const TArr
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Static);
 
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Pawn->GetInteractionComponent()->SetInteractable(false);
@@ -51,7 +53,9 @@ void UAbilityPawnState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Pawn_Active);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Static);
 
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Pawn->GetInteractionComponent()->SetInteractable(true);

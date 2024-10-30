@@ -28,8 +28,6 @@ public:
 	
 	virtual void OnRefresh(float DeltaSeconds) override;
 
-	virtual bool OnPreLeave(UFiniteStateBase* InNextState) override;
-
 	virtual void OnLeave(UFiniteStateBase* InNextState) override;
 
 	virtual void OnTermination() override;

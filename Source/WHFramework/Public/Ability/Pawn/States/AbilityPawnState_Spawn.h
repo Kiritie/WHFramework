@@ -30,4 +30,7 @@ public:
 	virtual void OnLeave(UFiniteStateBase* InNextState) override;
 
 	virtual void OnTermination() override;
+
+protected:
+	virtual void TryLeave();
 };
