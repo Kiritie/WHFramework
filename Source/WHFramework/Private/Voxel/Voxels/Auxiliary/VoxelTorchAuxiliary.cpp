@@ -11,14 +11,14 @@
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 {
-	PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
+	PointLight = CreateDefaultSubobject<UPointLightComponent>(FName("PointLight"));
 	PointLight->SetupAttachment(RootComponent);
 	PointLight->SetLightColor(FLinearColor(1.f, 0.8f, 0, 1.f));
 	PointLight->SetIntensity(10000.f);
 	PointLight->SetAttenuationRadius(1500.f);
 	PointLight->SetCastShadows(true);
 
-	ParticleSystem = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("ParticleSystem"));
+	ParticleSystem = CreateDefaultSubobject<UParticleSystemComponent>(FName("ParticleSystem"));
 	ParticleSystem->SetupAttachment(PointLight);
 }
 

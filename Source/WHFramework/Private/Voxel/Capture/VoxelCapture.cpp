@@ -13,7 +13,7 @@ AVoxelCapture::AVoxelCapture()
 	bIsSpatiallyLoaded = false;
 #endif
 	
-	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Capture"));
+	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(FName("Capture"));
 	Capture->SetupAttachment(RootComponent);
 	Capture->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -1000.f), FRotator(90.f, 0.f, 0.f));
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> VoxelsPreviewTexFinder(TEXT("TextureRenderTarget2D'/WHFramework/Voxel/Textures/RT_VoxelPreview.RT_VoxelPreview'"));

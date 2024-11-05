@@ -12,14 +12,14 @@
 // Sets default values
 AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 {
-	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
+	SphereComponent = CreateDefaultSubobject<USphereComponent>(FName("SphereComponent"));
 	SphereComponent->SetupAttachment(RootComponent);
 	SphereComponent->SetCollisionProfileName(TEXT("Projectile"));
 	SphereComponent->SetSphereRadius(50.f);
 	SphereComponent->SetGenerateOverlapEvents(false);
 	SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityProjectileRemoteBase::OnBeginOverlap);
 
-	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
+	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(FName("ProjectileMovement"));
 	ProjectileMovement->bRotationFollowsVelocity = true;
 	ProjectileMovement->ProjectileGravityScale = 0;
 	ProjectileMovement->BounceVelocityStopSimulatingThreshold = false;

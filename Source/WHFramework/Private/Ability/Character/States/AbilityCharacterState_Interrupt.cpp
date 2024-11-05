@@ -26,7 +26,7 @@ bool UAbilityCharacterState_Interrupt::OnPreEnter(UFiniteStateBase* InLastState,
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	return Character->DoAction(GameplayTags::Ability_Pawn_Action_Interrupt);
+	return Character->DoAction(GameplayTags::Ability_Vitality_Action_Interrupt);
 }
 
 void UAbilityCharacterState_Interrupt::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -65,7 +65,7 @@ void UAbilityCharacterState_Interrupt::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->StopAction(GameplayTags::Ability_Pawn_Action_Interrupt);
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Interrupt);
 		
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Interrupting);
 

@@ -32,7 +32,7 @@ class FModuleEditorCommands : public TCommands<FModuleEditorCommands>
 {	  
 public:
 	FModuleEditorCommands()
-		: TCommands<FModuleEditorCommands>(TEXT("ModuleEditor"),
+		: TCommands<FModuleEditorCommands>(FName("ModuleEditor"),
 			NSLOCTEXT("ModuleEditor", "Module Editor", "Module Editor Commands"),
 			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
 	{}

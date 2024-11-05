@@ -1,5 +1,6 @@
 #include "Ability/AbilityModuleTypes.h"
 
+#include "Ability/Actor/AbilityActorDataBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
@@ -171,12 +172,15 @@ void FInventorySaveData::CopyItems(const FInventorySaveData& InSaveData)
 	SplitItems = InSaveData.SplitItems;
 }
 
-void FInventorySaveData::AddItem(FAbilityItem InItem)
+void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
 {
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
 
 	Inventory.LoadSaveData(this);
-	Inventory.AddItemByRange(InItem, 0, -1, false);
+	if(!bUnique || !Inventory.QueryItemByRange(EItemQueryType::Get, InItem).IsValid())
+	{
+		Inventory.AddItemByRange(InItem, 0, -1, false);
+	}
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
@@ -211,7 +215,13 @@ void FInventorySaveData::ClearItems()
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
-UPrimaryAssetBase& FActorSaveData::GetData() const
+void FActorSaveData::InitInventoryData()
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
+	InventoryData = GetData().InventoryData;
+	InventoryData.FillItems(Level);
+}
+
+UAbilityActorDataBase& FActorSaveData::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
 }

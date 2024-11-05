@@ -515,8 +515,8 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 
 	const FRotator ControlRotation = OwnerPlayerController->GetControlRotation();
 
-	const FVector CharacterLocation = OwnerActor->GetActorLocation();
-	const FVector OtherActorLocation = OtherActor->GetActorLocation() + OtherActor->GetActorRotation().RotateVector(LocationOffset);
+	const FVector CharacterLocation = OwnerActor->GetActorLocation() + OwnerActor->GetActorRotation().RotateVector(LocationOffset);
+	const FVector OtherActorLocation = OtherActor->GetActorLocation();
 
 	// Find look at rotation
 	const FRotator LookRotation = FRotationMatrix::MakeFromX(OtherActorLocation - CharacterLocation).Rotator();

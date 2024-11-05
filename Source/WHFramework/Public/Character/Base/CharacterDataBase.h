@@ -4,6 +4,8 @@
 
 #include "CharacterDataBase.generated.h"
 
+class UAnimMontage;
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UCharacterDataBase : public UPawnDataBase
 {
@@ -14,5 +16,5 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<FName, class UAnimMontage*> AnimMontages;
+	TMap<FName, UAnimMontage*> AnimMontages;
 };

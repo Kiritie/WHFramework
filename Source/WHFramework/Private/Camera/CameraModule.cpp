@@ -932,7 +932,7 @@ void UCameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseTy
 {
 	if(!CurrentCamera || (CameraDoDistanceDistance != EMPTY_Flt || CurrentCameraDistance == InDistance)  && !bForce) return;
 
-	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
+	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewDistance : InitCameraDistance);
 	if(InDuration > 0.f)
 	{
 		CameraDoDistanceTime = 0.f;
@@ -1202,7 +1202,7 @@ bool UCameraModule::IsControllingZoom()
 	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
 }
 
-bool UCameraModule::IsTrackingTarget()
+bool UCameraModule::IsTrackingTarget() const
 {
 	return TrackCameraViewData.CameraViewParams.CameraViewTarget != nullptr;
 }

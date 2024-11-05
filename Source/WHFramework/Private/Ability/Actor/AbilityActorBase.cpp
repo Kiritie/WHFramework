@@ -98,30 +98,17 @@ void AAbilityActorBase::Serialize(FArchive& Ar)
 
 	if(!AttributeSet) return;
 
-	if(Ar.ArIsSaveGame && AttributeSet->GetPersistentAttributes().Num() > 0)
+	if(Ar.ArIsSaveGame)
 	{
-		float BaseValue = 0.f;
-		float CurrentValue = 0.f;
-		for(FGameplayAttribute& Attribute : AttributeSet->GetPersistentAttributes())
+		if(Ar.IsLoading())
 		{
-			if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(AttributeSet))
-			{
-				if(Ar.IsLoading())
-				{
-					Ar << BaseValue;
-					Ar << CurrentValue;
-					AttributeData->SetBaseValue(BaseValue);
-					AttributeData->SetCurrentValue(CurrentValue);
-				}
-				else if(Ar.IsSaving())
-				{
-					BaseValue = AttributeData->GetBaseValue();
-					CurrentValue = AttributeData->GetCurrentValue();
-					Ar << BaseValue;
-					Ar << CurrentValue;
-				}
-			}
+			Ar << Level;
 		}
+		else if(Ar.IsSaving())
+		{
+			Ar << Level;
+		}
+		AttributeSet->SerializeAttributes(Ar);
 	}
 }
 
@@ -137,6 +124,10 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(!SaveData.IsSaved())
 		{
 			BirthTransform = SaveData.SpawnTransform;
+		}
+		else
+		{
+			BirthTransform = SaveData.BirthTransform;
 		}
 	}
 	if(PHASEC(InPhase, EPhase::All))

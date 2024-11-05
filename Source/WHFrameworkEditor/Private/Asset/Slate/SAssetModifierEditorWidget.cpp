@@ -85,7 +85,7 @@ TSharedRef<SWidget> SAssetModifierEditorWidget::CreateDefaultWidget()
 			.Text(this, &SAssetModifierEditorWidget::GetPickedClassName)
 		];
 
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
+	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>(FName("ContentBrowser"));
 	
 	FAssetPickerConfig AssetPickerConfig;
 	AssetPickerConfig.GetCurrentSelectionDelegates.Add(&GetCurrentSelectionDelegate);

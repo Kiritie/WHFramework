@@ -22,8 +22,8 @@ protected:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffects")
-	TArray<TSubclassOf<UGameplayEffect>> ItemEffectClasses;
+	TArray<TSubclassOf<UGameplayEffect>> EffectClasses;
 
 private:
-	TArray<FActiveGameplayEffectHandle> ItemEffectHandles;
+	TArray<FActiveGameplayEffectHandle> EffectHandles;
 };

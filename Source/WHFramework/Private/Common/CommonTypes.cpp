@@ -104,12 +104,12 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Character_Flying, "State.Character.Flying", "Character Flying");
 
 	////////////////////////////////////////////////////
-	// Ability_Pawn_Action
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Death, "Ability.Pawn.Action.Death", "Pawn Action Death");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Spawn, "Ability.Pawn.Action.Spawn", "Pawn Action Spawn");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Static, "Ability.Pawn.Action.Static", "Pawn Action Static");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Walk, "Ability.Pawn.Action.Walk", "Pawn Action Walk");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Pawn_Action_Interrupt, "Ability.Pawn.Action.Interrupt", "Pawn Action Interrupt");
+	// Ability_Vitality_Action
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Vitality_Action_Death, "Ability.Vitality.Action.Death", "Vitality Action Death");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Vitality_Action_Spawn, "Ability.Vitality.Action.Spawn", "Vitality Action Spawn");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Vitality_Action_Static, "Ability.Vitality.Action.Static", "Vitality Action Static");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Vitality_Action_Walk, "Ability.Vitality.Action.Walk", "Vitality Action Walk");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Vitality_Action_Interrupt, "Ability.Vitality.Action.Interrupt", "Vitality Action Interrupt");
 
 	////////////////////////////////////////////////////
 	// Ability_Character_Action

@@ -7,6 +7,7 @@
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 UAbilityPawnState_Static::UAbilityPawnState_Static()
 {
@@ -31,8 +32,9 @@ void UAbilityPawnState_Static::OnEnter(UFiniteStateBase* InLastState, const TArr
 
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Static);
+	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Static);
 
+	Pawn->GetMovementComponent()->SetActive(false);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Pawn->GetInteractionComponent()->SetInteractable(false);
 
@@ -55,8 +57,9 @@ void UAbilityPawnState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Static);
+	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Static);
 
+	Pawn->GetMovementComponent()->SetActive(true);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Pawn->GetInteractionComponent()->SetInteractable(true);
 

@@ -71,6 +71,13 @@ void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
 	}
 }
 
+bool UAbilityCharacterState_Death::OnPreLeave(UFiniteStateBase* InNextState)
+{
+	if(!Super::OnPreLeave(InNextState)) return false;
+
+	return InNextState && InNextState->IsA<UAbilityCharacterState_Spawn>();
+}
+
 void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
@@ -83,7 +90,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
-	Character->StopAction(GameplayTags::Ability_Pawn_Action_Death);
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -101,7 +108,10 @@ void UAbilityCharacterState_Death::DeathStart()
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
 
-	Character->DoAction(GameplayTags::Ability_Pawn_Action_Death);
+	if(!Character->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	{
+		DeathEnd();
+	}
 }
 
 void UAbilityCharacterState_Death::DeathEnd()
@@ -110,8 +120,6 @@ void UAbilityCharacterState_Death::DeathEnd()
 	
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
-
-	Character->StopAction(GameplayTags::Ability_Pawn_Action_Death);
 
 	Character->Inventory->DiscardItems();
 

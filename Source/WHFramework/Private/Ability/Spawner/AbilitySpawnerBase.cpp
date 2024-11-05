@@ -23,14 +23,14 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	GetCapsuleComponent()->SetShouldUpdatePhysicsVolume(false);
 
 #if WITH_EDITORONLY_DATA
-	ArrowComponent = CreateEditorOnlyDefaultSubobject<UArrowComponent>(TEXT("Arrow"));
+	ArrowComponent = CreateEditorOnlyDefaultSubobject<UArrowComponent>(FName("Arrow"));
 	ArrowComponent->SetupAttachment(GetCapsuleComponent());
 	ArrowComponent->ArrowColor = FColor(150, 200, 255);
 	ArrowComponent->ArrowSize = 1.0f;
 	ArrowComponent->bTreatAsASprite = true;
 	ArrowComponent->bIsScreenSizeScaled = true;
 
-	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(TEXT("Widget"));
+	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(FName("Widget"));
 	WidgetComponent->SetupAttachment(GetCapsuleComponent());
 	WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
 	WidgetComponent->SetOrientCamera(true);

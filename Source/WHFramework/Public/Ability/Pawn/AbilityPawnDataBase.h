@@ -11,8 +11,4 @@ class WHFRAMEWORK_API UAbilityPawnDataBase : public UAbilityVitalityDataBase
 
 public:
 	UAbilityPawnDataBase();
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FPawnAbilityActionData> ActionAbilities;
 };

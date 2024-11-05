@@ -4,12 +4,21 @@
 #include "Ability/Actor/AbilityActorInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/AbilityModuleTypes.h"
-#include "ReferencePool/ReferencePoolModuleStatics.h"
 
 UActorAttributeSetBase::UActorAttributeSetBase()
 :	Exp(0.f),
 	MaxExp(50.f)
 {
+}
+
+void UActorAttributeSetBase::SerializeAttributes(FArchive& Ar)
+{
+	Super::SerializeAttributes(Ar);
+
+	if(Ar.IsLoading())
+	{
+		GetOwnerActor<IAbilityActorInterface>()->RefreshAttributes();
+	}
 }
 
 void UActorAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const

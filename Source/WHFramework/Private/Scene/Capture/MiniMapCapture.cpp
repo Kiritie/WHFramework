@@ -11,7 +11,7 @@ AMiniMapCapture::AMiniMapCapture()
 	bIsSpatiallyLoaded = false;
 #endif
 	
-	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Capture"));
+	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(FName("Capture"));
 	Capture->SetupAttachment(RootComponent);
 	Capture->SetRelativeLocationAndRotation(FVector(0.f, 0.f, 500.f), FRotator(-90.f, 0.f, 0.f));
 	Capture->ProjectionType = ECameraProjectionMode::Orthographic;

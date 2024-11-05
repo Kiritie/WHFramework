@@ -14,7 +14,7 @@ AAIControllerBase::AAIControllerBase()
 {
 	bAttachToPawn = true;
 
-	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
+	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(FName("AIPerception"));
 	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AAIControllerBase::OnTargetPerceptionUpdated);
 
 	FAISenseAffiliationFilter AffiliationFilter;
@@ -22,7 +22,7 @@ AAIControllerBase::AAIControllerBase()
 	AffiliationFilter.bDetectFriendlies = true;
 	AffiliationFilter.bDetectNeutrals = true;
 
-	const auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
+	const auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(FName("SightSenseConfig"));
 	SightSenseConfig->SightRadius = 1000;
 	SightSenseConfig->LoseSightRadius = 1200;
 	SightSenseConfig->PeripheralVisionAngleDegrees = 90;
@@ -31,7 +31,7 @@ AAIControllerBase::AAIControllerBase()
 	PerceptionComponent->ConfigureSense(*SightSenseConfig);
 	PerceptionComponent->SetDominantSense(*SightSenseConfig->GetSenseImplementation());
 
-	const auto DamageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
+	const auto DamageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(FName("DamageSenseConfig"));
 	PerceptionComponent->ConfigureSense(*DamageSenseConfig);
 
 	bInitialized = false;

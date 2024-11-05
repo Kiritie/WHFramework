@@ -1,7 +1,6 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 
 #include "GameplayEffectExtension.h"
-#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
@@ -68,11 +67,9 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 	}
 
 	AActor* TargetActor = nullptr;
-	IAbilityVitalityInterface* TargetVitality = nullptr;
 	if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
 	{
 		TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
-		TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 	}
 
 	if(Data.EvaluatedData.Attribute == GetPhysicsDamageAttribute())

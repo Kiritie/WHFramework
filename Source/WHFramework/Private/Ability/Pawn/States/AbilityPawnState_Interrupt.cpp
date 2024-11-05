@@ -5,6 +5,7 @@
 #include "Ability/Pawn/AbilityPawnBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Walk.h"
 #include "FSM/Components/FSMComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 UAbilityPawnState_Interrupt::UAbilityPawnState_Interrupt()
 {
@@ -25,7 +26,7 @@ bool UAbilityPawnState_Interrupt::OnPreEnter(UFiniteStateBase* InLastState, cons
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	return Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Interrupt);
+	return Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Interrupt);
 }
 
 void UAbilityPawnState_Interrupt::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -41,6 +42,8 @@ void UAbilityPawnState_Interrupt::OnEnter(UFiniteStateBase* InLastState, const T
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 	
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Interrupting);
+
+	Pawn->GetMovementComponent()->SetActive(false);
 }
 
 void UAbilityPawnState_Interrupt::OnRefresh(float DeltaSeconds)
@@ -60,9 +63,11 @@ void UAbilityPawnState_Interrupt::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Interrupt);
+	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Interrupt);
 		
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Interrupting);
+
+	Pawn->GetMovementComponent()->SetActive(true);
 }
 
 void UAbilityPawnState_Interrupt::OnTermination()

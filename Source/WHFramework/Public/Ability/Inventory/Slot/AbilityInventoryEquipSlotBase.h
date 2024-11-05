@@ -28,11 +28,11 @@ public:
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
-	virtual bool MatchItemLimit(FAbilityItem InItem) const override;
-	
-	virtual void Refresh() override;
-
 	virtual void OnItemPreChange(FAbilityItem& InNewItem) override;
 
 	virtual void OnItemChanged(FAbilityItem& InOldItem) override;
+
+	virtual bool MatchItemLimit(FAbilityItem InItem) const override;
+	
+	virtual void Refresh() override;
 };

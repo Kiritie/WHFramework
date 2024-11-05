@@ -73,7 +73,7 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 
 	const EAssetTypeCategories::Type AssetCategory = AssetTools.RegisterAdvancedAssetCategory(FName("WHFramework"), FText::FromString(TEXT("WHFramework")));
 
-	FPropertyEditorModule& PropertyEditorModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+	FPropertyEditorModule& PropertyEditorModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(FName("PropertyEditor"));
 
 	#define STARTUP_MODULE(ModuleName) \
 	{ \
@@ -102,7 +102,7 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 {
 	ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(FName("Settings"));
 
-	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(FName("PropertyEditor"));
 
 	#define SHUTDOWN_MODULE(ModuleName) \
 	{ \
@@ -124,7 +124,7 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{
-		IAssetTools& AssetTools = FModuleManager::GetModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
+		IAssetTools& AssetTools = FModuleManager::GetModuleChecked<FAssetToolsModule>(FName("AssetTools")).Get();
 
 		for(auto& AssetTypeAction : CreatedAssetTypeActions)
 		{
@@ -169,7 +169,7 @@ void FWHFrameworkEditorModule::RegisterMenus()
 	FStepEditorModule::Get().RegisterMenus(PluginCommands);
 	FTaskEditorModule::Get().RegisterMenus(PluginCommands);
 
-	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>(FName("LevelEditor"));
 	LevelEditorModule.GetGlobalLevelEditorActions()->Append(PluginCommands.ToSharedRef());
 
 	TSharedRef<FUICommandList> LevelEditorActions = LevelEditorModule.GetGlobalLevelEditorActions();

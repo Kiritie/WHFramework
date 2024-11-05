@@ -6,11 +6,12 @@
 #include "Data/DataAssetBase.h"
 #include "Main/Base/ModuleBase.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
+#include "Thread/IThreadSafeInterface.h"
 
 #include "AssetModule.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API UAssetModule : public UModuleBase
+class WHFRAMEWORK_API UAssetModule : public UModuleBase, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 		

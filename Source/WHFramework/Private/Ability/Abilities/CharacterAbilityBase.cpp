@@ -2,5 +2,5 @@
 
 UCharacterAbilityBase::UCharacterAbilityBase()
 {
-	AnimMontage = nullptr;
+	
 }

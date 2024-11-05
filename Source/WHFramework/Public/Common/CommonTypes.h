@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "NativeGameplayTags.h"
-#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "WHFrameworkCoreTypes.h"
 
 #include "CommonTypes.generated.h"
@@ -164,12 +163,12 @@ namespace GameplayTags
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Character_Flying);
 
 	////////////////////////////////////////////////////
-	// Ability_Pawn_Action
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Death);
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Spawn);
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Static);
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Walk);
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Pawn_Action_Interrupt);
+	// Ability_Vitality_Action
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Vitality_Action_Death);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Vitality_Action_Spawn);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Vitality_Action_Static);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Vitality_Action_Walk);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Vitality_Action_Interrupt);
 
 	////////////////////////////////////////////////////
 	// Ability_Character_Action

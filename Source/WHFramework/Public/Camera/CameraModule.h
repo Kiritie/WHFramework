@@ -453,7 +453,7 @@ public:
 	bool IsControllingZoom();
 
 	UFUNCTION(BlueprintPure)
-	bool IsTrackingTarget();
+	bool IsTrackingTarget() const;
 
 public:
 	UFUNCTION(BlueprintPure)

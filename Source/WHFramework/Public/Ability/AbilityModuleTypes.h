@@ -9,7 +9,8 @@
 
 #include "AbilityModuleTypes.generated.h"
 
-class UPawnActionAbilityBase;
+class UAbilityActorDataBase;
+class UVitalityActionAbilityBase;
 class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
@@ -600,15 +601,15 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPawnAbilityActionData : public FAbilityData
+struct WHFRAMEWORK_API FVitalityActionAbilityData : public FAbilityData
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<UPawnActionAbilityBase> AbilityClass;
+	TSubclassOf<UVitalityActionAbilityBase> AbilityClass;
 
-	FORCEINLINE FPawnAbilityActionData()
+	FORCEINLINE FVitalityActionAbilityData()
 	{
 		AbilityClass = nullptr;
 	}
@@ -850,7 +851,7 @@ public:
 
 	virtual void CopyItems(const FInventorySaveData& InSaveData);
 
-	virtual void AddItem(FAbilityItem InItem);
+	virtual void AddItem(FAbilityItem InItem, bool bUnique = false);
 
 	virtual void RemoveItem(FAbilityItem InItem);
 
@@ -1030,7 +1031,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;
 
 	UPROPERTY()
@@ -1044,13 +1045,15 @@ public:
 		InventoryData.MakeSaved();
 	}
 
+	virtual void InitInventoryData();
+
 	template<class T>
 	T& GetData() const
 	{
 		return static_cast<T&>(GetData());
 	}
 
-	UPrimaryAssetBase& GetData() const;
+	UAbilityActorDataBase& GetData() const;
 };
 
 USTRUCT(BlueprintType)
@@ -1062,16 +1065,21 @@ public:
 	FORCEINLINE FVitalitySaveData()
 	{
 		RaceID = NAME_None;
+		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 	FORCEINLINE FVitalitySaveData(const FActorSaveData& InActorSaveData) : FActorSaveData(InActorSaveData)
 	{
 		RaceID = NAME_None;
+		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FName RaceID;
+
+	UPROPERTY()
+	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 };
 
 USTRUCT(BlueprintType)
@@ -1082,17 +1090,13 @@ struct WHFRAMEWORK_API FPawnSaveData : public FVitalitySaveData
 public:
 	FORCEINLINE FPawnSaveData()
 	{
-		ActionAbilities = TMap<FGameplayTag, FPawnAbilityActionData>();
+		
 	}
 
 	FORCEINLINE FPawnSaveData(const FVitalitySaveData& InVitalitySaveData) : FVitalitySaveData(InVitalitySaveData)
 	{
-		ActionAbilities = TMap<FGameplayTag, FPawnAbilityActionData>();
+		
 	}
-
-public:
-	UPROPERTY()
-	TMap<FGameplayTag, FPawnAbilityActionData> ActionAbilities;
 };
 
 USTRUCT(BlueprintType)

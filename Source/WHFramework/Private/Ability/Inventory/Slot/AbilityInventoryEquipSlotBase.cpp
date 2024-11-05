@@ -24,16 +24,6 @@ void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInven
 	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
-bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem) const
-{
-	return Super::MatchItemLimit(InItem);
-}
-
-void UAbilityInventoryEquipSlotBase::Refresh()
-{
-	Super::Refresh();
-}
-
 void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 {
 	Super::OnItemPreChange(InNewItem);
@@ -50,4 +40,14 @@ void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
 	if(IsEmpty()) return;
 
 	ActiveItem(true);
+}
+
+bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem) const
+{
+	return Super::MatchItemLimit(InItem);
+}
+
+void UAbilityInventoryEquipSlotBase::Refresh()
+{
+	Super::Refresh();
 }

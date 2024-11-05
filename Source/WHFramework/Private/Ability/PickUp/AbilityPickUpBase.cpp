@@ -29,12 +29,12 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	Interaction->SetInteractable(false);
 	Interaction->AddInteractAction(EInteractAction::PickUp);
 
-	RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingMovement"));
+	RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(FName("RotatingMovement"));
 	RotatingMovement->RotationRate = FRotator(0.f, 180.f, 0.f);
 
-	FallingMovement = CreateDefaultSubobject<UFallingMovementComponent>(TEXT("FallingMovement"));
+	FallingMovement = CreateDefaultSubobject<UFallingMovementComponent>(FName("FallingMovement"));
 	
-	FollowingMovement = CreateDefaultSubobject<UFollowingMovementComponent>(TEXT("FollowingMovement"));
+	FollowingMovement = CreateDefaultSubobject<UFollowingMovementComponent>(FName("FollowingMovement"));
 
 	Item = FAbilityItem::Empty;
 }

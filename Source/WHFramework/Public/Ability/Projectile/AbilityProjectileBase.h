@@ -97,6 +97,9 @@ protected:
 	UPROPERTY()
 	TArray<AActor*> HitTargets;
 
+	UPROPERTY()
+	bool bLaunched;
+
 private:
 	FTimerHandle DestroyTimer;
 
@@ -109,4 +112,7 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	AActor* GetOwnerActor() const { return OwnerActor; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsLaunched() const { return bLaunched; }
 };

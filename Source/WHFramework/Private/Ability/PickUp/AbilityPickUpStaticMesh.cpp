@@ -10,7 +10,7 @@ AAbilityPickUpStaticMesh::AAbilityPickUpStaticMesh()
 {
 	BoxComponent->SetBoxExtent(FVector(20.f));
 
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
+	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

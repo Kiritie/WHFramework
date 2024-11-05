@@ -24,6 +24,11 @@ public:
 
 	virtual void RefreshAttributes();
 
+public:
+	virtual float GetExp() const = 0;
+
+	virtual float GetMaxExp() const = 0;
+	
 	virtual void ModifyExp(float InDeltaValue) = 0;
 
 protected:

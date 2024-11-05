@@ -26,6 +26,8 @@ void UAbilityVitalityState_Walk::OnEnter(UFiniteStateBase* InLastState, const TA
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+
+	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityVitalityState_Walk::OnRefresh(float DeltaSeconds)
@@ -40,6 +42,8 @@ void UAbilityVitalityState_Walk::OnLeave(UFiniteStateBase* InNextState)
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+
+	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityVitalityState_Walk::OnTermination()

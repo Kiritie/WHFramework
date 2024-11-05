@@ -10,7 +10,7 @@ AAbilityPickUpSkeletalMesh::AAbilityPickUpSkeletalMesh()
 {
 	BoxComponent->SetBoxExtent(FVector(20.f));
 
-	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComponent"));
+	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

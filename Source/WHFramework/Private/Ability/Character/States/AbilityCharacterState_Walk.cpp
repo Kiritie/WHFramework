@@ -19,11 +19,7 @@ void UAbilityCharacterState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InSta
 
 bool UAbilityCharacterState_Walk::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(!Super::OnPreEnter(InLastState, InParams)) return false;
-
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	return Character->DoAction(GameplayTags::Ability_Pawn_Action_Walk);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -33,7 +29,9 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const T
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Walking);
-	
+
+	Character->DoAction(GameplayTags::Ability_Vitality_Action_Walk);
+
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
@@ -71,7 +69,7 @@ void UAbilityCharacterState_Walk::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Walking);
 
-	Character->StopAction(GameplayTags::Ability_Pawn_Action_Walk);
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityCharacterState_Walk::OnTermination()

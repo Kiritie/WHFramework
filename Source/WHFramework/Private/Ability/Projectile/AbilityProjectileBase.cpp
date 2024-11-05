@@ -24,6 +24,7 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 	AbilityLevel = 0;
 	EffectContainerMap = TMap<FGameplayTag, FGameplayEffectContainer>();
 	HitTargets = TArray<AActor*>();
+	bLaunched = false;
 }
 
 void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -44,6 +45,7 @@ void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
 	AbilityLevel = 0;
 	AbilityActorInfo = FGameplayAbilityActorInfo();
 	EffectContainerMap.Empty();
+	bLaunched = false;
 }
 
 void AAbilityProjectileBase::OnPreparatory_Implementation(EPhase InPhase)
@@ -89,6 +91,8 @@ void AAbilityProjectileBase::Initialize_Implementation(AActor* InOwnerActor, con
 
 void AAbilityProjectileBase::Launch_Implementation(FVector InDirection)
 {
+	bLaunched = true;
+	
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 	SetActorRotation(InDirection != FVector::ZeroVector ? InDirection.Rotation() : OwnerActor->GetActorRotation());

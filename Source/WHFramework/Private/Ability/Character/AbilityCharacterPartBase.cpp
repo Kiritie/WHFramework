@@ -16,7 +16,7 @@ void UAbilityCharacterPartBase::BeginPlay()
 
 void UAbilityCharacterPartBase::UpdateVoxelOverlap()
 {
-	const auto OwnerCharacter = Cast<AAbilityCharacterBase>(GetOwnerCharacter());
+	const auto OwnerCharacter = GetOwnerCharacter<AAbilityCharacterBase>();
 	if(!OwnerCharacter || !OwnerCharacter->IsActive()) return;
 
 	Super::UpdateVoxelOverlap();

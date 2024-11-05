@@ -32,7 +32,7 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Character->DoAction(GameplayTags::Ability_Pawn_Action_Static);
+	Character->DoAction(GameplayTags::Ability_Vitality_Action_Static);
 
 	Character->LimitToAnim();
 
@@ -59,7 +59,7 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Character->StopAction(GameplayTags::Ability_Pawn_Action_Static);
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Static);
 
 	Character->FreeToAnim();
 

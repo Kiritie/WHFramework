@@ -27,17 +27,17 @@ AVoxelChunk::AVoxelChunk()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
-	SolidMesh = CreateDefaultSubobject<UVoxelMeshComponent>(TEXT("SolidMesh"));
+	SolidMesh = CreateDefaultSubobject<UVoxelMeshComponent>(FName("SolidMesh"));
 	SolidMesh->SetupAttachment(RootComponent);
 	SolidMesh->Initialize(EVoxelMeshNature::Chunk, EVoxelTransparency::Solid);
 	SolidMesh->OnComponentHit.AddDynamic(this, &AVoxelChunk::OnCollision);
 
-	SemiMesh = CreateDefaultSubobject<UVoxelMeshComponent>(TEXT("SemiMesh"));
+	SemiMesh = CreateDefaultSubobject<UVoxelMeshComponent>(FName("SemiMesh"));
 	SemiMesh->SetupAttachment(RootComponent);
 	SemiMesh->Initialize(EVoxelMeshNature::Chunk, EVoxelTransparency::SemiTransparent);
 	SemiMesh->OnComponentHit.AddDynamic(this, &AVoxelChunk::OnCollision);
 
-	TransMesh = CreateDefaultSubobject<UVoxelMeshComponent>(TEXT("TransMesh"));
+	TransMesh = CreateDefaultSubobject<UVoxelMeshComponent>(FName("TransMesh"));
 	TransMesh->SetupAttachment(RootComponent);
 	TransMesh->Initialize(EVoxelMeshNature::Chunk, EVoxelTransparency::Transparent);
 	TransMesh->OnComponentBeginOverlap.AddDynamic(this, &AVoxelChunk::OnBeginOverlap);

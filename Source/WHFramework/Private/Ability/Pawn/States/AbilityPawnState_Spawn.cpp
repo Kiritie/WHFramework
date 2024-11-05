@@ -8,6 +8,7 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/ShapeComponent.h"
 #include "FSM/Components/FSMComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 UAbilityPawnState_Spawn::UAbilityPawnState_Spawn()
 {
@@ -32,12 +33,14 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Spawn);
+	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
-	Pawn->ResetData();
-
+	Pawn->GetMovementComponent()->SetActive(false);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Pawn->GetInteractionComponent()->SetInteractable(false);
+	
+	Pawn->ResetData();
+	Pawn->SetMotionRate(1.f, 1.f);
 }
 
 void UAbilityPawnState_Spawn::OnRefresh(float DeltaSeconds)
@@ -55,8 +58,9 @@ void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 	
-	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Spawn);
+	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
+	Pawn->GetMovementComponent()->SetActive(true);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Pawn->GetInteractionComponent()->SetInteractable(true);
 

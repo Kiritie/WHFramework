@@ -5,6 +5,7 @@
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Components/ShapeComponent.h"
 #include "FSM/Components/FSMComponent.h"
 
 UAbilityVitalityState_Spawn::UAbilityVitalityState_Spawn()
@@ -30,16 +31,18 @@ void UAbilityVitalityState_Spawn::OnEnter(UFiniteStateBase* InLastState, const T
 
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Vitality->ResetData();
+	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Vitality->GetInteractionComponent()->SetInteractable(false);
+	
+	Vitality->ResetData();
 }
 
 void UAbilityVitalityState_Spawn::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
-	
+
 	TryLeave();
 }
 
@@ -50,6 +53,8 @@ void UAbilityVitalityState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	
+	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Vitality->GetInteractionComponent()->SetInteractable(true);

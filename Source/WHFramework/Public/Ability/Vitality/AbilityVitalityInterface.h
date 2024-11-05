@@ -4,7 +4,6 @@
 
 #include "AbilityVitalityInterface.generated.h"
 
-class UAbilityBase;
 UINTERFACE()
 class WHFRAMEWORK_API UAbilityVitalityInterface : public UAbilityActorInterface
 {
@@ -30,6 +29,17 @@ public:
 
 	virtual void UnInterrupt() = 0;
 
+	virtual bool DoAction(const FGameplayTag& InActionTag) = 0;
+
+	virtual bool StopAction(const FGameplayTag& InActionTag) = 0;
+
+	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) = 0;
+
+public:
+	virtual float GetHealth() const = 0;
+	
+	virtual float GetMaxHealth() const = 0;
+	
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 
 public:
@@ -50,10 +60,16 @@ public:
 
 	virtual FString GetHeadInfo() const = 0;
 
+	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const = 0;
+
+	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) = 0;
+
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() = 0;
+
 public:
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
+	virtual void HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 	
-	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
+	virtual void HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 	
-	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
+	virtual void HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 };

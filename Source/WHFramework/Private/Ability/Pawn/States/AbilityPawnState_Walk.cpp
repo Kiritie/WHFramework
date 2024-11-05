@@ -16,11 +16,7 @@ void UAbilityPawnState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InStateInd
 
 bool UAbilityPawnState_Walk::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(!Super::OnPreEnter(InLastState, InParams)) return false;
-
-	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
-
-	return Pawn->DoAction(GameplayTags::Ability_Pawn_Action_Walk);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityPawnState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -30,6 +26,8 @@ void UAbilityPawnState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+
+	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityPawnState_Walk::OnRefresh(float DeltaSeconds)
@@ -45,7 +43,7 @@ void UAbilityPawnState_Walk::OnLeave(UFiniteStateBase* InNextState)
 
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Walking);
 
-	Pawn->StopAction(GameplayTags::Ability_Pawn_Action_Walk);
+	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityPawnState_Walk::OnTermination()

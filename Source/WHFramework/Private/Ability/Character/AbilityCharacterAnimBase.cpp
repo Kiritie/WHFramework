@@ -19,7 +19,7 @@ void UAbilityCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	
-	AAbilityCharacterBase* Character = Cast<AAbilityCharacterBase>(TryGetPawnOwner());
+	AAbilityCharacterBase* Character = GetOwnerCharacter<AAbilityCharacterBase>();
 
 	if(!Character || !Character->Execute_GetAssetID(Character).IsValid() || !UCommonStatics::IsPlaying()) return;
 

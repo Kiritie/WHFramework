@@ -3,16 +3,16 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 
 #include "AbilitySystemComponent.h"
-#include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
-#include "Ability/Vitality/AbilityVitalityDataBase.h"
-#include "Common/Interaction/InteractionComponent.h"
-#include "Components/BoxComponent.h"
+#include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Common/Interaction/InteractionComponent.h"
 
 UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 {
 	StateName = FName("Death");
+
+	Killer = nullptr;
 }
 
 void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -40,10 +40,10 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(Killer && Killer != Vitality)
 	{
-		Killer->ModifyExp(Vitality->GetLevelA() * 5.f);
+		Killer->ModifyExp(Vitality->GetLevelA() * 10.f);
 	}
 
-	Vitality->SetExp(0);
+	Vitality->SetExp(0.f);
 	Vitality->SetHealth(0.f);
 
 	DeathStart();
@@ -52,6 +52,13 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+}
+
+bool UAbilityVitalityState_Death::OnPreLeave(UFiniteStateBase* InNextState)
+{
+	if(!Super::OnPreLeave(InNextState)) return false;
+
+	return InNextState && InNextState->IsA<UAbilityVitalityState_Spawn>();
 }
 
 void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
@@ -64,6 +71,8 @@ void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+
+	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 }
 
 void UAbilityVitalityState_Death::OnTermination()
@@ -78,7 +87,10 @@ void UAbilityVitalityState_Death::DeathStart()
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Vitality->GetInteractionComponent()->SetInteractable(false);
 
-	DeathEnd();
+	if(!Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	{
+		DeathEnd();
+	}
 }
 
 void UAbilityVitalityState_Death::DeathEnd()
@@ -89,4 +101,6 @@ void UAbilityVitalityState_Death::DeathEnd()
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	Vitality->Inventory->DiscardItems();
+
+	UObjectPoolModuleStatics::DespawnObject(Vitality);
 }

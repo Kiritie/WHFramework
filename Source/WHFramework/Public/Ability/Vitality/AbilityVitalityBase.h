@@ -72,6 +72,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnInterrupt() override;
+	
+	UFUNCTION(BlueprintCallable)
+	virtual bool DoAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual bool StopAction(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
@@ -101,11 +110,11 @@ public:
 
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
-	virtual void HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
-	virtual void HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -117,6 +126,8 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FPrimaryAssetId GenerateVoxelID;
+
+	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -136,24 +147,6 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
-
-public:
-	template<class T>
-	T& GetVitalityData() const
-	{
-		return static_cast<T&>(GetVitalityData());
-	}
-	
-	UAbilityVitalityDataBase& GetVitalityData() const;
-
-	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
-
-public:
-	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
-
-	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
-
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -196,6 +189,31 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
+
+	UFUNCTION(BlueprintPure)
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override { return ActionAbilities; }
+
+	template<class T>
+	T& GetVitalityData() const
+	{
+		return static_cast<T&>(GetVitalityData());
+	}
+	
+	UAbilityVitalityDataBase& GetVitalityData() const;
+
+	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
+
+	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
+
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
+
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 
 	template<class T>
 	T* GetAttributeSet() const

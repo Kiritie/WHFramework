@@ -21,7 +21,11 @@ void UAbilityVitalityState_Interrupt::OnInitialize(UFSMComponent* InFSM, int32 I
 
 bool UAbilityVitalityState_Interrupt::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnPreEnter(InLastState, InParams);
+	if(!Super::OnPreEnter(InLastState, InParams)) return false;
+
+	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
+
+	return Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Interrupt);
 }
 
 void UAbilityVitalityState_Interrupt::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -56,6 +60,8 @@ void UAbilityVitalityState_Interrupt::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
+	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Interrupt);
+		
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Interrupting);
 }
 

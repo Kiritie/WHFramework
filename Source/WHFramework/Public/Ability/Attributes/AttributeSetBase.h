@@ -15,6 +15,8 @@ public:
 	UAttributeSetBase();
 
 public:
+	virtual void SerializeAttributes(FArchive& Ar);
+
 	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
@@ -50,4 +52,14 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TArray<FGameplayAttribute> GetPersistentAttributes() const;
+
+public:
+	template<class T>
+	T* GetOwnerActor() const
+	{
+		return Cast<T>(GetOwnerActor());
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
 };

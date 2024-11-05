@@ -33,7 +33,7 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
-	Character->DoAction(GameplayTags::Ability_Pawn_Action_Spawn);
+	Character->DoAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
 	Character->LimitToAnim();
 
@@ -41,7 +41,6 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Character->GetInteractionComponent()->SetInteractable(false);
 
-	Character->Execute_SetActorVisible(Character, true);
 	Character->ResetData();
 	Character->SetMotionRate(1.f, 1.f);
 

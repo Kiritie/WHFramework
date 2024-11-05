@@ -1,10 +1,36 @@
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "GameplayEffectExtension.h"
 #include "AbilitySystemComponent.h"
-#include "Ability/Character/AbilityCharacterBase.h"
+#include "Common/CommonTypes.h"
 
 UAttributeSetBase::UAttributeSetBase()
 {
+}
+
+void UAttributeSetBase::SerializeAttributes(FArchive& Ar)
+{
+	float BaseValue = 0.f;
+	float CurrentValue = 0.f;
+	for(FGameplayAttribute& Attribute : GetPersistentAttributes())
+	{
+		if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(this))
+		{
+			if(Ar.IsLoading())
+			{
+				Ar << BaseValue;
+				Ar << CurrentValue;
+				AttributeData->SetBaseValue(BaseValue);
+				AttributeData->SetCurrentValue(CurrentValue);
+			}
+			else if(Ar.IsSaving())
+			{
+				BaseValue = AttributeData->GetBaseValue();
+				CurrentValue = AttributeData->GetCurrentValue();
+				Ar << BaseValue;
+				Ar << CurrentValue;
+			}
+		}
+	}
 }
 
 void UAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
@@ -100,4 +126,9 @@ TArray<FGameplayAttribute> UAttributeSetBase::GetPersistentAttributes() const
 		}
 	}
 	return PersistentAttributes;
+}
+
+AActor* UAttributeSetBase::GetOwnerActor(TSubclassOf<AActor> InClass) const
+{
+	return GetDeterminesOutputObject(GetOwningActor(), InClass);
 }

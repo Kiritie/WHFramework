@@ -11,7 +11,7 @@ AAbilityPickUpSprite::AAbilityPickUpSprite()
 {
 	BoxComponent->SetBoxExtent(FVector(12.f, 3.f, 12.f));
 
-	MeshComponent = CreateDefaultSubobject<UWorldWidgetComponent>(TEXT("MeshComponent"));
+	MeshComponent = CreateDefaultSubobject<UWorldWidgetComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		

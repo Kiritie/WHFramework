@@ -19,9 +19,9 @@ UFSMComponent::UFSMComponent()
 	DefaultState = nullptr;
 	FinalState = nullptr;
 	CurrentState = nullptr;
+	TargetState = nullptr;
 
 	States = TArray<TSubclassOf<UFiniteStateBase>>();
-
 	StateMap = TMap<FName, UFiniteStateBase*>();
 
 	bShowDebugMessage = false;

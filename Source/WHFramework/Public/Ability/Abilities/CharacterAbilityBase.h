@@ -13,8 +13,4 @@ class WHFRAMEWORK_API UCharacterAbilityBase : public UPawnAbilityBase
 
 public:
 	UCharacterAbilityBase();
-
-protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	UAnimMontage* AnimMontage;
 };

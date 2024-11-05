@@ -146,8 +146,10 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	FGuid ActorID;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	

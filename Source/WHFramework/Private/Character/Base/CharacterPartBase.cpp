@@ -82,7 +82,7 @@ void UCharacterPartBase::OnExitVoxel(UVoxel& InVoxel, const FVoxelHitResult& InH
 	InVoxel.OnAgentExit(GetOwnerCharacter(), InHitResult);
 }
 
-ACharacterBase* UCharacterPartBase::GetOwnerCharacter() const
+ACharacterBase* UCharacterPartBase::GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass) const
 {
-	return Cast<ACharacterBase>(GetOwner());
+	return GetDeterminesOutputObject(Cast<ACharacterBase>(GetOwner()), InClass);
 }
