@@ -15,7 +15,4 @@ class WHFRAMEWORK_API AAbilityPropBase : public AAbilityItemBase
 	
 public:	
 	AAbilityPropBase();
-
-public:
-	virtual void Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty) override;
 };

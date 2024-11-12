@@ -131,11 +131,11 @@ public:
 
 	FORCEINLINE FIndex(const FString& InValue)
 	{
-		TArray<FString> tmpArr;
-		InValue.ParseIntoArray(tmpArr, TEXT(","));
-		X = FCString::Atoi(*tmpArr[0]);
-		Y = FCString::Atoi(*tmpArr[1]);
-		Z = FCString::Atoi(*tmpArr[2]);
+		TArray<FString> Arr;
+		InValue.ParseIntoArray(Arr, TEXT(","));
+		X = FCString::Atoi(*Arr[0]);
+		Y = FCString::Atoi(*Arr[1]);
+		Z = FCString::Atoi(*Arr[2]);
 	}
 
 	FORCEINLINE FVector ToVector() const

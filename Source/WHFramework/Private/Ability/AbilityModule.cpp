@@ -82,46 +82,37 @@ void UAbilityModule::OnTermination(EPhase InPhase)
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	AAbilityItemBase* Item = SpawnAbilityItem(InItem);
-	if(Item)
+	if(AAbilityItemBase* Item = SpawnAbilityItem(InItem))
 	{
 		Item->SetActorLocationAndRotation(InLocation, InRotation);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Item);
 		}
+		return Item;
 	}
-	return Item;
+	return nullptr;
 }
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
 {
-	AAbilityItemBase* Item = nullptr;
 	switch (InItem.GetType())
 	{
 		case EAbilityItemType::Prop:
 		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(nullptr, nullptr, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
-			break;
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(InOwnerActor, { &InItem }, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
 		}
 		case EAbilityItemType::Equip:
 		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(nullptr, nullptr, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
-			break;
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(InOwnerActor, { &InItem }, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
 		}
 		case EAbilityItemType::Raw:
 		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(nullptr, nullptr, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
-			break;
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(InOwnerActor, { &InItem }, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
 		}
 		default: break;
 	}
-
-	if(Item)
-	{
-		Item->Initialize(InOwnerActor, InItem);
-	}
-	return Item;
+	return nullptr;
 }
 
 AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
@@ -141,35 +132,27 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, IS
 
 	const auto& ItemData = SaveData.Item.GetData<UAbilityItemDataBase>();
 	
-	AAbilityPickUpBase* PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpBase>(nullptr, nullptr, false, ItemData.PickUpClass);
-
-	if(PickUp)
+	if(AAbilityPickUpBase* PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpBase>(nullptr, nullptr, false, ItemData.PickUpClass))
 	{
 		PickUp->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(PickUp);
 		}
+		return PickUp;
 	}
-	return PickUp;
+	return nullptr;
 }
 
 AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
 {
-	if(!InClass) return nullptr;
-	
-	if(AAbilityProjectileBase* Projectile = UObjectPoolModuleStatics::SpawnObject<AAbilityProjectileBase>(nullptr, nullptr, false, InClass))
-	{
-		Projectile->Initialize(InOwnerActor, InAbilityHandle);
-		return Projectile;
-	}
-	return nullptr;
+	return UObjectPoolModuleStatics::SpawnObject<AAbilityProjectileBase>(InOwnerActor, { &InAbilityHandle }, false, InClass);
 }
 
 AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetData<UAbilityActorDataBase>().Class))
+	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { SaveData.ActorID, SaveData.AssetID }, false, SaveData.GetData<UAbilityActorDataBase>().Class))
 	{
 		Cast<ISaveDataAgentInterface>(Actor)->LoadSaveData(InSaveData);
 		if(InContainer)

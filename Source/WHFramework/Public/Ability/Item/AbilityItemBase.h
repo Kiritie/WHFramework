@@ -29,8 +29,11 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void Initialize(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty);
+	UFUNCTION(BlueprintNativeEvent, Blueprintable)
+	bool Active();
+	
+	UFUNCTION(BlueprintNativeEvent, Blueprintable)
+	void Deactive();
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

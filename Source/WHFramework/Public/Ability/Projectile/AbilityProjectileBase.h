@@ -37,11 +37,8 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintNativeEvent)
-	void Initialize(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle);
-	
-	UFUNCTION(BlueprintNativeEvent)
 	void Launch(FVector InDirection = FVector::ZeroVector);
-		
+	
 	UFUNCTION(BlueprintNativeEvent)
 	void Destroy();
 

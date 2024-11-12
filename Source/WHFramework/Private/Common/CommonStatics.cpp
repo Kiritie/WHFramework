@@ -176,6 +176,16 @@ int32 UCommonStatics::GetEnumValueByAuthoredName(const FString& InEnumName, cons
 	return -1;
 }
 
+FText UCommonStatics::GetPropertyDisplayName(const FProperty* InProperty)
+{
+	FText PropertyName;
+	if(!FText::FindText(TEXT("UObjectDisplayNames"), FString::Printf(TEXT("%s:%s"), *InProperty->GetOwnerStruct()->GetName(), *InProperty->GetName()), PropertyName))
+	{
+		PropertyName = FText::FromString(InProperty->GetName());
+	}
+	return PropertyName;
+}
+
 void UCommonStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
 	FCoreStatics::SaveObjectDataToMemory(InObject, OutObjectData);

@@ -49,11 +49,6 @@ void AAbilityProjectileRemoteBase::OnBeginOverlap(UPrimitiveComponent* Overlappe
 	}
 }
 
-void AAbilityProjectileRemoteBase::Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
-{
-	Super::Initialize_Implementation(InOwnerActor, InAbilityHandle);
-}
-
 void AAbilityProjectileRemoteBase::Launch_Implementation(FVector InDirection)
 {
 	Super::Launch_Implementation(InDirection);

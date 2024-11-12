@@ -8,6 +8,8 @@
 #include "Math/MathStatics.h"
 #include "AbilityModuleStatics.generated.h"
 
+class UAbilityBase;
+class UEffectBase;
 class AAbilityItemBase;
 class AAbilityActorBase;
 class UAbilitySystemComponentBase;
@@ -30,10 +32,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Ability
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static const UGameplayAbility* GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
+	static const UAbilityBase* GetAbilityBySpec(const FGameplayAbilitySpec& InAbilitySpec, bool& bInstance);
 
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static bool GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> AbilityClass, FAbilityInfo& OutAbilityInfo);
+	static FAbilityInfo GetAbilityInfoByClass(TSubclassOf<UAbilityBase> InAbilityClass, float InLevel = 1);
+
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static FEffectInfo GetEffectInfoByClass(TSubclassOf<UEffectBase> InEffectClass, float InLevel = 1);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Race

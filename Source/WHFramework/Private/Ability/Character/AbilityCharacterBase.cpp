@@ -26,6 +26,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Fly.h"
 #include "Ability/Character/States/AbilityCharacterState_Interrupt.h"
 #include "Ability/Character/States/AbilityCharacterState_Swim.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Common/Looking/LookingComponent.h"
@@ -103,7 +104,7 @@ void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
-	SetMotionRate(1, 1);
+	SetMotionRate(1.f, 1.f);
 	
 	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
@@ -592,6 +593,11 @@ void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
+void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+{
+	
+}
+
 void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -604,14 +610,14 @@ void AAbilityCharacterBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPas
 
 void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) Pos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
-void AAbilityCharacterBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
+void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	if(InSplitType == ESlotSplitType::Shortcut)
+	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{
@@ -654,7 +660,7 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	}
 }
 
-void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	ModifyHealth(-DamageValue);
 
@@ -672,22 +678,30 @@ void AAbilityCharacterBase::HandleDamage(EDamageType DamageType, float DamageVal
 
 	if(DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageType != EDamageType::Magic ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageAttribute != GetMagicDamageAttribute() ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 	}
-}
-
-void AAbilityCharacterBase::HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(RecoveryValue);
-
-	if(RecoveryValue > 1.f)
+	if(DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::White, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
-void AAbilityCharacterBase::HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	if(RecoveryAttribute == GetHealthRecoveryAttribute())
+	{
+		ModifyHealth(RecoveryValue);
+
+		if(RecoveryValue > 1.f)
+		{
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		}
+	}
+}
+
+void AAbilityCharacterBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	
 }
 
 UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() const

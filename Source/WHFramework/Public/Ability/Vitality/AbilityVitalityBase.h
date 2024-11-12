@@ -91,6 +91,8 @@ public:
 
 	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
+	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) override;
+
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 
 	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
@@ -99,7 +101,7 @@ public:
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
-	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) override;
+	virtual void OnSelectItem(const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
@@ -110,11 +112,11 @@ public:
 
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 	
-	virtual void HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
-	virtual void HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
-	virtual void HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -137,14 +139,16 @@ public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRecovery)
+		
+	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRegenSpeed)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
-	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
 	
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 

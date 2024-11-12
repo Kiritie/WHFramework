@@ -4,6 +4,7 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "AbilitySystemComponentBase.generated.h"
 
+class UEffectBase;
 class UAbilityBase;
 class USkeletalMeshComponent;
 
@@ -103,7 +104,7 @@ public:
 	virtual FGameplayAbilitySpec FindAbilitySpecForItem(FAbilityItem Item);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
-	FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
+	virtual FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FAbilityInfo GetAbilityInfoBySpec(FGameplayAbilitySpec Spec);

@@ -4,6 +4,7 @@
 
 #include "ItemAbilityBase.generated.h"
 
+class UEffectBase;
 /**
  * 物品Ability基类
  */
@@ -20,10 +21,13 @@ protected:
 	
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
-protected:
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffects")
-	TArray<TSubclassOf<UGameplayEffect>> EffectClasses;
+	TArray<TSubclassOf<UEffectBase>> EffectClasses;
 
 private:
 	TArray<FActiveGameplayEffectHandle> EffectHandles;
+
+public:
+	virtual TArray<TSubclassOf<UEffectBase>> GetEffectClasses() const override;
 };

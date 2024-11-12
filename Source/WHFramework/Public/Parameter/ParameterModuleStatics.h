@@ -238,6 +238,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FGuid GetGuidValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetGuidValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetGuidValue(UPARAM(ref) FParameter& InParameter, const FGuid& InValue) { InParameter.SetGuidValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FPrimaryAssetId GetAssetIDValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetAssetIDValue(); }
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")

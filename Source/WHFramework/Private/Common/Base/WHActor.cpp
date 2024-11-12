@@ -30,7 +30,7 @@ void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
+		ActorID = InParams[0];
 	}
 
 	Execute_SetActorVisible(this, true);

@@ -226,6 +226,11 @@ void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams
 	}
 }
 
+void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>* InParams, bool bInEditor)
+{
+	CreateWorldWidget(InParams ? *InParams : TArray<FParameter>(), bInEditor);
+}
+
 void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
 {
 	if(WorldWidget)

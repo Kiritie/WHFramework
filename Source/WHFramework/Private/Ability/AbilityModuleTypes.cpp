@@ -37,7 +37,7 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -45,12 +45,12 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleDamage(DamageType, DamageValue, false, false, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleDamage(DamageAttribute, DamageValue, false, false, HitResult, SourceTags, SourceActor);
 		}
 	}
 }
 
-void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -58,12 +58,12 @@ void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, f
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleRecovery(RecoveryValue, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleRecovery(RecoveryAttribute, RecoveryValue, HitResult, SourceTags, SourceActor);
 		}
 	}
 }
 
-void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -71,7 +71,7 @@ void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor,
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleInterrupt(InterruptDuration, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleInterrupt(InterruptAttribute, InterruptDuration, HitResult, SourceTags, SourceActor);
 		}
 	}
 }
@@ -159,9 +159,9 @@ void FInventorySaveData::FillItems(int32 InLevel)
 			{
 				if(ItemDatas.IsEmpty()) break;
 
-				const int32 tmpIndex = FMath::RandRange(0, ItemDatas.Num() - 1);
-				AddItem(FAbilityItem(ItemDatas[tmpIndex]->GetPrimaryAssetId(), 1, ItemDatas[tmpIndex]->ClampLevel(InLevel)));
-				ItemDatas.RemoveAt(tmpIndex);
+				const int32 Index = FMath::RandRange(0, ItemDatas.Num() - 1);
+				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), 1, ItemDatas[Index]->ClampLevel(InLevel)));
+				ItemDatas.RemoveAt(Index);
 			}
 		}
 	}

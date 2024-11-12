@@ -6,6 +6,7 @@
 #include "GameplayCueManager.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Debug/DebugModuleTypes.h"
 
@@ -193,7 +194,7 @@ FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoBySpec(FGameplayAbilityS
 			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(Spec.Level, AbilityInfo.CooldownDuration);
 		}
 	}
-	if(UGameplayAbility* Ability = Spec.GetPrimaryInstance())
+	if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 	{
 		AbilityInfo.CooldownRemaining = Ability->GetCooldownTimeRemaining();
 	}

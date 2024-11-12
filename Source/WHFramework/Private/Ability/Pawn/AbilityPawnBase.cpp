@@ -14,6 +14,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Pawn/AbilityPawnInventoryBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Interrupt.h"
 #include "Ability/Pawn/States/AbilityPawnState_Static.h"
@@ -326,6 +327,11 @@ void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
+void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+{
+	
+}
+
 void AAbilityPawnBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -338,14 +344,14 @@ void AAbilityPawnBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 
 void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) Pos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
-void AAbilityPawnBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
+void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	if(InSplitType == ESlotSplitType::Shortcut)
+	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{
@@ -375,7 +381,7 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 	}
 }
 
-void AAbilityPawnBase::HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityPawnBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	ModifyHealth(-DamageValue);
 
@@ -393,22 +399,30 @@ void AAbilityPawnBase::HandleDamage(EDamageType DamageType, float DamageValue, b
 
 	if(DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageType != EDamageType::Magic ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageAttribute != GetMagicDamageAttribute() ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 	}
-}
-
-void AAbilityPawnBase::HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(RecoveryValue);
-	
-	if(RecoveryValue > 1.f)
+	if(DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::White, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
-void AAbilityPawnBase::HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityPawnBase::HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	if(RecoveryAttribute == GetHealthRecoveryAttribute())
+	{
+		ModifyHealth(RecoveryValue);
+	
+		if(RecoveryValue > 1.f)
+		{
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		}
+	}
+}
+
+void AAbilityPawnBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	
 }
 
 UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const

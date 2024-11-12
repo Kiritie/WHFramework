@@ -73,6 +73,7 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 	ADD_PARAM_PROPERTY(Tag)
 	ADD_PARAM_PROPERTY(Tags)
 	ADD_PARAM_PROPERTY(Brush)
+	ADD_PARAM_PROPERTY(Guid)
 	ADD_PARAM_PROPERTY(AssetID)
 	ADD_PARAM_PROPERTY(Class)
 	ADD_PARAM_PROPERTY(ClassPtr)

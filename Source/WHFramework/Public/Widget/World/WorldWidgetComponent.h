@@ -39,6 +39,8 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
 
+	void CreateWorldWidget(const TArray<FParameter>* InParams = nullptr, bool bInEditor = false);
+
 	UFUNCTION(BlueprintCallable)
 	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
 
@@ -83,19 +85,19 @@ public:
 	bool IsAutoCreate() const { return bAutoCreate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetAutoCreate(bool bInAutoCreate) { this->bAutoCreate = bInAutoCreate; }
+	void SetAutoCreate(bool bInAutoCreate) { bAutoCreate = bInAutoCreate; }
 
 	UFUNCTION(BlueprintCallable)
 	bool IsOrientCamera() const { return bOrientCamera; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetOrientCamera(bool bInOrientCamera) { this->bOrientCamera = bInOrientCamera; }
+	void SetOrientCamera(bool bInOrientCamera) { bOrientCamera = bInOrientCamera; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsBindToSelf() const { return bBindToSelf; }
 	
 	UFUNCTION(BlueprintCallable)
-	void SetBindToSelf(bool bInBindToSelf) { this->bBindToSelf = bInBindToSelf; }
+	void SetBindToSelf(bool bInBindToSelf) { bBindToSelf = bInBindToSelf; }
 	
 	UFUNCTION(BlueprintPure)
 	UUserWidget* GetWorldWidget() const;

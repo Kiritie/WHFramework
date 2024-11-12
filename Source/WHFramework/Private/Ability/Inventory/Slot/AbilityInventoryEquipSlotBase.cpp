@@ -4,6 +4,7 @@
 #include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Item/Equip/AbilityEquipDataBase.h"
 
 UAbilityInventoryEquipSlotBase::UAbilityInventoryEquipSlotBase()
 {
@@ -28,18 +29,20 @@ void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 {
 	Super::OnItemPreChange(InNewItem);
 
-	if(IsEmpty()) return;
-
-	DeactiveItem(true);
+	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EEquipMode::Passive)
+	{
+		DeactiveItem(true);
+	}
 }
 
 void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
 {
 	Super::OnItemChanged(InOldItem);
 
-	if(IsEmpty()) return;
-
-	ActiveItem(true);
+	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EEquipMode::Passive)
+	{
+		ActiveItem(true);
+	}
 }
 
 bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem) const

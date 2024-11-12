@@ -6,8 +6,3 @@
 AAbilityRawBase::AAbilityRawBase()
 {
 }
-
-void AAbilityRawBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
-{
-	Super::Initialize_Implementation(InOwnerActor, InItem);
-}

@@ -586,19 +586,19 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 			if(Item.Tasks.Num() == 0 && Item.Queue.Num() > 0)
 			{
 				DON_WITHINDEX(FMath::CeilToInt((float)Item.Queue.Num() / Item.Speed), j,
-					TArray<FIndex> tmpQueue;
+					TArray<FIndex> Queue;
 					DON_WITHINDEX(FMath::Min(Item.Speed, Item.Queue.Num() - j * Item.Speed), k,
-						tmpQueue.Add(Item.Queue[j * Item.Speed + k]);
+						Queue.Add(Item.Queue[j * Item.Speed + k]);
 					)
-					const auto Task = new FAsyncTask<AsyncTask_ChunkQueue>(tmpQueue, InFunc, i);
+					const auto Task = new FAsyncTask<AsyncTask_ChunkQueue>(Queue, InFunc, i);
 					Item.Tasks.Add(Task);
 					Task->StartBackgroundTask();
 				)
 			}
 			else if(Item.Tasks.Num() > 0)
 			{
-				const auto tmpTasks = Item.Tasks;
-				ITER_ARRAY(tmpTasks, Task,
+				const auto Tasks = Item.Tasks;
+				ITER_ARRAY(Tasks, Task,
 					if(Task->IsDone())
 					{
 						ITER_ARRAY(Task->GetTask().GetChunkQueue(), Index,
@@ -616,9 +616,9 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 		}
 		else
 		{
-			const int32 tmpNum = FMath::Min(Item.Speed, Item.Queue.Num());
-			DON_WITHINDEX(tmpNum, j, InFunc(Item.Queue[j], i); )
-			Item.Queue.RemoveAt(0, tmpNum);
+			const int32 Num = FMath::Min(Item.Speed, Item.Queue.Num());
+			DON_WITHINDEX(Num, j, InFunc(Item.Queue[j], i); )
+			Item.Queue.RemoveAt(0, Num);
 			if(Item.Queue.Num() > 0)
 			{
 				return true;
@@ -813,16 +813,16 @@ FVector UVoxelModule::VoxelIndexToLocation(FIndex InIndex) const
 
 int32 UVoxelModule::VoxelIndexToNumber(FIndex InIndex) const
 {
-	const int32 tmpNum = (int32)WorldData->ChunkSize.X;
-	return InIndex.X + InIndex.Y * tmpNum + InIndex.Z * tmpNum * (int32)WorldData->ChunkSize.Y;
+	const int32 Num = (int32)WorldData->ChunkSize.X;
+	return InIndex.X + InIndex.Y * Num + InIndex.Z * Num * (int32)WorldData->ChunkSize.Y;
 }
 
 FIndex UVoxelModule::NumberToVoxelIndex(int32 InNumber) const
 {
-	const int32 tmpNum1 = (int32)WorldData->ChunkSize.X;
-	const int32 tmpNum2 = tmpNum1 * (int32)WorldData->ChunkSize.Y;
-	const int32 tmpNum3 = InNumber % tmpNum2;
-	return FIndex(tmpNum3 % tmpNum1, tmpNum3 / tmpNum1, InNumber / tmpNum2);
+	const int32 Num1 = (int32)WorldData->ChunkSize.X;
+	const int32 Num2 = Num1 * (int32)WorldData->ChunkSize.Y;
+	const int32 Num3 = InNumber % Num2;
+	return FIndex(Num3 % Num1, Num3 / Num1, InNumber / Num2);
 }
 
 bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

@@ -139,6 +139,8 @@ public:
 
 	int32 GetMaxVolume(FAbilityItem InItem = FAbilityItem::Empty) const;
 
+	int32 GetMaxLevel(FAbilityItem InItem = FAbilityItem::Empty) const;
+
 	UFUNCTION(BlueprintPure)
 	FAbilityItem& GetItem()  { return Item; }
 

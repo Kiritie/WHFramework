@@ -132,6 +132,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static int32 GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Enum
+	/*
+	* 获取属性显示名称
+	* @param InProperty 属性
+	*/
+	static FText GetPropertyDisplayName(const FProperty* InProperty);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize

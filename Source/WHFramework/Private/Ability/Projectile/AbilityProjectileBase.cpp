@@ -10,6 +10,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
@@ -30,6 +31,29 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	OwnerActor = Cast<AActor>(InOwner);
+
+	if(OwnerActor && InParams.IsValidIndex(0))
+	{
+		if(UMeshComponent* MeshComponent = OwnerActor->FindComponentByClass<UMeshComponent>())
+		{
+			AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
+			SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
+		}
+
+		if(UAbilitySystemComponentBase* OwningASC = UAbilitySystemComponentBase::GetAbilitySystemComponentFormActor(OwnerActor))
+		{
+			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].GetPointerValueRef<FGameplayAbilitySpecHandle>());
+
+			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
+			{
+				AbilityLevel = Ability->GetAbilityLevel();
+				AbilityActorInfo = Ability->GetActorInfo();
+				EffectContainerMap = Ability->EffectContainerMap;
+			}
+		}
+	}
 }
 
 void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
@@ -60,32 +84,6 @@ void AAbilityProjectileBase::OnRefresh_Implementation(float DeltaSeconds)
 	if(UMeshComponent* MeshComponent = Cast<UMeshComponent>(RootComponent->GetAttachParent()))
 	{
 		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
-	}
-}
-
-void AAbilityProjectileBase::Initialize_Implementation(AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
-{
-	OwnerActor = InOwnerActor;
-
-	if(OwnerActor)
-	{
-		if(UMeshComponent* MeshComponent = OwnerActor->FindComponentByClass<UMeshComponent>())
-		{
-			AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
-			SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
-		}
-
-		if(UAbilitySystemComponentBase* OwningASC = UAbilitySystemComponentBase::GetAbilitySystemComponentFormActor(OwnerActor))
-		{
-			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InAbilityHandle);
-
-			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
-			{
-				AbilityLevel = Ability->GetAbilityLevel();
-				AbilityActorInfo = Ability->GetActorInfo();
-				EffectContainerMap = Ability->EffectContainerMap;
-			}
-		}
 	}
 }
 
@@ -172,7 +170,7 @@ FGameplayEffectContainerSpec AAbilityProjectileBase::MakeEffectContainerSpecFrom
 			OverrideGameplayLevel = AbilityLevel;
 		}
 		// Build GameplayEffectSpecs for each applied effect
-		for (const TSubclassOf<UGameplayEffect>& EffectClass : InContainer.TargetGameplayEffectClasses)
+		for (const TSubclassOf<UEffectBase>& EffectClass : InContainer.TargetGameplayEffectClasses)
 		{
 			auto EffectContext = OwningASC->MakeEffectContext();
 			EffectContext.AddSourceObject(this);

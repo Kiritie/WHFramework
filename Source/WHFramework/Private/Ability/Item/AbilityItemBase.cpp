@@ -3,6 +3,7 @@
 
 #include "Ability/Item/AbilityItemBase.h"
 
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Common/CommonStatics.h"
@@ -20,6 +21,13 @@ AAbilityItemBase::AAbilityItemBase()
 void AAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
+
+	OwnerActor = Cast<AActor>(InOwner);
+	
+	if(InParams.IsValidIndex(0))
+	{
+		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
+	}
 }
 
 void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
@@ -27,8 +35,19 @@ void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 }
 
-void AAbilityItemBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
+bool AAbilityItemBase::Active_Implementation()
 {
-	OwnerActor = InOwnerActor;
-	Item = InItem;
+	if(Item.InventorySlot)
+	{
+		return Item.InventorySlot->ActiveItem();
+	}
+	return false;
+}
+
+void AAbilityItemBase::Deactive_Implementation()
+{
+	if(Item.InventorySlot)
+	{
+		Item.InventorySlot->DeactiveItem();
+	}
 }

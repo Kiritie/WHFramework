@@ -27,16 +27,18 @@ public:
 	virtual void OnAdditionItem(const FAbilityItem& InItem) = 0;
 	
 	virtual void OnRemoveItem(const FAbilityItem& InItem) = 0;
-	
-	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) = 0;
 		
+	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) = 0;
+
+	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) = 0;
+	
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) = 0;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) = 0;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) = 0;
 
-	virtual void OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem) = 0;
+	virtual void OnSelectItem(const FAbilityItem& InItem) = 0;
 	
 public:
 	virtual UAbilityInventoryBase* GetInventory() const = 0;

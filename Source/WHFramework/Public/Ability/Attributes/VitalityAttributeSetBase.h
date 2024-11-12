@@ -37,7 +37,15 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxHealth, Category = "VitalityAttributes")
 	FGameplayAttributeData MaxHealth;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_HealthRecovery, Category = "VitalityAttributes")
+	FGameplayAttributeData HealthRecovery;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRecovery)
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_HealthRegenSpeed, Category = "VitalityAttributes")
+	FGameplayAttributeData HealthRegenSpeed;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRegenSpeed)
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_PhysicsDamage, Category = "VitalityAttributes")
 	FGameplayAttributeData PhysicsDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
@@ -50,10 +58,6 @@ public:
 	FGameplayAttributeData FallDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_Recovery, Category = "VitalityAttributes")
-	FGameplayAttributeData Recovery;
-	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Recovery)
-	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_Interrupt, Category = "VitalityAttributes")
 	FGameplayAttributeData Interrupt;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
@@ -61,7 +65,7 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "VitalityHandles")
 	TSubclassOf<UDamageHandle> DamageHandleClass;
-			
+	
 	UPROPERTY(EditDefaultsOnly, Category = "VitalityHandles")
 	TSubclassOf<URecoveryHandle> RecoveryHandleClass;
 			
@@ -76,6 +80,12 @@ public:
 	virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth);
 
 	UFUNCTION()
+	virtual void OnRep_HealthRecovery(const FGameplayAttributeData& OldRecovery);
+
+	UFUNCTION()
+	virtual void OnRep_HealthRegenSpeed(const FGameplayAttributeData& OldMaxHealth);
+
+	UFUNCTION()
 	virtual void OnRep_PhysicsDamage(const FGameplayAttributeData& OldPhysicsDamage);
 
 	UFUNCTION()
@@ -83,9 +93,6 @@ public:
 
 	UFUNCTION()
 	virtual void OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage);
-
-	UFUNCTION()
-	virtual void OnRep_Recovery(const FGameplayAttributeData& OldRecovery);
 
 	UFUNCTION()
 	virtual void OnRep_Interrupt(const FGameplayAttributeData& OldInterrupt);

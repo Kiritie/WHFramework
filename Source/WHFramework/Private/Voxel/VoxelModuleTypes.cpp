@@ -13,7 +13,7 @@
 FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
 
 FVoxelItem FVoxelItem::Empty = FVoxelItem();
-FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
+FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA__Unknown")));
 
 FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
 {
@@ -112,7 +112,7 @@ bool FVoxelItem::IsUnknown() const
 
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const

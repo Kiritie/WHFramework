@@ -75,19 +75,27 @@ bool ULookingComponent::CanLookAtTarget() const
 
 bool ULookingComponent::DoLookAtTarget(AActor* InTargetActor)
 {
-	if (!CanLookAtTarget() || !InTargetActor) return true;
-
-	if(OnTargetLookAtOn.IsBound())
+	if (CanLookAtTarget())
 	{
-		OnTargetLookAtOn.Execute(LookingTarget);
+		if(OnTargetLookAtOn.IsBound())
+		{
+			OnTargetLookAtOn.Execute(InTargetActor);
+		}
+
+		const FRotator CurrentRotation = OwnerActor->GetActorRotation();
+		const FRotator TargetRotation = FRotator(CurrentRotation.Pitch, GetLookingRotation(InTargetActor).Yaw, CurrentRotation.Roll);
+		if(!CurrentRotation.Equals(TargetRotation))
+		{
+			OwnerActor->SetActorRotation(FMath::RInterpConstantTo(CurrentRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), LookingRotationSpeed));
+			return false;
+		}
 	}
-
-	const FRotator CurrentRotation = OwnerActor->GetActorRotation();
-	const FRotator TargetRotation = FRotator(CurrentRotation.Pitch, GetLookingRotation(InTargetActor).Yaw, CurrentRotation.Roll);
-	if(!CurrentRotation.Equals(TargetRotation))
+	else
 	{
-		OwnerActor->SetActorRotation(FMath::RInterpConstantTo(CurrentRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), LookingRotationSpeed));
-		return false;
+		if(OnTargetLookAtOff.IsBound())
+		{
+			OnTargetLookAtOff.Execute(InTargetActor);
+		}
 	}
 	return true;
 }

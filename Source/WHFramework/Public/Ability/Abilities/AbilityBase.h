@@ -190,4 +190,7 @@ public:
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<TSubclassOf<UEffectBase>> GetEffectClasses() const;
 };

@@ -160,7 +160,7 @@ ETickableTickType AMainModule::GetTickableTickType() const
 #if WITH_EDITOR
 		IsTickable() ? ETickableTickType::Conditional : 
 #endif // WITH_EDITOR
-		ETickableTickType::Never;
+		ETickableTickType::Always;
 }
 
 TStatId AMainModule::GetStatId() const
@@ -247,7 +247,7 @@ void AMainModule::UpdateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutM
 	}
 }
 
-bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass)
+bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass) const
 {
 	return !ModuleMap.Contains(InModuleClass->GetDefaultObject<UModuleBase>()->ModuleName);
 }

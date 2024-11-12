@@ -58,6 +58,11 @@ void AVoxelContainerAuxiliary::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
+void AVoxelContainerAuxiliary::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+{
+	
+}
+
 void AVoxelContainerAuxiliary::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -70,12 +75,12 @@ void AVoxelContainerAuxiliary::OnDeactiveItem(const FAbilityItem& InItem, bool b
 
 void AVoxelContainerAuxiliary::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) Pos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
-void AVoxelContainerAuxiliary::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
+void AVoxelContainerAuxiliary::OnSelectItem(const FAbilityItem& InItem)
 {
 	
 }

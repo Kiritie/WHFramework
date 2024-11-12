@@ -19,14 +19,11 @@ public:
 	AAbilityEquipBase();
 
 public:
-	virtual void Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty) override;
-
-public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnAssemble();
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnDischarge();
+	void OnDisassemble();
 
 public:
 	UFUNCTION(BlueprintPure)

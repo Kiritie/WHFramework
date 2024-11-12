@@ -27,6 +27,7 @@ enum class EParameterType : uint8
 	Tag,
 	Tags,
 	Brush,
+	Guid,
 	AssetID,
 	Class,
 	ClassPtr,
@@ -122,6 +123,7 @@ public:
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
 		BrushValue = FSlateBrush();
+		GuidValue = FGuid();
 		AssetIDValue = FPrimaryAssetId();
 		ClassValue = nullptr;
 		ClassPtrValue = nullptr;
@@ -220,8 +222,12 @@ public:
 	{
 		*this = MakeBrush(InValue);
 	}
-
 		
+	FParameter(const FGuid& InValue)
+	{
+		*this = MakeGuid(InValue);
+	}
+
 	FParameter(const FPrimaryAssetId& InValue)
 	{
 		*this = MakeAssetID(InValue);
@@ -298,15 +304,17 @@ public:
 	FORCEINLINE operator FGameplayTagContainer() const { return TagsValue; }
 		
 	FORCEINLINE operator FSlateBrush() const { return BrushValue; }
+	
+	FORCEINLINE operator FGuid() const { return GuidValue; }
 
 	FORCEINLINE operator FPrimaryAssetId() const { return AssetIDValue; }
 
 	FORCEINLINE operator UClass*() const { return ClassValue; }
 	
-	template<class T>
+	template<class T = UObject>
 	FORCEINLINE operator TSubclassOf<T>() const { return GetClassValue<T>(); }
 
-	template<class T>
+	template<class T = UObject>
 	FORCEINLINE operator TSoftClassPtr<T>() const { return GetClassPtrValue<T>(); }
 	
 	FORCEINLINE operator UObject*() const { return ObjectValue; }
@@ -314,7 +322,7 @@ public:
 	template<class T>
 	FORCEINLINE operator T*() const { return GetObjectValue<T>(); }
 
-	template<class T>
+	template<class T = UObject>
 	FORCEINLINE operator TSoftObjectPtr<T>() const { return GetObjectPtrValue<T>(); }
 
 	FORCEINLINE operator FSimpleDynamicDelegate() const { return DelegateValue; }
@@ -341,6 +349,7 @@ public:
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
 			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue == B.BrushValue;
+			case EParameterType::Guid: return A.GuidValue == B.GuidValue;
 			case EParameterType::AssetID: return A.AssetIDValue == B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue == B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue == B.ClassPtrValue;
@@ -372,6 +381,7 @@ public:
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
 			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue != B.BrushValue;
+			case EParameterType::Guid: return A.GuidValue != B.GuidValue;
 			case EParameterType::AssetID: return A.AssetIDValue != B.AssetIDValue;
 			case EParameterType::Class: return A.ClassValue != B.ClassValue;
 			case EParameterType::ClassPtr: return A.ClassPtrValue != B.ClassPtrValue;
@@ -436,6 +446,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSlateBrush BrushValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid GuidValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetIDValue;
@@ -557,6 +570,11 @@ public:
 	FSlateBrush GetBrushValue() const { return BrushValue; }
 
 	void SetBrushValue(const FSlateBrush& InBrushValue) { BrushValue = InBrushValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FGuid GetGuidValue() const { return GuidValue; }
+
+	void SetGuidValue(const FGuid& InGuidValue) { GuidValue = InGuidValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FPrimaryAssetId GetAssetIDValue() const { return AssetIDValue; }
@@ -770,6 +788,15 @@ public:
 		Parameter.ParameterType = EParameterType::Brush;
 		Parameter.Description = InDescription;
 		Parameter.SetBrushValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeGuid(const FGuid& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Guid;
+		Parameter.Description = InDescription;
+		Parameter.SetGuidValue(InValue);
 		return Parameter;
 	}
 

@@ -42,7 +42,7 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const T
 		UEffectBase* Effect = UObjectPoolModuleStatics::SpawnObject<UEffectBase>();
 
 		FGameplayModifierInfo ModifierInfo;
-		ModifierInfo.Attribute = GET_GAMEPLAYATTRIBUTE_PROPERTY(UVitalityAttributeSetBase, FallDamage);
+		ModifierInfo.Attribute = GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, FallDamage);
 		ModifierInfo.ModifierOp = EGameplayModOp::Override;
 		ModifierInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(1.f);
 

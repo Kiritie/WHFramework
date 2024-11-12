@@ -91,6 +91,8 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 
 	K2_OnCreate(InOwner, InParams);
 
+	Refresh();
+
 	if(GetWidgetSpace() == EWidgetSpace::Screen)
 	{
 		if(IsWidgetInEditor())

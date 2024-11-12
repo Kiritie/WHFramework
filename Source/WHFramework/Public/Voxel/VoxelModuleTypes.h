@@ -259,10 +259,6 @@ struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 	GENERATED_BODY()
 
 public:
-	static FVoxelItem Empty;
-	static FVoxelItem Unknown;
-
-public:
 	UPROPERTY(BlueprintReadWrite)
 	FIndex Index;
 
@@ -282,6 +278,10 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bGenerated;
+
+public:
+	static FVoxelItem Empty;
+	static FVoxelItem Unknown;
 
 public:
 	FVoxelItem()

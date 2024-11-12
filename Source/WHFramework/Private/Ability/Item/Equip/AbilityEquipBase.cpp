@@ -7,17 +7,12 @@ AAbilityEquipBase::AAbilityEquipBase()
 {
 }
 
-void AAbilityEquipBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
-{
-	Super::Initialize_Implementation(InOwnerActor, InItem);
-}
-
 void AAbilityEquipBase::OnAssemble_Implementation()
 {
 	
 }
 
-void AAbilityEquipBase::OnDischarge_Implementation()
+void AAbilityEquipBase::OnDisassemble_Implementation()
 {
 	
 }

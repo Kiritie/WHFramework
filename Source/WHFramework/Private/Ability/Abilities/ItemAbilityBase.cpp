@@ -1,6 +1,7 @@
 #include "Ability/Abilities/ItemAbilityBase.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Ability/Effects/EffectBase.h"
 
 UItemAbilityBase::UItemAbilityBase()
 {
@@ -28,4 +29,12 @@ void UItemAbilityBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const
 			BP_RemoveGameplayEffectFromOwnerWithHandle(Iter);
 		}
 	}
+}
+
+TArray<TSubclassOf<UEffectBase>> UItemAbilityBase::GetEffectClasses() const
+{
+	TArray<TSubclassOf<UEffectBase>> ReturnValues;
+	ReturnValues.Append(EffectClasses);
+	ReturnValues.Append(Super::GetEffectClasses());
+	return ReturnValues;
 }

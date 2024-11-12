@@ -46,6 +46,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityPickUpBase> PickUpClass;
 
+protected:
+	UPROPERTY(Transient)
+	UObject* InitIcon;
+
 public:
 	UFUNCTION(BlueprintPure)
 	int32 ClampCount(int32 InCount) const;
@@ -53,13 +57,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	int32 ClampLevel(int32 InLevel) const;
 
-protected:
-	UPROPERTY(Transient)
-	UObject* InitIcon;
-
 public:
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
+
+	UFUNCTION(BlueprintPure)
+	FText GetItemAttributeInfo(int32 InLevel = 1) const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);

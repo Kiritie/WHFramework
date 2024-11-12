@@ -5,10 +5,12 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Scene/SceneModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
 
+class UEffectBase;
 class UAbilityActorDataBase;
 class UVitalityActionAbilityBase;
 class UAbilityInventoryBase;
@@ -20,8 +22,10 @@ class AAbilityEquipBase;
 class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlotBase;
 
-#define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
-	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)); \
+DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
+
+#define GET_GAMEPLAYATTRIBUTE(ClassName, PropertyName) \
+	FGameplayAttribute(GET_MEMBER_PROPERTY(ClassName, PropertyName))
 
 #define GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
 	FORCEINLINE float GetBase##PropertyName() const \
@@ -237,7 +241,7 @@ class WHFRAMEWORK_API UDamageHandle : public UWHObject
 public:
 	UDamageHandle() {}
 
-	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -251,7 +255,7 @@ class WHFRAMEWORK_API URecoveryHandle : public UWHObject
 public:
 	URecoveryHandle() {}
 
-	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -265,7 +269,7 @@ class WHFRAMEWORK_API UInterruptHandle : public UWHObject
 public:
 	UInterruptHandle() {}
 
-	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -286,7 +290,7 @@ public:
 
     /** 目标GameplayEffect类型 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
-    TArray<TSubclassOf<UGameplayEffect>> TargetGameplayEffectClasses;
+    TArray<TSubclassOf<UEffectBase>> TargetGameplayEffectClasses;
 };
 
 /**
@@ -320,17 +324,17 @@ public:
 };
 
 /**
- * 伤害类型
- */
+* 装备模式
+*/
 UENUM(BlueprintType)
-enum class EDamageType : uint8
+enum class EEquipMode : uint8
 {
-	// 物理伤害
-	Physics,
-	// 魔法伤害
-	Magic,
-	// 掉落伤害
-	Fall
+	// 无
+	None,
+	// 被动
+	Passive,
+	// 主动
+	Initiative
 };
 
 /**
@@ -422,6 +426,7 @@ public:
 		ID = FPrimaryAssetId();
 		Count = 0;
 		Level = 0;
+		InventorySlot = nullptr;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
@@ -430,15 +435,17 @@ public:
 		ID = InID;
 		Count = InCount;
 		Level = InLevel;
+		InventorySlot = nullptr;
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InVoxelItem, int32 InCount = -1)
+	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1)
 	{
-		ID = InVoxelItem.ID;
-		Count = InCount == -1 ? InVoxelItem.Count : InCount;
-		Level = InVoxelItem.Level;
-		AbilityHandle = InVoxelItem.AbilityHandle;
+		ID = InItem.ID;
+		Count = InCount == -1 ? InItem.Count : InCount;
+		Level = InItem.Level;
+		InventorySlot = InItem.InventorySlot;
+		AbilityHandle = InItem.AbilityHandle;
 	}
 
 	virtual ~FAbilityItem() override = default;
@@ -453,6 +460,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
 
+	UPROPERTY(Transient)
+	UAbilityInventorySlotBase* InventorySlot;
+	
+	UPROPERTY(Transient)
 	FGameplayAbilitySpecHandle AbilityHandle;
 	
 	static FAbilityItem Empty;
@@ -491,24 +502,29 @@ public:
 		return *this == Empty;
 	}
 
-	FORCEINLINE bool EqualType(const FAbilityItem& InItem) const
+	FORCEINLINE bool Match(const FAbilityItem& InItem) const
 	{
 		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
 	}
 
+	FORCEINLINE bool Equal(const FAbilityItem& InItem) const
+	{
+		return (InItem.ID == ID) && (InItem.Count == Count) && (InItem.Level == Level);
+	}
+
 	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
 	{
-		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level);
+		return A.Equal(B);
 	}
 
 	FORCEINLINE friend bool operator!=(const FAbilityItem& A, const FAbilityItem& B)
 	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level);
+		return !A.Equal(B);
 	}
 
 	FORCEINLINE friend FAbilityItem operator+(FAbilityItem& A, FAbilityItem& B)
 	{
-		if(A.EqualType(B))
+		if(A.Match(B))
 		{
 			A.Count += B.Count;
 		}
@@ -517,7 +533,7 @@ public:
 
 	FORCEINLINE friend FAbilityItem operator-(FAbilityItem& A, FAbilityItem& B)
 	{
-		if(A.EqualType(B))
+		if(A.Match(B))
 		{
 			A.Count -= B.Count;
 		}
@@ -526,7 +542,7 @@ public:
 
 	FORCEINLINE friend FAbilityItem& operator+=(FAbilityItem& A, FAbilityItem& B)
 	{
-		if(A.EqualType(B))
+		if(A.Match(B))
 		{
 			A.Count += B.Count;
 		}
@@ -535,7 +551,7 @@ public:
 
 	FORCEINLINE friend FAbilityItem& operator-=(FAbilityItem& A, FAbilityItem& B)
 	{
-		if(A.EqualType(B))
+		if(A.Match(B))
 		{
 			A.Count -= B.Count;
 		}
@@ -576,6 +592,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
 	
+	UPROPERTY(Transient)
 	FGameplayAbilitySpecHandle AbilityHandle;
 
 public:
@@ -616,11 +633,70 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAttributeInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGameplayAttribute Attribute;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGameplayAttribute BaseAttribute;
+
+	UPROPERTY(EditDefaultsOnly, Category=Capture)
+	EGameplayEffectAttributeCaptureSource AttributeSource;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TEnumAsByte<EGameplayModOp::Type> ModifierOp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Value;
+
+public:
+	FORCEINLINE FAttributeInfo()
+	{
+		Attribute = FGameplayAttribute();
+		BaseAttribute = FGameplayAttribute();
+		AttributeSource = EGameplayEffectAttributeCaptureSource();
+		ModifierOp = EGameplayModOp::Additive;
+		Value = 0.f;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FEffectInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FAttributeInfo> Attributes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Duration;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Period;
+
+public:
+	FORCEINLINE FEffectInfo()
+	{
+		Attributes = TArray<FAttributeInfo>();
+		Duration = 0.f;
+		Period = 0.f;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAbilityInfo
 {
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FEffectInfo> Effects;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FGameplayAttribute CostAttribute;
 
@@ -636,6 +712,7 @@ public:
 public:
 	FORCEINLINE FAbilityInfo()
 	{
+		Effects = TArray<FEffectInfo>();
 		CostAttribute = FGameplayAttribute();
 		CostValue = 0.f;
 		CooldownDuration = -1.f;

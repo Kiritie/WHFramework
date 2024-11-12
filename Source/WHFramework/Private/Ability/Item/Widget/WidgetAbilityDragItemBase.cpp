@@ -26,5 +26,5 @@ void UWidgetAbilityDragItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	
-	Item = FAbilityItem::Empty;
+	Item = FAbilityItem();
 }

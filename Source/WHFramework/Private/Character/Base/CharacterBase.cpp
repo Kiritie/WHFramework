@@ -77,11 +77,11 @@ void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
+		ActorID = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+		AssetID = InParams[1];
 	}
 
 	USceneModuleStatics::AddSceneActor(this);

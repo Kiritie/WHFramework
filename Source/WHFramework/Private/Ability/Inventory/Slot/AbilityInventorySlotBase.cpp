@@ -4,16 +4,17 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
+#include "Ability/Actor/AbilityActorInterface.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Voxel/VoxelModule.h"
 
 UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 {
 	Item = FAbilityItem::Empty;
+	Item.InventorySlot = this;
 	Inventory = nullptr;
 	LimitType = EAbilityItemType::None;
 	SplitType = ESlotSplitType::Default;
@@ -47,12 +48,12 @@ void UAbilityInventorySlotBase::OnInitialize(UAbilityInventoryBase* InInventory,
 
 bool UAbilityInventorySlotBase::ContainsItem(FAbilityItem InItem) const
 {
-	return !IsEmpty() && Item.EqualType(InItem);
+	return !IsEmpty() && Item.Match(InItem);
 }
 
 bool UAbilityInventorySlotBase::MatchItem(FAbilityItem InItem, bool bPutIn) const
 {
-	return bPutIn ? (IsEmpty() && MatchItemLimit(InItem) || Item.EqualType(InItem) && GetRemainVolume(InItem) > 0) :
+	return bPutIn ? (IsEmpty() && MatchItemLimit(InItem) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
 		(!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
 }
 
@@ -110,29 +111,30 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem)
 {
 	if(Item.IsValid())
 	{
-		const auto Vitality = Inventory->GetOwnerAgent<IAbilityVitalityInterface>();
-		if (Vitality && Item.GetData().AbilityClass)
+		const auto Actor = Inventory->GetOwnerAgent<IAbilityActorInterface>();
+		if (Actor && Item.GetData().AbilityClass)
 		{
-			Item.AbilityHandle = Vitality->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
+			Item.AbilityHandle = Actor->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
 		}
 	}
 	else
 	{
 		Item.AbilityHandle = FGameplayAbilitySpecHandle();
 	}
-	if(IsSelected())
+	if(const auto Agent = Inventory->GetOwnerAgent())
 	{
-		if(const auto Agent = Inventory->GetOwnerAgent())
+		Agent->OnChangeItem(Item, InOldItem);
+		if(IsSelected())
 		{
-			Agent->OnSelectItem(SplitType, GetItem());
+			Agent->OnSelectItem(Item);
 		}
 	}
 }
 
 void UAbilityInventorySlotBase::Replace(UAbilityInventorySlotBase* InSlot)
 {
-	auto _Item = GetItem();
-	SetItem(InSlot->GetItem());
+	auto _Item = Item;
+	SetItem(InSlot->Item);
 	InSlot->SetItem(_Item);
 }
 
@@ -141,10 +143,16 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 	if(Item == InItem) return;
 	
 	OnItemPreChange(InItem);
+	
 	FAbilityItem OldItem = Item;
+	
 	Item = InItem;
 	Item.Count = FMath::Clamp(Item.Count, 0, GetMaxVolume(InItem));
+	Item.Level = FMath::Clamp(Item.Level, 0, GetMaxLevel(InItem));
+	Item.InventorySlot = this;
+	
 	OnItemChanged(OldItem);
+	
 	if(bRefresh)
 	{
 		Refresh();
@@ -155,16 +163,16 @@ void UAbilityInventorySlotBase::AddItem(FAbilityItem& InItem)
 {
 	if (ContainsItem(InItem))
 	{
-		const int32 tmpNum = InItem.Count - GetRemainVolume(InItem);
+		const int32 Num = InItem.Count - GetRemainVolume(InItem);
 		Item.Count = FMath::Clamp(Item.Count + InItem.Count, 0, GetMaxVolume(InItem));
-		InItem.Count = FMath::Max(tmpNum, 0);
+		InItem.Count = FMath::Max(Num, 0);
 		Refresh();
 	}
 	else
 	{
 		SetItem(InItem);
-		const int32 tmpNum = InItem.Count - GetMaxVolume(InItem);
-		InItem.Count = FMath::Max(tmpNum, 0);
+		const int32 Num = InItem.Count - GetMaxVolume(InItem);
+		InItem.Count = FMath::Max(Num, 0);
 	}
 }
 
@@ -172,9 +180,9 @@ void UAbilityInventorySlotBase::SubItem(FAbilityItem& InItem)
 {
 	if (ContainsItem(InItem))
 	{
-		int32 tmpNum = InItem.Count - Item.Count;
+		int32 Num = InItem.Count - Item.Count;
 		Item.Count = FMath::Clamp(Item.Count - InItem.Count, 0, GetMaxVolume(InItem));
-		InItem.Count = FMath::Max(tmpNum, 0);
+		InItem.Count = FMath::Max(Num, 0);
 		Refresh();
 	}
 }
@@ -184,11 +192,11 @@ void UAbilityInventorySlotBase::SplitItem(int32 InCount /*= -1*/)
 	if (IsEmpty()) return;
 
 	if(InCount == - 1) InCount = Item.Count;
-	const int32 tmpCount = Item.Count / InCount;
+	const int32 Count = Item.Count / InCount;
 	auto ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Add, Item);
 	for (int32 i = 0; i < InCount; i++)
 	{
-		FAbilityItem _Item = FAbilityItem(Item, tmpCount);
+		FAbilityItem _Item = FAbilityItem(Item, Count);
 		Item.Count -= _Item.Count;
 		for (int32 j = 0; j < ItemQueryData.Slots.Num(); j++)
 		{
@@ -300,9 +308,9 @@ bool UAbilityInventorySlotBase::ActiveItem(bool bPassive /*= false*/)
 	if(IsEmpty()) return false;
 
 	bool bSuccess = false;
-	if(auto Vitality = GetInventory()->GetOwnerAgent<IAbilityVitalityInterface>())
+	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		if(Vitality->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
+		if(Actor->GetLevelA() >= Item.Level && Actor->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
 		{
 			OnSlotActivated.Broadcast();
 			for(auto Iter : GetInventory()->QueryItemByRange(EItemQueryType::Get, Item).Slots)
@@ -326,9 +334,9 @@ void UAbilityInventorySlotBase::DeactiveItem(bool bPassive /*= false*/)
 {
 	if(IsEmpty()) return;
 	
-	if(auto Vitality = GetInventory()->GetOwnerAgent<IAbilityVitalityInterface>())
+	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		Vitality->GetAbilitySystemComponent()->CancelAbilityHandle(Item.AbilityHandle);
+		Actor->GetAbilitySystemComponent()->CancelAbilityHandle(Item.AbilityHandle);
 		OnSlotDeactived.Broadcast();
 	}
 	if(auto Agent = GetInventory()->GetOwnerAgent())
@@ -385,6 +393,12 @@ int32 UAbilityInventorySlotBase::GetMaxVolume(FAbilityItem InItem) const
 {
 	const FAbilityItem _Item = InItem.IsValid() ? InItem : Item;
 	return _Item.IsValid() ? _Item.GetData().MaxCount : 0;
+}
+
+int32 UAbilityInventorySlotBase::GetMaxLevel(FAbilityItem InItem) const
+{
+	const FAbilityItem _Item = InItem.IsValid() ? InItem : Item;
+	return _Item.IsValid() ? _Item.GetData().MaxLevel : 0;
 }
 
 FAbilityInfo UAbilityInventorySlotBase::GetAbilityInfo() const

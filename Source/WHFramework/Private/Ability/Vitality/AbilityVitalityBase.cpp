@@ -4,6 +4,7 @@
 
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
@@ -58,6 +59,8 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
+	Super::LoadData(InSaveData, InPhase);
+
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
@@ -85,8 +88,6 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		SetRaceID(SaveData.RaceID);
 	}
-
-	Super::LoadData(InSaveData, InPhase);
 }
 
 FSaveData* AAbilityVitalityBase::ToData()
@@ -218,6 +219,11 @@ void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInterac
 	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
 }
 
+void AAbilityVitalityBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+{
+	Super::OnChangeItem(InNewItem, InOldItem);
+}
+
 void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 	Super::OnActiveItem(InItem, bPassive, bSuccess);
@@ -238,11 +244,11 @@ void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPla
 	Super::OnDiscardItem(InItem, bInPlace);
 }
 
-void AAbilityVitalityBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
+void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	Super::OnSelectItem(InSplitType, InItem);
+	Super::OnSelectItem(InItem);
 
-	if(InSplitType == ESlotSplitType::Shortcut)
+	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{
@@ -275,7 +281,7 @@ void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAtt
 	Super::OnAttributeChange(InAttributeChangeData);
 }
 
-void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, float DamageValue, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
 	ModifyHealth(-DamageValue);
 
@@ -293,22 +299,30 @@ void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, float DamageValu
 
 	if(DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageType != EDamageType::Magic ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageAttribute != GetMagicDamageAttribute() ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 	}
-}
-
-void AAbilityVitalityBase::HandleRecovery(float RecoveryValue, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(RecoveryValue);
-	
-	if(RecoveryValue >= 1.f)
+	if(DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::White, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
-void AAbilityVitalityBase::HandleInterrupt(float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityVitalityBase::HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	if(RecoveryAttribute == GetHealthRecoveryAttribute())
+	{
+		ModifyHealth(RecoveryValue);
+	
+		if(RecoveryValue >= 1.f)
+		{
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		}
+	}
+}
+
+void AAbilityVitalityBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	
 }
 
 bool AAbilityVitalityBase::IsActive(bool bNeedNotDead) const

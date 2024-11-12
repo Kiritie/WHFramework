@@ -290,6 +290,6 @@ public:
 
 	void UpdateModuleListItem(TArray<TSharedPtr<struct FModuleListItem>>& OutModuleListItems);
 
-	bool CanAddModule(TSubclassOf<UModuleBase> InModuleClass);
+	bool CanAddModule(TSubclassOf<UModuleBase> InModuleClass) const;
 #endif
 };

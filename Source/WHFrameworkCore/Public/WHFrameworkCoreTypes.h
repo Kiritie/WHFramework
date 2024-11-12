@@ -72,6 +72,7 @@ for(auto& Item : Map) \
 	Index++; \
 }
 
+// INSTANCE
 #define GENERATED_INSTANCE(InstanceClass) \
 protected: \
 	static InstanceClass* Instance; \
@@ -94,6 +95,16 @@ InstanceClass* InstanceClass::GetPtr() \
 	return Instance; \
 }
 
+// ROB
+#define DECLARE_PROPERTY_ROB_GETTER(ClassName, PropertyName, PropertyClassName) \
+	PropertyClassName ClassName::*Get##PropertyName(); \
+	template <PropertyClassName ClassName::*M> \
+	struct ClassName##Rob { \
+		friend PropertyClassName ClassName::*Get##PropertyName() { return M; } \
+	}; \
+	template struct ClassName##Rob<&ClassName::PropertyName>;
+
+// INI
 #define GET_STRING_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \
 	FString SettingValue = DefaultValue; \
 	bool bSuccess = GConfig->GetString(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \

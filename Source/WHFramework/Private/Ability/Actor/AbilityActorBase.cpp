@@ -46,7 +46,7 @@ void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FP
 {
 	if(InParams.IsValidIndex(1))
 	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
+		AssetID = InParams[1];
 	}
 
 	Super::OnSpawn_Implementation(InOwner, InParams);
@@ -186,6 +186,11 @@ void AAbilityActorBase::OnRemoveItem(const FAbilityItem& InItem)
 {
 }
 
+void AAbilityActorBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+{
+	
+}
+
 void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
@@ -198,12 +203,12 @@ void AAbilityActorBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive
 
 void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) Pos += GetActorForwardVector() * (GetRadius() + 35.f);
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
-void AAbilityActorBase::OnSelectItem(ESlotSplitType InSplitType, const FAbilityItem& InItem)
+void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)
 {
 	
 }

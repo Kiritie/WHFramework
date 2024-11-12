@@ -84,6 +84,11 @@ enum class EInteractAgentType : uint8
 };
 
 //////////////////////////////////////////////////////////////////////////
+// Property
+#define GET_MEMBER_PROPERTY(ClassName, PropertyName) \
+	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)) \
+
+//////////////////////////////////////////////////////////////////////////
 // Functions
 extern WHFRAMEWORK_API const UObject* GetWorldContext(bool bInEditor = false);
 
@@ -101,7 +106,7 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 }
 
 #define GET_FUNCTION_NAME_THISCLASS(FunctionName) \
-	((void)sizeof(&ThisClass::FunctionName), FName(TEXT(#FunctionName)))
+	GET_FUNCTION_NAME_CHECKED(ThisClass, FunctionName)
 
 //////////////////////////////////////////////////////////////////////////
 // Tags

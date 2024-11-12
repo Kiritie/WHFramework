@@ -1,6 +1,7 @@
 #include "Ability/Abilities/AbilityBase.h"
 
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Common/CommonTypes.h"
 
 UAbilityBase::UAbilityBase()
@@ -90,7 +91,7 @@ FGameplayEffectContainerSpec UAbilityBase::MakeEffectContainerSpecFromContainer(
 			OverrideGameplayLevel = GetAbilityLevel();
 		}
 		// Build GameplayEffectSpecs for each applied effect
-		for (const TSubclassOf<UGameplayEffect>& EffectClass : Container.TargetGameplayEffectClasses)
+		for (const TSubclassOf<UEffectBase>& EffectClass : Container.TargetGameplayEffectClasses)
 		{
 			ReturnSpec.TargetGameplayEffectSpecs.Add(MakeOutgoingGameplayEffectSpec(EffectClass, OverrideGameplayLevel));
 		}
@@ -336,4 +337,14 @@ void UAbilityBase::MontageStopForAllMeshes(float OverrideBlendOutTime)
 AActor* UAbilityBase::GetOwnerActor(TSubclassOf<AActor> InClass /*= nullptr*/) const
 {
 	return GetDeterminesOutputObject(GetOwningActorFromActorInfo(), InClass);
+}
+
+TArray<TSubclassOf<UEffectBase>> UAbilityBase::GetEffectClasses() const
+{
+	TArray<TSubclassOf<UEffectBase>> ReturnValues;
+	for(auto& Iter : EffectContainerMap)
+	{
+		ReturnValues.Append(Iter.Value.TargetGameplayEffectClasses);
+	}
+	return ReturnValues;
 }

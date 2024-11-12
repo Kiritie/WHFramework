@@ -160,6 +160,12 @@ public:
 				
 	UFUNCTION(BlueprintPure)
 	TArray<UAbilityInventorySlotBase*> GetAllSlots() const;
+				
+	UFUNCTION(BlueprintPure)
+	TArray<FAbilityItem> GetAllItems() const;
+				
+	UFUNCTION(BlueprintPure)
+	TMap<EAbilityItemType, FAbilityItems> GetAllItemMap() const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<UAbilityInventorySlotBase*> GetSlotsBySplitType(ESlotSplitType InSplitType) const;
