@@ -71,33 +71,33 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	TArray<FParameter> WidgetParams;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UserInterface")
+	FVector WidgetScale;
+
 	UPROPERTY(Transient, DuplicateTransient)
 	TMap<FName, USceneComponent*> WidgetPoints;
 
 	UPROPERTY(Transient, DuplicateTransient)
 	UWorldWidgetBase* WorldWidget;
 
-private:	
-	FTransform InitTransform;
-
 public:
 	UFUNCTION(BlueprintCallable)
 	bool IsAutoCreate() const { return bAutoCreate; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetAutoCreate(bool bInAutoCreate) { bAutoCreate = bInAutoCreate; }
+	void SetAutoCreate(bool bInAutoCreate) { this->bAutoCreate = bInAutoCreate; }
 
 	UFUNCTION(BlueprintCallable)
 	bool IsOrientCamera() const { return bOrientCamera; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetOrientCamera(bool bInOrientCamera) { bOrientCamera = bInOrientCamera; }
+	void SetOrientCamera(bool bInOrientCamera) { this->bOrientCamera = bInOrientCamera; }
 
 	UFUNCTION(BlueprintPure)
 	bool IsBindToSelf() const { return bBindToSelf; }
 	
 	UFUNCTION(BlueprintCallable)
-	void SetBindToSelf(bool bInBindToSelf) { bBindToSelf = bInBindToSelf; }
+	void SetBindToSelf(bool bInBindToSelf) { this->bBindToSelf = bInBindToSelf; }
 	
 	UFUNCTION(BlueprintPure)
 	UUserWidget* GetWorldWidget() const;

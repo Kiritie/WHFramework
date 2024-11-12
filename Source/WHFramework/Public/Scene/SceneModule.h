@@ -320,7 +320,7 @@ public:
 	/// Outline
 protected:
 	UPROPERTY(EditAnywhere, Category = "Outline")
-	class UMaterialInterface* OutlineMat;
+	UMaterialInterface* OutlineMat;
 
 	UPROPERTY(EditAnywhere, Category = "Outline")
 	FLinearColor OutlineColor;
@@ -337,6 +337,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "Level")
+	TArray<FAsyncLoadLevelTask> AsyncLoadLevelQueue;
+
+	UPROPERTY(VisibleAnywhere, Category = "Level")
+	TArray<FAsyncUnloadLevelTask> AsyncUnloadLevelQueue;
+
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"))
 	void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
@@ -364,8 +371,21 @@ public:
 
 protected:
 	UFUNCTION()
-	void OnAsyncLoadLevelFinished(const FName InLevelPath, const FOnAsyncLoadLevelFinished InOnLoadFinished, bool bDestroyLoadingWidget);
+	void AsyncLoadLevelInternal(FAsyncLoadLevelTask InTask);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(const FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnUnloadFinished, bool bDestroyLoadingWidget);
+	void AsyncUnloadLevelInternal(FAsyncUnloadLevelTask InTask);
+
+	UFUNCTION()
+	void OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevelFinished(FAsyncUnloadLevelTask InTask);
+
+private:
+	UFUNCTION()
+	void OnHandleAsyncLoadLevelFinish();
+	
+	UFUNCTION()
+	void OnHandleAsyncUnloadLevelFinish();
 };

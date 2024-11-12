@@ -23,6 +23,7 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 	bOrientCamera = false;
 	bBindToSelf = true;
 	WidgetParams = TArray<FParameter>();
+	WidgetScale = FVector::OneVector;
 	WidgetPoints = TMap<FName, USceneComponent*>();
 	WorldWidget = nullptr;
 }
@@ -31,8 +32,6 @@ void UWorldWidgetComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	InitTransform = GetRelativeTransform();
-
 	WidgetPoints.Add(GetFName(), this);
 	
 	TArray<USceneComponent*> ChildrenComps;
@@ -72,12 +71,11 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 #else
 		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
 #endif
-		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
+		SetRelativeScale3D(FVector(-WidgetScale.X, -WidgetScale.Y, WidgetScale.Z));
 	}
 	else
 	{
-		SetRelativeRotation(InitTransform.GetRotation());
-		SetRelativeScale3D(InitTransform.GetScale3D());
+		SetRelativeScale3D(WidgetScale);
 	}
 
 	if(UCommonStatics::IsPlaying())
