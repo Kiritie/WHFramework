@@ -327,7 +327,12 @@ void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
-void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityPawnBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }
@@ -375,10 +380,21 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
+			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
+			SetExp(Exp);
 		}
 	}
+}
+
+void AAbilityPawnBase::OnActorAttached(AActor* InActor)
+{
+	
+}
+
+void AAbilityPawnBase::OnActorDetached(AActor* InActor)
+{
+	
 }
 
 void AAbilityPawnBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -433,6 +449,11 @@ UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const
 UShapeComponent* AAbilityPawnBase::GetCollisionComponent() const
 {
 	return BoxComponent;
+}
+
+UMeshComponent* AAbilityPawnBase::GetMeshComponent() const
+{
+	return nullptr;
 }
 
 UAbilitySystemComponent* AAbilityPawnBase::GetAbilitySystemComponent() const

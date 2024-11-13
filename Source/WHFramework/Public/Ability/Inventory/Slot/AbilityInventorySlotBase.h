@@ -52,7 +52,7 @@ public:
 	virtual bool MatchItemSplit(FAbilityItem InItem, bool bForce = false) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool MatchItemLimit(FAbilityItem InItem) const;
+	virtual bool MatchItemLimit(FAbilityItem InItem, bool bForce = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actions
@@ -130,7 +130,7 @@ public:
 	bool IsMatched() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsLimitMatched() const;
+	bool IsLimitMatched(bool bForce = false) const;
 
 	UFUNCTION(BlueprintPure)
 	bool IsSplitMatched(bool bForce = false) const;

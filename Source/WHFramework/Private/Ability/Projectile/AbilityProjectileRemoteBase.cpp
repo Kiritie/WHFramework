@@ -64,8 +64,6 @@ bool AAbilityProjectileRemoteBase::CanHitTarget(AActor* InTarget) const
 void AAbilityProjectileRemoteBase::OnHitTarget(AActor* InTarget, const FHitResult& InHitResult)
 {
 	Super::OnHitTarget(InTarget, InHitResult);
-
-	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
 bool AAbilityProjectileRemoteBase::IsHitAble() const

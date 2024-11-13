@@ -219,9 +219,14 @@ void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInterac
 	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
 }
 
-void AAbilityVitalityBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityVitalityBase::OnPreChangeItem(const FAbilityItem& InOldItem)
 {
-	Super::OnChangeItem(InNewItem, InOldItem);
+	Super::OnPreChangeItem(InOldItem);
+}
+
+void AAbilityVitalityBase::OnChangeItem(const FAbilityItem& InNewItem)
+{
+	Super::OnChangeItem(InNewItem);
 }
 
 void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
@@ -279,6 +284,16 @@ bool AAbilityVitalityBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResul
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
 	Super::OnAttributeChange(InAttributeChangeData);
+}
+
+void AAbilityVitalityBase::OnActorAttached(AActor* InActor)
+{
+	Super::OnActorAttached(InActor);
+}
+
+void AAbilityVitalityBase::OnActorDetached(AActor* InActor)
+{
+	Super::OnActorDetached(InActor);
 }
 
 void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)

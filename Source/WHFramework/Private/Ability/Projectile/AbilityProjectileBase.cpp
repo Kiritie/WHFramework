@@ -3,8 +3,6 @@
 
 #include "Ability/Projectile/AbilityProjectileBase.h"
 
-#include "Components/StaticMeshComponent.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "TimerManager.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -34,23 +32,22 @@ void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 
 	OwnerActor = Cast<AActor>(InOwner);
 
-	if(OwnerActor && InParams.IsValidIndex(0))
+	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
 	{
-		if(UMeshComponent* MeshComponent = OwnerActor->FindComponentByClass<UMeshComponent>())
-		{
-			AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
-			SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
-		}
+		AbilityActor->AttachActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
+		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), AbilityActor->GetMeshComponent()->GetSocketLocation(FinalSocketName)));
 
-		if(UAbilitySystemComponentBase* OwningASC = UAbilitySystemComponentBase::GetAbilitySystemComponentFormActor(OwnerActor))
+		if(InParams.IsValidIndex(0))
 		{
-			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].GetPointerValueRef<FGameplayAbilitySpecHandle>());
-
-			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
+			if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 			{
-				AbilityLevel = Ability->GetAbilityLevel();
-				AbilityActorInfo = Ability->GetActorInfo();
-				EffectContainerMap = Ability->EffectContainerMap;
+				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].GetPointerValueRef<FGameplayAbilitySpecHandle>());
+				if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
+				{
+					AbilityLevel = Ability->GetAbilityLevel();
+					AbilityActorInfo = Ability->GetActorInfo();
+					EffectContainerMap = Ability->EffectContainerMap;
+				}
 			}
 		}
 	}
@@ -58,7 +55,10 @@ void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 
 void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
 {
-	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
+	{
+		AbilityActor->DetachActor(this, FDetachmentTransformRules::KeepWorldTransform);
+	}
 
 	Super::OnDespawn_Implementation(bRecovery);
 
@@ -91,7 +91,10 @@ void AAbilityProjectileBase::Launch_Implementation(FVector InDirection)
 {
 	bLaunched = true;
 	
-	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
+	{
+		AbilityActor->DetachActor(this, FDetachmentTransformRules::KeepWorldTransform);
+	}
 
 	SetActorRotation(InDirection != FVector::ZeroVector ? InDirection.Rotation() : OwnerActor->GetActorRotation());
 
@@ -122,8 +125,11 @@ void AAbilityProjectileBase::OnHitTarget(AActor* InTarget, const FHitResult& InH
 	EventData.Instigator = OwnerActor;
 	EventData.Target = InTarget;
 	EventData.OptionalObject = this;
+	EventData.ContextHandle.AddHitResult(InHitResult);
 
 	ApplyEffectContainer(HitEventTag, EventData, -1);
+	
+	Destroy();
 }
 
 bool AAbilityProjectileBase::IsHitAble() const

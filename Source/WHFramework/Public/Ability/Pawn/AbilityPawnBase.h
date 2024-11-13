@@ -112,7 +112,9 @@ public:
 
 	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
 
-	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) override;
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -124,9 +126,14 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
-public:
+protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
-	
+
+	virtual void OnActorAttached(AActor* InActor) override;
+
+	virtual void OnActorDetached(AActor* InActor) override;
+
+public:
 	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
@@ -198,6 +205,8 @@ public:
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
 	virtual UShapeComponent* GetCollisionComponent() const override;
+
+	virtual UMeshComponent* GetMeshComponent() const override;
 
 	template<class T>
 	T* GetAbilitySystemComponent() const

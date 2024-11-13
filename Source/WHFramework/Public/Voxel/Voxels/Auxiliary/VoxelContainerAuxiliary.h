@@ -31,7 +31,9 @@ public:
 
 	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
 
-	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) override;
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
 	
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		

@@ -27,8 +27,10 @@ public:
 	virtual void OnAdditionItem(const FAbilityItem& InItem) = 0;
 	
 	virtual void OnRemoveItem(const FAbilityItem& InItem) = 0;
-		
-	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) = 0;
+				
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) = 0;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) = 0;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) = 0;
 	

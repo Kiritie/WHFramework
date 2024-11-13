@@ -109,14 +109,14 @@ bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, 
 		SetStyle(DefaultStyle);
 
 		FAbilityItem& _Item = PayloadSlot->GetItem();
-		if(OwnerSlot->MatchItemLimit(_Item))
+		if(OwnerSlot->MatchItemLimit(_Item, true))
 		{
 			if (OwnerSlot->ContainsItem(_Item))
 			{
 				OwnerSlot->AddItem(_Item);
 				PayloadSlot->OwnerSlot->Refresh();
 			}
-			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem()))
+			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem(), true))
 			{
 				OwnerSlot->Replace(PayloadSlot->OwnerSlot);
 			}
@@ -135,13 +135,13 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragEnter(const FGeometry& InGeome
 	{
 		TSubclassOf<UCommonButtonStyle> _Style;
 		FAbilityItem& _Item = PayloadSlot->GetItem();
-		if(OwnerSlot->MatchItemLimit(_Item))
+		if(OwnerSlot->MatchItemLimit(_Item, true))
 		{
 			if (OwnerSlot->ContainsItem(_Item))
 			{
 				_Style = MatchStyle;
 			}
-			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem()))
+			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem(), true))
 			{
 				_Style = MatchStyle;
 			}

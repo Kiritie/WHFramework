@@ -20,9 +20,13 @@ class WHFRAMEWORK_API IAbilityActorInterface : public IAbilitySystemInterface
 	GENERATED_BODY()
 
 public:
-	virtual void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
+	void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
 
-	virtual void RefreshAttributes();
+	void RefreshAttributes();
+
+	bool AttachActor(AActor* InActor, const FAttachmentTransformRules& InAttachmentRules, FName InSocketName = NAME_None);
+
+	void DetachActor(AActor* InActor, const FDetachmentTransformRules& InDetachmentRules);
 
 public:
 	virtual float GetExp() const = 0;
@@ -34,6 +38,10 @@ public:
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) = 0;
 	
+	virtual void OnActorAttached(AActor* InActor) = 0;
+
+	virtual void OnActorDetached(AActor* InActor) = 0;
+
 public:
 	virtual FName GetNameA() const = 0;
 
@@ -54,6 +62,8 @@ public:
 	virtual UAttributeSetBase* GetAttributeSet() const = 0;
 
 	virtual UShapeComponent* GetCollisionComponent() const = 0;
+
+	virtual UMeshComponent* GetMeshComponent() const = 0;
 
 private:
 	bool bAbilitiesInitialized = false;

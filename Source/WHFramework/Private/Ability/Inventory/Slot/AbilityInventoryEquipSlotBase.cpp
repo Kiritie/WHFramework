@@ -45,9 +45,9 @@ void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
 	}
 }
 
-bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem) const
+bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem, bool bForce) const
 {
-	return Super::MatchItemLimit(InItem);
+	return Super::MatchItemLimit(InItem, bForce);
 }
 
 void UAbilityInventoryEquipSlotBase::Refresh()

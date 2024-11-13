@@ -593,7 +593,12 @@ void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
-void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityCharacterBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }
@@ -641,8 +646,9 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
+			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
+			SetExp(Exp);
 		}
 	}
 	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
@@ -658,6 +664,16 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	{
 		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
 	}
+}
+
+void AAbilityCharacterBase::OnActorAttached(AActor* InActor)
+{
+	
+}
+
+void AAbilityCharacterBase::OnActorDetached(AActor* InActor)
+{
+	
 }
 
 void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -717,6 +733,11 @@ UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
 UShapeComponent* AAbilityCharacterBase::GetCollisionComponent() const
 {
 	return GetCapsuleComponent();
+}
+
+UMeshComponent* AAbilityCharacterBase::GetMeshComponent() const
+{
+	return GetMesh();
 }
 
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const
