@@ -4,16 +4,15 @@
 #include "Task/TaskModuleStatics.h"
 
 #include "Task/TaskModule.h"
-#include "Task/Base/TaskBase.h"
+
+TArray<UTaskAsset*> UTaskModuleStatics::GetTaskAssets()
+{
+	return UTaskModule::Get().GetAssets();
+}
 
 UTaskAsset* UTaskModuleStatics::GetCurrentTaskAsset()
 {
 	return UTaskModule::Get().GetCurrentAsset();
-}
-
-void UTaskModuleStatics::SetCurrentTaskAsset(UTaskAsset* InTaskAsset, bool bAutoEnterFirst)
-{
-	return UTaskModule::Get().SetCurrentAsset(InTaskAsset, bAutoEnterFirst);
 }
 
 UTaskBase* UTaskModuleStatics::GetCurrentTask()
@@ -29,6 +28,21 @@ UTaskBase* UTaskModuleStatics::GetCurrentRootTask()
 UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
 {
 	return UTaskModule::Get().GetTaskByGUID(InTaskGUID);
+}
+
+void UTaskModuleStatics::AddTaskAsset(UTaskAsset* InAsset)
+{
+	UTaskModule::Get().AddAsset(InAsset);
+}
+
+void UTaskModuleStatics::RemoveTaskAsset(UTaskAsset* InAsset)
+{
+	UTaskModule::Get().RemoveAsset(InAsset);
+}
+
+void UTaskModuleStatics::SwitchTaskAsset(UTaskAsset* InAsset)
+{
+	UTaskModule::Get().SwitchAsset(InAsset);
 }
 
 void UTaskModuleStatics::RestoreTask(UTaskBase* InTask)

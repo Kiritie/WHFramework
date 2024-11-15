@@ -368,12 +368,15 @@ void UAbilityInventoryBase::DiscardItems()
 void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
 	auto _Item = InItem;
-	for(int i = 0; i < InSlots.Num(); i++)
+	if(InItem.GetType() != EAbilityItemType::Misc)
 	{
-		InSlots[i]->AddItem(InItem);
-		if (InItem.Count <= 0) break;
+		for(int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->AddItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
 	}
-	_Item.Count -= InItem.Count;
 	if(auto Agent = GetOwnerAgent())
 	{
 		if(bBroadcast) Agent->OnAdditionItem(_Item);
@@ -383,12 +386,15 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
 	auto _Item = InItem;
-	for (int i = 0; i < InSlots.Num(); i++)
+	if(InItem.GetType() != EAbilityItemType::Misc)
 	{
-		InSlots[i]->SubItem(InItem);
-		if (InItem.Count <= 0) break;
+		for (int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->SubItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
 	}
-	_Item.Count -= InItem.Count;
 	if(auto Agent = GetOwnerAgent())
 	{
 		if(bBroadcast) Agent->OnRemoveItem(_Item);

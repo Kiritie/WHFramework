@@ -66,12 +66,16 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskModule
-protected:
-	/// 自动进入初始任务
-	UPROPERTY(EditAnywhere, Category = "TaskModule")
-	bool bAutoEnterFirst;
-
 public:
+	UFUNCTION(BlueprintCallable)
+	void AddAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void SwitchAsset(UTaskAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable)
 	void RestoreTask(UTaskBase* InTask);
 
@@ -100,6 +104,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 protected:
+	/// 流程资产列表
+	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
+	TArray<UTaskAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
 	UTaskAsset* DefaultAsset;
@@ -112,6 +119,11 @@ protected:
 
 public:
 	/**
+	* 获取资产列表
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<UTaskAsset*> GetAssets() const { return Assets; }
+	/**
 	* 获取默认资产
 	*/
 	UFUNCTION(BlueprintPure)
@@ -121,11 +133,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UTaskAsset* GetCurrentAsset() const { return CurrentAsset; }
-	/**
-	* 设置当前资产
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirst = false);
 	/**
 	* 获取初始任务
 	*/

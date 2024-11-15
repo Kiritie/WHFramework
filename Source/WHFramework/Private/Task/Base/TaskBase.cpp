@@ -263,6 +263,11 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 			Leave();
 		}
 	}
+
+	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
+	{
+		WHDebug(FString::Printf(TEXT("任务%s: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
+	}
 }
 
 void UTaskBase::OnLeave()
@@ -498,7 +503,6 @@ bool UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem, cons
 			if(SubTasks[i]->GenerateListItem(Item, InFilterText))
 			{
 				OutTaskListItem->SubListItems.Add(Item);
-				return true;
 			}
 		}
 	}
@@ -590,15 +594,15 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstTask)
 			{
-				if(GetTaskAsset()->GetFirstTask())
+				if(GetTaskAsset()->FirstTask)
 				{
-					GetTaskAsset()->GetFirstTask()->bFirstTask = false;
+					GetTaskAsset()->FirstTask->bFirstTask = false;
 				}
-				GetTaskAsset()->SetFirstTask(this);
+				GetTaskAsset()->FirstTask = this;
 			}
-			else if(GetTaskAsset()->GetFirstTask() == this)
+			else if(GetTaskAsset()->FirstTask == this)
 			{
-				GetTaskAsset()->SetFirstTask(nullptr);
+				GetTaskAsset()->FirstTask = nullptr;
 			}
 		}
 	}

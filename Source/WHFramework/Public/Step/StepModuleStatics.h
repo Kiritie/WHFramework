@@ -19,11 +19,11 @@ class WHFRAMEWORK_API UStepModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
+	static TArray<UStepAsset*> GetStepAssets();
+
 	UFUNCTION(BlueprintPure, Category = "StepModuleStatics")
 	static UStepAsset* GetCurrentStepAsset();
-
-	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
-	static void SetCurrentStepAsset(UStepAsset* InStepAsset, bool bAutoStartFirst = false);
 
 	UFUNCTION(BlueprintPure, Category = "StepModuleStatics")
 	static UStepBase* GetCurrentStep();
@@ -35,6 +35,15 @@ public:
 	static UStepBase* GetStepByGUID(const FString& InStepGUID);
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
+	static void AddStepAsset(UStepAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
+	static void RemoveStepAsset(UStepAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
+	static void SwitchStepAsset(UStepAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
 	static void StartStep(int32 InRootStepIndex = -1, bool bSkipSteps = false);
 

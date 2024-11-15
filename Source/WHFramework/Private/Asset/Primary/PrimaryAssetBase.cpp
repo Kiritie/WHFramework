@@ -22,8 +22,3 @@ FPrimaryAssetId UPrimaryAssetBase::GetPrimaryAssetId() const
 {
 	return FPrimaryAssetId(Type, GetFName());
 }
-
-bool UPrimaryAssetBase::EqualID(const FPrimaryAssetId& InAssetID) const
-{
-	return GetPrimaryAssetId() == InAssetID;
-}

@@ -34,7 +34,7 @@ void UWidgetSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>
 
 	if(!ContentBox)
 	{
-		ContentBox = NewObject<UVerticalBox>(this, UVerticalBox::StaticClass(), FName("ContentBox"));
+		ContentBox = NewObject<UVerticalBox>(this);
 	}
 
 	WidgetTree->RootWidget = ContentBox;

@@ -358,20 +358,6 @@ enum class EEquipRarity : uint8
 };
 
 /**
-* 技能类型
-*/
-UENUM(BlueprintType)
-enum class ESkillType : uint8
-{
-	// 无
-	None,
-	// 近战
-	Melee,
-	// 远程
-	Remote
-};
-
-/**
 * 技能模式
 */
 UENUM(BlueprintType)
@@ -412,7 +398,9 @@ enum class EAbilityItemType : uint8
 	// 对象
 	Pawn UMETA(DisplayName="对象"),
 	// 角色
-	Character UMETA(DisplayName="角色")
+	Character UMETA(DisplayName="角色"),
+	// 混杂
+	Misc UMETA(DisplayName="混杂")
 };
 
 USTRUCT(BlueprintType)

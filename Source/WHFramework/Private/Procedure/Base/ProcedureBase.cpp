@@ -40,9 +40,9 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(GetProcedureAsset()->GetFirstProcedure() == this)
+		if(GetProcedureAsset()->FirstProcedure == this)
 		{
-			GetProcedureAsset()->SetFirstProcedure(nullptr);
+			GetProcedureAsset()->FirstProcedure = nullptr;
 		}
 	}
 }
@@ -240,15 +240,15 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 		{
 			if(bFirstProcedure)
 			{
-				if(GetProcedureAsset()->GetFirstProcedure())
+				if(GetProcedureAsset()->FirstProcedure)
 				{
-					GetProcedureAsset()->GetFirstProcedure()->bFirstProcedure = false;
+					GetProcedureAsset()->FirstProcedure->bFirstProcedure = false;
 				}
-				GetProcedureAsset()->SetFirstProcedure(this);
+				GetProcedureAsset()->FirstProcedure = this;
 			}
-			else if(GetProcedureAsset()->GetFirstProcedure() == this)
+			else if(GetProcedureAsset()->FirstProcedure == this)
 			{
-				GetProcedureAsset()->SetFirstProcedure(nullptr);
+				GetProcedureAsset()->FirstProcedure = nullptr;
 			}
 		}
 	}

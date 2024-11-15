@@ -5,7 +5,6 @@
 
 #include "Main/MainModule.h"
 #include "Step/Base/StepBase.h"
-#include "Character/CharacterModuleTypes.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Step/EventHandle_StepEnded.h"
 #include "Event/Handle/Step/EventHandle_StepStarted.h"
@@ -21,10 +20,9 @@ UStepModule::UStepModule()
 
 	ModuleNetworkComponent = UStepModuleNetworkComponent::StaticClass();
 
-	bAutoStartFirst = false;
-
 	CurrentRootStepIndex = -1;
 
+	Assets = TArray<UStepAsset*>();
 	DefaultAsset = nullptr;
 	CurrentAsset = nullptr;
 	CurrentStep = nullptr;
@@ -57,11 +55,6 @@ void UStepModule::OnDestroy()
 void UStepModule::OnInitialize()
 {
 	Super::OnInitialize();
-
-	if(DefaultAsset)
-	{
-		SetCurrentAsset(DefaultAsset);
-	}
 }
 
 void UStepModule::OnPreparatory(EPhase InPhase)
@@ -70,9 +63,9 @@ void UStepModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(bAutoStartFirst)
+		if(DefaultAsset)
 		{
-			StartStep(-1, true);
+			SwitchAsset(DefaultAsset);
 		}
 	}
 }
@@ -143,6 +136,37 @@ void UStepModule::OnTermination(EPhase InPhase)
 FString UStepModule::GetModuleDebugMessage()
 {
 	return FString::Printf(TEXT("CurrentStep: %s"), CurrentStep ? *CurrentStep->StepDisplayName.ToString() : TEXT("None"));
+}
+
+void UStepModule::AddAsset(UStepAsset* InAsset)
+{
+	if(!Assets.Contains(InAsset))
+	{
+		Assets.Add(InAsset);
+	}
+}
+
+void UStepModule::RemoveAsset(UStepAsset* InAsset)
+{
+	if(Assets.Contains(InAsset))
+	{
+		Assets.Remove(InAsset);
+	}
+}
+
+void UStepModule::SwitchAsset(UStepAsset* InAsset)
+{
+	if(!InAsset || !Assets.Contains(InAsset) || (CurrentAsset && InAsset == CurrentAsset->SourceObject)) return;
+
+	CurrentAsset = DuplicateObject<UStepAsset>(InAsset, this);
+	CurrentAsset->Initialize(InAsset);
+
+	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Step, EDV_Log, FColor::Green, 5.f);
+
+	if(CurrentAsset->bAutoStartFirst)
+	{
+		StartStep(-1, true);
+	}
 }
 
 void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
@@ -347,21 +371,6 @@ bool UStepModule::IsAllStepCompleted()
 		}
 	}
 	return true;
-}
-
-void UStepModule::SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirst)
-{
-	if(!InStepAsset || (CurrentAsset && InStepAsset == CurrentAsset->SourceObject)) return;
-
-	CurrentAsset = DuplicateObject<UStepAsset>(InStepAsset, this);
-	CurrentAsset->Initialize(InStepAsset);
-
-	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Step, EDV_Log, FColor::Green, 5.f);
-
-	if(bInAutoStartFirst)
-	{
-		StartStep(-1, true);
-	}
 }
 
 void UStepModule::SetGlobalStepExecuteType(EStepExecuteType InGlobalStepExecuteType)

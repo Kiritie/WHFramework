@@ -22,6 +22,26 @@ UVoxelData::UVoxelData()
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
 }
 
+bool UVoxelData::IsEmpty() const
+{
+	return VoxelType == EVoxelType::Empty;
+}
+
+bool UVoxelData::IsUnknown() const
+{
+	return VoxelType == EVoxelType::Unknown;
+}
+
+bool UVoxelData::IsMainPart() const
+{
+	return bMainPart;
+}
+
+bool UVoxelData::IsCustom() const
+{
+	return VoxelType >= EVoxelType::Custom1;
+}
+
 bool UVoxelData::HasPartData(FIndex InIndex) const
 {
 	if(!bMainPart) return false;
@@ -71,24 +91,4 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 const FVoxelMeshData& UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
 	return MeshDatas[0];
-}
-
-bool UVoxelData::IsEmpty() const
-{
-	return VoxelType == EVoxelType::Empty;
-}
-
-bool UVoxelData::IsUnknown() const
-{
-	return VoxelType == EVoxelType::Unknown;
-}
-
-bool UVoxelData::IsMainPart() const
-{
-	return bMainPart;
-}
-
-bool UVoxelData::IsCustom() const
-{
-	return VoxelType >= EVoxelType::Custom1;
 }

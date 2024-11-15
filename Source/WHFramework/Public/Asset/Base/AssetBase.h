@@ -27,9 +27,9 @@ public:
 	/// Asset Stats
 public:
 	/// 显示名称 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText DisplayName;
-	
+
 	UPROPERTY(AssetRegistrySearchable)
 	TSubclassOf<UAssetBase> NativeClass;
 

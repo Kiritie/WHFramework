@@ -591,6 +591,8 @@ public:
 
 		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
 
+		IconMat = nullptr;
+
 		SceneData = FSceneModuleSaveData();
 	}
 
@@ -639,7 +641,10 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
-		
+				
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UMaterialInterface* IconMat;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSceneModuleSaveData SceneData;
 

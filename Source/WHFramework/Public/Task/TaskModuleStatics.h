@@ -20,10 +20,10 @@ class WHFRAMEWORK_API UTaskModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
-	static UTaskAsset* GetCurrentTaskAsset();
+	static TArray<UTaskAsset*> GetTaskAssets();
 
-	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void SetCurrentTaskAsset(UTaskAsset* InTaskAsset, bool bAutoEnterFirst = false);
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskAsset* GetCurrentTaskAsset();
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetCurrentTask();
@@ -35,6 +35,15 @@ public:
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void AddTaskAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RemoveTaskAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void SwitchTaskAsset(UTaskAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RestoreTask(UTaskBase* InTask);
 

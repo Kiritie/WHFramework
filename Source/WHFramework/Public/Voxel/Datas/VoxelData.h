@@ -45,6 +45,15 @@ public:
 	TArray<FVoxelMeshData> MeshDatas;
 
 public:
+	bool IsEmpty() const;
+
+	bool IsUnknown() const;
+
+	bool IsMainPart() const;
+
+	bool IsCustom() const;
+
+public:
 	virtual bool HasPartData(FIndex InIndex) const;
 
 	virtual UVoxelData& GetPartData(FIndex InIndex);
@@ -54,13 +63,4 @@ public:
 	virtual USoundBase* GetSound(EVoxelSoundType InSoundType) const;
 
 	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const;
-
-public:
-	bool IsEmpty() const;
-
-	bool IsUnknown() const;
-
-	bool IsMainPart() const;
-
-	bool IsCustom() const;
 };

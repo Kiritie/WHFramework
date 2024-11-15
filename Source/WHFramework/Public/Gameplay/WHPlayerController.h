@@ -73,6 +73,8 @@ protected:
 
 	virtual void SetupInputComponent() override;
 
+	virtual void InitPlayerState() override;
+
 public:
 	virtual void Tick(float DeltaSeconds) override;
 	

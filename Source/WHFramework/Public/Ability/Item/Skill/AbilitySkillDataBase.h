@@ -17,9 +17,6 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ESkillType SkillType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ESkillMode SkillMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

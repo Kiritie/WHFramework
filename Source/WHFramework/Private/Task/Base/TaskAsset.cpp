@@ -11,10 +11,11 @@ UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
 	
 	NativeClass = GetClass();
 
+	bAutoEnterFirst = false;
+	FirstTask = nullptr;
+
 	RootTasks = TArray<UTaskBase*>();
 	TaskMap = TMap<FString, UTaskBase*>();
-
-	FirstTask = nullptr;
 }
 
 void UTaskAsset::Initialize(UAssetBase* InSource)

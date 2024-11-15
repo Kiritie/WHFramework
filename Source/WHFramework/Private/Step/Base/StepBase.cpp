@@ -589,7 +589,6 @@ bool UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem, cons
 			if(SubSteps[i]->GenerateListItem(Item, InFilterText))
 			{
 				OutStepListItem->SubListItems.Add(Item);
-				return true;
 			}
 		}
 	}
@@ -689,15 +688,15 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstStep)
 			{
-				if(GetStepAsset()->GetFirstStep())
+				if(GetStepAsset()->FirstStep)
 				{
-					GetStepAsset()->GetFirstStep()->bFirstStep = false;
+					GetStepAsset()->FirstStep->bFirstStep = false;
 				}
-				GetStepAsset()->SetFirstStep(this);
+				GetStepAsset()->FirstStep = this;
 			}
-			else if(GetStepAsset()->GetFirstStep() == this)
+			else if(GetStepAsset()->FirstStep == this)
 			{
-				GetStepAsset()->SetFirstStep(nullptr);
+				GetStepAsset()->FirstStep = nullptr;
 			}
 		}
 	}

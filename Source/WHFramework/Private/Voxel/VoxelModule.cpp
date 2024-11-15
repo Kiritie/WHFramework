@@ -98,6 +98,12 @@ UVoxelModule::UVoxelModule()
 	{
 		WorldBasicData.RenderDatas.Add(EVoxelTransparency::Transparent, FVoxelRenderData(TransparentMatFinder.Object, UnlitTransparentMatFinder.Object));
 	}
+		
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Voxel/Materials/M_Voxels_Icon.M_Voxels_Icon'"));
+	if(IconSourceMatFinder.Succeeded())
+	{
+		WorldBasicData.IconMat = IconSourceMatFinder.Object;
+	}
 }
 
 UVoxelModule::~UVoxelModule()
@@ -334,7 +340,16 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeScale3D(FVector(0.3f));
-				Item->SetIconByTexture(VoxelCapture->GetCapture()->TextureTarget, FVector2D(8.f), ItemIndex);
+
+				if(!Item->Icon)
+				{
+					const auto IconMat = UMaterialInstanceDynamic::Create(WorldBasicData.IconMat, nullptr);
+					IconMat->SetTextureParameterValue(FName("Texture"), VoxelCapture->GetCapture()->TextureTarget);
+					IconMat->SetScalarParameterValue(FName("SizeX"), 8.f);
+					IconMat->SetScalarParameterValue(FName("SizeY"), 8.f);
+					IconMat->SetScalarParameterValue(FName("Index"), ItemIndex);
+					Item->Icon = IconMat;
+				}
 			}
 			ItemIndex++;
 		)

@@ -22,8 +22,7 @@ UTaskModule::UTaskModule()
 
 	ModuleNetworkComponent = UTaskModuleNetworkComponent::StaticClass();
 
-	bAutoEnterFirst = false;
-
+	Assets = TArray<UTaskAsset*>();
 	DefaultAsset = nullptr;
 	CurrentAsset = nullptr;
 	CurrentTask = nullptr;
@@ -51,11 +50,6 @@ void UTaskModule::OnDestroy()
 void UTaskModule::OnInitialize()
 {
 	Super::OnInitialize();
-
-	if(DefaultAsset)
-	{
-		SetCurrentAsset(DefaultAsset);
-	}
 }
 
 void UTaskModule::OnPreparatory(EPhase InPhase)
@@ -64,9 +58,9 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(bAutoEnterFirst && !CurrentTask)
+		if(DefaultAsset)
 		{
-			EnterTask(GetFirstTask());
+			SwitchAsset(DefaultAsset);
 		}
 	}
 }
@@ -134,10 +128,12 @@ void UTaskModule::Serialize(FArchive& Ar)
 	{
 		if(Ar.IsLoading())
 		{
+			Ar << CurrentAsset;
 			Ar << CurrentTask;
 		}
 		else if(Ar.IsSaving())
 		{
+			Ar << CurrentAsset;
 			Ar << CurrentTask;
 		}
 	}
@@ -194,6 +190,37 @@ FSaveData* UTaskModule::ToData()
 FString UTaskModule::GetModuleDebugMessage()
 {
 	return FString::Printf(TEXT("CurrentTask: %s"), CurrentTask ? *CurrentTask->TaskDisplayName.ToString() : TEXT("None"));
+}
+
+void UTaskModule::AddAsset(UTaskAsset* InAsset)
+{
+	if(!Assets.Contains(InAsset))
+	{
+		Assets.Add(InAsset);
+	}
+}
+
+void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
+{
+	if(Assets.Contains(InAsset))
+	{
+		Assets.Remove(InAsset);
+	}
+}
+
+void UTaskModule::SwitchAsset(UTaskAsset* InAsset)
+{
+	if(!InAsset || !Assets.Contains(InAsset) || (CurrentAsset && InAsset == CurrentAsset->SourceObject)) return;
+
+	CurrentAsset = DuplicateObject<UTaskAsset>(InAsset, this);
+	CurrentAsset->Initialize(InAsset);
+
+	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
+
+	if(InAsset->bAutoEnterFirst)
+	{
+		EnterTask(GetFirstTask());
+	}
 }
 
 void UTaskModule::RestoreTask(UTaskBase* InTask)
@@ -302,21 +329,6 @@ bool UTaskModule::IsAllTaskCompleted()
 		}
 	}
 	return true;
-}
-
-void UTaskModule::SetCurrentAsset(UTaskAsset* InTaskAsset, bool bInAutoEnterFirst)
-{
-	if(!InTaskAsset || (CurrentAsset && InTaskAsset == CurrentAsset->SourceObject)) return;
-
-	CurrentAsset = DuplicateObject<UTaskAsset>(InTaskAsset, this);
-	CurrentAsset->Initialize(InTaskAsset);
-
-	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
-
-	if(bInAutoEnterFirst)
-	{
-		EnterTask(GetFirstTask());
-	}
 }
 
 UTaskBase* UTaskModule::GetCurrentRootTask() const
