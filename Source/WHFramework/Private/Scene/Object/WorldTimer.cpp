@@ -26,8 +26,14 @@ void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	SetDayLength(SaveData.DayLength);
 	SetNightLength(SaveData.NightLength);
-	if(SaveData.DateTime != -1) SetDateTime(SaveData.DateTime);
-	else SetCurrentTime(SaveData.TimeOfDay);
+	if(SaveData.DateTime != -1)
+	{
+		SetDateTime(SaveData.DateTime);
+	}
+	else
+	{
+		SetCurrentTime(SaveData.TimeOfDay);
+	}
 }
 
 FSaveData* UWorldTimer::ToData()
@@ -41,6 +47,11 @@ FSaveData* UWorldTimer::ToData()
 	SaveData->DateTime = GetDateTime();
 
 	return SaveData;
+}
+
+void UWorldTimer::ResetTimerParams_Implementation() const
+{
+	ResetDateTime();
 }
 
 void UWorldTimer::ResetDateTime_Implementation(float InNewTime) const

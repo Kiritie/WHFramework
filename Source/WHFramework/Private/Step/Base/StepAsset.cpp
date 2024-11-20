@@ -18,9 +18,9 @@ UStepAsset::UStepAsset(const FObjectInitializer& ObjectInitializer)
 	StepMap = TMap<FString, UStepBase*>();
 }
 
-void UStepAsset::Initialize(UAssetBase* InSource)
+void UStepAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : RootSteps)
 	{

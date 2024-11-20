@@ -130,18 +130,20 @@ protected:
 	virtual void GenerateWorld();
 	
 public:
-	virtual void LoadChunkMap(FIndex InIndex);
-
-	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
-
-	virtual void BuildChunkMesh(FIndex InIndex);
-	
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
 
 	virtual void GenerateChunk(FIndex InIndex);
 
 	virtual void DestroyChunk(FIndex InIndex);
 
+	virtual void LoadChunkMap(FIndex InIndex);
+
+	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
+
+	virtual void SpawnChunkMesh(FIndex InIndex);
+
+	virtual void BuildChunkMesh(FIndex InIndex);
+	
 public:
 	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
 
@@ -197,11 +199,11 @@ public:
 
 	virtual bool VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
-	virtual bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
+	virtual bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
 
-	virtual bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
+	virtual bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
 
-	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bCheckVoxel = false);
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")

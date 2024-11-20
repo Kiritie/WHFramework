@@ -50,6 +50,12 @@ void UTaskModule::OnDestroy()
 void UTaskModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	if(DefaultAsset)
+	{
+		DefaultAsset = DefaultAsset->Duplicate<UTaskAsset>();
+		AddAsset(DefaultAsset);
+	}
 }
 
 void UTaskModule::OnPreparatory(EPhase InPhase)
@@ -73,35 +79,7 @@ void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(CurrentTask)
 	{
-		if(!CurrentTask->IsRootTask())
-		{
-			if(CurrentTask->GetTaskState() != ETaskState::Leaved)
-			{
-				CurrentTask->Refresh();
-			}
-			else if(CurrentTask->ParentTask)
-			{
-				if(CurrentTask->ParentTask->GetTaskState() != ETaskState::Leaved)
-				{
-					CurrentTask->ParentTask->Refresh();
-				}
-				else if(CurrentTask->ParentTask->IsRootTask() && GetRootTasks().IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
-				{
-					EnterTask(GetRootTasks()[CurrentTask->ParentTask->TaskIndex + 1]);
-				}
-			}
-		}
-		else
-		{
-			if(CurrentTask->GetTaskState() != ETaskState::Leaved)
-			{
-				CurrentTask->Refresh();
-			}
-			else if(GetRootTasks().IsValidIndex(CurrentTask->ParentTask->TaskIndex + 1))
-			{
-				EnterTask(GetRootTasks()[CurrentTask->ParentTask->TaskIndex + 1]);
-			}
-		}
+		CurrentTask->Refresh();
 	}
 }
 
@@ -120,41 +98,27 @@ void UTaskModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UTaskModule::Serialize(FArchive& Ar)
-{
-	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << CurrentAsset;
-			Ar << CurrentTask;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << CurrentAsset;
-			Ar << CurrentTask;
-		}
-	}
-}
-
 void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
+	auto& SaveData = InSaveData->CastRef<FTaskModuleSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		for(auto Iter : SaveData.TaskItemMap)
+		if(SaveData.IsSaved())
 		{
-			if(GetTaskMap().Contains(Iter.Key))
+			Assets = SaveData.Assets;
+			CurrentAsset = SaveData.CurrentAsset;
+			CurrentTask = SaveData.CurrentTask;
+			for(auto Iter1 : Assets)
 			{
-				GetTaskMap()[Iter.Key]->LoadSaveData(&Iter.Value);
+				for(auto Iter2 : Iter1->TaskMap)
+				{
+					if(SaveData.TaskDataMap.Contains(Iter2.Key))
+					{
+						Iter2.Value->LoadSaveData(&SaveData.TaskDataMap[Iter2.Key]);
+					}
+				}
 			}
-		}
-		if(!CurrentTask)
-		{
-			EnterTask(GetFirstTask());
 		}
 	}
 }
@@ -172,6 +136,8 @@ void UTaskModule::UnloadData(EPhase InPhase)
 			Iter->Restore();
 		}
 		CurrentTask = nullptr;
+		CurrentAsset = nullptr;
+		Assets.Empty();
 	}
 }
 
@@ -179,11 +145,18 @@ FSaveData* UTaskModule::ToData()
 {
 	static FTaskModuleSaveData SaveData;
 	SaveData = FTaskModuleSaveData();
-
-	for(auto Iter : GetTaskMap())
+	
+	SaveData.Assets = Assets;
+	SaveData.CurrentAsset = CurrentAsset;
+	SaveData.CurrentTask = CurrentTask;
+	for(auto Iter1 : Assets)
 	{
-		SaveData.TaskItemMap.Add(Iter.Key, Iter.Value->GetSaveDataRef<FSaveData>(true));
+		for(auto Iter2 : Iter1->TaskMap)
+		{
+			SaveData.TaskDataMap.Add(Iter2.Key, Iter2.Value->GetSaveDataRef<FSaveData>(true));
+		}
 	}
+
 	return &SaveData;
 }
 
@@ -194,26 +167,39 @@ FString UTaskModule::GetModuleDebugMessage()
 
 void UTaskModule::AddAsset(UTaskAsset* InAsset)
 {
-	if(!Assets.Contains(InAsset))
+	bool bCanAdd = true;
+	for(auto Iter : Assets)
+	{
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			bCanAdd = false;
+			break;
+		}
+	}
+	if(bCanAdd)
 	{
 		Assets.Add(InAsset);
+		InAsset->Initialize();
 	}
 }
 
 void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 {
-	if(Assets.Contains(InAsset))
+	for(auto Iter : Assets)
 	{
-		Assets.Remove(InAsset);
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			Assets.Remove(Iter);
+			break;
+		}
 	}
 }
 
 void UTaskModule::SwitchAsset(UTaskAsset* InAsset)
 {
-	if(!InAsset || !Assets.Contains(InAsset) || (CurrentAsset && InAsset == CurrentAsset->SourceObject)) return;
+	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
-	CurrentAsset = DuplicateObject<UTaskAsset>(InAsset, this);
-	CurrentAsset->Initialize(InAsset);
+	CurrentAsset = InAsset;
 
 	WHDebug(FString::Printf(TEXT("切换任务源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
 
@@ -231,6 +217,11 @@ void UTaskModule::RestoreTask(UTaskBase* InTask)
 	}
 }
 
+void UTaskModule::RestoreTaskByGUID(const FString& InTaskGUID)
+{
+	RestoreTask(GetTaskByGUID(InTaskGUID));
+}
+
 void UTaskModule::EnterTask(UTaskBase* InTask)
 {
 	if(!InTask || InTask->TaskEnterType == ETaskEnterType::None) return;
@@ -243,11 +234,10 @@ void UTaskModule::EnterTask(UTaskBase* InTask)
 	
 	if(InTask->ParentTask && !InTask->ParentTask->IsEntered())
 	{
-		InTask->ParentTask->CurrentSubTaskIndex = InTask->TaskIndex - 1;
 		EnterTask(InTask->ParentTask);
-		return;
 	}
-	if(InTask && InTask->GetTaskState() == ETaskState::None)
+	
+	if((!InTask->ParentTask || InTask->ParentTask->IsEntered()) && !InTask->IsEntered())
 	{
 		if(CurrentTask && !CurrentTask->IsParentOf(InTask))
 		{
@@ -256,15 +246,35 @@ void UTaskModule::EnterTask(UTaskBase* InTask)
 		UTaskBase* LastTask = CurrentTask;
 		CurrentTask = InTask;
 		InTask->OnEnter(LastTask);
+		if(InTask->HasSubTask(false))
+		{
+			if(InTask->SubTasks.IsValidIndex(0))
+			{
+				if(UTaskBase* SubTask = InTask->SubTasks[0]; SubTask->TaskEnterType == ETaskEnterType::Automatic)
+				{
+					SubTask->Enter();
+				}
+			}
+		}
 	}
+}
+
+void UTaskModule::EnterTaskByGUID(const FString& InTaskGUID)
+{
+	EnterTask(GetTaskByGUID(InTaskGUID));
 }
 
 void UTaskModule::RefreshTask(UTaskBase* InTask)
 {
-	if(InTask && InTask->GetTaskState() == ETaskState::Executing)
+	if(InTask && InTask->IsExecuting())
 	{
 		InTask->OnRefresh();
 	}
+}
+
+void UTaskModule::RefreshTaskByGUID(const FString& InTaskGUID)
+{
+	RefreshTask(GetTaskByGUID(InTaskGUID));
 }
 
 void UTaskModule::GuideTask(UTaskBase* InTask)
@@ -275,12 +285,22 @@ void UTaskModule::GuideTask(UTaskBase* InTask)
 	}
 }
 
+void UTaskModule::GuideTaskByGUID(const FString& InTaskGUID)
+{
+	GuideTask(GetTaskByGUID(InTaskGUID));
+}
+
 void UTaskModule::ExecuteTask(UTaskBase* InTask)
 {
 	if(InTask && InTask->GetTaskState() == ETaskState::Entered)
 	{
 		InTask->OnExecute();
 	}
+}
+
+void UTaskModule::ExecuteTaskByGUID(const FString& InTaskGUID)
+{
+	ExecuteTask(GetTaskByGUID(InTaskGUID));
 }
 
 void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
@@ -295,31 +315,72 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 			return;
 		}
 	}
-	if(!InTask->IsCompleted())
+	if(InTask->IsEntered() && !InTask->IsCompleted())
 	{
 		InTask->OnComplete(InTaskExecuteResult);
+		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubCompleted())
+		{
+			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubExecuteSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
+		}
 	}
-	for(auto Iter : InTask->SubTasks)
-	{
-		if(Iter) Iter->Complete(InTaskExecuteResult);
-	}
+}
+
+void UTaskModule::CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult)
+{
+	CompleteTask(GetTaskByGUID(InTaskGUID), InTaskExecuteResult);
 }
 
 void UTaskModule::LeaveTask(UTaskBase* InTask)
 {
 	if(!InTask) return;
 	
-	if(InTask->GetTaskState() != ETaskState::Completed)
+	if(!InTask->IsLeaved())
 	{
-		InTask->Complete(ETaskExecuteResult::Skipped);
-	}
-	if(InTask->GetTaskState() != ETaskState::Leaved)
-	{
+		if(InTask == CurrentTask)
+		{
+			if(InTask->ParentTask)
+			{
+				if(InTask->ParentTask->HasSubTask(false))
+				{
+					const int32 Index = InTask->TaskIndex + 1;
+					if(InTask->ParentTask->SubTasks.IsValidIndex(Index))
+					{
+						if(UTaskBase* SubTask = InTask->ParentTask->SubTasks[Index]; SubTask->TaskEnterType == ETaskEnterType::Automatic)
+						{
+							SubTask->Enter();
+						}
+					}
+				}
+			}
+			else
+			{
+				if(InTask->IsRootTask())
+				{
+					const int32 Index = InTask->TaskIndex + 1;
+					if(GetRootTasks().IsValidIndex(Index))
+					{
+						if(UTaskBase* RootTask = GetRootTasks()[Index]; RootTask->TaskEnterType == ETaskEnterType::Automatic)
+						{
+							EnterTask(RootTask);
+						}
+					}
+				}
+			}
+			if(CurrentTask == InTask)
+			{
+				CurrentTask = nullptr;
+			}
+		}
 		InTask->OnLeave();
 	}
 }
 
-bool UTaskModule::IsAllTaskCompleted()
+void UTaskModule::LeaveTaskByGUID(const FString& InTaskGUID)
+{
+	LeaveTask(GetTaskByGUID(InTaskGUID));
+}
+
+bool UTaskModule::IsAllTaskCompleted() const
 {
 	for(auto Iter : GetRootTasks())
 	{

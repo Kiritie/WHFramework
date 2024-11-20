@@ -18,9 +18,9 @@ UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
 	TaskMap = TMap<FString, UTaskBase*>();
 }
 
-void UTaskAsset::Initialize(UAssetBase* InSource)
+void UTaskAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : RootTasks)
 	{
@@ -28,7 +28,7 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 
 		RecursiveArrayItems<UTaskBase>(Iter, [this](const UTaskBase* Task)
 		{
-			TaskMap.Add(Task->TaskGUID, const_cast<UTaskBase*>(Task));
+			TaskMap.Emplace(Task->TaskGUID, const_cast<UTaskBase*>(Task));
 			return Task->SubTasks;
 		});
 

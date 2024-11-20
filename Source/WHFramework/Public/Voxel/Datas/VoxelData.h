@@ -24,7 +24,7 @@ public:
 	TSubclassOf<AVoxelAuxiliary> AuxiliaryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EVoxelTransparency Transparency;
+	EVoxelNature Nature;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bMainPart;
@@ -57,6 +57,8 @@ public:
 	virtual bool HasPartData(FIndex InIndex) const;
 
 	virtual UVoxelData& GetPartData(FIndex InIndex);
+
+	virtual EVoxelTransparency GetTransparency() const;
 
 	virtual FVector GetRange(ERightAngle InAngle = ERightAngle::RA_0) const;
 

@@ -19,7 +19,7 @@ public:
 	UStepAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void Initialize(UAssetBase* InSource) override;
+	virtual void Initialize() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats

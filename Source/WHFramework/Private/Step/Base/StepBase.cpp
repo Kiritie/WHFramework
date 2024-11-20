@@ -9,6 +9,7 @@
 #include "Event/Handle/Step/EventHandle_StepEntered.h"
 #include "Event/Handle/Step/EventHandle_StepExecuted.h"
 #include "Event/Handle/Step/EventHandle_StepLeaved.h"
+#include "Event/Handle/Step/EventHandle_StepStateChanged.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleStatics.h"
 
@@ -72,6 +73,8 @@ void UStepBase::OnStateChanged(EStepState InStepState)
 {
 	OnStepStateChanged.Broadcast(InStepState);
 	K2_OnStateChanged(InStepState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepStateChanged::StaticClass(), this, {this});
 }
 
 void UStepBase::OnInitialize()

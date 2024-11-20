@@ -50,6 +50,12 @@ void UProcedureModule::OnInitialize()
 	Super::OnInitialize();
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, GET_FUNCTION_NAME_THISCLASS(OnSwitchProcedure));
+
+	if(DefaultAsset)
+	{
+		DefaultAsset = DefaultAsset->Duplicate<UProcedureAsset>();
+		AddAsset(DefaultAsset);
+	}
 }
 
 void UProcedureModule::OnPreparatory(EPhase InPhase)
@@ -107,26 +113,39 @@ void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchP
 
 void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
 {
-	if(!Assets.Contains(InAsset))
+	bool bCanAdd = true;
+	for(auto Iter : Assets)
+	{
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			bCanAdd = false;
+			break;
+		}
+	}
+	if(bCanAdd)
 	{
 		Assets.Add(InAsset);
+		InAsset->Initialize();
 	}
 }
 
 void UProcedureModule::RemoveAsset(UProcedureAsset* InAsset)
 {
-	if(Assets.Contains(InAsset))
+	for(auto Iter : Assets)
 	{
-		Assets.Remove(InAsset);
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			Assets.Remove(Iter);
+			break;
+		}
 	}
 }
 
 void UProcedureModule::SwitchAsset(UProcedureAsset* InAsset)
 {
-	if(!InAsset || !Assets.Contains(InAsset) || (CurrentAsset && InAsset == CurrentAsset->SourceObject)) return;
+	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
-	CurrentAsset = DuplicateObject<UProcedureAsset>(InAsset, this);
-	CurrentAsset->Initialize(InAsset);
+	CurrentAsset = InAsset;
 
 	WHDebug(FString::Printf(TEXT("切换流程源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
 

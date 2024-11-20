@@ -6,7 +6,7 @@ UVoxelPlantData::UVoxelPlantData()
 {
 	VoxelClass = UVoxelPlant::StaticClass();
 	
-	Transparency = EVoxelTransparency::Transparent;
+	Nature = EVoxelNature::Plants;
 
 	MeshDatas[0].bCustomMesh = true;
 

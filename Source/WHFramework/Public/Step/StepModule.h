@@ -109,7 +109,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "StepModule")
 	EStepModuleState StepModuleState;
 	/// 流程资产列表
-	UPROPERTY(EditAnywhere, Category = "StepModule|Step Stats")
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
 	TArray<UStepAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "StepModule|Step Stats")

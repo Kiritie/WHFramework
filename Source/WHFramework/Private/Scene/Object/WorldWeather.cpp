@@ -24,7 +24,14 @@ void UWorldWeather::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	const auto& SaveData = InSaveData->CastRef<FWorldWeatherSaveData>();
 
 	SetWeatherSeed(SaveData.WeatherSeed);
-	if(!SaveData.WeatherParams.IsEmpty()) SetWeatherParams(SaveData.WeatherParams);
+	if(!SaveData.WeatherParams.IsEmpty())
+	{
+		SetWeatherParams(SaveData.WeatherParams);
+	}
+	else
+	{
+		ResetWeatherParams();
+	}
 }
 
 FSaveData* UWorldWeather::ToData()

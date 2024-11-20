@@ -31,7 +31,7 @@ FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOw
 FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
-	InSaveData.ParseIntoArray(DataStrs, TEXT("|"));
+	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
 	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
 	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
 	Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
@@ -97,7 +97,8 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 
 FString FVoxelItem::ToSaveData(bool bRefresh) const
 {
-	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
+	const FString _Data = !bRefresh ? *Data : *GetVoxel().ToData();
+	return FString::Printf(TEXT("%d;%d;%d%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
 }
 
 bool FVoxelItem::IsValid() const
@@ -112,7 +113,7 @@ bool FVoxelItem::IsUnknown() const
 
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const

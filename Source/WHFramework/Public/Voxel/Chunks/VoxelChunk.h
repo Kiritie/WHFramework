@@ -44,15 +44,6 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
-	UFUNCTION()
-	virtual void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-	
-	UFUNCTION()
-	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
@@ -168,14 +159,15 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SolidMesh;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SemiMesh;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* TransMesh;
+public:
+	void SpawnMeshComponents();
+
+	void DestroyMeshComponents();
+
+	UVoxelMeshComponent* GetMeshComponent(EVoxelNature InVoxelNature);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats

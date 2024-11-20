@@ -11,6 +11,7 @@
 #include "Task/Base/TaskBase.h"
 #include "Task/Blueprint/TaskBlueprintFactory.h"
 #include "Task/Slate/STaskDetailsWidget.h"
+#include "Task/Slate/STaskListItemWidget.h"
 #include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -481,7 +482,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 				}
 				else
 				{
-					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.EmplaceAt(OldTask->TaskIndex, NewTask);
+					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks[OldTask->TaskIndex] = NewTask;
 				}
 				OldTask->OnUnGenerate();
 			}

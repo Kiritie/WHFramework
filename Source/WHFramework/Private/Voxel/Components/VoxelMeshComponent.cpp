@@ -2,66 +2,67 @@
 
 
 #include "Voxel/Components/VoxelMeshComponent.h"
+
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleStatics.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Voxels/Voxel.h"
 
 UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bUseAsyncCooking = true;
 	OffsetScale = FVector::OneVector;
 	CenterOffset = FVector(0.5f);
-	MeshNature = EVoxelMeshNature::Chunk;
-	Transparency = EVoxelTransparency::Solid;
+	Scope = EVoxelScope::Chunk;
+	Nature = EVoxelNature::Solid;
 	Vertices = TArray<FVector>();
 	Triangles = TArray<int32>();
 	Normals = TArray<FVector>();
 	UVs = TArray<FVector2D>();
 	VertexColors = TArray<FColor>();
 	Tangents = TArray<FProcMeshTangent>();
+
+	OnComponentHit.AddDynamic(this, &UVoxelMeshComponent::OnCollision);
+	OnComponentBeginOverlap.AddDynamic(this, &UVoxelMeshComponent::OnBeginOverlap);
+	OnComponentEndOverlap.AddDynamic(this, &UVoxelMeshComponent::OnEndOverlap);
 }
 
-void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransparency InTransparency /*= EVoxelTransparency::Solid*/)
+void UVoxelMeshComponent::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	MeshNature = InMeshNature;
-	Transparency = InTransparency;
-	switch (MeshNature)
+	
+}
+
+void UVoxelMeshComponent::OnDespawn_Implementation(bool bRecovery)
+{
+	ClearMesh();
+	UnRegister();
+}
+
+void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
+{
+	Scope = InScope;
+	SetNature(InNature);
+	switch (Scope)
 	{
-		case EVoxelMeshNature::Chunk:
+		case EVoxelScope::Chunk:
 		{
 			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
-			switch(Transparency)
-			{
-				case EVoxelTransparency::Solid:
-				{
-					SetCollisionProfileName(TEXT("SolidVoxel"));
-					break;
-				}
-				case EVoxelTransparency::SemiTransparent:
-				{
-					SetCollisionProfileName(TEXT("SemiVoxel"));
-					break;
-				}
-				case EVoxelTransparency::Transparent:
-				{
-					SetCollisionProfileName(TEXT("TransVoxel"));
-					break;
-				}
-			}
 			SetCollisionEnabled(true);
 			break;
 		}
-		case EVoxelMeshNature::PickUp:
+		case EVoxelScope::PickUp:
 		{
 			OffsetScale = FVector::ZeroVector;
 			CenterOffset = FVector(0.5f);
 			SetCollisionEnabled(false);
 			break;
 		}
-		case EVoxelMeshNature::Entity:
+		case EVoxelScope::Entity:
 		{
 			OffsetScale = FVector(0.f, 0.f, 1.f);
 			CenterOffset = FVector(0.f, 0.f, 0.5f);
@@ -69,7 +70,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			SetCollisionEnabled(false);
 			break;
 		}
-		case EVoxelMeshNature::Preview:
+		case EVoxelScope::Preview:
 		{
 			OffsetScale = FVector::ZeroVector;
 			CenterOffset = FVector(0.5f);
@@ -77,7 +78,7 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			SetCollisionEnabled(false);
 			break;
 		}
-		case EVoxelMeshNature::Vitality:
+		case EVoxelScope::Vitality:
 		{
 			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.f, 0.f, 0.5f);
@@ -85,6 +86,18 @@ void UVoxelMeshComponent::Initialize(EVoxelMeshNature InMeshNature, EVoxelTransp
 			break;
 		}
 	}
+}
+
+void UVoxelMeshComponent::Register(UObject* InOuter)
+{
+	Rename(nullptr, InOuter);
+	RegisterComponent();
+}
+
+void UVoxelMeshComponent::UnRegister()
+{
+	DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	UnregisterComponent();
 }
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
@@ -123,7 +136,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 	{
 		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 		const FVector Range = VoxelData.GetRange();
-		Transparency = VoxelData.Transparency;
+		SetNature(VoxelData.Nature);
 		CenterOffset = FVector(0.f, 0.f, -Range.Z * 0.5f + 0.5f);
 		ITER_INDEX(PartIndex, Range, false,
 			UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
@@ -147,21 +160,20 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 {
 	if (HasData())
 	{
-		SetCollisionEnabled(true);
 		CreateMeshSection(InSectionIndex, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, bHasCollision);
-		switch (MeshNature)
+		switch (Scope)
 		{
-			case EVoxelMeshNature::Chunk:
-			case EVoxelMeshNature::PickUp:
-			case EVoxelMeshNature::Entity:
-			case EVoxelMeshNature::Vitality:
+			case EVoxelScope::Chunk:
+			case EVoxelScope::PickUp:
+			case EVoxelScope::Entity:
+			case EVoxelScope::Vitality:
 			{
-				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().RenderDatas[Transparency].MaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).MaterialInst);
 				break;
 			}
-			case EVoxelMeshNature::Preview:
+			case EVoxelScope::Preview:
 			{
-				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().RenderDatas[Transparency].UnlitMaterialInst);
+				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).UnlitMaterialInst);
 				break;
 			}
 		}
@@ -178,10 +190,6 @@ void UVoxelMeshComponent::ClearMesh(int32 InSectionIndex /*= 0*/)
 	if (GetNumSections() > InSectionIndex)
 	{
 		ClearMeshSection(InSectionIndex);
-	}
-	if (!HasMesh())
-	{
-		SetCollisionEnabled(false);
 	}
 	ClearData();
 }
@@ -203,15 +211,15 @@ void UVoxelMeshComponent::SetCollisionEnabled(ECollisionEnabled::Type NewType)
 
 void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
 {
-	switch(Transparency)
+	switch(UVoxelModuleStatics::VoxelNatureToTransparency(Nature))
 	{
 		case EVoxelTransparency::Solid:
-		case EVoxelTransparency::SemiTransparent:
+		case EVoxelTransparency::Semi:
 		{
 			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 			break;
 		}
-		case EVoxelTransparency::Transparent:
+		case EVoxelTransparency::Trans:
 		{
 			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 			break;
@@ -284,7 +292,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
-	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().RenderDatas[VoxelData.Transparency];
+	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().GetRenderData(Nature);
 	const FVector Scale = UMathStatics::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
 	const FVector Offset = CenterOffset + UMathStatics::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
@@ -315,6 +323,32 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	Normals.Add(InNormal);
 }
 
+void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if(!GetOwnerChunk()) return;
+	
+	if(IVoxelAgentInterface* VoxelAgent = Cast<IVoxelAgentInterface>(OtherActor))
+	{
+		const FVoxelItem& VoxelItem = GetOwnerChunk()->GetVoxelItem(GetOwnerChunk()->LocationToIndex(Hit.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)), true);
+		if(VoxelItem.IsValid())
+		{
+			VoxelItem.GetVoxel().OnAgentHit(VoxelAgent, FVoxelHitResult(VoxelItem, Hit.ImpactPoint, Hit.ImpactNormal));
+		}
+	}
+}
+
+void UVoxelMeshComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(!GetOwnerChunk()) return;
+	
+}
+
+void UVoxelMeshComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if(!GetOwnerChunk()) return;
+	
+}
+
 bool UVoxelMeshComponent::HasData() const
 {
 	return Vertices.Num() > 0;
@@ -333,6 +367,29 @@ bool UVoxelMeshComponent::HasMesh()
 		}
 	}
 	return false;
+}
+
+void UVoxelMeshComponent::SetNature(EVoxelNature InNature)
+{
+	Nature = InNature;
+	switch(UVoxelModuleStatics::VoxelNatureToTransparency(Nature))
+	{
+		case EVoxelTransparency::Solid:
+		{
+			SetCollisionProfileName(TEXT("SolidVoxel"));
+			break;
+		}
+		case EVoxelTransparency::Semi:
+		{
+			SetCollisionProfileName(TEXT("SemiVoxel"));
+			break;
+		}
+		case EVoxelTransparency::Trans:
+		{
+			SetCollisionProfileName(TEXT("TransVoxel"));
+			break;
+		}
+	}
 }
 
 AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const

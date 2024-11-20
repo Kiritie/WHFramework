@@ -19,7 +19,7 @@ public:
 	UTaskAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void Initialize(UAssetBase* InSource) override;
+	virtual void Initialize() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats

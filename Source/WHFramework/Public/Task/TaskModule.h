@@ -51,15 +51,11 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
-	virtual void Serialize(FArchive& Ar) override;
-
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual void UnloadData(EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
-
-	virtual bool HasArchive() const override { return true; }
 
 public:
 	virtual FString GetModuleDebugMessage() override;
@@ -80,37 +76,58 @@ public:
 	void RestoreTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable)
+	void RestoreTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable)
 	void EnterTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable)
+	void EnterTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable)
 	void RefreshTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable)
+	void RefreshTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable)
 	void GuideTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable)
+	void GuideTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable)
 	void ExecuteTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable)
+	void ExecuteTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable)
 	void CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
+
+	UFUNCTION(BlueprintCallable)
+	void CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
 
 	UFUNCTION(BlueprintCallable)
 	void LeaveTask(UTaskBase* InTask);
 
+	UFUNCTION(BlueprintCallable)
+	void LeaveTaskByGUID(const FString& InTaskGUID);
+
 public:
 	UFUNCTION(BlueprintPure)
-	bool IsAllTaskCompleted();
+	bool IsAllTaskCompleted() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 protected:
 	/// 流程资产列表
-	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
+	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	TArray<UTaskAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
 	UTaskAsset* DefaultAsset;
-	/// 当前流程资产 
+	/// 当前流程资产
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	UTaskAsset* CurrentAsset;
 	/// 当前任务 

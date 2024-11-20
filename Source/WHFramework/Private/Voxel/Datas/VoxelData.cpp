@@ -2,6 +2,7 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()
@@ -13,7 +14,7 @@ UVoxelData::UVoxelData()
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
-	Transparency = EVoxelTransparency::Solid;
+	Nature = EVoxelNature::Solid;
 	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
@@ -59,6 +60,11 @@ UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
 	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+}
+
+EVoxelTransparency UVoxelData::GetTransparency() const
+{
+	return UVoxelModuleStatics::VoxelNatureToTransparency(Nature);
 }
 
 FVector UVoxelData::GetRange(ERightAngle InAngle) const

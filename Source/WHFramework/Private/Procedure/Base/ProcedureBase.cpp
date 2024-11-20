@@ -9,6 +9,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Procedure/EventHandle_ProcedureEntered.h"
 #include "Event/Handle/Procedure/EventHandle_ProcedureLeaved.h"
+#include "Event/Handle/Procedure/EventHandle_ProcedureStateChanged.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleStatics.h"
 
@@ -52,6 +53,8 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 {
 	OnProcedureStateChanged.Broadcast(InProcedureState);
 	K2_OnStateChanged(InProcedureState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureStateChanged::StaticClass(), this, {this});
 }
 
 void UProcedureBase::OnInitialize()

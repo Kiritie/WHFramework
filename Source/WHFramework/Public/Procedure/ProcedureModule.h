@@ -97,7 +97,7 @@ protected:
 	/// Procedure Stats
 protected:
 	/// 流程资产列表
-	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Procedure Stats")
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
 	TArray<UProcedureAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Procedure Stats")

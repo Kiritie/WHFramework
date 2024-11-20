@@ -16,12 +16,16 @@ void UPoolWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPar
 {
 	OwnerWidget = Cast<UUserWidget>(InOwner);
 	WidgetParams = InParams;
+
+	Refresh();
 }
 
 void UPoolWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();
+
+	RemoveFromParent();
 }
 
 void UPoolWidgetBase::OnTick_Implementation(float DeltaSeconds)

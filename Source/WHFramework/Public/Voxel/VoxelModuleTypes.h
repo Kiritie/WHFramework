@@ -36,12 +36,13 @@ UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
-	Spawn,
-	Destroy,
-	Generate,
-	MapLoad,
-	MapBuild,
-	MeshBuild
+	Spawning,
+	Destroying,
+	Generating,
+	MapLoading,
+	MapBuilding,
+	MeshSpawning,
+	BuildMesh
 };
 
 /**
@@ -134,9 +135,51 @@ enum class EVoxelTransparency : uint8
 	// ???
 	Solid,
 	// ?????
-	SemiTransparent,
+	Semi,
 	// ???
-	Transparent
+	Trans
+};
+
+/**
+ * ?????
+ */
+UENUM(BlueprintType)
+enum class EVoxelNature : uint8
+{
+	// ???
+	Solid,
+	// ???
+	SemiSolid,
+	// ???
+	SmallSolid,
+	// ???
+	TransSolid,
+	// ???
+	Liquid,
+	// ???
+	SolidLiquid,
+	// ?????
+	Plants,
+	// ?????
+	Foliage
+};
+
+/**
+ * ????????????
+ */
+UENUM(BlueprintType)
+enum class EVoxelScope : uint8
+{
+	// ?????
+	Chunk,
+	// ??????
+	PickUp,
+	// ?????
+	Entity,
+	// ?????
+	Preview,
+	// ????????
+	Vitality
 };
 
 /**
@@ -157,24 +200,6 @@ enum class EVoxelSoundType : uint8
 	Interact2,
 	// 交互3
 	Interact3,
-};
-
-/**
- * ????????????
- */
-UENUM(BlueprintType)
-enum class EVoxelMeshNature : uint8
-{
-	// ?????
-	Chunk,
-	// ??????
-	PickUp,
-	// ?????
-	Entity,
-	// ?????
-	Preview,
-	// ????????
-	Vitality
 };
 
 /**
@@ -394,11 +419,11 @@ public:
 	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = FVoxelItem();
-		MeshNature = EVoxelMeshNature::Chunk;
+		MeshNature = EVoxelScope::Chunk;
 		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature = EVoxelMeshNature::Chunk) : FVoxelAuxiliarySaveData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::Chunk) : FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = InVoxelItem;
 		MeshNature = InMeshNature;
@@ -409,7 +434,7 @@ public:
 	FVoxelItem VoxelItem;
 
 	UPROPERTY()
-	EVoxelMeshNature MeshNature;
+	EVoxelScope MeshNature;
 
 	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;
@@ -589,7 +614,7 @@ public:
 		PlantScale = FVector4(0.8f, 0.8f, 0.5f, 0.08f);
 		TreeScale = FVector4(0.01f, 0.01f, 0.5f, 0.005f);
 
-		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
+		RenderDatas = TMap<EVoxelNature, FVoxelRenderData>();
 
 		IconMat = nullptr;
 
@@ -640,7 +665,7 @@ public:
 	FVector4 TreeScale;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
+	TMap<EVoxelNature, FVoxelRenderData> RenderDatas;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	UMaterialInterface* IconMat;
@@ -674,6 +699,11 @@ public:
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const
 	{
 		return BlockSize * InNormal * InLength;
+	}
+
+	FORCEINLINE FVoxelRenderData& GetRenderData(EVoxelNature InVoxelNature)
+	{
+		return RenderDatas[InVoxelNature];
 	}
 };
 

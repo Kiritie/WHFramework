@@ -48,20 +48,41 @@ public:
 	static void RestoreTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RestoreTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void EnterTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void EnterTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RefreshTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RefreshTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void GuideTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void GuideTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void ExecuteTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void ExecuteTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void LeaveTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void LeaveTaskByGUID(const FString& InTaskGUID);
 };

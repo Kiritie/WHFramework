@@ -55,6 +55,12 @@ void UStepModule::OnDestroy()
 void UStepModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	if(DefaultAsset)
+	{
+		DefaultAsset = DefaultAsset->Duplicate<UStepAsset>();
+		AddAsset(DefaultAsset);
+	}
 }
 
 void UStepModule::OnPreparatory(EPhase InPhase)
@@ -140,26 +146,39 @@ FString UStepModule::GetModuleDebugMessage()
 
 void UStepModule::AddAsset(UStepAsset* InAsset)
 {
-	if(!Assets.Contains(InAsset))
+	bool bCanAdd = true;
+	for(auto Iter : Assets)
+	{
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			bCanAdd = false;
+			break;
+		}
+	}
+	if(bCanAdd)
 	{
 		Assets.Add(InAsset);
+		InAsset->Initialize();
 	}
 }
 
 void UStepModule::RemoveAsset(UStepAsset* InAsset)
 {
-	if(Assets.Contains(InAsset))
+	for(auto Iter : Assets)
 	{
-		Assets.Remove(InAsset);
+		if(Iter->SourceObject == InAsset->SourceObject)
+		{
+			Assets.Remove(Iter);
+			break;
+		}
 	}
 }
 
 void UStepModule::SwitchAsset(UStepAsset* InAsset)
 {
-	if(!InAsset || !Assets.Contains(InAsset) || (CurrentAsset && InAsset == CurrentAsset->SourceObject)) return;
+	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
-	CurrentAsset = DuplicateObject<UStepAsset>(InAsset, this);
-	CurrentAsset->Initialize(InAsset);
+	CurrentAsset = InAsset;
 
 	WHDebug(FString::Printf(TEXT("切换步骤源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Step, EDV_Log, FColor::Green, 5.f);
 

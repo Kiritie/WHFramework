@@ -45,16 +45,16 @@ public:
 	template<class T>
 	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)
 	{
-		TArray<T> raceDatas;
-		if(UAssetModuleStatics::ReadDataTable(raceDatas))
+		TArray<T> RaceDatas;
+		if(UAssetModuleStatics::ReadDataTable(RaceDatas))
 		{
-			for(int32 i = 0; i < raceDatas.Num(); i++)
+			for(int32 i = 0; i < RaceDatas.Num(); i++)
 			{
-				const auto& raceData = raceDatas[i];
-				const float noiseHeight = UMathStatics::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
-				if(noiseHeight >= raceData.NoiseScale.Z)
+				const auto& RaceData = RaceDatas[i];
+				const float NoiseHeight = UMathStatics::GetNoiseHeight(InLocation, FVector(RaceData.NoiseScale.X, RaceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
+				if(FMath::Abs(NoiseHeight) >= RaceData.NoiseScale.Z)
 				{
-					OutDatas.Add(raceData);
+					OutDatas.Add(RaceData);
 				}
 			}
 		}

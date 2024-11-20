@@ -23,7 +23,7 @@ void UAssetBase::Serialize(FStructuredArchive::FRecord Record)
 }
 #endif
 
-void UAssetBase::Initialize(UAssetBase* InSource)
+void UAssetBase::Initialize()
 {
-	SourceObject = InSource;
+	
 }

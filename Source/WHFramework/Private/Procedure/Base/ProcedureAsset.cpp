@@ -18,9 +18,9 @@ UProcedureAsset::UProcedureAsset(const FObjectInitializer& ObjectInitializer)
 	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();
 }
 
-void UProcedureAsset::Initialize(UAssetBase* InSource)
+void UProcedureAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : Procedures)
 	{

@@ -50,6 +50,9 @@ protected:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void ResetTimerParams() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void ResetDateTime(float InNewTime = -1.f) const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
