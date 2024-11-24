@@ -119,7 +119,7 @@ void UInputModule::OnInitialize()
 
 	for(auto Iter : InputManagers)
 	{
-		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, false, Iter))
+		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, Iter))
 		{
 			InputManager->OnInitialize();
 			InputManagerRefs.Add(InputManager->GetInputManagerName(), InputManager);

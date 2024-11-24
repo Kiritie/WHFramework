@@ -9,13 +9,7 @@ UAbilityBase::UAbilityBase()
 	// Default to Instance Per Actor
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
-	bActivateAbilityOnGranted = false;
 	bActivateOnInput = true;
-	bSourceObjectMustEqualCurrentWeaponToActivate = false;
-	bCannotActivateWhileInteracting = true;
-
-	// UAbilitySystemGlobals hasn't initialized tags yet to set ActivationBlockedTags
-	//ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag("State.Vitality.Dead"));
 
 	EffectContainerMap = TMap<FGameplayTag, FGameplayEffectContainer>();
 }

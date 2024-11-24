@@ -202,7 +202,7 @@ void UWorldWidgetBase::Refresh_Implementation()
 
 void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
 {
-	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, IsWidgetInEditor(), GetClass());
+	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
 }
 
 void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)

@@ -101,9 +101,9 @@ public:
 	}
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
 	
-	static EVoxelType GetNoiseVoxelType(FIndex InIndex);
+	static EVoxelType GetBiomeVoxelType(FIndex InIndex);
 	
-	static EVoxelType GetRandomVoxelType(FIndex InIndex);
+	static EVoxelType GetFoliageVoxelType(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace

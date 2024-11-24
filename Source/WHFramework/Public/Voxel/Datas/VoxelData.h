@@ -38,6 +38,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == false"))
 	UVoxelData* MainData;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == true"))
+	UVoxelData* GatherData;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<EVoxelSoundType, USoundBase*> Sounds;
 

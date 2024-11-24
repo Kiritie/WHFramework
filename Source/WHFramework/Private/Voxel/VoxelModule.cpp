@@ -59,13 +59,13 @@ UVoxelModule::UVoxelModule()
 	
 	ChunkSpawnDistance = 2;
 	ChunkQueues = {
-		{ EVoxelWorldState::Spawning, TArray{ FVoxelChunkQueue(false, 100) } },
-		{ EVoxelWorldState::Destroying, TArray{ FVoxelChunkQueue(false, 10) } },
-		{ EVoxelWorldState::Generating, TArray{ FVoxelChunkQueue(false, 1) } },
-		{ EVoxelWorldState::MapLoading, TArray{ FVoxelChunkQueue(true, 100) } },
-		{ EVoxelWorldState::MapBuilding, TArray{ FVoxelChunkQueue(true, 100), FVoxelChunkQueue(false, 100) } },
-		{ EVoxelWorldState::MeshSpawning, TArray{ FVoxelChunkQueue(false, 100) } },
-		{ EVoxelWorldState::BuildMesh, TArray{ FVoxelChunkQueue(true, 100) } }
+		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({ FVoxelChunkQueue(false, 100) }) },
+		{ EVoxelWorldState::Destroying, FVoxelChunkQueues({ FVoxelChunkQueue(false, 10) }) },
+		{ EVoxelWorldState::Generating, FVoxelChunkQueues({ FVoxelChunkQueue(false, 1) }) },
+		{ EVoxelWorldState::MapLoading, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) }) },
+		{ EVoxelWorldState::MapBuilding, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100), FVoxelChunkQueue(false, 100) }) },
+		{ EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({ FVoxelChunkQueue(false, 100) }) },
+		{ EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) }) }
 	};
 
 	ChunkSpawnBatch = 0;
@@ -90,7 +90,7 @@ UVoxelModule::UVoxelModule()
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiSolid.M_Voxel_SemiSolid'"));
 	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, UnlitSemiMatFinder.Object));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SmallSolid, FVoxelRenderData(SemiSolidMatFinder.Object, UnlitSemiMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SmallSemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, UnlitSemiMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_TransSolid.M_Voxel_TransSolid'"));
 	WorldBasicData.RenderDatas.Add(EVoxelNature::TransSolid, FVoxelRenderData(TransSolidMatFinder.Object, UnlitTransMatFinder.Object));
@@ -98,14 +98,14 @@ UVoxelModule::UVoxelModule()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> LiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Liquid.M_Voxel_Liquid'"));
 	WorldBasicData.RenderDatas.Add(EVoxelNature::Liquid, FVoxelRenderData(LiquidMatFinder.Object, UnlitTransMatFinder.Object));
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidLiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SolidLiquid.M_Voxel_SolidLiquid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SolidLiquid, FVoxelRenderData(SolidLiquidMatFinder.Object, UnlitTransMatFinder.Object));
-	
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> PlantsMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Plants.M_Voxel_Plants'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Plants, FVoxelRenderData(PlantsMatFinder.Object, UnlitTransMatFinder.Object));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiLiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiLiquid.M_Voxel_SemiLiquid'"));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiLiquid, FVoxelRenderData(SemiLiquidMatFinder.Object, UnlitTransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Foliage.M_Voxel_Foliage'"));
 	WorldBasicData.RenderDatas.Add(EVoxelNature::Foliage, FVoxelRenderData(FoliageMatFinder.Object, UnlitSemiMatFinder.Object));
+	
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiFoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiFoliage.M_Voxel_SemiFoliage'"));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiFoliage, FVoxelRenderData(SemiFoliageMatFinder.Object, UnlitTransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Voxel/Materials/M_VoxelIcon.M_VoxelIcon'"));
 	WorldBasicData.IconMat = IconSourceMatFinder.Object;
@@ -452,9 +452,9 @@ void UVoxelModule::GenerateWorld()
 		SetWorldState(EVoxelWorldState::MeshSpawning);
 	}
 	// Build chunk mesh
-	else if(UpdateChunkQueue(EVoxelWorldState::BuildMesh, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
+	else if(UpdateChunkQueue(EVoxelWorldState::MeshBuilding, [this](FIndex Index, int32 Stage){ BuildChunkMesh(Index); }))
 	{
-		SetWorldState(EVoxelWorldState::BuildMesh);
+		SetWorldState(EVoxelWorldState::MeshBuilding);
 	}
 	// Generate chunk
 	else if(UpdateChunkQueue(EVoxelWorldState::Generating, [this](FIndex Index, int32 Stage){ GenerateChunk(Index); }))
@@ -468,7 +468,7 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	AVoxelChunk* Chunk = FindChunkByIndex(InIndex);
 	if(!Chunk)
 	{
-		Chunk = UObjectPoolModuleStatics::SpawnObject<AVoxelChunk>(nullptr, nullptr, false, ChunkSpawnClass);
+		Chunk = UObjectPoolModuleStatics::SpawnObject<AVoxelChunk>(nullptr, nullptr, ChunkSpawnClass);
 		Chunk->Initialize(InIndex, ChunkSpawnBatch + (IsOnTheWorld(InIndex) ? 0 : 1));
 		Chunk->SetActorLocationAndRotation(InIndex.ToVector() * WorldData->GetChunkRealSize(), FRotator::ZeroRotator);
 		ChunkMap.Add(InIndex, Chunk);
@@ -496,14 +496,14 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		if(!Chunk->IsGenerated() && IsOnTheWorld(InIndex))
 		{
 			AddToChunkQueue(EVoxelWorldState::MeshSpawning, InIndex);
-			AddToChunkQueue(EVoxelWorldState::BuildMesh, InIndex);
+			AddToChunkQueue(EVoxelWorldState::MeshBuilding, InIndex);
 			AddToChunkQueue(EVoxelWorldState::Generating, InIndex);
 			for(const auto& Iter : Chunk->GetNeighbors())
 			{
 				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
 				{
 					AddToChunkQueue(EVoxelWorldState::MeshSpawning, Iter.Value->GetIndex());
-					AddToChunkQueue(EVoxelWorldState::BuildMesh, Iter.Value->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::MeshBuilding, Iter.Value->GetIndex());
 					AddToChunkQueue(EVoxelWorldState::Generating, Iter.Value->GetIndex());
 				}
 			}
@@ -746,80 +746,101 @@ FVoxelItem& UVoxelModule::FindVoxelByLocation(FVector InLocation)
 	return FVoxelItem::Empty;
 }
 
-float UVoxelModule::GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset) const
+float UVoxelModule::GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight) const
 {
-	return UMathStatics::GetNoiseHeight(InLocation, InScale, InOffset, true) * WorldData->ChunkSize.Z * WorldData->WorldSize.Z;
+	return GetNoiseHeight(UMathStatics::GetNoiseHeight(InLocation, InScale, WorldData->WorldSeed, true) + InBaseHeight);
 }
 
 float UVoxelModule::GetNoiseHeight(float InBaseHeight) const
 {
-	return InBaseHeight * WorldData->ChunkSize.Z * WorldData->WorldSize.Z;
+	return InBaseHeight * WorldData->ChunkSize.Z;
 }
 
-EVoxelType UVoxelModule::GetNoiseVoxelType(FIndex InIndex) const
+EVoxelType UVoxelModule::GetBiomeVoxelType(FIndex InIndex) const
 {
-	return GetNoiseVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
+	return GetBiomeVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
 }
 
-EVoxelType UVoxelModule::GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) const
+EVoxelType UVoxelModule::GetBiomeVoxelType(int32 InX, int32 InY, int32 InZ) const
 {
 	const FVector2D WorldLocation = FVector2D(InX, InY);
 
-	const int32 PlainHeight = GetNoiseHeight(WorldLocation, WorldData->PlainScale, WorldData->WorldSeed);
-	const int32 MountainHeight = GetNoiseHeight(WorldLocation, WorldData->MountainScale, WorldData->WorldSeed);
-	const int32 BlobHeight = GetNoiseHeight(WorldLocation, WorldData->BlobScale, WorldData->WorldSeed);
-
-	const int32 BaseHeight = GetNoiseHeight(WorldData->BaseHeight) + FMath::Max3(PlainHeight, MountainHeight, BlobHeight);
-
-	if(InZ < BaseHeight)
+	int32 BiomeHeight = 0;
+	for(auto& Iter : WorldData->BiomeDatas)
 	{
-		if(InZ <= GetNoiseHeight(WorldData->BedrockHeight))
-		{
-			return EVoxelType::Bedrock; //Bedrock
-		}
-		if(InZ <= GetNoiseHeight(WorldLocation, WorldData->StoneScale, WorldData->WorldSeed))
-		{
-			return EVoxelType::Stone; //Stone
-		}
-		return EVoxelType::Dirt; //Dirt
+		BiomeHeight = FMath::Max(BiomeHeight, GetNoiseHeight(WorldLocation, Iter.Value.NoiseScale, Iter.Value.BaseHeight));
 	}
-	if(InZ >= BaseHeight)
+
+	for(auto& Iter1 : WorldData->BlockDatas)
 	{
-		const int32 SandHeight = GetNoiseHeight(WorldLocation, WorldData->SandScale, WorldData->WorldSeed);
-		const int32 WaterHeight = GetNoiseHeight(WorldData->WaterHeight);
-		if(InZ <= SandHeight)
+		if(Iter1.Key == EVoxelHierarchy::Under && InZ < BiomeHeight || Iter1.Key == EVoxelHierarchy::Upper && InZ >= BiomeHeight)
 		{
-			return EVoxelType::Sand; //Sand
-		}
-		if(InZ <= WaterHeight)
-		{
-			return EVoxelType::Water; //Water
-		}
-		if(InZ == BaseHeight)
-		{
-			return EVoxelType::Grass; //Grass
+			for(auto& Iter2 : Iter1.Value.BlockDatas)
+			{
+				switch(Iter2.Value.DataType)
+				{
+					case EVoxelDataType::Basic:
+					{
+						if(InZ <= GetNoiseHeight(Iter2.Value.BaseHeight))
+						{
+							return Iter2.Key;
+						}
+						break;
+					}
+					case EVoxelDataType::Biome:
+					{
+						if(InZ <= (Iter1.Key == EVoxelHierarchy::Under ? BiomeHeight - GetNoiseHeight(Iter2.Value.BaseHeight) : BiomeHeight + GetNoiseHeight(Iter2.Value.BaseHeight)))
+						{
+							return Iter2.Key;
+						}
+						break;
+					}
+					case EVoxelDataType::Noise:
+					{
+						if(InZ <= GetNoiseHeight(WorldLocation, Iter2.Value.NoiseScale, Iter2.Value.BaseHeight))
+						{
+							return Iter2.Key;
+						}
+						break;
+					}
+					case EVoxelDataType::Random:
+					{
+						if(WorldData->RandomStream.FRand() < Iter2.Value.RandomRate && InZ <= GetNoiseHeight(WorldLocation, Iter2.Value.NoiseScale, Iter2.Value.BaseHeight))
+						{
+							return Iter2.Key;
+						}
+						break;
+					}
+					default: break;
+				}
+			}
 		}
 	}
 	return EVoxelType::Empty;
 }
 
-EVoxelType UVoxelModule::GetRandomVoxelType(FIndex InIndex) const
+EVoxelType UVoxelModule::GetFoliageVoxelType(FIndex InIndex) const
 {
-	return GetRandomVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
+	return GetFoliageVoxelType(InIndex.X, InIndex.Y, InIndex.Z);
 }
 
-EVoxelType UVoxelModule::GetRandomVoxelType(int32 InX, int32 InY, int32 InZ) const
+EVoxelType UVoxelModule::GetFoliageVoxelType(int32 InX, int32 InY, int32 InZ) const
 {
 	const FVector2D WorldLocation = FVector2D(InX, InY);
 
-	const FRandomStream& RandomStream = WorldData->RandomStream;
-	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->TreeScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->TreeScale.W)
+	for(auto& Iter1 : WorldData->FoliageDatas)
 	{
-		return RandomStream.FRand() < 0.6f ? EVoxelType::Oak : EVoxelType::Birch; //Tree
-	}
-	if(InZ <= GetNoiseHeight(WorldLocation, WorldData->PlantScale, WorldData->WorldSeed) && RandomStream.FRand() <= WorldData->PlantScale.W)
-	{
-		return RandomStream.FRand() < 0.3f ? EVoxelType::Tall_Grass : (EVoxelType)RandomStream.RandRange((int32)EVoxelType::Flower_Allium, (int32)EVoxelType::Flower_Tulip_White); //Plant
+		if(WorldData->RandomStream.FRand() < Iter1.Value.RandomRate && InZ <= GetNoiseHeight(WorldLocation, Iter1.Value.NoiseScale, Iter1.Value.BaseHeight))
+		{
+			const float RandomRate = WorldData->RandomStream.FRand();
+			for(auto& Iter2 : Iter1.Value.RandomDatas)
+			{
+				if(RandomRate < Iter2.RandomRate)
+				{
+					return Iter2.VoxelTypes[WorldData->RandomStream.RandRange(0, Iter2.VoxelTypes.Num() - 1)];
+				}
+			}
+		}
 	}
 	return EVoxelType::Empty;
 }

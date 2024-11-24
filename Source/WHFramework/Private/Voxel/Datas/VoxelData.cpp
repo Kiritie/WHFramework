@@ -14,11 +14,12 @@ UVoxelData::UVoxelData()
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
-	Nature = EVoxelNature::Solid;
+	Nature = EVoxelNature::None;
 	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
+	GatherData = nullptr;
 	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
 }

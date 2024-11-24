@@ -6,7 +6,7 @@ UVoxelPlantData::UVoxelPlantData()
 {
 	VoxelClass = UVoxelPlant::StaticClass();
 	
-	Nature = EVoxelNature::Plants;
+	Nature = EVoxelNature::SemiFoliage;
 
 	MeshDatas[0].bCustomMesh = true;
 

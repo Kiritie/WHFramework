@@ -473,7 +473,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 
 USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
 {
-	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, false, InClass))
+	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;

@@ -12,6 +12,7 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();
+	Rarity = EAbilityItemRarity::None;
 	Icon = nullptr;
 	MaxCount = 1;
 	MaxLevel = 0;

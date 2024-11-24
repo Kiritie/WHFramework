@@ -17,7 +17,7 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	bUseAsyncCooking = true;
 	OffsetScale = FVector::OneVector;
 	CenterOffset = FVector(0.5f);
-	Scope = EVoxelScope::Chunk;
+	Scope = EVoxelScope::None;
 	Nature = EVoxelNature::Solid;
 	Vertices = TArray<FVector>();
 	Triangles = TArray<int32>();
@@ -85,6 +85,7 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 			SetCollisionEnabled(false);
 			break;
 		}
+		default: break;
 	}
 }
 
@@ -224,6 +225,7 @@ void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
 			SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 			break;
 		}
+		default: break;
 	}
 }
 

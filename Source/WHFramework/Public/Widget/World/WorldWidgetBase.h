@@ -21,6 +21,7 @@ UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API UWorldWidgetBase : public UCommonUserWidget, public IPanelWidgetInterface, public IObjectPoolInterface
 {
 	friend class UWidgetModule;
+	friend class UWorldWidgetComponent;
 	
 	GENERATED_BODY()
 
@@ -144,7 +145,7 @@ protected:
 	bool bWidgetInEditor;
 
 	UPROPERTY()
-	class UWorldWidgetComponent* WidgetComponent;
+	UWorldWidgetComponent* WidgetComponent;
 
 	UPROPERTY()
 	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
@@ -157,7 +158,6 @@ public:
 
 private:
 	FTimerHandle RefreshTimerHandle;
-
 	TSharedPtr<SWidget> WorldWidget;
 	
 public:

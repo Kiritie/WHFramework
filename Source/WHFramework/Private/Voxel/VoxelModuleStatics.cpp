@@ -30,13 +30,14 @@ EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature I
 		{
 			return EVoxelTransparency::Semi;
 		}
-		case EVoxelNature::SmallSolid:
+		case EVoxelNature::SmallSemiSolid:
 		case EVoxelNature::Liquid:
-		case EVoxelNature::SolidLiquid:
-		case EVoxelNature::Plants:
+		case EVoxelNature::SemiLiquid:
+		case EVoxelNature::SemiFoliage:
 		{
 			return EVoxelTransparency::Trans;
 		}
+		default: break;
 	}
 	return EVoxelTransparency::Solid;
 }
@@ -142,14 +143,14 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FVoxelItem& InVoxelItem)
 	return Voxel;
 }
 
-EVoxelType UVoxelModuleStatics::GetNoiseVoxelType(FIndex InIndex)
+EVoxelType UVoxelModuleStatics::GetBiomeVoxelType(FIndex InIndex)
 {
-	return UVoxelModule::Get().GetNoiseVoxelType(InIndex);
+	return UVoxelModule::Get().GetBiomeVoxelType(InIndex);
 }
 
-EVoxelType UVoxelModuleStatics::GetRandomVoxelType(FIndex InIndex)
+EVoxelType UVoxelModuleStatics::GetFoliageVoxelType(FIndex InIndex)
 {
-	return UVoxelModule::Get().GetRandomVoxelType(InIndex);
+	return UVoxelModule::Get().GetFoliageVoxelType(InIndex);
 }
 
 bool UVoxelModuleStatics::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

@@ -282,7 +282,7 @@ public:
 		
 		if(!HasUserWidgetByName(InName))
 		{
-			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, IsModuleInEditor(), UserWidgetClassMap[InName]);
+			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
 				AllUserWidget.Add(InName, UserWidget);
@@ -594,17 +594,14 @@ public:
 	template<class T>
 	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr)
 	{
-		if(IsModuleInEditor())
+		WorldWidgetClassMap.Empty();
+		for(auto& Iter : WorldWidgetClasses)
 		{
-			WorldWidgetClassMap.Empty();
-			for(auto& Iter : WorldWidgetClasses)
+			if(!Iter) continue;
+			const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
+			if(!WorldWidgetClassMap.Contains(WidgetName))
 			{
-				if(!Iter) continue;
-				const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
-				if(!WorldWidgetClassMap.Contains(WidgetName))
-				{
-					WorldWidgetClassMap.Add(WidgetName, Iter);
-				}
+				WorldWidgetClassMap.Add(WidgetName, Iter);
 			}
 		}
 		
@@ -614,15 +611,14 @@ public:
 			return nullptr;
 		}
 		
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, IsModuleInEditor(), WorldWidgetClassMap[InName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, WorldWidgetClassMap[InName]))
 		{
 			if(!AllWorldWidget.Contains(InName))
 			{
 				AllWorldWidget.Add(InName);
 			}
 			WorldWidget->WidgetIndex = AllWorldWidget[InName].WorldWidgets.Add(WorldWidget);
-			WorldWidget->bWidgetInEditor = IsModuleInEditor();
-			WorldWidget->OnCreate(InOwner, InMapping, *InParams);
+			WorldWidget->OnCreate(InOwner, InMapping, InParams ? *InParams : TArray<FParameter>());
 			return Cast<T>(WorldWidget);
 		}
 		return nullptr;

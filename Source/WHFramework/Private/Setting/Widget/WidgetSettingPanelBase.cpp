@@ -87,7 +87,7 @@ void UWidgetSettingPanelBase::OnResetButtonClicked()
 
 UWidgetSettingPageItemBase* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
 {
-	if(UWidgetSettingPageItemBase* PageItem = UObjectPoolModuleStatics::SpawnObject<UWidgetSettingPageItemBase>(InPage, nullptr, false, PageItemClass))
+	if(UWidgetSettingPageItemBase* PageItem = UObjectPoolModuleStatics::SpawnObject<UWidgetSettingPageItemBase>(InPage, nullptr, PageItemClass))
 	{
 		PageItem->SetTitle(InPage->Title);
 		if(InPage->PageItemStyle)

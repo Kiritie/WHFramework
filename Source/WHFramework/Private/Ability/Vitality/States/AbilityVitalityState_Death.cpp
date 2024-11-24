@@ -38,6 +38,8 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
+	Vitality->GetInteractionComponent()->SetInteractable(false);
+
 	if(Killer && Killer != Vitality)
 	{
 		Killer->ModifyExp(Vitality->GetLevelA() * 10.f);
@@ -85,7 +87,6 @@ void UAbilityVitalityState_Death::DeathStart()
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Vitality->GetInteractionComponent()->SetInteractable(false);
 
 	if(!Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{

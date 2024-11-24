@@ -59,6 +59,17 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	virtual void BindASCInput() override;
+
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
+
+protected:
+	virtual bool HasArchive() const override { return true; }
+
+	virtual void Serialize(FArchive& Ar) override;
+
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
@@ -68,10 +79,6 @@ protected:
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
-	virtual bool HasArchive() const override { return true; }
-
-	virtual void Serialize(FArchive& Ar) override;
-
 	virtual void Death(IAbilityVitalityInterface* InKiller) override;
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
@@ -309,4 +316,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override { return ActionAbilities; }
+
+public:
+	virtual void OnRep_Controller() override;
+
+	virtual void OnRep_PlayerState() override;
 };

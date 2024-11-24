@@ -49,10 +49,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 protected:
-	/// 默认引用池上限
-	UPROPERTY(EditAnywhere)
-	int32 DefaultLimit;
-
 	UPROPERTY(VisibleAnywhere, Transient)
 	TMap<TSubclassOf<UObject>, UObjectPool*> ObjectPools;
 

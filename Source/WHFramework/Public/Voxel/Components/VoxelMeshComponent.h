@@ -27,7 +27,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void Initialize(EVoxelScope InScope, EVoxelNature InNature = EVoxelNature::Solid);
+	virtual void Initialize(EVoxelScope InScope, EVoxelNature InNature = EVoxelNature::None);
 
 	virtual void Register(UObject* InOuter);
 	

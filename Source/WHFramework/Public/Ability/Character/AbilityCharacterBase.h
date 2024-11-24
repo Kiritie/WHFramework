@@ -66,7 +66,7 @@ public:
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-	virtual void BindASCInput();
+	virtual void BindASCInput() override;
 
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
@@ -229,8 +229,6 @@ protected:
 	UFSMComponent* FSM;
 
 protected:
-	bool bASCInputBound;
-
 	float DefaultGravityScale;
 
 	float DefaultAirControl;

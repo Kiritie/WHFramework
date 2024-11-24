@@ -40,6 +40,8 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
+	Pawn->GetInteractionComponent()->SetInteractable(false);
+
 	if(Pawn->GetController<AAIControllerBase>())
 	{
 		Pawn->GetController<AAIControllerBase>()->StopBehaviorTree();
@@ -80,6 +82,11 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Death);
+
+	if(Pawn->IsPlayer())
+	{
+		Pawn->Execute_SetActorVisible(Pawn, true);
+	}
 }
 
 void UAbilityPawnState_Death::OnTermination()
@@ -93,7 +100,6 @@ void UAbilityPawnState_Death::DeathStart()
 
 	Pawn->GetMovementComponent()->SetActive(false);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Pawn->GetInteractionComponent()->SetInteractable(false);
 
 	if(!Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{

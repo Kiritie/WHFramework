@@ -168,17 +168,17 @@ public:
 	virtual FVoxelItem& FindVoxelByLocation(FVector InLocation);
 
 public:
-	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset) const;
+	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight) const;
 
 	virtual float GetNoiseHeight(float InBaseHeight) const;
 
-	virtual EVoxelType GetNoiseVoxelType(FIndex InIndex) const;
+	virtual EVoxelType GetBiomeVoxelType(FIndex InIndex) const;
 
-	virtual EVoxelType GetNoiseVoxelType(int32 InX, int32 InY, int32 InZ) const;
+	virtual EVoxelType GetBiomeVoxelType(int32 InX, int32 InY, int32 InZ) const;
 
-	virtual EVoxelType GetRandomVoxelType(FIndex InIndex) const;
+	virtual EVoxelType GetFoliageVoxelType(FIndex InIndex) const;
 
-	virtual EVoxelType GetRandomVoxelType(int32 InX, int32 InY, int32 InZ) const;
+	virtual EVoxelType GetFoliageVoxelType(int32 InX, int32 InY, int32 InZ) const;
 
 	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
 

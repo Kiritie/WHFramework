@@ -191,7 +191,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		{
 			const auto& WorldData = UVoxelModule::Get().GetWorldData();
 			ITER_INDEX(VoxelIndex, WorldData.ChunkSize, false,
-				const auto VoxelType = UVoxelModuleStatics::GetNoiseVoxelType(LocalIndexToWorld(VoxelIndex));
+				const auto VoxelType = UVoxelModuleStatics::GetBiomeVoxelType(LocalIndexToWorld(VoxelIndex));
 				const FVoxelItem VoxelItem = FVoxelItem(VoxelType);
 				switch(VoxelType)
 				{
@@ -214,7 +214,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 					case EVoxelType::Grass:
 					{
 						const FIndex VoxelIndex = Iter.Key + FIndex(0, 0, 1);
-						const auto VoxelType = UVoxelModuleStatics::GetRandomVoxelType(LocalIndexToWorld(VoxelIndex));
+						const auto VoxelType = UVoxelModuleStatics::GetFoliageVoxelType(LocalIndexToWorld(VoxelIndex));
 						const FVoxelItem VoxelItem = FVoxelItem(VoxelType, VoxelIndex, this);
 						switch(VoxelType)
 						{
@@ -634,9 +634,11 @@ bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection I
 						}
 						break;
 					}
+					default: break;
 				}
 				break;
 			}
+			default: break;
 		}
 	}
 	else if(AdjacentItem.IsUnknown())
@@ -942,7 +944,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 		const auto& VoxelData = InVoxelItem.GetVoxelData();
 		if(VoxelData.AuxiliaryClass && VoxelData.bMainPart)
 		{
-			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, false, VoxelData.AuxiliaryClass))
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
 			{
 				FVoxelAuxiliarySaveData AuxiliaryData;
 				if(InVoxelItem.AuxiliaryData)

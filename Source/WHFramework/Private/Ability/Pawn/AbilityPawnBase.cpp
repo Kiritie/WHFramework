@@ -126,6 +126,46 @@ void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
+void AAbilityPawnBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	BindASCInput();
+}
+
+void AAbilityPawnBase::BindASCInput()
+{
+	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	{
+		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+		bASCInputBound = true;
+	}
+}
+
+void AAbilityPawnBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
+void AAbilityPawnBase::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << Level;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << Level;
+		}
+		AttributeSet->SerializeAttributes(Ar);
+	}
+}
+
 void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
@@ -195,24 +235,6 @@ void AAbilityPawnBase::ResetData()
 void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
 	FSM->SwitchStateByClass<UAbilityPawnState_Walk>();
-}
-
-void AAbilityPawnBase::Serialize(FArchive& Ar)
-{
-	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << Level;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << Level;
-		}
-		AttributeSet->SerializeAttributes(Ar);
-	}
 }
 
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
@@ -586,4 +608,19 @@ FVitalityActionAbilityData AAbilityPawnBase::GetActionAbility(const FGameplayTag
 		return ActionAbilities[InActionTag];
 	}
 	return FVitalityActionAbilityData();
+}
+
+void AAbilityPawnBase::OnRep_Controller()
+{
+	Super::OnRep_Controller();
+}
+
+void AAbilityPawnBase::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	if(GetPlayerState())
+	{
+		BindASCInput();
+	}
 }

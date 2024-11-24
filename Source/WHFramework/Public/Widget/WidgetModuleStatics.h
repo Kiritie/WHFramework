@@ -310,125 +310,125 @@ public:
 	static bool GetWorldWidgetVisible(bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetWorldWidgetVisible(bool bVisible, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+	static void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	template<class T>
-	static bool HasWorldWidget(int32 InIndex, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get(bInEditor).HasWorldWidget<T>(InIndex, InClass);
+		return UWidgetModule::Get().HasWorldWidget<T>(InIndex, InClass);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor = false);
+	static bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
 
 	UFUNCTION(BlueprintPure)
-	static bool HasWorldWidgetByName(FName InName, int32 InIndex, bool bInEditor = false)
+	static bool HasWorldWidgetByName(FName InName, int32 InIndex)
 	{
-		return UWidgetModule::Get(bInEditor).HasWorldWidgetByName(InName, InIndex);
+		return UWidgetModule::Get().HasWorldWidgetByName(InName, InIndex);
 	}
 
 	template<class T>
-	static T* GetWorldWidget(int32 InIndex, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* GetWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get(bInEditor).GetWorldWidget<T>(InIndex, InClass);
+		return UWidgetModule::Get().GetWorldWidget<T>(InIndex, InClass);
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor = false);
+	static UWorldWidgetBase* GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
 
 	template<class T>
-	static T* GetWorldWidgetByName(FName InName, int32 InIndex, bool bInEditor = false)
+	static T* GetWorldWidgetByName(FName InName, int32 InIndex)
 	{
-		return UWidgetModule::Get(bInEditor).GetWorldWidgetByName<T>(InName, InIndex);
+		return UWidgetModule::Get().GetWorldWidgetByName<T>(InName, InIndex);
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bInEditor = false);
+	static UWorldWidgetBase* GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
 
 	template<class T>
 	static TArray<T*> GetWorldWidgets(bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get(bInEditor).GetWorldWidgets<T>(InClass);
+		return UWidgetModule::Get().GetWorldWidgets<T>(InClass);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bInEditor = false);
+	static TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass);
 
 	template<class T>
-	static TArray<T*> GetWorldWidgetsByName(FName InName, bool bInEditor = false)
+	static TArray<T*> GetWorldWidgetsByName(FName InName)
 	{
-		return UWidgetModule::Get(bInEditor).GetWorldWidgetsByName<T>(InName);
+		return UWidgetModule::Get().GetWorldWidgetsByName<T>(InName);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName, bool bInEditor = false);
+	static TArray<UWorldWidgetBase*> GetWorldWidgetsByName(FName InName);
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get(bInEditor).CreateWorldWidget<T>(InOwner, InMapping, InParams, InClass);
+		return UWidgetModule::Get().CreateWorldWidget<T>(InOwner, InMapping, InParams, InClass);
 	}
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateWorldWidget<T>(InOwner, InMapping, &InParams, bInEditor, InClass);
+		return CreateWorldWidget<T>(InOwner, InMapping, &InParams, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor = false);
+	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, bool bInEditor = false)
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr)
 	{
-		return UWidgetModule::Get(bInEditor).CreateWorldWidgetByName<T>(InName, InOwner, InMapping, InParams);
+		return UWidgetModule::Get().CreateWorldWidgetByName<T>(InName, InOwner, InMapping, InParams);
 	}
 
 	template<class T>
-	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor = false)
+	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 	{
-		return CreateWorldWidgetByName<T>(InName, InOwner, InMapping, &InParams, bInEditor);
+		return CreateWorldWidgetByName<T>(InName, InOwner, InMapping, &InParams);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, bool bInEditor = false);
+	static UWorldWidgetBase* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 
-	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false, bool bInEditor = false)
+	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
 	{
 		if(!InWidget) return false;
 
 		const FName WidgetName = InWidget->GetWidgetName();
 		
-		return DestroyWorldWidgetByName(WidgetName, InWidget->GetWidgetIndex(), bRecovery, bInEditor);
+		return DestroyWorldWidgetByName(WidgetName, InWidget->GetWidgetIndex(), bRecovery);
 	}
 
 	template<class T>
-	static bool DestroyWorldWidget(int32 InIndex, bool bRecovery = false, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static bool DestroyWorldWidget(int32 InIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get(bInEditor).DestroyWorldWidget<T>(InIndex, bRecovery, InClass);
+		return UWidgetModule::Get().DestroyWorldWidget<T>(InIndex, bRecovery, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery = false, bool bInEditor = false);
+	static bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool DestroyWorldWidgetByName(FName InName, int32 InIndex, bool bRecovery = false, bool bInEditor = false)
+	static bool DestroyWorldWidgetByName(FName InName, int32 InIndex, bool bRecovery = false)
 	{
-		return UWidgetModule::Get(bInEditor).DestroyWorldWidgetByName(InName, InIndex, bRecovery);
+		return UWidgetModule::Get().DestroyWorldWidgetByName(InName, InIndex, bRecovery);
 	}
 
 	template<class T>
-	static void DestroyWorldWidgets(bool bRecovery = false, bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static void DestroyWorldWidgets(bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		UWidgetModule::Get(bInEditor).DestroyWorldWidgets<T>(bRecovery, InClass);
+		UWidgetModule::Get().DestroyWorldWidgets<T>(bRecovery, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery = false, bool bInEditor = false);
+	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
-	static void DestroyWorldWidgetsByName(FName InName, bool bRecovery = false, bool bInEditor = false)
+	static void DestroyWorldWidgetsByName(FName InName, bool bRecovery = false)
 	{
-		UWidgetModule::Get(bInEditor).DestroyWorldWidgetsByName(InName, bRecovery);
+		UWidgetModule::Get().DestroyWorldWidgetsByName(InName, bRecovery);
 	}
 };
