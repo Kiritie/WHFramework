@@ -188,6 +188,16 @@ public:
 		}
 		return WidgetState;
 	}
+	
+	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Opened || (bCheckOpening && GetWidgetState(bInheritParent) == EScreenWidgetState::Opening);
+	}
+	
+	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Closed || (bCheckClosing && GetWidgetState(bInheritParent) == EScreenWidgetState::Closing);
+	}
 
 	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
 

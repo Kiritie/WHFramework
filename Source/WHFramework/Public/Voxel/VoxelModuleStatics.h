@@ -101,8 +101,13 @@ public:
 	}
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
 	
-	static EVoxelType GetBiomeVoxelType(FIndex InIndex);
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static EVoxelBiomeType GetBiomeType(FIndex InIndex);
 	
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static EVoxelType GetBiomeVoxelType(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static EVoxelType GetFoliageVoxelType(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////

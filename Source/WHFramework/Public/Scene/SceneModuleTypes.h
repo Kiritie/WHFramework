@@ -8,6 +8,24 @@
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
 
+UENUM(BlueprintType)
+enum class EWorldTimePhase : uint8
+{
+	None,
+	//早晨
+	Morning,
+	//上午
+	Forenoon,
+	//中午
+	Noon,
+	//下午
+	Afternoon,
+	//傍晚
+	Evening,
+	//晚上
+	Night
+};
+
 /**
  *
  */
@@ -138,7 +156,7 @@ public:
 		DayLength = 10.f;
 		NightLength = 5.f;
 		TimeOfDay = 960.f;
-		DateTime = -1.f;
+		DateTime = FDateTime();
 	}
 
 public:

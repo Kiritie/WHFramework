@@ -64,6 +64,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// StepModule
 public:
+	UFUNCTION(BlueprintPure)
+	UStepAsset* GetAsset(UStepAsset* InAsset) const;
+
 	UFUNCTION(BlueprintCallable)
 	void AddAsset(UStepAsset* InAsset);
 	

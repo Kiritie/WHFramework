@@ -17,7 +17,7 @@ class WHFRAMEWORK_API UObjectPoolModuleStatics : public UBlueprintFunctionLibrar
 
 public:
 	template<class T>
-	static bool HasObject(bool bInEditor = false, TSubclassOf<UObject> InType = T::StaticClass())
+	static bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		return HasObject(InType);
 	}
@@ -55,7 +55,7 @@ public:
 	static void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
 
 	template<class T>
-	static void ClearObject(bool bInEditor = false, TSubclassOf<UObject> InType = T::StaticClass())
+	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
 	{
 		UObjectPoolModule::Get().ClearObject<T>(InType);
 	}

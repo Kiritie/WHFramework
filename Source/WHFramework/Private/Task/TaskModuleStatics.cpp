@@ -30,6 +30,11 @@ UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
 	return UTaskModule::Get().GetTaskByGUID(InTaskGUID);
 }
 
+UTaskAsset* UTaskModuleStatics::GetTaskAsset(UTaskAsset* InAsset)
+{
+	return UTaskModule::Get().GetAsset(InAsset);
+}
+
 void UTaskModuleStatics::AddTaskAsset(UTaskAsset* InAsset)
 {
 	UTaskModule::Get().AddAsset(InAsset);

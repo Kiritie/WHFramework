@@ -20,6 +20,11 @@ UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProced
 	return GetDeterminesOutputObject(UProcedureModule::Get().GetCurrentProcedure(), InClass);
 }
 
+UProcedureAsset* UProcedureModuleStatics::GetProcedureAsset(UProcedureAsset* InAsset)
+{
+	return UProcedureModule::Get().GetAsset(InAsset);
+}
+
 void UProcedureModuleStatics::AddProcedureAsset(UProcedureAsset* InAsset)
 {
 	UProcedureModule::Get().AddAsset(InAsset);

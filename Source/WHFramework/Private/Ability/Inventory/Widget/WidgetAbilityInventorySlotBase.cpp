@@ -21,6 +21,8 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 	
 	OwnerSlot = nullptr;
 	CooldownTimerHandle = FTimerHandle();
+
+	bWidgetTickAble = true;
 }
 
 void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -288,6 +290,22 @@ FAbilityItem& UWidgetAbilityInventorySlotBase::GetItem() const
 {
 	if(OwnerSlot) return OwnerSlot->GetItem();
 	return FAbilityItem::Empty;
+}
+
+TArray<FAbilityItem>& UWidgetAbilityInventorySlotBase::GetMatchItems() const
+{
+	static TArray<FAbilityItem> Items;
+	Items.Empty();
+	Items.Add(GetItem());
+	if(!OwnerSlot->IsMatched())
+	{
+		auto QueryData = GetInventory()->QueryItemByRange(EItemQueryType::Match, GetItem());
+		for(auto Iter : QueryData.Slots)
+		{
+			Items.Add(Iter->GetItem());
+		}
+	}
+	return Items;
 }
 
 UAbilityInventoryBase* UWidgetAbilityInventorySlotBase::GetInventory() const

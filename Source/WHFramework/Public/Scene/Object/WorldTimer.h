@@ -4,6 +4,7 @@
 
 #include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
+#include "Scene/SceneModuleTypes.h"
 #include "WorldTimer.generated.h"
 
 class ASkyLight;
@@ -93,6 +94,9 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunsetTime() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	EWorldTimePhase GetTimePhase() const;
 
 protected:
 	UPROPERTY(EditAnywhere)

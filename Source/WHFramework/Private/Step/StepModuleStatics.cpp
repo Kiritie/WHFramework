@@ -30,6 +30,11 @@ UStepBase* UStepModuleStatics::GetStepByGUID(const FString& InStepGUID)
 	return UStepModule::Get().GetStepByGUID(InStepGUID);
 }
 
+UStepAsset* UStepModuleStatics::GetStepAsset(UStepAsset* InAsset)
+{
+	return UStepModule::Get().GetAsset(InAsset);
+}
+
 void UStepModuleStatics::AddStepAsset(UStepAsset* InAsset)
 {
 	UStepModule::Get().AddAsset(InAsset);

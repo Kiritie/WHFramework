@@ -41,6 +41,18 @@ void UTaskAsset::Initialize()
 	}
 }
 
+bool UTaskAsset::IsAllTaskCompleted() const
+{
+	for (auto Iter : RootTasks)
+	{
+		if(Iter && !Iter->IsCompleted())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 #if WITH_EDITOR
 void UTaskAsset::GenerateTaskListItem(TArray<TSharedPtr<FTaskListItem>>& OutTaskListItems, const FString& InFilterText)
 {

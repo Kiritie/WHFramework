@@ -110,6 +110,9 @@ public:
 	FAbilityItem& GetItem() const;
 
 	UFUNCTION(BlueprintPure)
+	TArray<FAbilityItem>& GetMatchItems() const;
+
+	UFUNCTION(BlueprintPure)
 	UAbilityInventorySlotBase* GetOwnerSlot() const { return OwnerSlot; }
 
 	UFUNCTION(BlueprintPure)

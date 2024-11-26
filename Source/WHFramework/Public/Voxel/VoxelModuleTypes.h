@@ -598,8 +598,7 @@ enum class EVoxelBiomeType: uint8
 	None,
 	Plain,
 	Mountain,
-	Blob,
-	Hole
+	Blob
 };
 
 UENUM(BlueprintType)

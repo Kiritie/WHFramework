@@ -255,7 +255,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	if(bRefresh)
 	{
 		bool bVisible = false;
-		if(UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(false, GetClass()))
+		if(UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
 		{
 			FWorldWidgetMapping Mapping;
 			const auto OwnerActor = Cast<AActor>(OwnerObject);

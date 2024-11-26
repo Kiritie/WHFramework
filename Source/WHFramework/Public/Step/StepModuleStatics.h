@@ -35,6 +35,9 @@ public:
 	static UStepBase* GetStepByGUID(const FString& InStepGUID);
 
 public:
+	UFUNCTION(BlueprintPure, Category = "StepModuleStatics")
+	static UStepAsset* GetStepAsset(UStepAsset* InAsset);
+	
 	UFUNCTION(BlueprintCallable, Category = "StepModuleStatics")
 	static void AddStepAsset(UStepAsset* InAsset);
 	

@@ -34,6 +34,9 @@ public:
 	static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
 
 public:
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
+	static UProcedureAsset* GetProcedureAsset(UProcedureAsset* InAsset);
+	
 	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
 	static void AddProcedureAsset(UProcedureAsset* InAsset);
 	

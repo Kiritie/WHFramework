@@ -125,7 +125,7 @@ UWorldWidgetContainer* UWidgetModuleStatics::GetWorldWidgetContainer()
 	return UWidgetModule::Get().GetWorldWidgetContainer();
 }
 
-bool UWidgetModuleStatics::GetWorldWidgetVisible(bool bInEditor, TSubclassOf<UWorldWidgetBase> InClass)
+bool UWidgetModuleStatics::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
 {
 	return UWidgetModule::Get().GetWorldWidgetVisible(InClass);
 }

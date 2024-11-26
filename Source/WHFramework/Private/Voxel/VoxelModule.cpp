@@ -756,6 +756,25 @@ float UVoxelModule::GetNoiseHeight(float InBaseHeight) const
 	return InBaseHeight * WorldData->ChunkSize.Z;
 }
 
+EVoxelBiomeType UVoxelModule::GetBiomeType(FIndex InIndex) const
+{
+	return GetBiomeType(InIndex.X, InIndex.Y, InIndex.Z);
+}
+
+EVoxelBiomeType UVoxelModule::GetBiomeType(int32 InX, int32 InY, int32 InZ) const
+{
+	const FVector2D WorldLocation = FVector2D(InX, InY);
+
+	for(auto& Iter : WorldData->BiomeDatas)
+	{
+		if(InZ < GetNoiseHeight(WorldLocation, Iter.Value.NoiseScale, Iter.Value.BaseHeight) + 2)
+		{
+			return Iter.Key;
+		}
+	}
+	return EVoxelBiomeType::None;
+}
+
 EVoxelType UVoxelModule::GetBiomeVoxelType(FIndex InIndex) const
 {
 	return GetBiomeVoxelType(InIndex.X, InIndex.Y, InIndex.Z);

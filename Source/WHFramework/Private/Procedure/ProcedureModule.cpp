@@ -111,18 +111,21 @@ void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchP
 	SwitchProcedureByClass(InEventHandle->ProcedureClass);
 }
 
-void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
+UProcedureAsset* UProcedureModule::GetAsset(UProcedureAsset* InAsset) const
 {
-	bool bCanAdd = true;
 	for(auto Iter : Assets)
 	{
 		if(Iter->SourceObject == InAsset->SourceObject)
 		{
-			bCanAdd = false;
-			break;
+			return Iter;
 		}
 	}
-	if(bCanAdd)
+	return nullptr;
+}
+
+void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
+{
+	if(!GetAsset(InAsset))
 	{
 		Assets.Add(InAsset);
 		InAsset->Initialize();
@@ -131,13 +134,9 @@ void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
 
 void UProcedureModule::RemoveAsset(UProcedureAsset* InAsset)
 {
-	for(auto Iter : Assets)
+	if(UProcedureAsset* Asset = GetAsset(InAsset))
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
-		{
-			Assets.Remove(Iter);
-			break;
-		}
+		Assets.Remove(Asset);
 	}
 }
 

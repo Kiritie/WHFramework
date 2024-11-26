@@ -56,6 +56,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
 public:
+	UFUNCTION(BlueprintPure)
+	UProcedureAsset* GetAsset(UProcedureAsset* InAsset) const;
+
 	UFUNCTION(BlueprintCallable)
 	void AddAsset(UProcedureAsset* InAsset);
 	

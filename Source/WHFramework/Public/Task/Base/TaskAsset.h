@@ -37,6 +37,9 @@ public:
 	UPROPERTY(Transient)
 	TMap<FString, UTaskBase*> TaskMap;
 
+public:
+	bool IsAllTaskCompleted() const;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:

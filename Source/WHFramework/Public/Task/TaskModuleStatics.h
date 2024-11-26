@@ -35,6 +35,9 @@ public:
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
 
 public:
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskAsset* GetTaskAsset(UTaskAsset* InAsset);
+	
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void AddTaskAsset(UTaskAsset* InAsset);
 	

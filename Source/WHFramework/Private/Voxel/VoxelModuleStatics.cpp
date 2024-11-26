@@ -143,6 +143,11 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FVoxelItem& InVoxelItem)
 	return Voxel;
 }
 
+EVoxelBiomeType UVoxelModuleStatics::GetBiomeType(FIndex InIndex)
+{
+	return UVoxelModule::Get().GetBiomeType(InIndex);
+}
+
 EVoxelType UVoxelModuleStatics::GetBiomeVoxelType(FIndex InIndex)
 {
 	return UVoxelModule::Get().GetBiomeVoxelType(InIndex);

@@ -144,18 +144,21 @@ FString UStepModule::GetModuleDebugMessage()
 	return FString::Printf(TEXT("CurrentStep: %s"), CurrentStep ? *CurrentStep->StepDisplayName.ToString() : TEXT("None"));
 }
 
-void UStepModule::AddAsset(UStepAsset* InAsset)
+UStepAsset* UStepModule::GetAsset(UStepAsset* InAsset) const
 {
-	bool bCanAdd = true;
 	for(auto Iter : Assets)
 	{
 		if(Iter->SourceObject == InAsset->SourceObject)
 		{
-			bCanAdd = false;
-			break;
+			return Iter;
 		}
 	}
-	if(bCanAdd)
+	return nullptr;
+}
+
+void UStepModule::AddAsset(UStepAsset* InAsset)
+{
+	if(!GetAsset(InAsset))
 	{
 		Assets.Add(InAsset);
 		InAsset->Initialize();
@@ -164,13 +167,9 @@ void UStepModule::AddAsset(UStepAsset* InAsset)
 
 void UStepModule::RemoveAsset(UStepAsset* InAsset)
 {
-	for(auto Iter : Assets)
+	if(UStepAsset* Asset = GetAsset(InAsset))
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
-		{
-			Assets.Remove(Iter);
-			break;
-		}
+		Assets.Remove(Asset);
 	}
 }
 

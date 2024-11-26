@@ -307,7 +307,7 @@ public:
 	static UWorldWidgetContainer* GetWorldWidgetContainer();
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool GetWorldWidgetVisible(bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+	static bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
 	static void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
@@ -346,7 +346,7 @@ public:
 	static UWorldWidgetBase* GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
 
 	template<class T>
-	static TArray<T*> GetWorldWidgets(bool bInEditor = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		return UWidgetModule::Get().GetWorldWidgets<T>(InClass);
 	}

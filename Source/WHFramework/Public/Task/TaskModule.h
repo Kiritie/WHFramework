@@ -63,6 +63,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskModule
 public:
+	UFUNCTION(BlueprintPure)
+	UTaskAsset* GetAsset(UTaskAsset* InAsset) const;
+	
 	UFUNCTION(BlueprintCallable)
 	void AddAsset(UTaskAsset* InAsset);
 	

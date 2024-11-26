@@ -172,6 +172,10 @@ public:
 
 	virtual float GetNoiseHeight(float InBaseHeight) const;
 
+	virtual EVoxelBiomeType GetBiomeType(FIndex InIndex) const;
+
+	virtual EVoxelBiomeType GetBiomeType(int32 InX, int32 InY, int32 InZ) const;
+
 	virtual EVoxelType GetBiomeVoxelType(FIndex InIndex) const;
 
 	virtual EVoxelType GetBiomeVoxelType(int32 InX, int32 InY, int32 InZ) const;
@@ -180,6 +184,7 @@ public:
 
 	virtual EVoxelType GetFoliageVoxelType(int32 InX, int32 InY, int32 InZ) const;
 
+public:
 	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
 
 	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;

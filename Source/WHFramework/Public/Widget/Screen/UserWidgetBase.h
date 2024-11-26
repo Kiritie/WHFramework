@@ -370,6 +370,18 @@ public:
 	}
 	
 	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Opened || (bCheckOpening && GetWidgetState(bInheritParent) == EScreenWidgetState::Opening);
+	}
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Closed || (bCheckClosing && GetWidgetState(bInheritParent) == EScreenWidgetState::Closing);
+	}
+
+	UFUNCTION(BlueprintPure)
 	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
 	
 	UFUNCTION(BlueprintPure)

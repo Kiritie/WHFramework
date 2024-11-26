@@ -302,7 +302,7 @@ void UAbilityInventorySlotBase::DiscardItem(int32 InCount /*= -1*/, bool bInPlac
 
 	if(auto Agent = GetInventory()->GetOwnerAgent())
 	{
-		FAbilityItem _Item = FAbilityItem(Item, InCount);
+		FAbilityItem _Item = FAbilityItem(Item, InCount, true);
 		Agent->OnDiscardItem(_Item, bInPlace);
 		SubItem(_Item);
 	}

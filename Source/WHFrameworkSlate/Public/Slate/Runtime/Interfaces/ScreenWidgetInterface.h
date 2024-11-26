@@ -80,6 +80,10 @@ public:
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
 	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const = 0;
+	
+	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const = 0;
+	
+	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const = 0;
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const = 0;
 

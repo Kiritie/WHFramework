@@ -165,18 +165,21 @@ FString UTaskModule::GetModuleDebugMessage()
 	return FString::Printf(TEXT("CurrentTask: %s"), CurrentTask ? *CurrentTask->TaskDisplayName.ToString() : TEXT("None"));
 }
 
-void UTaskModule::AddAsset(UTaskAsset* InAsset)
+UTaskAsset* UTaskModule::GetAsset(UTaskAsset* InAsset) const
 {
-	bool bCanAdd = true;
 	for(auto Iter : Assets)
 	{
 		if(Iter->SourceObject == InAsset->SourceObject)
 		{
-			bCanAdd = false;
-			break;
+			return Iter;
 		}
 	}
-	if(bCanAdd)
+	return nullptr;
+}
+
+void UTaskModule::AddAsset(UTaskAsset* InAsset)
+{
+	if(!GetAsset(InAsset))
 	{
 		Assets.Add(InAsset);
 		InAsset->Initialize();
@@ -185,13 +188,9 @@ void UTaskModule::AddAsset(UTaskAsset* InAsset)
 
 void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 {
-	for(auto Iter : Assets)
+	if(UTaskAsset* Asset = GetAsset(InAsset))
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
-		{
-			Assets.Remove(Iter);
-			break;
-		}
+		Assets.Remove(Asset);
 	}
 }
 

@@ -429,13 +429,21 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1)
+	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1, bool bClearCaches = false)
 	{
 		ID = InItem.ID;
 		Count = InCount == -1 ? InItem.Count : InCount;
 		Level = InItem.Level;
-		InventorySlot = InItem.InventorySlot;
-		AbilityHandle = InItem.AbilityHandle;
+		if(!bClearCaches)
+		{
+			InventorySlot = InItem.InventorySlot;
+			AbilityHandle = InItem.AbilityHandle;
+		}
+		else
+		{
+			InventorySlot = nullptr;
+			AbilityHandle = FGameplayAbilitySpecHandle();
+		}
 	}
 
 	virtual ~FAbilityItem() override = default;
