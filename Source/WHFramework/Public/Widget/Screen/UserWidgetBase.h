@@ -89,6 +89,9 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
 
+	UFUNCTION(BlueprintCallable)
+	virtual void Reset(bool bForce = false) override;
+
 	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
@@ -99,9 +102,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Toggle(bool bInstant = false) override;
-
-	UFUNCTION(BlueprintCallable)
-	virtual void Reset(bool bForce = false) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Refresh() override;
@@ -122,81 +122,37 @@ protected:
 
 public:
 	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<USubWidgetBase> InClass = T::StaticClass())
+	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
 		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
 	}
 
 	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<USubWidgetBase> InClass = T::StaticClass())
+	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
 		return Cast<T>(CreateSubWidget(InClass, InParams));
 	}
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	USubWidgetBase* CreateSubWidget(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), DisplayName = "CreateSubWidget")
+	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	bool DestroySubWidget(USubWidgetBase* InWidget, bool bRecovery = false);
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
 
-	UFUNCTION(BlueprintPure)
-	TArray<USubWidgetBase*> GetAllSubWidgets() const;
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
 
-	template<class T>
-	TArray<T*> GetAllSubWidgets() const
-	{
-		TArray<T*> ReturnValues;
-		for(auto Iter : GetAllSubWidgets())
-		{
-			if(T* SubWidget = Cast<T>(Iter))
-			{
-				ReturnValues.Add(SubWidget);
-			}
-		}
-		return ReturnValues;
-	}
+	UFUNCTION(BlueprintCallable, DisplayName = "DestroyDestroyWidget")
+	bool K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery = false);
 
-	UFUNCTION(BlueprintPure)
-	virtual TArray<UWidget*> GetAllPoolWidgets() const;
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
 
-public:
-	void AddChild(IScreenWidgetInterface* InChildWidget) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void DestroyAllSubWidget(bool bRecovery) override;
 
-	void RemoveChild(IScreenWidgetInterface* InChildWidget) override;
+	virtual void AddChildWidget(IScreenWidgetInterface* InWidget) override;
 
-	void RemoveAllChild() override;
+	virtual void RemoveChildWidget(IScreenWidgetInterface* InWidget) override;
 
-	template<class T>
-	T* GetChild(int32 InIndex) const
-	{
-		return Cast<T>(GetChild(InIndex));
-	}
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetChild(int32 InIndex, TSubclassOf<UUserWidgetBase> InClass) const
-	{
-		return GetDeterminesOutputObject(Cast<UUserWidgetBase>(GetChild(InIndex)), InClass);
-	}
-
-	UFUNCTION(BlueprintPure)
-	int32 FindChild(UUserWidgetBase* InChildWidget) const
-	{
-		return FindChild(Cast<IScreenWidgetInterface>(InChildWidget));
-	}
-
-	IScreenWidgetInterface* GetChild(int32 InIndex) const override
-	{
-		if(ChildWidgets.IsValidIndex(InIndex))
-		{
-			return ChildWidgets[InIndex];
-		}
-		return nullptr;
-	}
-
-	int32 FindChild(IScreenWidgetInterface* InChildWidget) const override
-	{
-		return ChildWidgets.Find(InChildWidget);
-	}
+	virtual void RemoveAllChildWidget() override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
@@ -265,7 +221,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EInputMode WidgetInputMode;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bWidgetAutoFocus;
 
 	UPROPERTY(Transient)
@@ -279,6 +235,8 @@ protected:
 	IScreenWidgetInterface* ParentWidget;
 		
 	IScreenWidgetInterface* TemporaryChild;
+
+	TArray<ISubWidgetInterface*> SubWidgets;
 
 	TArray<IScreenWidgetInterface*> ChildWidgets;
 
@@ -382,7 +340,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 	
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
@@ -418,9 +376,57 @@ public:
 	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
 
 	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
+	
+	UFUNCTION(BlueprintPure)
+	TArray<UWidget*> GetPoolWidgets() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
+	virtual int32 GetSubWidgetNum() const override { return SubWidgets.Num(); }
+
+	template<class T>
+	TArray<T*> GetSubWidgets()
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetSubWidgets())
+		{
+			ReturnValues.Add(Cast<T>(Iter));
+		}
+		return ReturnValues;
+	}
+	
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override { return SubWidgets; }
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), DisplayName = "GetSubWidgets")
+	virtual TArray<UUserWidget*> K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass);
+
+	template<class T>
+	T* GetSubWidget(int32 InIndex) const
+	{
+		return Cast<T>(GetSubWidget(InIndex));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UUserWidget* GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const;
+
+	UFUNCTION(BlueprintPure)
+	int32 FindSubWidget(UUserWidget* InWidget) const;
+
+	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const override
+	{
+		if(SubWidgets.IsValidIndex(InIndex))
+		{
+			return SubWidgets[InIndex];
+		}
+		return nullptr;
+	}
+
+	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const override
+	{
+		return SubWidgets.Find(InWidget);
+	}
+
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetChildWidgetNum() const override { return ChildWidgets.Num(); }
 
 	template<class T>
 	TArray<T*> GetChildWidgets()
@@ -432,7 +438,43 @@ public:
 		}
 		return ReturnValues;
 	}
-	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
+	
+	virtual TArray<IScreenWidgetInterface*> GetChildWidgets() override { return ChildWidgets; }
+		
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), DisplayName = "GetChildWidgets")
+	virtual TArray<UUserWidgetBase*> K2_GetChildWidgets(TSubclassOf<UUserWidgetBase> InClass);
+
+	template<class T>
+	T* GetChildWidget(int32 InIndex) const
+	{
+		return Cast<T>(GetChildWidget(InIndex));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UUserWidgetBase* GetChildWidget(int32 InIndex, TSubclassOf<UUserWidgetBase> InClass) const
+	{
+		return GetDeterminesOutputObject(Cast<UUserWidgetBase>(GetChildWidget(InIndex)), InClass);
+	}
+
+	UFUNCTION(BlueprintPure)
+	int32 FindChildWidget(UUserWidgetBase* InWidget) const
+	{
+		return FindChildWidget(Cast<IScreenWidgetInterface>(InWidget));
+	}
+
+	virtual IScreenWidgetInterface* GetChildWidget(int32 InIndex) const override
+	{
+		if(ChildWidgets.IsValidIndex(InIndex))
+		{
+			return ChildWidgets[InIndex];
+		}
+		return nullptr;
+	}
+
+	virtual int32 FindChildWidget(IScreenWidgetInterface* InWidget) const override
+	{
+		return ChildWidgets.Find(InWidget);
+	}
 
 	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
 

@@ -7,12 +7,16 @@
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/ShapeComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalitySpawned.h"
 #include "FSM/Components/FSMComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 
 UAbilityPawnState_Spawn::UAbilityPawnState_Spawn()
 {
 	StateName = FName("Spawn");
+
+	Rescuer = nullptr;
 }
 
 void UAbilityPawnState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -28,6 +32,13 @@ bool UAbilityPawnState_Spawn::OnPreEnter(UFiniteStateBase* InLastState, const TA
 void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
@@ -53,6 +64,8 @@ void UAbilityPawnState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
+
+	Rescuer = nullptr;
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 

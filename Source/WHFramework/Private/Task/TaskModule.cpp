@@ -53,7 +53,6 @@ void UTaskModule::OnInitialize()
 
 	if(DefaultAsset)
 	{
-		DefaultAsset = DefaultAsset->Duplicate<UTaskAsset>();
 		AddAsset(DefaultAsset);
 	}
 }
@@ -64,10 +63,7 @@ void UTaskModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(DefaultAsset)
-		{
-			SwitchAsset(DefaultAsset);
-		}
+		SwitchAsset(DefaultAsset);
 	}
 }
 
@@ -169,7 +165,7 @@ UTaskAsset* UTaskModule::GetAsset(UTaskAsset* InAsset) const
 {
 	for(auto Iter : Assets)
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
+		if(Iter->SourceObject == InAsset)
 		{
 			return Iter;
 		}
@@ -181,6 +177,7 @@ void UTaskModule::AddAsset(UTaskAsset* InAsset)
 {
 	if(!GetAsset(InAsset))
 	{
+		InAsset = InAsset->Duplicate<UTaskAsset>();
 		Assets.Add(InAsset);
 		InAsset->Initialize();
 	}
@@ -196,6 +193,8 @@ void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 
 void UTaskModule::SwitchAsset(UTaskAsset* InAsset)
 {
+	if(InAsset && !InAsset->SourceObject) InAsset = GetAsset(InAsset);
+	
 	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
 	CurrentAsset = InAsset;

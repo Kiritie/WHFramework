@@ -210,7 +210,6 @@ void AVoxelChunk::BuildMap(int32 InStage)
 			ITER_MAP(TMap(VoxelMap), Iter,
 				switch(Iter.Value.GetVoxelType())
 				{
-					// Grass
 					case EVoxelType::Grass:
 					{
 						const FIndex VoxelIndex = Iter.Key + FIndex(0, 0, 1);
@@ -218,7 +217,6 @@ void AVoxelChunk::BuildMap(int32 InStage)
 						const FVoxelItem VoxelItem = FVoxelItem(VoxelType, VoxelIndex, this);
 						switch(VoxelType)
 						{
-							// Tree
 							case EVoxelType::Oak:
 							case EVoxelType::Birch:
 							{

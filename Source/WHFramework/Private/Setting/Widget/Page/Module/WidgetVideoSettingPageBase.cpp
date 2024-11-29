@@ -12,69 +12,56 @@
 
 UWidgetVideoSettingPageBase::UWidgetVideoSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("VideoSettingPage");
-
 	Title = FText::FromString(TEXT("视频"));
 }
 
-void UWidgetVideoSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetVideoSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetVideoSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
 	SettingItem_GlobalVideoQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality") }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_GlobalVideoQuality->SetValue((int32)UVideoModule::Get().GetGlobalVideoQuality());
 	AddSettingItem(FName("GlobalVideoQuality"), SettingItem_GlobalVideoQuality, FText::FromString(TEXT("预设")));
 
 	SettingItem_ViewDistanceQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ViewDistanceQuality->SetValue((int32)UVideoModule::Get().GetViewDistanceQuality());
 	AddSettingItem(FName("ViewDistanceQuality"), SettingItem_ViewDistanceQuality, FText::FromString(TEXT("视距")));
 
 	SettingItem_ShadowQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ShadowQuality->SetValue((int32)UVideoModule::Get().GetShadowQuality());
 	AddSettingItem(FName("ShadowQuality"), SettingItem_ShadowQuality, FText::FromString(TEXT("阴影")));
 
 	SettingItem_GlobalIlluminationQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_GlobalIlluminationQuality->SetValue((int32)UVideoModule::Get().GetGlobalIlluminationQuality());
 	AddSettingItem(FName("GlobalIlluminationQuality"), SettingItem_GlobalIlluminationQuality, FText::FromString(TEXT("光照")));
 
 	SettingItem_ReflectionQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ReflectionQuality->SetValue((int32)UVideoModule::Get().GetReflectionQuality());
 	AddSettingItem(FName("ReflectionQuality"), SettingItem_ReflectionQuality, FText::FromString(TEXT("反射")));
 
 	SettingItem_AntiAliasingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_AntiAliasingQuality->SetValue((int32)UVideoModule::Get().GetAntiAliasingQuality());
 	AddSettingItem(FName("AntiAliasingQuality"), SettingItem_AntiAliasingQuality, FText::FromString(TEXT("抗锯齿")));
 
 	SettingItem_TextureQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_TextureQuality->SetValue((int32)UVideoModule::Get().GetTextureQuality());
 	AddSettingItem(FName("TextureQuality"), SettingItem_TextureQuality, FText::FromString(TEXT("贴图")));
 
 	SettingItem_VisualEffectQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_VisualEffectQuality->SetValue((int32)UVideoModule::Get().GetVisualEffectQuality());
 	AddSettingItem(FName("VisualEffectQuality"), SettingItem_VisualEffectQuality, FText::FromString(TEXT("视效")));
 
 	SettingItem_PostProcessingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_PostProcessingQuality->SetValue((int32)UVideoModule::Get().GetPostProcessingQuality());
 	AddSettingItem(FName("PostProcessingQuality"), SettingItem_PostProcessingQuality, FText::FromString(TEXT("后处理")));
 
 	SettingItem_FoliageQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_FoliageQuality->SetValue((int32)UVideoModule::Get().GetFoliageQuality());
 	AddSettingItem(FName("FoliageQuality"), SettingItem_FoliageQuality, FText::FromString(TEXT("植被")));
 
 	SettingItem_ShadingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("画质等级")), FString("/Script/WHFramework.EVideoQuality"), 5 }, USettingModule::Get().GetEnumSettingItemClass());
-	AddSettingItem(FName("ShadingQuality"), SettingItem_ShadingQuality, FText::FromString(TEXT("遮蔽")));
-}
-
-void UWidgetVideoSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
-
-	SettingItem_GlobalVideoQuality->SetValue((int32)UVideoModule::Get().GetGlobalVideoQuality());
-	SettingItem_ViewDistanceQuality->SetValue((int32)UVideoModule::Get().GetViewDistanceQuality());
-	SettingItem_ShadowQuality->SetValue((int32)UVideoModule::Get().GetShadowQuality());
-	SettingItem_GlobalIlluminationQuality->SetValue((int32)UVideoModule::Get().GetGlobalIlluminationQuality());
-	SettingItem_ReflectionQuality->SetValue((int32)UVideoModule::Get().GetReflectionQuality());
-	SettingItem_AntiAliasingQuality->SetValue((int32)UVideoModule::Get().GetAntiAliasingQuality());
-	SettingItem_TextureQuality->SetValue((int32)UVideoModule::Get().GetTextureQuality());
-	SettingItem_VisualEffectQuality->SetValue((int32)UVideoModule::Get().GetVisualEffectQuality());
-	SettingItem_PostProcessingQuality->SetValue((int32)UVideoModule::Get().GetPostProcessingQuality());
-	SettingItem_FoliageQuality->SetValue((int32)UVideoModule::Get().GetFoliageQuality());
 	SettingItem_ShadingQuality->SetValue((int32)UVideoModule::Get().GetShadingQuality());
+	AddSettingItem(FName("ShadingQuality"), SettingItem_ShadingQuality, FText::FromString(TEXT("遮蔽")));
 }
 
 void UWidgetVideoSettingPageBase::OnApply()
@@ -94,6 +81,28 @@ void UWidgetVideoSettingPageBase::OnApply()
 	UVideoModule::Get().SetShadingQuality((EVideoQuality)SettingItem_ShadingQuality->GetValue().GetIntegerValue(), false);
 
 	UVideoModule::Get().ApplyVideoQualitySettings();
+}
+
+void UWidgetVideoSettingPageBase::OnActivated()
+{
+	Super::OnActivated();
+}
+
+void UWidgetVideoSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
+
+	SettingItem_GlobalVideoQuality->SetValue((int32)UVideoModule::Get().GetGlobalVideoQuality());
+	SettingItem_ViewDistanceQuality->SetValue((int32)UVideoModule::Get().GetViewDistanceQuality());
+	SettingItem_ShadowQuality->SetValue((int32)UVideoModule::Get().GetShadowQuality());
+	SettingItem_GlobalIlluminationQuality->SetValue((int32)UVideoModule::Get().GetGlobalIlluminationQuality());
+	SettingItem_ReflectionQuality->SetValue((int32)UVideoModule::Get().GetReflectionQuality());
+	SettingItem_AntiAliasingQuality->SetValue((int32)UVideoModule::Get().GetAntiAliasingQuality());
+	SettingItem_TextureQuality->SetValue((int32)UVideoModule::Get().GetTextureQuality());
+	SettingItem_VisualEffectQuality->SetValue((int32)UVideoModule::Get().GetVisualEffectQuality());
+	SettingItem_PostProcessingQuality->SetValue((int32)UVideoModule::Get().GetPostProcessingQuality());
+	SettingItem_FoliageQuality->SetValue((int32)UVideoModule::Get().GetFoliageQuality());
+	SettingItem_ShadingQuality->SetValue((int32)UVideoModule::Get().GetShadingQuality());
 }
 
 void UWidgetVideoSettingPageBase::OnReset(bool bForce)
@@ -142,11 +151,6 @@ void UWidgetVideoSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSettin
 	}
 }
 
-void UWidgetVideoSettingPageBase::OnClose(bool bInstant)
-{
-	Super::OnClose(bInstant);
-}
-
 bool UWidgetVideoSettingPageBase::CanApply_Implementation() const
 {
 	return UVideoModule::Get().GetGlobalVideoQuality() != (EVideoQuality)SettingItem_GlobalVideoQuality->GetValue().GetIntegerValue() ||
@@ -179,5 +183,5 @@ bool UWidgetVideoSettingPageBase::CanReset_Implementation() const
 
 FSaveData* UWidgetVideoSettingPageBase::GetDefaultSaveData() const
 {
-	return &USaveGameModuleStatics::GetSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().VideoData;
+	return &USaveGameModuleStatics::GetOrCreateSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().VideoData;
 }

@@ -11,41 +11,28 @@
 
 UWidgetAudioSettingPageBase::UWidgetAudioSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("AudioSettingPage");
-
 	Title = FText::FromString(TEXT("音频"));
 }
 
-void UWidgetAudioSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetAudioSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAudioSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
 	SettingItem_GlobalSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_GlobalSoundVolume->SetValue(UAudioModuleStatics::GetGlobalSoundVolume());
 	AddSettingItem(FName("GlobalSoundVolume"), SettingItem_GlobalSoundVolume, FText::FromString(TEXT("全局")));
 
 	SettingItem_BackgroundSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_BackgroundSoundVolume->SetValue(UAudioModuleStatics::GetBackgroundSoundVolume());
 	AddSettingItem(FName("BackgroundSoundVolume"), SettingItem_BackgroundSoundVolume, FText::FromString(TEXT("背景")));
 
 	SettingItem_EnvironmentSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_EnvironmentSoundVolume->SetValue(UAudioModuleStatics::GetEnvironmentSoundVolume());
 	AddSettingItem(FName("EnvironmentSoundVolume"), SettingItem_EnvironmentSoundVolume, FText::FromString(TEXT("环境")));
 
 	SettingItem_EffectSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("音量大小")), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
-	AddSettingItem(FName("EffectSoundVolume"), SettingItem_EffectSoundVolume, FText::FromString(TEXT("音效")));
-}
-
-void UWidgetAudioSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
-
-	SettingItem_GlobalSoundVolume->SetValue(UAudioModuleStatics::GetGlobalSoundVolume());
-	SettingItem_BackgroundSoundVolume->SetValue(UAudioModuleStatics::GetBackgroundSoundVolume());
-	SettingItem_EnvironmentSoundVolume->SetValue(UAudioModuleStatics::GetEnvironmentSoundVolume());
 	SettingItem_EffectSoundVolume->SetValue(UAudioModuleStatics::GetEffectSoundVolume());
+	AddSettingItem(FName("EffectSoundVolume"), SettingItem_EffectSoundVolume, FText::FromString(TEXT("音效")));
 }
 
 void UWidgetAudioSettingPageBase::OnApply()
@@ -68,9 +55,19 @@ void UWidgetAudioSettingPageBase::OnReset(bool bForce)
 	SettingItem_EffectSoundVolume->SetValue(GetDefaultSaveData()->CastRef<FAudioModuleSaveData>().EffectSoundParams.Volume);
 }
 
-void UWidgetAudioSettingPageBase::OnClose(bool bInstant)
+void UWidgetAudioSettingPageBase::OnActivated()
 {
-	Super::OnClose(bInstant);
+	Super::OnActivated();
+}
+
+void UWidgetAudioSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
+
+	SettingItem_GlobalSoundVolume->SetValue(UAudioModuleStatics::GetGlobalSoundVolume());
+	SettingItem_BackgroundSoundVolume->SetValue(UAudioModuleStatics::GetBackgroundSoundVolume());
+	SettingItem_EnvironmentSoundVolume->SetValue(UAudioModuleStatics::GetEnvironmentSoundVolume());
+	SettingItem_EffectSoundVolume->SetValue(UAudioModuleStatics::GetEffectSoundVolume());
 }
 
 bool UWidgetAudioSettingPageBase::CanApply_Implementation() const
@@ -91,5 +88,5 @@ bool UWidgetAudioSettingPageBase::CanReset_Implementation() const
 
 FSaveData* UWidgetAudioSettingPageBase::GetDefaultSaveData() const
 {
-	return &USaveGameModuleStatics::GetSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().AudioData;
+	return &USaveGameModuleStatics::GetOrCreateSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().AudioData;
 }

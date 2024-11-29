@@ -28,7 +28,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Swim.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
-#include "Camera/CameraModuleStatics.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
@@ -260,9 +259,6 @@ FSaveData* AAbilityCharacterBase::ToData()
 
 	SaveData.ActionAbilities = ActionAbilities;
 
-	SaveData.CameraRotation = UCameraModuleStatics::GetCameraRotation();
-	SaveData.CameraDistance = UCameraModuleStatics::GetCameraDistance();
-
 	return &SaveData;
 }
 
@@ -342,7 +338,7 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
 }
 
 void AAbilityCharacterBase::Static()

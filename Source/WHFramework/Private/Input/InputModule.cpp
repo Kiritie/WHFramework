@@ -356,7 +356,7 @@ void UInputModule::AddTouchMapping(const FInputTouchMapping& InTouchMapping)
 void UInputModule::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
 	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
-	if (!InKey.IsGamepadKey())
+	if (Settings && !InKey.IsGamepadKey())
 	{
 		FMapPlayerKeyArgs Args = {};
 		Args.MappingName = InName;
@@ -425,16 +425,18 @@ TArray<FName> UInputModule::GetAllActionKeyMappingNames(int32 InPlayerIndex)
 TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FPlayerKeyMapping> Mappings;
-	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
-	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
+	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
 	{
-		for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
+		for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
 		{
-			if (Iter2.Value.HasAnyMappings())
+			for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
 			{
-				for (const FPlayerKeyMapping& Mapping : Iter2.Value.Mappings)
+				if (Iter2.Value.HasAnyMappings())
 				{
-					Mappings.Add(Mapping);
+					for (const FPlayerKeyMapping& Mapping : Iter2.Value.Mappings)
+					{
+						Mappings.Add(Mapping);
+					}
 				}
 			}
 		}
@@ -469,14 +471,16 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 		}
 	}
 	TArray<FPlayerKeyMapping> Mappings;
-	const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
-	for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
+	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
 	{
-		if(Iter1.Value->GetPlayerMappingRows().Contains(InName))
+		for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
 		{
-			for (const FPlayerKeyMapping& Iter2 : Iter1.Value->GetPlayerMappingRows()[InName].Mappings)
+			if(Iter1.Value->GetPlayerMappingRows().Contains(InName))
 			{
-				Mappings.Add(Iter2);
+				for (const FPlayerKeyMapping& Iter2 : Iter1.Value->GetPlayerMappingRows()[InName].Mappings)
+				{
+					Mappings.Add(Iter2);
+				}
 			}
 		}
 	}

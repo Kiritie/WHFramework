@@ -822,14 +822,14 @@ EVoxelType UVoxelModule::GetBiomeVoxelType(int32 InX, int32 InY, int32 InZ) cons
 						}
 						break;
 					}
-					case EVoxelDataType::Random:
-					{
-						if(WorldData->RandomStream.FRand() < Iter2.Value.RandomRate && InZ <= GetNoiseHeight(WorldLocation, Iter2.Value.NoiseScale, Iter2.Value.BaseHeight))
-						{
-							return Iter2.Key;
-						}
-						break;
-					}
+					// case EVoxelDataType::Random:
+					// {
+					// 	if(WorldData->RandomStream.FRand() < Iter2.Value.RandomRate && InZ <= GetNoiseHeight(WorldLocation, Iter2.Value.NoiseScale, Iter2.Value.BaseHeight))
+					// 	{
+					// 		return Iter2.Key;
+					// 	}
+					// 	break;
+					// }
 					default: break;
 				}
 			}

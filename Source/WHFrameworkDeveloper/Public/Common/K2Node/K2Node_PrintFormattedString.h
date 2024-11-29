@@ -10,7 +10,7 @@
  * 
  */
 UCLASS()
-class WHFRAMEWORKEDITOR_API UK2Node_PrintFormattedString : public UK2Node
+class WHFRAMEWORKDEVELOPER_API UK2Node_PrintFormattedString : public UK2Node
 {
 GENERATED_BODY()
 

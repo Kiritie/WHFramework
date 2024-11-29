@@ -52,6 +52,16 @@ public:
 	UFUNCTION()
 	virtual void OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
 	
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+	void K2_OnInitialize(const TArray<FParameter>& InParams);
+	UFUNCTION()
+	virtual void OnInitialize(const TArray<FParameter>& InParams);
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset(bool bForce = false);
+	UFUNCTION()
+	virtual void OnReset(bool bForce = false) override;
+
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
 	UFUNCTION()
@@ -63,11 +73,47 @@ public:
 	virtual void OnDestroy(bool bRecovery) override;
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Refresh();
+	virtual void Init(const TArray<FParameter>* InParams);
+	
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
+	virtual void Init(const TArray<FParameter>& InParams);
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void Reset(bool bForce = false) override;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void Destroy(bool bRecovery = false);
+	UFUNCTION(BlueprintCallable)
+	virtual void Refresh() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void Destroy(bool bRecovery = false) override;
+
+public:
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
+	{
+		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
+	}
+
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
+	{
+		return Cast<T>(CreateSubWidget(InClass, InParams));
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), DisplayName = "CreateSubWidget")
+	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams);
+
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
+
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
+
+	UFUNCTION(BlueprintCallable, DisplayName = "DestroyDestroyWidget")
+	bool K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery = false);
+
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void DestroyAllSubWidget(bool bRecovery) override;
 
 protected:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -150,6 +196,8 @@ protected:
 	UPROPERTY()
 	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
 
+	TArray<ISubWidgetInterface*> SubWidgets;
+
 public:
 	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnDestroyed"))
 	FK2_OnWidgetDestroyed K2_OnDestroyed;
@@ -186,7 +234,7 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 	
 	UFUNCTION(BlueprintPure)
-	TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
@@ -218,5 +266,49 @@ public:
 	UPanelWidget* GetRootPanelWidget() const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<UWidget*> GetAllPoolWidgets() const;
+	TArray<UWidget*> GetPoolWidgets() const;
+
+	UFUNCTION(BlueprintPure)
+	virtual int32 GetSubWidgetNum() const override { return SubWidgets.Num(); }
+
+	template<class T>
+	TArray<T*> GetSubWidgets()
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetSubWidgets())
+		{
+			ReturnValues.Add(Cast<T>(Iter));
+		}
+		return ReturnValues;
+	}
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override { return SubWidgets; }
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), DisplayName = "GetSubWidgets")
+	virtual TArray<UUserWidget*> K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass);
+
+	template<class T>
+	T* GetSubWidget(int32 InIndex) const
+	{
+		return Cast<T>(GetSubWidget(InIndex));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UUserWidget* GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const;
+
+	UFUNCTION(BlueprintPure)
+	int32 FindSubWidget(UUserWidget* InWidget) const;
+
+	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const override
+	{
+		if(SubWidgets.IsValidIndex(InIndex))
+		{
+			return SubWidgets[InIndex];
+		}
+		return nullptr;
+	}
+
+	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const override
+	{
+		return SubWidgets.Find(InWidget);
+	}
 };

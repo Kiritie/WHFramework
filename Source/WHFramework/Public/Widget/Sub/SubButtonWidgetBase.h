@@ -2,22 +2,21 @@
 
 #pragma once
 
-#include "Slate/Runtime/Interfaces/BaseWidgetInterface.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/Common/CommonButton.h"
 
-#include "SubWidgetBase.generated.h"
+#include "SubButtonWidgetBase.generated.h"
 
-class UUserWidgetBase;
 /**
  * 
  */
 UCLASS(BlueprintType, meta = (DisableNativeTick))
-class WHFRAMEWORK_API USubWidgetBase : public UCommonButton, public IBaseWidgetInterface
+class WHFRAMEWORK_API USubButtonWidgetBase : public UCommonButton, public ISubWidgetInterface
 {
 	GENERATED_BODY()
 	
 public:
-	USubWidgetBase(const FObjectInitializer& ObjectInitializer);
+	USubButtonWidgetBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -39,14 +38,19 @@ public:
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
-	void K2_OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
+	void K2_OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams);
+	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize(const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual void OnInitialize(const TArray<FParameter>& InParams);
+	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset(bool bForce = false);
+	UFUNCTION()
+	virtual void OnReset(bool bForce = false) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh();
@@ -59,11 +63,14 @@ public:
 	virtual void OnDestroy(bool bRecovery) override;
 
 public:
-	virtual void Init(const TArray<FParameter>* InParams);
+	virtual void Init(const TArray<FParameter>* InParams) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Init(const TArray<FParameter>& InParams);
+	virtual void Init(const TArray<FParameter>& InParams) override;
 	
+	UFUNCTION(BlueprintCallable)
+	virtual void Reset(bool bForce = false) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void Refresh() override;
 
@@ -71,11 +78,10 @@ public:
 	virtual void Destroy(bool bRecovery = false) override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UUserWidgetBase* OwnerWidget;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
 	TArray<FParameter> WidgetParams;
+
+	IPanelWidgetInterface* OwnerWidget;
 
 public:
 	template<class T>
@@ -85,11 +91,11 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UUserWidgetBase* GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass = nullptr) const;
+	virtual UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const override;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }
+	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
-	TArray<UWidget*> GetAllPoolWidgets() const;
+	TArray<UWidget*> GetPoolWidgets() const;
 };

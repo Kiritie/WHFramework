@@ -10,6 +10,7 @@
 #include "World/WorldWidgetBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Input/InputManagerInterface.h"
+#include "Kismet/KismetInternationalizationLibrary.h"
 #include "WidgetModule.generated.h"
 
 class UWorldWidgetContainer;
@@ -50,6 +51,13 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
 public:
 	virtual FString GetModuleDebugMessage() override;
 
@@ -59,6 +67,44 @@ protected:
 
 	UFUNCTION()
 	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
+
+	////////////////////////////////////////////////////
+	// GlobalSettings
+protected:
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	TArray<FLanguageType> LanguageTypes;
+
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	int32 LanguageType;
+
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	float GlobalScale;
+
+public:
+	UFUNCTION(BlueprintPure)
+	TArray<FLanguageType> GetLanguageTypes() const { return LanguageTypes; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes) { LanguageTypes = InLanguageTypes; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetLanguageType() const { return LanguageType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageType(int32 InLanguageType)
+	{
+		LanguageType = InLanguageType;
+		if(LanguageTypes.IsValidIndex(InLanguageType))
+		{
+			UKismetInternationalizationLibrary::SetCurrentCulture(LanguageTypes[LanguageType].LocalCulture);
+		}
+	}
+
+	UFUNCTION(BlueprintPure)
+	float GetGlobalScale() const { return GlobalScale; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetGlobalScale(float InGlobalScale) { GlobalScale = InGlobalScale; }
 
 	////////////////////////////////////////////////////
 	// CommonWidget

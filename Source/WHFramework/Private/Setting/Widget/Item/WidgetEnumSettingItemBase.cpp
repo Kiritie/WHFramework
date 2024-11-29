@@ -17,11 +17,19 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	ComboBox_Value->OnSelectionChanged.AddDynamic(this, &UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged);
 	
 	FString EnumName;
+	TArray<FString> EnumNames;
 	int32 EnumMaxNum = -1;
 
 	if(InParams.IsValidIndex(1))
 	{
-		EnumName = InParams[1].GetStringValue();
+		if(InParams[1].GetParameterType() == EParameterType::String)
+		{
+			EnumName = InParams[1].GetStringValue();
+		}
+		else
+		{
+			EnumNames = InParams[1].GetPointerValueRef<TArray<FString>>();
+		}
 	}
 	if(InParams.IsValidIndex(2))
 	{
@@ -33,6 +41,13 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 		for(int32 i = 0; i < (EnumMaxNum != -1 ? EnumMaxNum : UCommonStatics::GetEnumItemNum(EnumName)); i++)
 		{
 			ComboBox_Value->AddOption(UCommonStatics::GetEnumValueDisplayName(EnumName, i).ToString());
+		}
+	}
+	else
+	{
+		for(int32 i = 0; i < (EnumMaxNum != -1 ? EnumMaxNum : EnumNames.Num()); i++)
+		{
+			ComboBox_Value->AddOption(EnumNames[i]);
 		}
 	}
 }

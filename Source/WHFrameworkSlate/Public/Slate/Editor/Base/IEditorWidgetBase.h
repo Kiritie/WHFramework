@@ -69,9 +69,9 @@ public:
 	virtual bool CanSave() = 0;
 	
 public:
-	virtual void AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) = 0;
+	virtual void AddChild(const TSharedPtr<IEditorWidgetBase>& InWidget) = 0;
 
-	virtual void RemoveChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) = 0;
+	virtual void RemoveChild(const TSharedPtr<IEditorWidgetBase>& InWidget) = 0;
 
 	virtual void RemoveAllChild() = 0;
 

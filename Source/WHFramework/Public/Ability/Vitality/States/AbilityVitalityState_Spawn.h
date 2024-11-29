@@ -6,6 +6,7 @@
 #include "UObject/Object.h"
 #include "AbilityVitalityState_Spawn.generated.h"
 
+class IAbilityVitalityInterface;
 /**
  * 
  */
@@ -34,4 +35,7 @@ public:
 
 protected:
 	virtual void TryLeave();
+
+protected:
+	IAbilityVitalityInterface* Rescuer;
 };

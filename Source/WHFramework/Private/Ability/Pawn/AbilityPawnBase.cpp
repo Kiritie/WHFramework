@@ -249,7 +249,7 @@ void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
 }
 
 void AAbilityPawnBase::Static()

@@ -24,7 +24,7 @@ void UWidgetAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 	Item = FAbilityItem::Empty;
 }
 
-void UWidgetAbilityItemBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 }

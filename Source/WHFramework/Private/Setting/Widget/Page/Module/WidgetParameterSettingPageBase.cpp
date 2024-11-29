@@ -14,17 +14,10 @@
 
 UWidgetParameterSettingPageBase::UWidgetParameterSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("ParameterSettingPage");
-
 	Title = FText::FromString(TEXT("参数"));
 }
 
-void UWidgetParameterSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetParameterSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
@@ -59,11 +52,6 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 			AddSettingItem(Iter.Name, SettingItem, Iter.Category);
 		}
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
 
 	for(auto& Iter : SettingItems)
 	{
@@ -87,6 +75,22 @@ void UWidgetParameterSettingPageBase::OnApply()
 	}
 }
 
+void UWidgetParameterSettingPageBase::OnActivated()
+{
+	Super::OnActivated();
+}
+
+void UWidgetParameterSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
+
+	for(auto& Iter : SettingItems)
+	{
+		FParameter Parameter = UParameterModule::Get().GetParameter(Iter.Key);
+		Iter.Value->SetValue(Parameter);
+	}
+}
+
 void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 {
 	Super::OnReset(bForce);
@@ -96,11 +100,6 @@ void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 		FParameter Parameter = GetDefaultSaveData()->CastRef<FParameterModuleSaveData>().Parameters.GetParameter(Iter.Key);
 		Iter.Value->SetValue(Parameter);
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnClose(bool bInstant)
-{
-	Super::OnClose(bInstant);
 }
 
 bool UWidgetParameterSettingPageBase::CanApply_Implementation() const
@@ -133,5 +132,5 @@ bool UWidgetParameterSettingPageBase::CanReset_Implementation() const
 
 FSaveData* UWidgetParameterSettingPageBase::GetDefaultSaveData() const
 {
-	return &USaveGameModuleStatics::GetSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().ParameterData;
+	return &USaveGameModuleStatics::GetOrCreateSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().ParameterData;
 }

@@ -10,6 +10,7 @@
 #include "Widgets/Layout/Anchors.h"
 #include "PanelWidgetInterface.generated.h"
 
+class ISubWidgetInterface;
 class UPanelWidget;
 
 // This class does not need to be modified.
@@ -26,7 +27,21 @@ class WHFRAMEWORKSLATE_API IPanelWidgetInterface : public IBaseWidgetInterface
 {
 	GENERATED_BODY()
 
-	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
+public:
+	virtual void OnReset(bool bForce = false) = 0;
+
+public:
+	virtual void Reset(bool bForce = false) = 0;
+
+public:
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) = 0;
+
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) = 0;
+
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery = false) = 0;
+
+	virtual void DestroyAllSubWidget(bool bRecovery = false) = 0;
+
 public:
 	virtual FName GetWidgetName() const = 0;
 
@@ -45,6 +60,16 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
 
 	virtual EInputMode GetWidgetInputMode() const = 0;
+
+	virtual int32 GetSubWidgetNum() const = 0;
+
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() = 0;
+
+	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const = 0;
+
+	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const = 0;
+
+	virtual TArray<FParameter> GetWidgetParams() const = 0;
 
 	virtual UObject* GetOwnerObject() const = 0;
 };

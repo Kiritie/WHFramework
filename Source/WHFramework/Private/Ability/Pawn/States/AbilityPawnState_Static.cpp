@@ -35,8 +35,6 @@ void UAbilityPawnState_Static::OnEnter(UFiniteStateBase* InLastState, const TArr
 	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Static);
 
 	Pawn->GetMovementComponent()->SetActive(false);
-	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Pawn->GetInteractionComponent()->SetInteractable(false);
 
 	if(!Pawn->IsPlayer())
 	{
@@ -60,8 +58,6 @@ void UAbilityPawnState_Static::OnLeave(UFiniteStateBase* InNextState)
 	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Static);
 
 	Pawn->GetMovementComponent()->SetActive(true);
-	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Pawn->GetInteractionComponent()->SetInteractable(true);
 
 	if(!Pawn->IsPlayer())
 	{

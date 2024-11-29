@@ -53,7 +53,6 @@ void UProcedureModule::OnInitialize()
 
 	if(DefaultAsset)
 	{
-		DefaultAsset = DefaultAsset->Duplicate<UProcedureAsset>();
 		AddAsset(DefaultAsset);
 	}
 }
@@ -64,10 +63,7 @@ void UProcedureModule::OnPreparatory(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(DefaultAsset)
-		{
-			SwitchAsset(DefaultAsset);
-		}
+		SwitchAsset(DefaultAsset);
 	}
 }
 
@@ -115,7 +111,7 @@ UProcedureAsset* UProcedureModule::GetAsset(UProcedureAsset* InAsset) const
 {
 	for(auto Iter : Assets)
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
+		if(Iter->SourceObject == InAsset)
 		{
 			return Iter;
 		}
@@ -127,6 +123,7 @@ void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
 {
 	if(!GetAsset(InAsset))
 	{
+		InAsset = InAsset->Duplicate<UProcedureAsset>();
 		Assets.Add(InAsset);
 		InAsset->Initialize();
 	}
@@ -142,6 +139,8 @@ void UProcedureModule::RemoveAsset(UProcedureAsset* InAsset)
 
 void UProcedureModule::SwitchAsset(UProcedureAsset* InAsset)
 {
+	if(InAsset && !InAsset->SourceObject) InAsset = GetAsset(InAsset);
+	
 	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
 	CurrentAsset = InAsset;

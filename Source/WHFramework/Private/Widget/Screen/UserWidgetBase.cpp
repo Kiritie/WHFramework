@@ -14,8 +14,8 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Input/InputModuleStatics.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/Animator/WidgetAnimatorBase.h"
-#include "Widget/Screen/SubWidgetBase.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -50,6 +50,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;
 	TemporaryChild = nullptr;
+	SubWidgets = TArray<ISubWidgetInterface*>();
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
@@ -74,7 +75,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	if(ParentWidget)
 	{
-		ParentWidget->RemoveChild(this);
+		ParentWidget->RemoveChildWidget(this);
 	}
 	if(ParentName != NAME_None)
 	{
@@ -86,7 +87,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	}
 	if(ParentWidget)
 	{
-		ParentWidget->AddChild(this);
+		ParentWidget->AddChildWidget(this);
 	}
 
 	if(WidgetOpenAnimator)
@@ -99,7 +100,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 		WidgetCloseAnimator->Execute_OnSpawn(WidgetCloseAnimator, this, {});
 	}
 
-	for(auto Iter : GetAllPoolWidgets())
+	for(auto Iter : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, this, {});
 	}
@@ -119,10 +120,16 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 			}
 		}
 	}
-
-	for(const auto Iter : GetAllSubWidgets())
+	
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
 	{
-		Iter->OnCreate(this, Iter->GetWidgetParams());
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Iter))
+		{
+			SubWidgets.Add(SubWidget);
+			SubWidget->OnCreate(this, SubWidget->GetWidgetParams());
+		}
 	}
 }
 
@@ -315,7 +322,7 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 	}
 	if(ParentWidget)
 	{
-		ParentWidget->RemoveChild(this);
+		ParentWidget->RemoveChildWidget(this);
 	}
 
 	UInputModuleStatics::UpdateGlobalInputMode();
@@ -359,6 +366,15 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams,
 	}
 }
 
+void UUserWidgetBase::Reset(bool bForce)
+{
+	if(bForce)
+	{
+		OwnerObject = nullptr;
+	}
+	OnReset(bForce);
+}
+
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
 	UWidgetModuleStatics::OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
@@ -386,15 +402,6 @@ void UUserWidgetBase::Toggle(bool bInstant)
 	{
 		Close(bInstant);
 	}
-}
-
-void UUserWidgetBase::Reset(bool bForce)
-{
-	if(bForce)
-	{
-		OwnerObject = nullptr;
-	}
-	OnReset(bForce);
 }
 
 void UUserWidgetBase::Refresh()
@@ -471,9 +478,19 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	UInputModuleStatics::UpdateGlobalInputMode();
 }
 
-USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USubWidgetBase> InClass, const TArray<FParameter>& InParams)
+UUserWidget* UUserWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
 {
-	if(USubWidgetBase* SubWidget = UObjectPoolModuleStatics::SpawnObject<USubWidgetBase>(nullptr, nullptr, InClass))
+	return Cast<UUserWidget>(CreateSubWidget(InClass, InParams));
+}
+
+ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
+{
+	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
+}
+
+ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+{
+	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(nullptr, nullptr, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;
@@ -481,32 +498,52 @@ USubWidgetBase* UUserWidgetBase::CreateSubWidget_Implementation(TSubclassOf<USub
 	return nullptr;
 }
 
-bool UUserWidgetBase::DestroySubWidget_Implementation(USubWidgetBase* InWidget, bool bRecovery)
+bool UUserWidgetBase::K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery)
+{
+	return DestroySubWidget(Cast<ISubWidgetInterface>(InWidget), bRecovery);
+}
+
+bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
 {
 	if(!InWidget) return false;
 
 	InWidget->OnDestroy(bRecovery);
 
-	UObjectPoolModuleStatics::DespawnObject(InWidget, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(Cast<UUserWidget>(InWidget), bRecovery);
 	return true;
 }
 
-TArray<USubWidgetBase*> UUserWidgetBase::GetAllSubWidgets() const
+void UUserWidgetBase::DestroyAllSubWidget(bool bRecovery)
 {
-	TArray<USubWidgetBase*> SubWidgets;
-	TArray<UWidget*> Widgets;
-	WidgetTree->GetAllWidgets(Widgets);
-	for(auto Iter : Widgets)
+	for(auto Iter : SubWidgets)
 	{
-		if(USubWidgetBase* SubWidget = Cast<USubWidgetBase>(Iter))
-		{
-			SubWidgets.Add(SubWidget);
-		}
+		Iter->Destroy();
 	}
-	return SubWidgets;
+	SubWidgets.Empty();
 }
 
-TArray<UWidget*> UUserWidgetBase::GetAllPoolWidgets() const
+void UUserWidgetBase::AddChildWidget(IScreenWidgetInterface* InWidget)
+{
+	if(!ChildWidgets.Contains(InWidget))
+	{
+		ChildWidgets.Add(InWidget);
+	}
+}
+
+void UUserWidgetBase::RemoveChildWidget(IScreenWidgetInterface* InWidget)
+{
+	if(ChildWidgets.Contains(InWidget))
+	{
+		ChildWidgets.Remove(InWidget);
+	}
+}
+
+void UUserWidgetBase::RemoveAllChildWidget()
+{
+	ChildWidgets.Empty();
+}
+
+TArray<UWidget*> UUserWidgetBase::GetPoolWidgets() const
 {
 	TArray<UWidget*> PoolWidgets;
 	TArray<UWidget*> Widgets;
@@ -521,25 +558,34 @@ TArray<UWidget*> UUserWidgetBase::GetAllPoolWidgets() const
 	return PoolWidgets;
 }
 
-void UUserWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)
+TArray<UUserWidget*> UUserWidgetBase::K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass)
 {
-	if(!ChildWidgets.Contains(InChildWidget))
+	TArray<UUserWidget*> ReturnValues;
+	for(auto Iter : SubWidgets)
 	{
-		ChildWidgets.Add(InChildWidget);
+		ReturnValues.Add(GetDeterminesOutputObject(Cast<UUserWidget>(Iter), InClass));
 	}
+	return ReturnValues;
 }
 
-void UUserWidgetBase::RemoveChild(IScreenWidgetInterface* InChildWidget)
+UUserWidget* UUserWidgetBase::GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const
 {
-	if(ChildWidgets.Contains(InChildWidget))
-	{
-		ChildWidgets.Remove(InChildWidget);
-	}
+	return GetDeterminesOutputObject(Cast<UUserWidget>(GetSubWidget(InIndex)), InClass);
 }
 
-void UUserWidgetBase::RemoveAllChild()
+int32 UUserWidgetBase::FindSubWidget(UUserWidget* InWidget) const
 {
-	ChildWidgets.Empty();
+	return FindSubWidget(Cast<ISubWidgetInterface>(InWidget));
+}
+
+TArray<UUserWidgetBase*> UUserWidgetBase::K2_GetChildWidgets(TSubclassOf<UUserWidgetBase> InClass)
+{
+	TArray<UUserWidgetBase*> ReturnValues;
+	for(auto Iter : ChildWidgets)
+	{
+		ReturnValues.Add(GetDeterminesOutputObject(Cast<UUserWidgetBase>(Iter), InClass));
+	}
+	return ReturnValues;
 }
 
 UWidgetAnimatorBase* UUserWidgetBase::GetWidgetOpenAnimator(TSubclassOf<UWidgetAnimatorBase> InClass) const

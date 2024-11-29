@@ -4,6 +4,7 @@
 
 
 #include "Audio/AudioModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AudioModuleStatics.generated.h"
 
@@ -14,8 +15,22 @@ UCLASS()
 class WHFRAMEWORK_API UAudioModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
+	
 public:
+	////////////////////////////////////////////////////
+	// GlobalSettings
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static TArray<FLanguageType> GetAudioLanguageTypes();
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetAudioLanguageTypes(const TArray<FLanguageType>& InLanguageTypes);
+
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static int32 GetAudioLanguageType();
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetAudioLanguageType(int32 InLanguageType);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
@@ -49,7 +64,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
-public:
 	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
 	static float GetGlobalSoundVolume();
 

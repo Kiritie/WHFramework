@@ -7,6 +7,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "InputModuleStatics.generated.h"
 
+class UInputManagerBase;
 class UInputActionBase;
 class UEnhancedInputLocalPlayerSubsystem;
 class UInputUserSettingsBase;

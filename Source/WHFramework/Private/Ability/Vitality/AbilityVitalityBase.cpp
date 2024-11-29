@@ -127,7 +127,7 @@ void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
 }
 
 void AAbilityVitalityBase::Static()

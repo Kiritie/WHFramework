@@ -58,7 +58,6 @@ void UStepModule::OnInitialize()
 
 	if(DefaultAsset)
 	{
-		DefaultAsset = DefaultAsset->Duplicate<UStepAsset>();
 		AddAsset(DefaultAsset);
 	}
 }
@@ -69,10 +68,7 @@ void UStepModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(DefaultAsset)
-		{
-			SwitchAsset(DefaultAsset);
-		}
+		SwitchAsset(DefaultAsset);
 	}
 }
 
@@ -148,7 +144,7 @@ UStepAsset* UStepModule::GetAsset(UStepAsset* InAsset) const
 {
 	for(auto Iter : Assets)
 	{
-		if(Iter->SourceObject == InAsset->SourceObject)
+		if(Iter->SourceObject == InAsset)
 		{
 			return Iter;
 		}
@@ -160,6 +156,7 @@ void UStepModule::AddAsset(UStepAsset* InAsset)
 {
 	if(!GetAsset(InAsset))
 	{
+		InAsset = InAsset->Duplicate<UStepAsset>();
 		Assets.Add(InAsset);
 		InAsset->Initialize();
 	}
@@ -175,6 +172,8 @@ void UStepModule::RemoveAsset(UStepAsset* InAsset)
 
 void UStepModule::SwitchAsset(UStepAsset* InAsset)
 {
+	if(InAsset && !InAsset->SourceObject) InAsset = GetAsset(InAsset);
+	
 	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
 
 	CurrentAsset = InAsset;

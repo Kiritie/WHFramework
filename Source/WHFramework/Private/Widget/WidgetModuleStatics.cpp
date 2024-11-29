@@ -5,6 +5,36 @@
 
 #include "Widget/Common/CommonToolTip.h"
 
+TArray<FLanguageType> UWidgetModuleStatics::GetWidgetLanguageTypes()
+{
+	return UWidgetModule::Get().GetLanguageTypes();
+}
+
+void UWidgetModuleStatics::SetWidgetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes)
+{
+	UWidgetModule::Get().SetLanguageTypes(InLanguageTypes);
+}
+
+int32 UWidgetModuleStatics::GetWidgetLanguageType()
+{
+	return UWidgetModule::Get().GetLanguageType();
+}
+
+void UWidgetModuleStatics::SetWidgetLanguageType(int32 InLanguageType)
+{
+	UWidgetModule::Get().SetLanguageType(InLanguageType);
+}
+
+float UWidgetModuleStatics::GetWidgetGlobalScale()
+{
+	return UWidgetModule::Get().GetGlobalScale();
+}
+
+void UWidgetModuleStatics::SetWidgetGlobalScale(float InGlobalScale)
+{
+	UWidgetModule::Get().SetGlobalScale(InGlobalScale);
+}
+
 UDataTable* UWidgetModuleStatics::GetCommonRichTextStyle()
 {
 	return UWidgetModule::Get().GetCommonRichTextStyle();

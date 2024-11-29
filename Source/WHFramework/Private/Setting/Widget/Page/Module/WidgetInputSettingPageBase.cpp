@@ -13,17 +13,10 @@
 
 UWidgetInputSettingPageBase::UWidgetInputSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("InputSettingPage");
-
 	Title = FText::FromString(TEXT("输入"));
 }
 
-void UWidgetInputSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetInputSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
@@ -50,11 +43,6 @@ void UWidgetInputSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParam
 			}
 		}
 	}
-}
-
-void UWidgetInputSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
 
 	for(auto& Iter : ShortcutSettingItems)
 	{
@@ -110,6 +98,38 @@ void UWidgetInputSettingPageBase::OnApply()
 	}
 }
 
+void UWidgetInputSettingPageBase::OnActivated()
+{
+	Super::OnActivated();
+}
+
+void UWidgetInputSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
+
+	for(auto& Iter : ShortcutSettingItems)
+	{
+		FInputKeyShortcut& KeyShortcut = UInputModule::Get().GetKeyShortcuts()[FGameplayTag::RequestGameplayTag(Iter.Key)];
+		TArray<FParameter> Values;
+		for(auto& Iter2 : KeyShortcut.Keys)
+		{
+			Values.Add(Iter2);
+		}
+		Iter.Value->SetValues(Values);
+	}
+
+	for(auto& Iter1 : MappingSettingItems)
+	{
+		TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByName(Iter1.Key);
+		TArray<FParameter> Values;
+		for(auto& Iter2 : Mappings)
+		{
+			Values.Add(Iter2.GetCurrentKey());
+		}
+		Iter1.Value->SetValues(Values);
+	}
+}
+
 void UWidgetInputSettingPageBase::OnReset(bool bForce)
 {
 	Super::OnReset(bForce);
@@ -135,16 +155,6 @@ void UWidgetInputSettingPageBase::OnReset(bool bForce)
 		}
 		Iter.Value->SetValues(Values);
 	}
-}
-
-void UWidgetInputSettingPageBase::OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues)
-{
-	Super::OnValuesChange(InSettingItem, InValues);
-}
-
-void UWidgetInputSettingPageBase::OnClose(bool bInstant)
-{
-	Super::OnClose(bInstant);
 }
 
 bool UWidgetInputSettingPageBase::CanApply_Implementation() const
@@ -244,5 +254,5 @@ void UWidgetInputSettingPageBase::ClearSettingItems_Implementation()
 
 FSaveData* UWidgetInputSettingPageBase::GetDefaultSaveData() const
 {
-	return &USaveGameModuleStatics::GetSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().InputData;
+	return &USaveGameModuleStatics::GetOrCreateSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().InputData;
 }

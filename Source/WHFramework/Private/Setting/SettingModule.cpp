@@ -10,6 +10,7 @@
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
 #include "Video/VideoModule.h"
+#include "Widget/WidgetModule.h"
 
 IMPLEMENTATION_MODULE(USettingModule)
 
@@ -77,6 +78,7 @@ void USettingModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FSettingModuleSaveData>();
 
+	UWidgetModule::Get().LoadSaveData(&SaveData.WidgetData, InPhase);
 	UAudioModule::Get().LoadSaveData(&SaveData.AudioData, InPhase);
 	UVideoModule::Get().LoadSaveData(&SaveData.VideoData, InPhase);
 	UCameraModule::Get().LoadSaveData(&SaveData.CameraData, InPhase);
@@ -93,6 +95,7 @@ FSaveData* USettingModule::ToData()
 	static FSettingModuleSaveData SaveData;
 	SaveData = FSettingModuleSaveData();
 
+	SaveData.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);
 	SaveData.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
 	SaveData.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
 	SaveData.CameraData = UCameraModule::Get().GetSaveDataRef<FCameraModuleSaveData>(true);

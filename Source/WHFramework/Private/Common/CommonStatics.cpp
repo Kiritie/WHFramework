@@ -17,7 +17,6 @@
 #include "Event/Handle/Common/Game/EventHandle_GamePaused.h"
 #include "Event/Handle/Common/Game/EventHandle_GameUnPaused.h"
 #include "Gameplay/WHLocalPlayer.h"
-#include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
 #include "Main/MainModule.h"
@@ -346,6 +345,7 @@ bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncNam
 
 bool UCommonStatics::IsClassHasChildren(const UClass* InClass, EClassFlags InDisabledFlags)
 {
+	return false;
 	return !GetClassChildren(InClass, false, InDisabledFlags).IsEmpty();
 }
 
@@ -538,7 +538,7 @@ TArray<UWHLocalPlayer*> UCommonStatics::GetLocalPlayers()
 UWHLocalPlayer* UCommonStatics::GetLocalPlayer(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
 	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
-	if(ensureEditorMsgf(LocalPlayers.IsValidIndex(InPlayerIndex), TEXT("WHLocalPlayer with no valid index"), EDC_Default, EDV_Error))
+	if(LocalPlayers.IsValidIndex(InPlayerIndex))
 	{
 		return GetDeterminesOutputObject(LocalPlayers[InPlayerIndex], InClass);
 	}

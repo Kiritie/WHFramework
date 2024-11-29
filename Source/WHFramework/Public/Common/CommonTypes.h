@@ -83,6 +83,26 @@ enum class EInteractAgentType : uint8
 	Initiative = 2 UMETA(DisplayName="主动的")
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FLanguageType
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FLanguageType()
+	{
+		DisplayName = TEXT("");
+		LocalCulture = TEXT("");
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString LocalCulture;
+};
+
 //////////////////////////////////////////////////////////////////////////
 // Property
 #define GET_MEMBER_PROPERTY(ClassName, PropertyName) \

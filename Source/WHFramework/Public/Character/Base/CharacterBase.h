@@ -178,6 +178,12 @@ protected:
 	AController* DefaultController;
 	
 public:
+	template<class T>
+	T* GetDefaultController() const
+	{
+		return Cast<T>(DefaultController);
+	}
+	
 	virtual AController* GetDefaultController() const override { return DefaultController; }
 
 	virtual bool IsUseControllerRotation() const override;

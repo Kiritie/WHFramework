@@ -11,6 +11,7 @@
 #include "Common/CommonStatics.h"
 #include "Input/InputModuleStatics.h"
 #include "Scene/SceneManager.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetComponent.h"
@@ -62,7 +63,6 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
-	WidgetParams = InParams;
 	
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
@@ -129,10 +129,36 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 		}
 	}
 
-	for(auto Iter : GetAllPoolWidgets())
+	for(auto Iter : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
 	}
+	
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Iter))
+		{
+			SubWidgets.Add(SubWidget);
+			SubWidget->OnCreate(this, SubWidget->GetWidgetParams());
+		}
+	}
+
+	OnInitialize(InParams);
+}
+
+void UWorldWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
+{
+	WidgetParams = InParams;
+	K2_OnInitialize(InParams);
+
+	OnRefresh();
+}
+
+void UWorldWidgetBase::OnReset(bool bForce)
+{
+	K2_OnReset(bForce);
 }
 
 void UWorldWidgetBase::OnRefresh()
@@ -173,36 +199,75 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	K2_OnDestroy(bRecovery);
 }
 
-void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
+void UWorldWidgetBase::Init(const TArray<FParameter>* InParams)
 {
-	if(GetWidgetSpace() == EWidgetSpace::Screen)
-	{
-		if(BindWidgetMap.Contains(this))
-		{
-			RefreshLocation(this, BindWidgetMap[this]);
-		}
-		if(BindWidgetMap.Num() > 1)
-		{
-			for(const auto& Iter : BindWidgetMap)
-			{
-				if(Iter.Key == this) continue;
-				RefreshLocation(Iter.Key, Iter.Value);
-			}
-		}
-		RefreshVisibility();
-	}
+	Init(InParams ? *InParams : TArray<FParameter>());
 }
 
-void UWorldWidgetBase::Refresh_Implementation()
+void UWorldWidgetBase::Init(const TArray<FParameter>& InParams)
+{
+	OnInitialize(InParams);
+}
+
+void UWorldWidgetBase::Reset(bool bForce)
+{
+	OnReset(bForce);
+}
+
+void UWorldWidgetBase::Refresh()
 {
 	if(WidgetRefreshType == EWidgetRefreshType::None) return;
 
 	OnRefresh();
 }
 
-void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
+void UWorldWidgetBase::Destroy(bool bRecovery)
 {
 	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
+}
+
+UUserWidget* UWorldWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+{
+	return Cast<UUserWidget>(CreateSubWidget(InClass, InParams));
+}
+
+ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
+{
+	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
+}
+
+ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+{
+	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(nullptr, nullptr, InClass))
+	{
+		SubWidget->OnCreate(this, InParams);
+		return SubWidget;
+	}
+	return nullptr;
+}
+
+bool UWorldWidgetBase::K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery)
+{
+	return DestroySubWidget(Cast<ISubWidgetInterface>(InWidget), bRecovery);
+}
+
+bool UWorldWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
+{
+	if(!InWidget) return false;
+
+	InWidget->OnDestroy(bRecovery);
+
+	UObjectPoolModuleStatics::DespawnObject(Cast<UUserWidget>(InWidget), bRecovery);
+	return true;
+}
+
+void UWorldWidgetBase::DestroyAllSubWidget(bool bRecovery)
+{
+	for(auto Iter : SubWidgets)
+	{
+		Iter->Destroy();
+	}
+	SubWidgets.Empty();
 }
 
 void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
@@ -221,6 +286,26 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 void UWorldWidgetBase::RefreshVisibility_Implementation()
 {
 	SetVisibility(IsWidgetVisible(true) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+}
+
+void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
+{
+	if(GetWidgetSpace() == EWidgetSpace::Screen)
+	{
+		if(BindWidgetMap.Contains(this))
+		{
+			RefreshLocation(this, BindWidgetMap[this]);
+		}
+		if(BindWidgetMap.Num() > 1)
+		{
+			for(const auto& Iter : BindWidgetMap)
+			{
+				if(Iter.Key == this) continue;
+				RefreshLocation(Iter.Key, Iter.Value);
+			}
+		}
+		RefreshVisibility();
+	}
 }
 
 void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
@@ -312,7 +397,7 @@ UPanelWidget* UWorldWidgetBase::GetRootPanelWidget() const
 	return Cast<UPanelWidget>(GetRootWidget());
 }
 
-TArray<UWidget*> UWorldWidgetBase::GetAllPoolWidgets() const
+TArray<UWidget*> UWorldWidgetBase::GetPoolWidgets() const
 {
 	TArray<UWidget*> PoolWidgets;
 	TArray<UWidget*> Widgets;
@@ -325,4 +410,24 @@ TArray<UWidget*> UWorldWidgetBase::GetAllPoolWidgets() const
 		}
 	}
 	return PoolWidgets;
+}
+
+TArray<UUserWidget*> UWorldWidgetBase::K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass)
+{
+	TArray<UUserWidget*> ReturnValues;
+	for(auto Iter : SubWidgets)
+	{
+		ReturnValues.Add(GetDeterminesOutputObject(Cast<UUserWidget>(Iter), InClass));
+	}
+	return ReturnValues;
+}
+
+UUserWidget* UWorldWidgetBase::GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<UUserWidget>(GetSubWidget(InIndex)), InClass);
+}
+
+int32 UWorldWidgetBase::FindSubWidget(UUserWidget* InWidget) const
+{
+	return FindSubWidget(Cast<ISubWidgetInterface>(InWidget));
 }

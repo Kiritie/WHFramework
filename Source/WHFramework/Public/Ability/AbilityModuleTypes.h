@@ -392,9 +392,9 @@ enum class EAbilityItemRarity : uint8
 	// 无
 	None,
 	// 普通
-	Normal,
-	// 精良
-	Superior,
+	Common,
+	// 非凡
+	Uncommon,
 	// 稀有
 	Rare,
 	// 史诗
@@ -402,7 +402,7 @@ enum class EAbilityItemRarity : uint8
 	// 传奇
 	Legendary,
 	// 神话
-	Mythic
+	Mythical
 };
 
 USTRUCT(BlueprintType)
@@ -853,6 +853,14 @@ public:
 	TArray<UWidgetAbilityInventorySlotBase*> Slots;
 };
 
+UENUM(BlueprintType)
+enum class EAbilityItemFillType : uint8
+{
+	Fixed,
+	Random,
+	Rate
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAbilityItemFillItem
 {
@@ -881,6 +889,10 @@ public:
 	FORCEINLINE FAbilityItemFillRule()
 	{
 		Rate = 0.f;
+		Type = EAbilityItemFillType::Fixed;
+		Num = 0;
+		MinNum = 0;
+		MaxNum = 0;
 		Items = TArray<FAbilityItemFillItem>();
 	}
 
@@ -888,6 +900,18 @@ public:
 	float Rate;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	EAbilityItemFillType Type;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Fixed"))
+	int32 Num;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MinNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MaxNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Rate"))
 	TArray<FAbilityItemFillItem> Items;
 };
 
@@ -1220,20 +1244,9 @@ struct WHFRAMEWORK_API FCharacterSaveData : public FPawnSaveData
 public:
 	FORCEINLINE FCharacterSaveData()
 	{
-		CameraRotation = FRotator::ZeroRotator;
-		CameraDistance = -1.f;
 	}
 
 	FORCEINLINE FCharacterSaveData(const FPawnSaveData& InPawnSaveData) : FPawnSaveData(InPawnSaveData)
 	{
-		CameraRotation = FRotator(-1.f);
-		CameraDistance = -1.f;
 	}
-
-public:
-	UPROPERTY()
-	FRotator CameraRotation;
-
-	UPROPERTY()
-	float CameraDistance;
 };

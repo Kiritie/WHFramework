@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-
+#include "SaveGame/SaveGameModuleTypes.h"
 
 #include "WidgetModuleTypes.generated.h"
 
@@ -40,10 +40,10 @@ public:
 	}
 	
 public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<class UWorldWidgetBase*> WorldWidgets;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bVisible;
 };
 
@@ -84,4 +84,24 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	FVector Location;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FWidgetModuleSaveData()
+	{
+		LanguageType = 0;
+		GlobalScale = 1.f;
+	}
+
+public:
+	UPROPERTY()
+	int32 LanguageType;
+
+	UPROPERTY()
+	float GlobalScale;
 };

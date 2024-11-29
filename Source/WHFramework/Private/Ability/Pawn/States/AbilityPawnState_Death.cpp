@@ -9,6 +9,8 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
 {
@@ -35,6 +37,8 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 	{
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 

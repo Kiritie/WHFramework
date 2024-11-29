@@ -30,6 +30,9 @@ UAudioModule::UAudioModule()
 	
 	ModuleNetworkComponent = UAudioModuleNetworkComponent::StaticClass();
 
+	LanguageTypes = TArray<FLanguageType>();
+	LanguageType = 0;
+
 	static ConstructorHelpers::FObjectFinder<USoundMix> GlobalSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Global.SCM_Global'"));
 	if(GlobalSoundMixFinder.Succeeded())
 	{

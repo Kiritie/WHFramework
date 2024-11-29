@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Widget/Screen/SubWidgetBase.h"
+#include "Widget/Sub/SubWidgetBase.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Widget/Screen/UserWidgetBase.h"
@@ -15,13 +15,11 @@ USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Su
 
 void USubWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	
 }
 
 void USubWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	Super::OnDespawn_Implementation(bRecovery);
-	
 	OwnerWidget = nullptr;
 }
 
@@ -30,11 +28,11 @@ void USubWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	
 }
 
-void USubWidgetBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void USubWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
-	OwnerWidget = InOwner;
+	OwnerWidget = Cast<IPanelWidgetInterface>(InOwner);
 
-	for(auto Iter : GetAllPoolWidgets())
+	for(auto Iter : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
 	}
@@ -50,6 +48,11 @@ void USubWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
 	K2_OnInitialize(InParams);
 
 	OnRefresh();
+}
+
+void USubWidgetBase::OnReset(bool bForce)
+{
+	K2_OnReset(bForce);
 }
 
 void USubWidgetBase::OnRefresh()
@@ -72,6 +75,11 @@ void USubWidgetBase::Init(const TArray<FParameter>& InParams)
 	OnInitialize(InParams);
 }
 
+void USubWidgetBase::Reset(bool bForce)
+{
+	OnReset(bForce);
+}
+
 void USubWidgetBase::Refresh()
 {
 	OnRefresh();
@@ -85,12 +93,12 @@ void USubWidgetBase::Destroy(bool bRecovery)
 	}
 }
 
-UUserWidgetBase* USubWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidgetBase> InClass) const
+UUserWidget* USubWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidget> InClass) const
 {
-	return GetDeterminesOutputObject(OwnerWidget, InClass);
+	return GetDeterminesOutputObject(Cast<UUserWidget>(OwnerWidget), InClass);
 }
 
-TArray<UWidget*> USubWidgetBase::GetAllPoolWidgets() const
+TArray<UWidget*> USubWidgetBase::GetPoolWidgets() const
 {
 	TArray<UWidget*> PoolWidgets;
 	TArray<UWidget*> Widgets;

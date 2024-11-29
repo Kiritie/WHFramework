@@ -47,7 +47,7 @@ public:
 
 public:
 	/** Adds a new pin to the node */
-	WHFRAMEWORKEDITOR_API void AddArgumentPin();
+	WHFRAMEWORKDEVELOPER_API void AddArgumentPin();
 
 	/** Returns the number of arguments currently available in the node */
 	int32 GetArgumentCount() const { return PinNames.Num(); }
@@ -58,10 +58,10 @@ public:
 	 * @param InIndex		The argument's index to find the name for
 	 * @return				Returns the argument's name if available
 	 */
-	WHFRAMEWORKEDITOR_API FText GetArgumentName(int32 InIndex) const;
+	WHFRAMEWORKDEVELOPER_API FText GetArgumentName(int32 InIndex) const;
 
 	/** Removes the argument at a given index */
-	WHFRAMEWORKEDITOR_API void RemoveArgument(int32 InIndex);
+	WHFRAMEWORKDEVELOPER_API void RemoveArgument(int32 InIndex);
 
 	/**
 	 * Sets an argument name
@@ -69,13 +69,13 @@ public:
 	 * @param InIndex		The argument's index to find the name for
 	 * @param InName		Name to set the argument to
 	 */
-	WHFRAMEWORKEDITOR_API void SetArgumentName(int32 InIndex, FName InName);
+	WHFRAMEWORKDEVELOPER_API void SetArgumentName(int32 InIndex, FName InName);
 
 	/** Swaps two arguments by index */
-	WHFRAMEWORKEDITOR_API void SwapArguments(int32 InIndexA, int32 InIndexB);
+	WHFRAMEWORKDEVELOPER_API void SwapArguments(int32 InIndexA, int32 InIndexB);
 
 	/** returns Format pin */
-	WHFRAMEWORKEDITOR_API UEdGraphPin* GetFormatPin() const;
+	WHFRAMEWORKDEVELOPER_API UEdGraphPin* GetFormatPin() const;
 
 	/** Returns TRUE if the arguments are allowed to be edited */
 	bool CanEditArguments() const { return GetFormatPin()->LinkedTo.Num() > 0; }
@@ -86,7 +86,7 @@ public:
 	 * @param InPinName		The pin name to check for
 	 * @return				NULL if the pin was not found, otherwise the found pin.
 	 */
-	WHFRAMEWORKEDITOR_API UEdGraphPin* FindArgumentPin(const FName InPinName) const;
+	WHFRAMEWORKDEVELOPER_API UEdGraphPin* FindArgumentPin(const FName InPinName) const;
 
 private:
 	/** Synchronize the type of the given argument pin with the type its connected to, or reset it to a wildcard pin if there's no connection */

@@ -40,7 +40,7 @@ void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 	StopCooldown();
 }
 
-void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 

@@ -7,6 +7,8 @@
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
 
 UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 {
@@ -33,6 +35,8 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 	{
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 

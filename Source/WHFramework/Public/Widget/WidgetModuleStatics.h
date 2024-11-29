@@ -16,10 +16,30 @@ UCLASS()
 class WHFRAMEWORK_API UWidgetModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+	
+public:
+	////////////////////////////////////////////////////
+	// GlobalSettings
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static TArray<FLanguageType> GetWidgetLanguageTypes();
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetWidgetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes);
+
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static int32 GetWidgetLanguageType();
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetWidgetLanguageType(int32 InLanguageType);
+
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
+	static float GetWidgetGlobalScale();
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
+	static void SetWidgetGlobalScale(float InGlobalScale);
 
 	////////////////////////////////////////////////////
 	// CommonWidget
-public:
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
 	static UDataTable* GetCommonRichTextStyle();
 
@@ -46,7 +66,6 @@ public:
 
 	////////////////////////////////////////////////////
 	// ScreenWidget
-public:
 	template<class T>
 	static T* GetTemporaryUserWidget()
 	{
@@ -255,7 +274,6 @@ public:
 
 	////////////////////////////////////////////////////
 	// SlateWidget
-public:
 	template<class T>
 	static TSharedPtr<T> GetSlateWidget()
 	{
@@ -302,7 +320,6 @@ public:
 	
 	////////////////////////////////////////////////////
 	// WorldWidget
-public:
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
 	static UWorldWidgetContainer* GetWorldWidgetContainer();
 

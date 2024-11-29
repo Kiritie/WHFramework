@@ -144,12 +144,29 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 			if(ParityRate <= Iter2.Value.Rate)
 			{
 				ItemParity = Iter2.Key;
-				const float ItemRate = InRandomStream.FRand();
-				for(auto& Iter3 : Iter2.Value.Items)
+				switch(Iter2.Value.Type)
 				{
-					if(ItemRate < Iter3.Rate)
+					case EAbilityItemFillType::Fixed:
 					{
-						ItemNum = Iter3.Num;
+						ItemNum = Iter2.Value.Num;
+						break;
+					}
+					case EAbilityItemFillType::Random:
+					{
+						ItemNum = InRandomStream.RandRange(Iter2.Value.MinNum, Iter2.Value.MaxNum);
+						break;
+					}
+					case EAbilityItemFillType::Rate:
+					{
+						const float ItemRate = InRandomStream.FRand();
+						for(auto& Iter3 : Iter2.Value.Items)
+						{
+							if(ItemRate < Iter3.Rate)
+							{
+								ItemNum = Iter3.Num;
+								break;
+							}
+						}
 						break;
 					}
 				}
@@ -179,8 +196,8 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 			{
 				if(ItemDatas.IsEmpty()) break;
 
-				const int32 Index = FMath::RandRange(0, ItemDatas.Num() - 1);
-				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), 1, ItemDatas[Index]->ClampLevel(InLevel)));
+				const int32 Index = InRandomStream.RandRange(0, ItemDatas.Num() - 1);
+				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), InRandomStream.RandRange(1, FMath::CeilToInt(ItemDatas[Index]->MaxCount * (1.f / (int32)ItemParity))), ItemDatas[Index]->ClampLevel(InLevel)));
 				ItemDatas.RemoveAt(Index);
 			}
 		}

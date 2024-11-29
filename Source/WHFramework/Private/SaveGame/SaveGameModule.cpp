@@ -20,7 +20,6 @@ USaveGameModule::USaveGameModule()
 
 	bModuleRequired = true;
 
-	bModuleAutoSave = true;
 	ModuleSavePhase = EPhase::Primary;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 

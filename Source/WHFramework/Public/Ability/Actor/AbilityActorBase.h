@@ -179,7 +179,7 @@ public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
 	
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
-		
+	
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameA() const override { return Name; }
 
